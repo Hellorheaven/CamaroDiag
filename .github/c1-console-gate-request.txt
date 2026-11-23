@@ -29,3 +29,8 @@ Consolidated USB permission failure classification regression checkpoint.
 Source SHA: b70a97783da729baee23d086b873a98aaee2ed70
 Tests: communication/diagnostic/app Android Debug, Windows bridge Debug self-test; no per-commit runs.
 No hardware ECU, ISO/SAE protocol change, merge or Release.
+
+Grouped C1/C2/C4/C6 connector and bridge integration regression checkpoint — 23 Nov 2026.
+Source HEAD before checkpoint: 13e5c5650a849c36eeaa945cb4604348a33b57c9
+Unit scope: Android communication/diagnostic/app including DTC consent VIN/session guard, C2 archive, USB and J2534 tests; Windows J2534 Debug self-test.
+This is not the final C8 gate, a vehicle qualification, a Release or a merge.
