@@ -8,6 +8,7 @@ internal static class J1939FdCmdtSelfTests
         internal readonly Queue<IsoTpCanFdSession.CanFrame> RX = new();
         internal readonly List<IsoTpCanFdSession.CanFrame> TX = [];
         internal readonly List<TimeSpan> ReceiveTimeouts = [];
+        internal bool SimulateOneLongWaitTimeout;
         public Task SendAsync(IsoTpCanFdSession.CanFrame frame, CancellationToken token)
         {
             token.ThrowIfCancellationRequested();
@@ -18,6 +19,11 @@ internal static class J1939FdCmdtSelfTests
         {
             token.ThrowIfCancellationRequested();
             ReceiveTimeouts.Add(timeout);
+            if (SimulateOneLongWaitTimeout)
+            {
+                SimulateOneLongWaitTimeout = false;
+                throw new TimeoutException("Simulated J2534 30-second wait chunk.");
+            }
             if (RX.Count == 0) throw new TimeoutException("No simulated FD.TP frame.");
             return Task.FromResult(RX.Dequeue());
         }
@@ -228,6 +234,21 @@ internal static class J1939FdCmdtSelfTests
                 J1939FdTransportFrames.ControlPgn &&
             (frame.Data[0] & 0x0F) == J1939FdTransportFrames.ConnectionAbort),
             "Corrupt final padding sends abort instead of EOM_ACK.");
+
+        var longRtsWait = new FakeLink { SimulateOneLongWaitTimeout = true };
+        foreach (var frame in tx.TX)
+        {
+            var id = StandardVehicleProtocols.ParseJ1939Id(frame.Id);
+            longRtsWait.RX.Enqueue(new(
+                J1939ClassicTpSession.ArbitrationId(
+                    id.Pgn, (byte)id.Priority, o.Peer, o.Local),
+                true, frame.Data.ToArray()));
+        }
+        Check(J1939FdCmdtSession.ReceiveAsync(longRtsWait, o,
+                TimeSpan.FromSeconds(31), CancellationToken.None)
+                .GetAwaiter().GetResult().SequenceEqual(Fill(131)) &&
+            longRtsWait.ReceiveTimeouts.Count >= 2,
+            "CMDT RTS discovery continues after one 30-second vendor wait under global deadline.");
 
         var noCts = new FakeLink();
         Reject<TimeoutException>(() => Send(noCts, o, Fill(131)),
