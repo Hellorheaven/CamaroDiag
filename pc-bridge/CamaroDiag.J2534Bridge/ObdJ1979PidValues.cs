@@ -29,9 +29,10 @@ internal static class ObdJ1979PidValues
             throw new InvalidDataException("PID or freeze-frame reply identity differs.");
         var values = result.Data.AsSpan(offset);
         var pid = request[1];
-        var needed = pid is 0x0C or 0x10 ? 2 : 1;
-        if (pid is not (0x05 or 0x06 or 0x07 or 0x08 or 0x09 or
-            0x0C or 0x0D or 0x10 or 0x11 or 0x52))
+        var needed = pid is 0x0C or 0x10 or 0x1F or 0x42 or 0x5E ? 2 : 1;
+        if (pid is not (0x04 or 0x05 or 0x06 or 0x07 or 0x08 or 0x09 or
+            0x0C or 0x0D or 0x0E or 0x0F or 0x10 or 0x11 or 0x1F or
+            0x2F or 0x33 or 0x42 or 0x46 or 0x52 or 0x5C or 0x5E))
             return null;
         if (values.Length != needed)
             throw new InvalidDataException("Incorrect byte count for the selected SAE J1979 PID.");
@@ -39,6 +40,7 @@ internal static class ObdJ1979PidValues
         var b = needed == 2 ? values[1] : (byte)0;
         var (name, number, unit) = pid switch
         {
+            0x04 => ("calculated-engine-load", a * 100d / 255, "%"),
             0x05 => ("coolant-temperature", (double)a - 40, "degC"),
             0x06 => ("short-term-fuel-trim-bank-1", a * 100d / 128 - 100, "%"),
             0x07 => ("long-term-fuel-trim-bank-1", a * 100d / 128 - 100, "%"),
@@ -46,9 +48,18 @@ internal static class ObdJ1979PidValues
             0x09 => ("long-term-fuel-trim-bank-2", a * 100d / 128 - 100, "%"),
             0x0C => ("engine-rpm", (a * 256d + b) / 4, "rpm"),
             0x0D => ("vehicle-speed", (double)a, "km/h"),
+            0x0E => ("timing-advance", a / 2d - 64, "degBTDC"),
+            0x0F => ("intake-air-temperature", (double)a - 40, "degC"),
             0x10 => ("mass-air-flow", (a * 256d + b) / 100, "g/s"),
             0x11 => ("throttle-position", a * 100d / 255, "%"),
+            0x1F => ("engine-runtime", a * 256d + b, "s"),
+            0x2F => ("fuel-tank-level", a * 100d / 255, "%"),
+            0x33 => ("barometric-pressure", (double)a, "kPa"),
+            0x42 => ("control-module-voltage", (a * 256d + b) / 1000, "V"),
+            0x46 => ("ambient-air-temperature", (double)a - 40, "degC"),
             0x52 => ("ethanol-content", a * 100d / 255, "%"),
+            0x5C => ("engine-oil-temperature", (double)a - 40, "degC"),
+            0x5E => ("engine-fuel-rate", (a * 256d + b) / 20, "L/h"),
             _ => throw new InvalidOperationException("Unknown PID formula.")
         };
         return new(request[0], pid, name, number, unit);
