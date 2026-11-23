@@ -51,9 +51,13 @@ internal static class ObdJ1979InterpretationSelfTests
 
         var raw = ObdJ1979Interpretation.Interpret(
             [0x01, 0x0C], [0x41, 0x0C, 0x2E, 0xE0]);
-        Check(raw.Positive && raw.Description.Contains("0C2EE0") &&
-            !raw.Description.Contains("rpm="),
-            "Unknown units and scaling are not invented.");
+        Check(raw.Positive && raw.Description.Contains("engine-rpm=3000 rpm"),
+            "Known SAE J1979 RPM signal is scaled from A/B bytes.");
+        var unknown = ObdJ1979Interpretation.Interpret(
+            [0x01, 0x90], [0x41, 0x90, 0x22]);
+        Check(unknown.Positive && unknown.Description.Contains("data=9022") &&
+            !unknown.Description.Contains("rpm="),
+            "Unknown PID remains raw without invented scale.");
 
         Reject<InvalidDataException>(() =>
             ObdJ1979Interpretation.Interpret([0x01, 0x0C],
