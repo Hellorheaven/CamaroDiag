@@ -247,6 +247,13 @@ internal static class UdsStandardServices
             // ISO 14229 WWH-OBD subfunctions echo the functional group
             // immediately after the subfunction. Ignoring it can attribute
             // a safety/legislated group DTC to an emissions request.
+            if (request.Length >= 5 && request[1] is 0x04 or 0x06)
+            {
+                if (response.Length < 5 ||
+                    !response.Slice(2, 3).SequenceEqual(request.Slice(2, 3)))
+                    throw new InvalidDataException(
+                        "UDS DTC snapshot/extended-data response has wrong 24-bit DTC.");
+            }
             if (request.Length >= 3 && request[1] is 0x42 or 0x55 or 0x56)
             {
                 if (response.Length < 3 || response[2] != request[2])
