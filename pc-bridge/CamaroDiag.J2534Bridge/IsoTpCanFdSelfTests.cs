@@ -469,6 +469,29 @@ internal static class IsoTpCanFdSelfTests
             new byte[] {0x22, 0xF8, 0x10}),
             "ISO-TP OBDonUDS F810 protocol information DID can be queried.");
 
+        var wwhIsoTp = StandardProtocolCli.ParseIsoTp([
+            StandardProtocolCli.RawIsoTpCommand, "--adapter-index", "0",
+            "--tx-id", "7E0", "--rx-id", "7E8", "--baud", "500000",
+            "--fd", "false", "--obd-wwh-status", "0x08",
+            "--obd-wwh-severity", "0x40"]);
+        Check(wwhIsoTp.Request.SequenceEqual(
+            new byte[] {0x19, 0x42, 0x33, 0x40, 0x08}) &&
+            wwhIsoTp.ValidateUdsResponse,
+            "ISO-TP WWH status DTC request is correlated to UDS response.");
+        var wwhPermanentIsoTp = StandardProtocolCli.ParseIsoTp([
+            StandardProtocolCli.RawIsoTpCommand, "--adapter-index", "0",
+            "--tx-id", "7E0", "--rx-id", "7E8", "--baud", "500000",
+            "--fd", "false", "--obd-wwh-permanent"]);
+        Check(wwhPermanentIsoTp.Request.SequenceEqual(
+            new byte[] {0x19, 0x55, 0x33}),
+            "ISO-TP WWH permanent emission DTC selector.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseIsoTp([
+            StandardProtocolCli.RawIsoTpCommand, "--adapter-index", "0",
+            "--tx-id", "7E0", "--rx-id", "7E8", "--baud", "500000",
+            "--fd", "false", "--mode", "receive",
+            "--obd-wwh-permanent"]),
+            "ISO-TP passive receive cannot silently request permanent DTCs.");
+
         var obdIsoTp = StandardProtocolCli.ParseIsoTp([
             StandardProtocolCli.RawIsoTpCommand, "--adapter-index", "0",
             "--tx-id", "7E0", "--rx-id", "7E8", "--baud", "500000",
