@@ -118,6 +118,39 @@ internal static class ObdOnUdsServices
     internal static byte[] ReadWwhPermanentEmissionsDtcs() =>
         UdsStandardServices.ReadDtc(0x55, [EmissionsFunctionalGroup]);
 
+    /// <summary>
+    /// ISO 14229 0x19/0x56 reportDTCInformationByDTCReadinessGroupIdentifier.
+    /// The readiness ID must be provided by the caller; it is not inferred
+    /// from ECU hardware, emissions capabilities or response content.
+    /// </summary>
+    internal static byte[] ReadWwhReadinessGroup(byte readinessGroup) =>
+        UdsStandardServices.ReadDtc(0x56,
+            [EmissionsFunctionalGroup, readinessGroup]);
+
+    internal sealed record WwhReadinessReport(byte ReadinessGroup,
+        WwhDtcReport DtcReport);
+
+    internal static WwhReadinessReport DecodeWwhReadinessGroup(
+        ReadOnlySpan<byte> reply)
+    {
+        if (reply.Length < 6 || reply[0] != 0x59 ||
+            reply[1] != 0x56 || reply[2] != EmissionsFunctionalGroup ||
+            (reply.Length - 6) % 4 != 0)
+            throw new InvalidDataException(
+                "Malformed WWH-OBD readiness DTC 0x19 0x56 response.");
+
+        var codes = new List<WwhDtc>((reply.Length - 6) / 4);
+        for (var offset = 6; offset < reply.Length; offset += 4)
+        {
+            var dtc = (uint)reply[offset] << 16 |
+                (uint)reply[offset + 1] << 8 | reply[offset + 2];
+            codes.Add(new WwhDtc(dtc, reply[offset + 3], null));
+        }
+        return new WwhReadinessReport(reply[5],
+            new WwhDtcReport(reply[2], reply[3], null,
+                reply[4], codes));
+    }
+
     internal static WwhDtcReport DecodeWwhEmissionsDtcs(
         ReadOnlySpan<byte> reply)
     {
