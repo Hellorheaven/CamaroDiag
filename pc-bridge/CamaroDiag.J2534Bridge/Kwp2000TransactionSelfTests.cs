@@ -39,6 +39,12 @@ internal static class Kwp2000TransactionSelfTests
             pending.NegativeResponseCode == 0x78,
             "ResponsePending has its own inconclusive status.");
 
+        var manufacturerService = Kwp2000Transaction.Decode(
+            [0xC1, 0xAA], [0x01, 0xAA]);
+        Check(manufacturerService.Status == Kwp2000Transaction.Kind.Positive &&
+            manufacturerService.Service == 0xC1,
+            "Optional parser has no artificial manufacturer SID whitelist.");
+
         Reject<InvalidDataException>(() =>
             Kwp2000Transaction.Decode([0x27, 1], [0x68, 1]),
             "Wrong positive service must not confirm KWP unlock.");
