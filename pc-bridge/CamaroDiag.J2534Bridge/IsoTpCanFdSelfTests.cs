@@ -111,17 +111,6 @@ internal static class IsoTpCanFdSelfTests
             fdOverCapacity.Sent[0].Data[0] == 0x32,
             "CAN-FD FlowControl overflow follows the selected TX_DL.");
 
-        var addressedOverCapacity = new QueueLink();
-        addressedOverCapacity.Replies.Enqueue(RX(false,
-            0x10, 0x10, 0x00, 0x00, 0x10, 0x00, 0x01, 0xAB));
-        Reject<InvalidDataException>(() =>
-            Receive(addressedOverCapacity, extendedAddress),
-            "ISO-TP extended logical address does not bypass receive limit.");
-        Check(addressedOverCapacity.Sent.Count == 1 &&
-            addressedOverCapacity.Sent[0].Data[0] == 0xF1 &&
-            addressedOverCapacity.Sent[0].Data[1] == 0x32,
-            "Overflow FC preserves selected TX logical addressing.");
-
         var malformedFirst = new QueueLink();
         malformedFirst.Replies.Enqueue(RX(false,
             0x10, 0x05, 0, 0, 0, 0, 0, 0));
@@ -192,6 +181,17 @@ internal static class IsoTpCanFdSelfTests
         // every SF, FF, CF and FC (not just the initial request).
         var extendedAddress = new IsoTpCanFdSession.Settings(0x7E0, 0x7E8,
             8, false, BlockSize: 1, TxAddress: 0xF1, RxAddress: 0x10);
+        var addressedOverCapacity = new QueueLink();
+        addressedOverCapacity.Replies.Enqueue(RX(false,
+            0x10, 0x10, 0x00, 0x00, 0x10, 0x00, 0x01, 0xAB));
+        Reject<InvalidDataException>(() =>
+            Receive(addressedOverCapacity, extendedAddress),
+            "ISO-TP extended logical address does not bypass receive limit.");
+        Check(addressedOverCapacity.Sent.Count == 1 &&
+            addressedOverCapacity.Sent[0].Data[0] == 0xF1 &&
+            addressedOverCapacity.Sent[0].Data[1] == 0x32,
+            "Overflow FC preserves selected TX logical addressing.");
+
         var addressedSingle = new QueueLink();
         Send(addressedSingle, extendedAddress, [0x22, 0xF1, 0x90]);
         Check(addressedSingle.Sent.Count == 1 &&
