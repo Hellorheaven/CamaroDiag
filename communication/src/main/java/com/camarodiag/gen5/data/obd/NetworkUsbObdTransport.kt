@@ -115,6 +115,11 @@ class ElmUsbTransport(private val context: Context) {
 
             Result.success(Unit)
 
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            // A superseded connection must finish closing its handle before
+            // the next adapter handshake can begin.
+            close()
+            throw cancelled
         } catch (e: Exception) {
             close()
             Result.failure(e)
@@ -191,6 +196,11 @@ class ElmWifiTransport {
 
             Result.success(Unit)
 
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            // A superseded connection must finish closing its handle before
+            // the next adapter handshake can begin.
+            close()
+            throw cancelled
         } catch (e: Exception) {
             close()
             Result.failure(e)
