@@ -411,6 +411,26 @@ internal static class J1939ClassicTpSelfTests
                 [0, 0, 1, 2, 3]),
             "Malformed DM1 diagnostic code length is rejected.");
 
+        var requestOptions = o with { Pgn = J1939PgnRequest.RequestPgn };
+        var requestWire = new FakeCan();
+        Send(requestWire, requestOptions, J1939PgnRequest.Encode(0xFECA));
+        Check(requestWire.Outgoing.Count == 1 &&
+            requestWire.Outgoing[0].Data.Length == 3 &&
+            requestWire.Outgoing[0].Data.SequenceEqual(
+                new byte[] {0xCA, 0xFE, 0x00}),
+            "J1939-21 PGN Request uses actual DLC 3 and no FF filler.");
+        var incomingRequest = new FakeCan();
+        incomingRequest.Incoming.Enqueue(new(
+            J1939ClassicTpSession.ArbitrationId(
+                J1939PgnRequest.RequestPgn, 6,
+                o.RemoteAddress, o.LocalAddress),
+            false, [0xCA, 0xFE, 0]));
+        Check(Receive(incomingRequest, requestOptions).Payload.Length == 3,
+            "J1939 receiver accepts a correctly addressed three-byte PGN Request.");
+        Reject<InvalidDataException>(() =>
+            Send(new FakeCan(), requestOptions, [0xCA, 0xFE]),
+            "Malformed 2-byte PGN Request cannot be transmitted.");
+
         Check(J1939PgnRequest.RequestPgn == 0xEA00 &&
             J1939PgnRequest.Encode(J1939DmDiagnostics.Dm1Pgn)
                 .SequenceEqual(new byte[] {0xCA, 0xFE, 0x00}) &&
