@@ -259,6 +259,28 @@ internal static class ObdOnUdsServices
             reply[4], codes);
     }
 
+    internal sealed record DtcCountReport(byte StatusAvailabilityMask,
+        byte DtcFormatIdentifier, ushort Count);
+
+    /// <summary>
+    /// ISO 14229-1 0x19/0x01 reportNumberOfDTCByStatusMask:
+    /// request 19 01 [mask], response 59 01 [availability] [format]
+    /// [count MSB] [count LSB]. Count is not an ECU-readiness verdict.
+    /// </summary>
+    internal static byte[] ReadDtcCountByStatusMask(byte statusMask) =>
+        UdsStandardServices.ReadDtc(0x01, [statusMask]);
+
+    internal static DtcCountReport DecodeDtcCountByStatusMask(
+        ReadOnlySpan<byte> reply)
+    {
+        if (reply.Length != 6 || reply[0] != 0x59 ||
+            reply[1] != 0x01)
+            throw new InvalidDataException(
+                "UDS DTC count must be 59 01 availability format countHi countLo.");
+        var count = BinaryPrimitives.ReadUInt16BigEndian(reply.Slice(4, 2));
+        return new(reply[2], reply[3], count);
+    }
+
     internal static byte[] ReadDtcByStatusMask(byte statusMask) =>
         UdsStandardServices.ReadDtc(0x02, [statusMask]);
 
