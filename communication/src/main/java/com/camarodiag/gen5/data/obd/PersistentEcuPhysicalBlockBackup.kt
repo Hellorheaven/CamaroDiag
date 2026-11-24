@@ -1,6 +1,5 @@
 package com.camarodiag.gen5.data.obd
 
-import java.io.ByteArrayOutputStream
 import java.io.DataInputStream
 import java.io.DataOutputStream
 import java.io.File
@@ -58,8 +57,11 @@ internal class PersistentEcuPhysicalBlockBackup(
         val file = File(directory,
             region.region.name + "-" + region.address.toString(16) + "-" + region.length + ".ecu-block")
         check(file.createNewFile()) { "Refusing to overwrite a physical ECU sector backup." }
-        val encoded = ByteArrayOutputStream().use { output ->
-            DataOutputStream(output).use { data ->
+        // Stream straight into the create-new sector file instead of building
+        // a second full serialized image in RAM. The file is never accepted
+        // until the synchronous write and independent byte-for-byte readback.
+        FileOutputStream(file, true).use { stream ->
+            DataOutputStream(stream).use { data ->
                 data.writeUTF("CAMARODIAG-PHYSICAL-BLOCK-V1")
                 data.writeUTF(target.controllerFamily)
                 data.writeUTF(target.controllerId)
@@ -71,12 +73,9 @@ internal class PersistentEcuPhysicalBlockBackup(
                 data.writeUTF(expectedOriginalSha256.lowercase())
                 data.writeInt(physical.size)
                 data.write(physical)
+                data.flush()
+                stream.fd.sync()
             }
-            output.toByteArray()
-        }
-        FileOutputStream(file, true).use { stream ->
-            stream.write(encoded)
-            stream.fd.sync()
         }
         // Treat missing, truncated or modified on-disk backups as an erase stop.
         DataInputStream(file.inputStream().buffered()).use { data ->
@@ -92,10 +91,22 @@ internal class PersistentEcuPhysicalBlockBackup(
                 data.readInt() == physical.size) {
                 "Persisted ECU sector metadata differs from the write target."
             }
-            val persisted = ByteArray(physical.size)
-            data.readFully(persisted)
-            check(data.read() == -1 && persisted.contentEquals(physical)) {
-                "Persisted ECU block bytes differ from the live capture."
+            // Verify on-disk contents in bounded chunks. Large erase sectors
+            // must not allocate an additional sector-sized readback buffer.
+            val buffer = ByteArray(8192)
+            var offset = 0
+            while (offset < physical.size) {
+                val length = minOf(buffer.size, physical.size - offset)
+                data.readFully(buffer, 0, length)
+                for (i in 0 until length) {
+                    check(buffer[i] == physical[offset + i]) {
+                        "Persisted ECU block bytes differ from the live capture."
+                    }
+                }
+                offset += length
+            }
+            check(data.read() == -1) {
+                "Persisted ECU block contains unexpected trailing data."
             }
         }
     }
