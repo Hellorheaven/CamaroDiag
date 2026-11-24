@@ -91,6 +91,17 @@ internal static class DoIpVinReader
             expectedGatewayAddress: gateway.LogicalAddress);
     }
 
+    private static async Task<string> VerifyObservedVinAsync(DoIpDiagnosticTransport transport,
+        DoIpVehicleDiscovery.Identity gateway, TimeSpan timeout, CancellationToken token,
+        Action<byte[]>? requested, Action<byte[]>? received)
+    {
+        var vin = await ReadAsync(transport, timeout, token, requested, received);
+        if (gateway.Vin is not null && !string.Equals(gateway.Vin, vin, StringComparison.Ordinal))
+            throw new InvalidDataException("UDS VIN differs from the observed DoIP vehicle identity.");
+        token.ThrowIfCancellationRequested();
+        return vin;
+    }
+
     internal static async Task<byte[]> ReadObservedGatewayDidAsync(
         DoIpVehicleDiscovery.Identity gateway, IPAddress address, ushort tester,
         ushort ecu, bool useTls, ushort did, TimeSpan timeout,
@@ -99,6 +110,8 @@ internal static class DoIpVinReader
     {
         await using var transport = await ConnectObservedAsync(gateway, address, tester,
             ecu, useTls, timeout, token, clientCertificateThumbprint);
+        var vin = await VerifyObservedVinAsync(transport, gateway, timeout, token, requested, received);
+        if (did == 0xF190) return Encoding.ASCII.GetBytes(vin);
         return await ReadDidAsync(transport, did, timeout, token, requested, received);
     }
 
@@ -133,8 +146,12 @@ internal static class DoIpVinReader
     {
         await using var transport = await ConnectObservedAsync(gateway, address, tester,
             ecu, useTls, timeout, token, clientCertificateThumbprint);
+        var vin = await VerifyObservedVinAsync(transport, gateway, timeout, token, requested, received);
         await MonitorDidAsync(transport, did, sampleCount, interval, timeout, token,
             sample, requested, received);
+        var finalVin = await VerifyObservedVinAsync(transport, gateway, timeout, token, requested, received);
+        if (!string.Equals(vin, finalVin, StringComparison.Ordinal))
+            throw new InvalidDataException("UDS VIN changed during DoIP monitoring.");
     }
 
     internal static async Task<ObdOnUdsServices.DtcStatusReport> ReadObservedGatewayDtcsAsync(
@@ -145,6 +162,7 @@ internal static class DoIpVinReader
     {
         await using var transport = await ConnectObservedAsync(gateway, address, tester,
             ecu, useTls, timeout, token, clientCertificateThumbprint);
+        _ = await VerifyObservedVinAsync(transport, gateway, timeout, token, requested, received);
         return await ReadDtcsAsync(transport, statusMask, timeout, token, requested, received);
     }
 
@@ -156,10 +174,6 @@ internal static class DoIpVinReader
     {
         await using var transport = await ConnectObservedAsync(gateway, address, tester,
             ecu, useTls, timeout, token, clientCertificateThumbprint);
-        var vin = await ReadAsync(transport, timeout, token, requested, received);
-        if (gateway.Vin is not null && !string.Equals(gateway.Vin, vin, StringComparison.Ordinal))
-            throw new InvalidDataException("UDS VIN differs from the observed DoIP vehicle identity.");
-        token.ThrowIfCancellationRequested();
-        return vin;
+        return await VerifyObservedVinAsync(transport, gateway, timeout, token, requested, received);
     }
 }
