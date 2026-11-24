@@ -576,6 +576,46 @@ internal static class DoIpDiagnosticSessionSelfTests
         }
         finally { routeListener.Stop(); }
 
+
+        // A gateway may hold routing activation in 0x11 while it asks the
+        // vehicle for confirmation. That cannot extend the original TCP
+        // activation deadline, and a late 0x10 is not an active session.
+        var waitingRoute = new TcpListener(IPAddress.Loopback, 0);
+        waitingRoute.Start();
+        var waitingPort = ((IPEndPoint)waitingRoute.LocalEndpoint).Port;
+        var waitingServer = Task.Run(async () =>
+        {
+            using var peer = await waitingRoute.AcceptTcpClientAsync();
+            await using var wire = peer.GetStream();
+            var activation = await ReadAsync(wire);
+            Check(activation.Type == DoIpCodec.RoutingActivationRequest,
+                "Routing timeout test received expected activation.");
+            await SendAsync(wire, DoIpCodec.RoutingActivationResponse,
+                [0x0E, 0x80, 0x12, 0x34, 0x11, 0, 0, 0, 0]);
+            await Task.Delay(180); // Above the client's full connection budget.
+            try
+            {
+                await SendAsync(wire, DoIpCodec.RoutingActivationResponse,
+                    [0x0E, 0x80, 0x12, 0x34, 0x10, 0, 0, 0, 0]);
+            }
+            catch (Exception error) when (error is IOException or
+                SocketException or ObjectDisposedException)
+            {
+                // The timed-out client correctly retired the TCP connection.
+            }
+        });
+        try
+        {
+            await Expect<OperationCanceledException>(() =>
+                DoIpDiagnosticTransport.ConnectAsync(
+                    "127.0.0.1", Tester, Ecu,
+                    TimeSpan.FromMilliseconds(80),
+                    CancellationToken.None, portOverride: waitingPort),
+                "Pending routing 0x11 never bypasses overall connect deadline.");
+            await waitingServer.WaitAsync(TimeSpan.FromSeconds(3));
+        }
+        finally { waitingRoute.Stop(); }
+
         return checks;
     }
 }
