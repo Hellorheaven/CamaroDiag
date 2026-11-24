@@ -39,7 +39,7 @@ internal static class BridgeCommandLineHelpSelfTests
             Require(french.Contains(option, StringComparison.Ordinal), "French " + option);
         }
         foreach (var option in new[] {
-            "--doip-discover", "--doip-status", "--doip-exchange",
+            "--doip-discover", "--doip-status", "--doip-exchange", "--doip-backup", "--doip-verify-backup", "--confirm-read true",
             "--listen-ipv6-ifindex", "--multicast-ipv6-ifindex",
             "--doip-version", "--uds-p2-ms", "--uds-p2-star-ms",
             "--power-mode true", "--broadcast-ip", "--vin", "--eid",

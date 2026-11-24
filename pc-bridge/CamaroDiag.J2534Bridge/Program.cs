@@ -37,6 +37,12 @@ internal static class Program
         if (BridgeCommandLineHelp.IsHelpRequest(args))
             return BridgeCommandLineHelp.Run(args);
 
+        // Parse the complete backup invocation first; a mixed command never
+        // falls through to an unrelated driver, programming or network path.
+        if (args.Contains(DoIpBackupCli.BackupCommand, StringComparer.OrdinalIgnoreCase) ||
+            args.Contains(DoIpBackupCli.VerifyCommand, StringComparer.OrdinalIgnoreCase))
+            return await DoIpBackupCli.RunAsync(args);
+
         // Offline COM enumeration must win over every active diagnostic or
         // programming flag. The handler rejects mixed invocations, rather
         // than allowing any protocol handler to open a driver accidentally.

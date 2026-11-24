@@ -25,6 +25,8 @@ Utilisation :
   CamaroDiag.J2534Bridge.exe --doip-discover --broadcast-ip 192.168.1.255
   CamaroDiag.J2534Bridge.exe --doip-discover --host 192.0.2.10 --vin 1G1FA1RXXR0123456
   CamaroDiag.J2534Bridge.exe --doip-status --host 192.0.2.10 --doip-version 3
+  CamaroDiag.J2534Bridge.exe --doip-backup --host 192.0.2.10 --profile ecu-doip.json --archive backup.zip --confirm-read true
+  CamaroDiag.J2534Bridge.exe --doip-verify-backup --profile ecu-doip.json --archive backup.zip
   CamaroDiag.J2534Bridge.exe --doip-exchange --host 192.0.2.10 --tester 0E80 --ecu 1234 --payload 22F190 --uds-p2-ms 100 --uds-p2-star-ms 2000
 
 Exemples :
@@ -50,6 +52,10 @@ Exemples :
                               vérifier la passerelle avant --doip-version.
   --doip-status               État passerelle ou --power-mode true par UDP.
                               --doip-version 2, 3 ou 4 ; 255 réservé à la découverte.
+  --doip-backup               Deux lectures de la zone ECU décrite par --profile JSON ;
+                              --host, --archive ZIP, --confirm-read true obligatoires.
+                              TLS par défaut ; --tls false explicite ; --certificate facultatif.
+  --doip-verify-backup        Contrôle hors ligne du ZIP et du profil ; aucun accès réseau.
   --doip-exchange             Diagnostic UDS par TCP/TLS : --host, --tester, --ecu,
                               --payload hexadécimal ; --tls true vérifie le serveur
                               et refuse le repli en clair ; --uds-p2-ms et
