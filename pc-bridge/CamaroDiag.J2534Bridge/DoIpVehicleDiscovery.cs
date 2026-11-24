@@ -17,6 +17,25 @@ internal static class DoIpVehicleDiscovery
         byte[] Eid, byte[] Gid, byte FurtherAction, byte? VinGidStatus,
         IPAddress Source, byte ProtocolVersion);
 
+    internal delegate void DatagramTrace(string direction, IPEndPoint endpoint, byte[] data);
+
+    internal static bool IsVehicleVin(string vin) =>
+        vin.Length == 17 && vin.All(c => c is >= '0' and <= '9' ||
+            c is >= 'A' and <= 'Z' && c is not ('I' or 'O' or 'Q'));
+
+    internal static async Task<Identity> DiscoverUniqueVinAsync(string vin, TimeSpan timeout,
+        CancellationToken cancellationToken, DatagramTrace? trace = null,
+        string broadcastIp = "255.255.255.255", int? portOverride = null)
+    {
+        if (!IsVehicleVin(vin))
+            throw new ArgumentException("Expected a valid vehicle VIN.", nameof(vin));
+        var candidates = await DiscoverBroadcastAsync(broadcastIp, timeout, cancellationToken,
+            vin: vin, portOverride: portOverride, trace: trace);
+        if (candidates.Count != 1)
+            throw new InvalidOperationException("DoIP gateway not found or ambiguous for selected VIN.");
+        return candidates[0];
+    }
+
     internal static byte[] BuildRequest() =>
         DoIpCodec.Encode(DoIpCodec.VehicleIdentificationRequest, [],
             DoIpCodec.VehicleIdentificationDefaultVersion);
@@ -83,7 +102,8 @@ internal static class DoIpVehicleDiscovery
     /// </summary>
     internal static async Task<IReadOnlyList<Identity>> DiscoverBroadcastAsync(
         string broadcastIp, TimeSpan timeout, CancellationToken cancellationToken,
-        string? vin = null, byte[]? eid = null, int? portOverride = null)
+        string? vin = null, byte[]? eid = null, int? portOverride = null,
+        DatagramTrace? trace = null)
     {
         if (!IPAddress.TryParse(broadcastIp, out var address) ||
             address.AddressFamily != AddressFamily.InterNetwork ||
@@ -108,8 +128,9 @@ internal static class DoIpVehicleDiscovery
             EnableBroadcast = true
         };
         var port = portOverride ?? 13400;
-        await socket.SendAsync(request.AsMemory(),
-            new IPEndPoint(address, port), deadline.Token);
+        var destination = new IPEndPoint(address, port);
+        await socket.SendAsync(request.AsMemory(), destination, deadline.Token);
+        trace?.Invoke("TX", destination, request.ToArray());
         var identified = new Dictionary<string, Identity>(StringComparer.Ordinal);
         while (identified.Count < 32)
         {
@@ -128,11 +149,14 @@ internal static class DoIpVehicleDiscovery
                 // A response from an arbitrary UDP source port is not an
                 // announcement from the requested DoIP endpoint.
                 if (received.RemoteEndPoint.Port != port) continue;
+                trace?.Invoke("RX", received.RemoteEndPoint, received.Buffer.ToArray());
                 var found = ParseAnnouncement(received.Buffer,
                     received.RemoteEndPoint.Address);
                 if (!MatchesRequestedIdentity(found, vin, fixedEid))
                     continue;
-                var key = found.Source + ":" + found.LogicalAddress.ToString("X4");
+                var key = found.Source + ":" + found.LogicalAddress.ToString("X4") +
+                    ":" + Convert.ToHexString(found.Eid) + ":" + Convert.ToHexString(found.Gid) +
+                    ":" + found.ProtocolVersion.ToString("X2") + ":" + found.Vin;
                 identified[key] = found;
             }
             catch (InvalidDataException)
@@ -151,7 +175,7 @@ internal static class DoIpVehicleDiscovery
     internal static async Task<DoIpCodec.Message> QueryStatusAsync(
         string host, bool powerMode, TimeSpan timeout,
         CancellationToken cancellationToken, int? portOverride = null,
-        byte protocolVersion = DoIpCodec.Version)
+        byte protocolVersion = DoIpCodec.Version, DatagramTrace? trace = null)
     {
         if (protocolVersion is not (0x02 or 0x03 or 0x04))
             throw new ArgumentOutOfRangeException(nameof(protocolVersion),
@@ -173,8 +197,9 @@ internal static class DoIpVehicleDiscovery
             DoIpCodec.PowerModeRequest : DoIpCodec.EntityStatusRequest, [],
             protocolVersion);
         var port = portOverride ?? 13400;
-        await socket.SendAsync(request.AsMemory(),
-            new IPEndPoint(address, port), deadline.Token);
+        var destination = new IPEndPoint(address, port);
+        await socket.SendAsync(request.AsMemory(), destination, deadline.Token);
+        trace?.Invoke("TX", destination, request.ToArray());
         var expectedType = powerMode ?
             DoIpCodec.PowerModeResponse : DoIpCodec.EntityStatusResponse;
         while (true)
@@ -184,6 +209,7 @@ internal static class DoIpVehicleDiscovery
             if (!response.RemoteEndPoint.Address.Equals(address) ||
                 response.RemoteEndPoint.Port != port)
                 continue;
+            trace?.Invoke("RX", response.RemoteEndPoint, response.Buffer.ToArray());
             var decoded = DoIpCodec.Decode(response.Buffer);
             if (decoded.Version != protocolVersion)
                 throw new InvalidDataException(
@@ -410,7 +436,7 @@ internal static class DoIpVehicleDiscovery
 
     internal static async Task<Identity> DiscoverAsync(string host,
         TimeSpan timeout, CancellationToken cancellationToken,
-        string? vin = null, byte[]? eid = null, int? portOverride = null)
+        string? vin = null, byte[]? eid = null, int? portOverride = null, DatagramTrace? trace = null)
     {
         if (!IPAddress.TryParse(host, out var address) ||
             address.AddressFamily is not (AddressFamily.InterNetwork or
@@ -434,6 +460,7 @@ internal static class DoIpVehicleDiscovery
         var request = vin is not null ? BuildVinRequest(vin) :
             fixedEid is not null ? BuildEidRequest(fixedEid) : BuildRequest();
         await socket.SendAsync(request.AsMemory(), destination, deadline.Token);
+        trace?.Invoke("TX", destination, request.ToArray());
         while (true)
         {
             var received = await socket.ReceiveAsync(deadline.Token);
@@ -443,6 +470,7 @@ internal static class DoIpVehicleDiscovery
                 continue;
             // An explicit generic NACK from the selected gateway is a
             // transport rejection, not an absent/malformed vehicle identity.
+            trace?.Invoke("RX", received.RemoteEndPoint, received.Buffer.ToArray());
             var decoded = DoIpCodec.Decode(received.Buffer);
             DoIpCodec.RequireNoGenericNack(decoded);
             if (decoded.Type != DoIpCodec.VehicleIdentificationResponse)
