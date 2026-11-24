@@ -92,6 +92,23 @@ class CanConsoleExportPolicyTest {
             hasHistory = false, hasRawData = false
         ))
     }
+    @Test fun cancelledBeforeLazyCaptureStartsNeverClaimsACompleteExport() {
+        // A Play/Stop within the same UI frame can cancel the lazy worker
+        // before a raw writer is constructed or its finally block executes.
+        val failed = CanConsoleExportPolicy.archiveFailedAfterStop(
+            alreadyFailed = false, writerCompleted = false
+        )
+        assertTrue(failed)
+        assertFalse(CanConsoleExportPolicy.canExport(
+            isCapturing = false,
+            archiveFailed = failed,
+            hasHistory = true,
+            hasRawData = false,
+            requiresRawArchive = true,
+            hasRawArchive = false
+        ))
+    }
+
     @Test fun operatorStopExportsOnlyWhenArchiveClosedCleanly() {
         assertFalse(CanConsoleExportPolicy.archiveFailedAfterStop(
             alreadyFailed = false, writerCompleted = true
