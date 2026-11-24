@@ -1469,6 +1469,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _calibrationWorkspace.update { it.copy(doIpReading = true, doIpResult = "", doIpTrace = emptyList(), doIpBackupBytes = 0,
                 doIpMonitorReport = null, doIpLiveSamples = emptyList()) }
             try {
+                val multi = operation in setOf(DoIpDirectRead.Operation.MULTI_DID, DoIpDirectRead.Operation.OBD_MULTI_DID)
+                val layout = if (multi) com.camarodiag.gen5.data.obd.DoIpMultiDid.parse(didHex) else null
+                require(operation != DoIpDirectRead.Operation.OBD_MULTI_DID ||
+                    requireNotNull(layout).all { DoIpDirectRead.isObdDid(it.did) })
                 val target = resolveSelectedDoIpTarget(host, tester, ecu, _vehicle.value.vin, tls,
                     onTrace = { trace -> journalDoIpControlTrace(trace, current) })
                 check(current())
@@ -1492,7 +1496,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 check(current())
                 val result = DoIpDirectRead.read(target, operation, did, mask = if (wwhMask) didHex.takeLast(2).toInt(16) else mask,
                     wwhSeverity = if (wwhMask) didHex.take(2).toInt(16) else 255,
-                    wwhReadinessGroup = if (wwhReadiness) didHex.toInt(16) else null,
+                    wwhReadinessGroup = if (wwhReadiness) didHex.toInt(16) else null, multiLayout = layout,
                     sampleCount = sampleCount, intervalMs = intervalMs,
                     timeoutMs = options.timeoutMs, sessionOptions = options, clientTls = clientTls,
                     onTrace = { trace ->
@@ -1532,6 +1536,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         result.obdProtocolValue ?: 0, result.vin.orEmpty())
                     operation == DoIpDirectRead.Operation.OBD_DID -> localizedContext.getString(R.string.cal_doip_obd_data,
                         did, result.data?.joinToString(" ") { "%02X".format(it.toInt() and 255) }.orEmpty())
+                    result.multiValues.isNotEmpty() -> result.multiValues.joinToString("\n") { row ->
+                        localizedContext.getString(R.string.cal_doip_multi_result, row.did, row.data.size,
+                            row.data.joinToString(" ") { "%02X".format(it.toInt() and 255) })
+                    }
                     result.wwhReport != null -> requireNotNull(result.wwhReport).let { wwh ->
                         val unavailable = localizedContext.getString(R.string.cal_status_unresolved)
                         localizedContext.getString(R.string.cal_doip_wwh_result, wwh.kind.subfunction, wwh.records.size,

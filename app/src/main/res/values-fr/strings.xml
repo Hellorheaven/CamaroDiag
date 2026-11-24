@@ -1093,4 +1093,8 @@
     <string name="cal_doip_wwh_result">WWH 0x%1$02X : %2$d défauts · masque statut 0x%3$02X · format 0x%4$02X</string>
     <string name="cal_doip_wwh_metadata">Disponibilité sévérité : %1$s · groupe : %2$s</string>
     <string name="cal_doip_wwh_record">DTC %1$06X · statut %2$02X · sévérité %3$s</string>
+    <string name="cal_doip_multi_layout">DID:longueur en octets, séparés par virgule</string>
+    <string name="cal_doip_multi_read">Lire plusieurs DID UDS</string>
+    <string name="cal_doip_multi_obd_read">Lire plusieurs DID OBD</string>
+    <string name="cal_doip_multi_result">DID %1$04X (%2$d octets) : %3$s</string>
 </resources>

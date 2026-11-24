@@ -1,3 +1,7 @@
+## PR117 — multi-DID Android DoIP (24/11/2026)
+
+- Requête UDS 22 multi-DID et variante OBDonUDS, géométrie explicitement fournie, validation avant réseau, vérification VIN/protocole avant/après sur le même socket. Interface FR/EN, contrôles stricts d’ordre/longueur/doublons, tests ajoutés. Ce lot est postérieur au checkpoint WWH 45501625699.
+
 ## PR117 — multi-DID Connectors DoIP (24/11/2026)
 
 - CLI `dids` / `obd-dids --layout DID:longueur,...` : vraie requête UDS 22 multi-DID, longueur explicite d'après définitions ECU, décodage strict des réponses dans l'ordre, limites et refus des doublons/troncatures. Identité vérifiée avant/après sur même connexion ; F802/F810 pour OBDonUDS. Aucun scaling supposé. Tests ajoutés, postérieurs au checkpoint WWH 45501625699 en cours.

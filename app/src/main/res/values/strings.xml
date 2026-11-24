@@ -1090,4 +1090,8 @@
     <string name="cal_doip_wwh_result">WWH 0x%1$02X: %2$d DTCs · status mask 0x%3$02X · format 0x%4$02X</string>
     <string name="cal_doip_wwh_metadata">Severity availability: %1$s · readiness group: %2$s</string>
     <string name="cal_doip_wwh_record">DTC %1$06X · status %2$02X · severity %3$s</string>
+    <string name="cal_doip_multi_layout">DID:byte length, comma separated</string>
+    <string name="cal_doip_multi_read">Read multiple UDS DIDs</string>
+    <string name="cal_doip_multi_obd_read">Read multiple OBD DIDs</string>
+    <string name="cal_doip_multi_result">DID %1$04X (%2$d bytes): %3$s</string>
 </resources>

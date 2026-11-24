@@ -338,6 +338,7 @@ fun CalibrationWorkspaceScreen(
     }
     var doIpDid by remember(vehicle) { mutableStateOf("F190") }
     var doIpDtcMask by remember(vehicle) { mutableStateOf("FF") }
+    var doIpMultiLayout by remember(vehicle) { mutableStateOf("") }
     var doIpWwhSeverity by remember(vehicle) { mutableStateOf("FF") }
     var doIpWwhReadiness by remember(vehicle) { mutableStateOf("") }
     var doIpDetailDtc by remember(vehicle) { mutableStateOf("") }
@@ -640,6 +641,23 @@ fun CalibrationWorkspaceScreen(
                                 doIpDid.toIntOrNull(16)?.let(DoIpDirectRead::isObdDid) == true, modifier = Modifier.weight(1f)) {
                             Text(stringResource(R.string.cal_doip_obd_read))
                         }
+                    }
+                    OutlinedTextField(doIpMultiLayout, { doIpMultiLayout = it.uppercase().filter { c -> c in "0123456789ABCDEF:, " }.take(383) },
+                        enabled = idle, singleLine = true, modifier = Modifier.fillMaxWidth(),
+                        label = { Text(stringResource(R.string.cal_doip_multi_layout)) })
+                    val multiLayout = remember(doIpMultiLayout) {
+                        runCatching { com.camarodiag.gen5.data.obd.DoIpMultiDid.parse(doIpMultiLayout) }.getOrNull()
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu, doIpMultiLayout,
+                            doIpTls, DoIpDirectRead.Operation.MULTI_DID, doIpCertificate, requireNotNull(doIpOptions)) },
+                            enabled = targetReady && vinReady && multiLayout != null, modifier = Modifier.weight(1f)) {
+                            Text(stringResource(R.string.cal_doip_multi_read))
+                        }
+                        OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu, doIpMultiLayout,
+                            doIpTls, DoIpDirectRead.Operation.OBD_MULTI_DID, doIpCertificate, requireNotNull(doIpOptions)) },
+                            enabled = targetReady && vinReady && multiLayout?.all { DoIpDirectRead.isObdDid(it.did) } == true,
+                            modifier = Modifier.weight(1f)) { Text(stringResource(R.string.cal_doip_multi_obd_read)) }
                     }
                     OutlinedTextField(doIpDtcMask, { doIpDtcMask = it.uppercase().filter { c -> c in "0123456789ABCDEF" }.take(2) },
                         enabled = idle, singleLine = true, modifier = Modifier.fillMaxWidth(),
