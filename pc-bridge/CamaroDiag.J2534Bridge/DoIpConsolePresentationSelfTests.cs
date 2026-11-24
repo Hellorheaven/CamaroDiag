@@ -31,8 +31,33 @@ internal static class DoIpConsolePresentationSelfTests
                 DoIpConsolePresentation.Text("Unavailable", culture)) &&
                 !unavailable.Contains(observed.Vin!),
                 "Missing VIN stays unavailable in " + language);
+            var status = DoIpCodec.Decode(DoIpCodec.Encode(
+                DoIpCodec.EntityStatusResponse, [0, 4, 2, 0, 0, 1, 0]));
+            var statusText = DoIpConsolePresentation.FormatStatus(status, false, culture);
+            Check(statusText.Contains("2/4") && statusText.Contains("256"),
+                "Entity status preserves observed socket counts and maximum size in " + language);
+            var withoutSize = DoIpCodec.Decode(DoIpCodec.Encode(
+                DoIpCodec.EntityStatusResponse, [1, 3, 1]));
+            Check(DoIpConsolePresentation.FormatStatus(withoutSize, false, culture)
+                .Contains(DoIpConsolePresentation.Text("Unavailable", culture)),
+                "Absent maximum data size stays unavailable in " + language);
+            foreach (var mode in new byte[] { 0, 1, 2 })
+            {
+                var power = DoIpCodec.Decode(DoIpCodec.Encode(
+                    DoIpCodec.PowerModeResponse, [mode]));
+                var key = mode == 0 ? "PowerNotReady" :
+                    mode == 1 ? "PowerReady" : "PowerUnsupported";
+                Check(DoIpConsolePresentation.FormatStatus(power, true, culture)
+                    .Contains(DoIpConsolePresentation.Text(key, culture)),
+                    "Power mode decoded in " + language);
+            }
+            var rejected = false;
+            try { _ = DoIpConsolePresentation.FormatStatus(status, true, culture); }
+            catch (InvalidDataException) { rejected = true; }
+            Check(rejected, "Wrong response type rejected in " + language);
             foreach (var key in new[] { "Host", "Discover", "Cancel", "Notice",
-                "Started", "Canceled", "Busy", "InvalidHost" })
+                "Started", "Canceled", "Busy", "InvalidHost", "Status", "Power",
+                "StatusNotice", "StatusStarted", "IdentifyFirst" })
                 Check(!string.IsNullOrWhiteSpace(DoIpConsolePresentation.Text(key, culture)),
                     "Resource " + key + " in " + language);
         }
