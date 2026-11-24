@@ -30,7 +30,7 @@ internal static class NativeE39BackupQualification
     {
         RequireFullScope(scope);
         var identity = NativeGmlanBenchProbe.RequireStableIdentity(first, second);
-        if (identity.Vin != scope.ExpectedVin || captured.ExpectedVin != scope.ExpectedVin ||
+        if (captured.AcquiredScope != scope || identity.Vin != scope.ExpectedVin || captured.ExpectedVin != scope.ExpectedVin ||
             captured.StartAddress != scope.StartAddress)
             throw new UnauthorizedAccessException("Backup capture, VIN and live ECU identity disagree.");
 

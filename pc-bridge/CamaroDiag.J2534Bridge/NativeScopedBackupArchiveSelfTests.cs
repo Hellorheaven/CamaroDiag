@@ -26,7 +26,7 @@ internal static class NativeScopedBackupArchiveSelfTests
         var bytes = Enumerable.Range(0, 300).Select(i => (byte)i).ToArray();
         var sha = Convert.ToHexString(SHA256.HashData(bytes));
         var capture = new NativeScopedMemoryReader.VerifiedCapture(bytes, scope.StartAddress, vin,
-            sha, 3, bytes.ToArray());
+            sha, 3, bytes.ToArray(), scope);
         var directory = Path.Combine(Path.GetTempPath(), "camarodiag-backup-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(directory);
         try
@@ -142,7 +142,15 @@ internal static class NativeScopedBackupArchiveSelfTests
                 scope.ResponseCanId, scope.ProtocolNumber, scope.StartAddress,
                 scope.Length, scope.MaxReadBytes, scope.Session, "CALIBRATION");
             var typedPath = Path.Combine(directory, "declared-calibration.zip");
-            NativeScopedBackupArchive.SaveNew(typedPath, typedScope, capture, CancellationToken.None);
+            Reject<InvalidDataException>(() => NativeScopedBackupArchive.SaveNew(
+                typedPath, typedScope, capture, CancellationToken.None));
+            Check(!File.Exists(typedPath), "Changed region cannot relabel an existing acquisition");
+            var differentChannel = new J2534MemoryReadScope(vin, 0x7E1, 0x7E9,
+                scope.ProtocolNumber, scope.StartAddress, scope.Length, scope.MaxReadBytes, scope.Session);
+            Reject<InvalidDataException>(() => NativeScopedBackupArchive.SaveNew(
+                typedPath, differentChannel, capture, CancellationToken.None));
+            var typedCapture = capture with { AcquiredScope = typedScope };
+            NativeScopedBackupArchive.SaveNew(typedPath, typedScope, typedCapture, CancellationToken.None);
             var typedImported = NativeScopedBackupImport.VerifyZip(typedPath, typedScope);
             Check(typedImported.DeclaredRegion == "CALIBRATION" && typedImported.RegionBound,
                 "Explicit calibration region is checked against its profile");

@@ -12,7 +12,7 @@ namespace CamaroDiag.J2534Bridge;
 /// VIN at UDS F190 or legacy GM GMLAN 1A/90 before 0x23 reads are allowed.
 /// The profile NEVER authorizes erase, write, SecurityAccess, or download.
 /// </summary>
-internal sealed class J2534MemoryReadScope
+internal sealed record J2534MemoryReadScope
 {
     public string ExpectedVin { get; }
     public int RequestCanId { get; }

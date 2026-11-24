@@ -50,7 +50,7 @@ internal static class NativeScopedMemoryReader
 
     internal sealed record VerifiedCapture(
         byte[] Bytes, uint StartAddress, string ExpectedVin, string Sha256,
-        int BlocksPerPass, byte[]? SecondBytes = null);
+        int BlocksPerPass, byte[]? SecondBytes, J2534MemoryReadScope AcquiredScope);
 
     internal static byte[] BuildReadRequest(
         J2534MemoryReadScope scope, uint address, int bytes)
@@ -275,6 +275,6 @@ internal static class NativeScopedMemoryReader
             throw new InvalidDataException("No independent physical bytes received.");
         return new VerifiedCapture(
             first, scope.StartAddress, scope.ExpectedVin,
-            Convert.ToHexString(SHA256.HashData(first)), blocksPerPass, second);
+            Convert.ToHexString(SHA256.HashData(first)), blocksPerPass, second, scope);
     }
 }

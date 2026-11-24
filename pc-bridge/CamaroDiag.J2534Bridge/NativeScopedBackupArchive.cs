@@ -27,6 +27,8 @@ internal static class NativeScopedBackupArchive
     {
         ArgumentNullException.ThrowIfNull(scope);
         ArgumentNullException.ThrowIfNull(capture);
+        if (capture.AcquiredScope != scope)
+            throw new InvalidDataException("Backup profile differs from the acquired ECU memory scope.");
         if (capture.SecondBytes is null || ReferenceEquals(capture.Bytes, capture.SecondBytes))
             throw new InvalidDataException("Two distinct ECU acquisitions are required.");
         var first = capture.Bytes.ToArray();
@@ -53,7 +55,7 @@ internal static class NativeScopedBackupArchive
         NativeScopedMemoryReader.VerifiedCapture capture, FirmwareIdentity? firmware)
     {
         var readback = NativeScopedBackupImport.VerifyZip(archivePath, scope);
-        if (!readback.ChannelBound ||
+        if (capture.AcquiredScope != scope || !readback.ChannelBound ||
             readback.Vin != capture.ExpectedVin ||
             readback.StartAddress != capture.StartAddress ||
             readback.ByteCount != capture.Bytes.Length ||

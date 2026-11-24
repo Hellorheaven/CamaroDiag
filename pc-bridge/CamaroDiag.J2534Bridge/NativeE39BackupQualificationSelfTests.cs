@@ -13,7 +13,7 @@ internal static class NativeE39BackupQualificationSelfTests
             (uint)original.Length, 256, 1);
         var identity = new NativeGmlanIdentification.Identity(vin, 12664221u, 0xC1, true, "test");
         var capture = new NativeScopedMemoryReader.VerifiedCapture(original.ToArray(), 0,
-            vin, hash, original.Length / 256, original.ToArray());
+            vin, hash, original.Length / 256, original.ToArray(), scope);
         var evidence = NativeE39BackupQualification.Compare(scope, original, capture, identity, identity);
         if (evidence.Sha256 != hash || evidence.Bytes != original.Length)
             throw new InvalidOperationException("Valid full image comparison failed.");
