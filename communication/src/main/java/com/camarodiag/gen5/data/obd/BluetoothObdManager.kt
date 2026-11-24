@@ -77,6 +77,18 @@ class BluetoothObdManager(context: Context) {
             activeAdapterCapabilities, isObdCommandChannelAvailable
         )
 
+    /** ELM command capability is a candidate, not proof of target UDS support.
+     * Configuration acknowledgements and the correlated ECU reply are mandatory.
+     */
+    val isElmUdsReadCandidate: Boolean
+        get() = isObdCommandChannelAvailable &&
+            activeAdapterCapabilities?.let {
+                it.supportsCanHeaders && it.supportsCanTransmit
+            } == true
+
+    val isEnhancedUdsReadAvailable: Boolean
+        get() = isJ2534BridgeConnected() || isStnUdsReadAvailable || isElmUdsReadCandidate
+
     fun getUsbDevices(): List<String> = usbTransport.availableDevices()
 
     var isDemoMode: Boolean = true
@@ -1251,10 +1263,51 @@ class BluetoothObdManager(context: Context) {
                 withStnUdsSession(requestCanId, responseCanId, protocolNumber,
                     timeoutMs, readDids, block = block)
             }
+            isElmUdsReadCandidate && protocolNumber in setOf(33, 34, 35, 36) ->
+                withElmUdsReadSession(epoch, requestCanId, responseCanId, protocolNumber,
+                    timeoutMs, readDids, block)
             else -> error("No compatible implemented UDS transport on the current adapter.")
         }
         transportSessionEpoch.requireCurrent(epoch)
         return result
+    }
+
+    private suspend fun <T> withElmUdsReadSession(
+        epoch: Long,
+        requestCanId: Int,
+        responseCanId: Int,
+        protocolNumber: Int,
+        timeoutMs: Long,
+        readDids: Set<Int>,
+        block: suspend (UdsClient) -> T
+    ): T = commandSessionMutex.withLock {
+        transportSessionEpoch.requireQueuedCurrent(epoch)
+        check(isElmUdsReadCandidate)
+        val transport = ElmUdsPayloadTransport(requestCanId, responseCanId, protocolNumber) { command, timeout ->
+            sendAtCommandInternal(command, timeout, expectedEpoch = epoch)
+        }
+        val result = try {
+            block(UdsClient(transport, UdsAccessPolicy.readOnly(readDids), timeoutMs))
+        } finally {
+            withContext(NonCancellable) {
+                if (transportSessionEpoch.isCurrent(epoch)) {
+                    var restored = true
+                    for (command in ElmUdsPayloadTransport.restoreCommands) {
+                        val response = runCatching {
+                            sendAtCommandInternal(command, 1_500L, expectedEpoch = epoch)
+                        }.getOrNull()
+                        if (response == null || !CanConsoleAdapterRestorationPolicy.accepted(response))
+                            restored = false
+                    }
+                    if (!restored) {
+                        disconnectIfCurrent(epoch)
+                        error("ELM diagnostic session cleanup failed; reconnect the adapter.")
+                    }
+                }
+            }
+        }
+        transportSessionEpoch.requireCurrent(epoch)
+        result
     }
 
     suspend fun <T> withJ2534BridgeUdsSession(

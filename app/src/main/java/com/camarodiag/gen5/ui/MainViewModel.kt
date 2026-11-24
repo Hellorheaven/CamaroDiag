@@ -1977,9 +1977,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun canMonitorAvailable(): Boolean =
         obdManager.isObdCommandChannelAvailable && _adapter.value.supportsCanHeaders
 
-    /** Enhanced read-only UDS needs a verified STN adapter or a connected J2534 bridge. */
+    /** Read-only UDS transport candidates; physical target responses remain authoritative. */
     fun canReadEnhancedUds(): Boolean =
-        obdManager.isStnUdsReadAvailable || obdManager.isJ2534BridgeConnected()
+        obdManager.isEnhancedUdsReadAvailable
 
     private fun appendCanConsoleSystemEvent(message: String, succeeded: Boolean = true) {
         val current = _liveCanMonitorState.value
