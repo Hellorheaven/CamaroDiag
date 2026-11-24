@@ -128,6 +128,15 @@ internal class CanConsoleEventJournalStore(private val directory: File) {
         return digest.digest().joinToString("") { "%02x".format(it.toInt() and 0xff) }
     }
 
+    /**
+     * Cheap, lock-protected revision marker captured by the UI before it queues
+     * an export. SHA-256 of a multi-hour journal is computed on Dispatchers.IO,
+     * then checked against this marker so the export cannot silently pick up
+     * events written after the user pressed Export.
+     */
+    @Synchronized
+    fun revision(): Long = generation
+
     /** Cheap UI capability check; snapshot() performs the final file flush. */
     @Synchronized
     fun isAvailable(): Boolean =
