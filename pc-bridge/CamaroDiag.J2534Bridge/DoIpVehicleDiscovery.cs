@@ -80,14 +80,15 @@ internal static class DoIpVehicleDiscovery
     /// </summary>
     internal static async Task<IReadOnlyList<Identity>> DiscoverBroadcastAsync(
         string broadcastIp, TimeSpan timeout, CancellationToken cancellationToken,
-        string? vin = null, byte[]? eid = null)
+        string? vin = null, byte[]? eid = null, int? portOverride = null)
     {
         if (!IPAddress.TryParse(broadcastIp, out var address) ||
             address.AddressFamily != AddressFamily.InterNetwork ||
             address.Equals(IPAddress.Any) ||
-            timeout <= TimeSpan.Zero || timeout > TimeSpan.FromSeconds(30))
+            timeout <= TimeSpan.Zero || timeout > TimeSpan.FromSeconds(30) ||
+            (portOverride.HasValue && portOverride.Value is < 1 or > 65535))
             throw new ArgumentException(
-                "Explicit IPv4 broadcast destination and bounded timeout required.");
+                "Explicit IPv4 broadcast destination, UDP port and bounded timeout required.");
 
         if (vin is not null && eid is not null)
             throw new ArgumentException("Choose VIN or EID identification, not both.");
@@ -99,8 +100,9 @@ internal static class DoIpVehicleDiscovery
         {
             EnableBroadcast = true
         };
+        var port = portOverride ?? 13400;
         await socket.SendAsync(request.AsMemory(),
-            new IPEndPoint(address, 13400), deadline.Token);
+            new IPEndPoint(address, port), deadline.Token);
         var identified = new Dictionary<string, Identity>(StringComparer.Ordinal);
         while (identified.Count < 32)
         {
@@ -115,6 +117,9 @@ internal static class DoIpVehicleDiscovery
             }
             try
             {
+                // A response from an arbitrary UDP source port is not an
+                // announcement from the requested DoIP endpoint.
+                if (received.RemoteEndPoint.Port != port) continue;
                 var found = ParseAnnouncement(received.Buffer,
                     received.RemoteEndPoint.Address);
                 if (!MatchesRequestedIdentity(found, vin, eid))
@@ -136,27 +141,30 @@ internal static class DoIpVehicleDiscovery
     /// </summary>
     internal static async Task<DoIpCodec.Message> QueryStatusAsync(
         string host, bool powerMode, TimeSpan timeout,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, int? portOverride = null)
     {
         if (!IPAddress.TryParse(host, out var address) ||
             address.AddressFamily != AddressFamily.InterNetwork ||
             address.Equals(IPAddress.Any) ||
             address.Equals(IPAddress.Broadcast) ||
-            timeout <= TimeSpan.Zero || timeout > TimeSpan.FromSeconds(30))
-            throw new ArgumentException("Provide a valid unicast DoIP IPv4 gateway and timeout.");
+            timeout <= TimeSpan.Zero || timeout > TimeSpan.FromSeconds(30) ||
+            (portOverride.HasValue && portOverride.Value is < 1 or > 65535))
+            throw new ArgumentException("Provide a valid unicast DoIP IPv4 gateway, port and timeout.");
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         deadline.CancelAfter(timeout);
         using var socket = new UdpClient(AddressFamily.InterNetwork);
         var request = DoIpCodec.Encode(powerMode ?
             DoIpCodec.PowerModeRequest : DoIpCodec.EntityStatusRequest, []);
+        var port = portOverride ?? 13400;
         await socket.SendAsync(request.AsMemory(),
-            new IPEndPoint(address, 13400), deadline.Token);
+            new IPEndPoint(address, port), deadline.Token);
         var expectedType = powerMode ?
             DoIpCodec.PowerModeResponse : DoIpCodec.EntityStatusResponse;
         while (true)
         {
             var response = await socket.ReceiveAsync(deadline.Token);
-            if (!response.RemoteEndPoint.Address.Equals(address))
+            if (!response.RemoteEndPoint.Address.Equals(address) ||
+                response.RemoteEndPoint.Port != port)
                 continue;
             var decoded = DoIpCodec.Decode(response.Buffer);
             if (decoded.Type != expectedType)
@@ -209,28 +217,30 @@ internal static class DoIpVehicleDiscovery
 
     internal static async Task<Identity> DiscoverAsync(string host,
         TimeSpan timeout, CancellationToken cancellationToken,
-        string? vin = null, byte[]? eid = null)
+        string? vin = null, byte[]? eid = null, int? portOverride = null)
     {
         if (!IPAddress.TryParse(host, out var address) ||
             address.AddressFamily != AddressFamily.InterNetwork ||
             address.Equals(IPAddress.Any) ||
             address.Equals(IPAddress.Broadcast) ||
-            timeout <= TimeSpan.Zero || timeout > TimeSpan.FromSeconds(30))
+            timeout <= TimeSpan.Zero || timeout > TimeSpan.FromSeconds(30) ||
+            (portOverride.HasValue && portOverride.Value is < 1 or > 65535))
             throw new ArgumentException(
-                "Provide an explicit unicast IPv4 gateway and a bounded timeout.");
+                "Provide an explicit unicast IPv4 gateway, port and bounded timeout.");
         if (vin is not null && eid is not null)
             throw new ArgumentException("Use either VIN or EID identification, not both.");
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         deadline.CancelAfter(timeout);
         using var socket = new UdpClient(AddressFamily.InterNetwork);
-        var destination = new IPEndPoint(address, 13400);
+        var destination = new IPEndPoint(address, portOverride ?? 13400);
         var request = vin is not null ? BuildVinRequest(vin) :
             eid is not null ? BuildEidRequest(eid) : BuildRequest();
         await socket.SendAsync(request.AsMemory(), destination, deadline.Token);
         while (true)
         {
             var received = await socket.ReceiveAsync(deadline.Token);
-            if (!received.RemoteEndPoint.Address.Equals(address))
+            if (!received.RemoteEndPoint.Address.Equals(address) ||
+                received.RemoteEndPoint.Port != destination.Port)
                 continue;
             // Reject invalid announcements from the selected gateway rather
             // than silently interpreting arbitrary UDP traffic as an ECU.
