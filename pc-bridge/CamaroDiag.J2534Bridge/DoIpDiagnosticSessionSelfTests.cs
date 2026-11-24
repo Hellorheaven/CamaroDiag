@@ -38,10 +38,12 @@ internal static class DoIpDiagnosticSessionSelfTests
 
     private static async Task GatewayAsync(Stream stream,
         Func<Stream, Task> scenario, bool pendingRoute = false,
-        byte activationType = 0x00, byte[]? activationOemData = null)
+        byte activationType = 0x00, byte[]? activationOemData = null,
+        byte protocolVersion = DoIpCodec.Version)
     {
         var activation = await ReadAsync(stream);
         if (activation.Type != DoIpCodec.RoutingActivationRequest ||
+            activation.Version != protocolVersion ||
             activation.Payload.Length != (activationOemData is null ? 7 : 11) ||
             activation.Payload[0] != 0x0E || activation.Payload[1] != 0x80 ||
             activation.Payload[2] != activationType ||
@@ -51,15 +53,18 @@ internal static class DoIpDiagnosticSessionSelfTests
             throw new InvalidOperationException("Unexpected DoIP routing activation.");
         if (pendingRoute)
             await SendAsync(stream, DoIpCodec.RoutingActivationResponse,
-                [0x0E, 0x80, 0x12, 0x34, 0x11, 0, 0, 0, 0]);
+                [0x0E, 0x80, 0x12, 0x34, 0x11, 0, 0, 0, 0],
+                protocolVersion);
         await SendAsync(stream, DoIpCodec.RoutingActivationResponse,
-            [0x0E, 0x80, 0x12, 0x34, 0x10, 0, 0, 0, 0]);
+            [0x0E, 0x80, 0x12, 0x34, 0x10, 0, 0, 0, 0],
+            protocolVersion);
         await scenario(stream);
     }
 
     private static async Task RunCaseAsync(Func<Stream, Task> gateway,
         Func<DoIpDiagnosticTransport, Task> client, bool pendingRoute = false,
-        byte activationType = 0x00, byte[]? activationOemData = null)
+        byte activationType = 0x00, byte[]? activationOemData = null,
+        byte protocolVersion = DoIpCodec.Version)
     {
         var listener = new TcpListener(IPAddress.Loopback, 0);
         listener.Start();
@@ -69,13 +74,14 @@ internal static class DoIpDiagnosticSessionSelfTests
             using var peer = await listener.AcceptTcpClientAsync();
             await using var stream = peer.GetStream();
             await GatewayAsync(stream, gateway, pendingRoute,
-                activationType, activationOemData);
+                activationType, activationOemData, protocolVersion);
         });
         try
         {
             await using var transport = await DoIpDiagnosticTransport.ConnectAsync(
                 "127.0.0.1", Tester, Ecu, TimeSpan.FromSeconds(3),
                 CancellationToken.None, portOverride: port,
+                protocolVersion: protocolVersion,
                 activationType: activationType,
                 activationOemData: activationOemData);
             await client(transport);
@@ -191,6 +197,37 @@ internal static class DoIpDiagnosticSessionSelfTests
                 .SequenceEqual(Positive),
                 "Operator-provided 11-byte OEM routing activation is transmitted.");
         }, activationType: 0xE0, activationOemData: [1, 2, 3, 4]);
+
+        // End-to-end TCP routing, ACK and UDS must agree on selected DoIP
+        // protocol version. These use loopback only, not an actual gateway.
+        foreach (var selectedVersion in new byte[] { 0x03, 0x04 })
+        {
+            await RunCaseAsync(async stream =>
+            {
+                var requestFrame = await RequireRequestAsync(stream);
+                Check(requestFrame.Version == selectedVersion,
+                    "DoIP diagnostic request carries negotiated v" +
+                    selectedVersion.ToString("X2") + ".");
+                await SendAsync(stream, DoIpCodec.DiagnosticPositiveAck,
+                    [0x12, 0x34, 0x0E, 0x80, 0x00, .. Request],
+                    selectedVersion);
+                await SendAsync(stream, DoIpCodec.AliveCheckRequest,
+                    [], selectedVersion);
+                var aliveResponse = await ReadAsync(stream);
+                Check(aliveResponse.Version == selectedVersion &&
+                    aliveResponse.Type == DoIpCodec.AliveCheckResponse,
+                    "DoIP AliveCheck response preserves negotiated version.");
+                await SendAsync(stream, DoIpCodec.DiagnosticMessage,
+                    FromEcu(Positive), selectedVersion);
+            }, async client =>
+            {
+                var answer = await client.ExchangeUdsAsync(Request,
+                    TimeSpan.FromSeconds(2), CancellationToken.None);
+                Check(answer.SequenceEqual(Positive),
+                    "DoIP TCP routing and exchange respect version 0x" +
+                    selectedVersion.ToString("X2") + ".");
+            }, protocolVersion: selectedVersion);
+        }
 
         // DoIP has no per-request correlation token. Two callers may never
         // interleave on the same socket; serialized reuse *after* success
