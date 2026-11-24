@@ -76,3 +76,12 @@ python -m camarodiagconnectors.doip_cli --host 192.0.2.10 --vin 1G1FA1RXXR012345
 ```
 
 Exemples fictifs, à remplacer par les données de la passerelle et du calculateur réellement sélectionnés. Services disponibles : découverte, statut, alimentation, VIN, DID, comptage/liste DTC, instantanés/données étendues et monitoring. Les données constructeur sans définition restent brutes ; aucun flash ni qualification physique. / The host connects directly over IP, not through the USB prototype. Use real verified logical addresses; no physical qualification or programming is implied.
+
+### Acquisition mémoire DoIP / DoIP memory capture
+
+```bash
+python -m camarodiagconnectors.doip_cli --host 192.0.2.10 backup --profile profil-doip.json --output capture.zip
+python -m camarodiagconnectors.offline_cli verify-doip --archive capture.zip --profile profil-doip.json
+```
+
+Les adresses et le VIN proviennent du profil d'origine, contrôlé avant chaque lecture de zone. Deux passes indépendantes et vérification de l'identité du calculateur sont obligatoires. L'archive est contrôlée avant publication exclusive ; le système de fichiers doit prendre en charge les liens physiques. Aucune réécriture d'un fichier existant, aucun déverrouillage ou effacement automatique. Limite : 8192 blocs par passe, 600 s de lecture. / Two independent scoped reads and identity verification, exclusive archive publication, no automatic ECU write or unlock.

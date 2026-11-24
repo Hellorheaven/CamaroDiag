@@ -6,10 +6,13 @@ from dataclasses import asdict
 import json
 import ssl
 import sys
+from pathlib import Path
 from datetime import datetime, timezone
 from typing import Sequence
 
 from .doip import Session, discover, status, DoIpError, valid_vin
+from .doip_archive import load_scope
+from .doip_capture import capture_region, save_capture
 
 
 def hex_value(value: str, digits: int) -> int:
@@ -54,7 +57,21 @@ def run(argv: Sequence[str] | None = None) -> dict:
         p = sub.add_parser(action)
         p.add_argument("--dtc", required=True, type=lambda x: hex_value(x, 6))
         p.add_argument("--record", required=True, type=lambda x: hex_value(x, 2))
+    backup = sub.add_parser("backup", help=tr("Read a documented ECU region twice", "Lire deux fois une zone ECU documentée"))
+    backup.add_argument("--profile", required=True, type=Path)
+    backup.add_argument("--output", required=True, type=Path)
     o = parser.parse_args(argv)
+    scope = None
+    if o.action == "backup":
+        scope = load_scope(o.profile)
+        for supplied, expected in ((o.vin, scope["Vin"]), (o.tester, scope["Tester"]), (o.ecu, scope["Ecu"])):
+            if supplied is not None and supplied != expected:
+                parser.error(tr("Target differs from profile", "La cible diffère du profil"))
+        o.vin, o.tester, o.ecu = scope["Vin"], scope["Tester"], scope["Ecu"]
+        if o.output.exists() or not o.output.parent.is_dir():
+            parser.error(tr("Choose a new output in an existing directory", "Choisir un nouveau fichier dans un dossier existant"))
+        if (scope["Length"] + scope["BlockSize"] - 1) // scope["BlockSize"] > 8192:
+            parser.error(tr("Profile exceeds 8192 blocks per pass", "Le profil dépasse 8192 blocs par passe"))
     trace = _trace if o.trace else None
     network_only = o.action in ("discover", "status", "power")
     if not network_only and (o.vin is None or not valid_vin(o.vin) or o.tester is None or o.ecu is None or o.tester == o.ecu):
@@ -72,11 +89,18 @@ def run(argv: Sequence[str] | None = None) -> dict:
         return result
     if o.action in ("status", "power"):
         return result | status(gateway, o.action == "power", o.timeout, trace)
+    if scope is not None and gateway.logical_address != scope["Gateway"]:
+        raise DoIpError(tr("Observed gateway differs from profile", "La passerelle observée diffère du profil"))
     context = ssl.create_default_context(cafile=o.ca_file) if o.ca_file else None
     with Session(gateway, o.tester, o.ecu, tls=not o.tcp, timeout=o.timeout,
                  trace=trace, context=context) as session:
         vin = session.verify_vin(o.vin)
         result |= {"vin": vin, "ecu": o.ecu, "tester": o.tester, "tls": not o.tcp}
+        if scope is not None:
+            def progress(index, offset, length):
+                print(tr("Pass", "Passe") + f" {index}/2: {offset}/{length}", file=sys.stderr)
+            first, second = capture_region(session, scope, progress)
+            return result | save_capture(o.output, o.profile, scope, first, second)
         if o.action == "vin":
             return result
         if o.action == "did":
