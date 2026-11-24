@@ -23,6 +23,9 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
     private readonly Stream stream;
     private readonly ushort testerAddress;
     private readonly ushort ecuAddress;
+    private ushort? routedGatewayAddress;
+    internal bool MatchesLogicalTarget(ushort gateway, ushort tester, ushort ecu) =>
+        routedGatewayAddress == gateway && testerAddress == tester && ecuAddress == ecu;
     private readonly byte protocolVersion;
     // 0 = ready, 1 = one UDS exchange in progress, 2 = closed/uncertain.
     // DoIP carries no per-request transaction ID. A late reply after a
@@ -153,6 +156,7 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
                 break;
             }
             deadline.Token.ThrowIfCancellationRequested();
+            session.routedGatewayAddress = routingEntityAddress;
             session.StartReceivePump();
             return session;
         }

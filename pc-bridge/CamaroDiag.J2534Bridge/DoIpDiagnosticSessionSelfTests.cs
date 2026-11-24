@@ -337,6 +337,79 @@ internal static class DoIpDiagnosticSessionSelfTests
             });
         }
 
+        // Scope-qualified memory capture on a simulated gateway. No physical ECU.
+        var backupScope = new DoIpBackupScope(simulatedVin, Ecu, Tester, Ecu, 0x1234,
+            "A1B2", 0x100, 4, 2, "CALIBRATION");
+        async Task BackupRequest(Stream stream, byte[] request, byte[] response)
+        {
+            var message = await ReadAsync(stream);
+            Check(message.Type == DoIpCodec.DiagnosticMessage &&
+                message.Payload.SequenceEqual((byte[])[0x0E, 0x80, 0x12, 0x34, .. request]),
+                "Backup sends only the expected scoped read to the same ECU.");
+            await SendAsync(stream, DoIpCodec.DiagnosticMessage, FromEcu(response));
+        }
+        async Task BackupIdentity(Stream stream)
+        {
+            await BackupRequest(stream, Request,
+                [0x62, 0xF1, 0x90, .. System.Text.Encoding.ASCII.GetBytes(simulatedVin)]);
+            await BackupRequest(stream, [0x22, 0x12, 0x34], [0x62, 0x12, 0x34, 0xA1, 0xB2]);
+        }
+        await RunCaseAsync(async stream =>
+        {
+            for (var pass = 0; pass < 2; pass++)
+            {
+                await BackupIdentity(stream);
+                await BackupRequest(stream, [0x23, 0x14, 0, 0, 1, 0, 2], [0x63, 1, 2]);
+                await BackupRequest(stream, [0x23, 0x14, 0, 0, 1, 2, 2], [0x63, 3, 4]);
+            }
+            await BackupIdentity(stream);
+        }, async client =>
+        {
+            var capture = await DoIpScopedBackup.ReadAsync(client, backupScope,
+                TimeSpan.FromSeconds(2), CancellationToken.None);
+            Check(capture.First.SequenceEqual((byte[])[1, 2, 3, 4]) &&
+                capture.Second.SequenceEqual(capture.First) &&
+                !ReferenceEquals(capture.First, capture.Second), "DoIP backup performs independent reads.");
+            var folder = Path.Combine(Path.GetTempPath(), "CamaroDiagDoIp-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(folder);
+            try
+            {
+                var path = Path.Combine(folder, "backup.zip");
+                DoIpScopedBackup.SaveNew(path, capture, CancellationToken.None);
+                var verified = DoIpScopedBackup.VerifyZip(path, backupScope, CancellationToken.None);
+                Check(verified.Sha256 == capture.Sha256, "DoIP backup verifies against original profile.");
+                await Expect<InvalidDataException>(() => Task.Run(() =>
+                    DoIpScopedBackup.VerifyZip(path, backupScope with { Start = 0x200 }, CancellationToken.None)),
+                    "DoIP archive rejected for different memory region.");
+                await Expect<IOException>(() => Task.Run(() =>
+                    DoIpScopedBackup.SaveNew(path, capture, CancellationToken.None)),
+                    "Original DoIP backup cannot be overwritten.");
+                using (var zip = System.IO.Compression.ZipFile.Open(path, System.IO.Compression.ZipArchiveMode.Update))
+                {
+                    zip.GetEntry("verification.bin")!.Delete();
+                    using var entry = zip.CreateEntry("verification.bin").Open();
+                    entry.Write(new byte[] { 1, 2, 3, 9 });
+                }
+                await Expect<InvalidDataException>(() => Task.Run(() =>
+                    DoIpScopedBackup.VerifyZip(path, backupScope, CancellationToken.None)),
+                    "Tampered DoIP backup rejected.");
+            }
+            finally { Directory.Delete(folder, recursive: true); }
+        });
+        await RunCaseAsync(async stream =>
+        {
+            await BackupRequest(stream, Request,
+                [0x62, 0xF1, 0x90, .. System.Text.Encoding.ASCII.GetBytes(simulatedVin)]);
+            await BackupRequest(stream, [0x22, 0x12, 0x34], [0x62, 0x12, 0x34, 0xA1, 0xB3]);
+        }, async client =>
+        {
+            await Expect<UnauthorizedAccessException>(async () =>
+            {
+                _ = await DoIpScopedBackup.ReadAsync(client, backupScope, TimeSpan.FromSeconds(2),
+                    CancellationToken.None);
+            }, "Different firmware identity prevents memory acquisition.");
+        });
+
         // UDP and TCP identity correlation: no diagnostic PDU may be sent
         // if routing activation reports a different logical gateway.
         var mismatchListener = new TcpListener(IPAddress.Loopback, 0);

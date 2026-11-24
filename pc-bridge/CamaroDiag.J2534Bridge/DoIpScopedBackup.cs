@@ -25,7 +25,7 @@ internal sealed record DoIpBackupScope(string Vin, ushort Gateway, ushort Tester
         string Get(string key) => root.GetProperty(key).GetString() ?? throw new InvalidDataException(key);
         var scope = new DoIpBackupScope(Get("vin"), DoIpVinReader.ParseLogicalAddress(Get("gateway")),
             DoIpVinReader.ParseLogicalAddress(Get("tester")), DoIpVinReader.ParseLogicalAddress(Get("ecu")),
-            DoIpVinReader.ParseLogicalAddress(Get("identityDid")), Get("identityHex"),
+            DoIpVinReader.ParseLogicalAddress(Get("identityDid")), Get("identityHex").ToUpperInvariant(),
             uint.Parse(Get("startAddress"), NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture),
             root.GetProperty("lengthBytes").GetInt32(), root.GetProperty("blockSize").GetInt32(), Get("region"));
         scope.Validate();
@@ -53,12 +53,15 @@ internal static class DoIpScopedBackup
         TimeSpan timeout, CancellationToken token, Action<int, int>? progress = null)
     {
         scope.Validate();
+        if (!link.MatchesLogicalTarget(scope.Gateway, scope.Tester, scope.Ecu))
+            throw new UnauthorizedAccessException("Active DoIP channel differs from the backup scope.");
         async Task VerifyIdentity()
         {
             var vin = await DoIpVinReader.ReadAsync(link, timeout, token);
+            if (!string.Equals(vin, scope.Vin, StringComparison.Ordinal))
+                throw new UnauthorizedAccessException("Live DoIP VIN does not match the approved profile.");
             var identity = await DoIpVinReader.ReadDidAsync(link, scope.IdentityDid, timeout, token);
-            if (!string.Equals(vin, scope.Vin, StringComparison.Ordinal) ||
-                !string.Equals(Convert.ToHexString(identity), scope.IdentityHex, StringComparison.OrdinalIgnoreCase))
+            if (!string.Equals(Convert.ToHexString(identity), scope.IdentityHex, StringComparison.OrdinalIgnoreCase))
                 throw new UnauthorizedAccessException("Live DoIP ECU identity does not match the approved profile.");
         }
         async Task<byte[]> ReadPass(int pass)
