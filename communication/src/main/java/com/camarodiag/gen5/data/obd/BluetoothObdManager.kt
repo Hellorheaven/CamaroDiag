@@ -86,6 +86,14 @@ class BluetoothObdManager(context: Context) {
                 it.supportsCanHeaders
             } == true
 
+    /** Accepted physical configurations for the implemented classical CAN console.
+     * Other adapter capabilities are not silently converted to classical CAN. */
+    fun availableRawCanProfiles(): Set<Int> {
+        val adapter = activeAdapterCapabilities ?: return emptySet()
+        if (!isObdCommandChannelAvailable || !adapter.supportsCanHeaders) return emptySet()
+        return adapter.acceptedElmProtocols.intersect(setOf(6, 7, 8, 9))
+    }
+
     /** A candidate is a configured software path, not proof of ECU response. */
     fun availableUdsReadProfiles(request: Int? = null, response: Int? = null): Set<Int> {
         if (request != null && response != null && request == response) return emptySet()
@@ -753,13 +761,18 @@ class BluetoothObdManager(context: Context) {
         check(capabilities.supportsCanHeaders) {
             "The connected adapter does not report CAN header support."
         }
+        require(DiagnosticRouteSelector.elmCanProtocol(can29Bit, bitrate) in availableRawCanProfiles()) {
+            "Selected CAN capture profile was not accepted by the connected adapter."
+        }
         require(durationMs >= 1_000L) {
             "CAN monitor duration must be at least one second."
         }
 
         commandSessionMutex.withLock {
             transportSessionEpoch.requireQueuedCurrent(requestedEpoch)
-            check(isObdCommandChannelAvailable) { "CAN monitor connection changed while waiting." }
+            check(DiagnosticRouteSelector.elmCanProtocol(can29Bit, bitrate) in availableRawCanProfiles()) {
+                "CAN monitor profile changed while waiting."
+            }
             suspend fun boundCommand(command: String, timeoutMs: Long, onChunk: ((String) -> Unit)? = null): String =
                 sendAtCommandInternal(command, timeoutMs, expectedEpoch = requestedEpoch, onChunk = onChunk)
             val isStnAdapter = capabilities.tier == AdapterTier.PRO_STN
@@ -859,7 +872,9 @@ class BluetoothObdManager(context: Context) {
 
         commandSessionMutex.withLock {
             transportSessionEpoch.requireQueuedCurrent(requestedEpoch)
-            check(isObdCommandChannelAvailable) { "CAN transmission connection changed while waiting." }
+            check(DiagnosticRouteSelector.elmCanProtocol(frame.isExtended, bitrate) in availableRawCanProfiles()) {
+                "CAN transmission profile is unavailable on the current adapter."
+            }
             suspend fun boundCommand(
                 command: String,
                 timeoutMs: Long,

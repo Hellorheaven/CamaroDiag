@@ -12,6 +12,7 @@ import com.camarodiag.gen5.data.db.DiagnosticDatabase
 import com.camarodiag.gen5.data.db.SavedSessionEntity
 import com.camarodiag.gen5.data.obd.BluetoothObdManager
 import com.camarodiag.gen5.data.obd.DoIpDirectRead
+import com.camarodiag.gen5.data.obd.DiagnosticRouteSelector
 import com.camarodiag.gen5.data.obd.Lfx2012ControllerReferences
 import com.google.firebase.auth.FirebaseAuth
 import com.camarodiag.gen5.auth.LicenseLevel
@@ -2071,8 +2072,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun canMonitorAvailable(): Boolean =
-        obdManager.isObdCommandChannelAvailable && _adapter.value.supportsCanHeaders
+    fun availableRawCanProfiles(): Set<Int> = obdManager.availableRawCanProfiles()
+
+    fun canMonitorAvailable(): Boolean = availableRawCanProfiles().isNotEmpty()
 
     /** Read-only UDS transport candidates; physical target responses remain authoritative. */
     fun canReadEnhancedUds(): Boolean =
@@ -2129,7 +2131,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      * observed-ID attribution, while preserving the global event history.
      */
     fun setCanConsoleBitrate(bitrate: Int) {
-        if (bitrate !in setOf(250_000, 500_000)) return
+        if (bitrate !in setOf(250_000, 500_000) ||
+            listOf(false, true).none { DiagnosticRouteSelector.elmCanProtocol(it, bitrate) in availableRawCanProfiles() }) return
         val state = _liveCanMonitorState.value
         if (state.isCapturing || state.isSendingRequest || state.bitrate == bitrate ||
             canMonitorJob?.isActive == true || canRequestJob?.isActive == true ||
@@ -2146,7 +2149,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (canMonitorJob != null || detachedCanMonitorJob?.isCompleted == false ||
             canRequestJob?.isCompleted == false || detachedCanRequestJob?.isCompleted == false
         ) return
-        if (!obdManager.isObdCommandChannelAvailable || !_adapter.value.supportsCanHeaders) {
+        if (DiagnosticRouteSelector.elmCanProtocol(can29Bit, _liveCanMonitorState.value.bitrate) !in availableRawCanProfiles()) {
             val unavailable = localizedContext.getString(R.string.can_sniffer_unavailable)
             appendCanConsoleSystemEvent(unavailable, succeeded = false)
             _liveCanMonitorState.value = _liveCanMonitorState.value.copy(message = unavailable)
@@ -2469,8 +2472,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 frame = frame,
                 pendingContextGeneration = expectedContextGeneration,
                 currentContextGeneration = state.consoleContextGeneration,
-                monitorAvailable = obdManager.isObdCommandChannelAvailable &&
-                    _adapter.value.supportsCanHeaders,
+                monitorAvailable = frame != null && DiagnosticRouteSelector.elmCanProtocol(frame.isExtended, state.bitrate) in availableRawCanProfiles(),
                 canTransmit = _adapter.value.supportsCanTransmit,
                 busy = state.isCapturing || state.isSendingRequest
             )) return
