@@ -49,6 +49,12 @@ internal class OBDLinkBleTransport(private val context: Context) {
 
     private var connectResult: CompletableDeferred<Unit>? = null
     private var writeResult: CompletableDeferred<Unit>? = null
+    /**
+     * One GATT handshake at a time. Without this lock, a delayed failure from
+     * a superseded connect() could call close() against the newly selected
+     * BLE adapter and clear its notification or write state.
+     */
+    private val connectionMutex = Mutex()
     /** Serializes GATT writes so callbacks cannot complete the wrong operation. */
     private val writeMutex = Mutex()
     /** Only one reader may consume the shared response buffer at a time. */
@@ -184,30 +190,31 @@ internal class OBDLinkBleTransport(private val context: Context) {
         }
     }
 
-    suspend fun connect(device: BluetoothDevice): Result<Unit> {
-        return try {
-            close()
-            connectionFailure = null
-            connectResult = CompletableDeferred()
-            gatt = device.connectGatt(context, false, callback, BluetoothDevice.TRANSPORT_LE)
-                ?: throw IllegalStateException("Unable to create BLE connection")
-            withTimeout(15_000) { connectResult!!.await() }
-            mtuResult = CompletableDeferred()
-            gatt?.requestMtu(247)
-            withTimeoutOrNull(3_000) { mtuResult?.await() }
-            Result.success(Unit)
-        } catch (cancelled: kotlinx.coroutines.CancellationException) {
-            close()
-            // A cancelled adapter switch must propagate to the ViewModel.
-            // A timeout started by this BLE handshake, however, leaves the
-            // caller job active and is a normal connection failure.
-            if (!kotlinx.coroutines.currentCoroutineContext().isActive) throw cancelled
-            Result.failure(cancelled)
-        } catch (e: Exception) {
-            close()
-            Result.failure(e)
+    suspend fun connect(device: BluetoothDevice): Result<Unit> =
+        connectionMutex.withLock {
+            try {
+                close()
+                connectionFailure = null
+                connectResult = CompletableDeferred()
+                gatt = device.connectGatt(context, false, callback, BluetoothDevice.TRANSPORT_LE)
+                    ?: throw IllegalStateException("Unable to create BLE connection")
+                withTimeout(15_000) { connectResult!!.await() }
+                mtuResult = CompletableDeferred()
+                gatt?.requestMtu(247)
+                withTimeoutOrNull(3_000) { mtuResult?.await() }
+                Result.success(Unit)
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                close()
+                // A cancelled adapter switch must propagate to the ViewModel.
+                // A timeout started by this BLE handshake, however, leaves the
+                // caller job active and is a normal connection failure.
+                if (!kotlinx.coroutines.currentCoroutineContext().isActive) throw cancelled
+                Result.failure(cancelled)
+            } catch (e: Exception) {
+                close()
+                Result.failure(e)
+            }
         }
-    }
 
     suspend fun write(data: ByteArray) = writeMutex.withLock {
         var writeSession: BluetoothGatt? = null
