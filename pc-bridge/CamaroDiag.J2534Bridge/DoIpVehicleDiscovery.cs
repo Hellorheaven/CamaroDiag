@@ -184,13 +184,21 @@ internal static class DoIpVehicleDiscovery
     /// bind local UDP port 13400; this is not ECU authentication.
     /// </summary>
     internal static async Task<IReadOnlyList<Identity>> ListenAsync(
-        TimeSpan duration, CancellationToken cancellationToken)
+        TimeSpan duration, CancellationToken cancellationToken,
+        int? localPortOverride = null, int? sourcePortOverride = null)
     {
-        if (duration <= TimeSpan.Zero || duration > TimeSpan.FromSeconds(30))
-            throw new ArgumentOutOfRangeException(nameof(duration));
+        if (duration <= TimeSpan.Zero || duration > TimeSpan.FromSeconds(30) ||
+            (localPortOverride.HasValue &&
+                localPortOverride.Value is < 1 or > 65535) ||
+            (sourcePortOverride.HasValue &&
+                sourcePortOverride.Value is < 1 or > 65535))
+            throw new ArgumentOutOfRangeException(nameof(duration),
+                "Passive DoIP listening needs a bounded interval and standard UDP endpoint.");
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         deadline.CancelAfter(duration);
-        using var receiver = new UdpClient(new IPEndPoint(IPAddress.Any, 13400));
+        var sourcePort = sourcePortOverride ?? 13400;
+        using var receiver = new UdpClient(
+            new IPEndPoint(IPAddress.Any, localPortOverride ?? 13400));
         var identified = new Dictionary<string, Identity>(StringComparer.Ordinal);
         while (identified.Count < 32)
         {
@@ -205,6 +213,10 @@ internal static class DoIpVehicleDiscovery
             }
             try
             {
+                // Spontaneous DoIP announcements must originate at the
+                // gateway's standardized UDP discovery port, not an
+                // arbitrary sender on the same host or LAN.
+                if (received.RemoteEndPoint.Port != sourcePort) continue;
                 var found = ParseAnnouncement(received.Buffer,
                     received.RemoteEndPoint.Address);
                 var key = found.Source + ":" + found.LogicalAddress.ToString("X4");
