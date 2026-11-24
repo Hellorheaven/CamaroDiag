@@ -1,3 +1,7 @@
+PR117 — grouped Android DoIP mutual TLS checkpoint
+Parent implementation HEAD: 1dcc903704432fd4e59402af3fcfaa346631a715
+Validate KeyChain certificate selection and target binding, TLS key manager, localhost mutual TLS certificate presentation, server identity/trust, all Android DoIP paths and resources FR/EN; existing cross-platform Debug checks. No merge/release/deployment/physical qualification.
+
 PR117 — grouped host DoIP transport and scoped capture, cross-platform command sequences checkpoint
 Parent implementation HEAD: 17ba6af8cedd06e14d8bd9d45332d7f9cace2cb5
 Validate Connectors Python UDP/TCP/TLS host, VIN ambiguity, DTC/monitor, scoped capture archive, consent and ordered sequence; Android and Windows GUI/CLI same-session UDS sequence, correlation, cancellation, localization, existing Debug checks. No merge/release/deployment/physical qualification.

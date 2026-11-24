@@ -41,8 +41,7 @@ class DoIpClientTls private constructor(
     /** Explicit client-certificate mode must actually negotiate that certificate.
      * A server that never requested a certificate is not a successful mTLS session. */
     internal fun requirePresented(socket: SSLSocket) {
-        if (socket.session.localCertificates?.firstOrNull() != leaf)
-            throw SSLHandshakeException("Selected DoIP client certificate was not presented.")
+        requirePresented(socket, leaf)
     }
 
     companion object {
@@ -92,6 +91,11 @@ class DoIpClientTls private constructor(
             } catch (error: Exception) {
                 throw DoIpClientCertificateException("Client certificate unavailable, invalid or expired.", error)
             }
+        }
+
+        internal fun requirePresented(socket: SSLSocket, expected: X509Certificate) {
+            if (socket.session.localCertificates?.firstOrNull() != expected)
+                throw SSLHandshakeException("Selected DoIP client certificate was not presented.")
         }
 
         internal fun fingerprint(certificate: X509Certificate): String =

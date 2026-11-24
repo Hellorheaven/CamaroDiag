@@ -472,7 +472,7 @@ fun CalibrationWorkspaceScreen(
                                             try {
                                                 if (alias != null && alias != "android:alias-selection-denied")
                                                     doIpCertificate = DoIpClientTls.select(certContext, alias, host, vin)
-                                                else if (alias != null) doIpCertificateError = true
+                                                else doIpCertificateError = true
                                             } catch (cancelled: CancellationException) {
                                                 throw cancelled
                                             } catch (_: Exception) { doIpCertificateError = true }
