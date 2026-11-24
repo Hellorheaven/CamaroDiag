@@ -31,7 +31,7 @@ internal static class BridgeCommandLineHelpSelfTests
         Require(english.Contains("Usage:", StringComparison.Ordinal), "English resource");
         Require(french.Contains("Utilisation", StringComparison.Ordinal), "French resource");
         foreach (var option in new[] {
-            "--self-test", "--probe-drivers", "--discover-connector",
+            "--self-test", "--probe-drivers", "--list-ports", "--discover-connector",
             "--inspect-write-journal", "--inspect-e39-image", "--port 35001"
         })
         {
