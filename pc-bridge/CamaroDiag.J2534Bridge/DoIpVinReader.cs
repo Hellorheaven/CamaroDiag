@@ -183,9 +183,29 @@ internal static class DoIpVinReader
         var fixedCommand = command.ToArray();
         await using var transport = await ConnectObservedAsync(gateway, address, tester,
             ecu, useTls, timeout, token, certificate, trace);
+        return await ExchangeVerifiedAsync(transport, gateway, fixedCommand, timeout, token);
+    }
+
+    internal static async Task<byte[]> ExchangeVerifiedAsync(DoIpDiagnosticTransport transport,
+        DoIpVehicleDiscovery.Identity gateway, byte[] command, TimeSpan timeout, CancellationToken token)
+    {
+        var fixedCommand = command.ToArray();
         _ = await VerifyObservedVinAsync(transport, gateway, timeout, token, null, null);
         token.ThrowIfCancellationRequested();
         return await transport.ExchangeUdsAsync(fixedCommand, timeout, token);
+    }
+
+    internal static async Task<ObdOnUdsServices.DtcCountReport> CountObservedGatewayDtcsAsync(
+        DoIpVehicleDiscovery.Identity gateway, IPAddress address, ushort tester, ushort ecu,
+        bool useTls, byte statusMask, TimeSpan timeout, CancellationToken token,
+        string? certificate = null, Action<DoIpDiagnosticTransport.PduTrace>? trace = null)
+    {
+        await using var transport = await ConnectObservedAsync(gateway, address, tester,
+            ecu, useTls, timeout, token, certificate, trace);
+        _ = await VerifyObservedVinAsync(transport, gateway, timeout, token, null, null);
+        var reply = await ExchangeReadAsync(transport,
+            ObdOnUdsServices.ReadDtcCountByStatusMask(statusMask), timeout, token, null, null);
+        return ObdOnUdsServices.DecodeDtcCountByStatusMask(reply);
     }
 
     internal static async Task<string> ReadObservedGatewayAsync(

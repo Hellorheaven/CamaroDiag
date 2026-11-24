@@ -1,3 +1,7 @@
+PR117 — grouped DoIP command console and DTC count/filter checkpoint
+Parent implementation HEAD: 33709b51ad6ffb64694de28afa14a0d77d5cea25
+Validate Windows confirmed UDS exchange, same-session VIN correlation, Android and Windows 19/01 DTC count, Android 19/02 filtering and FR/EN. Intermediate C6/DoIP only. No merge, release, deployment or physical qualification.
+
 PR117 — grouped DoIP TCP/TLS console and automatic endpoint routing checkpoint
 Implementation and handoff HEAD: af93c360baf505452230f3d933b245a4626cf7f0
 Full Debug validation: Windows PDU journal, TCP/TLS diagnostic loopback, GUI and backup tracing, FR/EN resources, Android VIN-based route resolution and profile binding, existing native/Connectors/backend offline checks. Intermediate C6/DoIP only. No merge, release, deployment or physical qualification.

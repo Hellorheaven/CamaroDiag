@@ -58,6 +58,12 @@ internal static class DoIpConsolePresentationSelfTests
                 dtcLines[0].Contains("0x0F") && dtcLines[1].Contains("0x123456") &&
                 dtcLines[1].Contains("0x01"),
                 "DTC report preserves code and requested/available masks in " + language);
+            var count = ObdOnUdsServices.DecodeDtcCountByStatusMask([0x59, 1, 0xF0, 4, 0x12, 0x34]);
+            var countText = DoIpConsolePresentation.FormatDtcCount(count, 0xF0, culture);
+            Check(countText.Contains("4660") && countText.Contains("0xF0") && countText.Contains("0x04"),
+                "DTC count preserves unsigned value, availability and format in " + language);
+            Check(!string.IsNullOrWhiteSpace(DoIpConsolePresentation.Text("CountDtcs", culture)),
+                "Localized DTC count button in " + language);
             var emptyDtcs = ObdOnUdsServices.DecodeDtcByStatusMask(
                 0x80, [0x59, 0x02, 0x01]);
             var emptyLines = DoIpConsolePresentation.FormatDtcs(emptyDtcs, 0x80, culture);

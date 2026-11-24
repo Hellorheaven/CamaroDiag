@@ -54,6 +54,11 @@ internal static class DoIpConsolePresentation
         return lines;
     }
 
+    internal static string FormatDtcCount(ObdOnUdsServices.DtcCountReport report,
+        byte requestedMask, CultureInfo? culture = null) =>
+        string.Format(CultureInfo.InvariantCulture, Text("DtcCountResult", culture),
+            report.Count, requestedMask, report.StatusAvailabilityMask, report.DtcFormatIdentifier);
+
     internal static byte[] ParsePayload(string text)
     {
         var compact = string.Concat(text.Where(c => !char.IsWhiteSpace(c)));

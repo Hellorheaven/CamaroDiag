@@ -1,3 +1,9 @@
+## PR117 — lots fonctionnels groupés, console DoIP et comptage DTC (24/11/2026)
+
+- `6bda16f` : console Windows DoIP avec commande UDS hexadécimale explicite, cible VIN/IP/adresses/logical/TLS et octets figés, double consentement OK puis Oui/Non, lecture F190 sur même session avant envoi, pas de réémission automatique en cas d'échec. Réponse et PDU réelles dans l'historique, FR/EN. Commande unitaire, pas de session OEM de programmation persistante; les ECU ne répondant pas à F190 ne disposent pas de ce parcours vérifié.
+- `33709b5` : Android, masque de statut DTC configurable, 19/01 comptage natif et 19/02 liste filtrée, format et disponibilité affichés ; une liste filtrée ne remplace pas les DTC globaux. Complément Windows : comptage 19/01 sur même cible, ressources FR/EN et tests de réponse/validation VIN/commande.
+- Développer en lots multi-fichiers cohérents plutôt que découper par fichier ou viser le nombre de commits. CI groupée demandée sur le marqueur de ce lot. Tests écrits mais résultats non confirmés ; le HEAD précédent e78fb8f ne retourne pas de runs via le connecteur. C6 et DoIP restent actifs, C8 non commencé. Pas de merge, déploiement ni release. Aucun profil OEM inventé.
+
 ## PR117 — journal DoIP TCP/TLS Windows et résolution automatique Android (24/11/2026)
 
 - HEAD fonctionnel `72d8e0b8c211a62eb6c2b23d5c914e7cd0249d92`. Windows : raccordement des PDU DoIP réellement échangées (routage, alive checks, ACK/NACK, diagnostic) à la console et aux lectures VIN/DID/DTC, monitoring et sauvegardes mémoire (`5c9b1d2`, `fdea179`, `72d2071`, `ec0e2de`). Horodatage à l'observation, tampon interthreads borné à 16 Mio, vidage sur le thread WinForms, échec explicite si incomplet, export refusé pendant une opération. Pas de capture de paquets Ethernet/TLS chiffrés. Aucune duplication volontaire des requêtes UDS dans le journal GUI.

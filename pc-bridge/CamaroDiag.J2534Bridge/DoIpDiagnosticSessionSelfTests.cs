@@ -330,6 +330,46 @@ internal static class DoIpDiagnosticSessionSelfTests
             });
         }
 
+        // Explicit console request follows the same-session VIN read, not
+        // a stale discovery. A mismatch never reaches the requested service.
+        foreach (var vinMatches in new[] { true, false })
+        {
+            byte[] command = [0x22, 0x12, 0x34];
+            var commandReceived = false;
+            await RunCaseAsync(async stream =>
+            {
+                _ = await RequireRequestAsync(stream);
+                var reportedVin = vinMatches ? selectedVehicleVin : otherVehicleVin;
+                await SendAsync(stream, DoIpCodec.DiagnosticMessage,
+                    FromEcu([0x62, 0xF1, 0x90, .. System.Text.Encoding.ASCII.GetBytes(reportedVin)]));
+                if (vinMatches)
+                {
+                    var request = await ReadAsync(stream);
+                    commandReceived = request.Type == DoIpCodec.DiagnosticMessage &&
+                        request.Payload.SequenceEqual(new byte[] {0x0E, 0x80, 0x12, 0x34, 0x22, 0x12, 0x34});
+                    await SendAsync(stream, DoIpCodec.DiagnosticMessage, FromEcu([0x62, 0x12, 0x34, 0xAB]));
+                }
+            }, async client =>
+            {
+                if (vinMatches)
+                {
+                    var result = await DoIpVinReader.ExchangeVerifiedAsync(client, observedForVin,
+                        command, TimeSpan.FromSeconds(2), CancellationToken.None);
+                    Check(result.SequenceEqual(new byte[] {0x62, 0x12, 0x34, 0xAB}),
+                        "Confirmed request returns actual correlated response.");
+                }
+                else
+                {
+                    await Expect<InvalidDataException>(async () =>
+                    {
+                        _ = await DoIpVinReader.ExchangeVerifiedAsync(client, observedForVin,
+                            command, TimeSpan.FromSeconds(2), CancellationToken.None);
+                    }, "Explicit command refused on mismatching ECU VIN.");
+                }
+            });
+            Check(commandReceived == vinMatches, "Explicit command follows only matching F190.");
+        }
+
         // One routed session serves sequential monitored DID requests.
         await RunCaseAsync(async stream =>
         {
