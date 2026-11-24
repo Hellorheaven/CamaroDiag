@@ -1150,7 +1150,8 @@ internal static class StandardProtocolCli
         byte[] Request, int TimeoutMs, bool UseTls, byte Version = 0x02,
         string? ReceiveFile = null,
         string? ClientCertificateThumbprint = null,
-        int DoIpP2Ms = 30000, int DoIpP2StarMs = 30000);
+        int DoIpP2Ms = 30000, int DoIpP2StarMs = 30000,
+        byte RoutingActivationType = 0x00, byte[]? RoutingOemData = null);
     internal sealed record PassThruOptions(int AdapterIndex, uint ProtocolId,
         uint Baud, uint Flags, byte[] Data, byte[]? Mask, byte[]? Pattern,
         byte[]? Flow, string? KlineInit, int TimeoutMs, int ReadFrames,
@@ -1303,6 +1304,13 @@ internal static class StandardProtocolCli
         var useTls = bool.Parse(Optional(args, "--tls") ?? "false");
         var version = checked((byte)Number(
             Optional(args, "--doip-version") ?? "2"));
+        var routingType = checked((byte)Number(
+            Optional(args, "--routing-activation-type") ?? "0"));
+        var routingOemText = Optional(args, "--routing-oem-data");
+        var routingOem = routingOemText is null ? null : Hex(routingOemText);
+        if (routingOem is not null && routingOem.Length != 4)
+            throw new ArgumentException(
+                "DoIP OEM routing-activation data must be exactly four bytes.");
         var receiveFile = Optional(args, "--rx-file");
         var clientCert = Optional(args, "--client-cert-thumbprint");
         if (clientCert is not null &&
@@ -1315,7 +1323,8 @@ internal static class StandardProtocolCli
             version is not (0x02 or 0x03 or 0x04))
             throw new ArgumentException("DoIP target or diagnostic PDU is invalid.");
         return new(host, tester, ecu, bytes, timeout, useTls,
-            version, receiveFile, clientCert, p2Ms, p2StarMs);
+            version, receiveFile, clientCert, p2Ms, p2StarMs,
+            routingType, routingOem);
     }
 
     internal static PassThruOptions ParseJ2534(string[] args)
@@ -1438,7 +1447,9 @@ internal static class StandardProtocolCli
             var o = ParseDoIp(args);
             if (!Confirm($"DoIP {(o.UseTls ? "TLS" : "TCP")} " +
                 $"{o.Host}:{(o.UseTls ? 3496 : 13400)} ECU=0x{o.Ecu:X4} " +
-                $"v=0x{o.Version:X2} UDS length={o.Request.Length} " +
+                $"v=0x{o.Version:X2} routing=0x{o.RoutingActivationType:X2} " +
+                $"OEM={(o.RoutingOemData is null ? "none" : "4 bytes")} " +
+                $"UDS length={o.Request.Length} " +
                 $"SHA256={Convert.ToHexString(
                     System.Security.Cryptography.SHA256.HashData(o.Request))}"))
                 return 2;
@@ -1446,7 +1457,9 @@ internal static class StandardProtocolCli
                 o.Host, o.Tester, o.Ecu,
                 TimeSpan.FromMilliseconds(o.TimeoutMs), CancellationToken.None,
                 useTls: o.UseTls, protocolVersion: o.Version,
-                clientCertificateThumbprint: o.ClientCertificateThumbprint);
+                clientCertificateThumbprint: o.ClientCertificateThumbprint,
+                activationType: o.RoutingActivationType,
+                activationOemData: o.RoutingOemData);
             var reply = await link.ExchangeUdsAsync(o.Request,
                 TimeSpan.FromMilliseconds(o.TimeoutMs), CancellationToken.None,
                 TimeSpan.FromMilliseconds(o.DoIpP2Ms),
