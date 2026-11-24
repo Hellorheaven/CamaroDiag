@@ -42,4 +42,8 @@
   <data name="DtcResult" xml:space="preserve"><value>Nombre de DTC={0} ; masque demandé=0x{1:X2} ; masque disponible=0x{2:X2}</value></data>
   <data name="DtcEntry" xml:space="preserve"><value>DTC 0x{0:X6}, état 0x{1:X2}</value></data>
   <data name="DtcNotice" xml:space="preserve"><value>Rapport en lecture seule ; aucun défaut effacé. Un résultat vide concerne uniquement les bits d’état demandés et disponibles.</value></data>
+  <data name="ReadDid" xml:space="preserve"><value>Lire donnée ECU</value></data>
+  <data name="DidLabel" xml:space="preserve"><value>Identifiant DID (hex)</value></data>
+  <data name="DidResult" xml:space="preserve"><value>DID 0x{0:X4} : {1}</value></data>
+  <data name="DidStarted" xml:space="preserve"><value>DoIP / {0} / UDS : lecture DID via {1}, ECU 0x{2:X4}, testeur 0x{3:X4}, version 0x{4:X2}.</value></data>
 </root>
