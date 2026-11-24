@@ -46,4 +46,5 @@
   <data name="DidLabel" xml:space="preserve"><value>Identifiant DID (hex)</value></data>
   <data name="DidResult" xml:space="preserve"><value>DID 0x{0:X4} : {1}</value></data>
   <data name="DidStarted" xml:space="preserve"><value>DoIP / {0} / UDS : lecture DID via {1}, ECU 0x{2:X4}, testeur 0x{3:X4}, version 0x{4:X2}.</value></data>
+  <data name="InvalidDid" xml:space="preserve"><value>Saisissez quatre chiffres hexadécimaux pour le DID.</value></data>
 </root>
