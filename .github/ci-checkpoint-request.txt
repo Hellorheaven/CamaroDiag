@@ -1,3 +1,18 @@
+C1 FOLLOW-UP ACCEPTANCE — 2026-11-24 (NOT FINAL C8)
+C1 fix: Physical RAW CAN replies exceeding the previous 300-item
+diagnostic correlation window now stream into the complete chronological
+console journal at each adapter RX callback, including segmented USB/BLE
+and Wi-Fi responses. Recent 300 events remain only a UI-memory window;
+full journal has every physical RX record plus TX and SYSTEM; eliminate
+duplicates by not replaying the matcher window in persistent export.
+Includes offline CanConsoleRawRxStreamTest: 1,200 RX, split CR/LF,
+trailing incomplete line, oversized malformed RX and adapter errors.
+Commits b9d5313, 21a305a, 6320aa9, db6b19c6.
+Group Android unit tests, lint, Debug APK once after implementation.
+C1 software acceptance only, no live vehicle/ECU tests in PR #95.
+Do not advance to C2 before C1 passing CI; C8 only at the very end,
+after C1/C2/C4/C6 software completion. ISO/SAE are other chat's scope.
+
 C1 SOFTWARE ACCEPTANCE GATE — 2026-11-24 (not C8 final quality)
 Pre-gate implementation HEAD: 49051e5df2d70f3e0a62a4f8edab8d3a08a7a5f4
 Scope: C1 console CAN/OBD only; ISO/SAE protocol work is owned by
