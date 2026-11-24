@@ -132,6 +132,8 @@ class DoIpGatewayControlTraceTest {
                         assertEquals("127.0.0.1", gateway.host)
                         assertEquals(vin, gateway.gateway.vin)
                         assertEquals(0x1000, gateway.gateway.logicalAddress)
+                        assertEquals("000000000000", gateway.gateway.eid)
+                        assertEquals("000000000000", gateway.gateway.gid)
                     }
                 } finally {
                     executor.shutdownNow()
@@ -150,6 +152,7 @@ class DoIpGatewayControlTraceTest {
         assertEquals(0x0E80, selected.tester)
         assertEquals(0x1001, selected.ecu)
         assertEquals(0x1000, selected.expectedGateway)
+        assertEquals(DoIpDirectRead.Gateway(vin, 0x1000, 2), selected.expectedIdentity)
         assertTrue(selected.tls)
         val mismatch = runCatching {
             DoIpDirectRead.resolveTargetWithDiscovery("", "0E80", "1001", vin, true, 0x1002) {
@@ -166,6 +169,27 @@ class DoIpGatewayControlTraceTest {
                 error("Invalid logical addresses must be rejected before discovery")
             }
         }.exceptionOrNull() is IllegalArgumentException)
+    }
+
+    @Test fun selectedRouteRejectsChangedGatewayIdentityBeforeTcp() {
+        val selected = DoIpDirectRead.Gateway(vin, 0x1000, 2, "112233445566", "010203040506")
+        val target = DoIpDirectRead.Target.parse("127.0.0.1", "0E80", "1001", vin, true, 0x1000, selected)
+        DoIpDirectRead.requireGatewayIdentity(target, selected)
+        for (changed in listOf(selected.copy(eid = "112233445567"), selected.copy(gid = "010203040507"),
+            selected.copy(version = 3), selected.copy(vin = null), selected.copy(logicalAddress = 0x1002)))
+            assertTrue(runCatching { DoIpDirectRead.requireGatewayIdentity(target, changed) }.isFailure)
+    }
+
+    @Test fun obdOnUdsReadRouteRequiresMatchingVinAndProtocolIdentification() {
+        val target = DoIpDirectRead.Target.parse("127.0.0.1", "0E80", "1001", vin, true)
+        assertEquals(1, DoIpDirectRead.decodeObdProtocol(byteArrayOf(0x62, 0xF8.toByte(), 0x10, 1)))
+        assertTrue(DoIpDirectRead.selectObdReadRoute(target, vin, 1).routes.isNotEmpty())
+        assertTrue(DoIpDirectRead.selectObdReadRoute(target, vin, 2).routes.isEmpty())
+        assertTrue(DoIpDirectRead.selectObdReadRoute(target, "1G1FA1RX0J0100002", 1).routes.isEmpty())
+        assertTrue(runCatching { DoIpDirectRead.decodeObdProtocol(byteArrayOf(0x62, 0xF8.toByte(), 0x11, 1)) }.isFailure)
+        assertTrue(DoIpDirectRead.isObdDid(0xF400))
+        assertTrue(DoIpDirectRead.isObdDid(0xF8FF))
+        assertFalse(DoIpDirectRead.isObdDid(0xF190))
     }
 
     @Test fun explicitCommandPreservesBytesAndCorrelatesStandardResponse() {

@@ -1,3 +1,8 @@
+## PR117 — consolidation des chemins Kotlin et reprise CI (24/11/2026)
+
+- Run 45452211613 sur `7321099` : échec Android (déclarations en double et import assertArrayEquals absent dans la copie historique) ; 11 autres jobs techniques réussis, revue ignorée sur PR draft. Cause : sept fichiers avaient été créés sous `com/camaradiag` au lieu de `com/camarodiag`. Historique et différences vérifiés ; les cinq versions enrichies remplacent leurs anciennes copies, les deux fichiers CanTraceFilter et son test sont déplacés sans modification. Les sept chemins erronés sont retirés. Les changements TLS, sélection passerelle, OBDonUDS et import JUnit sont conservés.
+- Validation groupée à reprendre sur le HEAD corrigé avec le lot DoIP hôte ci-dessous. Aucun merge ni Release ; C6 et DoIP toujours actifs.
+
 ## PR117 — parité DoIP Connectors : temporisations UDS et routage configurable (24/11/2026)
 
 - Client hôte Python : P2/P2* configurables, délai global indépendant, NRC 78 seul prolonge le délai de réponse sans dépasser le délai global. ACK et AliveCheck ne prolongent pas ce délai ; socket retiré après expiration ou erreur. Valeurs par défaut conservées (délai global).

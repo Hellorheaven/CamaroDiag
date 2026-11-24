@@ -1130,7 +1130,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 obdbSignalValue = "", obdbSignalMessage = "",
                 doIpReading = false, doIpResult = "", doIpTrace = emptyList(),
                 doIpBackupScope = null, doIpBackupBytes = 0, doIpMonitorReport = null, doIpLiveSamples = emptyList(),
-                doIpGatewayReading = false, doIpDiscoveredVin = "", doIpGatewayHost = "", doIpGatewayResult = "")
+                doIpGatewayReading = false, doIpDiscoveredVin = "", doIpGatewayHost = "", doIpGatewayIdentity = null, doIpGatewayResult = "")
         }
     }
 
@@ -1188,7 +1188,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (!requirePremiumLicense()) return
         launchEnhancedUdsRead(journalDoIp = true) { current ->
             _calibrationWorkspace.update { it.copy(doIpReading = true, doIpGatewayReading = true,
-                doIpGatewayResult = "", doIpDiscoveredVin = "", doIpGatewayHost = host) }
+                doIpGatewayResult = "", doIpDiscoveredVin = "", doIpGatewayHost = host, doIpGatewayIdentity = null) }
             try {
                 val result = DoIpDirectRead.inspectGateway(host, _vehicle.value.vin, operation,
                     onControlTrace = { trace -> journalDoIpControlTrace(trace, current) })
@@ -1211,8 +1211,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 _calibrationWorkspace.update { it.copy(doIpReading = false, doIpGatewayReading = false,
                     doIpGatewayHost = result.host ?: host,
+                    doIpGatewayIdentity = result.gateway,
                     doIpDiscoveredVin = if (result.host != null) result.gateway.vin.orEmpty() else "",
-                    doIpGatewayResult = listOfNotNull(identity, status, power).joinToString("\n")) }
+                    doIpGatewayResult = listOfNotNull(identity,
+                        localizedContext.getString(R.string.cal_doip_gateway_eid_gid, result.gateway.eid, result.gateway.gid),
+                        status, power).joinToString("\n")) }
                 if (current()) appendCanConsoleSystemEvent(localizedContext.getString(R.string.cal_doip_console_complete))
             } catch (cancelled: CancellationException) {
                 if (current()) _calibrationWorkspace.update { it.copy(doIpReading = false, doIpGatewayReading = false) }
@@ -1276,6 +1279,23 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    /** An observed endpoint is bound to the selected vehicle and numeric IP.
+     * Explicit new endpoints remain available, but a prior selection cannot
+     * silently be replaced on the same endpoint before routing activation. */
+    private suspend fun resolveSelectedDoIpTarget(host: String, tester: String, ecu: String, vin: String,
+        tls: Boolean, expectedGateway: Int? = null, onTrace: (DoIpDirectRead.ControlTrace) -> Unit): DoIpDirectRead.Target {
+        val snapshot = _calibrationWorkspace.value
+        val selected = snapshot.doIpGatewayIdentity?.takeIf {
+            it.vin == vin.uppercase(java.util.Locale.ROOT) &&
+                host.isNotBlank() && snapshot.doIpGatewayHost.isNotBlank() &&
+                runCatching { DoIpDirectRead.Target.parse(host, tester, ecu, vin, tls).address ==
+                    DoIpDirectRead.Target.parse(snapshot.doIpGatewayHost, tester, ecu, vin, tls).address }.getOrDefault(false)
+        }
+        return if (selected != null)
+            DoIpDirectRead.Target.parse(host, tester, ecu, vin, tls, expectedGateway, selected)
+        else DoIpDirectRead.resolveTarget(host, tester, ecu, vin, tls, expectedGateway, onTrace)
+    }
+
     fun captureDirectDoIpBackup(host: String, tester: String, ecu: String, tls: Boolean,
         scope: DoIpMemoryBackup.Scope, certificate: DoIpClientCertificateSelection? = null) {
         if (!requirePremiumLicense() || _calibrationWorkspace.value.doIpBackupScope != scope) return
@@ -1284,8 +1304,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 doIpTrace = emptyList(), doIpBackupBytes = 0) }
             try {
                 require(current() && _calibrationWorkspace.value.doIpBackupScope == scope)
-                val target = DoIpDirectRead.resolveTarget(host, tester, ecu, _vehicle.value.vin, tls,
-                    expectedGateway = scope.gateway, onControlTrace = { trace -> journalDoIpControlTrace(trace, current) })
+                val target = resolveSelectedDoIpTarget(host, tester, ecu, _vehicle.value.vin, tls,
+                    expectedGateway = scope.gateway, onTrace = { trace -> journalDoIpControlTrace(trace, current) })
                 check(current())
                 require(scope.vin == target.expectedVin && scope.tester == target.tester && scope.ecu == target.ecu)
                 val clientTls = certificate?.let { DoIpClientTls.open(getApplication<Application>(), it, target) }
@@ -1428,10 +1448,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _calibrationWorkspace.update { it.copy(doIpReading = true, doIpResult = "", doIpTrace = emptyList(), doIpBackupBytes = 0,
                 doIpMonitorReport = null, doIpLiveSamples = emptyList()) }
             try {
-                val target = DoIpDirectRead.resolveTarget(host, tester, ecu, _vehicle.value.vin, tls,
-                    onControlTrace = { trace -> journalDoIpControlTrace(trace, current) })
+                val target = resolveSelectedDoIpTarget(host, tester, ecu, _vehicle.value.vin, tls,
+                    onTrace = { trace -> journalDoIpControlTrace(trace, current) })
                 check(current())
-                val did = if (operation in setOf(DoIpDirectRead.Operation.DID, DoIpDirectRead.Operation.MONITOR)) {
+                val did = if (operation in setOf(DoIpDirectRead.Operation.DID, DoIpDirectRead.Operation.MONITOR, DoIpDirectRead.Operation.OBD_DID)) {
                     require(didHex.matches(Regex("[0-9A-Fa-f]{4}")))
                     didHex.toInt(16)
                 } else 0xF190
@@ -1479,6 +1499,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val count = result.dtcCount
                 val detail = result.dtcDetail
                 val rendered = when {
+                    operation == DoIpDirectRead.Operation.OBD_IDENTIFY -> localizedContext.getString(
+                        if (result.obdProtocolValue == 1) R.string.cal_doip_obd_verified else R.string.cal_doip_obd_unknown,
+                        result.obdProtocolValue ?: 0, result.vin.orEmpty())
+                    operation == DoIpDirectRead.Operation.OBD_DID -> localizedContext.getString(R.string.cal_doip_obd_data,
+                        did, result.data?.joinToString(" ") { "%02X".format(it.toInt() and 255) }.orEmpty())
                     result.commandReplies.isNotEmpty() -> result.commandReplies.mapIndexed { index, reply ->
                         localizedContext.getString(R.string.cal_doip_sequence_reply, index + 1,
                             reply.joinToString(" ") { "%02X".format(it.toInt() and 255) })
