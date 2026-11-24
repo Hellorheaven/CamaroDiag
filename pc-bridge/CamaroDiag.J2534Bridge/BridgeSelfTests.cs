@@ -16,6 +16,7 @@ internal static class BridgeSelfTests
         ConnectorCheckpointSelfTests.Run();
         UserExportStorageSelfTests.Run();
         var checks = DoIpDiagnosticSessionSelfTests.Run();
+        checks += DoIpUdpDiscoverySelfTests.Run();
         void Assert(bool condition, string name)
         {
             checks++;
