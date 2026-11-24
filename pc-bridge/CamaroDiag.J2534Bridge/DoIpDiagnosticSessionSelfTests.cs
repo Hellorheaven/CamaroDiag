@@ -254,6 +254,38 @@ internal static class DoIpDiagnosticSessionSelfTests
                 "DoIP transport must retire on correlated negative ACK.");
         });
 
+        // A flood of correctly correlated gateway ACKs is not an ECU
+        // diagnostic response and cannot extend the P2 deadline.
+        await RunCaseAsync(async stream =>
+        {
+            await RequireRequestAsync(stream);
+            for (var i = 0; i < 12; i++)
+            {
+                try
+                {
+                    await SendAsync(stream, DoIpCodec.DiagnosticPositiveAck,
+                        [0x12, 0x34, 0x0E, 0x80, 0, .. Request]);
+                }
+                catch (Exception error) when (error is IOException or
+                    SocketException or ObjectDisposedException)
+                {
+                    break; // client correctly retired timed-out session
+                }
+                await Task.Delay(7);
+            }
+        }, async client =>
+        {
+            await Expect<TimeoutException>(() =>
+                client.ExchangeUdsAsync(Request, TimeSpan.FromSeconds(1),
+                    CancellationToken.None,
+                    p2Timeout: TimeSpan.FromMilliseconds(20)),
+                "DoIP ACK flood cannot prolong ECU P2 response deadline.");
+            await Expect<InvalidOperationException>(() =>
+                client.ExchangeUdsAsync(Request, TimeSpan.FromSeconds(1),
+                    CancellationToken.None),
+                "Session receiving only ACKs is retired on response timeout.");
+        });
+
         // Explicit user cancellation is different from receive timeout.
         var seenForCancel = new TaskCompletionSource<bool>(
             TaskCreationOptions.RunContinuationsAsynchronously);
