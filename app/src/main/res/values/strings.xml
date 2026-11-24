@@ -1035,4 +1035,6 @@
     <string name="cal_doip_power_not_ready">Diagnostic power: not ready</string>
     <string name="cal_doip_power_ready">Diagnostic power: ready</string>
     <string name="cal_doip_power_unsupported">Diagnostic power: unsupported</string>
+    <string name="cal_doip_console_complete">DoIP operation complete</string>
+    <string name="cal_doip_console_active">DoIP acquisition in progress</string>
 </resources>

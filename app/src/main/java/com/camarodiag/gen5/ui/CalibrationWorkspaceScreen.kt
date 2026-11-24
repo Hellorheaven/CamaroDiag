@@ -245,6 +245,7 @@ private fun localizedInspectionFormat(format: String): String = stringResource(
 @Composable
 fun CalibrationWorkspaceScreen(
     state: CalibrationWorkspaceState,
+    consoleBusy: Boolean,
     vehicleLabel: String,
     ecmType: String,
     isConnected: Boolean,
@@ -362,7 +363,7 @@ fun CalibrationWorkspaceScreen(
             Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(stringResource(R.string.cal_doip_title), color = CamaroAmber, fontWeight = FontWeight.Bold)
-                    val idle = !state.doIpReading && !state.isUdsReading && !state.isObdbSignalReading &&
+                    val idle = !consoleBusy && !state.doIpReading && !state.isUdsReading && !state.isObdbSignalReading &&
                         !state.isJ2534MemoryCapturing
                     OutlinedTextField(doIpHost, { doIpHost = it.trim().take(64) },
                         enabled = idle, singleLine = true, modifier = Modifier.fillMaxWidth(),

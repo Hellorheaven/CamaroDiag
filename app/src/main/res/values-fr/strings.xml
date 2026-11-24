@@ -1038,4 +1038,6 @@
     <string name="cal_doip_power_not_ready">Alimentation diagnostic : non prête</string>
     <string name="cal_doip_power_ready">Alimentation diagnostic : prête</string>
     <string name="cal_doip_power_unsupported">Alimentation diagnostic : non prise en charge</string>
+    <string name="cal_doip_console_complete">Opération DoIP terminée</string>
+    <string name="cal_doip_console_active">Acquisition DoIP en cours</string>
 </resources>

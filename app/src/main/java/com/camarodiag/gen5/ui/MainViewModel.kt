@@ -120,6 +120,7 @@ data class DoIpMonitorRow(val index: Int, val elapsedMs: Long, val payloadHex: S
 
 data class LiveCanMonitorState(
     val isCapturing: Boolean = false,
+    val isDoIpActive: Boolean = false,
     val bitrate: Int = 500_000,
     val rawText: String = "",
     val report: CanTraceAnalysisReport? = null,
@@ -1114,7 +1115,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     @Volatile private var enhancedUdsGeneration = 0L
 
     private fun invalidateEnhancedUdsReads() {
-        enhancedUdsGeneration++
+        synchronized(consoleEventJournal) {
+            enhancedUdsGeneration++
+            _liveCanMonitorState.update { it.copy(isDoIpActive = false) }
+        }
         enhancedUdsJob?.cancel()
         enhancedUdsJob = null
         _calibrationWorkspace.update {
@@ -1130,8 +1134,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // The three read-only entrypoints share one context-bound operation slot.
     // Cancellation propagates through the adapter session and prevents queued
     // work or returned bytes from being attached to a replacement vehicle.
-    private fun launchEnhancedUdsRead(block: suspend (() -> Boolean) -> Unit) {
+    private fun launchEnhancedUdsRead(journalDoIp: Boolean = false, block: suspend (() -> Boolean) -> Unit) {
         if (enhancedUdsJob?.isActive == true) return
+        if (journalDoIp && (_liveCanMonitorState.value.isCapturing || _liveCanMonitorState.value.isSendingRequest ||
+                canMonitorJob?.isCompleted == false || canRequestJob?.isCompleted == false ||
+                detachedCanMonitorJob?.isCompleted == false || detachedCanRequestJob?.isCompleted == false)) return
         val generation = ++enhancedUdsGeneration
         val account = accountSessionGeneration
         val connection = connectionAttemptGeneration
@@ -1139,8 +1146,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         fun current() = generation == enhancedUdsGeneration &&
             isCurrentAccountGeneration(account) && connection == connectionAttemptGeneration &&
             vehicle == _vehicle.value && hasPremiumLicense()
+        if (journalDoIp) _liveCanMonitorState.update {
+            it.copy(isDoIpActive = true, consoleContextGeneration = ++canConsoleContextGeneration)
+        }
         enhancedUdsJob = viewModelScope.launch {
-            if (current()) block(::current)
+            try {
+                if (current()) block(::current)
+            } finally {
+                if (journalDoIp && generation == enhancedUdsGeneration)
+                    _liveCanMonitorState.update { it.copy(isDoIpActive = false) }
+            }
         }
     }
 
@@ -1148,7 +1163,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (!_calibrationWorkspace.value.doIpReading) return
         // A user cancellation is not a vehicle/account change: keep already
         // received trace and samples visible, but invalidate every late callback.
-        enhancedUdsGeneration++
+        synchronized(consoleEventJournal) {
+            enhancedUdsGeneration++
+            if (_liveCanMonitorState.value.isDoIpActive) {
+                appendCanConsoleSystemEvent(localizedContext.getString(R.string.cal_doip_cancel), succeeded = false)
+                _liveCanMonitorState.update { it.copy(isDoIpActive = false) }
+            }
+        }
         enhancedUdsJob?.cancel()
         enhancedUdsJob = null
         _calibrationWorkspace.update { it.copy(doIpReading = false, doIpMonitorReport = null,
@@ -1245,7 +1266,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun captureDirectDoIpBackup(host: String, tester: String, ecu: String, tls: Boolean,
         scope: DoIpMemoryBackup.Scope) {
         if (!requirePremiumLicense() || _calibrationWorkspace.value.doIpBackupScope != scope) return
-        launchEnhancedUdsRead { current ->
+        launchEnhancedUdsRead(journalDoIp = true) { current ->
             _calibrationWorkspace.update { it.copy(doIpReading = true, doIpResult = "",
                 doIpTrace = emptyList(), doIpBackupBytes = 0) }
             try {
@@ -1257,6 +1278,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         check(current())
                         _calibrationWorkspace.update { if (current()) it.copy(doIpBackupBytes = (pass - 1) * scope.length + offset) else it }
                     }, onTrace = { trace ->
+                        journalDoIpTrace(target, trace, current)
                         check(current())
                         _calibrationWorkspace.update {
                             if (current()) it.copy(doIpTrace = (it.doIpTrace + doIpTraceLine(trace)).takeLast(128)) else it
@@ -1280,13 +1302,34 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     doIpResult = localizedContext.getString(R.string.cal_doip_backup_saved,
                         scope.length, capture.sha256, path),
                     doIpTrace = result.trace.map(::doIpTraceLine)) }
+                if (current()) appendCanConsoleSystemEvent(localizedContext.getString(R.string.cal_doip_console_complete))
             } catch (cancelled: CancellationException) {
                 if (current()) _calibrationWorkspace.update { it.copy(doIpReading = false, doIpBackupBytes = 0) }
                 throw cancelled
             } catch (_: Exception) {
+                if (current()) appendCanConsoleSystemEvent(localizedContext.getString(R.string.cal_doip_failed), succeeded = false)
                 if (current()) _calibrationWorkspace.update { it.copy(doIpReading = false, doIpBackupBytes = 0,
                     doIpResult = localizedContext.getString(R.string.cal_doip_backup_failed)) }
             }
+        }
+    }
+
+    /** Logical DoIP addresses are deliberately not formatted as CAN IDs.
+     * Every observed diagnostic PDU is persisted before the UI ring trims it.
+     * The shared lock prevents a cancelled context appending to a cleared journal.
+     */
+    private fun journalDoIpTrace(target: DoIpDirectRead.Target, trace: DoIpDirectRead.Trace,
+        current: () -> Boolean) {
+        synchronized(consoleEventJournal) {
+            check(current() && _liveCanMonitorState.value.isDoIpActive)
+            val source = if (trace.direction == "TX") target.tester else target.ecu
+            val destination = if (trace.direction == "TX") target.ecu else target.tester
+            val content = "DoIP " + (if (target.tls) "TLS" else "TCP") +
+                " ${target.address.hostAddress} %04X>%04X ".format(source, destination) + trace.payloadHex
+            val event = CanConsoleHistoryEntry(System.nanoTime(), trace.direction,
+                trace.observedAtUtcMillis, content)
+            recordConsoleEvents(listOf(event))
+            _liveCanMonitorState.update { it.copy(consoleHistory = (it.consoleHistory + event).takeLast(300)) }
         }
     }
 
@@ -1338,7 +1381,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun readDirectDoIp(host: String, tester: String, ecu: String, didHex: String,
         tls: Boolean, operation: DoIpDirectRead.Operation, sampleCount: Int = 10, intervalMs: Int = 1000) {
         if (!requirePremiumLicense()) return
-        launchEnhancedUdsRead { current ->
+        launchEnhancedUdsRead(journalDoIp = true) { current ->
             _calibrationWorkspace.update { it.copy(doIpReading = true, doIpResult = "", doIpTrace = emptyList(), doIpBackupBytes = 0,
                 doIpMonitorReport = null, doIpLiveSamples = emptyList()) }
             try {
@@ -1349,6 +1392,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 } else 0xF190
                 val result = DoIpDirectRead.read(target, operation, did, sampleCount = sampleCount, intervalMs = intervalMs,
                     onTrace = { trace ->
+                        journalDoIpTrace(target, trace, current)
                         check(current())
                         _calibrationWorkspace.update {
                             if (current()) it.copy(doIpTrace = (it.doIpTrace + doIpTraceLine(trace)).takeLast(128))
@@ -1382,10 +1426,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         result.samples.map(::doIpSampleRow)) else null
                 _calibrationWorkspace.update { it.copy(doIpReading = false, doIpResult = rendered,
                     doIpTrace = result.trace.map(::doIpTraceLine), doIpMonitorReport = monitorReport) }
+                if (current()) appendCanConsoleSystemEvent(localizedContext.getString(R.string.cal_doip_console_complete))
             } catch (cancelled: CancellationException) {
                 if (current()) _calibrationWorkspace.update { it.copy(doIpReading = false) }
                 throw cancelled
             } catch (_: Exception) {
+                if (current()) appendCanConsoleSystemEvent(localizedContext.getString(R.string.cal_doip_failed), succeeded = false)
                 if (current()) _calibrationWorkspace.update { it.copy(doIpReading = false,
                     doIpResult = localizedContext.getString(R.string.cal_doip_failed)) }
             }
@@ -2344,7 +2390,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (bitrate !in setOf(250_000, 500_000, DiagnosticRouteSelector.SW_CAN_BITRATE) ||
             listOf(false, true).none { DiagnosticRouteSelector.rawCanProfile(it, bitrate) in availableRawCanProfiles() }) return
         val state = _liveCanMonitorState.value
-        if (state.isCapturing || state.isSendingRequest || state.bitrate == bitrate ||
+        if (state.isDoIpActive || state.isCapturing || state.isSendingRequest || state.bitrate == bitrate ||
             canMonitorJob?.isActive == true || canRequestJob?.isActive == true ||
             detachedCanMonitorJob?.isCompleted == false || detachedCanRequestJob?.isCompleted == false) return
         _liveCanMonitorState.value = state.copy(bitrate = bitrate,
@@ -2357,7 +2403,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     /** Starts passive monitoring until Stop, disconnect, adapter exit or an explicit timeout. */
     fun startCanMonitor(durationMs: Long = Long.MAX_VALUE, can29Bit: Boolean = false) {
-        if (!requirePremiumLicense()) return
+        if (!requirePremiumLicense() || _liveCanMonitorState.value.isDoIpActive) return
         if (canMonitorJob != null || detachedCanMonitorJob?.isCompleted == false ||
             canRequestJob?.isCompleted == false || detachedCanRequestJob?.isCompleted == false
         ) return
@@ -2599,7 +2645,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val current = _liveCanMonitorState.value
         // Keep an in-flight TX paired with its eventual RX/SYSTEM result.
         // The UI disables Clear while sending; this guard protects other callers too.
-        if (current.isSendingRequest || current.isCapturing) return
+        if (current.isDoIpActive || current.isSendingRequest || current.isCapturing) return
         activeCanCaptureFile?.delete()
         activeCanCaptureFile = null
         resetConsoleEventJournal()
@@ -2660,7 +2706,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      * confirmation entry point, even if another UI caller invokes this method.
      */
     fun sendCanConsoleInput(input: String) {
-        if (!requirePremiumLicense()) return
+        if (!requirePremiumLicense() || _liveCanMonitorState.value.isDoIpActive) return
         if (RawCanFrameParser.parse(input) != null) {
             val message = localizedContext.getString(R.string.can_console_raw_tx_confirm_title)
             appendCanConsoleSystemEvent(message, succeeded = false)
@@ -2689,7 +2735,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 monitorAvailable = frame != null && state.bitrate in setOf(250_000, 500_000) &&
                     DiagnosticRouteSelector.rawCanProfile(frame.isExtended, state.bitrate) in availableRawCanProfiles(),
                 canTransmit = _adapter.value.supportsCanTransmit,
-                busy = state.isCapturing || state.isSendingRequest
+                busy = state.isDoIpActive || state.isCapturing || state.isSendingRequest
             )) return
         sendRawCanConsoleFrame(input, requireNotNull(frame), expectedContextGeneration, approval)
     }
@@ -2923,6 +2969,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     /** Sends only a whitelisted, read-only SAE J1979 request; arbitrary CAN/UDS payloads are rejected. */
     fun sendSafeObdRequest(input: String) {
+        if (_liveCanMonitorState.value.isDoIpActive) return
         val request = SafeObdRequestPolicy.parse(input)
         if (request == null) {
             val message = localizedContext.getString(R.string.can_sniffer_invalid_request)
@@ -3035,7 +3082,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun canExportCanCapture(): Boolean {
         val state = _liveCanMonitorState.value
         val archive = activeCanCaptureFile?.takeIf { it.isFile }
-        return !consoleEventJournalFailed && !consoleEventJournal.hasFailed() &&
+        return !state.isDoIpActive && !consoleEventJournalFailed && !consoleEventJournal.hasFailed() &&
             (state.consoleHistory.isEmpty() || consoleEventJournal.isAvailable()) &&
             CanConsoleExportPolicy.canExport(
             isCapturing = state.isCapturing,
@@ -3074,6 +3121,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             !consoleEventJournalFailed && !consoleEventJournal.hasFailed() &&
             consoleEventJournal.revision() == journalRevisionAtClick &&
             (expectedJournalSnapshot?.let { consoleEventJournal.isCurrent(it) } != false) &&
+            !_liveCanMonitorState.value.isDoIpActive &&
             !_liveCanMonitorState.value.isCapturing &&
             !_liveCanMonitorState.value.isSendingRequest &&
             !_liveCanMonitorState.value.rawArchiveFailed &&

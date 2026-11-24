@@ -728,7 +728,7 @@ fun CamaroDiagApp(
                     knownModules = modules,
                     onStart = { can29Bit -> viewModel.startCanMonitor(can29Bit = can29Bit) },
                     onBitrateChange = viewModel::setCanConsoleBitrate,
-                    onStop = { viewModel.stopCanMonitor() },
+                    onStop = { if (liveCanMonitorState.isDoIpActive) viewModel.cancelDirectDoIp() else viewModel.stopCanMonitor() },
                     onSendRequest = { viewModel.sendCanConsoleInput(it) },
                     onConfirmRawFrame = { frame, epoch, approval ->
                         viewModel.confirmRawCanConsoleFrame(frame, epoch, approval)
@@ -754,6 +754,7 @@ fun CamaroDiagApp(
                 )
                 DiagTab.CALIBRATION -> CalibrationWorkspaceScreen(
                     state = calibrationWorkspace,
+                    consoleBusy = liveCanMonitorState.isCapturing || liveCanMonitorState.isSendingRequest,
                     canReadEnhancedUds = viewModel.canReadEnhancedUds(),
                     availableUdsReadProfiles = viewModel::availableUdsReadProfiles,
                     vehicleLabel = "${vehicle.modelYear} Camaro ${vehicle.engine.rpo} • ${localizedGenerationName(vehicle.generation)}",
@@ -1827,7 +1828,7 @@ fun CanSnifferScreen(
         profile(it.isExtended, state.bitrate) in availableRawCanProfiles
     } == true
     LaunchedEffect(availableRawCanProfiles, state.bitrate, state.isCapturing, state.isSendingRequest) {
-        if (!state.isCapturing && !state.isSendingRequest &&
+        if (!state.isDoIpActive && !state.isCapturing && !state.isSendingRequest &&
             selectedMonitorProfile !in availableRawCanProfiles && availableRawCanProfiles.size == 1) {
             val selected = availableRawCanProfiles.single()
             monitorCan29Bit = selected in setOf(7, 9, 62)
@@ -1869,13 +1870,14 @@ fun CanSnifferScreen(
             Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     SectionTitle(stringResource(R.string.can_sniffer_title))
+                    if (state.isDoIpActive) Text(stringResource(R.string.cal_doip_console_active), color = CamaroAmber, fontSize = 11.sp)
                     // Text(stringResource(R.string.can_sniffer_description), color = TextMuted, fontSize = 12.sp)
                     Text(stringResource(R.string.can_sniffer_safety), color = CamaroAmber, fontSize = 11.sp)
                     Text(stringResource(R.string.can_sniffer_bus_limit), color = TextMuted, fontSize = 10.sp)
                     Text(stringResource(R.string.can_sniffer_stn_filter_notice), color = TextMuted, fontSize = 10.sp)
                     Box {
                         OutlinedButton(onClick = { monitorFormatMenuExpanded = true },
-                            enabled = !state.isCapturing && !state.isSendingRequest && availableRawCanProfiles.isNotEmpty(),
+                            enabled = !state.isDoIpActive && !state.isCapturing && !state.isSendingRequest && availableRawCanProfiles.isNotEmpty(),
                             modifier = Modifier.fillMaxWidth()) {
                             Text(if (selectedMonitorProfile in availableRawCanProfiles)
                                 if (state.bitrate == 33_333) stringResource(R.string.can_console_swcan_profile, if (monitorCan29Bit) 29 else 11)
@@ -1905,7 +1907,7 @@ fun CanSnifferScreen(
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(
                             onClick = { onStart(monitorCan29Bit) },
-                            enabled = isAvailable && selectedMonitorProfile in availableRawCanProfiles && !state.isCapturing && !state.isSendingRequest,
+                            enabled = isAvailable && selectedMonitorProfile in availableRawCanProfiles && !state.isDoIpActive && !state.isCapturing && !state.isSendingRequest,
                             modifier = Modifier.weight(1f)
                         ) {
                             Icon(Icons.Filled.PlayArrow, contentDescription = null)
@@ -1914,7 +1916,7 @@ fun CanSnifferScreen(
                         }
                         OutlinedButton(
                             onClick = onStop,
-                            enabled = state.isCapturing,
+                            enabled = state.isCapturing || state.isDoIpActive,
                             modifier = Modifier.weight(1f)
                         ) {
                             Icon(Icons.Filled.Stop, contentDescription = null)
@@ -1957,7 +1959,7 @@ fun CanSnifferScreen(
                         }
                         TextButton(
                             onClick = onClearHistory,
-                            enabled = !state.isCapturing && !state.isSendingRequest &&
+                            enabled = !state.isDoIpActive && !state.isCapturing && !state.isSendingRequest &&
                                 (state.consoleHistory.isNotEmpty() || state.rawText.isNotBlank())
                         ) {
                             Text(stringResource(R.string.can_console_clear), color = CamaroBlue)
@@ -2108,7 +2110,7 @@ fun CanSnifferScreen(
                             canTransmit = canTransmitAvailable,
                             readObdAvailable = canReadObdAvailable,
                             inputPresent = requestInput.isNotBlank(),
-                            busy = state.isCapturing || state.isSendingRequest
+                            busy = state.isDoIpActive || state.isCapturing || state.isSendingRequest
                         ),
                         modifier = Modifier.fillMaxWidth()
                     ) {
@@ -2414,7 +2416,7 @@ fun CanSnifferScreen(
                 profile(it.isExtended, state.bitrate) in availableRawCanProfiles
             } == true,
             canTransmit = canTransmitAvailable,
-            busy = state.isCapturing || state.isSendingRequest
+            busy = state.isDoIpActive || state.isCapturing || state.isSendingRequest
         )
         AlertDialog(
             onDismissRequest = {
