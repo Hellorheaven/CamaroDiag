@@ -80,4 +80,30 @@ class Lfx2012FuelHistoryCsvTest {
         }.isFailure)
     }
 
+
+    @Test fun csvExportsValidatedSnapshotWhenCallerClearsOrMutatesHistoryDuringWrite() {
+        val mutableReadings = sample(100, 0).snapshot.readings.toMutableList()
+        val first = sample(100, 0).let {
+            it.copy(snapshot = it.snapshot.copy(readings = mutableReadings))
+        }
+        val observations = mutableListOf(first, sample(200, 128))
+        val output = object : StringWriter() {
+            override fun write(str: String) {
+                super.write(str)
+                if (str.startsWith("vin,session_id")) {
+                    observations.clear()
+                    mutableReadings[0] = Lfx2012FuelReadOnly.Reading(
+                        Lfx2012FuelReadOnly.ETHANOL,
+                        Lfx2012FuelReadOnly.Availability.NO_VALID_RESPONSE
+                    )
+                }
+            }
+        }
+        Lfx2012FuelHistoryCsv.export(observations, output)
+        assertTrue(observations.isEmpty())
+        val lines = output.toString().trimEnd().lines()
+        assertEquals(11, lines.size)
+        assertTrue(lines[1].contains(",52,REPORTED,0.00000000,0"))
+        assertTrue(lines[6].contains(",52,REPORTED,"))
+    }
 }
