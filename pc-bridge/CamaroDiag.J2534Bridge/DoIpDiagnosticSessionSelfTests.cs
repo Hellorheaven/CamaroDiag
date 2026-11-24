@@ -293,6 +293,50 @@ internal static class DoIpDiagnosticSessionSelfTests
             });
         }
 
+        // One routed session serves sequential monitored DID requests.
+        await RunCaseAsync(async stream =>
+        {
+            for (byte sample = 1; sample <= 3; sample++)
+            {
+                var request = await ReadAsync(stream);
+                Check(request.Type == DoIpCodec.DiagnosticMessage &&
+                    request.Payload.SequenceEqual((byte[])[0x0E, 0x80, 0x12, 0x34, 0x22, 0x12, 0x34]),
+                    "Monitoring addresses the same ECU and DID on each sample.");
+                await SendAsync(stream, DoIpCodec.DiagnosticMessage,
+                    FromEcu([0x62, 0x12, 0x34, sample]));
+            }
+        }, async client =>
+        {
+            var values = new List<byte>();
+            var txCount = 0;
+            var rxCount = 0;
+            await DoIpVinReader.MonitorDidAsync(client, 0x1234, 3,
+                TimeSpan.FromMilliseconds(250), TimeSpan.FromSeconds(2),
+                CancellationToken.None, (index, data) =>
+                {
+                    Check(index == values.Count + 1 && data.Length == 1,
+                        "Monitor sample preserves sequence and strips DID header.");
+                    values.Add(data[0]);
+                }, _ => txCount++, _ => rxCount++);
+            Check(values.SequenceEqual((byte[])[1, 2, 3]) && txCount == 3 && rxCount == 3,
+                "Monitor emits three correlated results and TX/RX events.");
+        });
+        foreach (var invalidDidReply in new byte[][] { [0x62, 0x12, 0x35, 1], [0x62, 0x12, 0x34] })
+        {
+            await RunCaseAsync(async stream =>
+            {
+                _ = await ReadAsync(stream);
+                await SendAsync(stream, DoIpCodec.DiagnosticMessage, FromEcu(invalidDidReply));
+            }, async client =>
+            {
+                await Expect<InvalidDataException>(async () =>
+                {
+                    _ = await DoIpVinReader.ReadDidAsync(client, 0x1234,
+                        TimeSpan.FromSeconds(2), CancellationToken.None);
+                }, "Wrong or empty DID response rejected.");
+            });
+        }
+
         // UDP and TCP identity correlation: no diagnostic PDU may be sent
         // if routing activation reports a different logical gateway.
         var mismatchListener = new TcpListener(IPAddress.Loopback, 0);

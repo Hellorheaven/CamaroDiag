@@ -66,7 +66,9 @@ internal static class DoIpConsolePresentationSelfTests
                 emptyLines[1] == DoIpConsolePresentation.Text("DtcNotice", culture),
                 "Empty DTC report retains availability limits in " + language);
             foreach (var dtcKey in new[] { "ReadDtcs", "DtcMask", "InvalidDtcMask",
-                "DtcStarted", "DtcResult", "DtcEntry", "DtcNotice" })
+                "DtcStarted", "DtcResult", "DtcEntry", "DtcNotice", "ReadDid", "DidLabel",
+                "InvalidDid", "DidStarted", "DidResult", "MonitorDid", "MonitorInterval", "MonitorCount",
+                "MonitorSample", "MonitorComplete" })
                 Check(!string.IsNullOrWhiteSpace(DoIpConsolePresentation.Text(dtcKey, culture)),
                     "DTC resource " + dtcKey + " in " + language);
             var rejected = false;

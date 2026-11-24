@@ -116,6 +116,8 @@ internal static class DoIpVinReader
             token.ThrowIfCancellationRequested();
             var data = await ReadDidAsync(transport, did, timeout, token, requested, received);
             token.ThrowIfCancellationRequested();
+            if (data.Length > 4096)
+                throw new InvalidDataException("DID payload exceeds the monitoring sample limit; use a single read.");
             sample(index, data);
             token.ThrowIfCancellationRequested();
             if (index < sampleCount) await Task.Delay(interval, token);

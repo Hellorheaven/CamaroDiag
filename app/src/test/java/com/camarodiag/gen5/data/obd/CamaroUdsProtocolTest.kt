@@ -370,6 +370,18 @@ class CamaroUdsProtocolTest {
     }
 
     @Test
+    fun configurationAcceptanceAndDisplayNameAreNotPhysicalVehicleEvidence() {
+        val capability = CamaroUdsProtocol.evaluateAdapterProbe(
+            deviceName = "OBDLink MX+", macAddress = "test", atzResp = "ELM327",
+            stiResp = "STN2255 v5.6.5", atalResp = "OK", stp61Resp = "OK",
+            elmProtocolProbe = mapOf(1 to "OK", 3 to "?", 8 to "OK", 10 to "ERROR")
+        )
+        assertEquals(setOf(1, 6, 8), capability.acceptedElmProtocols)
+        assertFalse(capability.supportsSwCan)
+        assertFalse(capability.supportsCanTransmit)
+    }
+
+    @Test
     fun adapterCapabilitiesDefaultToDisconnectedAndFailClosed() {
         val adapter = AdapterCapabilities()
         assertEquals(AdapterTier.DISCONNECTED, adapter.tier)
