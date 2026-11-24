@@ -515,7 +515,7 @@ internal static class DoIpDiagnosticSessionSelfTests
             using var peer = await plainServer.AcceptTcpClientAsync();
             await using var wire = peer.GetStream();
             var header = new byte[5];
-            await wire.ReadExactlyAsync(header).WaitAsync(TimeSpan.FromSeconds(3));
+            await wire.ReadExactlyAsync(header).AsTask().WaitAsync(TimeSpan.FromSeconds(3));
             sawClientHello = header[0] == 0x16 &&
                 header[1] == 0x03; // TLS record, never raw DoIP 0x02/0x03.
             await wire.WriteAsync(new byte[]
