@@ -97,7 +97,7 @@ class ElmWifiTransportSessionTest {
             assertTrue(transport.connect("192.168.0.10").isSuccess)
             assertTrue(transport.isConnected)
             // Invalid input is rejected before any replacement socket is created.
-            val rejected = runCatching { transport.connect("bad host", 35000, 4000) }
+            val rejected = transport.connect("bad host", 35000, 4000)
             assertTrue(rejected.isFailure)
             assertTrue(transport.isConnected)
             assertFalse(active.fakeClosed)
