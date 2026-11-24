@@ -273,7 +273,7 @@ internal static class DoIpVehicleDiscovery
                 break;
             }
             if (!IsIpv6MulticastAnnouncementSource(received.RemoteEndPoint,
-                    sourcePortOverride ?? 13400))
+                    sourcePortOverride ?? 13400, interfaceIndex))
                 continue;
             try
             {
@@ -302,9 +302,13 @@ internal static class DoIpVehicleDiscovery
     }
 
     internal static bool IsIpv6MulticastAnnouncementSource(
-        IPEndPoint remote, int sourcePort) =>
+        IPEndPoint remote, int sourcePort, int? interfaceIndex = null) =>
         remote.Address.AddressFamily == AddressFamily.InterNetworkV6 &&
-        remote.Address.IsIPv6LinkLocal && remote.Port == sourcePort;
+        remote.Address.IsIPv6LinkLocal && remote.Port == sourcePort &&
+        // Some OS versions do not expose an ingress scope on a received
+        // datagram. Reject an explicit *different* one; never invent it.
+        (!interfaceIndex.HasValue || remote.Address.ScopeId == 0 ||
+         remote.Address.ScopeId == interfaceIndex.Value);
 
     /// <summary>
     /// Active IPv6 link-local DoIP vehicle identification. Send exactly one
@@ -343,7 +347,8 @@ internal static class DoIpVehicleDiscovery
             {
                 break;
             }
-            if (!IsIpv6MulticastAnnouncementSource(received.RemoteEndPoint, port))
+            if (!IsIpv6MulticastAnnouncementSource(received.RemoteEndPoint,
+                    port, interfaceIndex))
                 continue;
             try
             {
