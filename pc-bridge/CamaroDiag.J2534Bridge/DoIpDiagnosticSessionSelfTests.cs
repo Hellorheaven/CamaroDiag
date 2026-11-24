@@ -390,6 +390,40 @@ internal static class DoIpDiagnosticSessionSelfTests
                 "DoIP unsolicited idle diagnostic response permanently retires session.");
         });
 
+        // Two identical final replies in one TCP burst have no DoIP
+        // transaction identifier. The second must never be carried over
+        // and credited as a fresh response to the same later UDS request.
+        await RunCaseAsync(async stream =>
+        {
+            await RequireRequestAsync(stream);
+            var frame = DoIpCodec.Encode(DoIpCodec.DiagnosticMessage,
+                FromEcu(Positive));
+            await stream.WriteAsync(new byte[] { .. frame, .. frame });
+            await stream.FlushAsync();
+            await Task.Delay(140);
+        }, async client =>
+        {
+            var gotValidFirst = false;
+            var duplicateRejectedFirst = false;
+            try
+            {
+                gotValidFirst = (await client.ExchangeUdsAsync(Request,
+                    TimeSpan.FromSeconds(2), CancellationToken.None))
+                    .SequenceEqual(Positive);
+            }
+            catch (InvalidDataException)
+            {
+                duplicateRejectedFirst = true;
+            }
+            Check(gotValidFirst || duplicateRejectedFirst,
+                "First final response succeeds or a queued duplicate retires the socket.");
+            await Task.Delay(60);
+            await Expect<InvalidOperationException>(() =>
+                client.ExchangeUdsAsync(Request,
+                    TimeSpan.FromSeconds(1), CancellationToken.None),
+                "DoIP duplicate UDS final response cannot satisfy next request.");
+        });
+
         // DoIP has no per-request correlation token. Two callers may never
         // interleave on the same socket; serialized reuse *after* success
         // remains legitimate for a diagnostic session.
