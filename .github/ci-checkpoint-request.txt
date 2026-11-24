@@ -1,3 +1,16 @@
+C6 COHERENT TLS PAIRING INPUT SAFETY CHECKPOINT — 2026-11-24
+Implementation HEAD before this grouped gate: 99ab376101a4f087282c58a3dc8f30a80b9ffd4b
+C4 software gate #45363634459 SUCCESS (c508902f), prerequisite completed.
+C6 change: reject CR/LF/TAB/NUL control characters in full pairing code
+BEFORE trimming/normalization in Android J2534 TLS parser and UI form.
+Keep harmless surrounding spaces accepted, pinned TLS verification unchanged.
+Offline regressions for invalid multiline pasted code, and old valid pairing.
+Do not modify ISO/SAE protocols (other session owns SAE J1979).
+One grouped software Debug checkpoint: Android unit/lint/assemble warnings fail,
+Windows/J2534 Debug, native ECU, all Connectors/firmware and backend.
+This is an intermediate C6 gate, NOT final C8. No real ECU/VCI/vehicle tests
+before owner's authorized Release #48; no merge/Release/branch/PR closure.
+
 C4 COHERENT READ-ONLY FUEL HISTORY CHECKPOINT — 2026-11-24
 Implementation HEAD before this one-time grouped gate: 25b9feb7961e92a869c5cf48c413a78ac5ae6f3c
 C4 (#52), no ISO/SAE protocol changes, no C6 work, NOT final C8.
