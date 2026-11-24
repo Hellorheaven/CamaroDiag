@@ -62,4 +62,7 @@
   <data name="BackupSaved" xml:space="preserve"><value>Verified region backup: {0} bytes, SHA-256 {1}, {2}</value></data>
   <data name="BackupVerify" xml:space="preserve"><value>Verify DoIP backup</value></data>
   <data name="BackupVerified" xml:space="preserve"><value>Archive integrity verified: {0} bytes, SHA-256 {1}. This check does not establish hardware provenance.</value></data>
+  <data name="ExpectedVin" xml:space="preserve"><value>Expected VIN (leave IP blank to discover)</value></data>
+  <data name="InvalidExpectedVin" xml:space="preserve"><value>Enter a valid 17-character VIN.</value></data>
+  <data name="VinDiscoveryStarted" xml:space="preserve"><value>Discovering DoIP gateway for VIN {0}</value></data>
 </root>
