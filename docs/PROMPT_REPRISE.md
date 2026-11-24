@@ -1,3 +1,7 @@
+## PR117 — validation groupée DoIP (24/11/2026)
+
+- Run 45456278234 sur d3e91f2 : 12/12 jobs techniques réussis. Demande du checkpoint suivant contenant 3a129db2739762ef77288a95cb01b8a478776901 : Android EID/IPv6/écoute passive et sélection interface, contrôle de passerelle Android/Windows/Python, P2/P2* monitoring CLI Windows. Le lot est implémenté, pas encore validé sur ce SHA. Ne pas déclarer le DoIP physiquement qualifié ni clôturer C6/C8.
+
 ## PR117 — sélection de l’interface IPv6 Android (24/11/2026)
 
 - Liste réseau réelle, hors thread UI, des interfaces actives non-loopback capables de multicast IPv6 link-local ; menu de sélection FR/EN, saisie manuelle conservée. Aucun choix automatique, nouvelle lecture à l’ouverture du menu. La sélection reste à qualifier sur le matériel réel.

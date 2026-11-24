@@ -1,3 +1,7 @@
+PR117 — validate complete new DoIP discovery/control/monitoring batch
+Implementation parent: 3a129db2739762ef77288a95cb01b8a478776901
+Previous run 45456278234 succeeded all 12 technical jobs. Validate Android EID, gateway control preservation, scoped IPv6 and passive discovery, interface selector and multicast lock, Windows gateway status correlation/scoped TLS/monitor P2-P2*, Python status identity validation. Full Debug only; no merge, release, physical qualification or deployment.
+
 PR117 — DoIP grouped validation after successful 8b4672f checkpoint
 Implementation parent: 962a70b66d96670d006d89d2c3ecc6a25aebdf7b
 Run 45454645809 completed successfully. Validate new Android and Windows session settings (P2/P2*, routing OEM), Python scoped IPv6 discovery and TLS IP verification; full Debug, no merge, Release, deployment or physical qualification.
