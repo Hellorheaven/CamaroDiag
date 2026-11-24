@@ -28,6 +28,7 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
     // DoIP carries no per-request transaction ID. A late reply after a
     // failed exchange could otherwise be mistaken for a fresh request.
     private int exchangeState;
+    private int disposed;
     // One owner reads from the TCP stream for the entire activated session.
     // Gateway AliveChecks must be answered even while no UDS exchange runs.
     // Channel is bounded: uncorrelated or flooding peers cannot accumulate
@@ -284,7 +285,8 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
             // wire. Never silently retry it or allow a late reply to be
             // interpreted as belonging to another operation.
             Interlocked.Exchange(ref exchangeState, 2);
-            lifetime.Cancel();
+            try { lifetime.Cancel(); }
+            catch (ObjectDisposedException) { /* Concurrent DisposeAsync retired session. */ }
             stream.Dispose();
             socket.Dispose();
             throw;
@@ -378,6 +380,10 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        // Explicit callers and await-using may both dispose the same
+        // transport; closing a TCP session must be idempotent.
+        if (Interlocked.Exchange(ref disposed, 1) != 0)
+            return;
         Interlocked.Exchange(ref exchangeState, 2);
         lifetime.Cancel();
         stream.Dispose();
