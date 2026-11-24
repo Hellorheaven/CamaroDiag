@@ -174,7 +174,9 @@ object DoIpDirectRead {
                 socket.send(DatagramPacket(request, request.size, destination, port))
                 controlTrace("TX", "UDP", destination, request, onControlTrace)
                 val end = deadline(timeoutMs)
-                val matches = linkedMapOf<Pair<InetAddress, Int>, Gateway>()
+                // EID/GID distinguish physically competing announcements even
+                // if their source IP and logical address happen to coincide.
+                val matches = linkedMapOf<Triple<InetAddress, Int, String>, Gateway>()
                 val buffer = ByteArray(1024)
                 while (System.nanoTime() < end) {
                     val wait = try { remaining(end) } catch (_: SocketTimeoutException) { break }
@@ -192,7 +194,8 @@ object DoIpDirectRead {
                     val observedVin = frame.data.copyOfRange(0, 17).toString(Charsets.US_ASCII)
                     if (observedVin != expected) continue
                     val gateway = Gateway(observedVin, u16(frame.data, 17), frame.version)
-                    val key = packet.address to gateway.logicalAddress
+                    val key = Triple(packet.address, gateway.logicalAddress,
+                        hex(frame.data.copyOfRange(19, 31)))
                     val prior = matches.putIfAbsent(key, gateway)
                     require(prior == null || prior == gateway) { "Conflicting DoIP gateway announcements." }
                     require(matches.size <= 16) { "Too many DoIP gateways for the selected VIN." }
