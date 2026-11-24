@@ -1,3 +1,13 @@
+## Point de reprise coordonnée — 24/11/2026 (C4 uniquement, pas de bascule de chantier)
+
+- PR #95 toujours en draft, branche unique `chore/unified-ci`. Les instructions AGENTS.md, la priorité C1 → C2 → C4 → C6 → C8, l'issue #110 et #63 ont été relues.
+- C1 et C2 : clôtures logicielles et campagnes antérieures consignées ci-dessous ; C2 gate #45351021895 : 2 jobs success. Ne pas convertir cette preuve en qualification véhicule.
+- **C4 actif** : commit `3be145c5b4c3a177fb7e16c5b19dbb8630f7f66e` ajoute deux tests de non-régression de `Lfx2012FuelHistoryExportPolicy` : export rejeté si un échantillon conserve le même horodatage mais change sa valeur éthanol, et rejet d'un historique mixant deux sessions pourtant identique à son instantané. Aucun moteur protocoles ISO/SAE touché ; l'autre session garde SAE J1979 (#110).
+- **Validation du nouveau commit** : tests ajoutés mais **non exécutés à ce stade**. Attendre la fin du développement C4 avant la campagne ciblée groupée, conformément à AGENTS.md. Ne pas déclarer ce HEAD vert sur la base d'une campagne antérieure. Contrôler également les jobs du HEAD final avant C6.
+- Les jobs de la campagne DoIP #45334468537 sont success (review skipped car draft) au SHA historique documenté dans #110, **pas** sur le commit C4 ci-dessus. Consentement OK puis Oui/Non, contrôle octets/blocs et préservation des originaux restent non négociables pour toute voie mutante. Aucun merge/Release ni essai physique pendant PR #95.
+
+---
+
 # Reprise PR #95 — 24 novembre 2026, C4 et SAE J1979 classique
 
 - C1 console clôturé côté logiciel (#59, campagne #45332946454).
