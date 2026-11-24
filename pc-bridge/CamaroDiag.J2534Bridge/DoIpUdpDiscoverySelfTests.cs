@@ -61,6 +61,23 @@ internal static class DoIpUdpDiscoverySelfTests
             identity.Source.Equals(IPAddress.Loopback),
             "DoIP unicast ignores same-IP identity announcements from wrong port.");
 
+        // Caller mutation after the request reaches the gateway must not
+        // change which EID the discovery accepts.
+        byte[] requestedEid = [1, 2, 3, 4, 5, 6];
+        var eidDiscovery = DoIpVehicleDiscovery.DiscoverAsync(
+            "127.0.0.1", TimeSpan.FromSeconds(2), CancellationToken.None,
+            eid: requestedEid, portOverride: port);
+        var eidRequest = await gateway.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(2));
+        var eidMessage = DoIpCodec.Decode(eidRequest.Buffer);
+        Check(eidMessage.Type == DoIpCodec.VehicleIdentificationRequestEid &&
+            eidMessage.Payload.SequenceEqual(requestedEid),
+            "DoIP sends the requested EID.");
+        requestedEid[0] = 99;
+        await gateway.SendAsync(Identity(requested), eidRequest.RemoteEndPoint);
+        var eidIdentity = await eidDiscovery.WaitAsync(TimeSpan.FromSeconds(2));
+        Check(eidIdentity.Eid.SequenceEqual(new byte[] {1, 2, 3, 4, 5, 6}),
+            "DoIP correlates against the transmitted EID despite caller mutation.");
+
         var status = DoIpVehicleDiscovery.QueryStatusAsync(
             "127.0.0.1", false, TimeSpan.FromSeconds(2),
             CancellationToken.None, portOverride: port);
