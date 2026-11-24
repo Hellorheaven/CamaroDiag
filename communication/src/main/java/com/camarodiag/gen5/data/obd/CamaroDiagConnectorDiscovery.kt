@@ -38,6 +38,19 @@ object CamaroDiagConnectorDiscovery {
     fun isConnectorUsbLabel(label: String): Boolean =
         label.contains("CamaroDiagConnectors", ignoreCase = true)
 
+    /**
+     * Recheck the *current* USB descriptor at the physical-open boundary.
+     * UI labels and Android permission grants are routing hints only: a
+     * hot-plugged connector must not become an ELM channel (or vice versa).
+     * This is not cryptographic device authentication.
+     */
+    fun allowsUsbDriverFamily(productName: String?, discoveryOnly: Boolean): Boolean {
+        val name = productName.orEmpty()
+        val connector = isConnectorUsbLabel(name)
+        val kkl = isLegacyKklUsbLabel(name)
+        return if (discoveryOnly) connector && !kkl else !connector && !kkl
+    }
+
     /** Explicit product-name hints only: FTDI is also used by real ELM devices. */
     fun isLegacyKklUsbLabel(label: String): Boolean =
         Regex("(?i)(?<![a-z0-9])(?:KKL|K[- ]?LINE)(?![a-z0-9])").containsMatchIn(label)
