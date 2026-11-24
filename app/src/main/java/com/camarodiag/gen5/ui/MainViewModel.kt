@@ -118,7 +118,7 @@ data class CanConsoleHistoryEntry(
 /** Completed, VIN-verified DoIP monitoring capture; partial runs are never exported. */
 data class DoIpMonitorReport(val vin: String, val gateway: Int, val tester: Int, val ecu: Int,
     val did: Int, val tls: Boolean, val completedAtUtcMillis: Long,
-    val samples: List<DoIpMonitorRow>)
+    val samples: List<DoIpMonitorRow>, val obdOnUds: Boolean = false)
 data class DoIpMonitorRow(val index: Int, val elapsedMs: Long, val payloadHex: String)
 
 data class LiveCanMonitorState(
@@ -1408,13 +1408,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     category = CamaroDiagExportStorage.Category.REPORTS,
                     beforePublish = { check(current()) }) { output ->
                     val writer = output.bufferedWriter(Charsets.UTF_8)
-                    writer.appendLine("vin,gateway_logical,tester_logical,ecu_logical,did,transport,completed_utc_ms,sample,elapsed_ms,payload_hex")
+                    writer.appendLine("vin,gateway_logical,tester_logical,ecu_logical,did,transport,completed_utc_ms,sample,elapsed_ms,payload_hex,service_protocol")
                     for (sample in report.samples) {
                         check(current())
                         writer.appendLine(listOf(report.vin, "%04X".format(report.gateway),
                             "%04X".format(report.tester), "%04X".format(report.ecu),
                             "%04X".format(report.did), if (report.tls) "TLS" else "TCP",
-                            report.completedAtUtcMillis, sample.index, sample.elapsedMs, sample.payloadHex).joinToString(","))
+                            report.completedAtUtcMillis, sample.index, sample.elapsedMs, sample.payloadHex,
+                            if (report.obdOnUds) "OBDonUDS" else "UDS").joinToString(","))
                     }
                     writer.flush()
                 }
@@ -1451,7 +1452,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val target = resolveSelectedDoIpTarget(host, tester, ecu, _vehicle.value.vin, tls,
                     onTrace = { trace -> journalDoIpControlTrace(trace, current) })
                 check(current())
-                val did = if (operation in setOf(DoIpDirectRead.Operation.DID, DoIpDirectRead.Operation.MONITOR, DoIpDirectRead.Operation.OBD_DID)) {
+                val did = if (operation in setOf(DoIpDirectRead.Operation.DID, DoIpDirectRead.Operation.MONITOR, DoIpDirectRead.Operation.OBD_DID, DoIpDirectRead.Operation.OBD_MONITOR)) {
                     require(didHex.matches(Regex("[0-9A-Fa-f]{4}")))
                     didHex.toInt(16)
                 } else 0xF190
@@ -1521,10 +1522,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     operation == DoIpDirectRead.Operation.VIN -> result.vin.orEmpty()
                     else -> result.data?.joinToString(" ") { "%02X".format(it.toInt() and 255) }.orEmpty()
                 }
-                val monitorReport = if (operation == DoIpDirectRead.Operation.MONITOR)
+                val monitorReport = if (operation in setOf(DoIpDirectRead.Operation.MONITOR, DoIpDirectRead.Operation.OBD_MONITOR))
                     DoIpMonitorReport(checkNotNull(result.vin), result.gateway.logicalAddress,
                         target.tester, target.ecu, did, tls, System.currentTimeMillis(),
-                        result.samples.map(::doIpSampleRow)) else null
+                        result.samples.map(::doIpSampleRow), obdOnUds = operation == DoIpDirectRead.Operation.OBD_MONITOR) else null
                 _calibrationWorkspace.update { it.copy(doIpReading = false, doIpResult = rendered,
                     doIpTrace = result.trace.map(::doIpTraceLine), doIpMonitorReport = monitorReport) }
                 if (current()) appendCanConsoleSystemEvent(localizedContext.getString(R.string.cal_doip_console_complete))

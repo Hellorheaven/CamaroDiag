@@ -1066,4 +1066,5 @@
     <string name="cal_doip_obd_verified">OBDonUDS confirmé (F810=%1$02X) · VIN %2$s</string>
     <string name="cal_doip_obd_unknown">OBDonUDS non confirmé (F810=%1$02X) · VIN %2$s</string>
     <string name="cal_doip_obd_data">DID OBDonUDS %1$04X · Données brutes : %2$s</string>
+    <string name="cal_doip_obd_monitor">Surveiller un DID OBDonUDS</string>
 </resources>

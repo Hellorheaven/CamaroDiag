@@ -60,10 +60,11 @@ def run(argv: Sequence[str] | None = None) -> dict:
     did.add_argument("--did", required=True, type=lambda x: hex_value(x, 4))
     obd_did = sub.add_parser("obd-did", help=tr("Read legislated DID after ECU identification", "Lire un DID réglementaire après identification ECU"))
     obd_did.add_argument("--did", required=True, type=lambda x: hex_value(x, 4))
-    monitor = sub.add_parser("monitor")
-    monitor.add_argument("--did", required=True, type=lambda x: hex_value(x, 4))
-    monitor.add_argument("--samples", type=int, default=10)
-    monitor.add_argument("--interval", type=float, default=1)
+    for action in ("monitor", "obd-monitor"):
+        monitor = sub.add_parser(action, help=tr("Monitor a DID on one verified ECU", "Surveiller un DID sur un ECU vérifié"))
+        monitor.add_argument("--did", required=True, type=lambda x: hex_value(x, 4))
+        monitor.add_argument("--samples", type=int, default=10)
+        monitor.add_argument("--interval", type=float, default=1)
     for action in ("dtcs", "count"):
         p = sub.add_parser(action)
         p.add_argument("--mask", type=lambda x: hex_value(x, 2), default=255)
@@ -103,9 +104,9 @@ def run(argv: Sequence[str] | None = None) -> dict:
                         "Les options de routage et UDS nécessitent une action de diagnostic"))
     if not network_only and (o.vin is None or not valid_vin(o.vin) or o.tester is None or o.ecu is None or o.tester == o.ecu):
         parser.error(tr("Expected VIN and distinct tester/ECU addresses required", "VIN attendu et adresses testeur/ECU distinctes requis"))
-    if o.action == "obd-did" and not 0xF400 <= o.did <= 0xF8FF:
+    if o.action in ("obd-did", "obd-monitor") and not 0xF400 <= o.did <= 0xF8FF:
         parser.error(tr("Legislated DID F400..F8FF required", "DID réglementaire F400..F8FF requis"))
-    if o.action == "monitor" and not (1 <= o.samples <= 3600 and 0.25 <= o.interval <= 60):
+    if o.action in ("monitor", "obd-monitor") and not (1 <= o.samples <= 3600 and 0.25 <= o.interval <= 60):
         parser.error(tr("Invalid sample count or interval", "Nombre de mesures ou intervalle invalide"))
     if o.action in ("snapshot", "extended") and o.record == 0:
         parser.error(tr("Record must be nonzero", "Enregistrement non nul requis"))
@@ -145,6 +146,11 @@ def run(argv: Sequence[str] | None = None) -> dict:
         if o.action in ("obd-identify", "obd-did"):
             return result | {"ecu": o.ecu, "tester": o.tester, "tls": not o.tcp} | session.read_obd(
                 o.vin, o.did if o.action == "obd-did" else None)
+        if o.action in ("monitor", "obd-monitor"):
+            def on_sample(row):
+                print(json.dumps({"partial_sample": row}), file=sys.stderr)
+            return result | {"ecu": o.ecu, "tester": o.tester, "tls": not o.tcp} | session.monitor(
+                o.vin, o.did, o.samples, o.interval, obd=o.action == "obd-monitor", on_sample=on_sample)
         vin = session.verify_vin(o.vin)
         result |= {"vin": vin, "ecu": o.ecu, "tester": o.tester, "tls": not o.tcp}
         if commands is not None:
@@ -169,17 +175,7 @@ def run(argv: Sequence[str] | None = None) -> dict:
             return result | session.dtc_count(o.mask)
         if o.action in ("snapshot", "extended"):
             return result | session.dtc_detail(o.dtc, o.record, o.action == "extended")
-        samples = []
-        for index in range(o.samples):
-            data = session.read_did(o.did)
-            if len(data) > 4096:
-                raise DoIpError(tr("Monitoring DID too large; use a single read", "DID trop volumineux pour le monitoring ; utiliser une lecture unique"))
-            samples.append({"index": index + 1, "utc": datetime.now(timezone.utc).isoformat(),
-                            "data": data.hex().upper()})
-            if index + 1 < o.samples:
-                session.wait(o.interval)
-        session.verify_vin(vin)
-        return result | {"did": o.did, "samples": samples}
+        raise DoIpError("Unsupported diagnostic action")
 
 
 def main():

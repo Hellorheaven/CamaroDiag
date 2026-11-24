@@ -445,6 +445,44 @@ class Session:
             self.close()
             raise
 
+    def monitor(self, expected: str, did: int, samples: int = 10,
+                interval: float = 1, *, obd: bool = False, on_sample=lambda _: None) -> dict:
+        """Read a single DID repeatedly on the same verified ECU and revalidate identity."""
+        if type(samples) is not int or not 1 <= samples <= 3600 or not 0.25 <= interval <= 60:
+            raise DoIpError("Invalid monitoring sample count or interval")
+        logical(did)
+        if obd and not 0xF400 <= did <= 0xF8FF:
+            raise DoIpError("Expected legislated OBDonUDS DID F400..F8FF")
+        try:
+            if obd:
+                if not self.read_obd(expected)["obd_on_uds"]:
+                    raise DoIpError("Selected ECU did not identify as OBDonUDS")
+            else:
+                self.verify_vin(expected)
+            rows = []
+            start = time.monotonic()
+            for index in range(1, samples + 1):
+                data = self.read_did(did)
+                if not 1 <= len(data) <= 4096:
+                    raise DoIpError("Missing or oversized DID monitoring sample")
+                row = {"index": index, "utc": datetime.now(timezone.utc).isoformat(),
+                       "elapsed_ms": int((time.monotonic() - start) * 1000),
+                       "data": data.hex().upper()}
+                rows.append(row)
+                on_sample(dict(row))
+                if index < samples:
+                    self.wait(interval)
+            if obd:
+                if not self.read_obd(expected)["obd_on_uds"]:
+                    raise DoIpError("OBDonUDS identification changed during monitoring")
+            else:
+                self.verify_vin(expected)
+            return {"vin": expected, "did": did, "service_protocol": "OBDonUDS" if obd else "UDS",
+                    "samples": rows}
+        except BaseException:
+            self.close()
+            raise
+
     def verify_vin(self, expected: str, vin_did: int = 0xF190) -> str:
         if not valid_vin(expected) or self.gateway.vin != expected:
             self.close()

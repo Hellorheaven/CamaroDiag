@@ -147,6 +147,41 @@ class DoIpTests(unittest.TestCase):
                         self.assertTrue(closed)
                 self.assertFalse(client._busy)
 
+    def test_obd_monitor_uses_legislated_identity_and_revalidates(self):
+        class Fake:
+            def __init__(self, values):
+                self.values = iter(values)
+                self.calls = []
+                self.closed = False
+            def read_obd(self, vin):
+                self.calls.append(("obd", vin))
+                return {"obd_on_uds": next(self.values)}
+            def verify_vin(self, vin):
+                self.calls.append(("uds", vin))
+            def read_did(self, did):
+                self.calls.append(("did", did))
+                return b"\x12\x34"
+            def wait(self, interval):
+                self.calls.append(("wait", interval))
+            def close(self):
+                self.closed = True
+        for values, ok, count in [([True, True], True, 2), ([False], False, 0),
+                                   ([True, False], False, 2)]:
+            fake = Fake(values)
+            partial = []
+            if ok:
+                result = Session.monitor(fake, VIN, 0xF40C, 2, .25, obd=True, on_sample=partial.append)
+                self.assertEqual(result["service_protocol"], "OBDonUDS")
+                self.assertEqual([r["data"] for r in result["samples"]], ["1234", "1234"])
+                self.assertEqual(fake.calls, [("obd", VIN), ("did", 0xF40C), ("wait", .25),
+                                              ("did", 0xF40C), ("obd", VIN)])
+            else:
+                with self.assertRaises(DoIpError):
+                    Session.monitor(fake, VIN, 0xF40C, 2, .25, obd=True, on_sample=partial.append)
+                self.assertTrue(fake.closed)
+            self.assertEqual(len(partial), count)
+            self.assertNotIn(("uds", VIN), fake.calls)
+
     def test_routing_options_on_wire(self):
         for routing_type, oem in ((0, None), (0xE0, bytes.fromhex("01020304"))):
             with self.subTest(routing_type=routing_type), socket.socket() as listener:

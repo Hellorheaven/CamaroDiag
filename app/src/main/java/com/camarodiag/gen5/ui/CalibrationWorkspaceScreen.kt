@@ -285,7 +285,7 @@ fun CalibrationWorkspaceScreen(
     onConfirmDoIpCommand: (DoIpConsoleCommand, EcuWriteConsentFlow.Approval) -> Unit,
     onInspectDoIpGateway: (String, DoIpDirectRead.GatewayOperation) -> Unit,
     onCancelDirectDoIp: () -> Unit,
-    onMonitorDirectDoIp: (String, String, String, String, Boolean, Int, Int, DoIpClientCertificateSelection?) -> Unit,
+    onMonitorDirectDoIp: (String, String, String, String, Boolean, Int, Int, Boolean, DoIpClientCertificateSelection?) -> Unit,
     onExportDoIpMonitoring: (DoIpMonitorReport) -> Unit,
     onImportDoIpBackupProfile: () -> Unit,
     onVerifyDoIpBackup: (DoIpMemoryBackup.Scope) -> Unit,
@@ -631,11 +631,20 @@ fun CalibrationWorkspaceScreen(
                     val interval = doIpInterval.toIntOrNull()
                     OutlinedButton(onClick = {
                         if (samples != null && interval != null)
-                            onMonitorDirectDoIp(doIpHost, doIpTester, doIpEcu, doIpDid, doIpTls, samples, interval, doIpCertificate)
+                            onMonitorDirectDoIp(doIpHost, doIpTester, doIpEcu, doIpDid, doIpTls, samples, interval, false, doIpCertificate)
                     }, enabled = targetReady && vinReady && doIpDid.length == 4 &&
                         samples != null && samples in 1..30 && interval != null && interval in 250..5000,
                         modifier = Modifier.fillMaxWidth()) {
                         Text(stringResource(R.string.cal_doip_monitor))
+                    }
+                    OutlinedButton(onClick = {
+                        if (samples != null && interval != null)
+                            onMonitorDirectDoIp(doIpHost, doIpTester, doIpEcu, doIpDid, doIpTls, samples, interval, true, doIpCertificate)
+                    }, enabled = targetReady && vinReady && doIpDid.length == 4 &&
+                        doIpDid.toIntOrNull(16)?.let(DoIpDirectRead::isObdDid) == true &&
+                        samples != null && samples in 1..30 && interval != null && interval in 250..5000,
+                        modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(R.string.cal_doip_obd_monitor))
                     }
                     HorizontalDivider()
                     OutlinedButton(onClick = onImportDoIpBackupProfile, enabled = idle && vinReady,

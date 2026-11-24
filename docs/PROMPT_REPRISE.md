@@ -1,3 +1,9 @@
+## PR117 — monitoring DoIP OBDonUDS Android et Connectors (24/11/2026)
+
+- Android : bouton de monitoring réglementaire, validation F802/F810 sur le même ECU avant et après mesures, vérification du DID et du contenu, même socket TCP/TLS et certificat choisi, journal/annulation existants, export CSV complet uniquement avec colonne service_protocol (UDS ou OBDonUDS). Mesures partielles visibles mais non exportables comme campagne réussie.
+- Connectors Python : action CLI `obd-monitor`, identification réglementaire avant et après, mesures horodatées et partielles sur stderr, résultat complet uniquement après validation ; le monitoring UDS générique conserve F190. Aucune conversion de DID inventée. Tests ciblés ajoutés. CI groupée demandée via marqueur, résultats à constater.
+- C6 et DoIP restent actifs ; pas de fusion, Release ni déploiement.
+
 ## PR117 — consolidation des chemins Kotlin et reprise CI (24/11/2026)
 
 - Run 45452211613 sur `7321099` : échec Android (déclarations en double et import assertArrayEquals absent dans la copie historique) ; 11 autres jobs techniques réussis, revue ignorée sur PR draft. Cause : sept fichiers avaient été créés sous `com/camaradiag` au lieu de `com/camarodiag`. Historique et différences vérifiés ; les cinq versions enrichies remplacent leurs anciennes copies, les deux fichiers CanTraceFilter et son test sont déplacés sans modification. Les sept chemins erronés sont retirés. Les changements TLS, sélection passerelle, OBDonUDS et import JUnit sont conservés.

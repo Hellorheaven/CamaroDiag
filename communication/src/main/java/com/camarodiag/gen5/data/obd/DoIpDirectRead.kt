@@ -23,7 +23,7 @@ import kotlin.coroutines.resumeWithException
  * A socket is owned by one operation and is never retained after failure.
  */
 object DoIpDirectRead {
-    enum class Operation { VIN, DID, DTC, DTC_COUNT, DTC_SNAPSHOT, DTC_EXTENDED, MONITOR, BACKUP, EXCHANGE, OBD_IDENTIFY, OBD_DID }
+    enum class Operation { VIN, DID, DTC, DTC_COUNT, DTC_SNAPSHOT, DTC_EXTENDED, MONITOR, BACKUP, EXCHANGE, OBD_IDENTIFY, OBD_DID, OBD_MONITOR }
     data class Target private constructor(val address: InetAddress, val tester: Int, val ecu: Int,
         val expectedVin: String, val tls: Boolean, val expectedGateway: Int? = null,
         val expectedIdentity: Gateway? = null) {
@@ -519,7 +519,7 @@ object DoIpDirectRead {
         require(timeoutMs in 100..30_000 && did in 0..65535 && mask in 0..255)
         require(operation == Operation.VIN || target.expectedVin.isNotEmpty())
         require(sampleCount in 1..30 && intervalMs in 250..5000)
-        require(operation != Operation.OBD_DID || isObdDid(did))
+        require(operation !in setOf(Operation.OBD_DID, Operation.OBD_MONITOR) || isObdDid(did))
         require((operation == Operation.BACKUP) == (backupScope != null))
         require(command == null || commands == null)
         val fixedCommands = (commands ?: command?.let { listOf(it) })?.map { it.copyOf() }
@@ -540,8 +540,8 @@ object DoIpDirectRead {
         }
         val budget = if (operation == Operation.BACKUP) 600_000L
             else if (operation == Operation.EXCHANGE) timeoutMs * (requireNotNull(fixedCommands).size + 4L)
-            else if (operation == Operation.MONITOR)
-            timeoutMs * (sampleCount + 5L) + intervalMs * (sampleCount - 1L) else timeoutMs * 5L
+            else if (operation in setOf(Operation.MONITOR, Operation.OBD_MONITOR))
+            timeoutMs * (sampleCount + 7L) + intervalMs * (sampleCount - 1L) else timeoutMs * 5L
         val gateway = discover(target.address, target.expectedVin, timeoutMs, onControlTrace)
         requireGatewayIdentity(target, gateway)
         if (operation == Operation.EXCHANGE) require(gateway.vin == target.expectedVin)
@@ -580,18 +580,34 @@ object DoIpDirectRead {
                         }
                         return vin
                     }
+                    fun monitorDid(): List<Sample> {
+                        val samples = mutableListOf<Sample>()
+                        val start = System.nanoTime()
+                        for (index in 1..sampleCount) {
+                            val reply = session.exchange(byteArrayOf(0x22, (did shr 8).toByte(), did.toByte()), timeoutMs)
+                            require(reply.size in 4..4099) { "Missing or oversized DID monitoring sample." }
+                            val sample = Sample(index, (System.nanoTime() - start) / 1_000_000,
+                                reply.copyOfRange(3, reply.size))
+                            samples += sample
+                            onSample(sample.copy(data = sample.data.copyOf()))
+                            if (index < sampleCount) session.waitBetweenSamples(intervalMs, timeoutMs)
+                        }
+                        return samples.toList()
+                    }
                     val vin: String
-                    if (operation == Operation.OBD_IDENTIFY || operation == Operation.OBD_DID) {
+                    if (operation in setOf(Operation.OBD_IDENTIFY, Operation.OBD_DID, Operation.OBD_MONITOR)) {
                         // OBD-only ECUs may not implement the generic F190 VIN DID.
                         // Do not silently assume F810 support from an unrelated UDS response.
                         vin = readVin(0xF802)
                         require(vin == target.expectedVin)
                         val protocolValue = decodeObdProtocol(session.exchange(
                             byteArrayOf(0x22, 0xF8.toByte(), 0x10), timeoutMs))
-                        val data = if (operation == Operation.OBD_DID) {
+                        if (operation != Operation.OBD_IDENTIFY) {
                             require(selectObdReadRoute(target, vin, protocolValue).routes.isNotEmpty()) {
                                 "Selected ECU did not identify as OBDonUDS."
                             }
+                        }
+                        val data = if (operation == Operation.OBD_DID) {
                             when (did) {
                                 0xF802 -> vin.toByteArray(Charsets.US_ASCII)
                                 0xF810 -> byteArrayOf(protocolValue.toByte())
@@ -599,7 +615,15 @@ object DoIpDirectRead {
                                     timeoutMs).let { it.copyOfRange(3, it.size) }
                             }
                         } else null
-                        Outcome(gateway, target.ecu, vin, data, null, trace.toList(), obdProtocolValue = protocolValue)
+                        val samples = if (operation == Operation.OBD_MONITOR) {
+                            val measured = monitorDid()
+                            require(readVin(0xF802) == vin)
+                            require(decodeObdProtocol(session.exchange(byteArrayOf(0x22, 0xF8.toByte(), 0x10),
+                                timeoutMs)) == protocolValue) { "OBDonUDS identity changed during monitoring." }
+                            measured
+                        } else emptyList()
+                        Outcome(gateway, target.ecu, vin, data, null, trace.toList(),
+                            samples = samples, obdProtocolValue = protocolValue)
                     } else if (operation == Operation.VIN || (operation == Operation.DID && did == 0xF190)) {
                         vin = readVin()
                         Outcome(gateway, target.ecu, vin, vin.toByteArray(Charsets.US_ASCII), null, trace.toList())
@@ -652,19 +676,9 @@ object DoIpDirectRead {
                             val capture = DoIpMemoryBackup.createCapture(scope, first, second)
                             Outcome(gateway, target.ecu, vin, null, null, trace.toList(), capture = capture)
                         } else if (operation == Operation.MONITOR) {
-                            val samples = mutableListOf<Sample>()
-                            val start = System.nanoTime()
-                            for (index in 1..sampleCount) {
-                                val reply = session.exchange(byteArrayOf(0x22, (did shr 8).toByte(), did.toByte()), timeoutMs)
-                                require(reply.size <= 4099) { "DID monitoring sample exceeds limit." }
-                                val sample = Sample(index, (System.nanoTime() - start) / 1_000_000,
-                                    reply.copyOfRange(3, reply.size))
-                                samples += sample
-                                onSample(sample.copy(data = sample.data.copyOf()))
-                                if (index < sampleCount) session.waitBetweenSamples(intervalMs, timeoutMs)
-                            }
+                            val samples = monitorDid()
                             require(readVin() == vin)
-                            Outcome(gateway, target.ecu, vin, null, null, trace.toList(), samples.toList())
+                            Outcome(gateway, target.ecu, vin, null, null, trace.toList(), samples)
                         } else if (operation == Operation.DID) {
                             val reply = session.exchange(byteArrayOf(0x22, (did shr 8).toByte(), did.toByte()), timeoutMs)
                             Outcome(gateway, target.ecu, vin, reply.copyOfRange(3, reply.size), null, trace.toList())
