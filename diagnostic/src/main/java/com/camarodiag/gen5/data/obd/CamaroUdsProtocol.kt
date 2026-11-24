@@ -204,7 +204,7 @@ object CamaroUdsProtocol {
         // arbitrary three hex characters that could be adapter chatter.
         val canHeader = Regex("(?:7E[8-F]|18DAF1[0-9A-F]{2})")
         for (sourceLine in response.lineSequence()) {
-            val line = sourceLine.trim().uppercase(Locale.ROOT)
+            val line = sourceLine.trim().removeSuffix(">").trimEnd().uppercase(Locale.ROOT)
             if (line.isEmpty()) continue
             val parts = line.split(Regex("\\s+"))
             val responder = when {

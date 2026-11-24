@@ -805,7 +805,7 @@
     <string name="flexfuel_lfx2012_pid_ltft_b2">Correction longue carburant B2 (PID 09)</string>
     <string name="flexfuel_lfx2012_reported_percent">%1$.1f%% (déclaré par l’ECU)</string>
     <string name="flexfuel_lfx2012_pid_unsupported">PID non annoncé par l’ECU</string>
-    <string name="flexfuel_lfx2012_pid_no_response">PID annoncé, aucune réponse physique valide</string>
+    <string name="flexfuel_lfx2012_pid_no_response">Aucune réponse valide pour ce PID</string>
     <string name="flexfuel_lfx2012_observation_warning">Une teneur en éthanol déclarée ne prouve ni la présence d’un capteur, ni l’activation FlexFuel, ni la compatibilité E85. Les corrections carburant ne mesurent pas l’éthanol. Cet écran ne modifie aucun paramètre ECU.</string>
     <string name="flexfuel_lfx2012_fuel_failed">Relevé carburant en lecture seule indisponible :</string>
     <string name="flexfuel_lfx2012_vin_unverified">Le VIN sélectionné n’a pas été comparé à une identité ECU physique récente et vérifiée pour ce relevé carburant.</string>

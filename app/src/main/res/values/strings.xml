@@ -802,7 +802,7 @@
     <string name="flexfuel_lfx2012_pid_ltft_b2">Long-term fuel trim B2 (PID 09)</string>
     <string name="flexfuel_lfx2012_reported_percent">%1$.1f%% (ECU-reported)</string>
     <string name="flexfuel_lfx2012_pid_unsupported">PID not advertised by ECU</string>
-    <string name="flexfuel_lfx2012_pid_no_response">PID advertised, no valid physical response</string>
+    <string name="flexfuel_lfx2012_pid_no_response">No valid response for this PID</string>
     <string name="flexfuel_lfx2012_observation_warning">A reported ethanol percentage does not establish a fitted ethanol sensor, an active FlexFuel calibration or E85 compatibility. Fuel trims are not ethanol measurements. This screen never changes ECU parameters.</string>
     <string name="flexfuel_lfx2012_fuel_failed">Read-only fuel inspection unavailable:</string>
     <string name="flexfuel_lfx2012_vin_unverified">The selected VIN was not independently matched to a fresh physical ECU identity for this fuel observation.</string>

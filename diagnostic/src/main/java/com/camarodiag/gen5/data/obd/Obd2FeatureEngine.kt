@@ -121,12 +121,16 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
 
     suspend fun discoverSupportedPids(): Set<Int> = discoverPidAvailability().supported
 
-    suspend fun discoverPidAvailability(): PidDiscovery {
+    suspend fun discoverPidAvailability(primaryPowertrainResponderOnly: Boolean = false): PidDiscovery {
         val supported = linkedSetOf<Int>()
         var basePid = 0x00
         repeat(8) {
-            val response = ask("01%02X".format(Locale.US, basePid))
-            val bytes = payload(response, 0x41, basePid)
+            val pidHex = "%02X".format(Locale.US, basePid)
+            val response = ask("01$pidHex")
+            val bytes = if (primaryPowertrainResponderOnly) {
+                CamaroUdsProtocol.parsePidBytes(response, pidHex, primaryPowertrainResponderOnly = true)
+                    ?.takeIf { it.size == 4 }?.asList()
+            } else payload(response, 0x41, basePid)
             if (bytes == null || bytes.size < 4) return PidDiscovery(supported, basePid + 1)
 
             for (bit in 0 until 32) {

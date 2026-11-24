@@ -513,7 +513,7 @@ class BluetoothObdManager(context: Context) {
         }
         return withObdCommandSession { engine ->
             transportSessionEpoch.requireQueuedCurrent(epoch)
-            val discovery = engine.discoverPidAvailability()
+            val discovery = engine.discoverPidAvailability(primaryPowertrainResponderOnly = true)
             transportSessionEpoch.requireQueuedCurrent(epoch)
             val replies = linkedMapOf<Int, String?>()
             for (pid in Lfx2012FuelReadOnly.PIDS) {
