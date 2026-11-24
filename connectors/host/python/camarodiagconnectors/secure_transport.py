@@ -56,8 +56,15 @@ def _wrap(context, stream, *, allowed_peer_sha256, expected_name=None, server=Fa
     timeout = stream.gettimeout()
     if timeout is None or not 0 < timeout <= 5:
         raise ValueError("Bounded TLS handshake socket timeout (<=5s) required")
-    wrapped = context.wrap_socket(stream, server_side=server,
-                                  server_hostname=None if server else expected_name)
+    # A failed TLS handshake can raise inside wrap_socket() before it
+    # returns an SSLSocket. That failure must also retire the original
+    # connection, not leave an unauthenticated transport alive for retry.
+    try:
+        wrapped = context.wrap_socket(stream, server_side=server,
+                                      server_hostname=None if server else expected_name)
+    except BaseException:
+        stream.close()
+        raise
     try:
         if wrapped.version() != "TLSv1.3" or wrapped.selected_alpn_protocol() != "camarodiag-discovery/1":
             raise ssl.SSLError("Unexpected TLS application protocol")
