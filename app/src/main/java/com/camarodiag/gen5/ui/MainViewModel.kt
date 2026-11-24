@@ -1178,11 +1178,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun inspectDirectDoIpGateway(host: String, operation: DoIpDirectRead.GatewayOperation) {
         if (!requirePremiumLicense()) return
-        launchEnhancedUdsRead { current ->
+        launchEnhancedUdsRead(journalDoIp = true) { current ->
             _calibrationWorkspace.update { it.copy(doIpReading = true, doIpGatewayResult = "",
                 doIpGatewayHost = host) }
             try {
-                val result = DoIpDirectRead.inspectGateway(host, _vehicle.value.vin, operation)
+                val result = DoIpDirectRead.inspectGateway(host, _vehicle.value.vin, operation,
+                    onControlTrace = { trace -> journalDoIpControlTrace(trace, current) })
                 if (!current()) return@launchEnhancedUdsRead
                 val unavailable = localizedContext.getString(R.string.cal_status_unresolved)
                 val identity = localizedContext.getString(R.string.cal_doip_gateway_identity,
@@ -1202,10 +1203,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 _calibrationWorkspace.update { it.copy(doIpReading = false,
                     doIpGatewayResult = listOfNotNull(identity, status, power).joinToString("\n")) }
+                if (current()) appendCanConsoleSystemEvent(localizedContext.getString(R.string.cal_doip_console_complete))
             } catch (cancelled: CancellationException) {
                 if (current()) _calibrationWorkspace.update { it.copy(doIpReading = false) }
                 throw cancelled
             } catch (_: Exception) {
+                if (current()) appendCanConsoleSystemEvent(localizedContext.getString(R.string.cal_doip_failed), succeeded = false)
                 if (current()) _calibrationWorkspace.update { it.copy(doIpReading = false,
                     doIpGatewayResult = localizedContext.getString(R.string.cal_doip_failed)) }
             }
@@ -1283,7 +1286,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         _calibrationWorkspace.update {
                             if (current()) it.copy(doIpTrace = (it.doIpTrace + doIpTraceLine(trace)).takeLast(128)) else it
                         }
-                    })
+                    }, onControlTrace = { trace -> journalDoIpControlTrace(trace, current) })
                 if (!current()) return@launchEnhancedUdsRead
                 val capture = checkNotNull(result.capture)
                 val path = CamaroDiagExportStorage.write(getApplication<Application>(),
@@ -1326,6 +1329,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val destination = if (trace.direction == "TX") target.ecu else target.tester
             val content = "DoIP " + (if (target.tls) "TLS" else "TCP") +
                 " ${target.address.hostAddress} %04X>%04X ".format(source, destination) + trace.payloadHex
+            val event = CanConsoleHistoryEntry(System.nanoTime(), trace.direction,
+                trace.observedAtUtcMillis, content)
+            recordConsoleEvents(listOf(event))
+            _liveCanMonitorState.update { it.copy(consoleHistory = (it.consoleHistory + event).takeLast(300)) }
+        }
+    }
+
+    /** DoIP transport control PDUs are not CAN frames or UDS service data. */
+    private fun journalDoIpControlTrace(trace: DoIpDirectRead.ControlTrace, current: () -> Boolean) {
+        synchronized(consoleEventJournal) {
+            check(current() && _liveCanMonitorState.value.isDoIpActive)
+            val content = "DoIP " + trace.transport + " " + trace.host + " PDU " + trace.payloadHex
             val event = CanConsoleHistoryEntry(System.nanoTime(), trace.direction,
                 trace.observedAtUtcMillis, content)
             recordConsoleEvents(listOf(event))
@@ -1403,7 +1418,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         _calibrationWorkspace.update {
                             if (current()) it.copy(doIpLiveSamples = it.doIpLiveSamples + doIpSampleRow(sample)) else it
                         }
-                    })
+                    }, onControlTrace = { trace -> journalDoIpControlTrace(trace, current) })
                 if (!current()) return@launchEnhancedUdsRead
                 val module = "DoIP 0x" + ecu.uppercase()
                 val report = result.dtcs
