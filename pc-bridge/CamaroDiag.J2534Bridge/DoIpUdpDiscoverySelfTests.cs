@@ -267,6 +267,31 @@ internal static class DoIpUdpDiscoverySelfTests
             new IPEndPoint(IPAddress.Parse("fe80::1234"), 15300), 13400),
             "Wrong UDP source port cannot claim IPv6 DoIP announcement.");
 
+        var activeDestination = DoIpVehicleDiscovery.Ipv6MulticastDestination(2);
+        Check(activeDestination.AddressFamily == AddressFamily.InterNetworkV6 &&
+            activeDestination.IsIPv6Multicast &&
+            activeDestination.ToString().StartsWith("ff02::1%", StringComparison.OrdinalIgnoreCase) &&
+            activeDestination.ScopeId == 2,
+            "DoIP ff02::1 active multicast scopes the correct IPv6 interface.");
+        var badActiveInterface = false;
+        try { _ = DoIpVehicleDiscovery.Ipv6MulticastDestination(-1); }
+        catch (ArgumentOutOfRangeException) { badActiveInterface = true; }
+        Check(badActiveInterface,
+            "Active DoIP IPv6 multicast refuses unscoped/default interface.");
+        Check(DoIpCodec.Decode(DoIpVehicleDiscovery.BuildRequest()).Version == 0xFF,
+            "Active DoIP multicast requests use version 0xFF before ECU negotiation.");
+        Check(DoIpVehicleDiscovery.MatchesRequestedIdentity(
+            DoIpVehicleDiscovery.ParseAnnouncement(
+                Identity(requested), IPAddress.Parse("fe80::1234")),
+            requested, null),
+            "Active IPv6 multicast VIN filtering accepts matching response.");
+        Check(!DoIpVehicleDiscovery.MatchesRequestedIdentity(
+            DoIpVehicleDiscovery.ParseAnnouncement(
+                Identity(requested), IPAddress.Parse("fe80::1234")),
+            rogueVin, null),
+            "Active IPv6 multicast VIN filtering excludes foreign gateway.");
+
+
         return checks;
     }
 }
