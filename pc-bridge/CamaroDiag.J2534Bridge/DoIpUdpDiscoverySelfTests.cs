@@ -93,6 +93,48 @@ internal static class DoIpUdpDiscoverySelfTests
             await power.WaitAsync(TimeSpan.FromSeconds(2))) == 1,
             "DoIP power-mode ready status is parsed from selected gateway.");
 
+        var statusV3 = DoIpVehicleDiscovery.QueryStatusAsync(
+            "127.0.0.1", false, TimeSpan.FromSeconds(2),
+            CancellationToken.None, portOverride: port,
+            protocolVersion: 0x03);
+        var requestV3 = await gateway.ReceiveAsync()
+            .WaitAsync(TimeSpan.FromSeconds(2));
+        Check(DoIpCodec.Decode(requestV3.Buffer).Version == 0x03,
+            "DoIP UDP status uses requested version 0x03.");
+        await gateway.SendAsync(DoIpCodec.Encode(
+            DoIpCodec.EntityStatusResponse, [0, 2, 1], 0x03),
+            requestV3.RemoteEndPoint);
+        Check((await statusV3.WaitAsync(TimeSpan.FromSeconds(2))).Version == 0x03,
+            "DoIP UDP gateway status accepts version-matched 0x03 response.");
+
+        var mismatchedVersion = DoIpVehicleDiscovery.QueryStatusAsync(
+            "127.0.0.1", true, TimeSpan.FromSeconds(2),
+            CancellationToken.None, portOverride: port,
+            protocolVersion: 0x03);
+        var mismatchRequest = await gateway.ReceiveAsync()
+            .WaitAsync(TimeSpan.FromSeconds(2));
+        await gateway.SendAsync(DoIpCodec.Encode(
+            DoIpCodec.PowerModeResponse, [1], 0x02),
+            mismatchRequest.RemoteEndPoint);
+        var refusedVersion = false;
+        try { await mismatchedVersion; }
+        catch (InvalidDataException) { refusedVersion = true; }
+        Check(refusedVersion,
+            "DoIP UDP status rejects a response on the wrong negotiated version.");
+
+        var badStatusVersion = false;
+        try
+        {
+            await DoIpVehicleDiscovery.QueryStatusAsync(
+                "127.0.0.1", false, TimeSpan.FromMilliseconds(20),
+                CancellationToken.None, portOverride: port,
+                protocolVersion: 0xFF);
+        }
+        catch (ArgumentOutOfRangeException) { badStatusVersion = true; }
+        Check(badStatusVersion,
+            "Discovery-only 0xFF is forbidden for DoIP UDP status requests.");
+
+
         // A standard UDP Generic NACK from the selected endpoint must
         // reveal the gateway's rejection code instead of masking it as an
         // unresponsive vehicle or returning a false-positive discovery.
