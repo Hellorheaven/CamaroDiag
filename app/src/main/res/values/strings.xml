@@ -1028,6 +1028,7 @@
     <string name="can_console_swcan_changed">SW-CAN 33.3 kbit/s</string>
     <string name="can_console_swcan_receive_only">SW-CAN: receive-only in this console.</string>
     <string name="cal_doip_discover">Discover gateway</string>
+    <string name="cal_doip_discover_by_vin">Find gateway by VIN</string>
     <string name="cal_doip_gateway_status_button">Status</string>
     <string name="cal_doip_power">Power mode</string>
     <string name="cal_doip_gateway_identity">Gateway 0x%1$s · DoIP 0x%2$s · reported VIN %3$s</string>
