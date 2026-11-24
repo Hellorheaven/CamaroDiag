@@ -45,13 +45,13 @@ internal sealed partial class BridgeDesktopForm
         layout.RowStyles.Add(new RowStyle(SizeType.Percent, 61));
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         var fields = Grid();
-        WideRow(fields, new Label
-        {
-            Text = "Campagne de recette lecture seule : pilotes J2534, " +
-                   "connexion ECU sur le profil vérifié, et liste de tous les calculateurs. " +
-                   "Bluetooth, BLE, USB ELM/STN et Wi-Fi se testent sur Android.",
-            AutoSize = true, ForeColor = Color.DarkSlateGray
-        }, 59);
+        // WideRow(fields, new Label
+        // {
+            // Text = "Campagne de recette lecture seule : pilotes J2534, " +
+                   // "connexion ECU sur le profil vérifié, et liste de tous les calculateurs. " +
+                   // "Bluetooth, BLE, USB ELM/STN et Wi-Fi se testent sur Android.",
+            // AutoSize = true, ForeColor = Color.DarkSlateGray
+        // }, 59);
         Row(fields, "Accès privé", functionalAuthentication, functionalGoogleSignIn, 52);
         WideRow(fields, functionalEcmProfileConfirmed, 48);
         var actions = new FlowLayoutPanel

@@ -159,10 +159,10 @@ fun ObdScanScreen(
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(stringResource(R.string.obd_scan_title),
                     color = CamaroAmber, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.sp)
-                Text(
-                    stringResource(R.string.obd_scan_description),
-                    color = TextMuted, fontSize = 12.sp
-                )
+                // Text(
+                    // stringResource(R.string.obd_scan_description),
+                    // color = TextMuted, fontSize = 12.sp
+                // )
                 Button(
                     onClick = onRunScan,
                     enabled = isConnected && !isScanning,

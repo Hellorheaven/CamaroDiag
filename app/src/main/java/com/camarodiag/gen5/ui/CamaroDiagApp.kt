@@ -1779,7 +1779,7 @@ fun CanSnifferScreen(
             Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     SectionTitle(stringResource(R.string.can_sniffer_title))
-                    Text(stringResource(R.string.can_sniffer_description), color = TextMuted, fontSize = 12.sp)
+                    // Text(stringResource(R.string.can_sniffer_description), color = TextMuted, fontSize = 12.sp)
                     Text(stringResource(R.string.can_sniffer_safety), color = CamaroAmber, fontSize = 11.sp)
                     Text(stringResource(R.string.can_sniffer_bus_limit), color = TextMuted, fontSize = 10.sp)
                     Text(stringResource(R.string.can_sniffer_stn_filter_notice), color = TextMuted, fontSize = 10.sp)
@@ -1937,10 +1937,10 @@ fun CanSnifferScreen(
                             }
                         }
                     }
-                    Text(
-                        stringResource(R.string.can_console_filter_observed_note),
-                        color = TextMuted, fontSize = 10.sp
-                    )
+                    // Text(
+                        // stringResource(R.string.can_console_filter_observed_note),
+                        // color = TextMuted, fontSize = 10.sp
+                    // )
                     if (state.consoleHistory.isNotEmpty()) {
                         Text(
                             stringResource(R.string.can_console_history_recent_scope),
@@ -2984,7 +2984,7 @@ fun SettingsScreen(
                             }
                         }
                     }
-                    Text(stringResource(R.string.system_language_hint), color = TextMuted, fontSize = 12.sp)
+                    // Text(stringResource(R.string.system_language_hint), color = TextMuted, fontSize = 12.sp)
                     Text(stringResource(R.string.settings_current_vehicle), fontWeight = FontWeight.Bold)
                     Text(currentVehicle, color = TextMuted, fontSize = 12.sp)
                     Text(stringResource(R.string.settings_current_adapter), fontWeight = FontWeight.Bold)

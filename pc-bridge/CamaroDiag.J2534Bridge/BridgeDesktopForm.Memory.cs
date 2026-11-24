@@ -104,14 +104,14 @@ internal sealed partial class BridgeDesktopForm
         };
         WideRow(fields, acquisitionButtons, 48);
         WideRow(fields, memoryStatus, 62);
-        WideRow(fields, new Label
-        {
-            Text = "L'interface, les CAN IDs et le profil de transport sont ceux du panneau " +
-                "Console CAN/OBD. Pour la lecture mémoire, la correspondance avec le profil " +
-                "et le VIN sera vérifiée avant le premier octet. " +
-                "Aucun droit d'écriture ou SecurityAccess n'est accordé.",
-            AutoSize = true, ForeColor = Color.DarkSlateGray
-        }, 82);
+        // WideRow(fields, new Label
+        // {
+            // Text = "L'interface, les CAN IDs et le profil de transport sont ceux du panneau " +
+                // "Console CAN/OBD. Pour la lecture mémoire, la correspondance avec le profil " +
+                // "et le VIN sera vérifiée avant le premier octet. " +
+                // "Aucun droit d'écriture ou SecurityAccess n'est accordé.",
+            // AutoSize = true, ForeColor = Color.DarkSlateGray
+        // }, 82);
         tab.Controls.Add(fields);
         return tab;
     }

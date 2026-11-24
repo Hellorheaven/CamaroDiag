@@ -1088,10 +1088,10 @@ fun CalibrationWorkspaceScreen(
                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(stringResource(R.string.cal_native_catalog_title),
                         color = CamaroAmber, fontWeight = FontWeight.Bold)
-                    Text(
-                        stringResource(R.string.cal_native_catalog_explanation),
-                        color = TextMuted, fontSize = 11.sp
-                    )
+                    // Text(
+                        // stringResource(R.string.cal_native_catalog_explanation),
+                        // color = TextMuted, fontSize = 11.sp
+                    // )
                     Text(state.nativeSignalMessage.ifBlank {
                         stringResource(R.string.cal_native_catalog_loading)
                     }, color = TextMuted, fontSize = 10.sp)
@@ -1225,10 +1225,10 @@ fun CalibrationWorkspaceScreen(
                         stringResource(R.string.cal_trace_title),
                         color = TextPrimary, fontWeight = FontWeight.Bold
                     )
-                    Text(
-                        stringResource(R.string.cal_trace_description),
-                        color = TextMuted, fontSize = 12.sp
-                    )
+                    // Text(
+                        // stringResource(R.string.cal_trace_description),
+                        // color = TextMuted, fontSize = 12.sp
+                    // )
                     OutlinedButton(
                         onClick = onImportTrace,
                         enabled = !state.isTraceAnalyzing,
@@ -1312,10 +1312,10 @@ fun CalibrationWorkspaceScreen(
                         Text(stringResource(R.string.calibration_files),
                             color = TextPrimary, fontWeight = FontWeight.Bold)
                     }
-                    Text(
-                        stringResource(R.string.cal_file_inspection_hint),
-                        color = TextMuted, fontSize = 12.sp
-                    )
+                    // Text(
+                        // stringResource(R.string.cal_file_inspection_hint),
+                        // color = TextMuted, fontSize = 12.sp
+                    // )
                     OutlinedButton(onClick = onImportFile, modifier = Modifier.fillMaxWidth()) {
                         androidx.compose.material3.Icon(Icons.Default.CloudDownload, contentDescription = null)
                         Text(stringResource(R.string.cal_import_file))
