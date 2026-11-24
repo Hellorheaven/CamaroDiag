@@ -76,7 +76,7 @@ internal static class DoIpVinReader
     internal static Task<DoIpDiagnosticTransport> ConnectObservedAsync(
         DoIpVehicleDiscovery.Identity gateway, IPAddress address, ushort tester,
         ushort ecu, bool useTls, TimeSpan timeout, CancellationToken token,
-        string? clientCertificateThumbprint)
+        string? clientCertificateThumbprint, Action<DoIpDiagnosticTransport.PduTrace>? trace = null)
     {
         ArgumentNullException.ThrowIfNull(gateway);
         ArgumentNullException.ThrowIfNull(address);
@@ -88,7 +88,7 @@ internal static class DoIpVinReader
             address.ToString(), tester, ecu, timeout, token,
             useTls: useTls, protocolVersion: gateway.ProtocolVersion,
             clientCertificateThumbprint: clientCertificateThumbprint,
-            expectedGatewayAddress: gateway.LogicalAddress);
+            expectedGatewayAddress: gateway.LogicalAddress, trace: trace);
     }
 
     internal static async Task<string> VerifyObservedVinAsync(DoIpDiagnosticTransport transport,
@@ -106,10 +106,11 @@ internal static class DoIpVinReader
         DoIpVehicleDiscovery.Identity gateway, IPAddress address, ushort tester,
         ushort ecu, bool useTls, ushort did, TimeSpan timeout,
         CancellationToken token, Action<byte[]>? requested = null,
-        Action<byte[]>? received = null, string? clientCertificateThumbprint = null)
+        Action<byte[]>? received = null, string? clientCertificateThumbprint = null,
+        Action<DoIpDiagnosticTransport.PduTrace>? trace = null)
     {
         await using var transport = await ConnectObservedAsync(gateway, address, tester,
-            ecu, useTls, timeout, token, clientCertificateThumbprint);
+            ecu, useTls, timeout, token, clientCertificateThumbprint, trace);
         var vin = await VerifyObservedVinAsync(transport, gateway, timeout, token, requested, received);
         if (did == 0xF190) return Encoding.ASCII.GetBytes(vin);
         return await ReadDidAsync(transport, did, timeout, token, requested, received);
@@ -142,10 +143,11 @@ internal static class DoIpVinReader
         ushort ecu, bool useTls, ushort did, int sampleCount, TimeSpan interval,
         TimeSpan timeout, CancellationToken token, Action<int, byte[]> sample,
         Action<byte[]>? requested = null, Action<byte[]>? received = null,
-        string? clientCertificateThumbprint = null)
+        string? clientCertificateThumbprint = null,
+        Action<DoIpDiagnosticTransport.PduTrace>? trace = null)
     {
         await using var transport = await ConnectObservedAsync(gateway, address, tester,
-            ecu, useTls, timeout, token, clientCertificateThumbprint);
+            ecu, useTls, timeout, token, clientCertificateThumbprint, trace);
         var vin = await VerifyObservedVinAsync(transport, gateway, timeout, token, requested, received);
         await MonitorDidAsync(transport, did, sampleCount, interval, timeout, token,
             sample, requested, received);
@@ -158,10 +160,11 @@ internal static class DoIpVinReader
         DoIpVehicleDiscovery.Identity gateway, IPAddress address, ushort tester,
         ushort ecu, bool useTls, byte statusMask, TimeSpan timeout,
         CancellationToken token, Action<byte[]>? requested = null,
-        Action<byte[]>? received = null, string? clientCertificateThumbprint = null)
+        Action<byte[]>? received = null, string? clientCertificateThumbprint = null,
+        Action<DoIpDiagnosticTransport.PduTrace>? trace = null)
     {
         await using var transport = await ConnectObservedAsync(gateway, address, tester,
-            ecu, useTls, timeout, token, clientCertificateThumbprint);
+            ecu, useTls, timeout, token, clientCertificateThumbprint, trace);
         _ = await VerifyObservedVinAsync(transport, gateway, timeout, token, requested, received);
         return await ReadDtcsAsync(transport, statusMask, timeout, token, requested, received);
     }
@@ -170,10 +173,11 @@ internal static class DoIpVinReader
         DoIpVehicleDiscovery.Identity gateway, IPAddress address, ushort tester,
         ushort ecu, bool useTls, TimeSpan timeout, CancellationToken token,
         Action<byte[]>? requested = null, Action<byte[]>? received = null,
-        string? clientCertificateThumbprint = null)
+        string? clientCertificateThumbprint = null,
+        Action<DoIpDiagnosticTransport.PduTrace>? trace = null)
     {
         await using var transport = await ConnectObservedAsync(gateway, address, tester,
-            ecu, useTls, timeout, token, clientCertificateThumbprint);
+            ecu, useTls, timeout, token, clientCertificateThumbprint, trace);
         return await VerifyObservedVinAsync(transport, gateway, timeout, token, requested, received);
     }
 }
