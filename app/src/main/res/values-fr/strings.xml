@@ -1060,4 +1060,5 @@
     <string name="cal_doip_cert_clear">Retirer la sélection</string>
     <string name="cal_doip_cert_none">TLS serveur uniquement (aucun certificat client sélectionné).</string>
     <string name="cal_doip_tls_error">Authentification TLS échouée ou certificat client indisponible/expiré. Vérifiez la confiance serveur et sélectionnez le bon certificat client.</string>
+    <string name="cal_doip_gateway_eid_gid">Passerelle EID %1$s · GID %2$s</string>
 </resources>
