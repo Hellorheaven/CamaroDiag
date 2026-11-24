@@ -349,6 +349,31 @@ internal static class DoIpDiagnosticSessionSelfTests
                 "DoIP idle AliveCheck keeps socket usable for a later UDS request.");
         });
 
+        await RunCaseAsync(async stream =>
+        {
+            await RequireRequestAsync(stream);
+            await SendAsync(stream, DoIpCodec.DiagnosticMessage, FromEcu(Positive));
+            await Task.Delay(30);
+            await SendAsync(stream, DoIpCodec.AliveCheckRequest, []);
+            var aliveIdle = await ReadAsync(stream);
+            Check(aliveIdle.Type == DoIpCodec.AliveCheckResponse &&
+                aliveIdle.Payload.SequenceEqual(new byte[] { 0x0E, 0x80 }),
+                "Gateway AliveCheck answered between two completed UDS requests.");
+            await RequireRequestAsync(stream);
+            await SendAsync(stream, DoIpCodec.DiagnosticMessage, FromEcu(Positive));
+        }, async client =>
+        {
+            var first = await client.ExchangeUdsAsync(Request,
+                TimeSpan.FromSeconds(2), CancellationToken.None);
+            Check(first.SequenceEqual(Positive),
+                "First diagnostic request finishes before idle AliveCheck.");
+            await Task.Delay(80);
+            var second = await client.ExchangeUdsAsync(Request,
+                TimeSpan.FromSeconds(2), CancellationToken.None);
+            Check(second.SequenceEqual(Positive),
+                "DoIP idle AliveCheck preserves a reused diagnostic session.");
+        });
+
         // Unsolicited diagnostic replies arriving *between* operations
         // cannot be queued and mistaken for the next UDS transaction.
         await RunCaseAsync(async stream =>
