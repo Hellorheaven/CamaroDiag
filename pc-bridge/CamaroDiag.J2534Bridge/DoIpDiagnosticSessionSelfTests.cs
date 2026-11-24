@@ -87,6 +87,35 @@ internal static class DoIpDiagnosticSessionSelfTests
         return message;
     }
 
+    private static async Task VerifyRoutingRejectedAsync(byte responseCode,
+        byte responseVersion, Func<Task, Task> verify)
+    {
+        var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        var port = ((IPEndPoint)listener.LocalEndpoint).Port;
+        var server = Task.Run(async () =>
+        {
+            using var peer = await listener.AcceptTcpClientAsync();
+            await using var stream = peer.GetStream();
+            var activation = await ReadAsync(stream);
+            if (activation.Type != DoIpCodec.RoutingActivationRequest)
+                throw new InvalidDataException("Missing DoIP routing activation.");
+            await SendAsync(stream, DoIpCodec.RoutingActivationResponse,
+                [0x0E, 0x80, 0x12, 0x34, responseCode, 0, 0, 0, 0],
+                responseVersion);
+        });
+        try
+        {
+            var attempt = DoIpDiagnosticTransport.ConnectAsync(
+                "127.0.0.1", Tester, Ecu,
+                TimeSpan.FromSeconds(2), CancellationToken.None,
+                portOverride: port);
+            await verify(attempt);
+            await server.WaitAsync(TimeSpan.FromSeconds(3));
+        }
+        finally { listener.Stop(); }
+    }
+
     internal static int Run() => RunAsync().GetAwaiter().GetResult();
 
     private static async Task<int> RunAsync()
@@ -120,7 +149,16 @@ internal static class DoIpDiagnosticSessionSelfTests
                 alive.Payload.SequenceEqual([0x0E, 0x80]),
                 "AliveCheck returns exact logical tester identity.");
             await SendAsync(stream, DoIpCodec.DiagnosticMessage, FromEcu(Pending));
-            await SendAsync(stream, DoIpCodec.DiagnosticMessage, FromEcu(Positive));
+            // Split TCP header and UDS body across writes: TCP frames are a
+            // byte stream, not guaranteed to fit a single ReadAsync.
+            var responseFrame = DoIpCodec.Encode(DoIpCodec.DiagnosticMessage,
+                FromEcu(Positive));
+            await stream.WriteAsync(responseFrame.AsMemory(0, 3));
+            await Task.Delay(2);
+            await stream.WriteAsync(responseFrame.AsMemory(3, 6));
+            await Task.Delay(2);
+            await stream.WriteAsync(responseFrame.AsMemory(9));
+            await stream.FlushAsync();
         }, async client =>
         {
             var response = await client.ExchangeUdsAsync(
@@ -178,6 +216,8 @@ internal static class DoIpDiagnosticSessionSelfTests
                     FromEcu(Positive));
             }
             catch (IOException) { /* peer closed the ambiguous connection */ }
+            catch (ObjectDisposedException) { /* closed after timeout */ }
+            catch (SocketException) { /* Windows socket closed by client */ }
         }, async client =>
         {
             var attempt = client.ExchangeUdsAsync(Request,
@@ -254,6 +294,71 @@ internal static class DoIpDiagnosticSessionSelfTests
                 .SequenceEqual(Positive),
                 "Bad argument does not poison an otherwise unused socket.");
         });
+
+        // A syntactically valid but negative routing activation response is
+        // not an authenticated/activated UDS transport.
+        await VerifyRoutingRejectedAsync(0x04, 0x02, async attempt =>
+        {
+            await Expect<IOException>(() => attempt,
+                "Routing response 0x04 rejects diagnostic access.");
+        });
+        await VerifyRoutingRejectedAsync(0x10, 0x04, async attempt =>
+        {
+            await Expect<InvalidDataException>(() => attempt,
+                "Unexpected DoIP version cannot activate routing.");
+        });
+
+        // Gateway generic header NACK aborts, but never becomes UDS data.
+        await RunCaseAsync(async stream =>
+        {
+            await RequireRequestAsync(stream);
+            await SendAsync(stream, DoIpCodec.GenericNegativeAck, [0x02]);
+        }, async client =>
+        {
+            await Expect<IOException>(() =>
+                client.ExchangeUdsAsync(Request, TimeSpan.FromSeconds(1),
+                    CancellationToken.None),
+                "Generic header NACK aborts DoIP diagnostic operation.");
+            await Expect<InvalidOperationException>(() =>
+                client.ExchangeUdsAsync(Request, TimeSpan.FromSeconds(1),
+                    CancellationToken.None),
+                "Generic NACK retires the uncertain TCP exchange.");
+        });
+
+        await RunCaseAsync(async stream =>
+        {
+            await RequireRequestAsync(stream);
+            await SendAsync(stream, DoIpCodec.DiagnosticMessage,
+                [0x12, 0x35, 0x0E, 0x80, .. Positive]);
+        }, async client =>
+        {
+            await Expect<InvalidDataException>(() =>
+                client.ExchangeUdsAsync(Request, TimeSpan.FromSeconds(1),
+                    CancellationToken.None),
+                "Wrong physical ECU source logical address rejected.");
+            await Expect<InvalidOperationException>(() =>
+                client.ExchangeUdsAsync(Request, TimeSpan.FromSeconds(1),
+                    CancellationToken.None),
+                "Uncorrelated ECU response poisons this DoIP socket.");
+        });
+
+        // Explicit disposal before an exchange is not a request to reconnect
+        // to a possibly different ECU with the same logical address.
+        await RunCaseAsync(async stream =>
+        {
+            // No UDS request is permitted after the client closes.
+            var one = new byte[1];
+            var read = await stream.ReadAsync(one);
+            Check(read == 0, "Disposed transport sends no further UDS packets.");
+        }, async client =>
+        {
+            await client.DisposeAsync();
+            await Expect<InvalidOperationException>(() =>
+                client.ExchangeUdsAsync(Request, TimeSpan.FromSeconds(1),
+                    CancellationToken.None),
+                "Explicitly closed DoIP socket never reopens implicitly.");
+        });
+
         return checks;
     }
 }
