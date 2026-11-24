@@ -96,7 +96,8 @@ class DoIpGatewayControlTraceTest {
 
     @Test fun vinDiscoverySelectsOnlyUniqueMatchingGateway() = runBlocking {
         val loopback = InetAddress.getByName("127.0.0.1")
-        for (ambiguous in listOf(false, true)) {
+        for (scenario in 0..2) {
+            val ambiguous = scenario != 0
             DatagramSocket(0, loopback).use { socket ->
                 socket.soTimeout = 5000
                 val executor = Executors.newSingleThreadExecutor()
@@ -106,12 +107,13 @@ class DoIpGatewayControlTraceTest {
                         byteArrayOf(0x10, 0x00) + ByteArray(13))
                     val otherGateway = pdu(2, 4, vin.toByteArray(Charsets.US_ASCII) +
                         byteArrayOf(0x10, 0x01) + ByteArray(13))
+                    val conflictingEid = identity().also { it[8 + 19] = 1 }
                     val server = executor.submit {
                         val incoming = DatagramPacket(ByteArray(1024), 1024)
                         socket.receive(incoming)
                         assertArrayEquals(discovery, incoming.data.copyOf(incoming.length))
                         for (reply in listOf(wrongVin, identity(), identity(),
-                            if (ambiguous) otherGateway else identity())) {
+                            when (scenario) { 1 -> otherGateway; 2 -> conflictingEid; else -> identity() })) {
                             socket.send(DatagramPacket(reply, reply.size, incoming.address, incoming.port))
                         }
                     }
