@@ -233,15 +233,15 @@ internal static class DoIpUdpDiscoverySelfTests
 
         // A passive announcement is likewise valid only if it originates
         // from the configured DoIP discovery port, not arbitrary UDP noise.
-        var reserve = new TcpListener(IPAddress.Loopback, 0);
-        reserve.Start();
-        try
+        // Allocate the actual UDP endpoint atomically, rather than reserving
+        // an unrelated TCP port that may be excluded or occupied for UDP.
+        using (var passiveReceiver = new UdpClient(
+            new IPEndPoint(IPAddress.Loopback, 0)))
         {
-            var passivePort = ((IPEndPoint)reserve.LocalEndpoint).Port;
-            var observed = DoIpVehicleDiscovery.ListenAsync(
-                TimeSpan.FromMilliseconds(160), CancellationToken.None,
-                localPortOverride: passivePort, sourcePortOverride: port);
-            var destination = new IPEndPoint(IPAddress.Loopback, passivePort);
+            var destination = (IPEndPoint)passiveReceiver.Client.LocalEndPoint!;
+            var observed = DoIpVehicleDiscovery.ListenOnBoundSocketAsync(
+                passiveReceiver, TimeSpan.FromMilliseconds(500),
+                CancellationToken.None, port);
             await rogue.SendAsync(Identity(rogueVin), destination);
             await Task.Delay(15);
             await gateway.SendAsync(Identity(requested), destination);
@@ -249,7 +249,6 @@ internal static class DoIpUdpDiscoverySelfTests
             Check(found.Count == 1 && found[0].Vin == requested,
                 "Passive DoIP discovery filters wrong UDP source ports.");
         }
-        finally { reserve.Stop(); }
 
         var invalidPassivePort = false;
         try
