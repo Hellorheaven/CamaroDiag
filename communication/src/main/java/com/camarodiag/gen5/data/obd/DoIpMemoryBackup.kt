@@ -115,6 +115,72 @@ object DoIpMemoryBackup {
         }
     }
 
+    data class Verification(val scope: Scope, val sha256: String, val capturedAtUtc: Instant)
+
+    /** Offline verification of either Windows or Android archives, against an
+     * independently selected profile. Archive integrity is not hardware provenance.
+     */
+    fun verify(input: InputStream, scope: Scope): Verification {
+        scope.validate()
+        val entries = linkedMapOf<String, ByteArray>()
+        val limits = mapOf("manifest.json" to 16384, "original.bin" to scope.length,
+            "verification.bin" to scope.length)
+        ZipInputStream(input).use { zip ->
+            while (true) {
+                val entry = zip.nextEntry ?: break
+                val limit = limits[entry.name] ?: error("Unexpected DoIP archive entry.")
+                require(!entry.isDirectory && entry.name !in entries)
+                entries[entry.name] = readBounded(zip, limit)
+                zip.closeEntry()
+            }
+        }
+        require(entries.keys == limits.keys)
+        val manifest = entries.getValue("manifest.json").toString(Charsets.UTF_8)
+        val fields = setOf("format", "transport", "coverage", "origin", "capturedAtUtc", "scope", "sha256")
+        val values = linkedMapOf<String, String>()
+        val expectedScope = scope.manifestScope()
+        var verifiedScope = false
+        JsonReader(StringReader(manifest)).use { reader ->
+            reader.isLenient = false
+            reader.beginObject()
+            val remaining = fields.toMutableSet()
+            while (reader.hasNext()) {
+                val key = reader.nextName()
+                require(remaining.remove(key)) { "Unexpected or duplicate manifest field." }
+                if (key == "scope") {
+                    reader.beginObject()
+                    val keys = expectedScope.keys().asSequence().toMutableSet()
+                    while (reader.hasNext()) {
+                        val name = reader.nextName()
+                        require(keys.remove(name))
+                        val expected = expectedScope.get(name)
+                        val type = if (expected is Number) JsonToken.NUMBER else JsonToken.STRING
+                        require(reader.peek() == type && reader.nextString() == expected.toString()) {
+                            "DoIP archive scope differs from the selected profile."
+                        }
+                    }
+                    reader.endObject()
+                    require(keys.isEmpty())
+                    verifiedScope = true
+                } else {
+                    require(reader.peek() == JsonToken.STRING)
+                    values[key] = reader.nextString()
+                }
+            }
+            reader.endObject()
+            require(remaining.isEmpty() && reader.peek() == JsonToken.END_DOCUMENT)
+        }
+        require(verifiedScope && values["format"] == "CamaroDiag-DoIP-memory-v1" &&
+            values["transport"] == "DoIP" && values["coverage"] == "SCOPED_REGION_ONLY" &&
+            values["origin"] == "REPORTED_HARDWARE_READ")
+        val first = entries.getValue("original.bin")
+        val second = entries.getValue("verification.bin")
+        val hash = sha(first)
+        require(first.size == scope.length && second.size == scope.length &&
+            MessageDigest.isEqual(first, second) && values["sha256"] == hash)
+        return Verification(scope, hash, Instant.parse(values.getValue("capturedAtUtc")))
+    }
+
     /** Check the real staged archive against the independent capture, not its own assertions. */
     fun verifyStaged(input: InputStream, capture: Capture) {
         val expected = linkedMapOf("manifest.json" to capture.manifest,

@@ -1018,4 +1018,7 @@
     <string name="cal_doip_profile_failed">Profil mémoire invalide ou VIN différent.</string>
     <string name="cal_doip_backup_failed">Échec de la sauvegarde DoIP. Aucune sauvegarde vérifiée publiée.</string>
     <string name="cal_doip_recent_trace">TX/RX récents (128 entrées maximum)</string>
+    <string name="cal_doip_verify_backup">Vérifier une sauvegarde DoIP</string>
+    <string name="cal_doip_backup_verified">Intégrité vérifiée : %1$d octets, SHA-256 %2$s. Provenance matérielle non attestée.</string>
+    <string name="cal_doip_verify_failed">Archive DoIP invalide ou incompatible avec le profil.</string>
 </resources>

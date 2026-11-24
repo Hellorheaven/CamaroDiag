@@ -353,6 +353,17 @@ fun CamaroDiagApp(
             viewModel.vehicle.value == context.third) viewModel.importDoIpBackupProfile(uri)
     }
 
+    var pendingDoIpArchive by remember {
+        mutableStateOf<Pair<Triple<String, Long, VehicleProfile>, com.camarodiag.gen5.data.obd.DoIpMemoryBackup.Scope>?>(null)
+    }
+    val doIpArchivePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        val pending = pendingDoIpArchive
+        pendingDoIpArchive = null
+        if (uri != null && pending != null && viewModel.canResumeExport(pending.first.second, pending.first.first) &&
+            viewModel.vehicle.value == pending.first.third)
+            viewModel.verifyDirectDoIpBackup(uri, pending.second)
+    }
+
     val ecuBackupPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri?.let(viewModel::verifyEcuBackup)
     }
@@ -780,6 +791,12 @@ fun CamaroDiagApp(
                         viewModel.activeAccountUid.value?.let { owner ->
                             pendingDoIpProfile = Triple(owner, viewModel.exportAccountGeneration(), viewModel.vehicle.value)
                             doIpProfilePicker.launch(arrayOf("application/json", "text/plain", "application/octet-stream"))
+                        }
+                    },
+                    onVerifyDoIpBackup = { scope ->
+                        viewModel.activeAccountUid.value?.let { owner ->
+                            pendingDoIpArchive = Triple(owner, viewModel.exportAccountGeneration(), viewModel.vehicle.value) to scope
+                            doIpArchivePicker.launch(arrayOf("application/zip", "application/octet-stream"))
                         }
                     },
                     onCaptureDoIpBackup = { host, tester, ecu, tls, scope ->

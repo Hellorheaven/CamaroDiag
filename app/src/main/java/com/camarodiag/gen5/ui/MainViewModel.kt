@@ -1165,6 +1165,34 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun verifyDirectDoIpBackup(uri: Uri, scope: DoIpMemoryBackup.Scope) {
+        if (!requirePremiumLicense() || _calibrationWorkspace.value.doIpBackupScope != scope) return
+        launchEnhancedUdsRead { current ->
+            _calibrationWorkspace.update { it.copy(doIpReading = true, doIpResult = "",
+                doIpBackupBytes = 0, doIpTrace = emptyList()) }
+            try {
+                require(scope.vin == _vehicle.value.vin.uppercase())
+                val result = withContext(Dispatchers.IO) {
+                    val resolver = getApplication<Application>().contentResolver
+                    requireNotNull(resolver.openInputStream(uri)).use {
+                        DoIpMemoryBackup.verify(it, scope)
+                    }
+                }
+                if (!current() || _calibrationWorkspace.value.doIpBackupScope != scope)
+                    return@launchEnhancedUdsRead
+                _calibrationWorkspace.update { it.copy(doIpReading = false,
+                    doIpResult = localizedContext.getString(R.string.cal_doip_backup_verified,
+                        result.scope.length, result.sha256)) }
+            } catch (cancelled: CancellationException) {
+                if (current()) _calibrationWorkspace.update { it.copy(doIpReading = false) }
+                throw cancelled
+            } catch (_: Exception) {
+                if (current()) _calibrationWorkspace.update { it.copy(doIpReading = false,
+                    doIpResult = localizedContext.getString(R.string.cal_doip_verify_failed)) }
+            }
+        }
+    }
+
     fun captureDirectDoIpBackup(host: String, tester: String, ecu: String, tls: Boolean,
         scope: DoIpMemoryBackup.Scope) {
         if (!requirePremiumLicense() || _calibrationWorkspace.value.doIpBackupScope != scope) return

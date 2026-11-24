@@ -259,6 +259,7 @@ fun CalibrationWorkspaceScreen(
     onCancelDirectDoIp: () -> Unit,
     onMonitorDirectDoIp: (String, String, String, String, Boolean, Int, Int) -> Unit,
     onImportDoIpBackupProfile: () -> Unit,
+    onVerifyDoIpBackup: (DoIpMemoryBackup.Scope) -> Unit,
     onCaptureDoIpBackup: (String, String, String, Boolean, DoIpMemoryBackup.Scope) -> Unit,
     onConnectJ2534Bridge: (String, String, String, String, String, String) -> Unit,
     onDisconnectJ2534Bridge: () -> Unit,
@@ -417,6 +418,11 @@ fun CalibrationWorkspaceScreen(
                         Text(stringResource(R.string.cal_doip_backup_scope,
                             scope.vin, "%04X".format(scope.ecu), "%08X".format(scope.start), scope.length),
                             color = TextPrimary, fontSize = 12.sp)
+                        OutlinedButton(onClick = { onVerifyDoIpBackup(scope) },
+                            enabled = idle && scope.vin == vehicle.vin.uppercase(),
+                            modifier = Modifier.fillMaxWidth()) {
+                            Text(stringResource(R.string.cal_doip_verify_backup))
+                        }
                         val matches = scope.vin == vehicle.vin.uppercase() &&
                             doIpTester.toIntOrNull(16) == scope.tester && doIpEcu.toIntOrNull(16) == scope.ecu
                         OutlinedButton(onClick = { pendingDoIpBackup = scope },
