@@ -103,6 +103,19 @@ internal sealed partial class BridgeDesktopForm
         Row(fields, DoIpConsolePresentation.Text("CertThumbprint"), doIpClientCertificate);
         doIpReadVin.Enabled = false;
         doIpReadVin.Click += async (_, _) => await ReadDoIpVinFromConsoleAsync();
+        // A logical endpoint or security-mode change invalidates the
+        // previously selected diagnostic context, even with the same IP.
+        // Require new discovery rather than retaining stale gateway evidence.
+        void InvalidateDoIpContext(object? sender, EventArgs args)
+        {
+            doIpObservedGateway = null;
+            doIpConsoleStatus.Enabled = doIpConsolePower.Enabled = doIpReadVin.Enabled = false;
+            doIpConsoleDiscoveryCancellation?.Cancel();
+        }
+        doIpTesterAddress.TextChanged += InvalidateDoIpContext;
+        doIpEcuAddress.TextChanged += InvalidateDoIpContext;
+        doIpUseTls.CheckedChanged += InvalidateDoIpContext;
+        doIpClientCertificate.TextChanged += InvalidateDoIpContext;
         WideRow(fields, new Label
         {
             Text = "Console J2534 locale : TX et RX séparés ; commandes ECU transmises selon " +
