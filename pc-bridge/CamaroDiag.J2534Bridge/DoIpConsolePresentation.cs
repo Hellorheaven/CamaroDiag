@@ -54,6 +54,23 @@ internal static class DoIpConsolePresentation
         return lines;
     }
 
+    internal static IReadOnlyList<string> FormatWwh(ObdOnUdsServices.WwhDtcReport report,
+        byte subfunction, byte? group, CultureInfo? culture = null)
+    {
+        string Hex(byte? value) => value?.ToString("X2", CultureInfo.InvariantCulture) ?? Text("Unavailable", culture);
+        var lines = new List<string>
+        {
+            string.Format(CultureInfo.InvariantCulture, Text("WwhResult", culture),
+                subfunction, report.Codes.Count, report.StatusAvailabilityMask, report.DtcFormatIdentifier),
+            string.Format(CultureInfo.InvariantCulture, Text("WwhMetadata", culture),
+                Hex(report.SeverityAvailabilityMask), Hex(group))
+        };
+        foreach (var code in report.Codes)
+            lines.Add(string.Format(CultureInfo.InvariantCulture, Text("WwhRecord", culture),
+                code.Code, code.Status, Hex(code.Severity)));
+        return lines;
+    }
+
     internal static string FormatDtcCount(ObdOnUdsServices.DtcCountReport report,
         byte requestedMask, CultureInfo? culture = null) =>
         string.Format(CultureInfo.InvariantCulture, Text("DtcCountResult", culture),

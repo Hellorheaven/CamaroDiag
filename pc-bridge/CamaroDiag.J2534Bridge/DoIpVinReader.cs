@@ -144,6 +144,41 @@ internal static class DoIpVinReader
         return new(vin, identification.Value, data);
     }
 
+    internal static async Task<ObdOnUdsServices.WwhDtcReport> ReadObservedWwhAsync(
+        DoIpVehicleDiscovery.Identity gateway, IPAddress address, ushort tester, ushort ecu,
+        bool tls, string expectedVin, byte subfunction, byte statusMask, byte severityMask,
+        byte readinessGroup, TimeSpan timeout, CancellationToken token, string? certificate = null,
+        Action<DoIpDiagnosticTransport.PduTrace>? trace = null,
+        DoIpDiagnosticTransport.SessionOptions? options = null)
+    {
+        if (!DoIpVehicleDiscovery.IsVehicleVin(expectedVin) || gateway.Vin != expectedVin)
+            throw new ArgumentException("Explicit matching VIN required.");
+        var request = subfunction switch
+        {
+            0x42 => ObdOnUdsServices.ReadWwhEmissionsDtcs(statusMask, severityMask),
+            0x55 => ObdOnUdsServices.ReadWwhPermanentEmissionsDtcs(),
+            0x56 => ObdOnUdsServices.ReadWwhReadinessGroup(readinessGroup),
+            _ => throw new ArgumentException("Unknown WWH DTC service.")
+        };
+        await using var link = await ConnectObservedAsync(gateway, address, tester, ecu,
+            tls, timeout, token, certificate, trace, options);
+        var before = await ReadVerifiedObdAsync(link, expectedVin, null, timeout, token);
+        if (before.ProtocolValue != 1) throw new InvalidDataException("Selected ECU did not identify as OBDonUDS.");
+        var reply = await link.ExchangeUdsAsync(request, timeout, token);
+        ObdOnUdsServices.WwhDtcReport report;
+        if (subfunction == 0x56)
+        {
+            var readiness = ObdOnUdsServices.DecodeWwhReadinessGroup(reply);
+            if (readiness.ReadinessGroup != readinessGroup) throw new InvalidDataException("Readiness group mismatch.");
+            report = readiness.DtcReport;
+        }
+        else report = subfunction == 0x42 ? ObdOnUdsServices.DecodeWwhEmissionsDtcs(reply)
+            : ObdOnUdsServices.DecodeWwhPermanentEmissionsDtcs(reply);
+        var after = await ReadVerifiedObdAsync(link, expectedVin, null, timeout, token);
+        if (after.ProtocolValue != before.ProtocolValue) throw new InvalidDataException("OBDonUDS identification changed.");
+        return report;
+    }
+
     internal static async Task<byte[]> ReadObservedGatewayDidAsync(
         DoIpVehicleDiscovery.Identity gateway, IPAddress address, ushort tester,
         ushort ecu, bool useTls, ushort did, TimeSpan timeout,

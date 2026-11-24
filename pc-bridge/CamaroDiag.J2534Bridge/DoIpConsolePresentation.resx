@@ -100,4 +100,12 @@
   <data name="RoutingOem" xml:space="preserve"><value>OEM routing data (8 hex, optional)</value></data>
   <data name="InvalidSessionOptions" xml:space="preserve"><value>Invalid session options. Check timing and routing fields.</value></data>
   <data name="SessionSummary" xml:space="preserve"><value>Timeout {0} ms; P2 {1} ms; P2* {2} ms; routing {3:X2}; OEM {4}</value></data>
+  <data name="WwhMask" xml:space="preserve"><value>Read WWH DTCs</value></data>
+  <data name="WwhPermanent" xml:space="preserve"><value>Read permanent WWH DTCs</value></data>
+  <data name="WwhReadiness" xml:space="preserve"><value>Read WWH readiness DTCs</value></data>
+  <data name="WwhSeverity" xml:space="preserve"><value>WWH severity mask (hex)</value></data>
+  <data name="WwhGroup" xml:space="preserve"><value>WWH readiness group (hex)</value></data>
+  <data name="WwhResult" xml:space="preserve"><value>WWH 0x{0:X2}: {1} DTCs; status mask 0x{2:X2}; format 0x{3:X2}</value></data>
+  <data name="WwhMetadata" xml:space="preserve"><value>Severity availability: {0}; readiness group: {1}</value></data>
+  <data name="WwhRecord" xml:space="preserve"><value>DTC {0:X6}; status {1:X2}; severity {2}</value></data>
 </root>

@@ -1,3 +1,7 @@
+## PR117 — WWH-OBD sur DoIP Windows GUI (24/11/2026)
+
+- Console Windows : accès 19/42, 19/55, 19/56 avec masques et groupe explicites ; lecteur vérifié F802/F810 avant et après sur le même socket, réutilisation des codecs Windows, journal, annulation et réglages TLS/routage existants ; rendu FR/EN. À valider avec le lot Android/Python.
+
 ## PR117 — WWH-OBD sur DoIP Android (24/11/2026)
 
 - Services 19/42, 19/55 et 19/56 groupe émissions 33 intégrés au transport Android, sélection explicite des masques et du groupe, vérification F802/F810 avant et après sur la même connexion, décodage structuré des défauts et métadonnées FR/EN. Aucune signification OEM inventée, aucune substitution de la liste DTC générale par un rapport filtré. Tests de codec et erreurs ajoutés. CI 45498873150 réussie sur 876015f ; ce nouveau lot et le précédent Python restent à valider.

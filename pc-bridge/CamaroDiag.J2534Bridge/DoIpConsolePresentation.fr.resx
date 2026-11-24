@@ -100,4 +100,12 @@
   <data name="RoutingOem" xml:space="preserve"><value>Données OEM (8 hex, facultatif)</value></data>
   <data name="InvalidSessionOptions" xml:space="preserve"><value>Paramètres de session invalides. Vérifier délais et routage.</value></data>
   <data name="SessionSummary" xml:space="preserve"><value>Délai {0} ms ; P2 {1} ms ; P2* {2} ms ; routage {3:X2} ; OEM {4}</value></data>
+  <data name="WwhMask" xml:space="preserve"><value>Lire les défauts WWH</value></data>
+  <data name="WwhPermanent" xml:space="preserve"><value>Lire les défauts permanents WWH</value></data>
+  <data name="WwhReadiness" xml:space="preserve"><value>Lire les défauts du groupe WWH</value></data>
+  <data name="WwhSeverity" xml:space="preserve"><value>Masque sévérité WWH (hex)</value></data>
+  <data name="WwhGroup" xml:space="preserve"><value>Groupe de préparation WWH (hex)</value></data>
+  <data name="WwhResult" xml:space="preserve"><value>WWH 0x{0:X2} : {1} défauts ; masque statut 0x{2:X2} ; format 0x{3:X2}</value></data>
+  <data name="WwhMetadata" xml:space="preserve"><value>Disponibilité sévérité : {0} ; groupe : {1}</value></data>
+  <data name="WwhRecord" xml:space="preserve"><value>DTC {0:X6} ; statut {1:X2} ; sévérité {2}</value></data>
 </root>
