@@ -1,3 +1,13 @@
+## Reprise coordonnée — 24/11/2026, C4 export CSV (session de 10 h 14)
+
+- **Chantier unique C4 (#52), protocole SAE J1979 classique réservé à l'autre session (#110)**. Relecture de `AGENTS.md`, de cette reprise, du suivi PR95 et de l'issue sauvegardes #63 ; aucune intervention sur ISO/SAE, aucune branche/PR nouvelle.
+- `4f9b98b44a58ac10f7eada178f3ab886ec08a735` : `Lfx2012FuelHistoryCsv.export` fige la liste et les listes internes des lectures avant contrôle et écriture. Empêche l'utilisateur d'exporter une collection validée puis modifiée pendant le `Writer` CSV.
+- `25b9feb7961e92a869c5cf48c413a78ac5ae6f3c` : régression avec `StringWriter` modifiant liste et octets éthanol après l'en-tête. Les tests supplémentaires `3be145c5` couvrent valeurs changées à horodatage identique et session mixte.
+- Checkpoint **C4 regroupé, NON C8 final**, demandé via `c508902f43fa397554fcb8618fa605ab41ae4880` : [GitHub Actions #45363634459](https://github.com/Hellorheaven/CamaroDiag/actions/runs/45363634459). Au dernier contrôle : `verify-revision`, Windows Debug (1 848 autotests hardware-free PASS), noyau natif et **tous** les jobs Connectors (ESP32, STM32, USB, parser, découverte Windows, Python 3.11–3.13) SUCCESS ; revue SKIPPED car PR draft ; Android `unit-tests` **encore IN PROGRESS — attendre son verdict**. Ne pas affirmer le run global vert, ne pas passer à C6 sans ce verdict.
+- Aucun test physique en PR95 ; aucune qualification capteur FlexFuel, activation E85, sauvegarde/restauration OEM complète ; recette sur Release propriétaire #48 uniquement. Pas de merge, de Release ni de fermeture de PR sans accord.
+
+---
+
 ## Point de reprise coordonnée — 24/11/2026 (C4 uniquement, pas de bascule de chantier)
 
 - PR #95 toujours en draft, branche unique `chore/unified-ci`. Les instructions AGENTS.md, la priorité C1 → C2 → C4 → C6 → C8, l'issue #110 et #63 ont été relues.
