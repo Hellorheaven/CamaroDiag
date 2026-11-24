@@ -91,7 +91,7 @@ internal static class DoIpVinReader
             expectedGatewayAddress: gateway.LogicalAddress);
     }
 
-    private static async Task<string> VerifyObservedVinAsync(DoIpDiagnosticTransport transport,
+    internal static async Task<string> VerifyObservedVinAsync(DoIpDiagnosticTransport transport,
         DoIpVehicleDiscovery.Identity gateway, TimeSpan timeout, CancellationToken token,
         Action<byte[]>? requested, Action<byte[]>? received)
     {
