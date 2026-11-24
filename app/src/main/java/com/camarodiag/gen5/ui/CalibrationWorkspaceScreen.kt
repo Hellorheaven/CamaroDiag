@@ -113,6 +113,7 @@ data class CalibrationWorkspaceState(
     val udsDtcResponse: String = "",
     val udsMessage: String = "",
     val doIpReading: Boolean = false,
+    val doIpGatewayReading: Boolean = false,
     val doIpGatewayHost: String = "",
     val doIpGatewayResult: String = "",
     val doIpResult: String = "",
