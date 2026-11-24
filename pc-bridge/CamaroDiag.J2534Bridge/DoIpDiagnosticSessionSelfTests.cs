@@ -45,7 +45,7 @@ internal static class DoIpDiagnosticSessionSelfTests
             activation.Payload.Length != (activationOemData is null ? 7 : 11) ||
             activation.Payload[0] != 0x0E || activation.Payload[1] != 0x80 ||
             activation.Payload[2] != activationType ||
-            !activation.Payload.AsSpan(3, 4).SequenceEqual([0, 0, 0, 0]) ||
+            !activation.Payload.AsSpan(3, 4).SequenceEqual(new byte[] {0, 0, 0, 0}) ||
             (activationOemData is not null &&
              !activation.Payload.AsSpan(7, 4).SequenceEqual(activationOemData)))
             throw new InvalidOperationException("Unexpected DoIP routing activation.");
