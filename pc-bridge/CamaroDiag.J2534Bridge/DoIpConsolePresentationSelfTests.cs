@@ -79,7 +79,8 @@ internal static class DoIpConsolePresentationSelfTests
             Check(rejected, "Wrong response type rejected in " + language);
             foreach (var key in new[] { "Host", "Discover", "Cancel", "Notice",
                 "Started", "Canceled", "Busy", "InvalidHost", "Status", "Power",
-                "StatusNotice", "StatusStarted", "IdentifyFirst" })
+                "StatusNotice", "StatusStarted", "IdentifyFirst", "ExpectedVin",
+                "InvalidExpectedVin", "VinDiscoveryStarted" })
                 Check(!string.IsNullOrWhiteSpace(DoIpConsolePresentation.Text(key, culture)),
                     "Resource " + key + " in " + language);
         }
