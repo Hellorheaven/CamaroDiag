@@ -222,7 +222,13 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
                 while (true)
                 {
                     DoIpCodec.Message message;
-                    try { message = await ReceiveAsync(stage.Token); }
+                    try
+                    {
+                        message = await ReceiveAsync(stage.Token);
+                        // Even a completed TCP read must not cross the
+                        // absolute P2/P2* stage deadline.
+                        stage.Token.ThrowIfCancellationRequested();
+                    }
                     catch (OperationCanceledException) when (
                         !token.IsCancellationRequested && stage.IsCancellationRequested)
                     {
