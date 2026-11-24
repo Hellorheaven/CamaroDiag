@@ -53,6 +53,9 @@ internal static class BridgeCommandLineHelpSelfTests
         Require(english.Contains("ACTIVE", StringComparison.Ordinal) &&
                 french.Contains("ACTIVE", StringComparison.Ordinal),
             "DoIP multicast active discovery is distinguished from passive listening.");
+        Require(english.Contains("version=0x02/0x03/0x04", StringComparison.Ordinal) &&
+                french.Contains("version=0x02/0x03/0x04", StringComparison.Ordinal),
+            "DoIP discovered protocol versions displayed in French and English.");
         Require(english.Contains("consent", StringComparison.OrdinalIgnoreCase) &&
                 french.Contains("consentement", StringComparison.OrdinalIgnoreCase),
             "Both CLI help resources warn that DoIP exchanges require consent.");
