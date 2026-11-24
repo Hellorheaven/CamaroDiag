@@ -876,7 +876,8 @@ internal static class StandardProtocolCli
         int AdapterIndex, uint Bitrate, IsoTpCanFdSession.Settings Settings,
         byte[] Request, int TimeoutMs, bool ExtendedId, bool Brs, uint? DataBaud,
         string Mode, bool ValidateUds = false, bool InterpretJ1979 = false,
-        string? TraceFile = null)
+        string? TraceFile = null, int UdsP2Ms = 30000,
+        int UdsP2StarMs = 30000)
     {
         // SAE J2534-1 CAN pass-filter mask/pattern TxFlags must indicate
         // whether the RX arbitration identifier uses 29-bit formatting.
@@ -933,6 +934,12 @@ internal static class StandardProtocolCli
             CultureInfo.InvariantCulture);
         var mode = (Optional(args, "--mode") ?? "exchange").ToLowerInvariant();
         var udsValidate = bool.Parse(Optional(args, "--uds-validate") ?? "false");
+        var p2Text = Optional(args, "--uds-p2-ms");
+        var p2StarText = Optional(args, "--uds-p2-star-ms");
+        var p2Ms = int.Parse(p2Text ?? "30000", CultureInfo.InvariantCulture);
+        var p2StarMs = int.Parse(p2StarText ?? "30000", CultureInfo.InvariantCulture);
+        if (p2Ms is < 1 or > 30000 || p2StarMs is < 1 or > 30000)
+            throw new ArgumentOutOfRangeException("UDS P2/P2* must be 1..30000 ms on this CLI.");
         var interpretJ1979 = bool.Parse(Optional(args, "--j1979-decode") ?? "false");
         var traceFile = Optional(args, "--trace-file");
         if (traceFile is not null && string.IsNullOrWhiteSpace(traceFile))
@@ -1029,13 +1036,17 @@ internal static class StandardProtocolCli
             rx > (extended ? 0x1FFF_FFFFu : 0x7FFu) ||
             (!fd && brs))
             throw new ArgumentException("Invalid ISO-TP physical address or J2534 option.");
+        var validateUds = udsValidate || obdDid is not null ||
+            udsDids is not null || obdDtcMask is not null ||
+            obdDtcCountMask is not null || wwhStatus is not null ||
+            wwhPermanent || wwhReadiness is not null ||
+            snapshotDtc is not null || extendedDtc is not null || obdIdentify;
+        if ((p2Text is not null || p2StarText is not null) &&
+            (mode != "exchange" || !validateUds))
+            throw new ArgumentException(
+                "UDS P2/P2* options require a validated UDS exchange.");
         return new(index, bitrate, setting, bytes, timeout, extended, brs, dataBaud,
-            mode, udsValidate || obdDid is not null ||
-                udsDids is not null || obdDtcMask is not null ||
-                obdDtcCountMask is not null || wwhStatus is not null ||
-                wwhPermanent || wwhReadiness is not null ||
-                snapshotDtc is not null || extendedDtc is not null ||
-                obdIdentify, interpretJ1979, traceFile);
+            mode, validateUds, interpretJ1979, traceFile, p2Ms, p2StarMs);
     }
 
     internal static TimeSpan RemainingIsoTpExchangeBudget(
@@ -1104,7 +1115,9 @@ internal static class StandardProtocolCli
                     o.Request,
                     (remaining, token) => IsoTpCanFdSession.ReceiveAsync(
                         link, o.Settings, remaining, token),
-                    remainingBudget, CancellationToken.None) :
+                    remainingBudget, CancellationToken.None,
+                    TimeSpan.FromMilliseconds(o.UdsP2Ms),
+                    TimeSpan.FromMilliseconds(o.UdsP2StarMs)) :
                 await IsoTpCanFdSession.ReceiveAsync(link, o.Settings,
                     remainingBudget, CancellationToken.None);
             _ = RemainingIsoTpExchangeBudget(limit, elapsed.Elapsed);
