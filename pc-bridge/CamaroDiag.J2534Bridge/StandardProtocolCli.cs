@@ -285,6 +285,12 @@ internal static class StandardProtocolCli
             var host = Optional(args, "--host");
             var broadcastIp = Optional(args, "--broadcast-ip");
             var passiveListen = bool.Parse(Optional(args, "--listen") ?? "false");
+            var ipv6InterfaceText = Optional(args, "--listen-ipv6-ifindex");
+            var ipv6Interface = ipv6InterfaceText is null ? (int?)null :
+                int.Parse(ipv6InterfaceText, CultureInfo.InvariantCulture);
+            if (ipv6Interface.HasValue && !passiveListen)
+                throw new ArgumentException(
+                    "IPv6 DoIP multicast interface requires --listen true.");
             if (passiveListen ?
                 host is not null || broadcastIp is not null :
                 (host is null) == (broadcastIp is null))
@@ -304,8 +310,11 @@ internal static class StandardProtocolCli
                 if (requestedVin is not null || eid is not null)
                     throw new ArgumentException(
                         "Passive DoIP listening cannot apply an outgoing VIN/EID request.");
-                identities = await DoIpVehicleDiscovery.ListenAsync(
-                    timeout, CancellationToken.None);
+                identities = ipv6Interface.HasValue ?
+                    await DoIpVehicleDiscovery.ListenIpv6MulticastAsync(
+                        ipv6Interface.Value, timeout, CancellationToken.None) :
+                    await DoIpVehicleDiscovery.ListenAsync(
+                        timeout, CancellationToken.None);
             }
             else if (broadcastIp is not null)
                 identities = await DoIpVehicleDiscovery.DiscoverBroadcastAsync(
