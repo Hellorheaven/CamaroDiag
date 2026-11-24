@@ -90,8 +90,9 @@ internal static class DoIpDiagnosticSessionSelfTests
     private static async Task<DoIpCodec.Message> RequireRequestAsync(Stream stream)
     {
         var message = await ReadAsync(stream);
+        byte[] expected = [0x0E, 0x80, 0x12, 0x34, .. Request];
         if (message.Type != DoIpCodec.DiagnosticMessage ||
-            !message.Payload.AsSpan().SequenceEqual([0x0E, 0x80, 0x12, 0x34, .. Request]))
+            !message.Payload.SequenceEqual(expected))
             throw new InvalidOperationException("Wrong simulated UDS request.");
         return message;
     }
@@ -155,7 +156,7 @@ internal static class DoIpDiagnosticSessionSelfTests
             await SendAsync(stream, DoIpCodec.AliveCheckRequest, []);
             var alive = await ReadAsync(stream);
             Check(alive.Type == DoIpCodec.AliveCheckResponse &&
-                alive.Payload.AsSpan().SequenceEqual([0x0E, 0x80]),
+                alive.Payload.SequenceEqual(new byte[] {0x0E, 0x80}),
                 "AliveCheck returns exact logical tester identity.");
             await SendAsync(stream, DoIpCodec.DiagnosticMessage, FromEcu(Pending));
             // Split TCP header and UDS body across writes: TCP frames are a
