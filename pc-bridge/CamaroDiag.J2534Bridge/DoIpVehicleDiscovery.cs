@@ -53,10 +53,9 @@ internal static class DoIpVehicleDiscovery
         var vinBytes = payload.AsSpan(0, 17);
         var vinUnavailable = vinBytes.IndexOfAnyExcept((byte)0x00) < 0 ||
             vinBytes.IndexOfAnyExcept((byte)0xFF) < 0;
-        string? vin = vinUnavailable ? null :
-            Encoding.ASCII.GetString(payload, 0, 17);
-        if (vin is not null && vin.Any(c => c < 0x20 || c > 0x7E))
+        if (!vinUnavailable && vinBytes.IndexOfAnyExceptInRange((byte)0x20, (byte)0x7E) >= 0)
             throw new InvalidDataException("DoIP VIN contains invalid bytes.");
+        string? vin = vinUnavailable ? null : Encoding.ASCII.GetString(vinBytes);
         return new Identity(vin,
             BinaryPrimitives.ReadUInt16BigEndian(payload.AsSpan(17, 2)),
             payload.AsSpan(19, 6).ToArray(),

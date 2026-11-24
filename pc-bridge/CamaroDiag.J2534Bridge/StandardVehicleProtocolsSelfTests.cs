@@ -306,6 +306,13 @@ internal static class StandardVehicleProtocolsSelfTests
                 unknownVin), discoveryAddress).Vin is null,
             "DoIP all-FF VIN invalidity pattern remains unavailable.");
 
+        var invalidVin = identityBytes.ToArray();
+        invalidVin[8] = 0x80;
+        Reject<InvalidDataException>(() => DoIpVehicleDiscovery.ParseAnnouncement(
+            DoIpCodec.Encode(DoIpCodec.VehicleIdentificationResponse,
+                invalidVin), discoveryAddress),
+            "Mixed non-ASCII VIN bytes must not decode to printable replacement characters.");
+
         Reject<InvalidDataException>(() => DoIpVehicleDiscovery.ParseAnnouncement(
             DoIpCodec.Encode(DoIpCodec.VehicleIdentificationResponse,
                 identityBytes[..31]), discoveryAddress),
