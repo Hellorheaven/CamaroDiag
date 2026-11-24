@@ -1127,7 +1127,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 obdbSignalValue = "", obdbSignalMessage = "",
                 doIpReading = false, doIpResult = "", doIpTrace = emptyList(),
                 doIpBackupScope = null, doIpBackupBytes = 0, doIpMonitorReport = null, doIpLiveSamples = emptyList(),
-                doIpGatewayReading = false, doIpGatewayHost = "", doIpGatewayResult = "")
+                doIpGatewayReading = false, doIpDiscoveredVin = "", doIpGatewayHost = "", doIpGatewayResult = "")
         }
     }
 
@@ -1185,7 +1185,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (!requirePremiumLicense()) return
         launchEnhancedUdsRead(journalDoIp = true) { current ->
             _calibrationWorkspace.update { it.copy(doIpReading = true, doIpGatewayReading = true,
-                doIpGatewayResult = "", doIpGatewayHost = host) }
+                doIpGatewayResult = "", doIpDiscoveredVin = "", doIpGatewayHost = host) }
             try {
                 val result = DoIpDirectRead.inspectGateway(host, _vehicle.value.vin, operation,
                     onControlTrace = { trace -> journalDoIpControlTrace(trace, current) })
@@ -1207,6 +1207,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     })
                 }
                 _calibrationWorkspace.update { it.copy(doIpReading = false, doIpGatewayReading = false,
+                    doIpGatewayHost = result.host ?: host,
+                    doIpDiscoveredVin = if (result.host != null) result.gateway.vin.orEmpty() else "",
                     doIpGatewayResult = listOfNotNull(identity, status, power).joinToString("\n")) }
                 if (current()) appendCanConsoleSystemEvent(localizedContext.getString(R.string.cal_doip_console_complete))
             } catch (cancelled: CancellationException) {
