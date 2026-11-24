@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms</value></resheader>
+  <data name="Host" xml:space="preserve"><value>IP passerelle DoIP</value></data>
+  <data name="Discover" xml:space="preserve"><value>Identifier DoIP</value></data>
+  <data name="Cancel" xml:space="preserve"><value>Annuler la découverte</value></data>
+  <data name="Unavailable" xml:space="preserve"><value>indisponible</value></data>
+  <data name="Identity" xml:space="preserve"><value>Passerelle DoIP={0} version=0x{1:X2} logique=0x{2:X4} VIN={3} EID={4} GID={5} suite=0x{6:X2} synchro={7}</value></data>
+  <data name="Notice" xml:space="preserve"><value>Une identité UDP ne prouve ni l’authentification ECU ni la qualification de programmation.</value></data>
+  <data name="Started" xml:space="preserve"><value>Requête d’identification DoIP / ISO 13400 UDP vers {0}.</value></data>
+  <data name="Canceled" xml:space="preserve"><value>Découverte DoIP annulée.</value></data>
+  <data name="Busy" xml:space="preserve"><value>Fermez le canal J2534 local et arrêtez le pont Android avant la découverte DoIP.</value></data>
+  <data name="InvalidHost" xml:space="preserve"><value>Saisissez une adresse IPv4 ou IPv6 unicast explicite de la passerelle.</value></data>
+</root>
