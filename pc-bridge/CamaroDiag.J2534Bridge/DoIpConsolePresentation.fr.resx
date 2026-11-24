@@ -25,4 +25,14 @@
   <data name="StatusStarted" xml:space="preserve"><value>Requête d’état DoIP / ISO 13400 UDP vers {0}, version 0x{1:X2}.</value></data>
   <data name="IdentifyFirst" xml:space="preserve"><value>Identifiez d’abord cette passerelle pour obtenir sa version DoIP observée.</value></data>
   <data name="ContextChanged" xml:space="preserve"><value>Adresse de passerelle modifiée ; identifiez-la à nouveau.</value></data>
+  <data name="ReadVin" xml:space="preserve"><value>Lire VIN ECU (UDS)</value></data>
+  <data name="TesterAddress" xml:space="preserve"><value>Adresse logique testeur (hex)</value></data>
+  <data name="EcuAddress" xml:space="preserve"><value>Adresse logique ECU (hex)</value></data>
+  <data name="UseTls" xml:space="preserve"><value>DoIP sécurisé (TLS)</value></data>
+  <data name="CertThumbprint" xml:space="preserve"><value>Empreinte certificat client (facultatif)</value></data>
+  <data name="VinStarted" xml:space="preserve"><value>DoIP / {0} / UDS : lecture VIN via {1}, ECU 0x{2:X4}, testeur 0x{3:X4}, version 0x{4:X2}.</value></data>
+  <data name="VinResult" xml:space="preserve"><value>VIN ECU : {0}</value></data>
+  <data name="VinNotice" xml:space="preserve"><value>La concordance VIN ne constitue ni une authentification ECU ni une autorisation d’écriture.</value></data>
+  <data name="InvalidLogical" xml:space="preserve"><value>Saisissez deux adresses logiques distinctes de quatre chiffres hexadécimaux.</value></data>
+  <data name="InvalidCertificate" xml:space="preserve"><value>Le certificat client nécessite TLS et une empreinte hexadécimale valide de 40 chiffres.</value></data>
 </root>
