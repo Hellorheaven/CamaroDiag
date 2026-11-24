@@ -61,7 +61,7 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
         byte protocolVersion = DoIpCodec.Version,
         string? clientCertificateThumbprint = null,
         int? portOverride = null, byte activationType = 0x00,
-        byte[]? activationOemData = null)
+        byte[]? activationOemData = null, ushort? expectedGatewayAddress = null)
     {
         if (string.IsNullOrWhiteSpace(host) || host.Length > 253 ||
             tester == ecu || timeout <= TimeSpan.Zero ||
@@ -131,6 +131,12 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
                 var status = DoIpCodec.ReadRoutingActivationCode(routing, tester);
                 var entityAddress = BinaryPrimitives.ReadUInt16BigEndian(
                     routing.Payload.AsSpan(2, 2));
+                // When discovery supplied a gateway identity, the routed
+                // endpoint must report that same logical address before UDS.
+                if (expectedGatewayAddress.HasValue &&
+                    expectedGatewayAddress.Value != entityAddress)
+                    throw new InvalidDataException(
+                        "DoIP routing gateway does not match the observed logical address.");
                 if (routingEntityAddress.HasValue &&
                     routingEntityAddress.Value != entityAddress)
                     throw new InvalidDataException(
