@@ -37,7 +37,7 @@ La commande de diagnostic demande une confirmation explicite avant émission. **
 
 ### Critères du lot logiciel et limites
 
-La recette automatique du lot couvre la syntaxe des paquets, les réponses de routage, les versions, la corrélation des adresses, l'ACK/NACK, les temporisations P2/P2*, les annulations et les erreurs. Les nouveaux scénarios de passerelle TCP/UDP exécutent de **vraies communications réseau en boucle locale**, mais pas avec un adaptateur, un calculateur ni un réseau du véhicule.
+La recette automatique du lot couvre la syntaxe des paquets, les réponses de routage, les versions, la corrélation des adresses, l'ACK/NACK, les temporisations P2/P2*, les annulations et les erreurs. Les nouveaux scénarios de passerelle TCP/UDP exécutent de **vraies communications réseau en boucle locale** : TCP fragmenté, ACK obsolète, SID ou version erronés, trames tronquées, confirmations de routage `0x11`/`0x10` avec stabilité de l'adresse logique passerelle, NRC `0x78` répétés et refus du repli TLS vers TCP non sécurisé. Ils n'accèdent à aucun adaptateur, calculateur ou réseau de véhicule.
 
 DoIP ne fournit pas de numéro de transaction UDS universel : deux réponses tardives identiques ne peuvent pas toujours être distinguées sur un socket réutilisé. C'est pourquoi un socket est retiré du service après toute incertitude ; des réponses dupliquées malgré la réussite d'une ancienne opération restent une limite à vérifier avec le matériel et les profils OEM. Les profils de sécurité, certificats constructeur, alimentation, mesures de bus et procédures de recovery ne sont pas qualifiés.
 
@@ -57,7 +57,7 @@ Only an explicitly supplied routing activation type (`--routing-activation-type`
 
 Use `--doip-discover --listen true --listen-ipv6-ifindex 3` for passive multicast, or `--doip-discover --multicast-ipv6-ifindex 3` to send a single UDP identification request to IPv6 `ff02::1`. The network interface index is illustrative and must be selected explicitly. Use `--doip-discover` for unicast/broadcast discovery, `--doip-status` for gateway status and `--doip-exchange` for a confirmed diagnostic exchange; `--uds-p2-ms` and `--uds-p2-star-ms` select independent UDS response windows. TLS never silently falls back to clear TCP.
 
-Automated TCP/UDP tests use local simulated gateways and **do not validate any real vehicle, VCI, OEM authentication, BRS, or ECU writing/recovery**. Real-world evidence belongs to the owner-authorized Release acceptance plan (issue #48), after PR #95 closes.
+Automated TCP/UDP tests cover fragmented frames, stale acknowledgments, incorrect SID/protocol version, truncated responses, consistent gateway logical addresses across routing-confirmation replies, repeated pending responses and rejection of plaintext when TLS is selected. They use local simulated gateways and **do not validate any real vehicle, VCI, OEM authentication, BRS, or ECU writing/recovery**. Real-world evidence belongs to the owner-authorized Release acceptance plan (issue #48), after PR #95 closes.
 
 ### Références de normalisation / Standards
 
