@@ -398,7 +398,10 @@ internal static class DoIpDiagnosticSessionSelfTests
             await RequireRequestAsync(stream);
             var frame = DoIpCodec.Encode(DoIpCodec.DiagnosticMessage,
                 FromEcu(Positive));
-            await stream.WriteAsync(new byte[] { .. frame, .. frame });
+            var duplicateBurst = new byte[frame.Length * 2];
+            frame.CopyTo(duplicateBurst, 0);
+            frame.CopyTo(duplicateBurst, frame.Length);
+            await stream.WriteAsync(duplicateBurst);
             await stream.FlushAsync();
             await Task.Delay(140);
         }, async client =>
