@@ -990,7 +990,8 @@ class BluetoothObdManager(context: Context) {
         timeoutMs: Long,
         expectedEpoch: Long? = null,
         onChunk: ((String) -> Unit)? = null,
-        beforeTransmit: () -> Unit = {}
+        beforeTransmit: () -> Unit = {},
+        preserveLines: Boolean = false
     ): String = withContext(Dispatchers.IO) {
         commandMutex.withLock {
             // The operation may have waited on the command mutex across a reconnect.
@@ -1040,7 +1041,7 @@ class BluetoothObdManager(context: Context) {
                     promptReceived = promptReceived
                 )
                 ensureSameSession()
-                normalizeElmReply(buffer.toString(), command)
+                normalizeElmReply(buffer.toString(), command, preserveLines)
             } else if (sessionTransport == "BLE") {
                 bleTransport.write(payload)
                 val buffer = StringBuilder(); val bytes = ByteArray(512); val start = System.currentTimeMillis()
@@ -1066,7 +1067,7 @@ class BluetoothObdManager(context: Context) {
                     promptReceived = promptReceived
                 )
                 ensureSameSession()
-                normalizeElmReply(buffer.toString(), command)
+                normalizeElmReply(buffer.toString(), command, preserveLines)
             } else if (sessionTransport == "WIFI") {
                 wifiTransport.write(payload)
                 val buffer = StringBuilder(); val bytes = ByteArray(256); val start = System.currentTimeMillis()
@@ -1097,7 +1098,7 @@ class BluetoothObdManager(context: Context) {
                     promptReceived = promptReceived
                 )
                 ensureSameSession()
-                normalizeElmReply(buffer.toString(), command)
+                normalizeElmReply(buffer.toString(), command, preserveLines)
             } else {
                 check(sessionTransport == "BLUETOOTH") {
                     "An ELM command cannot be sent through the selected transport."
@@ -1144,7 +1145,7 @@ class BluetoothObdManager(context: Context) {
                     promptReceived = promptReceived
                 )
                 ensureSameSession()
-                normalizeElmReply(buffer.toString(), command)
+                normalizeElmReply(buffer.toString(), command, preserveLines)
             }
             } catch (cancelled: kotlinx.coroutines.CancellationException) {
                 throw cancelled
@@ -1252,7 +1253,7 @@ class BluetoothObdManager(context: Context) {
             requestCanId != responseCanId)
         transportSessionEpoch.requireCurrent(epoch)
         val result = when {
-            isJ2534BridgeConnected() -> withJ2534BridgeUdsSession(
+            isJ2534BridgeConnected() -> withJ2534BridgeUdsSessionAtEpoch(epoch,
                 requestCanId, responseCanId, protocolNumber, timeoutMs, readDids, block)
             isStnUdsReadAvailable -> {
                 if (protocolNumber in setOf(63, 64)) {
@@ -1260,8 +1261,8 @@ class BluetoothObdManager(context: Context) {
                         "The connected adapter has not confirmed SW-CAN support."
                     }
                 }
-                withStnUdsSession(requestCanId, responseCanId, protocolNumber,
-                    timeoutMs, readDids, block = block)
+                withStnUdsSessionAtEpoch(epoch, requestCanId, responseCanId, protocolNumber,
+                    timeoutMs, readDids, null, block)
             }
             isElmUdsReadCandidate && protocolNumber in setOf(33, 34, 35, 36) ->
                 withElmUdsReadSession(epoch, requestCanId, responseCanId, protocolNumber,
@@ -1284,7 +1285,7 @@ class BluetoothObdManager(context: Context) {
         transportSessionEpoch.requireQueuedCurrent(epoch)
         check(isElmUdsReadCandidate)
         val transport = ElmUdsPayloadTransport(requestCanId, responseCanId, protocolNumber) { command, timeout ->
-            sendAtCommandInternal(command, timeout, expectedEpoch = epoch)
+            sendAtCommandInternal(command, timeout, expectedEpoch = epoch, preserveLines = true)
         }
         val result = try {
             block(UdsClient(transport, UdsAccessPolicy.readOnly(readDids), timeoutMs))
@@ -1317,8 +1318,14 @@ class BluetoothObdManager(context: Context) {
         timeoutMs: Long = 5000L,
         readDids: Set<Int> = emptySet(),
         block: suspend (UdsClient) -> T
+    ): T = withJ2534BridgeUdsSessionAtEpoch(transportSessionEpoch.capture(),
+        requestCanId, responseCanId, protocolNumber, timeoutMs, readDids, block)
+
+    private suspend fun <T> withJ2534BridgeUdsSessionAtEpoch(
+        epoch: Long, requestCanId: Int, responseCanId: Int, protocolNumber: Int,
+        timeoutMs: Long, readDids: Set<Int>, block: suspend (UdsClient) -> T
     ): T {
-        val epoch = transportSessionEpoch.capture()
+        transportSessionEpoch.requireCurrent(epoch)
         check(isJ2534BridgeConnected()) { "A real connected J2534 bridge is required." }
         return commandSessionMutex.withLock {
             transportSessionEpoch.requireQueuedCurrent(epoch)
@@ -1517,8 +1524,15 @@ class BluetoothObdManager(context: Context) {
         readDids: Set<Int> = emptySet(),
         policy: UdsAccessPolicy? = null,
         block: suspend (UdsClient) -> T
+    ): T = withStnUdsSessionAtEpoch(transportSessionEpoch.capture(),
+        requestCanId, responseCanId, protocolNumber, timeoutMs, readDids, policy, block)
+
+    private suspend fun <T> withStnUdsSessionAtEpoch(
+        requestedEpoch: Long, requestCanId: Int, responseCanId: Int,
+        protocolNumber: Int, timeoutMs: Long, readDids: Set<Int>,
+        policy: UdsAccessPolicy?, block: suspend (UdsClient) -> T
     ): T {
-        val requestedEpoch = transportSessionEpoch.capture()
+        transportSessionEpoch.requireCurrent(requestedEpoch)
         check(StnUdsSessionAdmission.allowsRead(
             activeAdapterCapabilities, isObdCommandChannelAvailable
         )) { "A connected physical OBDLink STN adapter with verified CAN transmit is required." }
@@ -1532,7 +1546,7 @@ class BluetoothObdManager(context: Context) {
                 responseCanId = responseCanId,
                 protocolNumber = protocolNumber
             ) { command, commandTimeout ->
-                sendAtCommandInternal(command, commandTimeout, expectedEpoch = requestedEpoch)
+                sendAtCommandInternal(command, commandTimeout, expectedEpoch = requestedEpoch, preserveLines = true)
             }
             val result = try {
                 block(UdsClient(transport, policy ?: UdsAccessPolicy.readOnly(readDids), timeoutMs))
@@ -1550,7 +1564,7 @@ class BluetoothObdManager(context: Context) {
                             // A partially restored adapter cannot safely serve
                             // normal PID reads. Never disconnect a newer session
                             // that replaced this adapter while cleanup ran.
-                            disconnect()
+                            disconnectIfCurrent(requestedEpoch)
                             error("STN diagnostic session cleanup failed; reconnect the OBD adapter.")
                         }
                     }
@@ -1632,12 +1646,12 @@ class BluetoothObdManager(context: Context) {
 }
 
 /** Strip the adapter's echo only when it occupies the first nonempty line. */
-internal fun normalizeElmReply(raw: String, command: String): String {
+internal fun normalizeElmReply(raw: String, command: String, preserveLines: Boolean = false): String {
     val lines = raw.trim().lineSequence().iterator()
     if (!lines.hasNext()) return ""
     val first = lines.next().trim()
     return buildList {
         if (!first.equals(command.trim(), ignoreCase = true)) add(first)
         for (line in lines) if (line.isNotBlank()) add(line.trim())
-    }.joinToString(" ")
+    }.joinToString(if (preserveLines) "\n" else " ")
 }
