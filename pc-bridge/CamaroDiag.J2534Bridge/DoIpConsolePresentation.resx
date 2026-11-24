@@ -25,4 +25,14 @@
   <data name="StatusStarted" xml:space="preserve"><value>DoIP / ISO 13400 UDP status request to {0}, version 0x{1:X2}.</value></data>
   <data name="IdentifyFirst" xml:space="preserve"><value>Identify this gateway first to obtain its observed DoIP version.</value></data>
   <data name="ContextChanged" xml:space="preserve"><value>Gateway address changed; identify it again.</value></data>
+  <data name="ReadVin" xml:space="preserve"><value>Read ECU VIN (UDS)</value></data>
+  <data name="TesterAddress" xml:space="preserve"><value>Tester logical address (hex)</value></data>
+  <data name="EcuAddress" xml:space="preserve"><value>ECU logical address (hex)</value></data>
+  <data name="UseTls" xml:space="preserve"><value>Secure DoIP (TLS)</value></data>
+  <data name="CertThumbprint" xml:space="preserve"><value>Client certificate thumbprint (optional)</value></data>
+  <data name="VinStarted" xml:space="preserve"><value>DoIP / {0} / UDS: VIN read at gateway {1}, ECU 0x{2:X4}, tester 0x{3:X4}, version 0x{4:X2}.</value></data>
+  <data name="VinResult" xml:space="preserve"><value>ECU VIN: {0}</value></data>
+  <data name="VinNotice" xml:space="preserve"><value>VIN correlation is not ECU authentication or authorization for writing.</value></data>
+  <data name="InvalidLogical" xml:space="preserve"><value>Enter distinct, explicit four-digit hexadecimal tester and ECU addresses.</value></data>
+  <data name="InvalidCertificate" xml:space="preserve"><value>Client certificate requires TLS and a valid 40-digit hexadecimal thumbprint.</value></data>
 </root>
