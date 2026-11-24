@@ -455,7 +455,8 @@ class J2534BridgeTransport(
      * service allowlist. The existing TLS pairing and J2534 channel still apply.
      */
     suspend fun exchangeOperatorUds(
-        payload: ByteArray, timeoutMs: Long, approval: EcuWriteConsentFlow.Approval
+        payload: ByteArray, timeoutMs: Long, approval: EcuWriteConsentFlow.Approval,
+        beforeTransmit: () -> Unit = {}
     ): ByteArray =
         withContext(Dispatchers.IO) {
             mutex.withLock {
@@ -467,6 +468,10 @@ class J2534BridgeTransport(
                     "ECU risk warning OK and separate YES confirmation required."
                 }
                 require(payload.size in 1..J2534BridgeProtocol.MAX_PAYLOAD_BYTES)
+                // Authorization must be current AFTER transport queue admission,
+                // immediately before the paired TLS bridge request is sent.
+                beforeTransmit()
+                ensureOpen()
                 val boundedTimeout = J2534BridgeProtocol.boundedTimeoutMs(timeoutMs)
                 val response = request(
                     JSONObject().put("op", "exchangeRaw")
@@ -489,7 +494,8 @@ class J2534BridgeTransport(
         }
 
     suspend fun sendOperatorUdsOnly(
-        payload: ByteArray, approval: EcuWriteConsentFlow.Approval
+        payload: ByteArray, approval: EcuWriteConsentFlow.Approval,
+        beforeTransmit: () -> Unit = {}
     ) = withContext(Dispatchers.IO) {
         mutex.withLock {
             ensureOpen()
@@ -500,6 +506,8 @@ class J2534BridgeTransport(
                 "ECU risk warning OK and separate YES confirmation required."
             }
             require(payload.size in 1..J2534BridgeProtocol.MAX_PAYLOAD_BYTES)
+            beforeTransmit()
+            ensureOpen()
             request(
                 JSONObject().put("op", "sendRaw")
                     .put("token", tlsPairing.token)
