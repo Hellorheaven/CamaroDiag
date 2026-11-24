@@ -102,6 +102,39 @@ internal static class DoIpVinReader
         return await ReadDidAsync(transport, did, timeout, token, requested, received);
     }
 
+    internal static async Task MonitorDidAsync(
+        DoIpDiagnosticTransport transport, ushort did, int sampleCount, TimeSpan interval,
+        TimeSpan timeout, CancellationToken token, Action<int, byte[]> sample,
+        Action<byte[]>? requested = null, Action<byte[]>? received = null)
+    {
+        ArgumentNullException.ThrowIfNull(sample);
+        if (sampleCount is < 1 or > 3600 || interval < TimeSpan.FromMilliseconds(250) ||
+            interval > TimeSpan.FromMinutes(1))
+            throw new ArgumentOutOfRangeException(nameof(sampleCount));
+        for (var index = 1; index <= sampleCount; index++)
+        {
+            token.ThrowIfCancellationRequested();
+            var data = await ReadDidAsync(transport, did, timeout, token, requested, received);
+            token.ThrowIfCancellationRequested();
+            sample(index, data);
+            token.ThrowIfCancellationRequested();
+            if (index < sampleCount) await Task.Delay(interval, token);
+        }
+    }
+
+    internal static async Task MonitorObservedGatewayDidAsync(
+        DoIpVehicleDiscovery.Identity gateway, IPAddress address, ushort tester,
+        ushort ecu, bool useTls, ushort did, int sampleCount, TimeSpan interval,
+        TimeSpan timeout, CancellationToken token, Action<int, byte[]> sample,
+        Action<byte[]>? requested = null, Action<byte[]>? received = null,
+        string? clientCertificateThumbprint = null)
+    {
+        await using var transport = await ConnectObservedAsync(gateway, address, tester,
+            ecu, useTls, timeout, token, clientCertificateThumbprint);
+        await MonitorDidAsync(transport, did, sampleCount, interval, timeout, token,
+            sample, requested, received);
+    }
+
     internal static async Task<ObdOnUdsServices.DtcStatusReport> ReadObservedGatewayDtcsAsync(
         DoIpVehicleDiscovery.Identity gateway, IPAddress address, ushort tester,
         ushort ecu, bool useTls, byte statusMask, TimeSpan timeout,

@@ -2,7 +2,15 @@ package com.camarodiag.gen5.data.obd
 
 import org.junit.Assert.*
 import org.junit.Test
-import com.camarodiag.gen5.data.obd.DiagnosticRouteSelector.*
+import com.camarodiag.gen5.data.obd.DiagnosticRouteSelector.Protocol
+import com.camarodiag.gen5.data.obd.DiagnosticRouteSelector.Link
+import com.camarodiag.gen5.data.obd.DiagnosticRouteSelector.Framing
+import com.camarodiag.gen5.data.obd.DiagnosticRouteSelector.Service
+import com.camarodiag.gen5.data.obd.DiagnosticRouteSelector.Target
+import com.camarodiag.gen5.data.obd.DiagnosticRouteSelector.Capability
+import com.camarodiag.gen5.data.obd.DiagnosticRouteSelector.Evidence
+import com.camarodiag.gen5.data.obd.DiagnosticRouteSelector.Operation
+import com.camarodiag.gen5.data.obd.DiagnosticRouteSelector.Rejection
 
 class DiagnosticRouteSelectorTest {
     private val raw = Protocol(Link.CAN, Framing.RAW, Service.RAW)

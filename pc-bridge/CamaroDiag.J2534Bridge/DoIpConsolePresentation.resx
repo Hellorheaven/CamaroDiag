@@ -47,4 +47,9 @@
   <data name="DidResult" xml:space="preserve"><value>DID 0x{0:X4}: {1}</value></data>
   <data name="DidStarted" xml:space="preserve"><value>DoIP / {0} / UDS: DID read at {1}, ECU 0x{2:X4}, tester 0x{3:X4}, version 0x{4:X2}.</value></data>
   <data name="InvalidDid" xml:space="preserve"><value>Enter four hexadecimal digits for the DID.</value></data>
+  <data name="MonitorDid" xml:space="preserve"><value>Monitor DID</value></data>
+  <data name="MonitorInterval" xml:space="preserve"><value>Interval (ms)</value></data>
+  <data name="MonitorCount" xml:space="preserve"><value>Samples</value></data>
+  <data name="MonitorSample" xml:space="preserve"><value>#{0} DID 0x{1:X4}: {2}</value></data>
+  <data name="MonitorComplete" xml:space="preserve"><value>Monitoring finished: {0} samples.</value></data>
 </root>
