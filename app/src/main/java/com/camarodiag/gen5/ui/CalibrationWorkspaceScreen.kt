@@ -114,6 +114,7 @@ data class CalibrationWorkspaceState(
     val udsMessage: String = "",
     val doIpReading: Boolean = false,
     val doIpGatewayReading: Boolean = false,
+    val doIpDiscoveredVin: String = "",
     val doIpGatewayHost: String = "",
     val doIpGatewayResult: String = "",
     val doIpResult: String = "",
@@ -290,6 +291,12 @@ fun CalibrationWorkspaceScreen(
     onClearFile: () -> Unit
 ) {
     var doIpHost by remember(vehicle) { mutableStateOf("") }
+    LaunchedEffect(state.doIpGatewayHost, state.doIpDiscoveredVin) {
+        if (doIpHost.isBlank() && state.doIpDiscoveredVin.isNotBlank() &&
+            state.doIpDiscoveredVin == vehicle.vin.uppercase() && state.doIpGatewayHost.isNotBlank()) {
+            doIpHost = state.doIpGatewayHost
+        }
+    }
     var doIpTester by remember(vehicle) { mutableStateOf("") }
     var doIpEcu by remember(vehicle) { mutableStateOf("") }
     var doIpDid by remember(vehicle) { mutableStateOf("F190") }
@@ -369,9 +376,11 @@ fun CalibrationWorkspaceScreen(
                     OutlinedTextField(doIpHost, { doIpHost = it.trim().take(64) },
                         enabled = idle, singleLine = true, modifier = Modifier.fillMaxWidth(),
                         label = { Text(stringResource(R.string.cal_doip_host)) })
+                    val vinReady = vehicle.vin.uppercase().matches(Regex("[A-HJ-NPR-Z0-9]{17}"))
                     OutlinedButton(onClick = { onInspectDoIpGateway(doIpHost, DoIpDirectRead.GatewayOperation.DISCOVER) },
-                        enabled = idle && doIpHost.isNotBlank(), modifier = Modifier.fillMaxWidth()) {
-                        Text(stringResource(R.string.cal_doip_discover))
+                        enabled = idle && (doIpHost.isNotBlank() || vinReady), modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(if (doIpHost.isBlank()) R.string.cal_doip_discover_by_vin
+                            else R.string.cal_doip_discover))
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedButton(onClick = { onInspectDoIpGateway(doIpHost, DoIpDirectRead.GatewayOperation.STATUS) },
@@ -400,7 +409,6 @@ fun CalibrationWorkspaceScreen(
                         label = { Text(stringResource(R.string.cal_uds_did)) })
                     val targetReady = idle && doIpHost.isNotBlank() && doIpTester.length == 4 &&
                         doIpEcu.length == 4 && doIpTester != doIpEcu
-                    val vinReady = vehicle.vin.uppercase().matches(Regex("[A-HJ-NPR-Z0-9]{17}"))
                     Button(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu, doIpDid, doIpTls, DoIpDirectRead.Operation.VIN) },
                         enabled = targetReady, modifier = Modifier.fillMaxWidth()) {
                         Text(stringResource(R.string.cal_doip_read_vin))
