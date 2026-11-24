@@ -35,12 +35,13 @@ internal static class DoIpVinReader
     {
         ArgumentNullException.ThrowIfNull(transport);
         token.ThrowIfCancellationRequested();
-        byte[] request = [0x22, 0xF1, 0x90];
+        var request = UdsStandardServices.ReadDid(0xF190);
         requested?.Invoke(request.ToArray());
         token.ThrowIfCancellationRequested();
         var reply = await transport.ExchangeUdsAsync(request, timeout, token);
         token.ThrowIfCancellationRequested();
         received?.Invoke(reply.ToArray());
+        token.ThrowIfCancellationRequested();
         return ParseVin(reply);
     }
 
@@ -64,6 +65,7 @@ internal static class DoIpVinReader
         var vin = await ReadAsync(transport, timeout, token, requested, received);
         if (gateway.Vin is not null && !string.Equals(gateway.Vin, vin, StringComparison.Ordinal))
             throw new InvalidDataException("UDS VIN differs from the observed DoIP vehicle identity.");
+        token.ThrowIfCancellationRequested();
         return vin;
     }
 }
