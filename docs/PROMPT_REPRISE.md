@@ -1,3 +1,12 @@
+## Reprise unifiée — 24/11/2026, C6 + correction DoIP
+
+- Décision propriétaire : ce chat unique pilote désormais les chantiers et protocoles. Les réservations historiques de fichiers à un autre chat sont obsolètes. Un chantier et un protocole actifs au maximum, validation avant passage au suivant. C6 actif ; DoIP rouvert pour corriger la régression Windows avant reprise SAE J1979.
+- Run #45365181139, SHA c8660bdde1978fa5794c09d49b207c6bca104a82 : 11 jobs réussis, Windows échoué, review ignorée (draft). Logs Windows : build Debug 0 erreur/avertissement, SocketException 10013 au bind UDP passif.
+- Correctifs 306094ae et b273b18c : réception passive commune sur socket UDP déjà lié ; autotest utilise un vrai port UDP éphémère attribué par OS au lieu d'un port réservé en TCP. Filtrage des sources conservé ; port production 13400 inchangé. Tests à exécuter au checkpoint groupé ; aucune réussite revendiquée sur ces nouveaux commits.
+- AGENTS.md actualisé (abfd1656). Aucun essai physique avant Release #48, aucun merge/Release sans consentement. C8 final reste en attente de clôture C6.
+
+---
+
 ## Reprise C6 — 24/11/2026, appairage et CI
 
 - C4 validé logiciel : run #45363634459 SUCCESS, SHA c508902f43fa397554fcb8618fa605ab41ae4880, 12 jobs techniques réussis.
