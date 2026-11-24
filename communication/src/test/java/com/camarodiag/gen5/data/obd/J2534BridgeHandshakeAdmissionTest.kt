@@ -6,25 +6,37 @@ import org.junit.Test
 
 /** No TLS connection or J2534 driver is opened by these tests. */
 class J2534BridgeHandshakeAdmissionTest {
+    private fun requireCurrent(active: Boolean, closed: Boolean,
+        startedAt: Long = 5L, now: Long = 5L
+    ) = J2534BridgeHandshakeAdmission.requireCurrent(
+        coroutineActive = active, closedByApp = closed,
+        capturedCloseEpoch = startedAt, currentCloseEpoch = now
+    )
+
     @Test fun onlyActiveNotYetClosedBridgeMaySendPairingAndPublishCapabilities() {
-        J2534BridgeHandshakeAdmission.requireCurrent(
-            coroutineActive = true, closedByApp = false
-        )
+        requireCurrent(active = true, closed = false)
         assertThrows(CancellationException::class.java) {
-            J2534BridgeHandshakeAdmission.requireCurrent(
-                coroutineActive = false, closedByApp = false
-            )
+            requireCurrent(active = false, closed = false)
         }
         assertThrows(IllegalStateException::class.java) {
-            J2534BridgeHandshakeAdmission.requireCurrent(
-                coroutineActive = true, closedByApp = true
-            )
+            requireCurrent(active = true, closed = true)
         }
-        // Cancellation takes precedence over a concurrent explicit close.
         assertThrows(CancellationException::class.java) {
-            J2534BridgeHandshakeAdmission.requireCurrent(
-                coroutineActive = false, closedByApp = true
-            )
+            requireCurrent(active = false, closed = true)
         }
+    }
+
+    @Test fun closeThenAnotherConnectCannotResetTheOriginalHandshakePermission() {
+        // A new connect() resets its own closed Boolean. A monotonic Close
+        // generation is required to catch the older socket finishing last.
+        assertThrows(IllegalStateException::class.java) {
+            requireCurrent(active = true, closed = false, startedAt = 5L, now = 6L)
+        }
+        assertThrows(IllegalStateException::class.java) {
+            requireCurrent(active = true, closed = false, startedAt = 5L, now = 8L)
+        }
+        // The same epoch remains authorized, including after async work
+        // that did not signal a new explicit Close.
+        requireCurrent(active = true, closed = false, startedAt = 6L, now = 6L)
     }
 }
