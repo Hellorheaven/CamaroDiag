@@ -10,6 +10,9 @@ internal sealed partial class BridgeDesktopForm
     private J2534Device? consoleDevice;
     private CancellationTokenSource? doIpConsoleDiscoveryCancellation;
     private readonly TextBox doIpConsoleHost = new() { Dock = DockStyle.Fill };
+    private readonly TextBox doIpExpectedVin = new()
+        { Dock = DockStyle.Fill, MaxLength = 17, CharacterCasing = CharacterCasing.Upper };
+    private bool doIpPublishingHost;
     private readonly Button doIpConsoleDiscover = Button(DoIpConsolePresentation.Text("Discover"));
     private readonly Button doIpConsoleCancel = Button(DoIpConsolePresentation.Text("Cancel"));
     private readonly Button doIpConsoleStatus = Button(DoIpConsolePresentation.Text("Status"));
@@ -91,6 +94,7 @@ internal sealed partial class BridgeDesktopForm
         consoleBattery.Click += async (_, _) => await ConsoleBatteryAsync();
         consoleSave.Click += (_, _) => SaveConsoleHistory();
         WideRow(fields, identityButtons, 48);
+        Row(fields, DoIpConsolePresentation.Text("ExpectedVin"), doIpExpectedVin);
         Row(fields, DoIpConsolePresentation.Text("Host"), doIpConsoleHost, doIpConsoleDiscover);
         doIpConsoleCancel.Enabled = false;
         doIpConsoleDiscover.Click += async (_, _) => await DiscoverDoIpFromConsoleAsync();
@@ -104,6 +108,7 @@ internal sealed partial class BridgeDesktopForm
         doIpConsolePower.Click += async (_, _) => await RunDoIpConsoleOperationAsync(true);
         doIpConsoleHost.TextChanged += (_, _) =>
         {
+            if (doIpPublishingHost) return;
             doIpObservedGateway = null;
             doIpConsoleStatus.Enabled = doIpConsolePower.Enabled = doIpReadDtcs.Enabled = doIpBackup.Enabled = doIpMonitorDid.Enabled = doIpReadDid.Enabled = doIpReadVin.Enabled = false;
             doIpConsoleDiscoveryCancellation?.Cancel();
@@ -137,6 +142,7 @@ internal sealed partial class BridgeDesktopForm
             doIpConsoleStatus.Enabled = doIpConsolePower.Enabled = doIpReadDtcs.Enabled = doIpBackup.Enabled = doIpMonitorDid.Enabled = doIpReadDid.Enabled = doIpReadVin.Enabled = false;
             doIpConsoleDiscoveryCancellation?.Cancel();
         }
+        doIpExpectedVin.TextChanged += InvalidateDoIpContext;
         doIpTesterAddress.TextChanged += InvalidateDoIpContext;
         doIpEcuAddress.TextChanged += InvalidateDoIpContext;
         doIpUseTls.CheckedChanged += InvalidateDoIpContext;
@@ -156,6 +162,13 @@ internal sealed partial class BridgeDesktopForm
         return tab;
     }
 
+    private void JournalDoIpUdp(string direction, System.Net.IPEndPoint endpoint, byte[] pdu)
+    {
+        if (IsDisposed || Disposing) return;
+        ConsoleLine(direction, "DoIP UDP " + endpoint + " PDU " + Convert.ToHexString(pdu),
+            direction == "TX" ? Color.DarkOrange : Color.DarkGreen);
+    }
+
     private Task DiscoverDoIpFromConsoleAsync() => RunDoIpConsoleOperationAsync(null);
 
     // null = identification; false = entity status; true = power mode.
@@ -168,11 +181,19 @@ internal sealed partial class BridgeDesktopForm
             return;
         }
         var host = doIpConsoleHost.Text.Trim();
-        if (!System.Net.IPAddress.TryParse(host, out var address) ||
+        var vin = doIpExpectedVin.Text.Trim();
+        var auto = !powerMode.HasValue && host.Length == 0;
+        if ((auto || vin.Length != 0) && !DoIpVehicleDiscovery.IsVehicleVin(vin))
+        {
+            ShowError(DoIpConsolePresentation.Text("InvalidExpectedVin"));
+            return;
+        }
+        System.Net.IPAddress? address = null;
+        if (!auto && (!System.Net.IPAddress.TryParse(host, out address) ||
             address.Equals(System.Net.IPAddress.Any) ||
             address.Equals(System.Net.IPAddress.IPv6Any) ||
             address.Equals(System.Net.IPAddress.Broadcast) ||
-            address.IsIPv6Multicast)
+            address.IsIPv6Multicast))
         {
             ShowError(DoIpConsolePresentation.Text("InvalidHost"));
             return;
@@ -189,7 +210,7 @@ internal sealed partial class BridgeDesktopForm
         using var stop = new CancellationTokenSource();
         doIpConsoleDiscoveryCancellation = stop;
         doIpConsoleDiscover.Enabled = doIpConsoleStatus.Enabled = doIpConsolePower.Enabled = doIpReadDtcs.Enabled = doIpBackup.Enabled = doIpMonitorDid.Enabled = doIpReadDid.Enabled = doIpReadVin.Enabled = false;
-        doIpConsoleHost.Enabled = false;
+        doIpConsoleHost.Enabled = doIpExpectedVin.Enabled = false;
         doIpConsoleCancel.Enabled = true;
         try
         {
@@ -200,12 +221,13 @@ internal sealed partial class BridgeDesktopForm
                     if (powerMode.HasValue)
                     {
                         var version = observed!.ProtocolVersion;
+                        var selectedAddress = observed.Source;
                         ConsoleLine("SYSTEM", string.Format(
-                            DoIpConsolePresentation.Text("StatusStarted"), address, version),
+                            DoIpConsolePresentation.Text("StatusStarted"), selectedAddress, version),
                             Color.DarkSlateGray);
                         var response = await DoIpVehicleDiscovery.QueryStatusAsync(
-                            address.ToString(), powerMode.Value, timeout, stop.Token,
-                            protocolVersion: version);
+                            selectedAddress.ToString(), powerMode.Value, timeout, stop.Token,
+                            protocolVersion: version, trace: JournalDoIpUdp);
                         stop.Token.ThrowIfCancellationRequested();
                         if (IsDisposed || Disposing) return;
                         ConsoleLine("SYSTEM", DoIpConsolePresentation.FormatStatus(
@@ -215,12 +237,22 @@ internal sealed partial class BridgeDesktopForm
                     }
                     else
                     {
-                        ConsoleLine("SYSTEM", string.Format(
-                            DoIpConsolePresentation.Text("Started"), address), Color.DarkSlateGray);
-                        var identity = await DoIpVehicleDiscovery.DiscoverAsync(
-                            address.ToString(), timeout, stop.Token);
+                        ConsoleLine("SYSTEM", auto
+                            ? string.Format(DoIpConsolePresentation.Text("VinDiscoveryStarted"), vin)
+                            : string.Format(DoIpConsolePresentation.Text("Started"), address), Color.DarkSlateGray);
+                        var identity = auto
+                            ? await DoIpVehicleDiscovery.DiscoverUniqueVinAsync(vin, timeout, stop.Token,
+                                trace: JournalDoIpUdp)
+                            : await DoIpVehicleDiscovery.DiscoverAsync(address!.ToString(), timeout, stop.Token,
+                                vin: vin.Length == 0 ? null : vin, trace: JournalDoIpUdp);
                         stop.Token.ThrowIfCancellationRequested();
                         if (IsDisposed || Disposing) return;
+                        if (auto)
+                        {
+                            doIpPublishingHost = true;
+                            try { doIpConsoleHost.Text = identity.Source.ToString(); }
+                            finally { doIpPublishingHost = false; }
+                        }
                         doIpObservedGateway = identity;
                         ConsoleLine("SYSTEM", DoIpConsolePresentation.FormatIdentity(identity),
                             Color.DarkGreen);
@@ -247,7 +279,7 @@ internal sealed partial class BridgeDesktopForm
             doIpConsoleDiscoveryCancellation = null;
             if (!IsDisposed && !Disposing)
             {
-                doIpConsoleHost.Enabled = true;
+                doIpConsoleHost.Enabled = doIpExpectedVin.Enabled = true;
                 doIpConsoleDiscover.Enabled = true;
                 doIpConsoleStatus.Enabled = doIpConsolePower.Enabled = doIpReadDtcs.Enabled = doIpBackup.Enabled = doIpMonitorDid.Enabled = doIpReadDid.Enabled = doIpReadVin.Enabled = doIpObservedGateway is not null;
                 doIpConsoleCancel.Enabled = false;
@@ -360,7 +392,7 @@ internal sealed partial class BridgeDesktopForm
         doIpConsoleDiscoveryCancellation = stop;
         doIpConsoleDiscover.Enabled = doIpConsoleStatus.Enabled =
             doIpConsolePower.Enabled = doIpReadDtcs.Enabled = doIpBackup.Enabled = doIpMonitorDid.Enabled = doIpReadDid.Enabled = doIpReadVin.Enabled = false;
-        doIpConsoleHost.Enabled = doIpTesterAddress.Enabled =
+        doIpConsoleHost.Enabled = doIpExpectedVin.Enabled = doIpTesterAddress.Enabled =
             doIpEcuAddress.Enabled = doIpDtcMask.Enabled = doIpDid.Enabled = doIpMonitorInterval.Enabled = doIpMonitorCount.Enabled = doIpUseTls.Enabled = doIpClientCertificate.Enabled = false;
         doIpConsoleCancel.Enabled = true;
         try
@@ -477,7 +509,7 @@ internal sealed partial class BridgeDesktopForm
             doIpConsoleDiscoveryCancellation = null;
             if (!IsDisposed && !Disposing)
             {
-                doIpConsoleHost.Enabled = doIpTesterAddress.Enabled =
+                doIpConsoleHost.Enabled = doIpExpectedVin.Enabled = doIpTesterAddress.Enabled =
                     doIpEcuAddress.Enabled = doIpDtcMask.Enabled = doIpDid.Enabled = doIpMonitorInterval.Enabled = doIpMonitorCount.Enabled = doIpUseTls.Enabled = doIpClientCertificate.Enabled = true;
                 doIpConsoleDiscover.Enabled = true;
                 doIpConsoleStatus.Enabled = doIpConsolePower.Enabled =
