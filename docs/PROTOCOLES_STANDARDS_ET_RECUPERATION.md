@@ -346,6 +346,12 @@ CamaroDiag.J2534Bridge.exe --j1979-discover-can --adapter-index 0 --baud 500000 
 La commande s'appuie sur le pilote fournisseur SAE J2534 et sur CAN brut classique, pas CAN-FD et pas sur une simulation ; elle n'a cependant **pas été qualifiée sur adaptateur ni véhicule**. Les preuves tests sont pour le moment uniquement des vecteurs offline écrits, non exécutés. Pour lire les pages suivantes d'un ECU ayant répondu, utiliser ensuite la commande `--j1979-pids` avec une paire TX/RX physique explicitement vérifiée.
 
 
+## SAE J1979 — image figée et moniteurs antipollution
+
+Le pont interprète le code déclencheur renvoyé en mode 02 PID 02 pour le numéro d’image demandé. Une valeur nulle indique l’absence d’image enregistrée. En mode 01 PID 01, le pont affiche quels moniteurs pris en charge ont terminé leurs tests depuis le dernier effacement des défauts. Il applique la table correspondant au type d’allumage annoncé et conserve les octets bruts B/C/D. Référence : SAE J1979 (mai 2007), tableaux 35, 37 et B2.
+
+Mode 02 PID 02 identifies the stored freeze-frame trigger DTC. Mode 01 PID 01 reports ready/incomplete for supported monitors using the spark- or compression-ignition definitions. The raw readiness bytes remain available in the output.
+
 ## SAE J1979 — identification du calculateur (24/11/2026)
 
 Avec le décodage J1979 du pont Windows activé, la requête CAN réassemblée `09 0A` affiche le sigle et le nom déclarés par le calculateur. Le pont contrôle la longueur du champ de 20 octets, le séparateur et le remplissage indépendant du sigle et du nom. Référence de format : SAE J1979, mai 2007, tableau 197.

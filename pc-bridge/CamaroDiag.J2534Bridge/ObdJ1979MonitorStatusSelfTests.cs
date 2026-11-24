@@ -36,6 +36,19 @@ internal static class ObdJ1979MonitorStatusSelfTests
         Check(!noDtc.MilOn && noDtc.ConfirmedDtcCount == 0 &&
             !noDtc.CompressionIgnition,
             "Zero DTC and MIL OFF are preserved.");
+        var spark = ObdJ1979MonitorStatus.Format(ObdJ1979MonitorStatus.Decode(
+            [0x41, 0x01, 0, 0x15, 0x65, 0x24]));
+        Check(spark.Contains("misfire=incomplete,components=ready") &&
+            spark.Contains("catalyst=ready,evaporative-system=incomplete,oxygen-sensor=incomplete,oxygen-sensor-heater=ready"),
+            "Spark monitors distinguish supported incomplete and ready tests.");
+        var diesel = ObdJ1979MonitorStatus.Format(ObdJ1979MonitorStatus.Decode(
+            [0x41, 0x01, 0, 0x0A, 0xFF, 0x42]));
+        Check(diesel.Contains("supported-monitors=[fuel-system=ready,nmhc-catalyst=ready,nox-aftertreatment=incomplete," +
+            "boost-pressure=ready,exhaust-gas-sensor=ready,particulate-filter=incomplete,egr-vvt=ready]"),
+            "Compression ignition decodes the diesel map and skips reserved bits.");
+        Check(ObdJ1979MonitorStatus.Format(ObdJ1979MonitorStatus.Decode(
+            [0x41, 0x01, 0, 0x70, 0, 0xFF])).EndsWith("supported-monitors=[]"),
+            "Completion flags alone never imply support.");
         Reject<InvalidDataException>(() =>
             ObdJ1979MonitorStatus.Decode(
                 [0x41, 0x01, 0x80, 0x08, 0xA5]),
