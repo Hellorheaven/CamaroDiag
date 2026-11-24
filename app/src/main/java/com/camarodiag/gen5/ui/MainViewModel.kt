@@ -12,6 +12,7 @@ import com.camarodiag.gen5.data.db.DiagnosticDatabase
 import com.camarodiag.gen5.data.db.SavedSessionEntity
 import com.camarodiag.gen5.data.obd.BluetoothObdManager
 import com.camarodiag.gen5.data.obd.DoIpDirectRead
+import com.camarodiag.gen5.data.obd.DoIpMemoryBackup
 import com.camarodiag.gen5.data.obd.DiagnosticRouteSelector
 import com.camarodiag.gen5.data.obd.Lfx2012ControllerReferences
 import com.google.firebase.auth.FirebaseAuth
@@ -1104,7 +1105,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private var enhancedUdsJob: Job? = null
-    private var enhancedUdsGeneration = 0L
+    @Volatile private var enhancedUdsGeneration = 0L
 
     private fun invalidateEnhancedUdsReads() {
         enhancedUdsGeneration++
@@ -1114,7 +1115,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             it.copy(isUdsReading = false, isObdbSignalReading = false,
                 udsDidResponse = "", udsDtcResponse = "", udsMessage = "",
                 obdbSignalValue = "", obdbSignalMessage = "",
-                doIpReading = false, doIpResult = "", doIpTrace = emptyList())
+                doIpReading = false, doIpResult = "", doIpTrace = emptyList(),
+                doIpBackupScope = null, doIpBackupBytes = 0)
         }
     }
 
@@ -1140,11 +1142,77 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         invalidateEnhancedUdsReads()
     }
 
+    fun importDoIpBackupProfile(uri: Uri) {
+        if (!requirePremiumLicense()) return
+        launchEnhancedUdsRead { current ->
+            _calibrationWorkspace.update { it.copy(doIpReading = true, doIpBackupScope = null,
+                doIpResult = "", doIpTrace = emptyList(), doIpBackupBytes = 0) }
+            try {
+                val scope = withContext(Dispatchers.IO) {
+                    val resolver = getApplication<Application>().contentResolver
+                    requireNotNull(resolver.openInputStream(uri)).use(DoIpMemoryBackup::load)
+                }
+                if (!current()) return@launchEnhancedUdsRead
+                require(scope.vin == _vehicle.value.vin.uppercase())
+                _calibrationWorkspace.update { it.copy(doIpReading = false, doIpBackupScope = scope) }
+            } catch (cancelled: CancellationException) {
+                if (current()) _calibrationWorkspace.update { it.copy(doIpReading = false) }
+                throw cancelled
+            } catch (_: Exception) {
+                if (current()) _calibrationWorkspace.update { it.copy(doIpReading = false,
+                    doIpResult = localizedContext.getString(R.string.cal_doip_profile_failed)) }
+            }
+        }
+    }
+
+    fun captureDirectDoIpBackup(host: String, tester: String, ecu: String, tls: Boolean,
+        scope: DoIpMemoryBackup.Scope) {
+        if (!requirePremiumLicense() || _calibrationWorkspace.value.doIpBackupScope != scope) return
+        launchEnhancedUdsRead { current ->
+            _calibrationWorkspace.update { it.copy(doIpReading = true, doIpResult = "",
+                doIpTrace = emptyList(), doIpBackupBytes = 0) }
+            try {
+                require(current() && _calibrationWorkspace.value.doIpBackupScope == scope)
+                val target = DoIpDirectRead.Target.parse(host, tester, ecu, _vehicle.value.vin, tls)
+                require(scope.vin == target.expectedVin && scope.tester == target.tester && scope.ecu == target.ecu)
+                val result = DoIpDirectRead.read(target, DoIpDirectRead.Operation.BACKUP,
+                    backupScope = scope, onBackupProgress = { pass, offset ->
+                        check(current())
+                        _calibrationWorkspace.update { it.copy(doIpBackupBytes = (pass - 1) * scope.length + offset) }
+                    })
+                if (!current()) return@launchEnhancedUdsRead
+                val capture = checkNotNull(result.capture)
+                val path = CamaroDiagExportStorage.write(getApplication<Application>(),
+                    "CamaroDiag_DoIP_${scope.vin}_${System.currentTimeMillis()}.zip", "application/zip",
+                    category = CamaroDiagExportStorage.Category.ECU_BACKUPS,
+                    beforePublish = { check(current() && _calibrationWorkspace.value.doIpBackupScope == scope) },
+                    verifyStaged = { input ->
+                        check(current())
+                        DoIpMemoryBackup.verifyStaged(input, capture)
+                    }) { output ->
+                    check(current())
+                    DoIpMemoryBackup.write(output, capture)
+                }
+                if (!current()) return@launchEnhancedUdsRead
+                _calibrationWorkspace.update { it.copy(doIpReading = false,
+                    doIpResult = localizedContext.getString(R.string.cal_doip_backup_saved,
+                        scope.length, capture.sha256, path),
+                    doIpTrace = result.trace.map { trace -> trace.direction + " " + trace.payloadHex }) }
+            } catch (cancelled: CancellationException) {
+                if (current()) _calibrationWorkspace.update { it.copy(doIpReading = false, doIpBackupBytes = 0) }
+                throw cancelled
+            } catch (_: Exception) {
+                if (current()) _calibrationWorkspace.update { it.copy(doIpReading = false, doIpBackupBytes = 0,
+                    doIpResult = localizedContext.getString(R.string.cal_doip_backup_failed)) }
+            }
+        }
+    }
+
     fun readDirectDoIp(host: String, tester: String, ecu: String, didHex: String,
         tls: Boolean, operation: DoIpDirectRead.Operation, sampleCount: Int = 10, intervalMs: Int = 1000) {
         if (!requirePremiumLicense()) return
         launchEnhancedUdsRead { current ->
-            _calibrationWorkspace.update { it.copy(doIpReading = true, doIpResult = "", doIpTrace = emptyList()) }
+            _calibrationWorkspace.update { it.copy(doIpReading = true, doIpResult = "", doIpTrace = emptyList(), doIpBackupBytes = 0) }
             try {
                 val target = DoIpDirectRead.Target.parse(host, tester, ecu, _vehicle.value.vin, tls)
                 val did = if (operation in setOf(DoIpDirectRead.Operation.DID, DoIpDirectRead.Operation.MONITOR)) {

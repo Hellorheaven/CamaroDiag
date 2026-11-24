@@ -345,6 +345,14 @@ fun CamaroDiagApp(
         uri?.let { viewModel.importCalibrationFile(it) }
     }
 
+    var pendingDoIpProfile by remember { mutableStateOf<Triple<String, Long, VehicleProfile>?>(null) }
+    val doIpProfilePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        val context = pendingDoIpProfile
+        pendingDoIpProfile = null
+        if (uri != null && context != null && viewModel.canResumeExport(context.second, context.first) &&
+            viewModel.vehicle.value == context.third) viewModel.importDoIpBackupProfile(uri)
+    }
+
     val ecuBackupPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri?.let(viewModel::verifyEcuBackup)
     }
@@ -768,6 +776,15 @@ fun CamaroDiagApp(
                             com.camarodiag.gen5.data.obd.DoIpDirectRead.Operation.MONITOR, samples, interval)
                     },
                     onCancelDirectDoIp = viewModel::cancelDirectDoIp,
+                    onImportDoIpBackupProfile = {
+                        viewModel.activeAccountUid.value?.let { owner ->
+                            pendingDoIpProfile = Triple(owner, viewModel.exportAccountGeneration(), viewModel.vehicle.value)
+                            doIpProfilePicker.launch(arrayOf("application/json", "text/plain", "application/octet-stream"))
+                        }
+                    },
+                    onCaptureDoIpBackup = { host, tester, ecu, tls, scope ->
+                        withExportFolder { viewModel.captureDirectDoIpBackup(host, tester, ecu, tls, scope) }
+                    },
                     onConnectJ2534Bridge = { host, port, token, requestId, responseId, baud ->
                         viewModel.connectJ2534Bridge(host, port, token, requestId, responseId, baud)
                     },

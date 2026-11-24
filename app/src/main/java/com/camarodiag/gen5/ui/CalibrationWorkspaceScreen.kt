@@ -62,6 +62,7 @@ import com.camarodiag.gen5.ui.theme.TextPrimary
 import com.camarodiag.gen5.ui.theme.WarnRed
 import com.camarodiag.gen5.data.obd.CamaroCalibrationCatalog
 import com.camarodiag.gen5.data.obd.DoIpDirectRead
+import com.camarodiag.gen5.data.obd.DoIpMemoryBackup
 import com.camarodiag.gen5.data.obd.J2534BridgePairingCodeFormat
 import com.camarodiag.gen5.data.obd.Lfx2012ControllerReferences
 import com.camarodiag.gen5.data.obd.Lfx2012FlexFuelPreflight
@@ -114,6 +115,8 @@ data class CalibrationWorkspaceState(
     val doIpReading: Boolean = false,
     val doIpResult: String = "",
     val doIpTrace: List<String> = emptyList(),
+    val doIpBackupScope: DoIpMemoryBackup.Scope? = null,
+    val doIpBackupBytes: Int = 0,
     val isJ2534BridgeConnecting: Boolean = false,
     val isJ2534BridgeConnected: Boolean = false,
     val isJ2534MemoryReadAvailable: Boolean = false,
@@ -255,6 +258,8 @@ fun CalibrationWorkspaceScreen(
     onReadDirectDoIp: (String, String, String, String, Boolean, DoIpDirectRead.Operation) -> Unit,
     onCancelDirectDoIp: () -> Unit,
     onMonitorDirectDoIp: (String, String, String, String, Boolean, Int, Int) -> Unit,
+    onImportDoIpBackupProfile: () -> Unit,
+    onCaptureDoIpBackup: (String, String, String, Boolean, DoIpMemoryBackup.Scope) -> Unit,
     onConnectJ2534Bridge: (String, String, String, String, String, String) -> Unit,
     onDisconnectJ2534Bridge: () -> Unit,
     onCaptureJ2534Memory: (String, String, Int, EcuBackupCoverage.Region) -> Unit,
@@ -282,6 +287,7 @@ fun CalibrationWorkspaceScreen(
     var doIpTls by remember(vehicle) { mutableStateOf(true) }
     var doIpSampleCount by remember(vehicle) { mutableStateOf("10") }
     var doIpInterval by remember(vehicle) { mutableStateOf("1000") }
+    var pendingDoIpBackup by remember(vehicle) { mutableStateOf<DoIpMemoryBackup.Scope?>(null) }
     var udsRequestCanId by remember(vehicle) { mutableStateOf("") }
     var udsResponseCanId by remember(vehicle) { mutableStateOf("") }
     var udsDid by remember { mutableStateOf("F190") }
@@ -402,14 +408,53 @@ fun CalibrationWorkspaceScreen(
                         modifier = Modifier.fillMaxWidth()) {
                         Text(stringResource(R.string.cal_doip_monitor))
                     }
+                    HorizontalDivider()
+                    OutlinedButton(onClick = onImportDoIpBackupProfile, enabled = idle && vinReady,
+                        modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(R.string.cal_doip_backup_profile))
+                    }
+                    state.doIpBackupScope?.let { scope ->
+                        Text(stringResource(R.string.cal_doip_backup_scope,
+                            scope.vin, "%04X".format(scope.ecu), "%08X".format(scope.start), scope.length),
+                            color = TextPrimary, fontSize = 12.sp)
+                        val matches = scope.vin == vehicle.vin.uppercase() &&
+                            doIpTester.toIntOrNull(16) == scope.tester && doIpEcu.toIntOrNull(16) == scope.ecu
+                        OutlinedButton(onClick = { pendingDoIpBackup = scope },
+                            enabled = targetReady && matches,
+                            modifier = Modifier.fillMaxWidth()) {
+                            Text(stringResource(R.string.cal_doip_backup))
+                        }
+                    }
+                    pendingDoIpBackup?.let { scope ->
+                        if (scope == state.doIpBackupScope && targetReady) {
+                            AlertDialog(onDismissRequest = { pendingDoIpBackup = null },
+                                title = { Text(stringResource(R.string.cal_doip_backup)) },
+                                text = { Text(stringResource(R.string.cal_doip_backup_confirm,
+                                    scope.vin, "%04X".format(scope.ecu), "%08X".format(scope.start), scope.length)) },
+                                confirmButton = { TextButton(onClick = {
+                                    pendingDoIpBackup = null
+                                    onCaptureDoIpBackup(doIpHost, doIpTester, doIpEcu, doIpTls, scope)
+                                }) { Text(stringResource(R.string.cal_doip_backup)) } },
+                                dismissButton = { TextButton(onClick = { pendingDoIpBackup = null }) {
+                                    Text(stringResource(R.string.cal_doip_cancel))
+                                } })
+                        }
+                    }
                     if (state.doIpReading) {
-                        LinearProgressIndicator(Modifier.fillMaxWidth())
+                        if (state.doIpBackupBytes > 0 && state.doIpBackupScope != null) {
+                            val total = state.doIpBackupScope.length * 2
+                            LinearProgressIndicator(progress = { (state.doIpBackupBytes.toFloat() / total).coerceIn(0f, 1f) },
+                                modifier = Modifier.fillMaxWidth())
+                            Text("${state.doIpBackupBytes} / $total")
+                        } else LinearProgressIndicator(Modifier.fillMaxWidth())
                         OutlinedButton(onClick = onCancelDirectDoIp, modifier = Modifier.fillMaxWidth()) {
                             Text(stringResource(R.string.cal_doip_cancel))
                         }
                     }
                     if (state.doIpResult.isNotBlank())
                         Text(state.doIpResult, color = TextPrimary, fontFamily = FontFamily.Monospace)
+                    if (state.doIpTrace.isNotEmpty() && state.doIpBackupBytes > 0)
+                        Text(stringResource(R.string.cal_doip_recent_trace), color = TextMuted, fontSize = 10.sp)
                     state.doIpTrace.forEach { line ->
                         Text(line, color = TextMuted, fontFamily = FontFamily.Monospace, fontSize = 10.sp)
                     }

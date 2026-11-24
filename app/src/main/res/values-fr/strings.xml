@@ -1010,4 +1010,12 @@
     <string name="cal_doip_samples">Échantillons (1–30)</string>
     <string name="cal_doip_interval">Intervalle (ms)</string>
     <string name="cal_doip_monitor">Monitorer le DID</string>
+    <string name="cal_doip_backup_profile">Charger le profil mémoire DoIP</string>
+    <string name="cal_doip_backup_scope">VIN %1$s · ECU %2$s · 0x%3$s · %4$d octets</string>
+    <string name="cal_doip_backup">Sauvegarder la zone ECU</string>
+    <string name="cal_doip_backup_confirm">Lire deux fois cette zone ? VIN %1$s, ECU %2$s, adresse 0x%3$s, %4$d octets. Aucune écriture ECU.</string>
+    <string name="cal_doip_backup_saved">Sauvegarde de zone vérifiée : %1$d octets. SHA-256 %2$s. %3$s</string>
+    <string name="cal_doip_profile_failed">Profil mémoire invalide ou VIN différent.</string>
+    <string name="cal_doip_backup_failed">Échec de la sauvegarde DoIP. Aucune sauvegarde vérifiée publiée.</string>
+    <string name="cal_doip_recent_trace">TX/RX récents (128 entrées maximum)</string>
 </resources>
