@@ -340,6 +340,7 @@ internal static class StandardProtocolCli
                 throw new TimeoutException("No DoIP gateway identity received.");
             foreach (var identity in identities)
                 Console.WriteLine($"DoIP gateway={identity.Source} " +
+                    $"version=0x{identity.ProtocolVersion:X2} " +
                     $"VIN={identity.Vin ?? "unavailable"} " +
                     $"logical=0x{identity.LogicalAddress:X4} " +
                     $"EID={Convert.ToHexString(identity.Eid)} " +
