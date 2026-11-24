@@ -145,19 +145,23 @@ internal class OBDLinkBleTransport(private val context: Context) {
         }
 
         override fun onDescriptorWrite(g: BluetoothGatt, descriptor: BluetoothGattDescriptor, status: Int) {
-            if (g !== gatt) return
+            if (g !== gatt || !BleGattCallbackPolicy.isExpectedNotificationDescriptor(
+                    descriptor.uuid, descriptor.characteristic?.uuid
+                )) return
+            // An unrelated descriptor callback must never make the serial
+            // UART connection appear ready to send vehicle requests.
             if (status == BluetoothGatt.GATT_SUCCESS) connectResult?.complete(Unit)
             else connectResult?.completeExceptionally(IllegalStateException("BLE notification subscription failed ($status)"))
         }
 
         override fun onMtuChanged(g: BluetoothGatt, mtu: Int, status: Int) {
             if (g !== gatt) return
-            if (status == BluetoothGatt.GATT_SUCCESS) mtuPayload = (mtu - 3).coerceAtLeast(20)
+            if (status == BluetoothGatt.GATT_SUCCESS) mtuPayload = BleGattCallbackPolicy.payloadForMtu(mtu)
             mtuResult?.complete(Unit)
         }
 
         override fun onCharacteristicWrite(g: BluetoothGatt, characteristic: BluetoothGattCharacteristic, status: Int) {
-            if (g !== gatt) return
+            if (g !== gatt || characteristic.uuid != writeUuid) return
             if (status == BluetoothGatt.GATT_SUCCESS) writeResult?.complete(Unit)
             else writeResult?.completeExceptionally(IllegalStateException("BLE write failed ($status)"))
         }
@@ -424,6 +428,22 @@ internal class BleNotificationBuffer(
     fun clear() {
         while (packets.tryReceive().isSuccess) { }
     }
+}
+
+/**
+ * BLE GATT callback correlation for the selected UART service. Android may
+ * deliver callbacks for other descriptors or GATT characteristics on the same
+ * connection; those callbacks must not complete the OBD serial handshake.
+ */
+internal object BleGattCallbackPolicy {
+    private val cccd = UUID.fromString("00002902-0000-1000-8000-00805F9B34FB")
+    private val uartNotify = UUID.fromString("0000FFF1-0000-1000-8000-00805F9B34FB")
+    fun isExpectedNotificationDescriptor(descriptor: UUID?, characteristic: UUID?): Boolean =
+        descriptor == cccd && characteristic == uartNotify
+
+    /** BLE ATT MTU is 23..517 bytes; invalid driver values keep the default. */
+    fun payloadForMtu(mtu: Int): Int =
+        if (mtu in 23..517) (mtu - 3).coerceIn(20, 514) else 20
 }
 
 /** One-shot wakeup for the single active BLE reader; signals are never queued across sessions. */
