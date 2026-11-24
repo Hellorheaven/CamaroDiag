@@ -120,14 +120,14 @@ internal sealed partial class BridgeDesktopForm
         doIpEcuAddress.TextChanged += InvalidateDoIpContext;
         doIpUseTls.CheckedChanged += InvalidateDoIpContext;
         doIpClientCertificate.TextChanged += InvalidateDoIpContext;
-        WideRow(fields, new Label
-        {
-            Text = "Console J2534 locale : TX et RX séparés ; commandes ECU transmises selon " +
-                "le protocole et le pilote réellement sélectionnés, sans liste blanche CamaroDiag. " +
-                "Les écritures et déverrouillages restent soumis aux réponses du calculateur. " +
-                "Fermez ce canal avant de démarrer le pont Android.",
-            Dock = DockStyle.Fill, AutoSize = true, ForeColor = Color.DarkSlateGray
-        }, 78);
+        // WideRow(fields, new Label
+        // {
+        // Text = "Console J2534 locale : TX et RX séparés ; commandes ECU transmises selon " +
+        // "le protocole et le pilote réellement sélectionnés, sans liste blanche CamaroDiag. " +
+        // "Les écritures et déverrouillages restent soumis aux réponses du calculateur. " +
+        // "Fermez ce canal avant de démarrer le pont Android.",
+        // Dock = DockStyle.Fill, AutoSize = true, ForeColor = Color.DarkSlateGray
+        // }, 78);
         outer.Controls.Add(fields, 0, 0);
         outer.Controls.Add(consoleHistory, 0, 1);
         tab.Controls.Add(outer);
@@ -189,8 +189,8 @@ internal sealed partial class BridgeDesktopForm
                         if (IsDisposed || Disposing) return;
                         ConsoleLine("SYSTEM", DoIpConsolePresentation.FormatStatus(
                             response, powerMode.Value), Color.DarkGreen);
-                        ConsoleLine("SYSTEM", DoIpConsolePresentation.Text("StatusNotice"),
-                            Color.DarkSlateGray);
+                        // ConsoleLine("SYSTEM", DoIpConsolePresentation.Text("StatusNotice"),
+                            // Color.DarkSlateGray);
                     }
                     else
                     {
@@ -203,8 +203,8 @@ internal sealed partial class BridgeDesktopForm
                         doIpObservedGateway = identity;
                         ConsoleLine("SYSTEM", DoIpConsolePresentation.FormatIdentity(identity),
                             Color.DarkGreen);
-                        ConsoleLine("SYSTEM", DoIpConsolePresentation.Text("Notice"),
-                            Color.DarkSlateGray);
+                        // ConsoleLine("SYSTEM", DoIpConsolePresentation.Text("Notice"),
+                            // Color.DarkSlateGray);
                     }
                 }
                 catch (OperationCanceledException) when (stop.IsCancellationRequested)
@@ -335,7 +335,7 @@ internal sealed partial class BridgeDesktopForm
                         if (IsDisposed || Disposing) return;
                         ConsoleLine("SYSTEM", string.Format(
                             DoIpConsolePresentation.Text("VinResult"), vin), Color.DarkGreen);
-                        ConsoleLine("SYSTEM", DoIpConsolePresentation.Text("VinNotice"), Color.DarkSlateGray);
+                        // ConsoleLine("SYSTEM", DoIpConsolePresentation.Text("VinNotice"), Color.DarkSlateGray);
                     }
                 }
                 catch (OperationCanceledException) when (stop.IsCancellationRequested)
