@@ -1030,4 +1030,12 @@
     <string name="can_console_swcan_profile">Capture SW-CAN 33,3 kbit/s, %1$d bits</string>
     <string name="can_console_swcan_changed">SW-CAN 33,3 kbit/s</string>
     <string name="can_console_swcan_receive_only">SW-CAN : réception seule dans cette console.</string>
+    <string name="cal_doip_discover">Identifier la passerelle</string>
+    <string name="cal_doip_gateway_status_button">État</string>
+    <string name="cal_doip_power">Alimentation</string>
+    <string name="cal_doip_gateway_identity">Passerelle 0x%1$s · DoIP 0x%2$s · VIN annoncé %3$s</string>
+    <string name="cal_doip_gateway_status">Nœud %1$d · connexions %2$d/%3$d · données max. %4$s</string>
+    <string name="cal_doip_power_not_ready">Alimentation diagnostic : non prête</string>
+    <string name="cal_doip_power_ready">Alimentation diagnostic : prête</string>
+    <string name="cal_doip_power_unsupported">Alimentation diagnostic : non prise en charge</string>
 </resources>

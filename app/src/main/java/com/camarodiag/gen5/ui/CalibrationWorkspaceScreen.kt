@@ -113,6 +113,8 @@ data class CalibrationWorkspaceState(
     val udsDtcResponse: String = "",
     val udsMessage: String = "",
     val doIpReading: Boolean = false,
+    val doIpGatewayHost: String = "",
+    val doIpGatewayResult: String = "",
     val doIpResult: String = "",
     val doIpTrace: List<String> = emptyList(),
     val doIpBackupScope: DoIpMemoryBackup.Scope? = null,
@@ -258,6 +260,7 @@ fun CalibrationWorkspaceScreen(
     onReadUdsDid: (String, String, String, String) -> Unit,
     onReadUdsDtcs: (String, String, String) -> Unit,
     onReadDirectDoIp: (String, String, String, String, Boolean, DoIpDirectRead.Operation) -> Unit,
+    onInspectDoIpGateway: (String, DoIpDirectRead.GatewayOperation) -> Unit,
     onCancelDirectDoIp: () -> Unit,
     onMonitorDirectDoIp: (String, String, String, String, Boolean, Int, Int) -> Unit,
     onExportDoIpMonitoring: (DoIpMonitorReport) -> Unit,
@@ -364,6 +367,22 @@ fun CalibrationWorkspaceScreen(
                     OutlinedTextField(doIpHost, { doIpHost = it.trim().take(64) },
                         enabled = idle, singleLine = true, modifier = Modifier.fillMaxWidth(),
                         label = { Text(stringResource(R.string.cal_doip_host)) })
+                    OutlinedButton(onClick = { onInspectDoIpGateway(doIpHost, DoIpDirectRead.GatewayOperation.DISCOVER) },
+                        enabled = idle && doIpHost.isNotBlank(), modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(R.string.cal_doip_discover))
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(onClick = { onInspectDoIpGateway(doIpHost, DoIpDirectRead.GatewayOperation.STATUS) },
+                            enabled = idle && doIpHost.isNotBlank(), modifier = Modifier.weight(1f)) {
+                            Text(stringResource(R.string.cal_doip_gateway_status_button))
+                        }
+                        OutlinedButton(onClick = { onInspectDoIpGateway(doIpHost, DoIpDirectRead.GatewayOperation.POWER) },
+                            enabled = idle && doIpHost.isNotBlank(), modifier = Modifier.weight(1f)) {
+                            Text(stringResource(R.string.cal_doip_power))
+                        }
+                    }
+                    if (state.doIpGatewayHost == doIpHost && state.doIpGatewayResult.isNotBlank())
+                        Text(state.doIpGatewayResult, color = TextPrimary, fontSize = 12.sp)
                     OutlinedTextField(doIpTester, { doIpTester = it.uppercase().filter { c -> c in "0123456789ABCDEF" }.take(4) },
                         enabled = idle, singleLine = true, modifier = Modifier.fillMaxWidth(),
                         label = { Text(stringResource(R.string.cal_doip_tester)) })

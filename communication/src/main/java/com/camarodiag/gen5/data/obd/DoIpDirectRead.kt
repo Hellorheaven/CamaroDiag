@@ -28,18 +28,7 @@ object DoIpDirectRead {
         val expectedVin: String, val tls: Boolean) {
         companion object {
             fun parse(host: String, tester: String, ecu: String, vin: String, tls: Boolean): Target {
-                val raw = host.trim()
-                val address = if (raw.contains(':')) {
-                    require(raw.matches(Regex("[0-9A-Fa-f:.]+(%[0-9]+)?"))) { "Numeric IPv6 address required." }
-                    InetAddress.getByName(raw)
-                } else {
-                    val parts = raw.split('.')
-                    require(parts.size == 4 && parts.all { it.matches(Regex("[0-9]{1,3}")) &&
-                        it.toInt() in 0..255 }) { "Numeric IPv4 address required." }
-                    InetAddress.getByAddress(parts.map { it.toInt().toByte() }.toByteArray())
-                }
-                require(!address.isAnyLocalAddress && !address.isMulticastAddress &&
-                    address.hostAddress != "255.255.255.255") { "An explicit unicast gateway is required." }
+                val address = parseHost(host)
                 fun logical(text: String): Int {
                     require(text.trim().matches(Regex("[0-9A-Fa-f]{4}")))
                     return text.trim().toInt(16)
@@ -53,7 +42,25 @@ object DoIpDirectRead {
             }
         }
     }
+    private fun parseHost(host: String): InetAddress {
+        val raw = host.trim()
+        val address = if (raw.contains(':')) {
+            require(raw.matches(Regex("[0-9A-Fa-f:.]+(%[0-9]+)?"))) { "Numeric IPv6 address required." }
+            InetAddress.getByName(raw)
+        } else {
+            val parts = raw.split('.')
+            require(parts.size == 4 && parts.all { it.matches(Regex("[0-9]{1,3}")) &&
+                it.toInt() in 0..255 }) { "Numeric IPv4 address required." }
+            InetAddress.getByAddress(parts.map { it.toInt().toByte() }.toByteArray())
+        }
+        require(!address.isAnyLocalAddress && !address.isMulticastAddress &&
+            address.hostAddress != "255.255.255.255") { "An explicit unicast gateway is required." }
+        return address
+    }
+    enum class GatewayOperation { DISCOVER, STATUS, POWER }
     data class Gateway(val vin: String?, val logicalAddress: Int, val version: Int)
+    data class GatewayStatus(val nodeType: Int, val maxSockets: Int, val currentSockets: Int, val maxDataSize: Long?)
+    data class GatewayResult(val gateway: Gateway, val status: GatewayStatus? = null, val power: Int? = null)
     data class Trace(val direction: String, val payloadHex: String, val observedAtUtcMillis: Long = System.currentTimeMillis())
     data class Outcome(val gateway: Gateway, val ecu: Int, val vin: String?,
         val data: ByteArray?, val dtcs: UdsDtcReport?, val trace: List<Trace>,
@@ -100,13 +107,13 @@ object DoIpDirectRead {
             }
         } ?: throw SocketTimeoutException("DoIP operation timed out.")
 
-    private suspend fun discover(target: Target, timeoutMs: Int): Gateway {
+    private suspend fun discover(address: InetAddress, expectedVin: String, timeoutMs: Int): Gateway {
         val socket = DatagramSocket()
         try {
             return io(timeoutMs.toLong(), socket::close) {
-                socket.connect(target.address, 13400)
+                socket.connect(address, 13400)
                 val packet = encode(255, 0x0001, byteArrayOf())
-                socket.send(DatagramPacket(packet, packet.size, target.address, 13400))
+                socket.send(DatagramPacket(packet, packet.size, address, 13400))
                 val deadline = deadline(timeoutMs)
                 val buffer = ByteArray(1024)
                 var found: Gateway? = null
@@ -115,7 +122,7 @@ object DoIpDirectRead {
                     val received = DatagramPacket(buffer, buffer.size)
                     socket.receive(received)
                     remaining(deadline)
-                    if (received.address != target.address || received.port != 13400 || received.length < 8) continue
+                    if (received.address != address || received.port != 13400 || received.length < 8) continue
                     val frame = parseFrame(buffer.copyOfRange(0, 8), buffer.copyOfRange(8, received.length))
                     if (frame.type == 0) throw IOException("DoIP gateway rejected identification.")
                     if (frame.type != 0x0004) continue
@@ -123,12 +130,58 @@ object DoIpDirectRead {
                     val raw = frame.data.copyOfRange(0, 17)
                     val vin = if (raw.all { it == 0.toByte() } || raw.all { it.u8() == 255 }) null
                         else raw.toString(Charsets.US_ASCII).also { require(validVin(it)) }
-                    if (vin != null && target.expectedVin.isNotEmpty()) require(vin == target.expectedVin) {
+                    if (vin != null && expectedVin.isNotEmpty()) require(vin == expectedVin) {
                         "Discovered DoIP vehicle differs from the selected VIN."
                     }
                     found = Gateway(vin, u16(frame.data, 17), frame.version)
                 }
                 found
+            }
+        } finally { socket.close() }
+    }
+
+    /** Discovery and control messages never activate a diagnostic TCP route. */
+    suspend fun inspectGateway(host: String, vin: String, operation: GatewayOperation,
+        timeoutMs: Int = 5000): GatewayResult {
+        require(timeoutMs in 100..30_000)
+        val address = parseHost(host)
+        val expected = vin.trim().uppercase(Locale.ROOT)
+        require(expected.isEmpty() || validVin(expected))
+        val gateway = discover(address, expected, timeoutMs)
+        if (operation == GatewayOperation.DISCOVER) return GatewayResult(gateway)
+        val socket = DatagramSocket()
+        try {
+            return io(timeoutMs.toLong(), socket::close) {
+                socket.connect(address, 13400)
+                val power = operation == GatewayOperation.POWER
+                val request = encode(gateway.version, if (power) 0x4003 else 0x4001, byteArrayOf())
+                socket.send(DatagramPacket(request, request.size, address, 13400))
+                val end = deadline(timeoutMs)
+                val buffer = ByteArray(1024)
+                var result: GatewayResult? = null
+                while (result == null) {
+                    socket.soTimeout = remaining(end)
+                    val packet = DatagramPacket(buffer, buffer.size)
+                    socket.receive(packet)
+                    remaining(end)
+                    if (packet.address != address || packet.port != 13400 || packet.length < 8) continue
+                    val frame = parseFrame(buffer.copyOfRange(0, 8), buffer.copyOfRange(8, packet.length))
+                    require(frame.version == gateway.version)
+                    if (frame.type == 0) throw IOException("DoIP gateway rejected control query.")
+                    if (frame.type != if (power) 0x4004 else 0x4002) continue
+                    if (power) {
+                        require(frame.data.size == 1 && frame.data[0].u8() in 0..2)
+                        result = GatewayResult(gateway, power = frame.data[0].u8())
+                    } else {
+                        require(frame.data.size in setOf(3, 7) && frame.data[0].u8() in 0..1 &&
+                            frame.data[2].u8() <= frame.data[1].u8())
+                        val size = if (frame.data.size == 7)
+                            ByteBuffer.wrap(frame.data, 3, 4).int.toLong() and 0xFFFFFFFFL else null
+                        result = GatewayResult(gateway, GatewayStatus(frame.data[0].u8(),
+                            frame.data[1].u8(), frame.data[2].u8(), size))
+                    }
+                }
+                result
             }
         } finally { socket.close() }
     }
@@ -262,7 +315,7 @@ object DoIpDirectRead {
         val budget = if (operation == Operation.BACKUP) 600_000L
             else if (operation == Operation.MONITOR)
             timeoutMs * (sampleCount + 5L) + intervalMs * (sampleCount - 1L) else timeoutMs * 5L
-        val gateway = discover(target, timeoutMs)
+        val gateway = discover(target.address, target.expectedVin, timeoutMs)
         require(target.tester != gateway.logicalAddress)
         if (backupScope != null) require(gateway.logicalAddress == backupScope.gateway)
         val trace = mutableListOf<Trace>()

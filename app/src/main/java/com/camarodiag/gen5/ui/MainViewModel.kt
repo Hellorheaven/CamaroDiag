@@ -1122,7 +1122,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 udsDidResponse = "", udsDtcResponse = "", udsMessage = "",
                 obdbSignalValue = "", obdbSignalMessage = "",
                 doIpReading = false, doIpResult = "", doIpTrace = emptyList(),
-                doIpBackupScope = null, doIpBackupBytes = 0, doIpMonitorReport = null, doIpLiveSamples = emptyList())
+                doIpBackupScope = null, doIpBackupBytes = 0, doIpMonitorReport = null, doIpLiveSamples = emptyList(),
+                doIpGatewayHost = "", doIpGatewayResult = "")
         }
     }
 
@@ -1146,6 +1147,42 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun cancelDirectDoIp() {
         if (!_calibrationWorkspace.value.doIpReading) return
         invalidateEnhancedUdsReads()
+    }
+
+    fun inspectDirectDoIpGateway(host: String, operation: DoIpDirectRead.GatewayOperation) {
+        if (!requirePremiumLicense()) return
+        launchEnhancedUdsRead { current ->
+            _calibrationWorkspace.update { it.copy(doIpReading = true, doIpGatewayResult = "",
+                doIpGatewayHost = host) }
+            try {
+                val result = DoIpDirectRead.inspectGateway(host, _vehicle.value.vin, operation)
+                if (!current()) return@launchEnhancedUdsRead
+                val unavailable = localizedContext.getString(R.string.cal_status_unresolved)
+                val identity = localizedContext.getString(R.string.cal_doip_gateway_identity,
+                    "%04X".format(result.gateway.logicalAddress), "%02X".format(result.gateway.version),
+                    result.gateway.vin ?: unavailable)
+                val status = result.status?.let { observed ->
+                    localizedContext.getString(R.string.cal_doip_gateway_status,
+                        observed.nodeType, observed.currentSockets, observed.maxSockets,
+                        observed.maxDataSize?.toString() ?: unavailable)
+                }
+                val power = result.power?.let { observed ->
+                    localizedContext.getString(when (observed) {
+                        0 -> R.string.cal_doip_power_not_ready
+                        1 -> R.string.cal_doip_power_ready
+                        else -> R.string.cal_doip_power_unsupported
+                    })
+                }
+                _calibrationWorkspace.update { it.copy(doIpReading = false,
+                    doIpGatewayResult = listOfNotNull(identity, status, power).joinToString("\n")) }
+            } catch (cancelled: CancellationException) {
+                if (current()) _calibrationWorkspace.update { it.copy(doIpReading = false) }
+                throw cancelled
+            } catch (_: Exception) {
+                if (current()) _calibrationWorkspace.update { it.copy(doIpReading = false,
+                    doIpGatewayResult = localizedContext.getString(R.string.cal_doip_failed)) }
+            }
+        }
     }
 
     fun importDoIpBackupProfile(uri: Uri) {

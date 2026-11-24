@@ -1027,4 +1027,12 @@
     <string name="can_console_swcan_profile">SW-CAN capture 33.3 kbit/s, %1$d-bit</string>
     <string name="can_console_swcan_changed">SW-CAN 33.3 kbit/s</string>
     <string name="can_console_swcan_receive_only">SW-CAN: receive-only in this console.</string>
+    <string name="cal_doip_discover">Discover gateway</string>
+    <string name="cal_doip_gateway_status_button">Status</string>
+    <string name="cal_doip_power">Power mode</string>
+    <string name="cal_doip_gateway_identity">Gateway 0x%1$s · DoIP 0x%2$s · reported VIN %3$s</string>
+    <string name="cal_doip_gateway_status">Node %1$d · sockets %2$d/%3$d · max data %4$s</string>
+    <string name="cal_doip_power_not_ready">Diagnostic power: not ready</string>
+    <string name="cal_doip_power_ready">Diagnostic power: ready</string>
+    <string name="cal_doip_power_unsupported">Diagnostic power: unsupported</string>
 </resources>
