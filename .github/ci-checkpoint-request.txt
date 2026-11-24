@@ -1,3 +1,7 @@
+PR117 — grouped DoIP TCP/TLS console and automatic endpoint routing checkpoint
+Implementation and handoff HEAD: af93c360baf505452230f3d933b245a4626cf7f0
+Full Debug validation: Windows PDU journal, TCP/TLS diagnostic loopback, GUI and backup tracing, FR/EN resources, Android VIN-based route resolution and profile binding, existing native/Connectors/backend offline checks. Intermediate C6/DoIP only. No merge, release, deployment or physical qualification.
+
 PR117 — grouped Windows and Android DoIP VIN gateway and ECU correlation checkpoint
 Implementation and handoff HEAD: e9d93c81500c7c40738eed8c549781134cd161b0
 Full Debug validation: Windows GUI/UDP tracing and loopback VIN discovery, F190 identity correlation before DID/DTC/monitor, Android EID/GID ambiguity, FR/EN resources, existing Android/native/Connectors/Firebase offline checks. Intermediate C6/DoIP only. No merge, release, deployment or physical qualification.
