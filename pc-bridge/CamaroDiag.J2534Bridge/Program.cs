@@ -138,26 +138,28 @@ internal static class Program
             return NativeE39CalibrationRepairCli.Run(args);
 
 
-        if (await BridgeUpdateManager.CheckAndOfferUpdateAsync()) return 0;
-        var port = ReadPort(args);
-        var allowObdClear = args.Contains("--allow-obd-clear", StringComparer.OrdinalIgnoreCase);
-        J2534MemoryReadScope? memoryReadScope = null;
-        var mapIndex = Array.FindIndex(args,
-            value => value.Equals("--memory-read-profile", StringComparison.OrdinalIgnoreCase));
-        if (mapIndex >= 0)
+        // Never silently reinterpret a mistyped CLI argument as "start the
+        // bridge on the default port". Parse before any updater, DLL lookup,
+        // vehicle connection or network listener.
+        if (!BridgeLaunchArguments.TryParse(args, out var launch, out var argumentError))
         {
-            if (mapIndex + 1 >= args.Length)
-            {
-                Console.Error.WriteLine("Missing JSON path after --memory-read-profile.");
-                return 6;
-            }
-            try { memoryReadScope = J2534MemoryReadScope.Load(args[mapIndex + 1]); }
+            Console.Error.WriteLine(argumentError);
+            Console.Error.WriteLine("Run --help alone for valid command examples.");
+            return 6;
+        }
+        var port = launch!.Port;
+        var allowObdClear = launch.AllowObdClear;
+        J2534MemoryReadScope? memoryReadScope = null;
+        if (launch.MemoryReadProfile is { } profilePath)
+        {
+            try { memoryReadScope = J2534MemoryReadScope.Load(profilePath); }
             catch (Exception ex)
             {
                 Console.Error.WriteLine("Invalid ECU memory read profile: " + ex.Message);
                 return 6;
             }
         }
+        if (await BridgeUpdateManager.CheckAndOfferUpdateAsync()) return 0;
         var adapters = J2534Registry.Discover();
         if (adapters.Count == 0)
         {
@@ -295,12 +297,4 @@ internal static class Program
         }
     }
 
-    private static int ReadPort(string[] args)
-    {
-        var index = Array.IndexOf(args, "--port");
-        if (index >= 0 && index + 1 < args.Length &&
-            int.TryParse(args[index + 1], out var port) && port is >= 1024 and <= 65535)
-            return port;
-        return 35001;
-    }
 }
