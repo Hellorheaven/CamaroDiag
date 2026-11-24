@@ -384,7 +384,7 @@ class J2534BridgeTransport(
 
     suspend fun clearStandardObdDtcs(
         approval: EcuWriteConsentFlow.Approval,
-        beforeTransmit: () -> Unit = {}
+        beforeTransmit: () -> Unit
     ) = withContext(Dispatchers.IO) {
         mutex.withLock {
             require(approval.warningAcknowledged && approval.confirmedYes) {
