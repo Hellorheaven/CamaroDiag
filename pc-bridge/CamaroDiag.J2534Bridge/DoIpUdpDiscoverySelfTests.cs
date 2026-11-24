@@ -93,6 +93,37 @@ internal static class DoIpUdpDiscoverySelfTests
             await power.WaitAsync(TimeSpan.FromSeconds(2))) == 1,
             "DoIP power-mode ready status is parsed from selected gateway.");
 
+        // A standard UDP Generic NACK from the selected endpoint must
+        // reveal the gateway's rejection code instead of masking it as an
+        // unresponsive vehicle or returning a false-positive discovery.
+        var rejectedStatus = DoIpVehicleDiscovery.QueryStatusAsync(
+            "127.0.0.1", false, TimeSpan.FromSeconds(2),
+            CancellationToken.None, portOverride: port);
+        var rejectedStatusRequest = await gateway.ReceiveAsync()
+            .WaitAsync(TimeSpan.FromSeconds(2));
+        await gateway.SendAsync(DoIpCodec.Encode(
+            DoIpCodec.GenericNegativeAck, [0x01]),
+            rejectedStatusRequest.RemoteEndPoint);
+        var receivedNack = false;
+        try { await rejectedStatus; }
+        catch (IOException) { receivedNack = true; }
+        Check(receivedNack,
+            "UDP status generic NACK is reported as gateway refusal.");
+
+        var rejectedDiscovery = DoIpVehicleDiscovery.DiscoverAsync(
+            "127.0.0.1", TimeSpan.FromSeconds(2),
+            CancellationToken.None, portOverride: port);
+        var rejectedDiscoveryRequest = await gateway.ReceiveAsync()
+            .WaitAsync(TimeSpan.FromSeconds(2));
+        await gateway.SendAsync(DoIpCodec.Encode(
+            DoIpCodec.GenericNegativeAck, [0x04]),
+            rejectedDiscoveryRequest.RemoteEndPoint);
+        var refusedIdentity = false;
+        try { await rejectedDiscovery; }
+        catch (IOException) { refusedIdentity = true; }
+        Check(refusedIdentity,
+            "Unicast DoIP identification generic NACK is not a timeout.");
+
         // No response from the selected endpoint: even a syntactically valid
         // announcement from the same IP but wrong source port must time out.
         var onlySpoof = DoIpVehicleDiscovery.DiscoverAsync(
