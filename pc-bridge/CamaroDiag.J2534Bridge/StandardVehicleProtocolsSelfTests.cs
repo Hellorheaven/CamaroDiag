@@ -513,13 +513,18 @@ internal static class StandardVehicleProtocolsSelfTests
         var verifiedMonitor = StandardProtocolCli.ParseDoIpMonitor([
             StandardProtocolCli.DoIpCommand, "--host", "192.0.2.10", "--tester", "0E80",
             "--ecu", "1234", "--expected-vin", "1G1FA1RXXR0123456", "--obd-monitor-did",
-            "F40C", "--samples", "5", "--interval-ms", "250"]);
+            "F40C", "--samples", "5", "--interval-ms", "250", "--timeout-ms", "3000",
+            "--uds-p2-ms", "100", "--uds-p2-star-ms", "2000"]);
         Check(verifiedMonitor.Obd && verifiedMonitor.Target.UseTls &&
             verifiedMonitor.Did == 0xF40C && verifiedMonitor.Count == 5 &&
-            verifiedMonitor.IntervalMs == 250, "Verified OBD monitoring parses a bounded TLS target.");
+            verifiedMonitor.IntervalMs == 250 && verifiedMonitor.Target.DoIpP2Ms == 100 &&
+            verifiedMonitor.Target.DoIpP2StarMs == 2000, "Verified OBD monitoring parses a bounded TLS target and timings.");
         var monitorArgs = new[] { StandardProtocolCli.DoIpCommand, "--host", "192.0.2.10",
             "--tester", "0E80", "--ecu", "1234", "--expected-vin", "1G1FA1RXXR0123456",
             "--obd-monitor-did", "F40C" };
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseDoIpMonitor(
+            [.. monitorArgs, "--uds-p2-ms", "1000", "--uds-p2-star-ms", "500"]),
+            "Monitoring rejects reversed P2/P2-star timing before opening a socket.");
         Reject<ArgumentException>(() => StandardProtocolCli.ParseDoIpMonitor(
             [.. monitorArgs, "--payload", "221234"]), "Monitoring rejects arbitrary command options.");
         Reject<ArgumentException>(() => StandardProtocolCli.ParseDoIpMonitor(

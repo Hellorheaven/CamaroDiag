@@ -1,3 +1,7 @@
+## PR117 — parité monitoring CLI et contrôle Connectors (24/11/2026)
+
+- Monitoring Windows CLI : P2/P2* optionnels dans le délai global, appliqués à toutes les requêtes de la session (identification et mesures), validation avant connexion, aide FR/EN. Connectors Python : contrôle d’identité avant status/power, contrôle du type de nœud annoncé dans EntityStatus, refus de substitution sans émission du contrôle. Tests ajoutés. Aucune qualification physique ; validation groupée à venir.
+
 ## PR117 — identité passerelle et IPv6 Windows (24/11/2026)
 
 - Statut et alimentation DoIP dans la console Windows : revalidation de l’identité sélectionnée avant requête, sans effacer la sélection sur erreur de contrôle ; nouvelle découverte explicite nécessaire pour substituer la passerelle. Adresses IPv4 multicast et IPv6 link-local sans scope rejetées en unicast, scope exclu du nom TLS sans désactiver la vérification du certificat. Tests de validation ajoutés. Checkpoint précédent 45456278234 vert ; ce lot reste à valider.

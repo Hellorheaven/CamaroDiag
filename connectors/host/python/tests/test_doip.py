@@ -7,7 +7,7 @@ from camarodiagconnectors.doip_cli import run
 from camarodiagconnectors.doip import (
     Gateway, Session, DoIpError, NegativeResponse, decode, encode, parse_identity, positive,
     discover, discover_ipv4, discover_ipv6, discovery_request, discover_unique_vin, parse_commands, confirm_commands,
-    endpoint, tls_server_name
+    endpoint, tls_server_name, status
 )
 
 VIN = "1G1FA1RXXR0123456"
@@ -157,6 +157,21 @@ class DoIpTests(unittest.TestCase):
             with self.assertRaises(SystemExit):
                 run(["--listen-ipv6-ifindex", "3", "--host", "127.0.0.1", "discover"])
             discover_mock.assert_not_called()
+
+    def test_control_query_revalidates_gateway_identity_and_node_type(self):
+        from dataclasses import replace
+        with patch("camarodiagconnectors.doip.discover", return_value=replace(GATEWAY, gid="010203040506")), \
+             patch("camarodiagconnectors.doip._udp") as udp:
+            with self.assertRaises(DoIpError):
+                status(GATEWAY)
+            udp.assert_not_called()
+        with patch("camarodiagconnectors.doip.discover", return_value=GATEWAY), \
+             patch("camarodiagconnectors.doip._udp", return_value=encode(2, 0x4002, bytes((2, 4, 1)))):
+            with self.assertRaises(DoIpError):
+                status(GATEWAY)
+        with patch("camarodiagconnectors.doip.discover", return_value=GATEWAY), \
+             patch("camarodiagconnectors.doip._udp", return_value=encode(2, 0x4002, bytes((1, 4, 1)))):
+            self.assertEqual(status(GATEWAY)["current_sockets"], 1)
 
     def test_passive_discovery_sends_nothing(self):
         with patch("camarodiagconnectors.doip.socket.socket") as factory:

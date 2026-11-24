@@ -311,6 +311,9 @@ def confirm_commands(commands: tuple[bytes, ...], gateway: Gateway, tester: int,
 
 def status(gateway: Gateway, power: bool = False, timeout: float = 3,
            trace: Trace | None = None, port: int = 13400) -> dict:
+    current = discover(gateway.host, gateway.vin, timeout, trace, port)
+    if gateway_key(current) != gateway_key(gateway):
+        raise DoIpError("Gateway identity changed before control query")
     request = encode(gateway.version, 0x4003 if power else 0x4001)
     version, kind, body = decode(_udp(gateway.host, request, timeout, trace, port))
     if version != gateway.version:
@@ -319,7 +322,7 @@ def status(gateway: Gateway, power: bool = False, timeout: float = 3,
         if kind != 0x4004 or len(body) != 1 or body[0] not in (0, 1, 2):
             raise DoIpError("Invalid diagnostic power mode")
         return {"power_mode": body[0]}
-    if kind != 0x4002 or len(body) not in (3, 7) or body[2] > body[1]:
+    if kind != 0x4002 or len(body) not in (3, 7) or body[0] not in (0, 1) or body[2] > body[1]:
         raise DoIpError("Invalid entity status")
     return {"node_type": body[0], "max_sockets": body[1], "current_sockets": body[2],
             "max_data_size": int.from_bytes(body[3:], "big") if len(body) == 7 else None}

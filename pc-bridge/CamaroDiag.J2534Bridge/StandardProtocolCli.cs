@@ -1532,7 +1532,8 @@ internal static class StandardProtocolCli
         {
             "--host", "--tester", "--ecu", "--expected-vin", "--monitor-did", "--obd-monitor-did",
             "--samples", "--interval-ms", "--timeout-ms", "--tls", "--doip-version",
-            "--client-cert-thumbprint", "--routing-activation-type", "--routing-oem-data"
+            "--client-cert-thumbprint", "--routing-activation-type", "--routing-oem-data",
+            "--uds-p2-ms", "--uds-p2-star-ms"
         };
         var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         for (var i = args.Length > 0 && args[0].Equals(DoIpCommand, StringComparison.OrdinalIgnoreCase) ? 1 : 0;
@@ -1556,16 +1557,19 @@ internal static class StandardProtocolCli
         if (count is < 1 or > 3600 || interval is < 250 or > 60000)
             throw new ArgumentOutOfRangeException(nameof(args), "Invalid monitoring count or interval.");
         var explicitVersion = values.ContainsKey("--doip-version");
+        var totalMs = int.Parse(values.GetValueOrDefault("--timeout-ms", "5000"), CultureInfo.InvariantCulture);
+        var p2 = values.GetValueOrDefault("--uds-p2-ms", totalMs.ToString(CultureInfo.InvariantCulture));
+        var p2Star = values.GetValueOrDefault("--uds-p2-star-ms", totalMs.ToString(CultureInfo.InvariantCulture));
+        var timing = DoIpDiagnosticTransport.SessionOptions.Parse(totalMs, p2, p2Star, "00", "");
+        values["--uds-p2-ms"] = timing.P2Ms.ToString(CultureInfo.InvariantCulture);
+        values["--uds-p2-star-ms"] = timing.P2StarMs.ToString(CultureInfo.InvariantCulture);
         foreach (var key in new[] { "--monitor-did", "--obd-monitor-did", "--samples",
             "--interval-ms", "--expected-vin" }) values.Remove(key);
         values["--payload"] = $"22{did:X4}";
         if (!values.ContainsKey("--tls")) values["--tls"] = "true";
         var target = ParseDoIp(values.SelectMany(x => new[] { x.Key, x.Value }).ToArray());
         if (!System.Net.IPAddress.TryParse(target.Host, out var address) ||
-            System.Net.IPAddress.Any.Equals(address) || System.Net.IPAddress.IPv6Any.Equals(address) ||
-            System.Net.IPAddress.Broadcast.Equals(address) || address.IsIPv6Multicast ||
-            (address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork &&
-             address.GetAddressBytes()[0] is >= 224 and <= 239))
+            !DoIpVehicleDiscovery.IsExplicitUnicast(address))
             throw new ArgumentException("DoIP monitoring requires a numeric unicast IP.");
         return new DoIpMonitorOptions(target, vin, did, count, interval, obd, explicitVersion);
     }
@@ -1590,9 +1594,10 @@ internal static class StandardProtocolCli
                 o.Host, o.Tester, o.Ecu, timeout, cancellation.Token,
                 useTls: o.UseTls, protocolVersion: gateway.ProtocolVersion,
                 clientCertificateThumbprint: o.ClientCertificateThumbprint,
-                activationType: o.RoutingActivationType,
-                activationOemData: o.RoutingOemData,
-                expectedGatewayAddress: gateway.LogicalAddress);
+                expectedGatewayAddress: gateway.LogicalAddress,
+                sessionOptions: new DoIpDiagnosticTransport.SessionOptions(o.DoIpP2Ms,
+                    o.DoIpP2StarMs, o.RoutingActivationType,
+                    o.RoutingOemData is null ? "" : Convert.ToHexString(o.RoutingOemData)));
             var interval = TimeSpan.FromMilliseconds(monitor.IntervalMs);
             void Sample(int index, byte[] data) => Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(
                 new { sample = index, utc = DateTimeOffset.UtcNow, vin = monitor.Vin,

@@ -67,6 +67,7 @@ Exemples :
                               --monitor-did F190 ou --obd-monitor-did F40C
                               avec --expected-vin VIN, --samples 10, --interval-ms 1000.
                               Monitoring en lecture seule, sur le même ECU, TLS par défaut.
+                              --uds-p2-ms et --uds-p2-star-ms facultatifs dans le délai global.
                               Mesures provisoires avant vérification finale de l’identité.
                               Ni contournement OEM ni flash ou récupération qualifiés.
 
