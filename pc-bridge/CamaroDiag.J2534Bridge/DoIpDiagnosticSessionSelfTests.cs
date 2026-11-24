@@ -193,6 +193,25 @@ internal static class DoIpDiagnosticSessionSelfTests
             Check(rx is not null && rx.Length == 20 && rx[0] == 0x62,
                 "VIN RX journal receives the unmodified positive response.");
         });
+        // Cancellation by the RX observer must prevent publication of a VIN,
+        // even though the transport has already received a valid response.
+        using (var canceledAfterReply = new CancellationTokenSource())
+        {
+            await RunCaseAsync(async stream =>
+            {
+                await RequireRequestAsync(stream);
+                await SendAsync(stream, DoIpCodec.DiagnosticMessage,
+                    FromEcu([0x62, 0xF1, 0x90, .. System.Text.Encoding.ASCII.GetBytes(simulatedVin)]));
+            }, async client =>
+            {
+                await Expect<OperationCanceledException>(async () =>
+                {
+                    _ = await DoIpVinReader.ReadAsync(client,
+                        TimeSpan.FromSeconds(2), canceledAfterReply.Token,
+                        received: _ => canceledAfterReply.Cancel());
+                }, "A canceled RX observer prevents publication of a VIN.");
+            });
+        }
         foreach (var malformed in new byte[][]
         {
             [0x62, 0xF1, 0x90],
