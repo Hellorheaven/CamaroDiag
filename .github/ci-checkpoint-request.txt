@@ -1,3 +1,30 @@
+C8 FINAL NON-PROTOCOL CONNECTIONS AND CONSENT CHECKPOINT — 2026-11-24
+Implementation HEAD immediately before CI request: 6060cf0940a24b5d57c13d9bf65f44be27f689d1
+One PR #95, branch chore/unified-ci. NO live vehicle/ECU tests.
+Since prior fully green #45311771440 (SHA 0bf30352):
+- C6 BLE: serialize GATT handshakes so delayed old connection teardown cannot
+  close the new BLE session.
+- C6 Windows J2534 Android: verify out-of-band TLS pairing, numeric private
+  LAN host, port, protocol and CAN IDs BEFORE disconnecting the active adapter.
+- C6 J2534 clear DTC: require explicit live operator context callback and
+  recheck physical adapter epoch at the exact network transmit boundary.
+- C1/C6 RAW CAN: remove approval-free public TX API; require existing two
+  independent UI confirmations and recheck account, adapter and vehicle
+  at actual CAN payload transmission, after adapter setup/queue.
+- Android USB: reject invalid selector/baud before tearing down active
+  adapter, with offline regression.
+- Android demo connection: obsolete delayed simulation cannot replace real
+  USB/Wi-Fi/BLE/J2534 session.
+- Concurrent 8-opener test for atomic USB handle publication.
+- Wi-Fi: classify read/write failure atomically with exact socket generation,
+  preserving a newer connection; socket allocation failure no longer drops it.
+- Windows CLI: listing/discovery commands are evaluated before ANY protocol
+  driver dispatch even with mixed arguments; mixed active commands refuse IO.
+Full Debug C8: Android unit/lint/assemble, Windows J2534 self-tests, native
+ECU, all Connectors (Python3.11-3.13, STM32/ESP32, USB/native/Windows).
+Hardware acceptance only on later owner-authorized Release, Lot 8 issue #48.
+No merge, new branch, PR closure, or release.
+
 C8 COHERENT USB AND BRIDGE COMPILE FIX CHECKPOINT — 2026-11-24
 Software HEAD before request: 027ddeafc1ef7e4e4491ae5d72ae11cd7938cbf2
 Scope (strictly NON-PROTOCOL; one PR #95):
