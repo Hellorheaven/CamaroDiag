@@ -135,6 +135,80 @@ def discover(host: str, vin: str | None = None, timeout: float = 3,
     return parse_identity(endpoint(host), _udp(host, request, timeout, trace, port), vin)
 
 
+def gateway_key(gateway: Gateway) -> tuple:
+    return (gateway.host, gateway.vin, gateway.logical_address,
+            gateway.version, gateway.eid, gateway.gid)
+
+
+def discover_unique_vin(vin: str, timeout: float = 3, trace: Trace | None = None,
+                        destination: str = "255.255.255.255", port: int = 13400) -> Gateway:
+    """Directed VIN query on the selected IPv4 network; ambiguity never chooses a target."""
+    _timeout(timeout)
+    if not valid_vin(vin):
+        raise DoIpError("Invalid expected VIN")
+    ip = ipaddress.IPv4Address(destination)
+    if ip.is_multicast or ip.is_unspecified:
+        raise DoIpError("Invalid IPv4 discovery destination")
+    request = encode(255, 3, vin.encode("ascii"))
+    deadline = time.monotonic() + timeout
+    matches = {}
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+        sock.bind(("", 0))
+        sock.settimeout(remaining(deadline))
+        sock.sendto(request, (destination, port))
+        _emit(trace, "TX", "UDP", destination, request)
+        while time.monotonic() < deadline:
+            try:
+                sock.settimeout(remaining(deadline))
+                raw, peer = sock.recvfrom(65536)
+            except TimeoutError:
+                break
+            if peer[1] != port:
+                continue
+            _emit(trace, "RX", "UDP", peer[0], raw)
+            try:
+                observed = parse_identity(peer[0], raw, vin)
+            except ValueError:
+                continue
+            matches[gateway_key(observed)] = observed
+            if len(matches) > 1:
+                raise DoIpError("Multiple gateways announce the selected VIN")
+    if len(matches) != 1:
+        raise DoIpError("No matching DoIP gateway observed")
+    return next(iter(matches.values()))
+
+
+def parse_commands(text: str) -> tuple[bytes, ...]:
+    parts = text.split(";")
+    if not 1 <= len(parts) <= 16:
+        raise DoIpError("Expected 1..16 commands")
+    commands = []
+    for part in parts:
+        compact = "".join(part.split())
+        if not re.fullmatch(r"(?:[0-9A-Fa-f]{2}){1,4091}", compact):
+            raise DoIpError("Invalid hexadecimal command")
+        commands.append(bytes.fromhex(compact))
+    if sum(map(len, commands)) > 4091:
+        raise DoIpError("Command sequence exceeds 4091 bytes")
+    return tuple(commands)
+
+
+def confirm_commands(commands: tuple[bytes, ...], gateway: Gateway, tester: int, ecu: int,
+                     tls: bool, read, display, french: bool = False) -> bool:
+    """Only a separate explicit YES after OK permits the frozen sequence."""
+    display(f"VIN {gateway.vin} | {gateway.host} | tester 0x{tester:04X} | ECU 0x{ecu:04X} | {'TLS' if tls else 'TCP'}")
+    for index, command in enumerate(commands, 1):
+        display(f"{index}: {command.hex().upper()}")
+    display("Risque de modification ou d'effacement ECU. Saisir OK pour continuer."
+            if french else "Risk of ECU modification or erasure. Type OK to continue.")
+    if read().strip().upper() != "OK":
+        return False
+    display("Confirmer l'envoi exact de la séquence ? Saisir OUI." if french
+            else "Confirm sending this exact sequence? Type YES.")
+    return read().strip().upper() == ("OUI" if french else "YES")
+
+
 def status(gateway: Gateway, power: bool = False, timeout: float = 3,
            trace: Trace | None = None, port: int = 13400) -> dict:
     request = encode(gateway.version, 0x4003 if power else 0x4001)
@@ -320,6 +394,21 @@ class Session:
             raise
         finally:
             self._busy = False
+
+    def exchange_sequence(self, commands: tuple[bytes, ...], on_reply=lambda *_: None) -> list[bytes]:
+        frozen = tuple(bytes(command) for command in commands)
+        if not 1 <= len(frozen) <= 16 or any(not 1 <= len(c) <= 4091 for c in frozen) or sum(map(len, frozen)) > 4091:
+            raise DoIpError("Invalid command sequence")
+        replies = []
+        try:
+            for index, command in enumerate(frozen, 1):
+                reply = self.exchange(command)
+                replies.append(reply)
+                on_reply(index, reply)
+            return replies
+        except BaseException:
+            self.close()
+            raise
 
     def verify_vin(self, expected: str) -> str:
         if not valid_vin(expected) or self.gateway.vin != expected:

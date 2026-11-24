@@ -1497,8 +1497,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 throw cancelled
             } catch (_: Exception) {
                 if (current()) appendCanConsoleSystemEvent(localizedContext.getString(R.string.cal_doip_failed), succeeded = false)
-                if (current()) _calibrationWorkspace.update { it.copy(doIpReading = false,
-                    doIpResult = localizedContext.getString(R.string.cal_doip_failed)) }
+                if (current()) _calibrationWorkspace.update {
+                    val error = localizedContext.getString(R.string.cal_doip_failed)
+                    it.copy(doIpReading = false, doIpResult =
+                        if (operation == DoIpDirectRead.Operation.EXCHANGE && it.doIpResult.isNotBlank())
+                            it.doIpResult + "\n" + error else error)
+                }
             }
         }
     }

@@ -3,7 +3,8 @@ import threading
 import unittest
 
 from camarodiagconnectors.doip import (
-    Gateway, Session, DoIpError, NegativeResponse, decode, encode, parse_identity, positive
+    Gateway, Session, DoIpError, NegativeResponse, decode, encode, parse_identity, positive,
+    discover_unique_vin, parse_commands, confirm_commands
 )
 
 VIN = "1G1FA1RXXR0123456"
@@ -37,6 +38,49 @@ class DoIpTests(unittest.TestCase):
             positive(bytes.fromhex("221234"), bytes.fromhex("62123501"))
         with self.assertRaises(DoIpError):
             decode(raw[:-1])
+
+    def test_unique_vin_discovery(self):
+        for conflict in (False, True):
+            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as server:
+                server.bind(("127.0.0.1", 0))
+                server.settimeout(2)
+                errors = []
+                def peer():
+                    try:
+                        raw, source = server.recvfrom(1024)
+                        self.assertEqual(raw, encode(255, 3, VIN.encode()))
+                        body = VIN.encode() + ECU + bytes(13)
+                        server.sendto(encode(2, 4, body), source)
+                        server.sendto(encode(2, 4, body), source)
+                        if conflict:
+                            server.sendto(encode(2, 4, VIN.encode() + ECU + bytes((1,)) + bytes(12)), source)
+                    except BaseException as exc:
+                        errors.append(exc)
+                thread = threading.Thread(target=peer)
+                thread.start()
+                try:
+                    if conflict:
+                        with self.assertRaises(DoIpError):
+                            discover_unique_vin(VIN, 0.4, destination="127.0.0.1", port=server.getsockname()[1])
+                    else:
+                        found = discover_unique_vin(VIN, 0.4, destination="127.0.0.1", port=server.getsockname()[1])
+                        self.assertEqual(found.vin, VIN)
+                finally:
+                    thread.join(3)
+                if errors:
+                    raise errors[0]
+
+    def test_sequence_requires_two_separate_confirmations(self):
+        commands = parse_commands("22 F1 90;19 01 FF")
+        self.assertEqual(commands, (bytes.fromhex("22F190"), bytes.fromhex("1901FF")))
+        for invalid in ("", "22;", "22;;19", "GG", ";".join(["22"] * 17)):
+            with self.assertRaises(DoIpError):
+                parse_commands(invalid)
+        for answers, expected, french in [(("NO",), False, False), (("OK", "NO"), False, False),
+                                           (("OK", "YES"), True, False), (("OK", "OUI"), True, True)]:
+            values = iter(answers)
+            self.assertEqual(confirm_commands(commands, GATEWAY, 0xE80, 0x1234, True,
+                lambda: next(values), lambda _: None, french), expected)
 
     def test_session_trace_pending_ack_alive_and_count(self):
         with socket.socket() as listener:

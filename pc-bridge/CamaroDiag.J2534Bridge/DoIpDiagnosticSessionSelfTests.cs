@@ -394,17 +394,19 @@ internal static class DoIpDiagnosticSessionSelfTests
                 }
             }, async client =>
             {
+                var completed = false;
                 try
                 {
                     var done = await DoIpVinReader.ExchangeSequenceVerifiedAsync(client, observedForVin,
                         new byte[][] { [0x22,0x12,0x34], [0x19,1,0xFF] }, TimeSpan.FromSeconds(2),
                         CancellationToken.None, (index, _) => replies.Add(index));
-                    Check(!failFirst && done == 2, "Sequence completes only on both correlated replies.");
+                    completed = done == 2;
                 }
                 catch (Exception) when (failFirst)
                 {
-                    Check(replies.Count == 0, "Failed sequence publishes no successful reply.");
+                    // A negative reply closes the transport; no subsequent command.
                 }
+                Check(completed != failFirst, "Sequence completes only on both correlated replies.");
             });
             Check(replies.Count == (failFirst ? 0 : 2), "Sequence stopped or completed as expected.");
         }

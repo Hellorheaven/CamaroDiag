@@ -85,3 +85,7 @@ python -m camarodiagconnectors.offline_cli verify-doip --archive capture.zip --p
 ```
 
 Les adresses et le VIN proviennent du profil d'origine, contrôlé avant chaque lecture de zone. Deux passes indépendantes et vérification de l'identité du calculateur sont obligatoires. L'archive est contrôlée avant publication exclusive ; le système de fichiers doit prendre en charge les liens physiques. Aucune réécriture d'un fichier existant, aucun déverrouillage ou effacement automatique. Limite : 8192 blocs par passe, 600 s de lecture. / Two independent scoped reads and identity verification, exclusive archive publication, no automatic ECU write or unlock.
+
+La découverte par VIN fonctionne également sans `--host` sur le réseau IPv4 sélectionné par le système ; plusieurs identités concurrentes sont refusées. TLS accepte `--ca-file`, `--client-cert` et `--client-key` (certificats légitimement fournis, vérification serveur maintenue).
+
+`sequence --commands "22F190;1901FF"` envoie au maximum 16 commandes sur une seule session après deux confirmations distinctes, uniquement depuis un terminal interactif. Les exemples sont des lectures, pas des procédures de programmation ECU. Arrêt sur la première erreur, aucune répétition automatique.
