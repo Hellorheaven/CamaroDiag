@@ -172,3 +172,8 @@ Demande unique de campagne Debug groupée au SHA de CE commit marqueur : Windows
 HEAD des modifications avant marqueur : b8e7621eca9fd6bdb18c31faa2f51bb1c6ad6d1b.
 Deuxieme protocole apres validation logicielle Windows et CI globale ISO-TP CAN classique sur run #45304636194 : audit offline CAN-FD option --isotp-fd-audit-trace, DLC FD canonique (8,12,16,20,24,32,48,64), SF echappee, FF 12/32 bit, CF RX_DL, N_Cr/N_Bs, STmin, BlockSize, adressages et 11/29-bit. Selftests Windows sans DLL VCI et documentation Release ; aucune pretention de validation reelle/flash ECU.
 Demander UNE validation globale Debug du HEAD marqueur : Windows -warnaserror / --self-test, Android, natif et connecteurs. Ne pas fusionner PR95 ni publier Release, aucun essai voiture avant Release du proprietaire.
+
+24/11/2026 — validation logicielle ISO 14229 UDS P2/P2* (#110)
+HEAD du code avant marqueur : 45d73af55ada03b138318c05ad153bc9419bbdee.
+Apres le checkpoint CAN-FD #45305792189 reussi : delais UDS P2 (premiere reponse) et P2* (apres NRC 0x78), avec budget global inchange et refus des reponses tardives d'un pilote; parametrage CLI ISO-TP --uds-p2-ms/--uds-p2-star-ms sur echanges UDS valides ; tests positifs et negatifs offline, doc FR/EN. DoIP et timing OEM physiques non qualifies, pas de modification ECU.
+Verifier UNE suite Debug complete au SHA de ce marqueur Windows 0 warnings / --self-test, Android test/lint/assemble, noyau natif, connecteurs. Pas de merge ni release sans accord. Tests vehicule uniquement Release par proprietaire.
