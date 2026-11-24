@@ -73,7 +73,7 @@ internal static class DoIpVinReader
         return ObdOnUdsServices.DecodeReadDid(did, reply);
     }
 
-    private static Task<DoIpDiagnosticTransport> ConnectObservedAsync(
+    internal static Task<DoIpDiagnosticTransport> ConnectObservedAsync(
         DoIpVehicleDiscovery.Identity gateway, IPAddress address, ushort tester,
         ushort ecu, bool useTls, TimeSpan timeout, CancellationToken token,
         string? clientCertificateThumbprint)
