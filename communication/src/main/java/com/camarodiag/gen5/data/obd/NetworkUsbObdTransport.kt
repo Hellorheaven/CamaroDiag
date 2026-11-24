@@ -235,7 +235,12 @@ class ElmWifiTransport(
         } catch (error: IllegalArgumentException) {
             return@withContext Result.failure(error)
         }
-        val candidate = socketFactory()
+        val candidate = try {
+            socketFactory()
+        } catch (error: Exception) {
+            // Failure to allocate a replacement cannot invalidate the previous socket.
+            return@withContext Result.failure(error)
+        }
         val previous = synchronized(sessionLock) {
             val previous = socket
             socket = candidate
@@ -263,43 +268,54 @@ class ElmWifiTransport(
         }
     }
 
+    private fun classifyIoFailure(active: Socket, error: java.io.IOException): java.io.IOException =
+        synchronized(sessionLock) {
+            if (socket !== active) ObdSupersededSessionException(error)
+            else {
+                connectionLost = true
+                error
+            }
+        }
+
     fun write(data: ByteArray) {
-        if (connectionLost) throw ObdTransportDisconnectedException("Wi-Fi OBD adapter disconnected")
-        val activeSocket = socket ?: throw ObdTransportDisconnectedException("Wi-Fi OBD adapter is not connected")
+        val activeSocket = synchronized(sessionLock) {
+            if (connectionLost) throw ObdTransportDisconnectedException("Wi-Fi OBD adapter disconnected")
+            socket ?: throw ObdTransportDisconnectedException("Wi-Fi OBD adapter is not connected")
+        }
         try {
             activeSocket.getOutputStream().write(data)
-            if (socket !== activeSocket) {
-                throw java.io.IOException("Wi-Fi OBD connection replaced during write")
+            synchronized(sessionLock) {
+                if (socket !== activeSocket)
+                    throw java.io.IOException("Wi-Fi OBD connection replaced during write")
             }
         } catch (error: java.io.IOException) {
-            if (socket !== activeSocket) throw ObdSupersededSessionException(error)
-            connectionLost = true
-            throw error
+            throw classifyIoFailure(activeSocket, error)
         }
     }
 
     fun read(buffer: ByteArray): Int {
-        if (connectionLost) throw ObdTransportDisconnectedException("Wi-Fi OBD adapter disconnected")
-        val activeSocket = socket ?: run {
-            connectionLost = true
-            return -1
-        }
+        val activeSocket = synchronized(sessionLock) {
+            if (connectionLost) throw ObdTransportDisconnectedException("Wi-Fi OBD adapter disconnected")
+            socket
+        } ?: return -1
         return try {
             val count = activeSocket.getInputStream().read(buffer)
-            if (socket !== activeSocket) {
-                throw java.io.IOException("Wi-Fi OBD connection replaced during read")
+            synchronized(sessionLock) {
+                if (socket !== activeSocket) {
+                    throw java.io.IOException("Wi-Fi OBD connection replaced during read")
+                }
+                if (count < 0) connectionLost = true
             }
-            if (count < 0) connectionLost = true
             count
         } catch (timeout: java.net.SocketTimeoutException) {
-            // ELM response gaps are normal on the current socket, but a late
-            // timeout from a replaced connection must not disconnect its successor.
-            if (socket !== activeSocket) throw ObdSupersededSessionException(timeout)
+            // A normal ELM read gap is not a lost connection; a timeout from
+            // an obsolete socket is a superseded-session error instead.
+            synchronized(sessionLock) {
+                if (socket !== activeSocket) throw ObdSupersededSessionException(timeout)
+            }
             throw timeout
         } catch (error: java.io.IOException) {
-            if (socket !== activeSocket) throw ObdSupersededSessionException(error)
-            connectionLost = true
-            throw error
+            throw classifyIoFailure(activeSocket, error)
         }
     }
 
