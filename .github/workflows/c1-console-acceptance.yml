@@ -1,0 +1,53 @@
+name: C1 console software acceptance (isolated checkpoint)
+
+# Explicit C1 validation independent of concurrent ISO/SAE checkpoints.
+# This is NOT C8 final quality, not a Release and not an on-vehicle test.
+on:
+  workflow_dispatch:
+  push:
+    branches: [chore/unified-ci]
+    paths:
+      - '.github/workflows/c1-console-acceptance.yml'
+      - '.github/c1-console-checkpoint.txt'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: c1-console-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  c1-android:
+    name: Android C1 unit tests, lint and Debug APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: '8.11.1'
+      - uses: android-actions/setup-android@v4
+        with:
+          cmdline-tools-version: 14742923
+          packages: 'platform-tools platforms;android-36 build-tools;36.0.0'
+      - name: Generate project wrapper
+        run: gradle wrapper --gradle-version 8.11.1
+      - name: Verify C1 code and all Android Debug unit tests without warnings
+        run: ./gradlew testDebugUnitTest lintDebug app:assembleDebug --stacktrace --warning-mode=fail
+      - name: Publish offline C1 test reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: c1-console-test-results-${{ github.sha }}
+          path: |
+            **/build/reports/tests/testDebugUnitTest/**
+            **/build/test-results/testDebugUnitTest/**
+          if-no-files-found: ignore
+          retention-days: 14
