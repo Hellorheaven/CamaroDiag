@@ -172,6 +172,35 @@ internal static class IsoTpDeadlineSelfTests
             configured.Settings.ConsecutiveFrameTimeoutMs == 225,
             "CAN transport CLI sets independent N_Bs/N_Cr timers.");
 
+
+        var udsTimed = StandardProtocolCli.ParseIsoTp([
+            StandardProtocolCli.RawIsoTpCommand, "--adapter-index", "0",
+            "--tx-id", "7E0", "--rx-id", "7E8", "--baud", "500000",
+            "--fd", "false", "--uds-validate", "true",
+            "--uds-p2-ms", "20", "--uds-p2-star-ms", "150",
+            "--payload", "22F190"
+        ]);
+        Check(udsTimed.ValidateUds && udsTimed.UdsP2Ms == 20 &&
+            udsTimed.UdsP2StarMs == 150,
+            "UDS P2/P2* CLI is forwarded to validated CAN exchange.");
+        Check(configured.UdsP2Ms == 30000 &&
+            configured.UdsP2StarMs == 30000,
+            "Default P2/P2* leaves historical host timeout compatibility.");
+        Reject<ArgumentOutOfRangeException>(() =>
+            StandardProtocolCli.ParseIsoTp([
+                StandardProtocolCli.RawIsoTpCommand, "--adapter-index", "0",
+                "--tx-id", "7E0", "--rx-id", "7E8", "--baud", "500000",
+                "--fd", "false", "--uds-validate", "true",
+                "--uds-p2-ms", "0", "--payload", "22F190"
+            ]), "Zero P2 timeout is not accepted.");
+        Reject<ArgumentException>(() =>
+            StandardProtocolCli.ParseIsoTp([
+                StandardProtocolCli.RawIsoTpCommand, "--adapter-index", "0",
+                "--tx-id", "7E0", "--rx-id", "7E8", "--baud", "500000",
+                "--fd", "false", "--uds-p2-star-ms", "150",
+                "--payload", "22F190"
+            ]), "P2* options may not silently apply to unvalidated raw exchange.");
+
         return checkedCount;
     }
 }
