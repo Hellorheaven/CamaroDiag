@@ -229,6 +229,41 @@ internal static class DoIpDiagnosticSessionSelfTests
             }, protocolVersion: selectedVersion);
         }
 
+        // IPv6 unicast diagnostic TCP must work just like IPv4; the
+        // gateway here is IPv6 loopback, never an automotive network.
+        if (Socket.OSSupportsIPv6)
+        {
+            var ipv6Listener = new TcpListener(IPAddress.IPv6Loopback, 0);
+            ipv6Listener.Start();
+            var ipv6Port = ((IPEndPoint)ipv6Listener.LocalEndpoint).Port;
+            var ipv6Server = Task.Run(async () =>
+            {
+                using var peer = await ipv6Listener.AcceptTcpClientAsync();
+                await using var wire = peer.GetStream();
+                await GatewayAsync(wire, async stream =>
+                {
+                    var message = await RequireRequestAsync(stream);
+                    Check(message.Version == 0x02,
+                        "IPv6 TCP gateway receives DoIP v02 diagnostic request.");
+                    await SendAsync(stream, DoIpCodec.DiagnosticMessage,
+                        FromEcu(Positive));
+                });
+            });
+            try
+            {
+                await using var ipv6Session =
+                    await DoIpDiagnosticTransport.ConnectAsync(
+                        "::1", Tester, Ecu, TimeSpan.FromSeconds(2),
+                        CancellationToken.None, portOverride: ipv6Port);
+                var answer = await ipv6Session.ExchangeUdsAsync(
+                    Request, TimeSpan.FromSeconds(2), CancellationToken.None);
+                Check(answer.SequenceEqual(Positive),
+                    "IPv6 TCP DoIP routing and UDS exchange completes on loopback.");
+                await ipv6Server.WaitAsync(TimeSpan.FromSeconds(3));
+            }
+            finally { ipv6Listener.Stop(); }
+        }
+
         // The caller owns the original byte[] and might reuse it as soon
         // as an async exchange is initiated. All transmission, ACK matching
         // and UDS SID validation must use the same immutable snapshot.
