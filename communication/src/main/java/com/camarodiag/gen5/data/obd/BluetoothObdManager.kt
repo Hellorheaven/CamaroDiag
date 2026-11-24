@@ -292,6 +292,11 @@ class BluetoothObdManager(context: Context) {
         }
 
     suspend fun connectUsb(deviceId: Int, baudRate: Int = 38400): Result<AdapterCapabilities> = withContext(Dispatchers.IO) {
+        try {
+            UsbAdapterConnectParameters.requireValid(deviceId, baudRate)
+        } catch (invalid: IllegalArgumentException) {
+            return@withContext Result.failure(invalid)
+        }
         val epoch = beginAdapterConnection()
         try {
             // Re-check the currently enumerated USB device at the manager boundary.
