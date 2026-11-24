@@ -1281,7 +1281,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 doIpTrace = emptyList(), doIpBackupBytes = 0) }
             try {
                 require(current() && _calibrationWorkspace.value.doIpBackupScope == scope)
-                val target = DoIpDirectRead.Target.parse(host, tester, ecu, _vehicle.value.vin, tls)
+                val target = DoIpDirectRead.resolveTarget(host, tester, ecu, _vehicle.value.vin, tls,
+                    expectedGateway = scope.gateway, onControlTrace = { trace -> journalDoIpControlTrace(trace, current) })
+                check(current())
                 require(scope.vin == target.expectedVin && scope.tester == target.tester && scope.ecu == target.ecu)
                 val result = DoIpDirectRead.read(target, DoIpDirectRead.Operation.BACKUP,
                     backupScope = scope, onBackupProgress = { pass, offset ->
@@ -1407,7 +1409,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _calibrationWorkspace.update { it.copy(doIpReading = true, doIpResult = "", doIpTrace = emptyList(), doIpBackupBytes = 0,
                 doIpMonitorReport = null, doIpLiveSamples = emptyList()) }
             try {
-                val target = DoIpDirectRead.Target.parse(host, tester, ecu, _vehicle.value.vin, tls)
+                val target = DoIpDirectRead.resolveTarget(host, tester, ecu, _vehicle.value.vin, tls,
+                    onControlTrace = { trace -> journalDoIpControlTrace(trace, current) })
+                check(current())
                 val did = if (operation in setOf(DoIpDirectRead.Operation.DID, DoIpDirectRead.Operation.MONITOR)) {
                     require(didHex.matches(Regex("[0-9A-Fa-f]{4}")))
                     didHex.toInt(16)
