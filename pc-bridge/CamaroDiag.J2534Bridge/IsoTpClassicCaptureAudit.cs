@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Buffers.Binary;
 
 namespace CamaroDiag.J2534Bridge;
 
@@ -13,14 +14,20 @@ internal static class IsoTpClassicCaptureAudit
     internal sealed record Result(Status Status, string Reason, int Cf, int Cts);
 
     internal static Result Analyze(IReadOnlyList<Frame> frames, uint tx, uint rx,
-        bool can29, bool senderTx, int nBsMs = 1000)
+        bool can29, bool senderTx, int nBsMs = 1000, int nCrMs = 1000,
+        int maxWaitFrames = 4, byte? txAddress = null, byte? rxAddress = null)
     {
         var idMax = can29 ? 0x1FFFFFFFu : 0x7FFu;
         if (frames is null || frames.Count > 50000 || tx > idMax ||
-            rx > idMax || tx == rx || nBsMs is < 1 or > 30000)
+            rx > idMax || tx == rx || nBsMs is < 1 or > 30000 ||
+            nCrMs is < 1 or > 30000 || maxWaitFrames is < 0 or > 255 ||
+            txAddress.HasValue != rxAddress.HasValue)
             throw new ArgumentException("Invalid CAN ID, timeout or capture count.");
         var sender = senderTx ? tx : rx;
         var receiver = senderTx ? rx : tx;
+        var senderAddress = senderTx ? txAddress : rxAddress;
+        var receiverAddress = senderTx ? rxAddress : txAddress;
+        var addressWidth = txAddress.HasValue ? 1 : 0;
         var started = false;
         var waitingForFc = false;
         var overflow = false;
@@ -30,9 +37,10 @@ internal static class IsoTpClassicCaptureAudit
         var nextSn = 1;
         var blockSize = 0;
         var inBlock = 0;
+        var waitFrames = 0;
         var cfCount = 0;
         var ctsCount = 0;
-        long lastTime = -1, fcWaitSince = 0, stMinUs = 0;
+        long lastTime = -1, fcWaitSince = 0, cfWaitSince = 0, stMinUs = 0;
         long? lastCf = null;
         Result Fail(string reason) => new(Status.Fail, reason, cfCount, ctsCount);
         Result Unknown(string reason) => new(Status.Inconclusive, reason, cfCount, ctsCount);
@@ -47,22 +55,49 @@ internal static class IsoTpClassicCaptureAudit
             var own = frame.TesterTx == senderTx && frame.Id == sender;
             var peer = frame.TesterTx != senderTx && frame.Id == receiver;
             if (!own && !peer) continue;
-            var kind = frame.Data[0] & 0xF0;
+            var expectedAddress = own ? senderAddress : receiverAddress;
+            // A different one-byte ISO-TP address on the same CAN ID belongs
+            // to a separate logical participant; it must not alter our PDU.
+            if (expectedAddress.HasValue && frame.Data[0] != expectedAddress.Value)
+                continue;
+            if (frame.Data.Length <= addressWidth)
+                return Fail("ISO-TP PCI is missing.");
+            var kind = frame.Data[addressWidth] & 0xF0;
             if (!started)
             {
                 if (!own) continue;
                 if (kind == 0)
                 {
-                    var n = frame.Data[0] & 15;
-                    return n is >= 1 and <= 7 && n <= frame.Data.Length - 1
+                    var n = frame.Data[addressWidth] & 15;
+                    return n >= 1 && n <= 7 - addressWidth &&
+                        n <= frame.Data.Length - 1 - addressWidth
                         ? new(Status.Pass, "SingleFrame syntax only; no STmin evidence.", 0, 0)
                         : Fail("Invalid single-frame size.");
                 }
                 if (kind != 0x10 || frame.Data.Length != 8)
                     return Fail("Expected SF or 8-byte FirstFrame.");
-                total = ((frame.Data[0] & 15) << 8) | frame.Data[1];
-                if (total is < 8 or > 4095) return Fail("Invalid FF length.");
-                copied = 6;
+                var length12 = ((frame.Data[addressWidth] & 15) << 8) |
+                    frame.Data[addressWidth + 1];
+                if (length12 == 0)
+                {
+                    // ISO 15765-2 extended FF_DL is a 32-bit big-endian
+                    // length. On classic CAN its FF still carries payload.
+                    if (frame.Data.Length < addressWidth + 7)
+                        return Fail("Extended FF has no data bytes.");
+                    var length32 = BinaryPrimitives.ReadUInt32BigEndian(
+                        frame.Data.AsSpan(addressWidth + 2, 4));
+                    if (length32 <= 4095 || length32 > IsoTpCanFdSession.MaximumPayloadBytes)
+                        return Fail("Invalid extended 32-bit FF length.");
+                    total = (int)length32;
+                    copied = 2 - addressWidth;
+                }
+                else
+                {
+                    total = length12;
+                    if (total <= 7 - addressWidth)
+                        return Fail("FF length fits within a SingleFrame.");
+                    copied = 6 - addressWidth;
+                }
                 waitingForFc = started = true;
                 fcWaitSince = frame.TimeUs;
                 continue;
@@ -70,13 +105,15 @@ internal static class IsoTpClassicCaptureAudit
             if (peer)
             {
                 if (kind != 0x30) continue;
-                if (!waitingForFc || frame.Data.Length < 3)
+                if (!waitingForFc || frame.Data.Length < addressWidth + 3)
                     return Fail("Unexpected or malformed FlowControl.");
                 if (frame.TimeUs - fcWaitSince > nBsMs * 1000L)
                     return Fail("FlowControl exceeded N_Bs.");
-                var status = frame.Data[0] & 15;
+                var status = frame.Data[addressWidth] & 15;
                 if (status == 1)
                 {
+                    if (++waitFrames > maxWaitFrames)
+                        return Fail("FC/WAIT exceeded configured WFTmax.");
                     fcWaitSince = frame.TimeUs;
                     continue;
                 }
@@ -87,31 +124,36 @@ internal static class IsoTpClassicCaptureAudit
                     continue;
                 }
                 if (status != 0) return Fail("Invalid FC status.");
-                reservedStMin |= IsoTpCanFdSession.IsReservedStMin(frame.Data[2]);
-                var value = frame.Data[2];
+                reservedStMin |= IsoTpCanFdSession.IsReservedStMin(frame.Data[addressWidth + 2]);
+                var value = frame.Data[addressWidth + 2];
                 stMinUs = reservedStMin ? 127000L :
                     value <= 0x7F ? value * 1000L :
                     value is >= 0xF1 and <= 0xF9 ? (value - 0xF0) * 100L :
                     127000L;
-                blockSize = frame.Data[1];
+                blockSize = frame.Data[addressWidth + 1];
                 inBlock = 0;
+                waitFrames = 0;
                 waitingForFc = false;
+                cfWaitSince = frame.TimeUs;
                 ctsCount++;
                 continue;
             }
             if (overflow) return Fail("Sender continued after FC/OVFLW.");
             if (waitingForFc) return Fail("CF was emitted before FC/CTS.");
-            if (kind != 0x20 || frame.Data.Length < 2 ||
-                (frame.Data[0] & 15) != nextSn)
+            if (kind != 0x20 || frame.Data.Length < addressWidth + 2 ||
+                (frame.Data[addressWidth] & 15) != nextSn)
                 return Fail("Bad CF type/sequence.");
+            if (frame.TimeUs - cfWaitSince > nCrMs * 1000L)
+                return Fail("CF exceeded the N_Cr deadline.");
             if (lastCf.HasValue && frame.TimeUs - lastCf.Value < stMinUs)
                 return Fail("CF-to-CF bus timing violates STmin.");
             var remaining = total - copied;
-            var take = Math.Min(remaining, frame.Data.Length - 1);
+            var take = Math.Min(remaining, frame.Data.Length - 1 - addressWidth);
             if (take == 0 || (take < remaining && frame.Data.Length != 8))
                 return Fail("Short non-final CF.");
             copied += take;
             lastCf = frame.TimeUs;
+            cfWaitSince = frame.TimeUs;
             cfCount++;
             inBlock++;
             nextSn = (nextSn + 1) & 15;
@@ -123,6 +165,7 @@ internal static class IsoTpClassicCaptureAudit
             {
                 waitingForFc = true;
                 fcWaitSince = frame.TimeUs;
+                waitFrames = 0;
             }
         }
         return Unknown(overflow ? "Peer aborted with FC/OVFLW." :
@@ -186,11 +229,12 @@ internal static class IsoTpClassicCaptureAudit
         {
             if (args.Length < 9 || args.Length % 2 != 1 ||
                 !args[0].Equals(Command, StringComparison.OrdinalIgnoreCase))
-                throw new ArgumentException("Usage: --isotp-audit-trace --capture-file <bus.csv> --tx-id <hex> --rx-id <hex> --sender tx|rx [--extended true|false] [--n-bs-ms 1000]");
+                throw new ArgumentException("Usage: --isotp-audit-trace --capture-file <bus.csv> --tx-id <hex> --rx-id <hex> --sender tx|rx [--extended true|false] [--tx-address <hex> --rx-address <hex>] [--n-bs-ms 1000] [--n-cr-ms 1000] [--max-wait-frames 4]");
             var options = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             for (var i = 1; i < args.Length; i += 2)
                 if (!new[] {"--capture-file", "--tx-id", "--rx-id",
-                    "--sender", "--extended", "--n-bs-ms" }
+                    "--sender", "--extended", "--n-bs-ms", "--n-cr-ms",
+                    "--max-wait-frames", "--tx-address", "--rx-address" }
                     .Contains(args[i], StringComparer.OrdinalIgnoreCase) ||
                     !options.TryAdd(args[i], args[i + 1]))
                     throw new ArgumentException("Unknown or duplicate option.");
@@ -214,8 +258,17 @@ internal static class IsoTpClassicCaptureAudit
             };
             var nBs = options.TryGetValue("--n-bs-ms", out var value)
                 ? int.Parse(value, CultureInfo.InvariantCulture) : 1000;
+            var nCr = options.TryGetValue("--n-cr-ms", out var nCrText)
+                ? int.Parse(nCrText, CultureInfo.InvariantCulture) : 1000;
+            var maxWait = options.TryGetValue("--max-wait-frames", out var waitText)
+                ? int.Parse(waitText, CultureInfo.InvariantCulture) : 4;
+            byte? txAddress = options.ContainsKey("--tx-address")
+                ? checked((byte)Id("--tx-address")) : null;
+            byte? rxAddress = options.ContainsKey("--rx-address")
+                ? checked((byte)Id("--rx-address")) : null;
             var result = Analyze(ReadCapture(Req("--capture-file"), can29),
-                Id("--tx-id"), Id("--rx-id"), can29, senderTx, nBs);
+                Id("--tx-id"), Id("--rx-id"), can29, senderTx, nBs, nCr,
+                maxWait, txAddress, rxAddress);
             Console.WriteLine($"ISO-TP classic: {result.Status}, CF={result.Cf}, CTS={result.Cts}");
             Console.WriteLine(result.Reason);
             Console.WriteLine("Input is user supplied; no attestation of bus source, ECU or programming capability.");

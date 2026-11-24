@@ -85,6 +85,76 @@ internal static class IsoTpClassicCaptureAuditSelfTests
             Check(rejected, "Reject Windows host TX_QUEUED CSV");
         }
         finally { if(File.Exists(temp)) File.Delete(temp); }
+
+        // Classical CAN can carry the extended 32-bit FF length as well.
+        // 4096 bytes require sequence wrap, without any large allocation.
+        var large = new List<IsoTpClassicCaptureAudit.Frame> {
+            F(1000, true, 0x7E0, 0x10, 0x00, 0x00, 0x00, 0x10, 0x00, 1, 2),
+            F(2000, false, 0x7E8, 0x30, 0, 0, 0, 0, 0, 0, 0)
+        };
+        var left = 4094;
+        for (var i = 0; left > 0; i++)
+        {
+            var take = Math.Min(left, 7);
+            var bytes = new byte[take + 1];
+            bytes[0] = (byte)(0x20 | ((i + 1) & 0x0F));
+            large.Add(F(3000 + i * 1000L, true, 0x7E0, bytes));
+            left -= take;
+        }
+        Check(Audit(large).Status == pass, "32-bit 4096-byte FF and CF SN wrap");
+        var fakeExtended = large.Take(2).ToArray();
+        fakeExtended[0] = fakeExtended[0] with {
+            Data = new byte[] {0x10, 0, 0, 0, 0, 100, 1, 2} };
+        Check(Audit(fakeExtended).Status == fail,
+            "32-bit FF length must not encode values <=4095");
+
+        // Normal, extended and mixed ISO-TP addressing share the same
+        // classic CAN physical frame format; the prefix is not a PCI byte.
+        var addressed = new[] {
+            F(1000, true, 0x7E0, 0xF1, 0x10, 0x11, 1, 2, 3, 4, 5),
+            F(2000, false, 0x7E8, 0x10, 0x30, 0, 5, 0, 0, 0, 0),
+            F(3000, true, 0x7E0, 0xF1, 0x21, 6, 7, 8, 9, 10, 11),
+            F(8500, true, 0x7E0, 0xF1, 0x22, 12, 13, 14, 15, 16, 17)
+        };
+        Check(IsoTpClassicCaptureAudit.Analyze(addressed,
+            0x7E0, 0x7E8, false, true, txAddress: 0xF1,
+            rxAddress: 0x10).Status == pass, "Extended addressing both ways");
+        var mismatchedFc = addressed.ToArray();
+        mismatchedFc[1] = mismatchedFc[1] with {
+            Data = new byte[] {0x11, 0x30, 0, 5, 0, 0, 0, 0} };
+        Check(IsoTpClassicCaptureAudit.Analyze(mismatchedFc,
+            0x7E0, 0x7E8, false, true, txAddress: 0xF1,
+            rxAddress: 0x10).Status == fail,
+            "FC sent to another ISO-TP logical address cannot release CF");
+        var mixed = addressed.ToArray();
+        mixed[1] = mixed[1] with {
+            Data = new byte[] {0xF1, 0x30, 0, 5, 0, 0, 0, 0} };
+        Check(IsoTpClassicCaptureAudit.Analyze(mixed,
+            0x7E0, 0x7E8, false, true, txAddress: 0xF1,
+            rxAddress: 0xF1).Status == pass, "Shared mixed addressing extension");
+        var missingAddress = false;
+        try {
+            IsoTpClassicCaptureAudit.Analyze(addressed, 0x7E0, 0x7E8,
+                false, true, txAddress: 0xF1);
+        } catch (ArgumentException) { missingAddress = true; }
+        Check(missingAddress, "Address pair required, no silent mixed profile");
+
+        var delayedCf = valid.ToArray();
+        delayedCf[2] = delayedCf[2] with { TimeUs = 1500000 };
+        delayedCf[3] = delayedCf[3] with { TimeUs = 1505500 };
+        Check(Audit(delayedCf).Status == fail,
+            "N_Cr counts from CTS even for first CF");
+        Check(IsoTpClassicCaptureAudit.Analyze(wait,
+            0x7E0, 0x7E8, false, true, maxWaitFrames: 0).Status == fail,
+            "WFTmax zero must reject the first FC/WAIT");
+        var tooManyWaits = new List<IsoTpClassicCaptureAudit.Frame> {valid[0]};
+        for (int i = 0; i < 5; i++)
+            tooManyWaits.Add(F(1100 + 100L * i, false, 0x7E8,
+                0x31, 0, 0, 0, 0, 0, 0, 0));
+        tooManyWaits.Add(valid[1]);
+        Check(Audit(tooManyWaits).Status == fail,
+            "WFTmax four rejects fifth FC/WAIT before CTS");
+
         return checks;
     }
 }
