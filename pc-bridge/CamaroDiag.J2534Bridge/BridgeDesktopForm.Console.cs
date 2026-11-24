@@ -185,47 +185,6 @@ internal sealed partial class BridgeDesktopForm
             return;
         }
         if (!powerMode.HasValue) doIpObservedGateway = null;
-        DoIpBackupScope? backupScope = null;
-        string? backupPath = null;
-        if (operation == DoIpReadOperation.Backup)
-        {
-            using var profile = new OpenFileDialog
-            {
-                Title = DoIpConsolePresentation.Text("BackupProfile"), Filter = "JSON (*.json)|*.json"
-            };
-            if (profile.ShowDialog(this) != DialogResult.OK) return;
-            try
-            {
-                backupScope = DoIpBackupScope.Load(profile.FileName);
-                if (backupScope.Gateway != observed.LogicalAddress || backupScope.Tester != tester ||
-                    backupScope.Ecu != ecu || (observed.Vin is not null && observed.Vin != backupScope.Vin))
-                    throw new InvalidDataException(DoIpConsolePresentation.Text("BackupMismatch"));
-            }
-            catch (Exception error) when (error is ArgumentException or IOException or JsonException or
-                UnauthorizedAccessException or FormatException or OverflowException or InvalidOperationException)
-            {
-                ShowError(error.Message);
-                return;
-            }
-            using var destination = new SaveFileDialog
-            {
-                Title = DoIpConsolePresentation.Text("Backup"),
-                Filter = "ZIP (*.zip)|*.zip", DefaultExt = "zip",
-                AddExtension = true, FileName = "CamaroDiag_DoIP_" + backupScope.Vin + ".zip"
-            };
-            if (destination.ShowDialog(this) != DialogResult.OK) return;
-            if (File.Exists(destination.FileName))
-            {
-                ShowError(DoIpConsolePresentation.Text("BackupExists"));
-                return;
-            }
-            backupPath = destination.FileName;
-            if (MessageBox.Show(this, string.Format(DoIpConsolePresentation.Text("BackupConfirm"),
-                backupScope.Vin, backupScope.Ecu, backupScope.Start, backupScope.Length),
-                DoIpConsolePresentation.Text("Backup"), MessageBoxButtons.YesNo,
-                MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2) != DialogResult.Yes) return;
-            if (!ReferenceEquals(observed, doIpObservedGateway)) return;
-        }
         var timeout = TimeSpan.FromMilliseconds((int)consoleTimeout.Value);
         using var stop = new CancellationTokenSource();
         doIpConsoleDiscoveryCancellation = stop;
@@ -354,6 +313,47 @@ internal sealed partial class BridgeDesktopForm
         {
             ShowError(DoIpConsolePresentation.Text("InvalidCertificate"));
             return;
+        }
+        DoIpBackupScope? backupScope = null;
+        string? backupPath = null;
+        if (operation == DoIpReadOperation.Backup)
+        {
+            using var profile = new OpenFileDialog
+            {
+                Title = DoIpConsolePresentation.Text("BackupProfile"), Filter = "JSON (*.json)|*.json"
+            };
+            if (profile.ShowDialog(this) != DialogResult.OK) return;
+            try
+            {
+                backupScope = DoIpBackupScope.Load(profile.FileName);
+                if (backupScope.Gateway != observed.LogicalAddress || backupScope.Tester != tester ||
+                    backupScope.Ecu != ecu || (observed.Vin is not null && observed.Vin != backupScope.Vin))
+                    throw new InvalidDataException(DoIpConsolePresentation.Text("BackupMismatch"));
+            }
+            catch (Exception error) when (error is ArgumentException or IOException or JsonException or
+                UnauthorizedAccessException or FormatException or OverflowException or InvalidOperationException)
+            {
+                ShowError(error.Message);
+                return;
+            }
+            using var destination = new SaveFileDialog
+            {
+                Title = DoIpConsolePresentation.Text("Backup"),
+                Filter = "ZIP (*.zip)|*.zip", DefaultExt = "zip",
+                AddExtension = true, FileName = "CamaroDiag_DoIP_" + backupScope.Vin + ".zip"
+            };
+            if (destination.ShowDialog(this) != DialogResult.OK) return;
+            if (File.Exists(destination.FileName))
+            {
+                ShowError(DoIpConsolePresentation.Text("BackupExists"));
+                return;
+            }
+            backupPath = destination.FileName;
+            if (MessageBox.Show(this, string.Format(DoIpConsolePresentation.Text("BackupConfirm"),
+                backupScope.Vin, backupScope.Ecu, backupScope.Start, backupScope.Length),
+                DoIpConsolePresentation.Text("Backup"), MessageBoxButtons.YesNo,
+                MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2) != DialogResult.Yes) return;
+            if (!ReferenceEquals(observed, doIpObservedGateway)) return;
         }
         var timeout = TimeSpan.FromMilliseconds((int)consoleTimeout.Value);
         using var stop = new CancellationTokenSource();
