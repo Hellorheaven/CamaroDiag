@@ -15,6 +15,12 @@ internal sealed partial class BridgeDesktopForm
     private readonly Button doIpConsoleStatus = Button(DoIpConsolePresentation.Text("Status"));
     private readonly Button doIpConsolePower = Button(DoIpConsolePresentation.Text("Power"));
     private DoIpVehicleDiscovery.Identity? doIpObservedGateway;
+    private readonly TextBox doIpTesterAddress = new() { Dock = DockStyle.Fill };
+    private readonly TextBox doIpEcuAddress = new() { Dock = DockStyle.Fill };
+    private readonly CheckBox doIpUseTls = new()
+        { Text = DoIpConsolePresentation.Text("UseTls"), Checked = true, AutoSize = true };
+    private readonly TextBox doIpClientCertificate = new() { Dock = DockStyle.Fill };
+    private readonly Button doIpReadVin = Button(DoIpConsolePresentation.Text("ReadVin"));
     private readonly TextBox consoleRequestId = new()
         { Text = "7E0", Dock = DockStyle.Fill };
     private readonly TextBox consoleResponseId = new()
@@ -81,16 +87,22 @@ internal sealed partial class BridgeDesktopForm
         doIpOperations.Controls.Add(doIpConsoleStatus);
         doIpOperations.Controls.Add(doIpConsolePower);
         doIpOperations.Controls.Add(doIpConsoleCancel);
-        doIpConsoleStatus.Enabled = doIpConsolePower.Enabled = false;
+        doIpConsoleStatus.Enabled = doIpConsolePower.Enabled = doIpReadVin.Enabled = false;
         doIpConsoleStatus.Click += async (_, _) => await RunDoIpConsoleOperationAsync(false);
         doIpConsolePower.Click += async (_, _) => await RunDoIpConsoleOperationAsync(true);
         doIpConsoleHost.TextChanged += (_, _) =>
         {
             doIpObservedGateway = null;
-            doIpConsoleStatus.Enabled = doIpConsolePower.Enabled = false;
+            doIpConsoleStatus.Enabled = doIpConsolePower.Enabled = doIpReadVin.Enabled = false;
             doIpConsoleDiscoveryCancellation?.Cancel();
         };
         WideRow(fields, doIpOperations, 48);
+        Row(fields, DoIpConsolePresentation.Text("TesterAddress"), doIpTesterAddress);
+        Row(fields, DoIpConsolePresentation.Text("EcuAddress"), doIpEcuAddress, doIpReadVin);
+        WideRow(fields, doIpUseTls, 38);
+        Row(fields, DoIpConsolePresentation.Text("CertThumbprint"), doIpClientCertificate);
+        doIpReadVin.Enabled = false;
+        doIpReadVin.Click += async (_, _) => await ReadDoIpVinFromConsoleAsync();
         WideRow(fields, new Label
         {
             Text = "Console J2534 locale : TX et RX séparés ; commandes ECU transmises selon " +
@@ -138,7 +150,7 @@ internal sealed partial class BridgeDesktopForm
         var timeout = TimeSpan.FromMilliseconds((int)consoleTimeout.Value);
         using var stop = new CancellationTokenSource();
         doIpConsoleDiscoveryCancellation = stop;
-        doIpConsoleDiscover.Enabled = doIpConsoleStatus.Enabled = doIpConsolePower.Enabled = false;
+        doIpConsoleDiscover.Enabled = doIpConsoleStatus.Enabled = doIpConsolePower.Enabled = doIpReadVin.Enabled = false;
         doIpConsoleHost.Enabled = false;
         doIpConsoleCancel.Enabled = true;
         try
@@ -199,7 +211,108 @@ internal sealed partial class BridgeDesktopForm
             {
                 doIpConsoleHost.Enabled = true;
                 doIpConsoleDiscover.Enabled = true;
-                doIpConsoleStatus.Enabled = doIpConsolePower.Enabled = doIpObservedGateway is not null;
+                doIpConsoleStatus.Enabled = doIpConsolePower.Enabled = doIpReadVin.Enabled = doIpObservedGateway is not null;
+                doIpConsoleCancel.Enabled = false;
+            }
+        }
+    }
+
+    private async Task ReadDoIpVinFromConsoleAsync()
+    {
+        if (busy || doIpConsoleDiscoveryCancellation is not null) return;
+        if (consoleDevice is not null || bridgeTask is { IsCompleted: false })
+        {
+            ShowError(DoIpConsolePresentation.Text("Busy"));
+            return;
+        }
+        var observed = doIpObservedGateway;
+        if (observed is null ||
+            !System.Net.IPAddress.TryParse(doIpConsoleHost.Text.Trim(), out var address) ||
+            !observed.Source.Equals(address))
+        {
+            ShowError(DoIpConsolePresentation.Text("IdentifyFirst"));
+            return;
+        }
+        ushort tester;
+        ushort ecu;
+        try
+        {
+            tester = DoIpVinReader.ParseLogicalAddress(doIpTesterAddress.Text.Trim());
+            ecu = DoIpVinReader.ParseLogicalAddress(doIpEcuAddress.Text.Trim());
+            if (tester == ecu) throw new ArgumentException();
+        }
+        catch (ArgumentException)
+        {
+            ShowError(DoIpConsolePresentation.Text("InvalidLogical"));
+            return;
+        }
+        var useTls = doIpUseTls.Checked;
+        var thumbprint = string.Concat(doIpClientCertificate.Text.Where(c => !char.IsWhiteSpace(c)));
+        if (thumbprint.Length != 0 &&
+            (!useTls || thumbprint.Length != 40 || !thumbprint.All(Uri.IsHexDigit)))
+        {
+            ShowError(DoIpConsolePresentation.Text("InvalidCertificate"));
+            return;
+        }
+        var timeout = TimeSpan.FromMilliseconds((int)consoleTimeout.Value);
+        using var stop = new CancellationTokenSource();
+        doIpConsoleDiscoveryCancellation = stop;
+        doIpConsoleDiscover.Enabled = doIpConsoleStatus.Enabled =
+            doIpConsolePower.Enabled = doIpReadVin.Enabled = false;
+        doIpConsoleHost.Enabled = doIpTesterAddress.Enabled =
+            doIpEcuAddress.Enabled = doIpUseTls.Enabled = doIpClientCertificate.Enabled = false;
+        doIpConsoleCancel.Enabled = true;
+        try
+        {
+            await RunBusyAsync(async () =>
+            {
+                try
+                {
+                    ConsoleLine("SYSTEM", string.Format(
+                        DoIpConsolePresentation.Text("VinStarted"), useTls ? "TLS" : "TCP",
+                        address, ecu, tester, observed.ProtocolVersion), Color.DarkSlateGray);
+                    var vin = await DoIpVinReader.ReadObservedGatewayAsync(
+                        observed, address, tester, ecu, useTls, timeout, stop.Token,
+                        requested: data =>
+                        {
+                            if (!IsDisposed && !Disposing)
+                                ConsoleLine("TX", Convert.ToHexString(data), Color.DarkOrange);
+                        },
+                        received: data =>
+                        {
+                            if (!IsDisposed && !Disposing)
+                                ConsoleLine("RX", Convert.ToHexString(data), Color.DarkGreen);
+                        },
+                        clientCertificateThumbprint: thumbprint.Length == 0 ? null : thumbprint);
+                    stop.Token.ThrowIfCancellationRequested();
+                    if (IsDisposed || Disposing) return;
+                    ConsoleLine("SYSTEM", string.Format(
+                        DoIpConsolePresentation.Text("VinResult"), vin), Color.DarkGreen);
+                    ConsoleLine("SYSTEM", DoIpConsolePresentation.Text("VinNotice"), Color.DarkSlateGray);
+                }
+                catch (OperationCanceledException) when (stop.IsCancellationRequested)
+                {
+                    doIpObservedGateway = null;
+                    if (!IsDisposed && !Disposing)
+                        ConsoleLine("SYSTEM", DoIpConsolePresentation.Text("Canceled"), Color.DarkSlateGray);
+                }
+                catch
+                {
+                    doIpObservedGateway = null;
+                    throw;
+                }
+            });
+        }
+        finally
+        {
+            doIpConsoleDiscoveryCancellation = null;
+            if (!IsDisposed && !Disposing)
+            {
+                doIpConsoleHost.Enabled = doIpTesterAddress.Enabled =
+                    doIpEcuAddress.Enabled = doIpUseTls.Enabled = doIpClientCertificate.Enabled = true;
+                doIpConsoleDiscover.Enabled = true;
+                doIpConsoleStatus.Enabled = doIpConsolePower.Enabled =
+                    doIpReadVin.Enabled = doIpObservedGateway is not null;
                 doIpConsoleCancel.Enabled = false;
             }
         }
