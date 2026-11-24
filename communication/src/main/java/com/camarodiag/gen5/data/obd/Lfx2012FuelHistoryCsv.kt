@@ -17,14 +17,22 @@ object Lfx2012FuelHistoryCsv {
         samples: List<Lfx2012FuelSessionHistory.Sample>,
         output: Writer
     ) {
-        // Validates VIN/session/source, strict chronology, and size before
+        // Freeze both the sample list and each nested readings list before
+        // validation. The UI may append/clear observations while a slow Writer
+        // is exporting; never mix validated rows with later mutations.
+        val frozen = samples.map { sample ->
+            sample.copy(snapshot = sample.snapshot.copy(
+                readings = sample.snapshot.readings.toList()
+            ))
+        }
+        // Validates VIN/session/source, strict chronology and size before
         // streaming any bytes into a destination file.
-        Lfx2012FuelSessionHistory.summarize(samples)
-        require(samples.size <= MAX_ROWS)
+        Lfx2012FuelSessionHistory.summarize(frozen)
+        require(frozen.size <= MAX_ROWS)
         output.write(
             "vin,session_id,source,utc_millis,pid_hex,availability,reported_percent,raw_byte\n"
         )
-        for (sample in samples) {
+        for (sample in frozen) {
             val identity = sample.identity
             for (reading in sample.snapshot.readings) {
                 output.write(csv(identity.vin))
