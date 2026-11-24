@@ -1127,7 +1127,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 obdbSignalValue = "", obdbSignalMessage = "",
                 doIpReading = false, doIpResult = "", doIpTrace = emptyList(),
                 doIpBackupScope = null, doIpBackupBytes = 0, doIpMonitorReport = null, doIpLiveSamples = emptyList(),
-                doIpGatewayHost = "", doIpGatewayResult = "")
+                doIpGatewayReading = false, doIpGatewayHost = "", doIpGatewayResult = "")
         }
     }
 
@@ -1172,15 +1172,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
         enhancedUdsJob?.cancel()
         enhancedUdsJob = null
-        _calibrationWorkspace.update { it.copy(doIpReading = false, doIpMonitorReport = null,
-            doIpBackupBytes = 0, doIpResult = localizedContext.getString(R.string.cal_doip_cancel)) }
+        _calibrationWorkspace.update {
+            val message = localizedContext.getString(R.string.cal_doip_cancel)
+            if (it.doIpGatewayReading) it.copy(doIpReading = false, doIpGatewayReading = false,
+                doIpGatewayResult = message)
+            else it.copy(doIpReading = false, doIpMonitorReport = null,
+                doIpBackupBytes = 0, doIpResult = message)
+        }
     }
 
     fun inspectDirectDoIpGateway(host: String, operation: DoIpDirectRead.GatewayOperation) {
         if (!requirePremiumLicense()) return
         launchEnhancedUdsRead(journalDoIp = true) { current ->
-            _calibrationWorkspace.update { it.copy(doIpReading = true, doIpGatewayResult = "",
-                doIpGatewayHost = host) }
+            _calibrationWorkspace.update { it.copy(doIpReading = true, doIpGatewayReading = true,
+                doIpGatewayResult = "", doIpGatewayHost = host) }
             try {
                 val result = DoIpDirectRead.inspectGateway(host, _vehicle.value.vin, operation,
                     onControlTrace = { trace -> journalDoIpControlTrace(trace, current) })
@@ -1201,15 +1206,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         else -> R.string.cal_doip_power_unsupported
                     })
                 }
-                _calibrationWorkspace.update { it.copy(doIpReading = false,
+                _calibrationWorkspace.update { it.copy(doIpReading = false, doIpGatewayReading = false,
                     doIpGatewayResult = listOfNotNull(identity, status, power).joinToString("\n")) }
                 if (current()) appendCanConsoleSystemEvent(localizedContext.getString(R.string.cal_doip_console_complete))
             } catch (cancelled: CancellationException) {
-                if (current()) _calibrationWorkspace.update { it.copy(doIpReading = false) }
+                if (current()) _calibrationWorkspace.update { it.copy(doIpReading = false, doIpGatewayReading = false) }
                 throw cancelled
             } catch (_: Exception) {
                 if (current()) appendCanConsoleSystemEvent(localizedContext.getString(R.string.cal_doip_failed), succeeded = false)
-                if (current()) _calibrationWorkspace.update { it.copy(doIpReading = false,
+                if (current()) _calibrationWorkspace.update { it.copy(doIpReading = false, doIpGatewayReading = false,
                     doIpGatewayResult = localizedContext.getString(R.string.cal_doip_failed)) }
             }
         }
