@@ -456,7 +456,7 @@ class J2534BridgeTransport(
      */
     suspend fun exchangeOperatorUds(
         payload: ByteArray, timeoutMs: Long, approval: EcuWriteConsentFlow.Approval,
-        beforeTransmit: () -> Unit = {}
+        beforeTransmit: () -> Unit
     ): ByteArray =
         withContext(Dispatchers.IO) {
             mutex.withLock {
@@ -495,7 +495,7 @@ class J2534BridgeTransport(
 
     suspend fun sendOperatorUdsOnly(
         payload: ByteArray, approval: EcuWriteConsentFlow.Approval,
-        beforeTransmit: () -> Unit = {}
+        beforeTransmit: () -> Unit
     ) = withContext(Dispatchers.IO) {
         mutex.withLock {
             ensureOpen()
