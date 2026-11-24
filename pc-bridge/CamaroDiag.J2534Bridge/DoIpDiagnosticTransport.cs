@@ -273,6 +273,12 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
             remaining, deadline.Token, p2Timeout, p2StarTimeout);
         if (Interlocked.CompareExchange(ref exchangeState, 0, 1) != 1)
             throw new ObjectDisposedException(nameof(DoIpDiagnosticTransport));
+        // A duplicate positive UDS PDU may have arrived before this
+        // exchange ended. It has no transaction token and MUST NOT become
+        // the response to a later command with the same SID. Fail closed.
+        if (inbound.Reader.TryPeek(out _))
+            throw new InvalidDataException(
+                "DoIP stale queued diagnostic response after final UDS reply; reconnect.");
         // An EOF received just after a valid final reply retires the
         // connection, but does not retroactively invalidate that reply.
         if (Volatile.Read(ref receiveFailure) is not null)
@@ -337,6 +343,12 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
                 if (!inbound.Writer.TryWrite(message))
                     throw new InvalidDataException(
                         "DoIP diagnostic receive buffer overflow; reconnect.");
+                // The exchange may have finished just while TryWrite
+                // published the frame; a late write after transition to
+                // idle must retire the socket, never feed a next exchange.
+                if (Volatile.Read(ref exchangeState) != 1)
+                    throw new InvalidDataException(
+                        "DoIP response crossed diagnostic exchange boundary; reconnect.");
             }
         }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested)
