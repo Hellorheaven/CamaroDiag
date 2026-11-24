@@ -46,6 +46,7 @@ Les commandes suivantes travaillent **sur des fichiers déjà présents sur le P
 cd host/python
 python -m camarodiagconnectors.offline_cli backup --target 24LC256 --capacity 32768 --input original.bin --output-prefix sauvegarde
 python -m camarodiagconnectors.offline_cli verify --prefix sauvegarde
+python -m camarodiagconnectors.offline_cli verify-doip --archive sauvegarde-doip.zip --profile profil-doip.json
 python -m camarodiagconnectors.offline_cli plan --target 24LC256 --technology i2c_eeprom --page-size 64 --input original.bin --patch 0x10:01 --proposed-output simulation.bin
 ```
 
@@ -60,3 +61,5 @@ USB 5 V prioritaire pour la logique du boîtier ; alimentation externe stabilis�
 ## Limites de sécurité
 
 La découverte ASCII/binaire ne prouve pas l'identité de la carte. Le TLS mutuel de simulation ne s'applique pas encore au transport USB. Le journal logiciel ne garantit pas la restauration d'un calculateur et ne doit pas servir à déclencher une écriture. Aucun mode de programmation ne peut être activé sans qualification par cible, alimentation et route (#8, #9, #10).
+
+La commande `verify-doip` vérifie hors connexion les archives de zones ECU DoIP produites par Windows ou Android (jusqu’à 16 Mio par zone), avec leur profil original. Elle ne prouve pas la provenance matérielle et n’autorise aucune écriture. / `verify-doip` checks scoped DoIP backups against their original profile, offline (up to 16 MiB per region). It does not establish hardware provenance or authorize programming.

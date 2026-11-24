@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Sequence
 
 from .backup import backup_manifest, write_bundle, verify_bundle
+from .doip_archive import verify_archive
 from .memory import Geometry, Patch, Region, Technology, plan_patches
 
 
@@ -50,6 +51,10 @@ def _parser() -> argparse.ArgumentParser:
     verify = commands.add_parser("verify", help="Verify a local backup bundle")
     verify.add_argument("--prefix", required=True, type=Path)
 
+    doip = commands.add_parser("verify-doip", help="Verify an Android or Windows DoIP backup against its profile")
+    doip.add_argument("--archive", type=Path, required=True)
+    doip.add_argument("--profile", type=Path, required=True)
+
     plan = commands.add_parser("plan", help="Dry-run changes; no device programming")
     plan.add_argument("--target", required=True)
     plan.add_argument("--technology", required=True, choices=[t.value for t in Technology])
@@ -74,6 +79,9 @@ def run(argv: Sequence[str] | None = None) -> dict[str, object]:
     if args.action == "verify":
         manifest = verify_bundle(args.prefix)
         return {"action": "verify", "manifest": asdict(manifest), "physical_read_verified": False}
+
+    if args.action == "verify-doip":
+        return verify_archive(args.archive, args.profile)
 
     original = args.input.read_bytes()
     geometry = Geometry(args.target, Technology(args.technology), len(original), args.page_size,
