@@ -1,3 +1,11 @@
+## Décision propriétaire prioritaire — intégration des protocoles et C8 final (24/11/2026)
+
+- C8 est strictement le dernier chantier, après C1/C2/C4/C6 ET la clôture logicielle de tous les protocoles du périmètre PR95, y compris leur intégration aux fonctions applicables Android, Windows GUI/CLI, Connectors, console, diagnostic, sauvegardes, calibration/programmation et récupération selon les capacités réelles. Les tests d'intégration font partie de chaque protocole, pas d'un reliquat à reporter à C8.
+- Un seul chat, un chantier et un protocole actifs au maximum. Matrice de couverture par fonction/protocole/transport, parcours de bout en bout positifs et négatifs, consentement OK puis Oui/Non, sauvegardes et contrôles d'intégrité conservés. Cas non applicables justifiés, aucune capacité matérielle fictive.
+- Checkpoint C6/DoIP demandé au SHA `266279ef79327541519ffcaec2789102d9a3a479` : aucun run retourné par la consultation actuelle ; résultat non établi, ne pas dupliquer le déclenchement ni passer à SAE J1979/C8 prématurément. Règle durable AGENTS.md commit `2b6db9ae`. Aucun essai physique avant Release #48, aucune fusion sans accord.
+
+---
+
 ## Reprise unifiée — 24/11/2026, C6 + correction DoIP
 
 - Décision propriétaire : ce chat unique pilote désormais les chantiers et protocoles. Les réservations historiques de fichiers à un autre chat sont obsolètes. Un chantier et un protocole actifs au maximum, validation avant passage au suivant. C6 actif ; DoIP rouvert pour corriger la régression Windows avant reprise SAE J1979.
