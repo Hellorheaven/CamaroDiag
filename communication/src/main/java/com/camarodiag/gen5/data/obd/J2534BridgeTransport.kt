@@ -57,6 +57,9 @@ class J2534BridgeTransport(
         get() = isConnected && scopedMemoryReadEnabled
     /** Close requested by the app, not a spontaneous I/O failure of the bridge. */
     @Volatile private var externallyClosed = false
+    // A Boolean alone can lose a Close arriving between a blocked TLS
+    // handshake and the next connection's initial state reset.
+    private val explicitCloseEpoch = java.util.concurrent.atomic.AtomicLong(0L)
 
     /** Reflects a live TCP session rather than just an allocated transport object. */
     val isConnected: Boolean
@@ -71,8 +74,9 @@ class J2534BridgeTransport(
         protocolNumber: Int = 33
     ): String = withContext(Dispatchers.IO) {
         mutex.withLock {
-            closeInternal()
-            externallyClosed = false
+            // Validate before disconnecting an existing usable bridge.
+            // Invalid profile, unpinned token or non-LAN target cannot tear
+            // down an established diagnostic connection.
             require(host.isNotBlank()) { "Adresse IP du PC manquante." }
             require(port in 1024..65535) { "Port du pont PC invalide." }
             // Parse before network I/O: legacy token-only pairing must fail closed.
@@ -85,6 +89,10 @@ class J2534BridgeTransport(
             require(can29Bit == (protocolNumber in setOf(34, 36, 64))) {
                 "La largeur des identifiants CAN ne correspond pas au profil sélectionné."
             }
+            pairing.localBridgeIpv4(host) // no DNS or public network target
+            val closeEpoch = explicitCloseEpoch.get()
+            closeInternal()
+            externallyClosed = false
             try {
                 // TLS handshake (including SHA-256 certificate pin verification)
                 // completes BEFORE the first pairing token or UDS command is sent.
@@ -94,7 +102,8 @@ class J2534BridgeTransport(
                 // race it. No pairing bearer token or CAN "open" request may
                 // be sent after the operator switched away from this bridge.
                 J2534BridgeHandshakeAdmission.requireCurrent(
-                    currentCoroutineContext().isActive, externallyClosed
+                    currentCoroutineContext().isActive, externallyClosed,
+                    closeEpoch, explicitCloseEpoch.get()
                 )
                 connected.soTimeout = 12_000
                 reader = BufferedReader(InputStreamReader(connected.getInputStream(), Charsets.UTF_8))
@@ -112,7 +121,8 @@ class J2534BridgeTransport(
                 // Even a valid reply can arrive after cancellation: do not
                 // publish capabilities for a closed/superseded TLS session.
                 J2534BridgeHandshakeAdmission.requireCurrent(
-                    currentCoroutineContext().isActive, externallyClosed
+                    currentCoroutineContext().isActive, externallyClosed,
+                    closeEpoch, explicitCloseEpoch.get()
                 )
                 val requestLabel = requestCanId.toString(16).uppercase().padStart(if (can29Bit) 8 else 3, '0')
                 val responseLabel = responseCanId.toString(16).uppercase().padStart(if (can29Bit) 8 else 3, '0')
@@ -576,6 +586,9 @@ class J2534BridgeTransport(
     }
 
     fun close() {
+        // Publish closure before tearing down sockets. A late TLS handshake
+        // cannot reset the Boolean and resurrect this explicitly closed link.
+        explicitCloseEpoch.incrementAndGet()
         externallyClosed = true
         closeInternal()
     }
@@ -608,13 +621,16 @@ class J2534BridgeTransport(
 
 /** Pure fail-closed admission used after blocking TLS I/O and before publication. */
 internal object J2534BridgeHandshakeAdmission {
-    fun requireCurrent(coroutineActive: Boolean, closedByApp: Boolean) {
+    fun requireCurrent(
+        coroutineActive: Boolean, closedByApp: Boolean,
+        capturedCloseEpoch: Long, currentCloseEpoch: Long
+    ) {
         if (!coroutineActive) {
             throw kotlinx.coroutines.CancellationException(
                 "J2534 TLS connection was cancelled before admission"
             )
         }
-        check(!closedByApp) {
+        check(!closedByApp && currentCloseEpoch == capturedCloseEpoch) {
             "J2534 bridge connection was closed during the TLS handshake"
         }
     }
