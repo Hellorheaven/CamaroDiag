@@ -1,3 +1,6 @@
+PR95 MERGE CONFLICT RESOLUTION — FULL DEBUG CHECKPOINT
+Preserve both UDS response deadline test suites and integrate main cfadb863d5ef9ffcadcde064bfd60224e3217058 into PR95 0ec8be1d7e7c8a0717d3333cf39273a1cd896e51. Validate exact merge candidate before final merge. No release or final C8 implied.
+
 PR95 SPLIT — FULL DEBUG PRE-MERGE CHECKPOINT — 2026-11-24
 Implementation and handoff HEAD: 7f28463935512e048a34c8bdd1ac06fdb29539d5
 Validate all Debug jobs on the exact resulting HEAD before owner-authorized merge. Intermediate stabilization only, not final C8. No physical qualification claimed. Preserve remaining scope in immediate continuation PR.

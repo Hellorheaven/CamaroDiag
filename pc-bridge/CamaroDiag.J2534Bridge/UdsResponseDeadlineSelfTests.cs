@@ -158,6 +158,41 @@ internal static class UdsResponseDeadlineSelfTests
                 p2StarTimeout: TimeSpan.FromMinutes(11)).GetAwaiter().GetResult(),
             "P2* exceeding ten minutes is refused.");
 
+        Check(UdsResponseSequence.AwaitFinalAsync(request,
+            (_, token) =>
+            {
+                token.ThrowIfCancellationRequested();
+                return Task.FromResult(final);
+            }, TimeSpan.FromSeconds(1), CancellationToken.None)
+            .GetAwaiter().GetResult().SequenceEqual(final),
+            "Direct timely response is accepted.");
+
+        var overallCalls = 0;
+        Reject<TimeoutException>(() =>
+            UdsResponseSequence.AwaitFinalAsync(request,
+                async (_, token) =>
+                {
+                    overallCalls++;
+                    if (overallCalls == 1)
+                        return new byte[] { 0x7F, 0x22, 0x78 };
+                    await Task.Delay(120, token);
+                    return final;
+                }, TimeSpan.FromMilliseconds(60), CancellationToken.None)
+                .GetAwaiter().GetResult(),
+            "ResponsePending does not extend the overall deadline.");
+        Check(overallCalls == 2, "Final receive attempted after pending response.");
+
+        using var cancelledAfterRx = new CancellationTokenSource();
+        Reject<OperationCanceledException>(() =>
+            UdsResponseSequence.AwaitFinalAsync(request,
+                (_, token) =>
+                {
+                    cancelledAfterRx.Cancel();
+                    return Task.FromResult(final);
+                }, TimeSpan.FromSeconds(1), cancelledAfterRx.Token)
+                .GetAwaiter().GetResult(),
+            "Cancellation after RX prevents publication of a completed transaction.");
+
         return checks;
     }
 }
