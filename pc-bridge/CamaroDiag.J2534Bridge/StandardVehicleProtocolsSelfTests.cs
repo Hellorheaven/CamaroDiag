@@ -363,6 +363,16 @@ internal static class StandardVehicleProtocolsSelfTests
         var routeResponse = DoIpCodec.Decode(DoIpCodec.Encode(
             DoIpCodec.RoutingActivationResponse, [0x0E, 0x80, 0x12, 0x34, 0x10, 0, 0, 0, 0]));
         DoIpCodec.RequireRoutingActive(routeResponse, 0x0E80);
+        var oemRoutingResponse = DoIpCodec.Decode(DoIpCodec.Encode(
+            DoIpCodec.RoutingActivationResponse,
+            [0x0E, 0x80, 0x12, 0x34, 0x10, 0, 0, 0, 0, 1, 2, 3, 4],
+            version: 0x04));
+        DoIpCodec.RequireRoutingActive(oemRoutingResponse, 0x0E80);
+        Check(oemRoutingResponse.Version == 0x04 &&
+            oemRoutingResponse.Payload.Length == 13 &&
+            oemRoutingResponse.Payload.AsSpan(9).SequenceEqual(
+                new byte[] { 1, 2, 3, 4 }),
+            "DoIP 13-byte OEM routing response is accepted without inventing credentials.");
         Reject<InvalidDataException>(() =>
             DoIpCodec.RequireRoutingActive(routeResponse, 0x0E81),
             "DoIP routing response to another tester.");
