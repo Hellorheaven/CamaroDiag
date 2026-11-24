@@ -1,3 +1,11 @@
+## Reprise C6/DoIP — lecture VIN ECU UDS Windows (24/11/2026)
+
+- `7201e38` : contrôle facultatif de l'adresse logique annoncée par la passerelle lors du routage TCP/TLS. `47ddb6a` : service UDS F190 lecture seule, VIN ASCII 17 caractères valides, concordance avec le VIN UDP disponible, adresses explicites, copie indépendante TX/RX. `613bac4`, `6ba26de`, `d3b25a5` : ressources EN/FR et raccordement console Windows, TLS par défaut, certificat client facultatif, annulation et invalidation après erreur. `49a84bb` : historique TX demandé/RX corrélé distinct.
+- `7239385`, `c6155fd` : tests loopback du service VIN et refus de routage vers une passerelle logique différente avant toute émission UDS ; 17 assertions supplémentaires écrites, non exécutées. Le checkpoint précédent `d5842eb` n'est pas observable avec la vue GitHub limitée aux événements PR. Ne pas dupliquer sans contrôle ; aucune compilation locale disponible (pas de dotnet, accès git réseau indisponible).
+- Intégration limitée à lecture VIN, pas à une authentification, ni à l'écriture, ni à un sélecteur global. C6 et DoIP restent actifs ; C8 non commencé. Aucun test physique, merge, Release ou nouvelle branche.
+
+---
+
 ## Reprise C6/DoIP — état passerelle dans la console (24/11/2026)
 
 - `859401d`, `ad8c010`, `52dc2fc` : présentation commune FR/EN des réponses EntityStatus et PowerMode. `981bead` : raccordement graphique aux requêtes UDP réelles, version reprise de l'identification observée pour l'adresse exacte, invalidation au changement de contexte, annulation ou échec. `7435f65` : même décodage pour CLI. `d21ca1f` : 22 assertions supplémentaires dans les autotests existants (taille présente/absente, trois modes, type incorrect, ressources FR/EN).
