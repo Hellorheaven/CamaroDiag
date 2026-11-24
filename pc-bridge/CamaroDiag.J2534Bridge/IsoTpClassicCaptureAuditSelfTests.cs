@@ -155,6 +155,34 @@ internal static class IsoTpClassicCaptureAuditSelfTests
         Check(Audit(tooManyWaits).Status == fail,
             "WFTmax four rejects fifth FC/WAIT before CTS");
 
+
+        // The same wire exchange with ECU as sender must use the reversed
+        // bus direction without making "TX" automatically mean ECU->tester.
+        var ecuSends = valid.Select(f => f with {
+            TesterTx = !f.TesterTx,
+            Id = f.Id == 0x7E0 ? 0x7E8u : 0x7E0u }).ToArray();
+        Check(IsoTpClassicCaptureAudit.Analyze(ecuSends,
+            0x7E0, 0x7E8, false, false).Status == pass,
+            "ECU sender direction has separate ID and timestamp correlation");
+        var wrongDirection = valid.Select(f => f with {
+            TesterTx = !f.TesterTx }).ToArray();
+        Check(Audit(wrongDirection).Status == uncertain,
+            "Swapped wire direction cannot invent a valid TX PDU");
+        // A correct CAN ID with a different ISO-TP extension belongs to
+        // another logical channel, and is never a CTS for our sender.
+        var foreign = addressed.ToList();
+        foreign.Insert(1, F(1500, false, 0x7E8,
+            0x55, 0x30, 0, 5, 0, 0, 0, 0));
+        Check(IsoTpClassicCaptureAudit.Analyze(foreign,
+            0x7E0, 0x7E8, false, true,
+            txAddress: 0xF1, rxAddress: 0x10).Status == pass,
+            "Foreign extension cannot interrupt a correct CTS");
+        // The per-frame N_Cr timeout is independent of a slower N_Bs.
+        Check(IsoTpClassicCaptureAudit.Analyze(delayedCf,
+            0x7E0, 0x7E8, false, true,
+            nBsMs: 30000, nCrMs: 1000).Status == fail,
+            "N_Cr remains bounded when N_Bs is large");
+
         return checks;
     }
 }
