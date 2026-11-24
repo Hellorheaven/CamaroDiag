@@ -263,8 +263,20 @@ internal static class StandardVehicleProtocolsSelfTests
             vehicleIdentity.Eid.SequenceEqual(new byte[] {1, 2, 3, 4, 5, 6}) &&
             vehicleIdentity.Gid.SequenceEqual(new byte[] {11, 12, 13, 14, 15, 16}) &&
             vehicleIdentity.FurtherAction == 0x10 &&
-            vehicleIdentity.VinGidStatus == 0,
-            "DoIP UDP response parses VIN, logical address, EID, GID and status.");
+            vehicleIdentity.VinGidStatus == 0 &&
+            vehicleIdentity.ProtocolVersion == 0x02,
+            "DoIP UDP response parses VIN, logical address, EID, GID, version and status.");
+        foreach (var gatewayVersion in new byte[] { 0x03, 0x04 })
+        {
+            var versionedIdentity = DoIpVehicleDiscovery.ParseAnnouncement(
+                DoIpCodec.Encode(DoIpCodec.VehicleIdentificationResponse,
+                    identityBytes, gatewayVersion), discoveryAddress);
+            Check(versionedIdentity.ProtocolVersion == gatewayVersion &&
+                versionedIdentity.Vin == vehicleIdentity.Vin &&
+                versionedIdentity.LogicalAddress == vehicleIdentity.LogicalAddress,
+                "DoIP gateway discovery preserves header protocol versions 0x" +
+                gatewayVersion.ToString("X2") + " for explicit operator negotiation.");
+        }
         Check(DoIpVehicleDiscovery.MatchesRequestedIdentity(
             vehicleIdentity, "12345678901234567", [1, 2, 3, 4, 5, 6]),
             "DoIP VIN/EID-targeted identification accepts exact matching response.");
