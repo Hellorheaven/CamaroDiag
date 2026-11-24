@@ -177,6 +177,12 @@ class BluetoothObdManager(context: Context) {
     }
 
     suspend fun connectWifi(host: String, port: Int = 35000): Result<AdapterCapabilities> = withContext(Dispatchers.IO) {
+        // Invalid manual input must not tear down an otherwise working adapter.
+        try {
+            ElmWifiConnectionPolicy.validate(host, port, 4000)
+        } catch (invalid: IllegalArgumentException) {
+            return@withContext Result.failure(invalid)
+        }
         val epoch = beginWifiConnection()
         try {
             val connected = wifiTransport.connect(host, port)
