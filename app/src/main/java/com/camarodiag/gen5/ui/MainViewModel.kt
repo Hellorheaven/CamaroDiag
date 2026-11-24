@@ -1402,9 +1402,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun confirmDirectDoIpCommand(command: DoIpConsoleCommand, approval: EcuWriteConsentFlow.Approval) {
+        if (!requirePremiumLicense() || command.vehicle != _vehicle.value ||
+            command.generation != _liveCanMonitorState.value.consoleContextGeneration) return
+        val payload = runCatching { DoIpDirectRead.parseCommand(command.payload) }.getOrNull() ?: return
+        readDirectDoIp(command.host, command.tester, command.ecu, "", command.tls,
+            DoIpDirectRead.Operation.EXCHANGE, command = payload, approval = approval)
+    }
+
     fun readDirectDoIp(host: String, tester: String, ecu: String, didHex: String,
-        tls: Boolean, operation: DoIpDirectRead.Operation, sampleCount: Int = 10, intervalMs: Int = 1000) {
-        if (!requirePremiumLicense()) return
+        tls: Boolean, operation: DoIpDirectRead.Operation, sampleCount: Int = 10, intervalMs: Int = 1000,
+        command: ByteArray? = null, approval: EcuWriteConsentFlow.Approval? = null) {
+        if (!requirePremiumLicense() || (operation == DoIpDirectRead.Operation.EXCHANGE &&
+                (command == null || approval == null))) return
+        val fixedCommand = command?.copyOf()
         launchEnhancedUdsRead(journalDoIp = true) { current ->
             _calibrationWorkspace.update { it.copy(doIpReading = true, doIpResult = "", doIpTrace = emptyList(), doIpBackupBytes = 0,
                 doIpMonitorReport = null, doIpLiveSamples = emptyList()) }
@@ -1433,7 +1444,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         _calibrationWorkspace.update {
                             if (current()) it.copy(doIpLiveSamples = it.doIpLiveSamples + doIpSampleRow(sample)) else it
                         }
-                    }, onControlTrace = { trace -> journalDoIpControlTrace(trace, current) })
+                    }, onControlTrace = { trace -> journalDoIpControlTrace(trace, current) },
+                    command = fixedCommand, approval = approval, isContextCurrent = current)
                 if (!current()) return@launchEnhancedUdsRead
                 val module = "DoIP 0x" + ecu.uppercase()
                 val report = result.dtcs

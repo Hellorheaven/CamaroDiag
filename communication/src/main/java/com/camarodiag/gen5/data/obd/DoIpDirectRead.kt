@@ -23,7 +23,7 @@ import kotlin.coroutines.resumeWithException
  * A socket is owned by one operation and is never retained after failure.
  */
 object DoIpDirectRead {
-    enum class Operation { VIN, DID, DTC, DTC_COUNT, MONITOR, BACKUP }
+    enum class Operation { VIN, DID, DTC, DTC_COUNT, MONITOR, BACKUP, EXCHANGE }
     data class Target private constructor(val address: InetAddress, val tester: Int, val ecu: Int,
         val expectedVin: String, val tls: Boolean, val expectedGateway: Int? = null) {
         companion object {
@@ -38,6 +38,40 @@ object DoIpDirectRead {
                 require(expected.isEmpty() || validVin(expected))
                 return Target(address, source, destination, expected, tls, expectedGateway)
             }
+        }
+    }
+
+    fun parseCommand(text: String): ByteArray {
+        val compact = text.filterNot(Char::isWhitespace)
+        require(compact.length in 2..8182 && compact.length % 2 == 0 &&
+            compact.all { it in "0123456789ABCDEFabcdef" })
+        return ByteArray(compact.length / 2) { index ->
+            compact.substring(index * 2, index * 2 + 2).toInt(16).toByte()
+        }
+    }
+
+    /** Correlation checks do not restrict manufacturer-specific service IDs.
+     * A positive service echo alone is not proof that a write was persisted. */
+    internal fun requirePositiveResponse(request: ByteArray, reply: ByteArray) {
+        require(request.isNotEmpty() && reply.isNotEmpty() &&
+            reply[0].u8() == request[0].u8() + 0x40)
+        fun echo(length: Int) {
+            require(request.size >= 1 + length && reply.size >= 1 + length &&
+                request.copyOfRange(1, 1 + length).contentEquals(reply.copyOfRange(1, 1 + length)))
+        }
+        when (request[0].u8()) {
+            0x22 -> { echo(2); require(reply.size >= 4) }
+            0x2E, 0x2F -> echo(2)
+            0x19 -> { echo(1); require(reply.size >= 3) }
+            0x10, 0x11, 0x27, 0x28, 0x3E, 0x85 -> {
+                require(request.size >= 2 && reply.size >= 2 &&
+                    reply[1].u8() == (request[1].u8() and 0x7F))
+            }
+            0x31 -> { require(request.size >= 4 && reply.size >= 4 &&
+                reply[1].u8() == (request[1].u8() and 0x7F) &&
+                reply[2] == request[2] && reply[3] == request[3]) }
+            0x36 -> echo(1)
+            0x23 -> require(reply.size >= 2)
         }
     }
 
@@ -378,8 +412,8 @@ object DoIpDirectRead {
         }
         fun exchange(request: ByteArray, timeout: Int): ByteArray {
             val end = deadline(timeout)
-            record("TX", request)
             send(0x8001, addr(target.tester) + addr(target.ecu) + request, end)
+            record("TX", request)
             while (true) {
                 val frame = receive(end)
                 if (alive(frame, end)) continue
@@ -401,11 +435,7 @@ object DoIpDirectRead {
                     if (reply[2].u8() == 0x78) continue // same absolute transaction deadline
                     throw UdsNegativeResponseException(reply[1].u8(), reply[2].u8())
                 }
-                require(reply[0].u8() == request[0].u8() + 0x40)
-                if (request[0].u8() == 0x22)
-                    require(reply.size >= 4 && reply[1] == request[1] && reply[2] == request[2])
-                else if (request[0].u8() == 0x19) require(reply.size >= 3 && reply[1] == request[1])
-                else require(request[0].u8() == 0x23 && reply.size >= 2)
+                requirePositiveResponse(request, reply)
                 return reply
             }
         }
@@ -420,11 +450,19 @@ object DoIpDirectRead {
         intervalMs: Int = 1000, backupScope: DoIpMemoryBackup.Scope? = null,
         onBackupProgress: (Int, Int) -> Unit = { _, _ -> },
         onTrace: (Trace) -> Unit = {}, onSample: (Sample) -> Unit = {},
-        onControlTrace: (ControlTrace) -> Unit = {}): Outcome {
+        onControlTrace: (ControlTrace) -> Unit = {},
+        command: ByteArray? = null, approval: EcuWriteConsentFlow.Approval? = null,
+        isContextCurrent: () -> Boolean = { false }): Outcome {
         require(timeoutMs in 100..30_000 && did in 0..65535 && mask in 0..255)
         require(operation == Operation.VIN || target.expectedVin.isNotEmpty())
         require(sampleCount in 1..30 && intervalMs in 250..5000)
         require((operation == Operation.BACKUP) == (backupScope != null))
+        require((operation == Operation.EXCHANGE) == (command != null && approval != null))
+        val fixedCommand = command?.copyOf()
+        if (operation == Operation.EXCHANGE) {
+            require(fixedCommand != null && fixedCommand.size in 1..4091)
+            EcuWriteConsentFlow.requireCurrentForTransmit(requireNotNull(approval), isContextCurrent)
+        }
         if (backupScope != null) {
             backupScope.validate()
             require(backupScope.vin == target.expectedVin && backupScope.tester == target.tester && backupScope.ecu == target.ecu)
@@ -434,6 +472,7 @@ object DoIpDirectRead {
             timeoutMs * (sampleCount + 5L) + intervalMs * (sampleCount - 1L) else timeoutMs * 5L
         val gateway = discover(target.address, target.expectedVin, timeoutMs, onControlTrace)
         require(target.tester != gateway.logicalAddress)
+        if (operation == Operation.EXCHANGE) require(gateway.vin == target.expectedVin)
         require(target.expectedGateway == null || target.expectedGateway == gateway.logicalAddress) {
             "Gateway identity changed after route selection."
         }
@@ -474,7 +513,11 @@ object DoIpDirectRead {
                         // The gateway's announcement is not proof of the selected ECU identity.
                         vin = readVin()
                         require(vin == target.expectedVin)
-                        if (operation == Operation.BACKUP) {
+                        if (operation == Operation.EXCHANGE) {
+                            EcuWriteConsentFlow.requireCurrentForTransmit(requireNotNull(approval), isContextCurrent)
+                            val reply = session.exchange(requireNotNull(fixedCommand), timeoutMs)
+                            Outcome(gateway, target.ecu, vin, reply, null, trace.toList())
+                        } else if (operation == Operation.BACKUP) {
                             val scope = checkNotNull(backupScope)
                             fun identity() {
                                 require(readVin() == scope.vin)

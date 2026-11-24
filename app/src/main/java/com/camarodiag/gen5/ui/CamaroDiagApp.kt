@@ -783,6 +783,8 @@ fun CamaroDiagApp(
                     onReadDirectDoIp = { host, tester, ecu, did, tls, operation ->
                         viewModel.readDirectDoIp(host, tester, ecu, did, tls, operation)
                     },
+                    doIpContextGeneration = liveCanMonitorState.consoleContextGeneration,
+                    onConfirmDoIpCommand = viewModel::confirmDirectDoIpCommand,
                     onMonitorDirectDoIp = { host, tester, ecu, did, tls, samples, interval ->
                         viewModel.readDirectDoIp(host, tester, ecu, did, tls,
                             com.camarodiag.gen5.data.obd.DoIpDirectRead.Operation.MONITOR, samples, interval)

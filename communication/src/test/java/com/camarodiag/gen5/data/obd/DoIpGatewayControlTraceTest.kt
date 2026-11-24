@@ -168,4 +168,24 @@ class DoIpGatewayControlTraceTest {
         }.exceptionOrNull() is IllegalArgumentException)
     }
 
+    @Test fun explicitCommandPreservesBytesAndCorrelatesStandardResponse() {
+        val command = DoIpDirectRead.parseCommand("22 F1 90")
+        assertArrayEquals(byteArrayOf(0x22, 0xF1.toByte(), 0x90.toByte()), command)
+        DoIpDirectRead.requirePositiveResponse(command, byteArrayOf(0x62, 0xF1.toByte(), 0x90.toByte(), 1))
+        assertTrue(runCatching { DoIpDirectRead.requirePositiveResponse(command,
+            byteArrayOf(0x62, 0xF1.toByte(), 0x91.toByte(), 1)) }.isFailure)
+        assertTrue(runCatching { DoIpDirectRead.requirePositiveResponse(byteArrayOf(0x36, 1),
+            byteArrayOf(0x76, 2)) }.isFailure)
+        for (invalid in listOf("", "0x22", "A", "GG", "AA".repeat(4092)))
+            assertTrue(runCatching { DoIpDirectRead.parseCommand(invalid) }.isFailure)
+    }
+
+    @Test fun unconfirmedExchangeFailsBeforeAnyDiscovery() = runBlocking {
+        val target = DoIpDirectRead.Target.parse("127.0.0.1", "0E80", "1001", vin, false)
+        val events = mutableListOf<DoIpDirectRead.ControlTrace>()
+        assertTrue(runCatching { DoIpDirectRead.read(target, DoIpDirectRead.Operation.EXCHANGE,
+            command = byteArrayOf(0x22, 1, 2), onControlTrace = { events.add(it) }) }.isFailure)
+        assertTrue(events.isEmpty())
+    }
+
 }

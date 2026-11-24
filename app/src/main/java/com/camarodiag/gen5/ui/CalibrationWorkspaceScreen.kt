@@ -62,6 +62,7 @@ import com.camarodiag.gen5.ui.theme.TextPrimary
 import com.camarodiag.gen5.ui.theme.WarnRed
 import com.camarodiag.gen5.data.obd.CamaroCalibrationCatalog
 import com.camarodiag.gen5.data.obd.DoIpDirectRead
+import com.camarodiag.gen5.data.obd.EcuWriteConsentFlow
 import com.camarodiag.gen5.data.obd.DoIpMemoryBackup
 import com.camarodiag.gen5.data.obd.J2534BridgePairingCodeFormat
 import com.camarodiag.gen5.data.obd.Lfx2012ControllerReferences
@@ -243,6 +244,9 @@ private fun localizedInspectionFormat(format: String): String = stringResource(
     }
 )
 
+data class DoIpConsoleCommand(val host: String, val tester: String, val ecu: String,
+    val tls: Boolean, val payload: String, val vehicle: VehicleProfile, val generation: Long)
+
 // Keep static UI copy in Android resources so this screen follows the active system locale.
 @Composable
 fun CalibrationWorkspaceScreen(
@@ -263,6 +267,8 @@ fun CalibrationWorkspaceScreen(
     onReadUdsDid: (String, String, String, String) -> Unit,
     onReadUdsDtcs: (String, String, String) -> Unit,
     onReadDirectDoIp: (String, String, String, String, Boolean, DoIpDirectRead.Operation) -> Unit,
+    doIpContextGeneration: Long,
+    onConfirmDoIpCommand: (DoIpConsoleCommand, EcuWriteConsentFlow.Approval) -> Unit,
     onInspectDoIpGateway: (String, DoIpDirectRead.GatewayOperation) -> Unit,
     onCancelDirectDoIp: () -> Unit,
     onMonitorDirectDoIp: (String, String, String, String, Boolean, Int, Int) -> Unit,
@@ -309,6 +315,9 @@ fun CalibrationWorkspaceScreen(
     }
     var doIpDid by remember(vehicle) { mutableStateOf("F190") }
     var doIpDtcMask by remember(vehicle) { mutableStateOf("FF") }
+    var doIpCommand by remember(vehicle) { mutableStateOf("") }
+    var pendingDoIpCommand by remember(vehicle, doIpContextGeneration) { mutableStateOf<DoIpConsoleCommand?>(null) }
+    var doIpConsentStep by remember(vehicle, doIpContextGeneration) { mutableStateOf(EcuWriteConsentFlow.Step.WARNING) }
     var doIpTls by remember(vehicle) { mutableStateOf(true) }
     var doIpSampleCount by remember(vehicle) { mutableStateOf("10") }
     var doIpInterval by remember(vehicle) { mutableStateOf("1000") }
@@ -448,6 +457,54 @@ fun CalibrationWorkspaceScreen(
                             enabled = idle, singleLine = true, modifier = Modifier.weight(1f),
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             label = { Text(stringResource(R.string.cal_doip_interval)) })
+                    }
+                    OutlinedTextField(doIpCommand, { doIpCommand = it.take(12288) },
+                        enabled = idle, singleLine = true, modifier = Modifier.fillMaxWidth(),
+                        label = { Text(stringResource(R.string.cal_doip_command_payload)) })
+                    OutlinedButton(onClick = {
+                        doIpConsentStep = EcuWriteConsentFlow.Step.WARNING
+                        pendingDoIpCommand = DoIpConsoleCommand(doIpHost, doIpTester, doIpEcu,
+                            doIpTls, doIpCommand, vehicle, doIpContextGeneration)
+                    }, enabled = targetReady && vinReady && runCatching { DoIpDirectRead.parseCommand(doIpCommand) }.isSuccess,
+                        modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(R.string.cal_doip_command_send))
+                    }
+                    pendingDoIpCommand?.let { pending ->
+                        val sameContext = pending.vehicle == vehicle && pending.generation == doIpContextGeneration &&
+                            pending.host == doIpHost && pending.tester == doIpTester && pending.ecu == doIpEcu &&
+                            pending.tls == doIpTls && pending.payload == doIpCommand && targetReady
+                        AlertDialog(onDismissRequest = { pendingDoIpCommand = null },
+                            title = { Text(stringResource(if (doIpConsentStep == EcuWriteConsentFlow.Step.WARNING)
+                                R.string.ecu_write_warning_title else R.string.ecu_write_confirm_title)) },
+                            text = {
+                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Text(stringResource(R.string.cal_doip_command_target, pending.vehicle.vin,
+                                        pending.host.ifBlank { stringResource(R.string.cal_doip_discover_by_vin) },
+                                        pending.tester, pending.ecu, if (pending.tls) "TLS" else "TCP"))
+                                    Text(pending.payload, fontFamily = FontFamily.Monospace)
+                                    Text(stringResource(if (doIpConsentStep == EcuWriteConsentFlow.Step.WARNING)
+                                        R.string.ecu_write_warning_message else R.string.ecu_write_confirm_message))
+                                }
+                            },
+                            confirmButton = {
+                                TextButton(enabled = sameContext, onClick = {
+                                    if (doIpConsentStep == EcuWriteConsentFlow.Step.WARNING)
+                                        doIpConsentStep = EcuWriteConsentFlow.afterWarningOk(doIpConsentStep)
+                                    else {
+                                        EcuWriteConsentFlow.approval(doIpConsentStep, true, sameContext)?.let {
+                                            onConfirmDoIpCommand(pending, it)
+                                        }
+                                        pendingDoIpCommand = null
+                                    }
+                                }) { Text(stringResource(if (doIpConsentStep == EcuWriteConsentFlow.Step.WARNING)
+                                    R.string.ecu_write_ok else R.string.ecu_write_yes)) }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = { pendingDoIpCommand = null }) {
+                                    Text(stringResource(if (doIpConsentStep == EcuWriteConsentFlow.Step.WARNING)
+                                        R.string.ecu_write_cancel else R.string.ecu_write_no))
+                                }
+                            })
                     }
                     val samples = doIpSampleCount.toIntOrNull()
                     val interval = doIpInterval.toIntOrNull()
