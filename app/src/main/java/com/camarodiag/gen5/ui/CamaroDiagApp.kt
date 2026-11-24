@@ -1630,10 +1630,10 @@ fun LiveDataScreen(
                         telemetryMessage?.takeIf { it.isNotBlank() }?.let {
                             Text(it, color = WarnRed, fontSize = 11.sp)
                         }
-                        Text(
-                            stringResource(R.string.live_recording_notice),
-                            color = TextMuted, fontSize = 10.sp
-                        )
+                        // Text(
+                            // stringResource(R.string.live_recording_notice),
+                            // color = TextMuted, fontSize = 10.sp
+                        // )
                     }
                 }
             }
@@ -1998,7 +1998,7 @@ fun CanSnifferScreen(
                         label = { Text(stringResource(R.string.can_console_input_label)) },
                         placeholder = { Text("7E0 02 01 0C  •  01 0C") }
                     )
-                    Text(stringResource(R.string.can_console_input_hint), color = TextMuted, fontSize = 10.sp)
+                    // Text(stringResource(R.string.can_console_input_hint), color = TextMuted, fontSize = 10.sp)
                     if (rawCanFrameInput && !canTransmitAvailable) {
                         Text(stringResource(R.string.can_console_tx_unverified), color = WarnRed, fontSize = 11.sp)
                     }

@@ -201,12 +201,14 @@ internal sealed partial class BridgeDesktopForm : Form
 
         Row(panel, "IP à saisir dans Android", new Label
         {
-            Text = "Sélectionner ci-dessus l'adresse du réseau commun au téléphone.",
+            // Text = "Sélectionner ci-dessus l'adresse du réseau commun au téléphone."
+            Text = string.Empty,
             Dock = DockStyle.Fill, AutoSize = true
         }, copyIp);
         Row(panel, "Port à saisir", new Label
         {
-            Text = "Identique au port choisi avant le démarrage.", Dock = DockStyle.Fill,
+            // Text = "Identique au port choisi avant le démarrage."
+            Text = string.Empty, Dock = DockStyle.Fill,
             AutoSize = true
         }, copyPort);
         Row(panel, "Code TLS d'appairage", pairingCode, copyCode);

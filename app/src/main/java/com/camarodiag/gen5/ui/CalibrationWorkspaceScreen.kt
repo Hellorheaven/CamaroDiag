@@ -628,11 +628,11 @@ fun CalibrationWorkspaceScreen(
                         )
                         Text(stringResource(R.string.flexfuel_lfx2012_audit_post_not_performed),
                             color = WarnRed, fontSize = 11.sp)
-                        Text(
-                            stringResource(R.string.flexfuel_lfx2012_readonly_testing_notice),
-                            color = TextMuted,
-                            fontSize = 11.sp
-                        )
+                        // Text(
+                            // stringResource(R.string.flexfuel_lfx2012_readonly_testing_notice),
+                            // color = TextMuted,
+                            // fontSize = 11.sp
+                        // )
                         OutlinedButton(
                             onClick = onReadIdentification,
                             enabled = (isConnected || state.isJ2534BridgeConnected) && !state.isReading,
@@ -705,10 +705,10 @@ fun CalibrationWorkspaceScreen(
                         Text(stringResource(R.string.cal_ecu_identification),
                             color = TextPrimary, fontWeight = FontWeight.Bold)
                     }
-                    Text(
-                        stringResource(R.string.cal_obd_mode09_explanation),
-                        color = TextMuted, fontSize = 12.sp
-                    )
+                    // Text(
+                        // stringResource(R.string.cal_obd_mode09_explanation),
+                        // color = TextMuted, fontSize = 12.sp
+                    // )
                     Button(
                         onClick = onReadIdentification,
                         enabled = (isConnected || state.isJ2534BridgeConnected) && !state.isReading,
