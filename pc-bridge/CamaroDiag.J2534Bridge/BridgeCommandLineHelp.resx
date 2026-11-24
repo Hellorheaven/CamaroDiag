@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms</value></resheader>
+  <data name="HelpText" xml:space="preserve"><value>CamaroDiag Windows J2534 Bridge — command line
+Run without arguments to open the graphical interface.
+
+Usage:
+  CamaroDiag.J2534Bridge.exe --help
+  CamaroDiag.J2534Bridge.exe --self-test
+  CamaroDiag.J2534Bridge.exe --probe-drivers
+  CamaroDiag.J2534Bridge.exe --discover-connector COM5
+  CamaroDiag.J2534Bridge.exe --inspect-connector-checkpoint checkpoint.bin
+  CamaroDiag.J2534Bridge.exe --inspect-write-journal attempt.jsonl
+  CamaroDiag.J2534Bridge.exe --inspect-e39-image original-3MiB.bin
+  CamaroDiag.J2534Bridge.exe --port 35001
+  CamaroDiag.J2534Bridge.exe --port 35001 --memory-read-profile profile.json
+  CamaroDiag.J2534Bridge.exe --port 35001 --allow-obd-clear
+
+Examples:
+  --self-test                 Software simulation only. No ECU or adapter.
+  --probe-drivers             Inspect installed Windows J2534 drivers; no ECU.
+  --discover-connector COM5   USB serial CD/1 discovery only, isolated prototype.
+  --inspect-write-journal attempt.jsonl
+                              Inspect an offline write journal; never recover or erase.
+  --port 35001                Start the TLS-paired LAN bridge using a selected J2534 driver.
+                              It may check for app updates; never forward the LAN port to the Internet.
+  --allow-obd-clear           Explicitly enable OBD DTC clear on this local bridge run.
+                              The Android user must also confirm OK then YES.
+
+Use each option with the exact arguments described above. --help must be alone:
+mixing it with a programming command fails without contacting hardware.
+Raw UDS, flash and EEPROM operations are NOT enabled by this help.
+A simulated pass does not qualify the device on a real ECU.
+Linux x64/ARM64 bridge and matching CLI remain planned in issue #115.</value></data>
+</root>
