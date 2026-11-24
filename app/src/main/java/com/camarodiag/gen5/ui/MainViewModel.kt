@@ -2431,13 +2431,59 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         recordConsoleEvents(listOf(txEvent))
         lateinit var requestJob: Job
         requestJob = viewModelScope.launch(Dispatchers.IO, start = CoroutineStart.LAZY) {
+            val rawRxStream = CanConsoleRawRxStream()
+            var rxStreamFinished = false
+            fun persistResponseBatch(batch: CanConsoleRawRxStream.Batch) {
+                if (canRequestJob !== requestJob ||
+                    confirmedConsoleGeneration != _liveCanMonitorState.value.consoleContextGeneration ||
+                    !isCurrentAccountGeneration(confirmedAccountGeneration) ||
+                    confirmedAdapterGeneration != connectionAttemptGeneration ||
+                    confirmedVehicle != _vehicle.value
+                ) return
+                val records = batch.records.map { received ->
+                    CanConsoleHistoryEntry(
+                        id = System.nanoTime(),
+                        direction = received.direction,
+                        timestampMillis = batch.receivedAtMillis,
+                        content = received.content,
+                        succeeded = received.succeeded
+                    )
+                }
+                val discarded = if (batch.discardedOversizedLines > 0) {
+                    listOf(CanConsoleHistoryEntry(
+                        id = System.nanoTime(),
+                        direction = "SYSTEM",
+                        timestampMillis = batch.receivedAtMillis,
+                        content = localizedContext.getString(
+                            R.string.can_console_oversized_line, batch.discardedOversizedLines
+                        ),
+                        succeeded = false
+                    ))
+                } else emptyList()
+                // Persist each physical RX batch, not just the diagnostic
+                // matcher’s recent 300-record UI window. The callback runs
+                // on IO and keeps constant memory during long ECU replies.
+                recordConsoleEvents(records + discarded)
+            }
+            fun drainResponseStream() {
+                if (!rxStreamFinished) {
+                    rxStreamFinished = true
+                    persistResponseBatch(rawRxStream.finish())
+                }
+            }
             try {
-                val transmission = obdManager.sendRawCanFrameWithStatus(frame, approval) {
+                val transmission = obdManager.sendRawCanFrameWithStatus(
+                    frame, approval,
+                    onPhysicalResponseChunk = { chunk, receivedAtMillis ->
+                        persistResponseBatch(rawRxStream.append(chunk, receivedAtMillis))
+                    }
+                ) {
                     isCurrentAccountGeneration(confirmedAccountGeneration) &&
                         confirmedAdapterGeneration == connectionAttemptGeneration &&
                         confirmedVehicle == _vehicle.value &&
                         confirmedConsoleGeneration == _liveCanMonitorState.value.consoleContextGeneration
                 }
+                drainResponseStream()
                 val response = transmission.adapterOutput
                 if (canRequestJob === requestJob) {
                     val current = _liveCanMonitorState.value
@@ -2469,7 +2515,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             )
                         ))
                     }
-                    recordConsoleEvents(displayedReceivedEvents)
+                    // Live RX was already written in full through the
+                    // transport callback; only a fallback acknowledgement
+                    // needs to be appended when no physical record arrived.
+                    if (rawRxStream.recordCount == 0L)
+                        recordConsoleEvents(displayedReceivedEvents)
                     _liveCanMonitorState.value = current.copy(
                         isSendingRequest = false,
                         consoleHistory = (
@@ -2485,6 +2535,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     )
                 }
             } catch (cancelled: CancellationException) {
+                drainResponseStream()
                 if (canRequestJob === requestJob) {
                     val current = _liveCanMonitorState.value
                     val receivedEvents = (cancelled as? CanConsolePhysicalExchangeCancelled)
@@ -2497,7 +2548,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                                 succeeded = timed.record.succeeded
                             )
                         }
-                    recordConsoleEvents(receivedEvents)
+                    if (rawRxStream.recordCount == 0L) recordConsoleEvents(receivedEvents)
                     // A cancelled TX stays pending/unsuccessful. Old vehicle jobs
                     // cannot reach this branch after detachCanRequest().
                     _liveCanMonitorState.value = current.copy(
@@ -2508,6 +2559,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 throw cancelled
             } catch (error: Exception) {
+                drainResponseStream()
                 if (canRequestJob === requestJob) {
                     reportConnectionLoss(error)
                     val current = _liveCanMonitorState.value
@@ -2534,7 +2586,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         content = errorMessage,
                         succeeded = false
                     )
-                    recordConsoleEvents(receivedEvents + errorEvent)
+                    // Only the error outcome is new: physical RX was
+                    // already persisted before this late transport failure.
+                    recordConsoleEvents(
+                        (if (rawRxStream.recordCount == 0L) receivedEvents else emptyList()) +
+                            errorEvent
+                    )
                     _liveCanMonitorState.value = current.copy(
                         isSendingRequest = false,
                         consoleHistory = (
