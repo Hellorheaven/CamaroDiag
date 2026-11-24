@@ -57,6 +57,19 @@ function publicUser(user) {
     };
 }
 
+// Bounded pages; listing does not grant licenses or expose auth tokens.
+exports.adminListAccounts = onCall({ region, enforceAppCheck: ENFORCE_APP_CHECK }, async request => {
+    const actor = adminIdentity(request);
+    await requireCurrentAdmin(actor, request.auth.token.auth_time);
+    const token = request.data?.pageToken;
+    if (token !== undefined && (typeof token !== "string" || !token.length || token.length > 4096))
+        throw new HttpsError("invalid-argument", "Invalid page token.");
+    const page = await getAuth().listUsers(25, token);
+    const accounts = await Promise.all(page.users.map(visibleAccount));
+    await requireCurrentAdmin(actor, request.auth.token.auth_time);
+    return { accounts, nextPageToken: page.pageToken || null };
+});
+
 exports.adminGetAccount = onCall({ region, enforceAppCheck: ENFORCE_APP_CHECK }, async request => {
     const actor = adminIdentity(request);
     await requireCurrentAdmin(actor, request.auth.token.auth_time);

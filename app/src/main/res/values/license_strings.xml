@@ -7,4 +7,23 @@
     <string name="license_activation_help">The license activates after server confirmation of payment. Return here and tap Refresh. A redirect alone never grants a license.</string>
     <string name="license_required_for_feature">Activate a license on the signed-in account to use this feature.</string>
     <string name="license_checkout_not_open">Purchases are not open yet. Verified accounts currently receive a complimentary license unless access is revoked by an administrator.</string>
+    <string name="admin_table_title">User management</string>
+    <string name="admin_table_refresh">Refresh</string>
+    <string name="admin_table_close">Close</string>
+    <string name="admin_table_error">Operation failed. Sign in again if needed.</string>
+    <string name="admin_table_email">User</string>
+    <string name="admin_table_license">License</string>
+    <string name="admin_table_admin">Administrator</string>
+    <string name="admin_table_active">Active</string>
+    <string name="admin_table_verified">Verified</string>
+    <string name="admin_table_owner">Owner</string>
+    <string name="admin_table_more">More users</string>
+    <string name="admin_table_empty">No users</string>
+    <string name="admin_table_revoke">Revoke sessions</string>
+    <string name="admin_table_reset">Send password reset</string>
+    <string name="admin_table_confirm">Confirm</string>
+    <string name="admin_table_cancel">Cancel</string>
+    <string name="admin_table_yes">Yes</string>
+    <string name="admin_table_no">No</string>
+    <string name="admin_table_unknown">Unknown</string>
 </resources>

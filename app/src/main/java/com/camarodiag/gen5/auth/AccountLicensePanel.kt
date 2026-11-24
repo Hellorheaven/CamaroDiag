@@ -2,7 +2,14 @@ package com.camarodiag.gen5.auth
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import com.camarodiag.gen5.R
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -56,226 +63,151 @@ internal fun AccountLicenseStatus(
     )
 }
 
+private data class AdminAccountRow(
+    val uid: String, val email: String, val admin: Boolean, val owner: Boolean,
+    val disabled: Boolean, val verified: Boolean, val licensed: Boolean?,
+    val passwordLinked: Boolean
+)
+
+private fun parseAdminAccount(raw: Any?): AdminAccountRow? {
+    val m = raw as? Map<*, *> ?: return null
+    val uid = (m["uid"] as? String)?.takeIf { it.isNotBlank() } ?: return null
+    return AdminAccountRow(uid, m["email"] as? String ?: "", m["administrator"] == true,
+        m["functionalTests"] == true, m["disabled"] == true, m["emailVerified"] == true,
+        (m["license"] as? Map<*, *>)?.get("licensed") as? Boolean,
+        (m["providers"] as? List<*>)?.contains("password") == true)
+}
+
+private data class AdminChange(val row: AdminAccountRow, val action: String, val value: Boolean?)
+
 @Composable
 internal fun AccountAdministrationDialog(french: Boolean, onClose: () -> Unit) {
     val functions = remember { FirebaseFunctions.getInstance("europe-west1") }
-    var email by remember { mutableStateOf("") }
-    var uid by remember { mutableStateOf<String?>(null) }
-    var selectedEmail by remember { mutableStateOf("") }
-    var licensed by remember { mutableStateOf<Boolean?>(null) }
-    var disabled by remember { mutableStateOf(false) }
-    var isAdmin by remember { mutableStateOf(false) }
-    var isOwner by remember { mutableStateOf(false) }
-    var emailVerified by remember { mutableStateOf(false) }
-    var passwordLinked by remember { mutableStateOf(false) }
-    var source by remember { mutableStateOf("") }
-    var message by remember { mutableStateOf("") }
-    var busy by remember { mutableStateOf(false) }
-    var searchGeneration by remember { mutableIntStateOf(0) }
-    var confirm by remember { mutableStateOf<Pair<String, Boolean?>?>(null) }
-
-    fun updateFromServer(raw: Any?) {
-        val envelope = raw as? Map<*, *> ?: return
-        val account = envelope["account"] as? Map<*, *> ?: return
-        uid = account["uid"] as? String
-        selectedEmail = account["email"] as? String ?: ""
-        disabled = account["disabled"] == true
-        emailVerified = account["emailVerified"] == true
-        isOwner = account["functionalTests"] == true
-        isAdmin = account["administrator"] == true
-        val providers = account["providers"] as? List<*>
-        passwordLinked = providers?.contains("password") == true
-        val status = account["license"] as? Map<*, *>
-        licensed = status?.get("licensed") as? Boolean
-        source = status?.get("source") as? String ?: ""
-    }
-
-    fun fetchAccount() {
-        val searchedEmail = email.trim()
-        if (searchedEmail.isBlank() || busy) return
-        val requestGeneration = ++searchGeneration
+    val actor = FirebaseAuth.getInstance().currentUser?.uid
+    var rows by remember(actor) { mutableStateOf<List<AdminAccountRow>>(emptyList()) }
+    var next by remember(actor) { mutableStateOf<String?>(null) }
+    var busy by remember(actor) { mutableStateOf(false) }
+    var error by remember(actor) { mutableStateOf(false) }
+    var pending by remember(actor) { mutableStateOf<AdminChange?>(null) }
+    var selected by remember(actor) { mutableStateOf<AdminAccountRow?>(null) }
+    var active by remember(actor) { mutableStateOf(true) }
+    DisposableEffect(actor) { onDispose { active = false } }
+    fun current() = active && actor != null && FirebaseAuth.getInstance().currentUser?.uid == actor
+    fun load(reset: Boolean) {
+        if (busy || !current()) return
+        val token = if (reset) null else next ?: return
         busy = true
-        message = ""
-        uid = null
-        licensed = null
-        functions.getHttpsCallable("adminGetAccount")
-            .call(mapOf("email" to searchedEmail))
-            .addOnCompleteListener { task ->
-                busy = false
-                // A response for a previous search must never select another user.
-                if (requestGeneration != searchGeneration ||
-                    !email.trim().equals(searchedEmail, ignoreCase = true)
-                ) return@addOnCompleteListener
-                if (task.isSuccessful) {
-                    updateFromServer(task.result?.data)
-                    if (uid == null) message = if (french) "Réponse incomplète" else "Incomplete response"
-                } else {
-                    message = if (french) "Consultation indisponible. Reconnectez-vous si nécessaire."
-                    else "Lookup unavailable. Sign in again if necessary."
-                }
-            }
+        error = false
+        if (reset) { rows = emptyList(); next = null; selected = null }
+        val payload = if (token == null) emptyMap<String, String>() else mapOf("pageToken" to token)
+        functions.getHttpsCallable("adminListAccounts").call(payload).addOnCompleteListener { task ->
+            if (!current()) return@addOnCompleteListener
+            busy = false
+            val data = if (task.isSuccessful) task.result?.data as? Map<*, *> else null
+            val raw = data?.get("accounts") as? List<*>
+            val page = raw?.mapNotNull(::parseAdminAccount)
+            if (page == null || page.size != raw.size) { error = true; return@addOnCompleteListener }
+            rows = (rows + page).distinctBy { it.uid }
+            next = data["nextPageToken"] as? String
+        }
     }
-
-    fun changeAccount(action: String, value: Boolean? = null) {
-        val targetUid = uid ?: return
-        val targetEmail = selectedEmail
-        if (isOwner || busy) return
+    fun editable(row: AdminAccountRow) = row.uid != actor && !row.owner
+    fun apply(change: AdminChange) {
+        if (busy || !current() || !editable(change.row)) return
         busy = true
-        message = ""
-        val payload = mutableMapOf<String, Any>("uid" to targetUid, "action" to action)
-        if (value != null) payload["value"] = value
-        functions.getHttpsCallable("adminUpdateAccount")
-            .call(payload)
-            .addOnCompleteListener { task ->
-                busy = false
-                // Never display a stale change result for another selected user.
-                if (uid != targetUid || selectedEmail != targetEmail) return@addOnCompleteListener
-                if (task.isSuccessful) {
-                    updateFromServer(task.result?.data)
-                    message = if (french) "Modification enregistrée." else "Change saved."
-                } else {
-                    message = if (french) "Modification refusée. Vérifiez vos droits ou reconnectez-vous."
-                    else "Change refused. Check your permissions or sign in again."
-                }
-            }
+        error = false
+        val data = mutableMapOf<String, Any>("uid" to change.row.uid, "action" to change.action)
+        change.value?.let { data["value"] = it }
+        functions.getHttpsCallable("adminUpdateAccount").call(data).addOnCompleteListener { task ->
+            if (!current()) return@addOnCompleteListener
+            busy = false
+            val envelope = if (task.isSuccessful) task.result?.data as? Map<*, *> else null
+            val result = parseAdminAccount(envelope?.get("account"))
+            if (result == null || result.uid != change.row.uid) { error = true; return@addOnCompleteListener }
+            rows = rows.map { if (it.uid == result.uid) result else it }
+            if (selected?.uid == result.uid) selected = result
+        }
     }
-
-    AlertDialog(
-        onDismissRequest = { if (!busy) onClose() },
-        title = { Text(if (french) "Administration des comptes" else "Account administration") },
-        text = {
-            Column(
-                Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                Text(if (french) "Recherche par adresse e-mail" else "Search by email address")
-                OutlinedTextField(
-                    value = email,
-                    onValueChange = {
-                        email = it
-                        searchGeneration++
-                        uid = null
-                        selectedEmail = ""
-                        confirm = null
-                        licensed = null
-                        message = ""
-                    },
-                    label = { Text(if (french) "E-mail utilisateur" else "User email") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Button(enabled = !busy && email.contains("@"), onClick = { fetchAccount() }) {
-                    Text(if (french) "Rechercher" else "Search")
+    LaunchedEffect(actor) { load(true) }
+    val yes = stringResource(R.string.admin_table_yes)
+    val no = stringResource(R.string.admin_table_no)
+    val unknown = stringResource(R.string.admin_table_unknown)
+    fun status(v: Boolean?) = when(v) { true -> yes; false -> no; null -> unknown }
+    Dialog(onDismissRequest = { if (!busy) onClose() },
+        properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Surface(modifier = Modifier.fillMaxWidth().padding(12.dp), shape = MaterialTheme.shapes.large) {
+            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(stringResource(R.string.admin_table_title), style = MaterialTheme.typography.titleLarge)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = { load(true) }, enabled = !busy) { Text(stringResource(R.string.admin_table_refresh)) }
+                    TextButton(onClick = onClose, enabled = !busy) { Text(stringResource(R.string.admin_table_close)) }
                 }
-                if (uid != null) {
+                if (error) Text(stringResource(R.string.admin_table_error), color = MaterialTheme.colorScheme.error)
+                if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
+                Column(Modifier.horizontalScroll(rememberScrollState())) {
+                    Row {
+                        Text(stringResource(R.string.admin_table_email), Modifier.width(240.dp))
+                        Text(stringResource(R.string.admin_table_license), Modifier.width(100.dp))
+                        Text(stringResource(R.string.admin_table_admin), Modifier.width(130.dp))
+                        Text(stringResource(R.string.admin_table_active), Modifier.width(100.dp))
+                        Text(stringResource(R.string.admin_table_verified), Modifier.width(100.dp))
+                    }
                     HorizontalDivider()
-                    Text(selectedEmail, style = MaterialTheme.typography.titleSmall)
-                    Text(if (french) "E-mail vérifié : " + if (emailVerified) "Oui" else "Non"
-                         else "Email verified: " + if (emailVerified) "Yes" else "No")
-                    Text(if (french) "Compte : " + if (disabled) "Désactivé" else "Actif"
-                         else "Account: " + if (disabled) "Disabled" else "Active")
-                    Text(if (french) "Administrateur : " + if (isAdmin) "Oui" else "Non"
-                         else "Administrator: " + if (isAdmin) "Yes" else "No")
-                    Text(if (french) "Licence : " + if (licensed == true) "Oui" else "Non"
-                         else "License: " + if (licensed == true) "Yes" else "No")
-                    if (source.isNotBlank()) Text(
-                        (if (french) "Origine : " else "Source: ") + source,
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                    if (isOwner) {
-                        Text(if (french) "Compte propriétaire protégé : modification interdite."
-                             else "Protected owner account: changes are not permitted.")
-                    } else {
-                        Text(if (french) "Attribuer ou retirer une licence" else "Grant or revoke license")
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Button(enabled = !busy && licensed != true, onClick = {
-                                changeAccount("license", true)
-                            }) { Text(if (french) "Licence Oui" else "License Yes") }
-                            OutlinedButton(enabled = !busy && licensed != false, onClick = {
-                                confirm = "license" to false
-                            }) { Text(if (french) "Licence Non" else "License No") }
-                        }
-                        HorizontalDivider()
-                        Text(if (french) "Gestion des droits" else "Permission management")
-                        OutlinedButton(enabled = !busy, onClick = {
-                            confirm = "administrator" to !isAdmin
-                        }) {
-                            Text(if (isAdmin) {
-                                if (french) "Retirer le droit administrateur" else "Revoke administrator"
-                            } else {
-                                if (french) "Donner le droit administrateur" else "Grant administrator"
-                            })
-                        }
-                        OutlinedButton(enabled = !busy, onClick = {
-                            confirm = "disable" to !disabled
-                        }) {
-                            Text(if (disabled) {
-                                if (french) "Réactiver le compte" else "Enable account"
-                            } else {
-                                if (french) "Désactiver le compte" else "Disable account"
-                            })
-                        }
-                        OutlinedButton(enabled = !busy, onClick = {
-                            confirm = "revoke_sessions" to null
-                        }) { Text(if (french) "Révoquer les sessions" else "Revoke sessions") }
-                        if (passwordLinked && !disabled) {
-                            OutlinedButton(enabled = !busy, onClick = {
-                                busy = true
-                                FirebaseAuth.getInstance().sendPasswordResetEmail(selectedEmail)
-                                    .addOnCompleteListener { result ->
-                                        busy = false
-                                        message = if (result.isSuccessful) {
-                                            if (french) "E-mail de réinitialisation demandé."
-                                            else "Password reset email requested."
-                                        } else {
-                                            if (french) "Envoi du courriel impossible."
-                                            else "Could not send reset email."
-                                        }
-                                    }
-                            }) {
-                                Text(if (french) "Envoyer une réinitialisation de mot de passe"
-                                     else "Send password reset email")
+                    LazyColumn(Modifier.width(670.dp).heightIn(max = 440.dp)) {
+                        items(rows, key = { it.uid }) { row ->
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                TextButton(onClick = { selected = row }, modifier = Modifier.width(240.dp)) {
+                                    Text(row.email.ifBlank { row.uid })
+                                }
+                                TextButton(onClick = { pending = AdminChange(row, "license", row.licensed != true) },
+                                    enabled = !busy && editable(row) && row.licensed != null && !row.disabled &&
+                                        (row.licensed == true || row.verified), modifier = Modifier.width(100.dp)) { Text(status(row.licensed)) }
+                                TextButton(onClick = { pending = AdminChange(row, "administrator", !row.admin) },
+                                    enabled = !busy && editable(row), modifier = Modifier.width(130.dp)) {
+                                    Text(if (row.owner) stringResource(R.string.admin_table_owner) else status(row.admin))
+                                }
+                                TextButton(onClick = { pending = AdminChange(row, "disable", !row.disabled) },
+                                    enabled = !busy && editable(row) && (!row.admin || row.disabled), modifier = Modifier.width(100.dp)) { Text(status(!row.disabled)) }
+                                Text(status(row.verified), Modifier.width(100.dp))
                             }
+                            HorizontalDivider()
                         }
                     }
                 }
-                if (message.isNotEmpty()) Text(message)
-                if (busy) CircularProgressIndicator()
-            }
-        },
-        confirmButton = {
-            TextButton(enabled = !busy, onClick = onClose) {
-                Text(if (french) "Fermer" else "Close")
+                if (next != null) OutlinedButton(enabled = !busy, onClick = { load(false) }) { Text(stringResource(R.string.admin_table_more)) }
+                if (!busy && !error && rows.isEmpty()) Text(stringResource(R.string.admin_table_empty))
             }
         }
-    )
-
-    if (confirm != null) {
-        val pending = confirm!!
-        val label = when (pending.first) {
-            "disable" -> if (french) "Modifier l'état du compte et éventuellement déconnecter l'utilisateur ?"
-                         else "Change account status and possibly sign the user out?"
-            "administrator" -> if (french) "Modifier les droits d'administration de cet utilisateur ?"
-                               else "Change this user's administration permissions?"
-            "revoke_sessions" -> if (french) "Révoquer toutes les sessions de ce compte ?"
-                                 else "Revoke all sessions for this account?"
-            else -> if (french) "Retirer l'accès aux fonctions Premium ?" else "Remove Premium access?"
-        }
-        AlertDialog(
-            onDismissRequest = { confirm = null },
-            title = { Text(if (french) "Confirmation" else "Confirm change") },
-            text = { Text(label) },
-            confirmButton = {
-                TextButton(onClick = {
-                    confirm = null
-                    changeAccount(pending.first, pending.second)
-                }) { Text(if (french) "Confirmer" else "Confirm") }
-            },
-            dismissButton = {
-                TextButton(onClick = { confirm = null }) {
-                    Text(if (french) "Annuler" else "Cancel")
+    }
+    selected?.let { row ->
+        AlertDialog(onDismissRequest = { selected = null }, title = { Text(row.email.ifBlank { row.uid }) },
+            text = { Column {
+                Text(status(row.verified))
+                OutlinedButton(enabled = !busy && editable(row), onClick = { selected = null; pending = AdminChange(row, "revoke_sessions", null) }) {
+                    Text(stringResource(R.string.admin_table_revoke))
                 }
-            }
-        )
+                if (row.passwordLinked && !row.disabled && row.email.isNotBlank()) {
+                    OutlinedButton(enabled = !busy && editable(row), onClick = {
+                        busy = true; error = false; selected = null
+                        FirebaseAuth.getInstance().sendPasswordResetEmail(row.email).addOnCompleteListener {
+                            if (current()) { busy = false; error = !it.isSuccessful }
+                        }
+                    }) { Text(stringResource(R.string.admin_table_reset)) }
+                }
+            } }, confirmButton = { TextButton(onClick = { selected = null }) { Text(stringResource(R.string.admin_table_close)) } })
+    }
+    pending?.let { change ->
+        val permission = stringResource(when(change.action) {
+            "license" -> R.string.admin_table_license
+            "administrator" -> R.string.admin_table_admin
+            "disable" -> R.string.admin_table_active
+            else -> R.string.admin_table_revoke
+        })
+        AlertDialog(onDismissRequest = { pending = null },
+            title = { Text(stringResource(R.string.admin_table_confirm)) },
+            text = { Text(change.row.email.ifBlank { change.row.uid } + "\n" + permission +
+                (change.value?.let { ": " + status(if (change.action == "disable") !it else it) } ?: "")) },
+            confirmButton = { TextButton(onClick = { pending = null; apply(change) }) { Text(stringResource(R.string.admin_table_confirm)) } },
+            dismissButton = { TextButton(onClick = { pending = null }) { Text(stringResource(R.string.admin_table_cancel)) } })
     }
 }

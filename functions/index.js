@@ -6,3 +6,5 @@ const admin = require("./account-admin");
 exports.getMyLicenseStatus = license.getMyLicenseStatus;
 exports.adminGetAccount = admin.adminGetAccount;
 exports.adminUpdateAccount = admin.adminUpdateAccount;
+
+exports.adminListAccounts = admin.adminListAccounts;
