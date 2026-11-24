@@ -42,6 +42,46 @@ class CanConsoleEventJournalStoreTest {
         }
     }
 
+    @Test fun clickRevisionNeverAuthorizesEventsAddedBeforeBackgroundSnapshot() {
+        val directory = Files.createTempDirectory("console-export-revision").toFile()
+        try {
+            val store = CanConsoleEventJournalStore(directory)
+            store.append(listOf(event(0)))
+            val clickedAtRevision = store.revision()
+            assertEquals(clickedAtRevision, store.revision())
+            // IO worker starts later, after a second event arrived.
+            store.append(listOf(event(1)))
+            val lateSnapshot = requireNotNull(store.snapshot())
+            assertEquals(2L, lateSnapshot.eventCount)
+            assertTrue(store.isCurrent(lateSnapshot))
+            assertTrue(store.revision() != clickedAtRevision)
+            // Capturing another session's snapshot must not authorize export.
+            store.reset()
+            store.append(listOf(event(2)))
+            assertTrue(store.revision() != clickedAtRevision)
+            assertFalse(store.isCurrent(lateSnapshot))
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
+
+    @Test fun longEventJournalSnapshotRemainsCompleteAndRevisionStable() {
+        val directory = Files.createTempDirectory("console-large-export").toFile()
+        try {
+            val store = CanConsoleEventJournalStore(directory)
+            val events = (0 until 2000).map { event(it) }
+            store.append(events)
+            val atClick = store.revision()
+            val snapshot = requireNotNull(store.snapshot())
+            assertEquals(2000L, snapshot.eventCount)
+            assertEquals(atClick, store.revision())
+            assertTrue(store.isCurrent(snapshot))
+            assertEquals(2001, snapshot.file.useLines { it.count() })
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
+
     @Test fun disappearingArchiveInvalidatesSnapshotAndPreventsExport() {
         val directory = Files.createTempDirectory("console-lost").toFile()
         try {
