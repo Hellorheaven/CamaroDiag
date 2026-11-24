@@ -2670,14 +2670,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val snapshot = _liveCanMonitorState.value
         val history = snapshot.consoleHistory.toList()
         val selectedArchive = activeCanCaptureFile
-        val journalSnapshot = consoleEventJournal.snapshot()
+        // The UI must never flush and SHA-256 hash a multi-hour event archive.
+        // Capture only a cheap journal revision; the worker reads and hashes
+        // the actual bytes on Dispatchers.IO before publishing the export.
+        val journalRevisionAtClick = consoleEventJournal.revision()
+        var expectedJournalSnapshot: CanConsoleEventJournalStore.Snapshot? = null
         // Do not publish an old snapshot after Clear, a new recording, or a
         // new physical TX has changed the active console since export started.
         fun current() = canResumeExport(exportGeneration, owner) &&
             _vehicle.value == profile && hasPremiumLicense() &&
             activeCanCaptureFile == selectedArchive &&
             !consoleEventJournalFailed && !consoleEventJournal.hasFailed() &&
-            (journalSnapshot == null || consoleEventJournal.isCurrent(journalSnapshot)) &&
+            consoleEventJournal.revision() == journalRevisionAtClick &&
+            (expectedJournalSnapshot?.let { consoleEventJournal.isCurrent(it) } != false) &&
             !_liveCanMonitorState.value.isCapturing &&
             !_liveCanMonitorState.value.isSendingRequest &&
             !_liveCanMonitorState.value.rawArchiveFailed &&
@@ -2687,6 +2692,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _liveCanMonitorState.value.rawText == snapshot.rawText
         viewModelScope.launch(Dispatchers.IO) {
             try {
+                if (!current()) return@launch
+                val journalSnapshot = consoleEventJournal.snapshot()
+                expectedJournalSnapshot = journalSnapshot
                 if (!current()) return@launch
                 val archive = selectedArchive?.takeIf { it.isFile }
                 check(history.isEmpty() || journalSnapshot != null) {
