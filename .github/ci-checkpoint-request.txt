@@ -1,3 +1,7 @@
+PR117 — CAPABILITIES / ELM UDS / DOIP FUNCTIONAL INTEGRATION — INTERMEDIATE DEBUG CHECKPOINT
+Implementation HEAD: c0ea895772505f25412dc67c389b113c8750d7dc
+Full grouped Android/backend/Windows/native/Connectors Debug validation, including administration table/deletion, connector capability inventory, ELM ISO-TP and CAN profiles, DoIP DID monitoring, context and resource regressions. Intermediate only, not C8. No deployment Firebase, no merge, no Release, no physical qualification.
+
 PR117 — UI CLEANUP AND DOIP INTERMEDIATE DEBUG CHECKPOINT — 2026-11-24
 Implementation + handoff HEAD: 8523a18dc0612cdb7446da5d079140d8912e6af3
 Run full Debug validation of Android and Windows UI cleanup, DoIP DTC TCP regression tests and shared DID reading, native and connectors. This is not C8 final. No merge or release.
