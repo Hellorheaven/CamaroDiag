@@ -94,6 +94,9 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
             while (true)
             {
                 var routing = await session.ReceiveAsync(deadline.Token);
+                // Receiving a routing message concurrently with a timer's
+                // expiry cannot retroactively activate an expired session.
+                deadline.Token.ThrowIfCancellationRequested();
                 DoIpCodec.RequireNoGenericNack(routing);
                 if (routing.Version != protocolVersion)
                     throw new InvalidDataException(
@@ -122,6 +125,7 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
                     Console.WriteLine("DoIP vehicle confirmation received; routing is now active.");
                 break;
             }
+            deadline.Token.ThrowIfCancellationRequested();
             return session;
         }
         catch
