@@ -1,3 +1,23 @@
+C8 COHERENT USB AND BRIDGE COMPILE FIX CHECKPOINT — 2026-11-24
+Software HEAD before request: 027ddeafc1ef7e4e4491ae5d72ae11cd7938cbf2
+Scope (strictly NON-PROTOCOL; one PR #95):
+- Fix Android UsbSerialPort.write API: Unit-returning, not an Int byte count.
+  Do not claim raw accepted byte count or delivery; nonempty preflight and
+  ordinary IOException reporting, with offline unit tests.
+- Atomic USB connection-slot with generation ownership; stale opens cannot
+  publish/close new port; failure state belongs to exact USB session.
+- Wi-Fi/Bluetooth/BLE/J2534 connection session-generation isolation and
+  stale read/write results; simulation-only tests.
+- Bounded BLE notification queue; overflow disconnects rather than silently
+  losing bytes.
+- Python Connectors and Windows J2534 bridge: list local serial COM/USB ports
+  without opening hardware; tests; Windows bilingual CLI --help updated.
+- Other protocol session owns DoIP compile corrections concurrently.
+Run full Android unit/lint/Debug build, Windows J2534 Debug, native ECU,
+Python Connector 3.11-3.13, STM32/ESP32 and Windows USB discover tests.
+No physical ECU/vehicle tests in PR; post-Release Lot 8 issue #48 only.
+Do not merge, release or create a new PR/branch.
+
 C8 GROUPED CONNECTION LIFECYCLE CHECKPOINT — 2026-11-24
 Implementation HEAD: e509113810a78528f702344c27ef710d49d0120c
 Scope: C6 / all adapter connections, NON-PROTOCOL (ISO/SAE owned by other chat).
