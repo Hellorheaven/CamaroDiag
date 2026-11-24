@@ -117,6 +117,8 @@ data class CalibrationWorkspaceState(
     val doIpTrace: List<String> = emptyList(),
     val doIpBackupScope: DoIpMemoryBackup.Scope? = null,
     val doIpBackupBytes: Int = 0,
+    val doIpLiveSamples: List<DoIpMonitorRow> = emptyList(),
+    val doIpMonitorReport: DoIpMonitorReport? = null,
     val isJ2534BridgeConnecting: Boolean = false,
     val isJ2534BridgeConnected: Boolean = false,
     val isJ2534MemoryReadAvailable: Boolean = false,
@@ -258,6 +260,7 @@ fun CalibrationWorkspaceScreen(
     onReadDirectDoIp: (String, String, String, String, Boolean, DoIpDirectRead.Operation) -> Unit,
     onCancelDirectDoIp: () -> Unit,
     onMonitorDirectDoIp: (String, String, String, String, Boolean, Int, Int) -> Unit,
+    onExportDoIpMonitoring: (DoIpMonitorReport) -> Unit,
     onImportDoIpBackupProfile: () -> Unit,
     onVerifyDoIpBackup: (DoIpMemoryBackup.Scope) -> Unit,
     onCaptureDoIpBackup: (String, String, String, Boolean, DoIpMemoryBackup.Scope) -> Unit,
@@ -459,6 +462,22 @@ fun CalibrationWorkspaceScreen(
                     }
                     if (state.doIpResult.isNotBlank())
                         Text(state.doIpResult, color = TextPrimary, fontFamily = FontFamily.Monospace)
+                    if (state.doIpLiveSamples.isNotEmpty()) {
+                        Text(stringResource(R.string.cal_doip_monitor_samples_received, state.doIpLiveSamples.size),
+                            color = CamaroAmber, fontWeight = FontWeight.Bold)
+                        state.doIpLiveSamples.forEach { sample ->
+                            Text("#${sample.index}  ${sample.elapsedMs} ms  ${sample.payloadHex}",
+                                color = TextPrimary, fontFamily = FontFamily.Monospace, fontSize = 11.sp)
+                        }
+                        if (idle && state.doIpMonitorReport == null)
+                            Text(stringResource(R.string.cal_doip_monitor_partial), color = CamaroAmber, fontSize = 11.sp)
+                    }
+                    state.doIpMonitorReport?.let { report ->
+                        OutlinedButton(onClick = { onExportDoIpMonitoring(report) },
+                            enabled = idle, modifier = Modifier.fillMaxWidth()) {
+                            Text(stringResource(R.string.cal_doip_monitor_export))
+                        }
+                    }
                     if (state.doIpTrace.isNotEmpty() && state.doIpBackupBytes > 0)
                         Text(stringResource(R.string.cal_doip_recent_trace), color = TextMuted, fontSize = 10.sp)
                     state.doIpTrace.forEach { line ->

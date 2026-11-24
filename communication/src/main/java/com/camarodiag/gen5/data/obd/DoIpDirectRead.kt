@@ -54,7 +54,7 @@ object DoIpDirectRead {
         }
     }
     data class Gateway(val vin: String?, val logicalAddress: Int, val version: Int)
-    data class Trace(val direction: String, val payloadHex: String)
+    data class Trace(val direction: String, val payloadHex: String, val observedAtUtcMillis: Long = System.currentTimeMillis())
     data class Outcome(val gateway: Gateway, val ecu: Int, val vin: String?,
         val data: ByteArray?, val dtcs: UdsDtcReport?, val trace: List<Trace>,
         val samples: List<Sample> = emptyList(), val capture: DoIpMemoryBackup.Capture? = null)
@@ -135,12 +135,14 @@ object DoIpDirectRead {
 
     private class Session(private val socket: Socket, private val gateway: Gateway,
         private val target: Target, private val trace: MutableList<Trace>,
-        private val rollingTrace: Boolean = false) {
+        private val rollingTrace: Boolean = false, private val onTrace: (Trace) -> Unit = {}) {
         private fun record(direction: String, payload: ByteArray) {
             require(payload.size <= 65536)
             if (rollingTrace && trace.size >= 128) trace.removeAt(0)
             check(trace.size < 128) { "DoIP diagnostic trace limit exceeded." }
-            trace += Trace(direction, hex(payload))
+            val event = Trace(direction, hex(payload))
+            trace += event
+            onTrace(event)
         }
         private fun readExact(size: Int, deadline: Long): ByteArray {
             val output = ByteArray(size)
@@ -247,7 +249,8 @@ object DoIpDirectRead {
     suspend fun read(target: Target, operation: Operation, did: Int = 0xF190,
         mask: Int = 255, timeoutMs: Int = 5000, sampleCount: Int = 10,
         intervalMs: Int = 1000, backupScope: DoIpMemoryBackup.Scope? = null,
-        onBackupProgress: (Int, Int) -> Unit = { _, _ -> }): Outcome {
+        onBackupProgress: (Int, Int) -> Unit = { _, _ -> },
+        onTrace: (Trace) -> Unit = {}, onSample: (Sample) -> Unit = {}): Outcome {
         require(timeoutMs in 100..30_000 && did in 0..65535 && mask in 0..255)
         require(operation == Operation.VIN || target.expectedVin.isNotEmpty())
         require(sampleCount in 1..30 && intervalMs in 250..5000)
@@ -277,7 +280,8 @@ object DoIpDirectRead {
                     secure
                 } else base
                 wire.use {
-                    val session = Session(wire, gateway, target, trace, rollingTrace = operation == Operation.BACKUP)
+                    val session = Session(wire, gateway, target, trace, rollingTrace = operation == Operation.BACKUP,
+                        onTrace = onTrace)
                     session.activate(timeoutMs)
                     fun readVin(): String {
                         val reply = session.exchange(byteArrayOf(0x22,0xF1.toByte(),0x90.toByte()), timeoutMs)
@@ -337,8 +341,10 @@ object DoIpDirectRead {
                             for (index in 1..sampleCount) {
                                 val reply = session.exchange(byteArrayOf(0x22, (did shr 8).toByte(), did.toByte()), timeoutMs)
                                 require(reply.size <= 4099) { "DID monitoring sample exceeds limit." }
-                                samples += Sample(index, (System.nanoTime() - start) / 1_000_000,
+                                val sample = Sample(index, (System.nanoTime() - start) / 1_000_000,
                                     reply.copyOfRange(3, reply.size))
+                                samples += sample
+                                onSample(sample.copy(data = sample.data.copyOf()))
                                 if (index < sampleCount) session.waitBetweenSamples(intervalMs, timeoutMs)
                             }
                             require(readVin() == vin)

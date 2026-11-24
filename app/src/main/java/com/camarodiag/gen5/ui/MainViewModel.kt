@@ -112,6 +112,12 @@ data class CanConsoleHistoryEntry(
     val succeeded: Boolean = true
 )
 
+/** Completed, VIN-verified DoIP monitoring capture; partial runs are never exported. */
+data class DoIpMonitorReport(val vin: String, val gateway: Int, val tester: Int, val ecu: Int,
+    val did: Int, val tls: Boolean, val completedAtUtcMillis: Long,
+    val samples: List<DoIpMonitorRow>)
+data class DoIpMonitorRow(val index: Int, val elapsedMs: Long, val payloadHex: String)
+
 data class LiveCanMonitorState(
     val isCapturing: Boolean = false,
     val bitrate: Int = 500_000,
@@ -1116,7 +1122,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 udsDidResponse = "", udsDtcResponse = "", udsMessage = "",
                 obdbSignalValue = "", obdbSignalMessage = "",
                 doIpReading = false, doIpResult = "", doIpTrace = emptyList(),
-                doIpBackupScope = null, doIpBackupBytes = 0)
+                doIpBackupScope = null, doIpBackupBytes = 0, doIpMonitorReport = null, doIpLiveSamples = emptyList())
         }
     }
 
@@ -1206,7 +1212,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val result = DoIpDirectRead.read(target, DoIpDirectRead.Operation.BACKUP,
                     backupScope = scope, onBackupProgress = { pass, offset ->
                         check(current())
-                        _calibrationWorkspace.update { it.copy(doIpBackupBytes = (pass - 1) * scope.length + offset) }
+                        _calibrationWorkspace.update { if (current()) it.copy(doIpBackupBytes = (pass - 1) * scope.length + offset) else it }
+                    }, onTrace = { trace ->
+                        check(current())
+                        _calibrationWorkspace.update {
+                            if (current()) it.copy(doIpTrace = (it.doIpTrace + doIpTraceLine(trace)).takeLast(128)) else it
+                        }
                     })
                 if (!current()) return@launchEnhancedUdsRead
                 val capture = checkNotNull(result.capture)
@@ -1225,7 +1236,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _calibrationWorkspace.update { it.copy(doIpReading = false,
                     doIpResult = localizedContext.getString(R.string.cal_doip_backup_saved,
                         scope.length, capture.sha256, path),
-                    doIpTrace = result.trace.map { trace -> trace.direction + " " + trace.payloadHex }) }
+                    doIpTrace = result.trace.map(::doIpTraceLine)) }
             } catch (cancelled: CancellationException) {
                 if (current()) _calibrationWorkspace.update { it.copy(doIpReading = false, doIpBackupBytes = 0) }
                 throw cancelled
@@ -1236,18 +1247,76 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    private fun doIpTraceLine(trace: DoIpDirectRead.Trace): String =
+        "${trace.observedAtUtcMillis} ${if (trace.direction == "TX") "TX_REQUEST" else "RX"} ${trace.payloadHex}"
+
+    private fun doIpSampleRow(sample: DoIpDirectRead.Sample) = DoIpMonitorRow(sample.index,
+        sample.elapsedMs, sample.data.joinToString("") { "%02X".format(it.toInt() and 255) })
+
+    fun exportDoIpMonitoring(report: DoIpMonitorReport) {
+        if (!requirePremiumLicense() || _calibrationWorkspace.value.doIpMonitorReport !== report) return
+        val owner = authenticatedAccountUid ?: return
+        val account = accountSessionGeneration
+        val connection = connectionAttemptGeneration
+        val vehicle = _vehicle.value
+        fun current() = canResumeExport(account, owner) && hasPremiumLicense() &&
+            connection == connectionAttemptGeneration && _vehicle.value == vehicle &&
+            report.vin == vehicle.vin.uppercase() && !_calibrationWorkspace.value.doIpReading &&
+            _calibrationWorkspace.value.doIpMonitorReport === report
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                check(current() && report.samples.isNotEmpty())
+                val path = CamaroDiagExportStorage.write(getApplication<Application>(),
+                    "CamaroDiag_DoIP_monitor_${report.completedAtUtcMillis}.csv", "text/csv",
+                    category = CamaroDiagExportStorage.Category.REPORTS,
+                    beforePublish = { check(current()) }) { output ->
+                    val writer = output.bufferedWriter(Charsets.UTF_8)
+                    writer.appendLine("vin,gateway_logical,tester_logical,ecu_logical,did,transport,completed_utc_ms,sample,elapsed_ms,payload_hex")
+                    for (sample in report.samples) {
+                        check(current())
+                        writer.appendLine(listOf(report.vin, "%04X".format(report.gateway),
+                            "%04X".format(report.tester), "%04X".format(report.ecu),
+                            "%04X".format(report.did), if (report.tls) "TLS" else "TCP",
+                            report.completedAtUtcMillis, sample.index, sample.elapsedMs, sample.payloadHex).joinToString(","))
+                    }
+                    writer.flush()
+                }
+                _calibrationWorkspace.update { if (current()) it.copy(doIpResult =
+                    localizedContext.getString(R.string.cal_doip_monitor_exported, path)) else it }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                _calibrationWorkspace.update { if (current()) it.copy(doIpResult =
+                    localizedContext.getString(R.string.cal_doip_monitor_export_failed)) else it }
+            }
+        }
+    }
+
     fun readDirectDoIp(host: String, tester: String, ecu: String, didHex: String,
         tls: Boolean, operation: DoIpDirectRead.Operation, sampleCount: Int = 10, intervalMs: Int = 1000) {
         if (!requirePremiumLicense()) return
         launchEnhancedUdsRead { current ->
-            _calibrationWorkspace.update { it.copy(doIpReading = true, doIpResult = "", doIpTrace = emptyList(), doIpBackupBytes = 0) }
+            _calibrationWorkspace.update { it.copy(doIpReading = true, doIpResult = "", doIpTrace = emptyList(), doIpBackupBytes = 0,
+                doIpMonitorReport = null, doIpLiveSamples = emptyList()) }
             try {
                 val target = DoIpDirectRead.Target.parse(host, tester, ecu, _vehicle.value.vin, tls)
                 val did = if (operation in setOf(DoIpDirectRead.Operation.DID, DoIpDirectRead.Operation.MONITOR)) {
                     require(didHex.matches(Regex("[0-9A-Fa-f]{4}")))
                     didHex.toInt(16)
                 } else 0xF190
-                val result = DoIpDirectRead.read(target, operation, did, sampleCount = sampleCount, intervalMs = intervalMs)
+                val result = DoIpDirectRead.read(target, operation, did, sampleCount = sampleCount, intervalMs = intervalMs,
+                    onTrace = { trace ->
+                        check(current())
+                        _calibrationWorkspace.update {
+                            if (current()) it.copy(doIpTrace = (it.doIpTrace + doIpTraceLine(trace)).takeLast(128))
+                            else it
+                        }
+                    }, onSample = { sample ->
+                        check(current())
+                        _calibrationWorkspace.update {
+                            if (current()) it.copy(doIpLiveSamples = it.doIpLiveSamples + doIpSampleRow(sample)) else it
+                        }
+                    })
                 if (!current()) return@launchEnhancedUdsRead
                 val module = "DoIP 0x" + ecu.uppercase()
                 val report = result.dtcs
@@ -1256,9 +1325,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     _dtcs.value = _dtcs.value.filterNot { it.module == module } + mapped
                 }
                 val rendered = when {
-                    result.samples.isNotEmpty() -> result.samples.joinToString("\n") { sample ->
-                        "#${sample.index}  ${sample.elapsedMs} ms  " + sample.data.joinToString(" ") { "%02X".format(it.toInt() and 255) }
-                    }
+                    result.samples.isNotEmpty() -> localizedContext.getString(R.string.cal_doip_monitor_complete, result.samples.size)
                     report != null -> localizedContext.getString(R.string.cal_doip_dtc_count, report.records.size) +
                         report.records.joinToString(separator = "\n", prefix = "\n") {
                             "0x" + it.rawDtc.toString(16).uppercase().padStart(6, '0')
@@ -1266,8 +1333,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     operation == DoIpDirectRead.Operation.VIN -> result.vin.orEmpty()
                     else -> result.data?.joinToString(" ") { "%02X".format(it.toInt() and 255) }.orEmpty()
                 }
+                val monitorReport = if (operation == DoIpDirectRead.Operation.MONITOR)
+                    DoIpMonitorReport(checkNotNull(result.vin), result.gateway.logicalAddress,
+                        target.tester, target.ecu, did, tls, System.currentTimeMillis(),
+                        result.samples.map(::doIpSampleRow)) else null
                 _calibrationWorkspace.update { it.copy(doIpReading = false, doIpResult = rendered,
-                    doIpTrace = result.trace.map { trace -> trace.direction + " " + trace.payloadHex }) }
+                    doIpTrace = result.trace.map(::doIpTraceLine), doIpMonitorReport = monitorReport) }
             } catch (cancelled: CancellationException) {
                 if (current()) _calibrationWorkspace.update { it.copy(doIpReading = false) }
                 throw cancelled

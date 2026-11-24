@@ -787,6 +787,7 @@ fun CamaroDiagApp(
                             com.camarodiag.gen5.data.obd.DoIpDirectRead.Operation.MONITOR, samples, interval)
                     },
                     onCancelDirectDoIp = viewModel::cancelDirectDoIp,
+                    onExportDoIpMonitoring = { report -> withExportFolder { viewModel.exportDoIpMonitoring(report) } },
                     onImportDoIpBackupProfile = {
                         viewModel.activeAccountUid.value?.let { owner ->
                             pendingDoIpProfile = Triple(owner, viewModel.exportAccountGeneration(), viewModel.vehicle.value)

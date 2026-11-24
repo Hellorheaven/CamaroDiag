@@ -1018,4 +1018,10 @@
     <string name="cal_doip_verify_backup">Verify DoIP backup</string>
     <string name="cal_doip_backup_verified">Integrity verified: %1$d bytes, SHA-256 %2$s. Hardware provenance not established.</string>
     <string name="cal_doip_verify_failed">Invalid DoIP archive or incompatible profile.</string>
+    <string name="cal_doip_monitor_complete">Monitoring complete: %1$d samples.</string>
+    <string name="cal_doip_monitor_samples_received">Samples received: %1$d</string>
+    <string name="cal_doip_monitor_partial">Incomplete measurement; CSV export unavailable.</string>
+    <string name="cal_doip_monitor_export">Export measurements (CSV)</string>
+    <string name="cal_doip_monitor_exported">Measurements saved: %1$s</string>
+    <string name="cal_doip_monitor_export_failed">Could not export DoIP measurements.</string>
 </resources>
