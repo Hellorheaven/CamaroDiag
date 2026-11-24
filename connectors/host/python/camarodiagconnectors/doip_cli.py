@@ -10,7 +10,7 @@ from pathlib import Path
 from datetime import datetime, timezone
 from typing import Sequence
 
-from .doip import (Session, discover, discover_unique_vin, discover_ipv4, gateway_key, status,
+from .doip import (Session, discover, discover_unique_vin, discover_ipv4, discover_ipv6, gateway_key, status,
                    DoIpError, valid_vin, parse_commands, confirm_commands)
 from .doip_archive import load_scope
 from .doip_capture import capture_region, save_capture
@@ -41,6 +41,12 @@ def run(argv: Sequence[str] | None = None) -> dict:
     discovery_mode = parser.add_mutually_exclusive_group()
     discovery_mode.add_argument("--broadcast-ip", help=tr("Explicit IPv4 discovery destination", "Destination de découverte IPv4 explicite"))
     discovery_mode.add_argument("--listen", action="store_true", help=tr("Listen passively for IPv4 announcements", "Écouter passivement les annonces IPv4"))
+    discovery_mode.add_argument("--multicast-ipv6-ifindex", type=int,
+                                help=tr("Active link-local IPv6 discovery on an interface index",
+                                        "Découverte IPv6 link-local active sur un index d'interface"))
+    discovery_mode.add_argument("--listen-ipv6-ifindex", type=int,
+                                help=tr("Passive IPv6 announcements on an interface index",
+                                        "Écoute passive IPv6 sur un index d'interface"))
     parser.add_argument("--listen-host", default="0.0.0.0", help=tr("Local IPv4 bind address for discovery", "Adresse IPv4 locale pour découverte"))
     parser.add_argument("--tester", type=lambda x: hex_value(x, 4))
     parser.add_argument("--ecu", type=lambda x: hex_value(x, 4))
@@ -124,13 +130,20 @@ def run(argv: Sequence[str] | None = None) -> dict:
         parser.error(tr("Invalid VIN", "VIN invalide"))
     if o.eid is not None and o.vin is not None:
         parser.error(tr("Choose VIN or EID, not both", "Choisir VIN ou EID, pas les deux"))
-    discovery_options = o.eid is not None or o.broadcast_ip is not None or o.listen or o.listen_host != "0.0.0.0"
+    ipv6_index = o.multicast_ipv6_ifindex if o.multicast_ipv6_ifindex is not None else o.listen_ipv6_ifindex
+    discovery_options = (o.eid is not None or o.broadcast_ip is not None or o.listen or
+                         o.listen_host != "0.0.0.0" or ipv6_index is not None)
     if discovery_options and o.action != "discover":
         parser.error(tr("Discovery options require discover", "Options réservées à discover"))
-    if o.host and (o.broadcast_ip is not None or o.listen):
+    if o.host and (o.broadcast_ip is not None or o.listen or ipv6_index is not None):
         parser.error(tr("Choose unicast, broadcast or passive discovery", "Choisir unicast, diffusion ou écoute passive"))
     if o.listen_host != "0.0.0.0" and not (o.broadcast_ip is not None or o.listen):
         parser.error(tr("Local bind address requires broadcast or passive discovery", "Adresse locale réservée à la diffusion ou écoute passive"))
+    if ipv6_index is not None:
+        found = discover_ipv6(ipv6_index, o.timeout, trace, passive=o.listen_ipv6_ifindex is not None,
+                              vin=o.vin, eid=o.eid)
+        return {"gateways": [asdict(item) for item in found], "ecu_authenticated": False,
+                "physical_qualification": False}
     if o.broadcast_ip is not None or o.listen:
         found = discover_ipv4(o.timeout, trace, destination=o.broadcast_ip, vin=o.vin, eid=o.eid,
                               listen_host=o.listen_host)

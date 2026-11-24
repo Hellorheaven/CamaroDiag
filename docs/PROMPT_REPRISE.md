@@ -1,3 +1,7 @@
+## PR117 — découverte IPv6 link-local DoIP Connectors (24/11/2026)
+
+- Client hôte Python : découverte active ff02::1 limitée à une interface explicite et écoute passive sur cette même interface, filtrage port/source link-local/scope, déduplication, VIN/EID et limite 32 résultats. CLI FR/EN `--multicast-ipv6-ifindex` et `--listen-ipv6-ifindex` ; aucune commande diagnostique émise pendant la découverte, aucune émission en mode passif. Les IP link-local unicast exigent un scope ; le scope de routage est distinct de l’identité IP vérifiée par TLS. Tests sockets simulés et parsing CLI ajoutés ; multicast réel non qualifié. Ce complément est postérieur au checkpoint 45454645809, qui valide le SHA précédent.
+
 ## PR117 — checkpoint de validation groupée DoIP (24/11/2026)
 
 - Campagne 45453585549 sur `9afc5ff` : 11/12 jobs techniques réussis, Android y compris compilation/tests/lint/assemble du gate, ESP32/STM32, Python 3.11/3.12/3.13 et autres jobs Connectors/native. Windows : compilation 0 erreur / 0 avertissement, self-test monitoring en échec. Revue ignorée sur PR draft. Le correctif de concurrence et les compléments Windows/Connectors ultérieurs ne sont pas validés par cette campagne.

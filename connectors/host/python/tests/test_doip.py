@@ -6,7 +6,8 @@ from camarodiagconnectors.doip_cli import run
 
 from camarodiagconnectors.doip import (
     Gateway, Session, DoIpError, NegativeResponse, decode, encode, parse_identity, positive,
-    discover, discover_ipv4, discovery_request, discover_unique_vin, parse_commands, confirm_commands
+    discover, discover_ipv4, discover_ipv6, discovery_request, discover_unique_vin, parse_commands, confirm_commands,
+    endpoint, tls_server_name
 )
 
 VIN = "1G1FA1RXXR0123456"
@@ -111,6 +112,51 @@ class DoIpTests(unittest.TestCase):
                     thread.join(3)
                 if errors:
                     raise errors[0]
+
+    def test_scoped_ipv6_discovery_filters_interface_and_source(self):
+        body = VIN.encode() + ECU + bytes(13)
+        announcement = encode(2, 4, body)
+        for passive in (False, True):
+            with self.subTest(passive=passive), patch("camarodiagconnectors.doip.socket.socket") as factory:
+                sock = factory.return_value.__enter__.return_value
+                sock.recvfrom.side_effect = [
+                    (announcement, ("fe80::2", 13400, 0, 4)),
+                    (announcement, ("2001:db8::2", 13400, 0, 3)),
+                    (announcement, ("fe80::2", 9999, 0, 3)),
+                    (announcement, ("fe80::2", 13400, 0, 3)),
+                    (announcement, ("fe80::2", 13400, 0, 3)),
+                    TimeoutError(),
+                ]
+                trace = []
+                found = discover_ipv6(3, 0.5, lambda *event: trace.append(event),
+                                      passive=passive, vin=VIN)
+                self.assertEqual(len(found), 1)
+                self.assertEqual(found[0].host, "fe80::2%3")
+                if passive:
+                    sock.bind.assert_called_once_with(("::", 13400))
+                    sock.sendto.assert_not_called()
+                    self.assertFalse(any(row[0] == "TX" for row in trace))
+                else:
+                    sock.sendto.assert_called_once_with(encode(255, 3, VIN.encode()),
+                                                        ("ff02::1", 13400, 0, 3))
+                sock.send.assert_not_called()
+        with self.assertRaises(DoIpError):
+            discover_ipv6(0)
+        with self.assertRaises(DoIpError):
+            endpoint("fe80::2")
+        self.assertEqual(endpoint("fe80::2%3"), "fe80::2%3")
+        self.assertEqual(tls_server_name("fe80::2%3"), "fe80::2")
+
+    def test_ipv6_discovery_cli_is_explicit_and_read_only(self):
+        with patch("camarodiagconnectors.doip_cli.discover_ipv6", return_value=[GATEWAY]) as discover_mock:
+            result = run(["--multicast-ipv6-ifindex", "3", "discover"])
+            self.assertEqual(len(result["gateways"]), 1)
+            self.assertFalse(result["ecu_authenticated"])
+            discover_mock.assert_called_once_with(3, 3, None, passive=False, vin=None, eid=None)
+        with patch("camarodiagconnectors.doip_cli.discover_ipv6") as discover_mock:
+            with self.assertRaises(SystemExit):
+                run(["--listen-ipv6-ifindex", "3", "--host", "127.0.0.1", "discover"])
+            discover_mock.assert_not_called()
 
     def test_passive_discovery_sends_nothing(self):
         with patch("camarodiagconnectors.doip.socket.socket") as factory:

@@ -34,7 +34,15 @@ def endpoint(host: str) -> str:
     address = ipaddress.ip_address(host)
     if address.is_unspecified or address.is_multicast or str(address) == "255.255.255.255":
         raise DoIpError("Explicit unicast IP required")
+    if isinstance(address, ipaddress.IPv6Address) and address.is_link_local:
+        if not address.scope_id or address.scope_id == "0":
+            raise DoIpError("Link-local IPv6 requires an explicit interface scope")
     return str(address)
+
+
+def tls_server_name(host: str) -> str:
+    # The scope routes the socket but is not part of the certificate IP SAN.
+    return endpoint(host).split("%", 1)[0]
 
 
 def logical(value: int) -> bytes:
@@ -205,6 +213,59 @@ def discover_ipv4(timeout: float = 3, trace: Trace | None = None, *,
     return list(matches.values())
 
 
+def discover_ipv6(interface_index: int, timeout: float = 3, trace: Trace | None = None, *,
+                  passive: bool = False, vin: str | None = None, eid: bytes | None = None,
+                  port: int = 13400, max_results: int = 32) -> list[Gateway]:
+    """Link-local IPv6 ff02::1 discovery on one explicit interface; no UDS traffic."""
+    _timeout(timeout)
+    if type(interface_index) is not int or not 1 <= interface_index <= 0x7FFFFFFF:
+        raise DoIpError("An explicit positive IPv6 interface index is required")
+    if type(port) is not int or not 1 <= port <= 65535 or type(max_results) is not int or not 1 <= max_results <= 32:
+        raise DoIpError("Invalid discovery port or result limit")
+    request = discovery_request(vin, eid)
+    group = "ff02::1"
+    scoped_group = f"{group}%{interface_index}"
+    deadline = time.monotonic() + timeout
+    matches = {}
+    with socket.socket(socket.AF_INET6, socket.SOCK_DGRAM) as sock:
+        sock.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
+        if passive:
+            sock.bind(("::", port))
+            membership = socket.inet_pton(socket.AF_INET6, group) + struct.pack("=I", interface_index)
+            sock.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_JOIN_GROUP, membership)
+        else:
+            sock.bind(("::", 0))
+            sock.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_MULTICAST_IF, interface_index)
+            sock.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_MULTICAST_HOPS, 1)
+            sock.settimeout(remaining(deadline))
+            sock.sendto(request, (group, port, 0, interface_index))
+            _emit(trace, "TX", "UDP", scoped_group, request)
+        while time.monotonic() < deadline:
+            try:
+                sock.settimeout(remaining(deadline))
+                raw, peer = sock.recvfrom(65536)
+                remaining(deadline)
+            except TimeoutError:
+                break
+            if peer[1] != port or len(peer) != 4 or peer[3] != interface_index:
+                continue
+            try:
+                address = ipaddress.IPv6Address(peer[0].split("%", 1)[0])
+                if not address.is_link_local:
+                    continue
+                host = f"{address.compressed}%{interface_index}"
+                _emit(trace, "RX", "UDP", host, raw)
+                observed = parse_identity(host, raw, vin)
+            except ValueError:
+                continue
+            if eid is not None and observed.eid != eid.hex().upper():
+                continue
+            matches[gateway_key(observed)] = observed
+            if len(matches) >= max_results:
+                break
+    return list(matches.values())
+
+
 def discover_unique_vin(vin: str, timeout: float = 3, trace: Trace | None = None,
                         destination: str = "255.255.255.255", port: int = 13400) -> Gateway:
     """Directed VIN query; ambiguity never chooses a target."""
@@ -318,7 +379,7 @@ class Session:
                 secure = context or ssl.create_default_context()
                 secure.minimum_version = ssl.TLSVersion.TLSv1_2
                 wire.settimeout(remaining(deadline))
-                wire = secure.wrap_socket(wire, server_hostname=gateway.host)
+                wire = secure.wrap_socket(wire, server_hostname=tls_server_name(gateway.host))
             self._socket = wire
             self._send(5, activation, deadline)
             while True:
