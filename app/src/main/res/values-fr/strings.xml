@@ -1031,6 +1031,7 @@
     <string name="can_console_swcan_changed">SW-CAN 33,3 kbit/s</string>
     <string name="can_console_swcan_receive_only">SW-CAN : réception seule dans cette console.</string>
     <string name="cal_doip_discover">Identifier la passerelle</string>
+    <string name="cal_doip_discover_by_vin">Rechercher la passerelle par VIN</string>
     <string name="cal_doip_gateway_status_button">État</string>
     <string name="cal_doip_power">Alimentation</string>
     <string name="cal_doip_gateway_identity">Passerelle 0x%1$s · DoIP 0x%2$s · VIN annoncé %3$s</string>
