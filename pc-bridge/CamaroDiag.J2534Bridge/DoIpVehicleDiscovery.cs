@@ -83,6 +83,17 @@ internal static class DoIpVehicleDiscovery
             source, decoded.Version);
     }
 
+    internal static bool IsExplicitUnicast(IPAddress address) =>
+        !address.Equals(IPAddress.Any) && !address.Equals(IPAddress.IPv6Any) &&
+        !address.Equals(IPAddress.Broadcast) && !address.IsIPv6Multicast &&
+        (address.AddressFamily != AddressFamily.InterNetwork ||
+            address.GetAddressBytes()[0] is not (>= 224 and <= 239)) &&
+        (!address.IsIPv6LinkLocal || address.ScopeId > 0);
+
+    internal static string TlsServerName(string host) =>
+        IPAddress.TryParse(host, out var address) && address.AddressFamily == AddressFamily.InterNetworkV6
+            ? address.ToString().Split('%')[0] : host;
+
     internal static bool SameGatewayIdentity(Identity selected, Identity observed) =>
         selected.Source.Equals(observed.Source) &&
         string.Equals(selected.Vin, observed.Vin, StringComparison.Ordinal) &&
@@ -203,10 +214,7 @@ internal static class DoIpVehicleDiscovery
         if (!IPAddress.TryParse(host, out var address) ||
             address.AddressFamily is not (AddressFamily.InterNetwork or
                 AddressFamily.InterNetworkV6) ||
-            address.Equals(IPAddress.Any) ||
-            address.Equals(IPAddress.Broadcast) ||
-            address.Equals(IPAddress.IPv6Any) ||
-            address.IsIPv6Multicast ||
+            !IsExplicitUnicast(address) ||
             timeout <= TimeSpan.Zero || timeout > TimeSpan.FromSeconds(30) ||
             (portOverride.HasValue && portOverride.Value is < 1 or > 65535))
             throw new ArgumentException("Provide a valid unicast DoIP IPv4/IPv6 gateway, port and timeout.");
@@ -461,10 +469,7 @@ internal static class DoIpVehicleDiscovery
         if (!IPAddress.TryParse(host, out var address) ||
             address.AddressFamily is not (AddressFamily.InterNetwork or
                 AddressFamily.InterNetworkV6) ||
-            address.Equals(IPAddress.Any) ||
-            address.Equals(IPAddress.Broadcast) ||
-            address.Equals(IPAddress.IPv6Any) ||
-            address.IsIPv6Multicast ||
+            !IsExplicitUnicast(address) ||
             timeout <= TimeSpan.Zero || timeout > TimeSpan.FromSeconds(30) ||
             (portOverride.HasValue && portOverride.Value is < 1 or > 65535))
             throw new ArgumentException(

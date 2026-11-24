@@ -123,6 +123,9 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
             (activationOemData is not null && activationOemData.Length != 4) ||
             (clientCertificateThumbprint is not null && !useTls))
             throw new ArgumentException("Explicit gateway, distinct logical addresses and timeout required.");
+        if (System.Net.IPAddress.TryParse(host, out var numericAddress) &&
+            !DoIpVehicleDiscovery.IsExplicitUnicast(numericAddress))
+            throw new ArgumentException("Explicit unicast address and IPv6 scope required.");
         cancellationToken.ThrowIfCancellationRequested();
         // Freeze the caller-owned OEM routing bytes before any asynchronous I/O.
         var fixedActivationOemData = activationOemData?.ToArray();
@@ -143,7 +146,7 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
                     FindClientCertificate(clientCertificateThumbprint);
                 var authentication = new SslClientAuthenticationOptions
                 {
-                    TargetHost = host,
+                    TargetHost = DoIpVehicleDiscovery.TlsServerName(host),
                     EnabledSslProtocols = SslProtocols.Tls12 | SslProtocols.Tls13,
                     CertificateRevocationCheckMode = X509RevocationMode.Online
                 };

@@ -1,3 +1,7 @@
+## PR117 — identité passerelle et IPv6 Windows (24/11/2026)
+
+- Statut et alimentation DoIP dans la console Windows : revalidation de l’identité sélectionnée avant requête, sans effacer la sélection sur erreur de contrôle ; nouvelle découverte explicite nécessaire pour substituer la passerelle. Adresses IPv4 multicast et IPv6 link-local sans scope rejetées en unicast, scope exclu du nom TLS sans désactiver la vérification du certificat. Tests de validation ajoutés. Checkpoint précédent 45456278234 vert ; ce lot reste à valider.
+
 ## PR117 — contrôle d’identité avant status/power Android (24/11/2026)
 
 - Les requêtes de contrôle conservent et revérifient l’identité de passerelle déjà sélectionnée avant d’émettre le statut/alimentation. Refus de substitution, ancienne sélection conservée en cas d’échec ; une nouvelle découverte explicite permet de choisir une nouvelle passerelle. EID filtré avant lecture VIN d’une réponse non demandée. Tests négatifs UDP ajoutés. Validation à venir avec le lot Android EID.

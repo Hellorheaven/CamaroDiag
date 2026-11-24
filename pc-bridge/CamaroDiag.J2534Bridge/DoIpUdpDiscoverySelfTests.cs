@@ -37,6 +37,16 @@ internal static class DoIpUdpDiscoverySelfTests
             if (!ok)
                 throw new InvalidOperationException("DoIP UDP loopback: " + name);
         }
+        Check(!DoIpVehicleDiscovery.IsExplicitUnicast(IPAddress.Parse("fe80::2")),
+            "Link-local IPv6 requires a scope.");
+        Check(DoIpVehicleDiscovery.IsExplicitUnicast(IPAddress.Parse("fe80::2%3")),
+            "Explicit link-local IPv6 scope accepted.");
+        Check(!DoIpVehicleDiscovery.IsExplicitUnicast(IPAddress.Parse("224.0.0.1")),
+            "Multicast IPv4 is not a diagnostic target.");
+        Check(DoIpVehicleDiscovery.TlsServerName("fe80::2%3") == "fe80::2",
+            "TLS validates IP identity rather than routing scope.");
+        Check(DoIpVehicleDiscovery.TlsServerName("gateway.example.org") == "gateway.example.org",
+            "TLS retains explicit DNS identity.");
         using var gateway = new UdpClient(new IPEndPoint(IPAddress.Loopback, 0));
         using var rogue = new UdpClient(new IPEndPoint(IPAddress.Loopback, 0));
         var port = ((IPEndPoint)gateway.Client.LocalEndPoint!).Port;

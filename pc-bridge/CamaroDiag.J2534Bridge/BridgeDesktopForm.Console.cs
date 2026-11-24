@@ -222,10 +222,7 @@ internal sealed partial class BridgeDesktopForm
         }
         System.Net.IPAddress? address = null;
         if (!auto && (!System.Net.IPAddress.TryParse(host, out address) ||
-            address.Equals(System.Net.IPAddress.Any) ||
-            address.Equals(System.Net.IPAddress.IPv6Any) ||
-            address.Equals(System.Net.IPAddress.Broadcast) ||
-            address.IsIPv6Multicast))
+            !DoIpVehicleDiscovery.IsExplicitUnicast(address)))
         {
             ShowError(DoIpConsolePresentation.Text("InvalidHost"));
             return;
@@ -257,6 +254,8 @@ internal sealed partial class BridgeDesktopForm
                         ConsoleLine("SYSTEM", string.Format(
                             DoIpConsolePresentation.Text("StatusStarted"), selectedAddress, version),
                             Color.DarkSlateGray);
+                        await DoIpVehicleDiscovery.RequireCurrentIdentityAsync(observed, timeout,
+                            stop.Token, JournalDoIpUdp);
                         var response = await DoIpVehicleDiscovery.QueryStatusAsync(
                             selectedAddress.ToString(), powerMode.Value, timeout, stop.Token,
                             protocolVersion: version, trace: JournalDoIpUdp);
@@ -294,14 +293,14 @@ internal sealed partial class BridgeDesktopForm
                 }
                 catch (OperationCanceledException) when (stop.IsCancellationRequested)
                 {
-                    doIpObservedGateway = null;
+                    if (!powerMode.HasValue) doIpObservedGateway = null;
                     if (!IsDisposed && !Disposing)
                         ConsoleLine("SYSTEM", DoIpConsolePresentation.Text("Canceled"),
                             Color.DarkSlateGray);
                 }
                 catch
                 {
-                    doIpObservedGateway = null;
+                    if (!powerMode.HasValue) doIpObservedGateway = null;
                     throw;
                 }
             });
