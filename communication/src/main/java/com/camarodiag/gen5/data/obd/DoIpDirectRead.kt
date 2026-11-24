@@ -181,6 +181,7 @@ object DoIpDirectRead {
         }
         fun exchange(request: ByteArray, timeout: Int): ByteArray {
             val end = deadline(timeout)
+            check(trace.size < 128) { "Too many DoIP diagnostic messages." }
             trace += Trace("TX", hex(request))
             send(0x8001, addr(target.tester) + addr(target.ecu) + request, end)
             while (true) {
@@ -198,6 +199,7 @@ object DoIpDirectRead {
                     continue
                 }
                 val reply = frame.data.copyOfRange(4, frame.data.size)
+                check(trace.size < 128 && reply.size <= 65536) { "DoIP diagnostic trace limit exceeded." }
                 trace += Trace("RX", hex(reply))
                 if (reply[0].u8() == 0x7F) {
                     require(reply.size == 3 && reply[1] == request[0])
@@ -250,12 +252,13 @@ object DoIpDirectRead {
                         }
                         return vin
                     }
-                    var vin = gateway.vin
+                    var vin: String
                     if (operation == Operation.VIN || (operation == Operation.DID && did == 0xF190)) {
                         vin = readVin()
                         Outcome(gateway, target.ecu, vin, vin.toByteArray(Charsets.US_ASCII), null, trace.toList())
                     } else {
-                        if (vin == null) vin = readVin()
+                        // The gateway's announcement is not proof of the selected ECU identity.
+                        vin = readVin()
                         require(vin == target.expectedVin)
                         if (operation == Operation.DID) {
                             val reply = session.exchange(byteArrayOf(0x22, (did shr 8).toByte(), did.toByte()), timeoutMs)

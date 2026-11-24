@@ -998,4 +998,13 @@
     <string name="adapter_can_headers">En-têtes CAN</string>
     <string name="adapter_config_accepted">Configurations acceptées (non validées sur véhicule) : %1$s</string>
     <string name="cal_choose_compatible_profile">Sélectionner un profil CAN compatible</string>
+    <string name="cal_doip_title">DoIP direct</string>
+    <string name="cal_doip_host">IP de la passerelle</string>
+    <string name="cal_doip_tester">Adresse logique testeur</string>
+    <string name="cal_doip_ecu">Adresse logique calculateur</string>
+    <string name="cal_doip_tls">TLS</string>
+    <string name="cal_doip_read_vin">Lire le VIN ECU</string>
+    <string name="cal_doip_cancel">Annuler</string>
+    <string name="cal_doip_dtc_count">DTC : %1$d</string>
+    <string name="cal_doip_failed">Lecture DoIP impossible. Vérifiez la passerelle, les adresses, le VIN et la confiance TLS.</string>
 </resources>

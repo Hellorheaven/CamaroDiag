@@ -995,4 +995,13 @@
     <string name="adapter_can_headers">CAN headers</string>
     <string name="adapter_config_accepted">Accepted configurations (not verified on vehicle): %1$s</string>
     <string name="cal_choose_compatible_profile">Select a compatible CAN profile</string>
+    <string name="cal_doip_title">Direct DoIP</string>
+    <string name="cal_doip_host">Gateway IP</string>
+    <string name="cal_doip_tester">Tester logical address</string>
+    <string name="cal_doip_ecu">ECU logical address</string>
+    <string name="cal_doip_tls">TLS</string>
+    <string name="cal_doip_read_vin">Read ECU VIN</string>
+    <string name="cal_doip_cancel">Cancel</string>
+    <string name="cal_doip_dtc_count">DTCs: %1$d</string>
+    <string name="cal_doip_failed">DoIP read failed. Check gateway, addresses, VIN and TLS trust.</string>
 </resources>

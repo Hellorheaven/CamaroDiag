@@ -759,6 +759,8 @@ fun CamaroDiagApp(
                     onSyncVehicleVinFromEcu = { viewModel.syncVehicleVinFromEcu(it) },
                     onReadUdsDid = { requestId, responseId, did, protocol -> viewModel.readUdsDid(requestId, responseId, did, protocol) },
                     onReadUdsDtcs = { requestId, responseId, protocol -> viewModel.readUdsDtcs(requestId, responseId, protocol) },
+                    onReadDirectDoIp = viewModel::readDirectDoIp,
+                    onCancelDirectDoIp = viewModel::cancelDirectDoIp,
                     onConnectJ2534Bridge = { host, port, token, requestId, responseId, baud ->
                         viewModel.connectJ2534Bridge(host, port, token, requestId, responseId, baud)
                     },

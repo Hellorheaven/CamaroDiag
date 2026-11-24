@@ -61,6 +61,7 @@ import com.camarodiag.gen5.ui.theme.TextMuted
 import com.camarodiag.gen5.ui.theme.TextPrimary
 import com.camarodiag.gen5.ui.theme.WarnRed
 import com.camarodiag.gen5.data.obd.CamaroCalibrationCatalog
+import com.camarodiag.gen5.data.obd.DoIpDirectRead
 import com.camarodiag.gen5.data.obd.J2534BridgePairingCodeFormat
 import com.camarodiag.gen5.data.obd.Lfx2012ControllerReferences
 import com.camarodiag.gen5.data.obd.Lfx2012FlexFuelPreflight
@@ -110,6 +111,9 @@ data class CalibrationWorkspaceState(
     val udsDidResponse: String = "",
     val udsDtcResponse: String = "",
     val udsMessage: String = "",
+    val doIpReading: Boolean = false,
+    val doIpResult: String = "",
+    val doIpTrace: List<String> = emptyList(),
     val isJ2534BridgeConnecting: Boolean = false,
     val isJ2534BridgeConnected: Boolean = false,
     val isJ2534MemoryReadAvailable: Boolean = false,
@@ -248,6 +252,8 @@ fun CalibrationWorkspaceScreen(
     onSyncVehicleVinFromEcu: (String) -> Unit,
     onReadUdsDid: (String, String, String, String) -> Unit,
     onReadUdsDtcs: (String, String, String) -> Unit,
+    onReadDirectDoIp: (String, String, String, String, Boolean, DoIpDirectRead.Operation) -> Unit,
+    onCancelDirectDoIp: () -> Unit,
     onConnectJ2534Bridge: (String, String, String, String, String, String) -> Unit,
     onDisconnectJ2534Bridge: () -> Unit,
     onCaptureJ2534Memory: (String, String, Int, EcuBackupCoverage.Region) -> Unit,
@@ -268,8 +274,13 @@ fun CalibrationWorkspaceScreen(
     onExportFile: () -> Unit,
     onClearFile: () -> Unit
 ) {
-    var udsRequestCanId by remember { mutableStateOf("") }
-    var udsResponseCanId by remember { mutableStateOf("") }
+    var doIpHost by remember(vehicle) { mutableStateOf("") }
+    var doIpTester by remember(vehicle) { mutableStateOf("") }
+    var doIpEcu by remember(vehicle) { mutableStateOf("") }
+    var doIpDid by remember(vehicle) { mutableStateOf("F190") }
+    var doIpTls by remember(vehicle) { mutableStateOf(true) }
+    var udsRequestCanId by remember(vehicle) { mutableStateOf("") }
+    var udsResponseCanId by remember(vehicle) { mutableStateOf("") }
     var udsDid by remember { mutableStateOf("F190") }
     var udsCanProtocol by remember { mutableStateOf("33") }
     var udsProfileMenuExpanded by remember { mutableStateOf(false) }
@@ -331,6 +342,57 @@ fun CalibrationWorkspaceScreen(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        item {
+            Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
+                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(stringResource(R.string.cal_doip_title), color = CamaroAmber, fontWeight = FontWeight.Bold)
+                    val idle = !state.doIpReading && !state.isUdsReading && !state.isObdbSignalReading &&
+                        !state.isJ2534MemoryCapturing
+                    OutlinedTextField(doIpHost, { doIpHost = it.trim().take(64) },
+                        enabled = idle, singleLine = true, modifier = Modifier.fillMaxWidth(),
+                        label = { Text(stringResource(R.string.cal_doip_host)) })
+                    OutlinedTextField(doIpTester, { doIpTester = it.uppercase().filter { c -> c in "0123456789ABCDEF" }.take(4) },
+                        enabled = idle, singleLine = true, modifier = Modifier.fillMaxWidth(),
+                        label = { Text(stringResource(R.string.cal_doip_tester)) })
+                    OutlinedTextField(doIpEcu, { doIpEcu = it.uppercase().filter { c -> c in "0123456789ABCDEF" }.take(4) },
+                        enabled = idle, singleLine = true, modifier = Modifier.fillMaxWidth(),
+                        label = { Text(stringResource(R.string.cal_doip_ecu)) })
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(checked = doIpTls, onCheckedChange = { doIpTls = it }, enabled = idle)
+                        Text(stringResource(R.string.cal_doip_tls))
+                    }
+                    OutlinedTextField(doIpDid, { doIpDid = it.uppercase().filter { c -> c in "0123456789ABCDEF" }.take(4) },
+                        enabled = idle, singleLine = true, modifier = Modifier.fillMaxWidth(),
+                        label = { Text(stringResource(R.string.cal_uds_did)) })
+                    val targetReady = idle && doIpHost.isNotBlank() && doIpTester.length == 4 &&
+                        doIpEcu.length == 4 && doIpTester != doIpEcu
+                    val vinReady = vehicle.vin.uppercase().matches(Regex("[A-HJ-NPR-Z0-9]{17}"))
+                    Button(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu, doIpDid, doIpTls, DoIpDirectRead.Operation.VIN) },
+                        enabled = targetReady, modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(R.string.cal_doip_read_vin))
+                    }
+                    OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu, doIpDid, doIpTls, DoIpDirectRead.Operation.DID) },
+                        enabled = targetReady && vinReady && doIpDid.length == 4, modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(R.string.cal_read_uds_did))
+                    }
+                    OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu, doIpDid, doIpTls, DoIpDirectRead.Operation.DTC) },
+                        enabled = targetReady && vinReady, modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(R.string.cal_read_uds_dtcs))
+                    }
+                    if (state.doIpReading) {
+                        LinearProgressIndicator(Modifier.fillMaxWidth())
+                        OutlinedButton(onClick = onCancelDirectDoIp, modifier = Modifier.fillMaxWidth()) {
+                            Text(stringResource(R.string.cal_doip_cancel))
+                        }
+                    }
+                    if (state.doIpResult.isNotBlank())
+                        Text(state.doIpResult, color = TextPrimary, fontFamily = FontFamily.Monospace)
+                    state.doIpTrace.forEach { line ->
+                        Text(line, color = TextMuted, fontFamily = FontFamily.Monospace, fontSize = 10.sp)
+                    }
+                }
+            }
+        }
         item {
             Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
                 Text(stringResource(R.string.cal_workspace_title),
@@ -1035,7 +1097,7 @@ fun CalibrationWorkspaceScreen(
                     Button(
                         onClick = { onReadUdsDid(udsRequestCanId, udsResponseCanId, udsDid, udsCanProtocol) },
                         enabled = canReadEnhancedUds && profileAvailable && !state.isUdsReading &&
-                            !state.isObdbSignalReading && canIdsMatchProfile && udsDid.length == 4 &&
+                            !state.doIpReading && !state.isObdbSignalReading && canIdsMatchProfile && udsDid.length == 4 &&
                             udsCanProtocol in setOf("33", "34", "35", "36", "63", "64"),
                         modifier = Modifier.fillMaxWidth()
                     ) {
@@ -1050,7 +1112,7 @@ fun CalibrationWorkspaceScreen(
                     OutlinedButton(
                         onClick = { onReadUdsDtcs(udsRequestCanId, udsResponseCanId, udsCanProtocol) },
                         enabled = canReadEnhancedUds && profileAvailable && !state.isUdsReading &&
-                            !state.isObdbSignalReading && canIdsMatchProfile &&
+                            !state.doIpReading && !state.isObdbSignalReading && canIdsMatchProfile &&
                             udsCanProtocol in setOf("33", "34", "35", "36", "63", "64"),
                         modifier = Modifier.fillMaxWidth()
                     ) {
@@ -1234,7 +1296,7 @@ fun CalibrationWorkspaceScreen(
                                 signal.hasSupportedPhysicalCanAddressing &&
                                 signalProfile != null &&
                                 signal.service == 0x22 &&
-                                !state.isUdsReading && !state.isObdbSignalReading,
+                                !state.doIpReading && !state.isUdsReading && !state.isObdbSignalReading,
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             if (state.isObdbSignalReading) CircularProgressIndicator()

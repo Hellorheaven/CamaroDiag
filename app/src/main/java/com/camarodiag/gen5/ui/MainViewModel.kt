@@ -11,6 +11,7 @@ import androidx.lifecycle.viewModelScope
 import com.camarodiag.gen5.data.db.DiagnosticDatabase
 import com.camarodiag.gen5.data.db.SavedSessionEntity
 import com.camarodiag.gen5.data.obd.BluetoothObdManager
+import com.camarodiag.gen5.data.obd.DoIpDirectRead
 import com.camarodiag.gen5.data.obd.Lfx2012ControllerReferences
 import com.google.firebase.auth.FirebaseAuth
 import com.camarodiag.gen5.auth.LicenseLevel
@@ -1111,7 +1112,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _calibrationWorkspace.update {
             it.copy(isUdsReading = false, isObdbSignalReading = false,
                 udsDidResponse = "", udsDtcResponse = "", udsMessage = "",
-                obdbSignalValue = "", obdbSignalMessage = "")
+                obdbSignalValue = "", obdbSignalMessage = "",
+                doIpReading = false, doIpResult = "", doIpTrace = emptyList())
         }
     }
 
@@ -1129,6 +1131,50 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             vehicle == _vehicle.value && hasPremiumLicense()
         enhancedUdsJob = viewModelScope.launch {
             if (current()) block(::current)
+        }
+    }
+
+    fun cancelDirectDoIp() {
+        if (!_calibrationWorkspace.value.doIpReading) return
+        invalidateEnhancedUdsReads()
+    }
+
+    fun readDirectDoIp(host: String, tester: String, ecu: String, didHex: String,
+        tls: Boolean, operation: DoIpDirectRead.Operation) {
+        if (!requirePremiumLicense()) return
+        launchEnhancedUdsRead { current ->
+            _calibrationWorkspace.update { it.copy(doIpReading = true, doIpResult = "", doIpTrace = emptyList()) }
+            try {
+                val target = DoIpDirectRead.Target.parse(host, tester, ecu, _vehicle.value.vin, tls)
+                val did = if (operation == DoIpDirectRead.Operation.DID) {
+                    require(didHex.matches(Regex("[0-9A-Fa-f]{4}")))
+                    didHex.toInt(16)
+                } else 0xF190
+                val result = DoIpDirectRead.read(target, operation, did)
+                if (!current()) return@launchEnhancedUdsRead
+                val module = "DoIP 0x" + ecu.uppercase()
+                val report = result.dtcs
+                if (report != null) {
+                    val mapped = report.records.map { it.toDiagnosticDtc(module) }
+                    _dtcs.value = _dtcs.value.filterNot { it.module == module } + mapped
+                }
+                val rendered = when {
+                    report != null -> localizedContext.getString(R.string.cal_doip_dtc_count, report.records.size) +
+                        report.records.joinToString(separator = "\n", prefix = "\n") {
+                            "0x" + it.rawDtc.toString(16).uppercase().padStart(6, '0')
+                        }
+                    operation == DoIpDirectRead.Operation.VIN -> result.vin.orEmpty()
+                    else -> result.data?.joinToString(" ") { "%02X".format(it.toInt() and 255) }.orEmpty()
+                }
+                _calibrationWorkspace.update { it.copy(doIpReading = false, doIpResult = rendered,
+                    doIpTrace = result.trace.map { trace -> trace.direction + " " + trace.payloadHex }) }
+            } catch (cancelled: CancellationException) {
+                if (current()) _calibrationWorkspace.update { it.copy(doIpReading = false) }
+                throw cancelled
+            } catch (_: Exception) {
+                if (current()) _calibrationWorkspace.update { it.copy(doIpReading = false,
+                    doIpResult = localizedContext.getString(R.string.cal_doip_failed)) }
+            }
         }
     }
 
