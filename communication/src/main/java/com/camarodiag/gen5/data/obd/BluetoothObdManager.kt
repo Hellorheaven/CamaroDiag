@@ -1250,26 +1250,37 @@ class BluetoothObdManager(context: Context) {
     suspend fun exchangeJ2534OperatorUds(
         payload: ByteArray,
         approval: EcuWriteConsentFlow.Approval,
-        timeoutMs: Long = 3000L
+        timeoutMs: Long = 3000L,
+        isOperatorContextCurrent: () -> Boolean
     ): ByteArray {
         val epoch = transportSessionEpoch.capture()
         return commandSessionMutex.withLock {
             transportSessionEpoch.requireQueuedCurrent(epoch)
             check(isJ2534BridgeConnected()) { "Connect a physical Windows J2534 bridge." }
-            val reply = checkNotNull(j2534BridgeTransport).exchangeOperatorUds(payload, timeoutMs, approval)
+            val reply = checkNotNull(j2534BridgeTransport).exchangeOperatorUds(
+                payload, timeoutMs, approval
+            ) {
+                transportSessionEpoch.requireQueuedCurrent(epoch)
+                EcuWriteConsentFlow.requireCurrentForTransmit(approval, isOperatorContextCurrent)
+            }
             transportSessionEpoch.requireCurrent(epoch)
             reply
         }
     }
 
     suspend fun sendJ2534OperatorUdsOnly(
-        payload: ByteArray, approval: EcuWriteConsentFlow.Approval
+        payload: ByteArray,
+        approval: EcuWriteConsentFlow.Approval,
+        isOperatorContextCurrent: () -> Boolean
     ) {
         val epoch = transportSessionEpoch.capture()
         commandSessionMutex.withLock {
             transportSessionEpoch.requireQueuedCurrent(epoch)
             check(isJ2534BridgeConnected()) { "Connect a physical Windows J2534 bridge." }
-            checkNotNull(j2534BridgeTransport).sendOperatorUdsOnly(payload, approval)
+            checkNotNull(j2534BridgeTransport).sendOperatorUdsOnly(payload, approval) {
+                transportSessionEpoch.requireQueuedCurrent(epoch)
+                EcuWriteConsentFlow.requireCurrentForTransmit(approval, isOperatorContextCurrent)
+            }
             transportSessionEpoch.requireCurrent(epoch)
         }
     }
