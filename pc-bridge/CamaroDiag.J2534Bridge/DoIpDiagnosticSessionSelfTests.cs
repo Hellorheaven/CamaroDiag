@@ -546,6 +546,36 @@ internal static class DoIpDiagnosticSessionSelfTests
             plainServer.Stop();
         }
 
+
+        // Two routing responses on one TCP socket must refer to the same
+        // gateway. Otherwise a pending 0x11 could be completed by a
+        // different logical entity without a fresh routing handshake.
+        var routeListener = new TcpListener(IPAddress.Loopback, 0);
+        routeListener.Start();
+        var routePort = ((IPEndPoint)routeListener.LocalEndpoint).Port;
+        var routeServer = Task.Run(async () =>
+        {
+            using var peer = await routeListener.AcceptTcpClientAsync();
+            await using var wire = peer.GetStream();
+            var activation = await ReadAsync(wire);
+            Check(activation.Type == DoIpCodec.RoutingActivationRequest,
+                "Routing-source test received the expected activation.");
+            await SendAsync(wire, DoIpCodec.RoutingActivationResponse,
+                [0x0E, 0x80, 0x12, 0x34, 0x11, 0, 0, 0, 0]);
+            await SendAsync(wire, DoIpCodec.RoutingActivationResponse,
+                [0x0E, 0x80, 0x12, 0x35, 0x10, 0, 0, 0, 0]);
+        });
+        try
+        {
+            await Expect<InvalidDataException>(() =>
+                DoIpDiagnosticTransport.ConnectAsync(
+                    "127.0.0.1", Tester, Ecu, TimeSpan.FromSeconds(2),
+                    CancellationToken.None, portOverride: routePort),
+                "Routing activation cannot switch logical gateway after 0x11.");
+            await routeServer.WaitAsync(TimeSpan.FromSeconds(3));
+        }
+        finally { routeListener.Stop(); }
+
         return checks;
     }
 }
