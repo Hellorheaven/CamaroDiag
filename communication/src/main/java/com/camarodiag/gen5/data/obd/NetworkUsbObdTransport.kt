@@ -276,8 +276,14 @@ class ElmWifiTransport(
         val activeSocket = socket ?: throw ObdTransportDisconnectedException("Wi-Fi OBD adapter is not connected")
         try {
             activeSocket.getOutputStream().write(data)
+            if (socket !== activeSocket) {
+                throw ObdSupersededSessionException(
+                    java.io.IOException("Wi-Fi OBD connection replaced during write")
+                )
+            }
         } catch (error: java.io.IOException) {
-            if (socket === activeSocket) connectionLost = true
+            if (socket !== activeSocket) throw ObdSupersededSessionException(error)
+            connectionLost = true
             throw error
         }
     }
@@ -289,14 +295,22 @@ class ElmWifiTransport(
             return -1
         }
         return try {
-            activeSocket.getInputStream().read(buffer).also { count ->
-                if (count < 0 && socket === activeSocket) connectionLost = true
+            val count = activeSocket.getInputStream().read(buffer)
+            if (socket !== activeSocket) {
+                throw ObdSupersededSessionException(
+                    java.io.IOException("Wi-Fi OBD connection replaced during read")
+                )
             }
+            if (count < 0) connectionLost = true
+            count
         } catch (timeout: java.net.SocketTimeoutException) {
-            // A read timeout is normal while waiting for the ELM prompt.
+            // ELM response gaps are normal on the current socket, but a late
+            // timeout from a replaced connection must not disconnect its successor.
+            if (socket !== activeSocket) throw ObdSupersededSessionException(timeout)
             throw timeout
         } catch (error: java.io.IOException) {
-            if (socket === activeSocket) connectionLost = true
+            if (socket !== activeSocket) throw ObdSupersededSessionException(error)
+            connectionLost = true
             throw error
         }
     }
