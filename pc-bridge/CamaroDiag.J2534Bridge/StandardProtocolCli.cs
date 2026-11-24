@@ -1149,7 +1149,8 @@ internal static class StandardProtocolCli
     internal sealed record DoIpOptions(string Host, ushort Tester, ushort Ecu,
         byte[] Request, int TimeoutMs, bool UseTls, byte Version = 0x02,
         string? ReceiveFile = null,
-        string? ClientCertificateThumbprint = null);
+        string? ClientCertificateThumbprint = null,
+        int DoIpP2Ms = 30000, int DoIpP2StarMs = 30000);
     internal sealed record PassThruOptions(int AdapterIndex, uint ProtocolId,
         uint Baud, uint Flags, byte[] Data, byte[]? Mask, byte[]? Pattern,
         byte[]? Flow, string? KlineInit, int TimeoutMs, int ReadFrames,
@@ -1292,6 +1293,13 @@ internal static class StandardProtocolCli
             Hex(hexPayload!);
         var timeout = int.Parse(Optional(args, "--timeout-ms") ?? "5000",
             CultureInfo.InvariantCulture);
+        var p2Ms = int.Parse(Optional(args, "--uds-p2-ms") ?? "30000",
+            CultureInfo.InvariantCulture);
+        var p2StarMs = int.Parse(Optional(args, "--uds-p2-star-ms") ?? "30000",
+            CultureInfo.InvariantCulture);
+        if (p2Ms is < 1 or > 30000 || p2StarMs is < 1 or > 30000)
+            throw new ArgumentOutOfRangeException(
+                "DoIP UDS P2/P2* values must be within 1..30000 ms.");
         var useTls = bool.Parse(Optional(args, "--tls") ?? "false");
         var version = checked((byte)Number(
             Optional(args, "--doip-version") ?? "2"));
@@ -1307,7 +1315,7 @@ internal static class StandardProtocolCli
             version is not (0x02 or 0x03 or 0x04))
             throw new ArgumentException("DoIP target or diagnostic PDU is invalid.");
         return new(host, tester, ecu, bytes, timeout, useTls,
-            version, receiveFile, clientCert);
+            version, receiveFile, clientCert, p2Ms, p2StarMs);
     }
 
     internal static PassThruOptions ParseJ2534(string[] args)
@@ -1440,7 +1448,9 @@ internal static class StandardProtocolCli
                 useTls: o.UseTls, protocolVersion: o.Version,
                 clientCertificateThumbprint: o.ClientCertificateThumbprint);
             var reply = await link.ExchangeUdsAsync(o.Request,
-                TimeSpan.FromMilliseconds(o.TimeoutMs), CancellationToken.None);
+                TimeSpan.FromMilliseconds(o.TimeoutMs), CancellationToken.None,
+                TimeSpan.FromMilliseconds(o.DoIpP2Ms),
+                TimeSpan.FromMilliseconds(o.DoIpP2StarMs));
             var replyHash = Convert.ToHexString(
                 System.Security.Cryptography.SHA256.HashData(reply));
             if (o.ReceiveFile is not null)
