@@ -9,6 +9,13 @@
 - Indiquer systématiquement SHA exact, résultats de jobs GitHub Actions, tests réellement exécutés, avertissements et limitations. Une CI verte n'est **pas** un essai sur calculateur réel.
 - Les documents utilisateurs doivent rester compréhensibles sans détail technique interne ; README et documentation FR/EN. Logiciels Android, Windows et Connectors : chaînes utilisateur FR/EN via ressources, **pas de texte UI en dur** ; les 28 autres langues arriveront au lot i18n final.
 
+## Séquence obligatoire des chantiers PR #95 — rappel du propriétaire du 24/11/2026
+- **Exécuter exclusivement dans cet ordre : C1 (console CAN/OBD) → C2 (sauvegarde ECU) → C4 (FlexFuel LFX en lecture seule) → C6 (ponts, connecteurs et sûreté) → C8 (QUALITÉ FINALE).**
+- **« Très avancé » n'est pas « terminé ».** Terminer toutes les fonctions logicielles et les tests du chantier en cours ; corriger les échecs ; consigner preuves et limites ; seulement ensuite commencer le chantier suivant. Ne pas faire de travaux C6 parce qu'ils sont disponibles si C1 est encore incomplet. L'autre chat possède exclusivement les protocoles ISO/SAE et ses contrôles associés : ne pas modifier ses fichiers.
+- **C8 signifie qualité *finale*.** Ne pas annoncer « C8 en cours » ou « C8 terminé » tant que C1, C2, C4 et C6 ne sont pas terminés côté logiciel. Les tests unitaires, builds et checkpoints CI intermédiaires restent obligatoires **à la fin de chaque chantier** mais ne constituent pas le chantier C8.
+- **Aucune recette sur véhicule pendant la PR** : la qualification réelle relève du propriétaire sur la Release après fermeture, dans le lot 8 / issue #48. Ne pas inventer de succès matériel pour déclarer le développement logiciel terminé.
+- Après C8 et autorisation expresse de fusion : audit #106, puis travaux C3, C5 et C7 ordonnés dans #108, sans nouvelle PR/branche avant autorisation.
+
 ## Politique de validation PR / Release — décision du propriétaire du 24/11/2026
 - **Aucun essai réel sur voiture, ECU, adaptateur véhicule ou banc matériel comme condition de clôture de la PR #95.** Le propriétaire ne teste que les **Releases**, après fermeture de la PR. Ne plus solliciter des essais physiques intermédiaires et ne plus présenter leur absence comme un bloqueur de fusion de cette PR.
 - **Avant fusion** : terminer le développement logiciel réellement implémentable sans matériel, exécuter les contrôles automatisés Debug/Windows/Android/firmware/simulation, auditer les secrets, les conflits, la documentation et les limites. Ne pas falsifier l'état « validé sur matériel » : toute fonction non vérifiée restera indiquée *non qualifiée physiquement*, même si ses tests simulés passent.
