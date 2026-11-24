@@ -3,19 +3,24 @@ using System.Buffers.Binary;
 
 namespace CamaroDiag.J2534Bridge;
 
-/// <summary>Read-only check of one normal-address ISO-TP exchange against an
-/// externally timestamped classical CAN trace. Never connects to any ECU.
+/// <summary>Read-only check of one ISO-TP exchange against an externally
+/// timestamped classical CAN or CAN-FD capture. Never connects to any ECU.
 /// Input timestamps and provenance are not independently attested.</summary>
 internal static class IsoTpClassicCaptureAudit
 {
     internal const string Command = "--isotp-audit-trace";
+    internal const string CommandFd = "--isotp-fd-audit-trace";
+
+    private static bool ValidDlc(int length, bool canFd) =>
+        length is >= 1 and <= 8 || (canFd && length is 12 or 16 or 20 or 24 or 32 or 48 or 64);
     internal enum Status { Pass, Fail, Inconclusive }
     internal sealed record Frame(long TimeUs, bool TesterTx, uint Id, byte[] Data);
     internal sealed record Result(Status Status, string Reason, int Cf, int Cts);
 
     internal static Result Analyze(IReadOnlyList<Frame> frames, uint tx, uint rx,
         bool can29, bool senderTx, int nBsMs = 1000, int nCrMs = 1000,
-        int maxWaitFrames = 4, byte? txAddress = null, byte? rxAddress = null)
+        int maxWaitFrames = 4, byte? txAddress = null, byte? rxAddress = null,
+        bool canFd = false)
     {
         var idMax = can29 ? 0x1FFFFFFFu : 0x7FFu;
         if (frames is null || frames.Count > 50000 || tx > idMax ||
@@ -38,6 +43,7 @@ internal static class IsoTpClassicCaptureAudit
         var blockSize = 0;
         var inBlock = 0;
         var waitFrames = 0;
+        var rxDl = 0;
         var cfCount = 0;
         var ctsCount = 0;
         long lastTime = -1, fcWaitSince = 0, cfWaitSince = 0, stMinUs = 0;
@@ -49,8 +55,8 @@ internal static class IsoTpClassicCaptureAudit
         {
             if (frame is null || frame.TimeUs < lastTime ||
                 frame.TimeUs < 0 || frame.Id > idMax || frame.Data is null ||
-                frame.Data.Length is < 1 or > 8)
-                throw new InvalidDataException("Malformed/unsorted classical CAN capture.");
+                !ValidDlc(frame.Data.Length, canFd))
+                throw new InvalidDataException("Malformed/unsorted CAN/CAN-FD capture or DLC.");
             lastTime = frame.TimeUs;
             var own = frame.TesterTx == senderTx && frame.Id == sender;
             var peer = frame.TesterTx != senderTx && frame.Id == receiver;
@@ -68,14 +74,20 @@ internal static class IsoTpClassicCaptureAudit
                 if (!own) continue;
                 if (kind == 0)
                 {
-                    var n = frame.Data[addressWidth] & 15;
-                    return n >= 1 && n <= 7 - addressWidth &&
-                        n <= frame.Data.Length - 1 - addressWidth
+                    var escaped = frame.Data.Length > 8;
+                    if (escaped && (!canFd || frame.Data[addressWidth] != 0 ||
+                        frame.Data.Length < addressWidth + 3))
+                        return Fail("FD SingleFrame with DLC > 8 needs escaped SF_DL.");
+                    var header = escaped ? 2 : 1;
+                    var n = escaped ? frame.Data[addressWidth + 1] :
+                        frame.Data[addressWidth] & 15;
+                    return n >= 1 && n <= frame.Data.Length - addressWidth - header
                         ? new(Status.Pass, "SingleFrame syntax only; no STmin evidence.", 0, 0)
                         : Fail("Invalid single-frame size.");
                 }
-                if (kind != 0x10 || frame.Data.Length != 8)
-                    return Fail("Expected SF or 8-byte FirstFrame.");
+                if (kind != 0x10 || frame.Data.Length < 8)
+                    return Fail("Expected SF or valid FirstFrame.");
+                rxDl = frame.Data.Length;
                 var length12 = ((frame.Data[addressWidth] & 15) << 8) |
                     frame.Data[addressWidth + 1];
                 if (length12 == 0)
@@ -89,14 +101,16 @@ internal static class IsoTpClassicCaptureAudit
                     if (length32 <= 4095 || length32 > IsoTpCanFdSession.MaximumPayloadBytes)
                         return Fail("Invalid extended 32-bit FF length.");
                     total = (int)length32;
-                    copied = 2 - addressWidth;
+                    copied = frame.Data.Length - 6 - addressWidth;
                 }
                 else
                 {
                     total = length12;
-                    if (total <= 7 - addressWidth)
+                    var singleCapacity = frame.Data.Length > 8 ?
+                        frame.Data.Length - 2 - addressWidth : 7 - addressWidth;
+                    if (total <= singleCapacity)
                         return Fail("FF length fits within a SingleFrame.");
-                    copied = 6 - addressWidth;
+                    copied = frame.Data.Length - 2 - addressWidth;
                 }
                 waitingForFc = started = true;
                 fcWaitSince = frame.TimeUs;
@@ -141,6 +155,7 @@ internal static class IsoTpClassicCaptureAudit
             if (overflow) return Fail("Sender continued after FC/OVFLW.");
             if (waitingForFc) return Fail("CF was emitted before FC/CTS.");
             if (kind != 0x20 || frame.Data.Length < addressWidth + 2 ||
+                frame.Data.Length > rxDl ||
                 (frame.Data[addressWidth] & 15) != nextSn)
                 return Fail("Bad CF type/sequence.");
             if (frame.TimeUs - cfWaitSince > nCrMs * 1000L)
@@ -149,7 +164,7 @@ internal static class IsoTpClassicCaptureAudit
                 return Fail("CF-to-CF bus timing violates STmin.");
             var remaining = total - copied;
             var take = Math.Min(remaining, frame.Data.Length - 1 - addressWidth);
-            if (take == 0 || (take < remaining && frame.Data.Length != 8))
+            if (take == 0 || (take < remaining && frame.Data.Length != rxDl))
                 return Fail("Short non-final CF.");
             copied += take;
             lastCf = frame.TimeUs;
@@ -173,7 +188,8 @@ internal static class IsoTpClassicCaptureAudit
             "No matching sender PDU.");
     }
 
-    internal static IReadOnlyList<Frame> ReadCapture(string path, bool can29)
+    internal static IReadOnlyList<Frame> ReadCapture(string path, bool can29,
+        bool canFd = false)
     {
         var file = new FileInfo(path);
         if (!file.Exists || file.Length > 16 * 1024 * 1024)
@@ -215,8 +231,8 @@ internal static class IsoTpClassicCaptureAudit
             {
                 throw new InvalidDataException("Invalid hex CAN payload.", error);
             }
-            if (data.Length is < 1 or > 8 || output.Count >= 50000)
-                throw new InvalidDataException("Invalid classic CAN DLC/capture length.");
+            if (!ValidDlc(data.Length, canFd) || output.Count >= 50000)
+                throw new InvalidDataException("Invalid CAN/CAN-FD DLC or capture length.");
             output.Add(new(timestamp, direction, id, data));
         }
         if (!header) throw new InvalidDataException("No capture CSV header.");
@@ -228,8 +244,9 @@ internal static class IsoTpClassicCaptureAudit
         try
         {
             if (args.Length < 9 || args.Length % 2 != 1 ||
-                !args[0].Equals(Command, StringComparison.OrdinalIgnoreCase))
-                throw new ArgumentException("Usage: --isotp-audit-trace --capture-file <bus.csv> --tx-id <hex> --rx-id <hex> --sender tx|rx [--extended true|false] [--tx-address <hex> --rx-address <hex>] [--n-bs-ms 1000] [--n-cr-ms 1000] [--max-wait-frames 4]");
+                (!args[0].Equals(Command, StringComparison.OrdinalIgnoreCase) &&
+                 !args[0].Equals(CommandFd, StringComparison.OrdinalIgnoreCase)))
+                throw new ArgumentException("Usage: --isotp-audit-trace OR --isotp-fd-audit-trace --capture-file <bus.csv> --tx-id <hex> --rx-id <hex> --sender tx|rx [--extended true|false] [--tx-address <hex> --rx-address <hex>] [--n-bs-ms 1000] [--n-cr-ms 1000] [--max-wait-frames 4]");
             var options = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             for (var i = 1; i < args.Length; i += 2)
                 if (!new[] {"--capture-file", "--tx-id", "--rx-id",
@@ -250,6 +267,7 @@ internal static class IsoTpClassicCaptureAudit
                     throw new ArgumentException("Invalid hex CAN ID.");
                 return id;
             }
+            var canFd = args[0].Equals(CommandFd, StringComparison.OrdinalIgnoreCase);
             var can29 = options.TryGetValue("--extended", out var flag) && bool.Parse(flag);
             var senderTx = Req("--sender").ToLowerInvariant() switch
             {
@@ -266,10 +284,10 @@ internal static class IsoTpClassicCaptureAudit
                 ? checked((byte)Id("--tx-address")) : null;
             byte? rxAddress = options.ContainsKey("--rx-address")
                 ? checked((byte)Id("--rx-address")) : null;
-            var result = Analyze(ReadCapture(Req("--capture-file"), can29),
+            var result = Analyze(ReadCapture(Req("--capture-file"), can29, canFd),
                 Id("--tx-id"), Id("--rx-id"), can29, senderTx, nBs, nCr,
-                maxWait, txAddress, rxAddress);
-            Console.WriteLine($"ISO-TP classic: {result.Status}, CF={result.Cf}, CTS={result.Cts}");
+                maxWait, txAddress, rxAddress, canFd);
+            Console.WriteLine($"ISO-TP {(canFd ? "CAN-FD" : "classic CAN")}: {result.Status}, CF={result.Cf}, CTS={result.Cts}");
             Console.WriteLine(result.Reason);
             Console.WriteLine("Input is user supplied; no attestation of bus source, ECU or programming capability.");
             return result.Status switch

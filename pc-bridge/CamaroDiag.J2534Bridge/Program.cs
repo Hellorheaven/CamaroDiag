@@ -56,7 +56,9 @@ internal static class Program
             return await StandardProtocolCli.RunIsoTpAsync(args);
         // Entirely offline: never discover or open a J2534 adapter.
         if (args.Contains(IsoTpClassicCaptureAudit.Command,
-            StringComparer.OrdinalIgnoreCase))
+            StringComparer.OrdinalIgnoreCase) ||
+            args.Contains(IsoTpClassicCaptureAudit.CommandFd,
+                StringComparer.OrdinalIgnoreCase))
             return IsoTpClassicCaptureAudit.Run(args);
         if (args.Contains(StandardProtocolCli.ObdProtocolAutoDetectCommand,
             StringComparer.OrdinalIgnoreCase))
