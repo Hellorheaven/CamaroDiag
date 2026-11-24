@@ -10,7 +10,7 @@ from pathlib import Path
 from datetime import datetime, timezone
 from typing import Sequence
 
-from .doip import (Session, discover, discover_unique_vin, gateway_key, status,
+from .doip import (Session, discover, discover_unique_vin, discover_ipv4, gateway_key, status,
                    DoIpError, valid_vin, parse_commands, confirm_commands)
 from .doip_archive import load_scope
 from .doip_capture import capture_region, save_capture
@@ -36,6 +36,12 @@ def run(argv: Sequence[str] | None = None) -> dict:
     parser.add_argument("--fr", action="store_true", help="Français")
     parser.add_argument("--host", help=tr("Numeric gateway IP; omit for VIN discovery", "IP numérique ; laisser vide pour découverte VIN"))
     parser.add_argument("--vin", help=tr("Expected vehicle VIN", "VIN attendu"))
+    parser.add_argument("--eid", type=lambda x: hex_value(x, 12).to_bytes(6, "big"),
+                        help=tr("Gateway EID, 12 hex digits (discovery only)", "EID passerelle, 12 chiffres hex (découverte uniquement)"))
+    discovery_mode = parser.add_mutually_exclusive_group()
+    discovery_mode.add_argument("--broadcast-ip", help=tr("Explicit IPv4 discovery destination", "Destination de découverte IPv4 explicite"))
+    discovery_mode.add_argument("--listen", action="store_true", help=tr("Listen passively for IPv4 announcements", "Écouter passivement les annonces IPv4"))
+    parser.add_argument("--listen-host", default="0.0.0.0", help=tr("Local IPv4 bind address for discovery", "Adresse IPv4 locale pour découverte"))
     parser.add_argument("--tester", type=lambda x: hex_value(x, 4))
     parser.add_argument("--ecu", type=lambda x: hex_value(x, 4))
     parser.add_argument("--tcp", action="store_true", help=tr("Explicit unencrypted TCP", "TCP non chiffré explicite"))
@@ -114,12 +120,29 @@ def run(argv: Sequence[str] | None = None) -> dict:
         parser.error(tr("Certificate files require TLS", "Les certificats nécessitent TLS"))
     if o.client_key and not o.client_cert:
         parser.error(tr("Client key requires a certificate", "La clé client nécessite un certificat"))
+    if o.vin is not None and not valid_vin(o.vin):
+        parser.error(tr("Invalid VIN", "VIN invalide"))
+    if o.eid is not None and o.vin is not None:
+        parser.error(tr("Choose VIN or EID, not both", "Choisir VIN ou EID, pas les deux"))
+    discovery_options = o.eid is not None or o.broadcast_ip is not None or o.listen or o.listen_host != "0.0.0.0"
+    if discovery_options and o.action != "discover":
+        parser.error(tr("Discovery options require discover", "Options réservées à discover"))
+    if o.host and (o.broadcast_ip is not None or o.listen):
+        parser.error(tr("Choose unicast, broadcast or passive discovery", "Choisir unicast, diffusion ou écoute passive"))
+    if o.listen_host != "0.0.0.0" and not (o.broadcast_ip is not None or o.listen):
+        parser.error(tr("Local bind address requires broadcast or passive discovery", "Adresse locale réservée à la diffusion ou écoute passive"))
+    if o.broadcast_ip is not None or o.listen:
+        found = discover_ipv4(o.timeout, trace, destination=o.broadcast_ip, vin=o.vin, eid=o.eid,
+                              listen_host=o.listen_host)
+        return {"gateways": [asdict(item) for item in found], "ecu_authenticated": False,
+                "physical_qualification": False}
     if not o.host and (o.vin is None or not valid_vin(o.vin)):
         parser.error(tr("Host or valid expected VIN required", "IP ou VIN attendu valide requis"))
     if commands is not None and not sys.stdin.isatty():
         parser.error(tr("Interactive terminal required for confirmation", "Terminal interactif requis pour la confirmation"))
     if o.host:
-        gateway = discover(o.host, o.vin, o.timeout, trace)
+        gateway = (discover(o.host, o.vin, o.timeout, trace, eid=o.eid) if o.eid is not None
+                   else discover(o.host, o.vin, o.timeout, trace))
     else:
         selected = discover_unique_vin(o.vin, o.timeout, trace)
         gateway = discover(selected.host, o.vin, o.timeout, trace)

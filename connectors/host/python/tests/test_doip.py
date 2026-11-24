@@ -6,7 +6,7 @@ from camarodiagconnectors.doip_cli import run
 
 from camarodiagconnectors.doip import (
     Gateway, Session, DoIpError, NegativeResponse, decode, encode, parse_identity, positive,
-    discover_unique_vin, parse_commands, confirm_commands
+    discover, discover_ipv4, discovery_request, discover_unique_vin, parse_commands, confirm_commands
 )
 
 VIN = "1G1FA1RXXR0123456"
@@ -71,6 +71,55 @@ class DoIpTests(unittest.TestCase):
                     thread.join(3)
                 if errors:
                     raise errors[0]
+
+    def test_ipv4_discovery_eid_filter_and_unicast_correlation(self):
+        eid = bytes.fromhex("010203040506")
+        self.assertEqual(discovery_request(eid=eid), encode(255, 2, eid))
+        self.assertEqual(discovery_request(), encode(255, 1))
+        with self.assertRaises(DoIpError):
+            discovery_request(VIN, eid)
+        with self.assertRaises(DoIpError):
+            discovery_request(eid=b"bad")
+        for unicast in (False, True):
+            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as server:
+                server.bind(("127.0.0.1", 0))
+                server.settimeout(2)
+                errors = []
+                def peer():
+                    try:
+                        raw, source = server.recvfrom(1024)
+                        self.assertEqual(raw, encode(255, 2, eid))
+                        body = VIN.encode() + ECU + eid + bytes(7)
+                        if not unicast:
+                            server.sendto(encode(2, 4, VIN.encode() + ECU + bytes(13)), source)
+                        server.sendto(encode(2, 4, body), source)
+                        if not unicast:
+                            server.sendto(encode(2, 4, body), source)
+                    except BaseException as exc:
+                        errors.append(exc)
+                thread = threading.Thread(target=peer)
+                thread.start()
+                try:
+                    port = server.getsockname()[1]
+                    if unicast:
+                        found = [discover("127.0.0.1", timeout=0.5, port=port, eid=eid)]
+                    else:
+                        found = discover_ipv4(0.5, destination="127.0.0.1", port=port, eid=eid)
+                    self.assertEqual(len(found), 1)
+                    self.assertEqual(found[0].eid, eid.hex().upper())
+                finally:
+                    thread.join(3)
+                if errors:
+                    raise errors[0]
+
+    def test_passive_discovery_sends_nothing(self):
+        with patch("camarodiagconnectors.doip.socket.socket") as factory:
+            sock = factory.return_value.__enter__.return_value
+            sock.recvfrom.side_effect = TimeoutError
+            self.assertEqual(discover_ipv4(0.2, listen_host="127.0.0.1"), [])
+            sock.bind.assert_called_once_with(("127.0.0.1", 13400))
+            sock.sendto.assert_not_called()
+            sock.send.assert_not_called()
 
     def test_sequence_requires_two_separate_confirmations(self):
         commands = parse_commands("22 F1 90;19 01 FF")

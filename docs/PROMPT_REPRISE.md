@@ -1,3 +1,7 @@
+## PR117 — découverte DoIP Connectors IPv4 / EID (24/11/2026)
+
+- Extension du client Python et de sa CLI FR/EN : identification unicast par EID, découverte IPv4 explicite générique/VIN/EID, écoute passive, adresse locale de liaison, filtre port/source, déduplication et limite 32 passerelles. L’identification automatique VIN conserve le refus d’ambiguïté. La découverte ne vaut ni authentification ni autorisation d’écriture. Tests UDP locaux et écoute sans émission ajoutés. Qualification matérielle non réalisée ; validation CI à demander avec le lot courant.
+
 ## PR117 — correction de concurrence du transport DoIP Windows (24/11/2026)
 
 - Run 45453585549 : compilation Windows 0 erreur / 0 avertissement mais échec du test de monitoring (session fermée entre deux requêtes). Cause probable identifiée : le producteur vérifiait l'état de l'échange après publication de la réponse, alors que le consommateur pouvait légitimement avoir terminé. Sérialisation de la publication, admission, vérification des doublons et transition à l'état inactif ; maintien du refus des données non sollicitées et de la retraite de connexion après incertitude. Test 128 requêtes successives ajouté. Nouvelle validation indispensable. Les réponses tardives identiques sur un socket réutilisé restent intrinsèquement ambiguës.

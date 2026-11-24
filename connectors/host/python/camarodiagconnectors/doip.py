@@ -127,12 +127,28 @@ def _udp(host: str, request: bytes, timeout: float, trace: Trace | None,
         return response
 
 
+def discovery_request(vin: str | None = None, eid: bytes | None = None) -> bytes:
+    if vin is not None and eid is not None:
+        raise DoIpError("Choose VIN or EID identification, not both")
+    if vin is not None:
+        if not valid_vin(vin):
+            raise DoIpError("Invalid expected VIN")
+        return encode(255, 3, vin.encode("ascii"))
+    if eid is not None:
+        if not isinstance(eid, bytes) or len(eid) != 6:
+            raise DoIpError("EID must contain six bytes")
+        return encode(255, 2, eid)
+    return encode(255, 1)
+
+
 def discover(host: str, vin: str | None = None, timeout: float = 3,
-             trace: Trace | None = None, port: int = 13400) -> Gateway:
-    if vin is not None and not valid_vin(vin):
-        raise DoIpError("Invalid expected VIN")
-    request = encode(255, 3, vin.encode("ascii")) if vin else encode(255, 1)
-    return parse_identity(endpoint(host), _udp(host, request, timeout, trace, port), vin)
+             trace: Trace | None = None, port: int = 13400, *,
+             eid: bytes | None = None) -> Gateway:
+    request = discovery_request(vin, eid)
+    found = parse_identity(endpoint(host), _udp(host, request, timeout, trace, port), vin)
+    if eid is not None and found.eid != eid.hex().upper():
+        raise DoIpError("Announced EID does not match requested gateway")
+    return found
 
 
 def gateway_key(gateway: Gateway) -> tuple:
@@ -140,28 +156,38 @@ def gateway_key(gateway: Gateway) -> tuple:
             gateway.version, gateway.eid, gateway.gid)
 
 
-def discover_unique_vin(vin: str, timeout: float = 3, trace: Trace | None = None,
-                        destination: str = "255.255.255.255", port: int = 13400) -> Gateway:
-    """Directed VIN query on the selected IPv4 network; ambiguity never chooses a target."""
+def discover_ipv4(timeout: float = 3, trace: Trace | None = None, *,
+                  destination: str | None = None, vin: str | None = None,
+                  eid: bytes | None = None, port: int = 13400,
+                  max_results: int = 32, listen_host: str = "0.0.0.0") -> list[Gateway]:
+    """Explicit IPv4 broadcast or passive announcement collection. No UDS traffic."""
     _timeout(timeout)
-    if not valid_vin(vin):
-        raise DoIpError("Invalid expected VIN")
-    ip = ipaddress.IPv4Address(destination)
-    if ip.is_multicast or ip.is_unspecified:
-        raise DoIpError("Invalid IPv4 discovery destination")
-    request = encode(255, 3, vin.encode("ascii"))
+    if type(port) is not int or not 1 <= port <= 65535 or type(max_results) is not int or not 1 <= max_results <= 32:
+        raise DoIpError("Invalid discovery port or result limit")
+    request = discovery_request(vin, eid)
+    if destination is not None:
+        ip = ipaddress.IPv4Address(destination)
+        if ip.is_multicast or ip.is_unspecified:
+            raise DoIpError("Invalid IPv4 discovery destination")
+    bind_address = ipaddress.IPv4Address(listen_host)
+    if bind_address.is_multicast or str(bind_address) == "255.255.255.255":
+        raise DoIpError("Invalid IPv4 listen address")
     deadline = time.monotonic() + timeout
     matches = {}
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-        sock.bind(("", 0))
-        sock.settimeout(remaining(deadline))
-        sock.sendto(request, (destination, port))
-        _emit(trace, "TX", "UDP", destination, request)
+        if destination is None:
+            sock.bind((str(bind_address), port))
+        else:
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+            sock.bind((str(bind_address), 0))
+            sock.settimeout(remaining(deadline))
+            sock.sendto(request, (destination, port))
+            _emit(trace, "TX", "UDP", destination, request)
         while time.monotonic() < deadline:
             try:
                 sock.settimeout(remaining(deadline))
                 raw, peer = sock.recvfrom(65536)
+                remaining(deadline)
             except TimeoutError:
                 break
             if peer[1] != port:
@@ -171,12 +197,25 @@ def discover_unique_vin(vin: str, timeout: float = 3, trace: Trace | None = None
                 observed = parse_identity(peer[0], raw, vin)
             except ValueError:
                 continue
+            if eid is not None and observed.eid != eid.hex().upper():
+                continue
             matches[gateway_key(observed)] = observed
-            if len(matches) > 1:
-                raise DoIpError("Multiple gateways announce the selected VIN")
-    if len(matches) != 1:
+            if len(matches) >= max_results:
+                break
+    return list(matches.values())
+
+
+def discover_unique_vin(vin: str, timeout: float = 3, trace: Trace | None = None,
+                        destination: str = "255.255.255.255", port: int = 13400) -> Gateway:
+    """Directed VIN query; ambiguity never chooses a target."""
+    if not valid_vin(vin):
+        raise DoIpError("Invalid expected VIN")
+    matches = discover_ipv4(timeout, trace, destination=destination, vin=vin, port=port, max_results=2)
+    if len(matches) > 1:
+        raise DoIpError("Multiple gateways announce the selected VIN")
+    if not matches:
         raise DoIpError("No matching DoIP gateway observed")
-    return next(iter(matches.values()))
+    return matches[0]
 
 
 def parse_commands(text: str) -> tuple[bytes, ...]:
