@@ -212,11 +212,20 @@ internal static class DoIpVehicleDiscovery
                 sourcePortOverride.Value is < 1 or > 65535))
             throw new ArgumentOutOfRangeException(nameof(duration),
                 "Passive DoIP listening needs a bounded interval and standard UDP endpoint.");
-        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        deadline.CancelAfter(duration);
-        var sourcePort = sourcePortOverride ?? 13400;
         using var receiver = new UdpClient(
             new IPEndPoint(IPAddress.Any, localPortOverride ?? 13400));
+        return await ListenOnBoundSocketAsync(receiver, duration,
+            cancellationToken, sourcePortOverride ?? 13400);
+    }
+
+    // The caller owns the already-bound socket. Keeping it open avoids a
+    // reserve/rebind race and permits OS-assigned UDP ports in offline tests.
+    internal static async Task<IReadOnlyList<Identity>> ListenOnBoundSocketAsync(
+        UdpClient receiver, TimeSpan duration, CancellationToken cancellationToken,
+        int sourcePort)
+    {
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        deadline.CancelAfter(duration);
         var identified = new Dictionary<string, Identity>(StringComparer.Ordinal);
         while (identified.Count < 32)
         {
