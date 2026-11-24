@@ -1132,6 +1132,16 @@ class BluetoothObdManager(context: Context) {
         can29Bit: Boolean,
         protocolNumber: Int = 33
     ): Result<String> = withContext(Dispatchers.IO) {
+        // A malformed token, public host or incompatible CAN profile must
+        // never tear down an already working Bluetooth/USB/Wi-Fi adapter.
+        try {
+            J2534BridgeConnectionPreflight.requireValid(
+                host, port, pairingToken, requestCanId, responseCanId,
+                can29Bit, protocolNumber
+            )
+        } catch (invalid: IllegalArgumentException) {
+            return@withContext Result.failure(invalid)
+        }
         val epoch = beginAdapterConnection()
         val bridge = J2534BridgeTransport(host, port, pairingToken)
         try {
