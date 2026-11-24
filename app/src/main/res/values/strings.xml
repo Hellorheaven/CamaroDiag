@@ -1079,4 +1079,7 @@
     <string name="cal_doip_ipv6_interface">IPv6 network interface index</string>
     <string name="cal_doip_discover_ipv6">Discover by IPv6 multicast</string>
     <string name="cal_doip_listen_ipv6">Listen for IPv6 announcements</string>
+    <string name="cal_doip_select_interface">Choose network interface</string>
+    <string name="cal_doip_no_interfaces">No eligible IPv6 interface</string>
+    <string name="cal_doip_interface_error">Could not enumerate network interfaces.</string>
 </resources>

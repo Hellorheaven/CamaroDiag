@@ -315,6 +315,11 @@ fun CalibrationWorkspaceScreen(
     var doIpDiscoveryEid by remember(vehicle) { mutableStateOf("") }
     var doIpDiscoveryInterface by remember(vehicle) { mutableStateOf("") }
     var doIpDiscoveryAdvanced by remember(vehicle) { mutableStateOf(false) }
+    var doIpNetworkMenu by remember(vehicle) { mutableStateOf(false) }
+    var doIpNetworkInterfaces by remember(vehicle) { mutableStateOf(emptyList<DoIpDirectRead.DiscoveryInterface>()) }
+    var doIpNetworkLoading by remember(vehicle) { mutableStateOf(false) }
+    var doIpNetworkError by remember(vehicle) { mutableStateOf(false) }
+    val doIpNetworkScope = rememberCoroutineScope()
     LaunchedEffect(state.doIpGatewayHost, state.doIpDiscoveredVin) {
         if (doIpHost.isBlank() && state.doIpDiscoveredVin.isNotBlank() &&
             state.doIpDiscoveredVin == vehicle.vin.uppercase() && state.doIpGatewayHost.isNotBlank()) {
@@ -461,6 +466,38 @@ fun CalibrationWorkspaceScreen(
                                 enabled = idle, singleLine = true, modifier = Modifier.fillMaxWidth(),
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                 label = { Text(stringResource(R.string.cal_doip_ipv6_interface)) })
+                            Box {
+                                OutlinedButton(onClick = {
+                                    doIpNetworkLoading = true
+                                    doIpNetworkError = false
+                                    doIpNetworkInterfaces = emptyList()
+                                    doIpNetworkScope.launch {
+                                        try {
+                                            doIpNetworkInterfaces = DoIpDirectRead.availableDiscoveryInterfaces()
+                                            doIpNetworkMenu = true
+                                        } catch (cancelled: CancellationException) { throw cancelled }
+                                        catch (_: Exception) { doIpNetworkError = true }
+                                        finally { doIpNetworkLoading = false }
+                                    }
+                                }, enabled = idle && !doIpNetworkLoading, modifier = Modifier.fillMaxWidth()) {
+                                    Text(stringResource(R.string.cal_doip_select_interface))
+                                }
+                                DropdownMenu(expanded = doIpNetworkMenu, onDismissRequest = { doIpNetworkMenu = false }) {
+                                    if (doIpNetworkInterfaces.isEmpty()) {
+                                        DropdownMenuItem(text = { Text(stringResource(R.string.cal_doip_no_interfaces)) },
+                                            onClick = { doIpNetworkMenu = false })
+                                    }
+                                    doIpNetworkInterfaces.forEach { network ->
+                                        DropdownMenuItem(text = { Text("${network.name} (#${network.index})") },
+                                            onClick = {
+                                                doIpDiscoveryInterface = network.index.toString()
+                                                doIpNetworkMenu = false
+                                            })
+                                    }
+                                }
+                            }
+                            if (doIpNetworkError)
+                                Text(stringResource(R.string.cal_doip_interface_error), color = WarnRed, fontSize = 12.sp)
                             val interfaceReady = (doIpDiscoveryInterface.toIntOrNull() ?: 0) > 0
                             OutlinedButton(onClick = { onInspectDoIpGateway(doIpDiscoveryInterface, DoIpDirectRead.GatewayOperation.DISCOVER_IPV6, null) },
                                 enabled = idle && vinReady && interfaceReady, modifier = Modifier.fillMaxWidth()) {

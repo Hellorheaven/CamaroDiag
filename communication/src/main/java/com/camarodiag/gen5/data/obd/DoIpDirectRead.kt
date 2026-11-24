@@ -398,6 +398,21 @@ object DoIpDirectRead {
         } finally { socket.close() }
     }
 
+    data class DiscoveryInterface(val index: Int, val name: String)
+
+    /** List only interfaces capable of scoped link-local multicast. Selection remains explicit. */
+    suspend fun availableDiscoveryInterfaces(): List<DiscoveryInterface> = withContext(Dispatchers.IO) {
+        val interfaces = NetworkInterface.getNetworkInterfaces() ?: return@withContext emptyList()
+        java.util.Collections.list(interfaces).mapNotNull { network ->
+            try {
+                if (network.index > 0 && network.isUp && !network.isLoopback && network.supportsMulticast() &&
+                    java.util.Collections.list(network.inetAddresses).any { it is Inet6Address && it.isLinkLocalAddress })
+                    DiscoveryInterface(network.index, network.name)
+                else null
+            } catch (_: java.net.SocketException) { null }
+        }.sortedBy { it.index }
+    }
+
     private suspend fun discoverSelectedVehicleIpv6(vin: String, interfaceIndex: Int, passive: Boolean,
         timeoutMs: Int, onControlTrace: (ControlTrace) -> Unit): GatewayResult {
         val expected = vin.trim().uppercase(Locale.ROOT)

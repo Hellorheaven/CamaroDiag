@@ -1082,4 +1082,7 @@
     <string name="cal_doip_ipv6_interface">Index de l’interface réseau IPv6</string>
     <string name="cal_doip_discover_ipv6">Découvrir par multicast IPv6</string>
     <string name="cal_doip_listen_ipv6">Écouter les annonces IPv6</string>
+    <string name="cal_doip_select_interface">Choisir une interface réseau</string>
+    <string name="cal_doip_no_interfaces">Aucune interface IPv6 compatible</string>
+    <string name="cal_doip_interface_error">Impossible de lister les interfaces réseau.</string>
 </resources>

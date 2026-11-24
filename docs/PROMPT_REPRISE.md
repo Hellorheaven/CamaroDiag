@@ -1,3 +1,7 @@
+## PR117 — sélection de l’interface IPv6 Android (24/11/2026)
+
+- Liste réseau réelle, hors thread UI, des interfaces actives non-loopback capables de multicast IPv6 link-local ; menu de sélection FR/EN, saisie manuelle conservée. Aucun choix automatique, nouvelle lecture à l’ouverture du menu. La sélection reste à qualifier sur le matériel réel.
+
 ## PR117 — découverte réseau DoIP Android IPv4 passive et IPv6 (24/11/2026)
 
 - Découverte active IPv6 link-local ff02::1 sur index d’interface explicitement choisi et écoute passive IPv4/IPv6, limitée au VIN sélectionné ; même collecte bornée et refus des identités concurrentes. L’écoute n’émet aucune demande diagnostique ou UDP DoIP ; verrou multicast Wi-Fi Android limité à la durée de l’opération, libéré sur annulation/erreur. Boutons FR/EN et tests de filtrage scope ajoutés. Interface numérique requise, multicast physique à qualifier. Validation groupée nécessaire.
