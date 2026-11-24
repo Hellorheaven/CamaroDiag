@@ -93,4 +93,49 @@ class DoIpGatewayControlTraceTest {
             }
         }
     }
+
+    @Test fun vinDiscoverySelectsOnlyUniqueMatchingGateway() = runBlocking {
+        val loopback = InetAddress.getByName("127.0.0.1")
+        for (ambiguous in listOf(false, true)) {
+            DatagramSocket(0, loopback).use { socket ->
+                socket.soTimeout = 5000
+                val executor = Executors.newSingleThreadExecutor()
+                try {
+                    val discovery = pdu(255, 3, vin.toByteArray(Charsets.US_ASCII))
+                    val wrongVin = pdu(2, 4, "1G1FA1RX0J0100002".toByteArray(Charsets.US_ASCII) +
+                        byteArrayOf(0x10, 0x00) + ByteArray(13))
+                    val otherGateway = pdu(2, 4, vin.toByteArray(Charsets.US_ASCII) +
+                        byteArrayOf(0x10, 0x01) + ByteArray(13))
+                    val server = executor.submit {
+                        val incoming = DatagramPacket(ByteArray(1024), 1024)
+                        socket.receive(incoming)
+                        assertArrayEquals(discovery, incoming.data.copyOf(incoming.length))
+                        for (reply in listOf(wrongVin, identity(), identity(),
+                            if (ambiguous) otherGateway else identity())) {
+                            socket.send(DatagramPacket(reply, reply.size, incoming.address, incoming.port))
+                        }
+                    }
+                    val events = mutableListOf<DoIpDirectRead.ControlTrace>()
+                    val result = runCatching {
+                        DoIpDirectRead.discoverSelectedVehicleAt(vin, 1500, loopback, socket.localPort) {
+                            events.add(it)
+                        }
+                    }
+                    server.get(5, TimeUnit.SECONDS)
+                    assertEquals(hex(discovery), events.first().payloadHex)
+                    assertEquals("TX", events.first().direction)
+                    if (ambiguous) assertTrue(result.isFailure)
+                    else {
+                        val gateway = result.getOrThrow()
+                        assertEquals("127.0.0.1", gateway.host)
+                        assertEquals(vin, gateway.gateway.vin)
+                        assertEquals(0x1000, gateway.gateway.logicalAddress)
+                    }
+                } finally {
+                    executor.shutdownNow()
+                }
+            }
+        }
+    }
+
 }
