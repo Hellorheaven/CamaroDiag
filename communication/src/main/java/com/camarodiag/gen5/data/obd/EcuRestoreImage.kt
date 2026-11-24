@@ -39,7 +39,8 @@ object EcuRestoreImage {
         fun bytes(): ByteArray = original.copyOf()
 
         fun writeTo(output: OutputStream) {
-            output.write(original)
+            // Keep the verified storage private, including from caller-owned streams.
+            original.inputStream().copyTo(output)
         }
     }
 

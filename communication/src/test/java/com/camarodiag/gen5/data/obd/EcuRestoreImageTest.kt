@@ -45,6 +45,23 @@ class EcuRestoreImageTest {
         assertEquals(EcuBenchExpertPlan.sha256Hex(output.toByteArray()), image.sha256)
     }
 
+    @Test fun outputStreamCannotModifyVerifiedRegionStorage() {
+        val original = ByteArray(20_000) { it.toByte() }
+        val image = EcuRestoreImage.RegionImage(
+            EcuRestoreImage.MemoryRegion(region, 0, original.size.toLong()), original
+        )
+        val sink = object : ByteArrayOutputStream() {
+            override fun write(buffer: ByteArray, offset: Int, length: Int) {
+                super.write(buffer, offset, length)
+                buffer.fill(0, offset, offset + length)
+            }
+        }
+        image.writeTo(sink)
+        assertArrayEquals(original, sink.toByteArray())
+        assertArrayEquals(original, image.bytes())
+        assertEquals(EcuBenchExpertPlan.sha256Hex(original), image.sha256)
+    }
+
     @Test fun missingPhysicalBytesAndIncorrectGeometryNeverProduceCompleteImage() {
         val archive = verifiedArchive(listOf(
             segment(0x1000, 1, 2), segment(0x1004, 3, 4)

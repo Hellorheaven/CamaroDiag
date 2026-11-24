@@ -3,6 +3,7 @@ package com.camarodiag.gen5.data.obd
 import java.io.ByteArrayOutputStream
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -39,6 +40,18 @@ class EcuRestoreCoveragePreviewTest {
         assertEquals(6L, report.doubleReadBytes)
         assertTrue(report.missing.isEmpty())
         // This only describes the supplied map. No OEM memory-map attestation.
+    }
+
+    @Test fun matchingReadsChangedAfterImportCannotReportVerifiedCoverage() {
+        val input = archive(capture(flash, 0x1000, byteArrayOf(1, 2)))
+        val capture = input.captures.single()
+        capture.firstRead[0] = 3
+        requireNotNull(capture.independentRead)[0] = 3
+        assertThrows(IllegalArgumentException::class.java) {
+            EcuRestoreCoveragePreview.inspect(input, listOf(
+                EcuRestoreImage.MemoryRegion(flash, 0x1000, 2)
+            ))
+        }
     }
 
     @Test fun gapsAndUnmappedCapturedRegionsCannotLookComplete() {

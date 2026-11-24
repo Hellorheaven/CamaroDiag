@@ -31,7 +31,9 @@ object EcuRestoreCoveragePreview {
         archive: EcuBackupArchive.Imported,
         suppliedMap: List<EcuRestoreImage.MemoryRegion>
     ): Report {
-        require(archive.verification.consistent) { "ECU archive is inconsistent" }
+        require(archive.verification.consistent &&
+            EcuBackupIntegrity.verify(archive.manifest, archive.captures, archive.requiredRegions).consistent
+        ) { "ECU archive no longer matches its verified manifest" }
         require(suppliedMap.size in 1..128) { "Missing or excessive ECU memory regions" }
         val ordered = suppliedMap.sortedWith(compareBy<EcuRestoreImage.MemoryRegion>(
             { it.region.ordinal }, { it.startAddress }
