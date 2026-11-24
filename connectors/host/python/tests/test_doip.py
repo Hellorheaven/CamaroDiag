@@ -121,6 +121,19 @@ class DoIpTests(unittest.TestCase):
             sock.sendto.assert_not_called()
             sock.send.assert_not_called()
 
+    def test_confirmed_sequence_revalidates_gateway_before_connect(self):
+        from dataclasses import replace
+        with (patch("camarodiagconnectors.doip_cli.discover",
+                    side_effect=[GATEWAY, replace(GATEWAY, gid="010203040506")]) as discover_mock,
+              patch("camarodiagconnectors.doip_cli.confirm_commands", return_value=True),
+              patch("camarodiagconnectors.doip_cli.sys.stdin.isatty", return_value=True),
+              patch("camarodiagconnectors.doip_cli.Session") as session):
+            with self.assertRaises(DoIpError):
+                run(["--host", "127.0.0.1", "--vin", VIN, "--tester", "0E80", "--ecu", "1234",
+                     "--tcp", "sequence", "--commands", "22F190"])
+            self.assertEqual(discover_mock.call_count, 2)
+            session.assert_not_called()
+
     def test_sequence_requires_two_separate_confirmations(self):
         commands = parse_commands("22 F1 90;19 01 FF")
         self.assertEqual(commands, (bytes.fromhex("22F190"), bytes.fromhex("1901FF")))

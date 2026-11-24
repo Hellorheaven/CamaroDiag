@@ -61,6 +61,19 @@ internal static class DoIpUdpDiscoverySelfTests
             identity.Source.Equals(IPAddress.Loopback),
             "DoIP unicast ignores same-IP identity announcements from wrong port.");
 
+        Check(DoIpVehicleDiscovery.SameGatewayIdentity(identity, identity with
+            { Eid = identity.Eid.ToArray(), Gid = identity.Gid.ToArray() }),
+            "Gateway identity uses byte content, not array references.");
+        foreach (var changed in new[] {
+            identity with { Vin = rogueVin },
+            identity with { LogicalAddress = 0x1235 },
+            identity with { ProtocolVersion = 3 },
+            identity with { Eid = new byte[6] },
+            identity with { Gid = new byte[6] },
+            identity with { Source = IPAddress.Parse("127.0.0.2") } })
+            Check(!DoIpVehicleDiscovery.SameGatewayIdentity(identity, changed),
+                "Substituted gateway identity is rejected.");
+
         // Caller mutation after the request reaches the gateway must not
         // change which EID the discovery accepts.
         byte[] requestedEid = [1, 2, 3, 4, 5, 6];

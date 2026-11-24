@@ -523,6 +523,10 @@ internal sealed partial class BridgeDesktopForm
                         DoIpConsolePresentation.Text(operation switch { DoIpReadOperation.Exchange => "ExchangeStarted", DoIpReadOperation.Backup => "BackupStarted", DoIpReadOperation.Dtcs or DoIpReadOperation.DtcCount or DoIpReadOperation.DtcSnapshot or DoIpReadOperation.DtcExtended => "DtcStarted", DoIpReadOperation.Did or DoIpReadOperation.MonitorDid or DoIpReadOperation.ObdMonitor => "DidStarted", _ => "VinStarted" }),
                         useTls ? "TLS" : "TCP", address, ecu, tester, observed.ProtocolVersion),
                         Color.DarkSlateGray);
+                    await DoIpVehicleDiscovery.RequireCurrentIdentityAsync(observed, timeout,
+                        stop.Token, JournalDoIpUdp);
+                    if (!ReferenceEquals(observed, doIpObservedGateway))
+                        throw new InvalidOperationException("DoIP target changed.");
                     var certificate = thumbprint.Length == 0 ? null : thumbprint;
                     if (operation == DoIpReadOperation.Backup)
                     {

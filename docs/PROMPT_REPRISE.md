@@ -1,3 +1,8 @@
+## PR117 — corrélation DoIP après consentement et TLS Windows (24/11/2026)
+
+- Windows console : relecture UDP avant chaque ouverture diagnostique, comparaison IP/VIN/adresse/version/EID/GID avec la sélection et journal UDP existant. Windows CLI séquence et Python CLI séquence : nouvelle découverte après confirmation et avant connexion, refus de substitution ; pas de réémission automatique. Les annonces UDP ne sont pas authentifiées.
+- Windows TLS : si certificat client explicitement choisi, exige authentification mutuelle et vérifie le certificat local effectivement utilisé avant activation du routage. Pas de repli en TCP. Régression de comparaison de passerelle et de non-connexion après substitution Python ajoutée. À compiler et valider ; aucun matériel qualifié.
+
 ## PR117 — monitoring DoIP en CLI Windows (24/11/2026)
 
 - Options `--monitor-did` et `--obd-monitor-did` sur `--doip-exchange`, VIN obligatoire, sélection TCP/TLS (TLS par défaut), DID et bornes validés avant réseau, vérification de l’identité avant et après les mesures. Sortie JSONL horodatée, mesures provisoires jusqu’au résultat final, annulation Ctrl+C, aide FR/EN, tests parseur. Les options de temporisation P2/P2* spécialisées restent réservées aux échanges unitaires/séquences ; monitoring utilise le délai global. Aucune mutation ECU. À valider sur le prochain checkpoint.

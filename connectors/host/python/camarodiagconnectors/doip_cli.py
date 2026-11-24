@@ -162,6 +162,10 @@ def run(argv: Sequence[str] | None = None) -> dict:
     if commands is not None and not confirm_commands(commands, gateway, o.tester, o.ecu,
             not o.tcp, input, lambda line: print(line, file=sys.stderr), fr):
         return result | {"cancelled": True, "commands_sent": 0}
+    if commands is not None:
+        current = discover(gateway.host, o.vin, o.timeout, trace)
+        if gateway_key(current) != gateway_key(gateway):
+            raise DoIpError(tr("Gateway changed after confirmation", "La passerelle a changé après confirmation"))
     with Session(gateway, o.tester, o.ecu, tls=not o.tcp, timeout=o.timeout,
                  trace=trace, context=context, p2=p2, p2_star=p2_star,
                  routing_type=o.routing_activation_type or 0,

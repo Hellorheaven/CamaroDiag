@@ -113,6 +113,12 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
                     authentication.ClientCertificates =
                         new X509CertificateCollection { clientCert };
                 await tls.AuthenticateAsClientAsync(authentication, deadline.Token);
+                if (clientCert is not null &&
+                    (!tls.IsMutuallyAuthenticated || tls.LocalCertificate is null ||
+                     !string.Equals(tls.LocalCertificate.GetCertHashString(), clientCert.Thumbprint,
+                         StringComparison.OrdinalIgnoreCase)))
+                    throw new AuthenticationException(
+                        "The selected TLS client certificate was not used for mutual authentication.");
                 dataStream = tls;
             }
             var session = new DoIpDiagnosticTransport(socket, dataStream,

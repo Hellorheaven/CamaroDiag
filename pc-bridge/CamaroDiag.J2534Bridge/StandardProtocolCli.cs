@@ -1505,6 +1505,7 @@ internal static class StandardProtocolCli
                 $"commands={string.Join("; ", sequence.Commands.Select(c => Convert.ToHexString(c)))}"))
                 return 2;
             cancellation.Token.ThrowIfCancellationRequested();
+            await DoIpVehicleDiscovery.RequireCurrentIdentityAsync(gateway, timeout, cancellation.Token);
             await using var transport = await DoIpDiagnosticTransport.ConnectAsync(
                 o.Host, o.Tester, o.Ecu, timeout, cancellation.Token,
                 useTls: o.UseTls, protocolVersion: gateway.ProtocolVersion,

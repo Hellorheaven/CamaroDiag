@@ -83,6 +83,26 @@ internal static class DoIpVehicleDiscovery
             source, decoded.Version);
     }
 
+    internal static bool SameGatewayIdentity(Identity selected, Identity observed) =>
+        selected.Source.Equals(observed.Source) &&
+        string.Equals(selected.Vin, observed.Vin, StringComparison.Ordinal) &&
+        selected.LogicalAddress == observed.LogicalAddress &&
+        selected.ProtocolVersion == observed.ProtocolVersion &&
+        selected.Eid.AsSpan().SequenceEqual(observed.Eid) &&
+        selected.Gid.AsSpan().SequenceEqual(observed.Gid);
+
+    internal static async Task RequireCurrentIdentityAsync(Identity selected,
+        TimeSpan timeout, CancellationToken token, DatagramTrace? trace = null)
+    {
+        // A fresh unicast announcement correlates the target selected earlier;
+        // UDP identity is not authenticated and never substitutes for TLS/ECU VIN.
+        var current = await DiscoverAsync(selected.Source.ToString(), timeout, token,
+            vin: selected.Vin, trace: trace);
+        if (!SameGatewayIdentity(selected, current))
+            throw new InvalidDataException("DoIP gateway identity changed; rediscover before routing.");
+        token.ThrowIfCancellationRequested();
+    }
+
     internal static bool MatchesRequestedIdentity(Identity found,
         string? expectedVin, byte[]? expectedEid)
     {
