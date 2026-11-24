@@ -13,6 +13,30 @@ internal static class DoIpConsolePresentation
         Resources.GetString(key, culture ?? CultureInfo.CurrentUICulture)
         ?? throw new InvalidOperationException("Missing DoIP console resource: " + key);
 
+    internal static string FormatStatus(DoIpCodec.Message response,
+        bool powerMode, CultureInfo? culture = null)
+    {
+        ArgumentNullException.ThrowIfNull(response);
+        if (powerMode)
+        {
+            var mode = DoIpCodec.ParseDiagnosticPowerMode(response);
+            var label = Text(mode switch
+            {
+                0 => "PowerNotReady",
+                1 => "PowerReady",
+                _ => "PowerUnsupported"
+            }, culture);
+            return string.Format(CultureInfo.InvariantCulture,
+                Text("PowerResult", culture), mode, label);
+        }
+        var status = DoIpCodec.ParseEntityStatus(response);
+        return string.Format(CultureInfo.InvariantCulture,
+            Text("StatusResult", culture), status.NodeType,
+            status.CurrentSockets, status.MaxSockets,
+            status.MaxDataSize?.ToString(CultureInfo.InvariantCulture) ??
+                Text("Unavailable", culture));
+    }
+
     internal static string FormatIdentity(DoIpVehicleDiscovery.Identity identity,
         CultureInfo? culture = null)
     {
