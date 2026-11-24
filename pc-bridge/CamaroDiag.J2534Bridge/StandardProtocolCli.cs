@@ -288,14 +288,20 @@ internal static class StandardProtocolCli
             var ipv6InterfaceText = Optional(args, "--listen-ipv6-ifindex");
             var ipv6Interface = ipv6InterfaceText is null ? (int?)null :
                 int.Parse(ipv6InterfaceText, CultureInfo.InvariantCulture);
+            var activeIpv6Text = Optional(args, "--multicast-ipv6-ifindex");
+            var activeIpv6Interface = activeIpv6Text is null ? (int?)null :
+                int.Parse(activeIpv6Text, CultureInfo.InvariantCulture);
             if (ipv6Interface.HasValue && !passiveListen)
                 throw new ArgumentException(
-                    "IPv6 DoIP multicast interface requires --listen true.");
+                    "IPv6 DoIP passive interface requires --listen true.");
+            var destinations = (host is null ? 0 : 1) +
+                (broadcastIp is null ? 0 : 1) +
+                (activeIpv6Interface.HasValue ? 1 : 0);
             if (passiveListen ?
-                host is not null || broadcastIp is not null :
-                (host is null) == (broadcastIp is null))
+                destinations != 0 :
+                destinations != 1 || ipv6Interface.HasValue)
                 throw new ArgumentException(
-                    "Listen mode needs no destination; active discovery requires one host or broadcast IP.");
+                    "Listen mode needs no destination; active DoIP discovery requires exactly one host, broadcast or IPv6 multicast interface.");
             var timeoutMs = int.Parse(Optional(args, "--timeout-ms") ?? "2000",
                 CultureInfo.InvariantCulture);
             var requestedVin = Optional(args, "--vin");
@@ -316,6 +322,10 @@ internal static class StandardProtocolCli
                     await DoIpVehicleDiscovery.ListenAsync(
                         timeout, CancellationToken.None);
             }
+            else if (activeIpv6Interface.HasValue)
+                identities = await DoIpVehicleDiscovery.DiscoverIpv6MulticastAsync(
+                    activeIpv6Interface.Value, timeout, CancellationToken.None,
+                    vin: requestedVin, eid: eid);
             else if (broadcastIp is not null)
                 identities = await DoIpVehicleDiscovery.DiscoverBroadcastAsync(
                     broadcastIp, timeout, CancellationToken.None,
