@@ -1,3 +1,8 @@
+## PR117 — checkpoint de validation groupée DoIP (24/11/2026)
+
+- Campagne 45453585549 sur `9afc5ff` : 11/12 jobs techniques réussis, Android y compris compilation/tests/lint/assemble du gate, ESP32/STM32, Python 3.11/3.12/3.13 et autres jobs Connectors/native. Windows : compilation 0 erreur / 0 avertissement, self-test monitoring en échec. Revue ignorée sur PR draft. Le correctif de concurrence et les compléments Windows/Connectors ultérieurs ne sont pas validés par cette campagne.
+- Nouveau marqueur demandé sur le HEAD contenant `e888c091d1e669a638fb86f8da139058fadd1af0` : validation groupée des correctifs et fonctions DoIP. C6 / DoIP restent actifs, C8 non commencé. Ne pas clore un protocole ou déclarer une qualification physique sans preuve correspondante.
+
 ## PR117 — corrélation DoIP après consentement et TLS Windows (24/11/2026)
 
 - Windows console : relecture UDP avant chaque ouverture diagnostique, comparaison IP/VIN/adresse/version/EID/GID avec la sélection et journal UDP existant. Windows CLI séquence et Python CLI séquence : nouvelle découverte après confirmation et avant connexion, refus de substitution ; pas de réémission automatique. Les annonces UDP ne sont pas authentifiées.

@@ -1,3 +1,7 @@
+PR117 — grouped DoIP Windows receive race, monitor CLI, IPv4/EID discovery and TLS identity checkpoint
+Implementation parent: e888c091d1e669a638fb86f8da139058fadd1af0
+Previous run 45453585549 at 9afc5ff2606fda563ebdf565c87250ed864696b0: 11 technical jobs succeeded including Android; Windows compilation 0 warnings/errors but monitoring self-test failed. Validate Windows serialized receive exchange boundaries and 128 exchanges, OBD monitor GUI and CLI, UDP gateway revalidation, selected mTLS certificate check, Python discovery EID/broadcast/passive and confirmation revalidation, all Debug jobs. Intermediate C6/DoIP; no merge, Release or deployment.
+
 PR117 — grouped Debug checkpoint after Android Kotlin path consolidation and DoIP host/Android monitoring
 Parent: d55e123e2b5673a1486b1a38b8a29fd64e8935ed
 Validate Android restored canonical package paths, mTLS, gateway correlation, OBDonUDS and new monitoring/CSV; Connectors host P2/P2*, routing options and OBD monitoring. Previous run 45452211613 failed Android due to duplicate source paths; all other technical jobs passed. No merge, Release or deployment.
