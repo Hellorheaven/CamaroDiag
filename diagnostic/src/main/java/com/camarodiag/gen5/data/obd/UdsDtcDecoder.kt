@@ -82,7 +82,24 @@ data class UdsDtcReport(
 
 data class UdsDtcCountReport(val availabilityMask: Int, val formatIdentifier: Int, val count: Int)
 
+data class UdsDtcDetail(val dtc: Int, val status: Int, val records: ByteArray)
+
 object UdsDtcDecoder {
+    fun readDetailRequest(subFunction: Int, dtc: Int, record: Int): ByteArray {
+        require(subFunction in setOf(4, 6) && dtc in 0..0xFFFFFF && record in 1..255)
+        return byteArrayOf(0x19, subFunction.toByte(), (dtc shr 16).toByte(),
+            (dtc shr 8).toByte(), dtc.toByte(), record.toByte())
+    }
+
+    /** Keep records raw: their lengths/semantics depend on verified ECU definitions. */
+    fun decodeDetail(subFunction: Int, expectedDtc: Int, reply: ByteArray): UdsDtcDetail {
+        require(subFunction in setOf(4, 6) && expectedDtc in 0..0xFFFFFF &&
+            reply.size >= 6 && reply[0] == 0x59.toByte() && reply[1] == subFunction.toByte())
+        val dtc = ((reply[2].toInt() and 255) shl 16) or
+            ((reply[3].toInt() and 255) shl 8) or (reply[4].toInt() and 255)
+        require(dtc == expectedDtc) { "DTC detail belongs to another fault." }
+        return UdsDtcDetail(dtc, reply[5].toInt() and 255, reply.copyOfRange(6, reply.size))
+    }
     /** ISO 14229 19/01: 59 01 availability format countHi countLo. */
     fun decodeCountByStatusMask(reply: ByteArray): UdsDtcCountReport {
         require(reply.size == 6 && reply[0] == 0x59.toByte() && reply[1] == 0x01.toByte()) {

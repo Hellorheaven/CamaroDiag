@@ -23,7 +23,7 @@ import kotlin.coroutines.resumeWithException
  * A socket is owned by one operation and is never retained after failure.
  */
 object DoIpDirectRead {
-    enum class Operation { VIN, DID, DTC, DTC_COUNT, MONITOR, BACKUP, EXCHANGE }
+    enum class Operation { VIN, DID, DTC, DTC_COUNT, DTC_SNAPSHOT, DTC_EXTENDED, MONITOR, BACKUP, EXCHANGE }
     data class Target private constructor(val address: InetAddress, val tester: Int, val ecu: Int,
         val expectedVin: String, val tls: Boolean, val expectedGateway: Int? = null) {
         companion object {
@@ -132,7 +132,7 @@ object DoIpDirectRead {
     data class Outcome(val gateway: Gateway, val ecu: Int, val vin: String?,
         val data: ByteArray?, val dtcs: UdsDtcReport?, val trace: List<Trace>,
         val samples: List<Sample> = emptyList(), val capture: DoIpMemoryBackup.Capture? = null,
-        val dtcCount: UdsDtcCountReport? = null)
+        val dtcCount: UdsDtcCountReport? = null, val dtcDetail: UdsDtcDetail? = null)
     data class Sample(val index: Int, val elapsedMs: Long, val data: ByteArray)
 
     private const val MAX_PAYLOAD = 1024 * 1024
@@ -452,12 +452,17 @@ object DoIpDirectRead {
         onTrace: (Trace) -> Unit = {}, onSample: (Sample) -> Unit = {},
         onControlTrace: (ControlTrace) -> Unit = {},
         command: ByteArray? = null, approval: EcuWriteConsentFlow.Approval? = null,
-        isContextCurrent: () -> Boolean = { false }): Outcome {
+        isContextCurrent: () -> Boolean = { false }, dtc: Int = 0, record: Int = 1): Outcome {
         require(timeoutMs in 100..30_000 && did in 0..65535 && mask in 0..255)
         require(operation == Operation.VIN || target.expectedVin.isNotEmpty())
         require(sampleCount in 1..30 && intervalMs in 250..5000)
         require((operation == Operation.BACKUP) == (backupScope != null))
         require((operation == Operation.EXCHANGE) == (command != null && approval != null))
+        val detailRequest = when (operation) {
+            Operation.DTC_SNAPSHOT -> UdsDtcDecoder.readDetailRequest(4, dtc, record)
+            Operation.DTC_EXTENDED -> UdsDtcDecoder.readDetailRequest(6, dtc, record)
+            else -> null
+        }
         val fixedCommand = command?.copyOf()
         if (operation == Operation.EXCHANGE) {
             require(fixedCommand != null && fixedCommand.size in 1..4091)
@@ -568,6 +573,10 @@ object DoIpDirectRead {
                         } else if (operation == Operation.DID) {
                             val reply = session.exchange(byteArrayOf(0x22, (did shr 8).toByte(), did.toByte()), timeoutMs)
                             Outcome(gateway, target.ecu, vin, reply.copyOfRange(3, reply.size), null, trace.toList())
+                        } else if (detailRequest != null) {
+                            val reply = session.exchange(detailRequest, timeoutMs)
+                            val detail = UdsDtcDecoder.decodeDetail(detailRequest[1].u8(), dtc, reply)
+                            Outcome(gateway, target.ecu, vin, null, null, trace.toList(), dtcDetail = detail)
                         } else if (operation == Operation.DTC_COUNT) {
                             val reply = session.exchange(byteArrayOf(0x19,0x01,mask.toByte()), timeoutMs)
                             val count = UdsDtcDecoder.decodeCountByStatusMask(reply)

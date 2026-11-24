@@ -1431,6 +1431,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     require(didHex.matches(Regex("[0-9A-Fa-f]{2}")))
                     didHex.toInt(16)
                 } else 255
+                val isDetail = operation in setOf(DoIpDirectRead.Operation.DTC_SNAPSHOT, DoIpDirectRead.Operation.DTC_EXTENDED)
+                if (isDetail) require(didHex.matches(Regex("[0-9A-Fa-f]{8}")))
+                val detailDtc = if (isDetail) didHex.take(6).toInt(16) else 0
+                val detailRecord = if (isDetail) didHex.takeLast(2).toInt(16) else 1
                 val result = DoIpDirectRead.read(target, operation, did, mask = mask, sampleCount = sampleCount, intervalMs = intervalMs,
                     onTrace = { trace ->
                         journalDoIpTrace(target, trace, current)
@@ -1445,7 +1449,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             if (current()) it.copy(doIpLiveSamples = it.doIpLiveSamples + doIpSampleRow(sample)) else it
                         }
                     }, onControlTrace = { trace -> journalDoIpControlTrace(trace, current) },
-                    command = fixedCommand, approval = approval, isContextCurrent = current)
+                    command = fixedCommand, approval = approval, isContextCurrent = current,
+                    dtc = detailDtc, record = detailRecord)
                 if (!current()) return@launchEnhancedUdsRead
                 val module = "DoIP 0x" + ecu.uppercase()
                 val report = result.dtcs
@@ -1455,7 +1460,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     _dtcs.value = _dtcs.value.filterNot { it.module == module } + mapped
                 }
                 val count = result.dtcCount
+                val detail = result.dtcDetail
                 val rendered = when {
+                    detail != null -> localizedContext.getString(R.string.cal_doip_detail_result,
+                        detail.dtc, detail.status, detail.records.joinToString(" ") { "%02X".format(it.toInt() and 255) })
                     count != null -> localizedContext.getString(R.string.cal_doip_count_result,
                         count.count, mask, count.availabilityMask, count.formatIdentifier)
                     result.samples.isNotEmpty() -> localizedContext.getString(R.string.cal_doip_monitor_complete, result.samples.size)

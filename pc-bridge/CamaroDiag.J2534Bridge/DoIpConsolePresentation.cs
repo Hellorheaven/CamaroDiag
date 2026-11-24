@@ -59,6 +59,20 @@ internal static class DoIpConsolePresentation
         string.Format(CultureInfo.InvariantCulture, Text("DtcCountResult", culture),
             report.Count, requestedMask, report.StatusAvailabilityMask, report.DtcFormatIdentifier);
 
+    internal static (uint Dtc, byte Record) ParseDetail(string dtc, string record)
+    {
+        if (dtc.Length != 6 || !uint.TryParse(dtc, NumberStyles.AllowHexSpecifier,
+                CultureInfo.InvariantCulture, out var code) ||
+            record.Length != 2 || !byte.TryParse(record, NumberStyles.AllowHexSpecifier,
+                CultureInfo.InvariantCulture, out var number) || number == 0)
+            throw new ArgumentException("Expected a 24-bit DTC and nonzero record number.");
+        return (code, number);
+    }
+
+    internal static string FormatDetail(uint dtc, byte status, byte[] records, CultureInfo? culture = null) =>
+        string.Format(CultureInfo.InvariantCulture, Text("DetailResult", culture),
+            dtc, status, Convert.ToHexString(records));
+
     internal static byte[] ParsePayload(string text)
     {
         var compact = string.Concat(text.Where(c => !char.IsWhiteSpace(c)));

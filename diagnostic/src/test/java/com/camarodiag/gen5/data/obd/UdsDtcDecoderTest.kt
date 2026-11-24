@@ -185,4 +185,16 @@ class UdsDtcDecoderTest {
         assertTrue(runCatching { UdsDtcDecoder.decodeCountByStatusMask(byteArrayOf(0x59, 1, 0, 0, 0)) }.isFailure)
     }
 
+    @Test fun detailPreservesUnknownRecordsAndRejectsWrongFault() {
+        assertArrayEquals(byteArrayOf(0x19, 4, 0x12, 0x34, 0x56, 1),
+            UdsDtcDecoder.readDetailRequest(4, 0x123456, 1))
+        val reply = byteArrayOf(0x59, 4, 0x12, 0x34, 0x56, 8, 1, 0x22)
+        val detail = UdsDtcDecoder.decodeDetail(4, 0x123456, reply)
+        assertEquals(8, detail.status)
+        assertArrayEquals(byteArrayOf(1, 0x22), detail.records)
+        assertTrue(runCatching { UdsDtcDecoder.decodeDetail(6, 0x123456, reply) }.isFailure)
+        assertTrue(runCatching { UdsDtcDecoder.decodeDetail(4, 0x123457, reply) }.isFailure)
+        assertTrue(runCatching { UdsDtcDecoder.readDetailRequest(6, 0x123456, 0) }.isFailure)
+    }
+
 }

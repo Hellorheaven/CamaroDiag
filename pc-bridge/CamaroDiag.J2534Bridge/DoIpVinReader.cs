@@ -208,6 +208,28 @@ internal static class DoIpVinReader
         return ObdOnUdsServices.DecodeDtcCountByStatusMask(reply);
     }
 
+    internal sealed record DtcDetail(uint Dtc, byte Status, byte[] Records);
+
+    internal static async Task<DtcDetail> ReadObservedGatewayDtcDetailAsync(
+        DoIpVehicleDiscovery.Identity gateway, IPAddress address, ushort tester, ushort ecu,
+        bool useTls, uint dtc, byte record, bool extended, TimeSpan timeout, CancellationToken token,
+        string? certificate = null, Action<DoIpDiagnosticTransport.PduTrace>? trace = null)
+    {
+        var request = extended ? ObdOnUdsServices.ReadDtcExtendedData(dtc, record) :
+            ObdOnUdsServices.ReadDtcSnapshot(dtc, record);
+        await using var transport = await ConnectObservedAsync(gateway, address, tester,
+            ecu, useTls, timeout, token, certificate, trace);
+        _ = await VerifyObservedVinAsync(transport, gateway, timeout, token, null, null);
+        var reply = await ExchangeReadAsync(transport, request, timeout, token, null, null);
+        if (extended)
+        {
+            var detail = ObdOnUdsServices.DecodeDtcExtendedData(dtc, reply);
+            return new DtcDetail(detail.Dtc, detail.Status, detail.RawExtendedDataRecords);
+        }
+        var snapshot = ObdOnUdsServices.DecodeDtcSnapshot(dtc, reply);
+        return new DtcDetail(snapshot.Dtc, snapshot.Status, snapshot.RawSnapshotRecords);
+    }
+
     internal static async Task<string> ReadObservedGatewayAsync(
         DoIpVehicleDiscovery.Identity gateway, IPAddress address, ushort tester,
         ushort ecu, bool useTls, TimeSpan timeout, CancellationToken token,

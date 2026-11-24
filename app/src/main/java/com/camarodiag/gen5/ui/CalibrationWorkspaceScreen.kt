@@ -315,6 +315,8 @@ fun CalibrationWorkspaceScreen(
     }
     var doIpDid by remember(vehicle) { mutableStateOf("F190") }
     var doIpDtcMask by remember(vehicle) { mutableStateOf("FF") }
+    var doIpDetailDtc by remember(vehicle) { mutableStateOf("") }
+    var doIpDetailRecord by remember(vehicle) { mutableStateOf("01") }
     var doIpCommand by remember(vehicle) { mutableStateOf("") }
     var pendingDoIpCommand by remember(vehicle, doIpContextGeneration) { mutableStateOf<DoIpConsoleCommand?>(null) }
     var doIpConsentStep by remember(vehicle, doIpContextGeneration) { mutableStateOf(EcuWriteConsentFlow.Step.WARNING) }
@@ -457,6 +459,28 @@ fun CalibrationWorkspaceScreen(
                             enabled = idle, singleLine = true, modifier = Modifier.weight(1f),
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             label = { Text(stringResource(R.string.cal_doip_interval)) })
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(doIpDetailDtc, { doIpDetailDtc = it.uppercase().filter { c -> c in "0123456789ABCDEF" }.take(6) },
+                            enabled = idle, singleLine = true, modifier = Modifier.weight(1f),
+                            label = { Text(stringResource(R.string.cal_doip_detail_dtc)) })
+                        OutlinedTextField(doIpDetailRecord, { doIpDetailRecord = it.uppercase().filter { c -> c in "0123456789ABCDEF" }.take(2) },
+                            enabled = idle, singleLine = true, modifier = Modifier.weight(1f),
+                            label = { Text(stringResource(R.string.cal_doip_detail_record)) })
+                    }
+                    val detailReady = targetReady && vinReady && doIpDetailDtc.length == 6 &&
+                        doIpDetailRecord.length == 2 && doIpDetailRecord != "00"
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu,
+                            doIpDetailDtc + doIpDetailRecord, doIpTls, DoIpDirectRead.Operation.DTC_SNAPSHOT) },
+                            enabled = detailReady, modifier = Modifier.weight(1f)) {
+                            Text(stringResource(R.string.cal_doip_snapshot))
+                        }
+                        OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu,
+                            doIpDetailDtc + doIpDetailRecord, doIpTls, DoIpDirectRead.Operation.DTC_EXTENDED) },
+                            enabled = detailReady, modifier = Modifier.weight(1f)) {
+                            Text(stringResource(R.string.cal_doip_extended))
+                        }
                     }
                     OutlinedTextField(doIpCommand, { doIpCommand = it.take(12288) },
                         enabled = idle, singleLine = true, modifier = Modifier.fillMaxWidth(),

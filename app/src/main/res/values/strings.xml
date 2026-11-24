@@ -1045,4 +1045,9 @@
     <string name="cal_doip_command_payload">UDS command (hex)</string>
     <string name="cal_doip_command_send">Send UDS command</string>
     <string name="cal_doip_command_target">VIN %1$s · %2$s · tester 0x%3$s · ECU 0x%4$s · %5$s</string>
+    <string name="cal_doip_detail_dtc">DTC (6 hex digits)</string>
+    <string name="cal_doip_detail_record">Record (hex)</string>
+    <string name="cal_doip_snapshot">Snapshot</string>
+    <string name="cal_doip_extended">Extended data</string>
+    <string name="cal_doip_detail_result">DTC 0x%1$06X · status 0x%2$02X · raw records: %3$s</string>
 </resources>

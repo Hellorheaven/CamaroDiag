@@ -78,4 +78,10 @@
   <data name="ExchangeResult" xml:space="preserve"><value>Réponse ECU : {0}</value></data>
   <data name="CountDtcs" xml:space="preserve"><value>Compter les DTC</value></data>
   <data name="DtcCountResult" xml:space="preserve"><value>Nombre de DTC={0} ; masque demandé=0x{1:X2} ; disponible=0x{2:X2} ; format=0x{3:X2}</value></data>
+  <data name="Snapshot" xml:space="preserve"><value>Lire instantané</value></data>
+  <data name="Extended" xml:space="preserve"><value>Lire données étendues</value></data>
+  <data name="DetailDtc" xml:space="preserve"><value>DTC (6 chiffres hex)</value></data>
+  <data name="DetailRecord" xml:space="preserve"><value>Enregistrement (hex)</value></data>
+  <data name="InvalidDetail" xml:space="preserve"><value>Saisissez un DTC hexadécimal sur six chiffres et un enregistrement non nul sur deux chiffres.</value></data>
+  <data name="DetailResult" xml:space="preserve"><value>DTC 0x{0:X6} ; statut 0x{1:X2} ; enregistrements bruts : {2}</value></data>
 </root>
