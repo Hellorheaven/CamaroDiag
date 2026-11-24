@@ -250,9 +250,11 @@ internal static class StandardProtocolCli
             var power = bool.Parse(Optional(args, "--power-mode") ?? "false");
             var timeoutMs = int.Parse(Optional(args, "--timeout-ms") ?? "2000",
                 CultureInfo.InvariantCulture);
+            var version = checked((byte)Number(
+                Optional(args, "--doip-version") ?? "2"));
             var status = await DoIpVehicleDiscovery.QueryStatusAsync(
                 host, power, TimeSpan.FromMilliseconds(timeoutMs),
-                CancellationToken.None);
+                CancellationToken.None, protocolVersion: version);
             if (power)
             {
                 var mode = DoIpCodec.ParseDiagnosticPowerMode(status);
