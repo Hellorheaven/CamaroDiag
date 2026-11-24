@@ -1,3 +1,7 @@
+PR117 — grouped Windows and Android DoIP VIN gateway and ECU correlation checkpoint
+Implementation and handoff HEAD: e9d93c81500c7c40738eed8c549781134cd161b0
+Full Debug validation: Windows GUI/UDP tracing and loopback VIN discovery, F190 identity correlation before DID/DTC/monitor, Android EID/GID ambiguity, FR/EN resources, existing Android/native/Connectors/Firebase offline checks. Intermediate C6/DoIP only. No merge, release, deployment or physical qualification.
+
 PR117 — grouped Android DoIP control journal and VIN discovery checkpoint
 Implementation and handoff HEAD: 6a1acc1e018354c3b200ed411e47ce3728a80000
 Full grouped Debug validation of new DoIP UDP discovery and routing/control TX/RX journal, FR/EN, loopback tests and all existing Android/Windows/native/Connectors/Firebase checks. C6 and DoIP intermediate only. No merge, Release, physical qualification or deployment.
