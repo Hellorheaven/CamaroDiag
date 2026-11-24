@@ -20,16 +20,26 @@ class UsbPermissionPendingException : SecurityException("USB device permission r
 
 /** USB serial ELM/STN transport. Device permission is requested by Android when opened. */
 class ElmUsbTransport(private val context: Context) {
-
     private val usbManager =
         context.getSystemService(Context.USB_SERVICE) as UsbManager
 
-    @Volatile private var port: UsbSerialPort? = null
-    @Volatile private var connection: android.hardware.usb.UsbDeviceConnection? = null
-    @Volatile private var connectionLost = false
+    private class UsbSession(
+        val port: UsbSerialPort,
+        val connection: android.hardware.usb.UsbDeviceConnection
+    ) {
+        fun close() {
+            try { port.close() } catch (_: Exception) {}
+            try { connection.close() } catch (_: Exception) {}
+        }
+    }
+
+    // The USB open/permission path can be suspended or blocked while the user
+    // selects another adapter. Only the newest generation owns the USB handle.
+    private val sessions = ObdConnectionSlot<UsbSession>()
+    @Volatile private var connectionLost = true
 
     val isConnected: Boolean
-        get() = port != null && connection != null && !connectionLost
+        get() = sessions.snapshot() != null && !connectionLost
 
     fun availableDevices(): List<String> =
         UsbSerialProber.getDefaultProber()
@@ -44,7 +54,10 @@ class ElmUsbTransport(private val context: Context) {
         discoveryOnly: Boolean = false,
         requireCdc: Boolean = false
     ): Result<Unit> = withContext(Dispatchers.IO) {
-        close()
+        val selection = sessions.begin()
+        connectionLost = true
+        selection.previous?.close()
+        var candidate: UsbSession? = null
         try {
             val candidates = UsbSerialProber.getDefaultProber()
                 .findAllDrivers(usbManager)
@@ -55,9 +68,8 @@ class ElmUsbTransport(private val context: Context) {
                 )
             }
             val driver = candidates.single()
-            // Device IDs may be reused after hot-unplug. Recheck the actual
-            // descriptor immediately before requesting permission/opening USB.
-            // A dedicated prototype cannot masquerade as a normal ELM device.
+            // A hot-plugged connector cannot be mistaken for an ELM channel.
+            // The product name remains a routing hint, not authentication.
             if (!CamaroDiagConnectorDiscovery.allowsUsbDriverFamily(
                     driver.device.productName, discoveryOnly
                 )
@@ -66,9 +78,6 @@ class ElmUsbTransport(private val context: Context) {
                     IllegalArgumentException("The selected USB adapter family changed")
                 )
             }
-
-            // Connectors' binary prototype supports one unambiguous CDC ACM
-            // channel. Never select port zero from an unknown multiport device.
             if ((discoveryOnly && driver.ports.size != 1) ||
                 (requireCdc && driver !is CdcAcmSerialDriver)
             ) {
@@ -80,107 +89,95 @@ class ElmUsbTransport(private val context: Context) {
             if (!usbManager.hasPermission(driver.device)) {
                 val intent = Intent(UsbPermissionReceiver.ACTION)
                     .setPackage(context.packageName)
-
                 val flags = PendingIntent.FLAG_UPDATE_CURRENT or
-                    if (Build.VERSION.SDK_INT >= 31) {
-                        PendingIntent.FLAG_MUTABLE
-                    } else {
-                        0
-                    }
-
+                    if (Build.VERSION.SDK_INT >= 31) PendingIntent.FLAG_MUTABLE else 0
                 val permissionIntent = PendingIntent.getBroadcast(
-                    context,
-                    deviceId,
-                    intent,
-                    flags
+                    context, deviceId, intent, flags
                 )
-
                 usbManager.requestPermission(driver.device, permissionIntent)
-
-                return@withContext Result.failure(
-                    UsbPermissionPendingException()
-                )
+                return@withContext Result.failure(UsbPermissionPendingException())
             }
 
             val conn = usbManager.openDevice(driver.device)
                 ?: return@withContext Result.failure(
                     IllegalStateException("Unable to open USB OBD device")
                 )
-            // Track ownership before subsequent setup so every failure releases
-            // the USB device handle, including missing-port and serial-open errors.
-            connection = conn
-
             val serial = driver.ports.firstOrNull() ?: run {
-                close()
+                conn.close()
                 return@withContext Result.failure<Unit>(
                     IllegalStateException("No USB serial port")
                 )
             }
-
-            port = serial
+            val local = UsbSession(serial, conn)
+            candidate = local
             serial.open(conn)
             serial.setParameters(
-                baudRate,
-                8,
-                UsbSerialPort.STOPBITS_1,
-                UsbSerialPort.PARITY_NONE
+                baudRate, 8, UsbSerialPort.STOPBITS_1, UsbSerialPort.PARITY_NONE
             )
+            // Do not publish a partially opened port or an obsolete USB ID.
+            if (!sessions.publish(selection.generation, local)) {
+                throw ObdSupersededSessionException(
+                    java.io.IOException("A newer USB adapter selection replaced this open")
+                )
+            }
+            candidate = null // Ownership transferred atomically to the active slot.
             connectionLost = false
-
             Result.success(Unit)
-
         } catch (cancelled: kotlinx.coroutines.CancellationException) {
-            // A superseded connection must finish closing its handle before
-            // the next adapter handshake can begin.
-            close()
+            sessions.releaseIfCurrent(selection.generation)?.close()
             throw cancelled
-        } catch (e: Exception) {
-            close()
-            Result.failure(e)
+        } catch (error: Exception) {
+            sessions.releaseIfCurrent(selection.generation)?.close()
+            Result.failure(error)
+        } finally {
+            // A stale attempt can close only the handle it opened itself.
+            candidate?.close()
         }
     }
 
     fun write(data: ByteArray) {
         if (connectionLost) throw ObdTransportDisconnectedException("USB OBD adapter disconnected")
-        val activePort = port ?: throw ObdTransportDisconnectedException("USB OBD adapter is not connected")
+        val active = sessions.snapshot()
+            ?: throw ObdTransportDisconnectedException("USB OBD adapter is not connected")
         try {
-            activePort.write(data, 1500)
+            val written = active.port.write(data, 1500)
+            if (!sessions.isCurrent(active)) {
+                throw java.io.IOException("USB adapter replaced during serial write")
+            }
+            // A partial USB write must not be mistaken for complete CAN/OBD
+            // transmission. Recovery requires a fresh adapter session.
+            UsbSerialWritePolicy.requireComplete(written, data.size)
         } catch (error: java.io.IOException) {
-            if (port === activePort) connectionLost = true
+            if (!sessions.isCurrent(active)) throw ObdSupersededSessionException(error)
+            connectionLost = true
             throw error
         }
     }
 
     fun read(buffer: ByteArray, timeoutMs: Int): Int {
+        require(timeoutMs in 1..30_000) { "USB read timeout must be finite and positive" }
         if (connectionLost) throw ObdTransportDisconnectedException("USB OBD adapter disconnected")
-        val activePort = port ?: run {
+        val active = sessions.snapshot() ?: run {
             connectionLost = true
             return -1
         }
         return try {
-            activePort.read(buffer, timeoutMs).also { count ->
-                if (count < 0 && port === activePort) connectionLost = true
+            val count = active.port.read(buffer, timeoutMs)
+            if (!sessions.isCurrent(active)) {
+                throw java.io.IOException("USB adapter replaced during serial read")
             }
+            if (count < 0) connectionLost = true
+            count
         } catch (error: java.io.IOException) {
-            if (port === activePort) connectionLost = true
+            if (!sessions.isCurrent(active)) throw ObdSupersededSessionException(error)
+            connectionLost = true
             throw error
         }
     }
 
     fun close() {
-        try {
-            port?.close()
-        } catch (_: Exception) {
-        }
-
-        try {
-            connection?.close()
-        } catch (_: Exception) {
-        }
-
-        port = null
-        connection = null
-        connectionLost = false
+        connectionLost = true
+        sessions.release()?.close()
     }
 }
 
