@@ -1,3 +1,22 @@
+C1 SOFTWARE ACCEPTANCE GATE — 2026-11-24 (not C8 final quality)
+Pre-gate implementation HEAD: 49051e5df2d70f3e0a62a4f8edab8d3a08a7a5f4
+Scope: C1 console CAN/OBD only; ISO/SAE protocol work is owned by
+another chat. Group checks once after coherent C1 development (not per
+commit): Android :app:testDebugUnitTest and :communication:testDebugUnitTest
+including CanConsoleEventJournalStoreTest, CanConsoleRawArchiveIntegrityTest,
+CanConsoleEventJournalWriterTest, CanConsoleExportPolicyTest, Gradle warnings
+fail, lintDebug/assembleDebug, Windows/native/connectors regression.
+C1 fixes: SHA-256 and flush of full chronological TX/RX/SYSTEM journal
+only on Dispatchers.IO, revision-at-click; full raw CAN byte SHA-256
+revalidation before publish; detect same-size modifications/append/delete;
+Play/Stop cancellation before lazy capture starts is incomplete and logged;
+failed journal flush not retried in cleanup; export failure is visible only
+to unchanged operator session. No vehicle or hardware testing in PR #95.
+Owner validates physical Release via Lot 8 issue #48 after PR close.
+Final C8 stage must NOT begin until C1 then C2 then C4 then C6 are
+software-complete. This CI is solely C1 development acceptance, not C8.
+No merge, Release, branch creation, or protocol edits.
+
 C8 FINAL NON-PROTOCOL CONNECTIONS AND CONSENT CHECKPOINT — 2026-11-24
 Implementation HEAD immediately before CI request: 6060cf0940a24b5d57c13d9bf65f44be27f689d1
 One PR #95, branch chore/unified-ci. NO live vehicle/ECU tests.
