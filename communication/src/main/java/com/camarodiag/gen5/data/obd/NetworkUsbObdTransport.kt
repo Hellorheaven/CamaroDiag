@@ -184,6 +184,23 @@ class ElmUsbTransport(private val context: Context) {
     }
 }
 
+/**
+ * An explicit zero socket timeout means "wait forever" in Java and is not
+ * appropriate for a removable automotive adapter. Keep hostnames and IPv6
+ * available; this is transport parameter validation, not an ECU write policy.
+ */
+internal object ElmWifiConnectionPolicy {
+    fun validate(host: String, port: Int, timeoutMs: Int) {
+        require(host.isNotBlank() && host.length <= 253 && host.none {
+            it.isWhitespace() || it.isISOControl()
+        }) { "Invalid Wi-Fi OBD adapter address" }
+        require(port in 1..65535) { "Invalid Wi-Fi OBD adapter port" }
+        require(timeoutMs in 1..30_000) {
+            "Wi-Fi OBD connection timeout must be bounded and positive"
+        }
+    }
+}
+
 /** TCP transport for Wi-Fi ELM327 adapters; common defaults are configurable by the caller. */
 class ElmWifiTransport {
 
@@ -200,11 +217,14 @@ class ElmWifiTransport {
     ): Result<Unit> = withContext(Dispatchers.IO) {
         try {
             close()
-
+            // Socket.connect(..., 0) means an unbounded wait; reject it before
+            // even creating a TCP socket. Disconnection must stay responsive.
+            ElmWifiConnectionPolicy.validate(host, port, timeoutMs)
             val s = Socket()
             // Publish the socket before connect so a failed attempt can close it.
             socket = s
             s.connect(InetSocketAddress(host, port), timeoutMs)
+            s.tcpNoDelay = true
             s.soTimeout = 1200
             connectionLost = false
 
