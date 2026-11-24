@@ -9,6 +9,7 @@ Run without arguments to open the graphical interface.
 
 Usage:
   CamaroDiag.J2534Bridge.exe --help
+  CamaroDiag.J2534Bridge.exe --list-ports
   CamaroDiag.J2534Bridge.exe --self-test
   CamaroDiag.J2534Bridge.exe --probe-drivers
   CamaroDiag.J2534Bridge.exe --discover-connector COM5
