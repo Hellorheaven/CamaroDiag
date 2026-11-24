@@ -1,5 +1,14 @@
 # PR #95 — Audit de reprise des chantiers C1 / C2 / C4 / C6 / C8
 
+> **Décision du propriétaire, 24/11/2026 (prioritaire sur les mentions historiques ci-dessous)** :
+> aucun essai sur voiture ou ECU réel n'est demandé ni exigé pour fermer la PR #95.
+> L'intégration PR utilise tests automatisés, simulations et compilations sans
+> véhicule. **Les essais physiques et le cahier Excel Lot 8 (issue #48)
+> concernent uniquement la Release, après fermeture de la PR.**
+> Les capacités matériellement non qualifiées restent explicitement indiquées
+> comme telles ; cela n'autorise pas à déclarer du matériel fictivement opérationnel.
+> C6 continue côté logiciel, sans attendre la recette Release.
+
 **Révision de l'audit : 23/11/2026, après les dernières décisions du propriétaire.**
 **Ce document reflète une revue du code, du périmètre GitHub et des anciennes campagnes de tests.** Aucune qualification véhicule physique ne résulte d'un test automatisé. Avant toute conclusion de livraison, exécuter la campagne globale Debug au **HEAD final** et consulter ses jobs (sans se fier aux seuls anciens SHAs). PR unique : [#95](https://github.com/Hellorheaven/CamaroDiag/pull/95), branche `chore/unified-ci`, **non fusionnée**.
 
