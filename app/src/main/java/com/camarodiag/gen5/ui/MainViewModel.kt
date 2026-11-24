@@ -2298,8 +2298,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      * observed-ID attribution, while preserving the global event history.
      */
     fun setCanConsoleBitrate(bitrate: Int) {
-        if (bitrate !in setOf(250_000, 500_000) ||
-            listOf(false, true).none { DiagnosticRouteSelector.elmCanProtocol(it, bitrate) in availableRawCanProfiles() }) return
+        if (bitrate !in setOf(250_000, 500_000, DiagnosticRouteSelector.SW_CAN_BITRATE) ||
+            listOf(false, true).none { DiagnosticRouteSelector.rawCanProfile(it, bitrate) in availableRawCanProfiles() }) return
         val state = _liveCanMonitorState.value
         if (state.isCapturing || state.isSendingRequest || state.bitrate == bitrate ||
             canMonitorJob?.isActive == true || canRequestJob?.isActive == true ||
@@ -2307,7 +2307,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _liveCanMonitorState.value = state.copy(bitrate = bitrate,
             consoleContextGeneration = ++canConsoleContextGeneration,
             observedCanIds = emptySet(), report = null)
-        appendCanConsoleSystemEvent(localizedContext.getString(R.string.can_console_bitrate_changed, bitrate / 1000))
+        appendCanConsoleSystemEvent(if (bitrate == DiagnosticRouteSelector.SW_CAN_BITRATE)
+            localizedContext.getString(R.string.can_console_swcan_changed)
+            else localizedContext.getString(R.string.can_console_bitrate_changed, bitrate / 1000))
     }
 
     /** Starts passive monitoring until Stop, disconnect, adapter exit or an explicit timeout. */
@@ -2316,7 +2318,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (canMonitorJob != null || detachedCanMonitorJob?.isCompleted == false ||
             canRequestJob?.isCompleted == false || detachedCanRequestJob?.isCompleted == false
         ) return
-        if (DiagnosticRouteSelector.elmCanProtocol(can29Bit, _liveCanMonitorState.value.bitrate) !in availableRawCanProfiles()) {
+        if (DiagnosticRouteSelector.rawCanProfile(can29Bit, _liveCanMonitorState.value.bitrate) !in availableRawCanProfiles()) {
             val unavailable = localizedContext.getString(R.string.can_sniffer_unavailable)
             appendCanConsoleSystemEvent(unavailable, succeeded = false)
             _liveCanMonitorState.value = _liveCanMonitorState.value.copy(message = unavailable)
@@ -2332,7 +2334,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             id = System.nanoTime(),
             direction = "SYSTEM",
             timestampMillis = System.currentTimeMillis(),
-            content = localizedContext.getString(R.string.can_console_capture_profile, previousState.bitrate / 1000, if (can29Bit) 29 else 11)
+            content = if (previousState.bitrate == DiagnosticRouteSelector.SW_CAN_BITRATE)
+                localizedContext.getString(R.string.can_console_swcan_profile, if (can29Bit) 29 else 11)
+                else localizedContext.getString(R.string.can_console_capture_profile, previousState.bitrate / 1000, if (can29Bit) 29 else 11)
         )
         _liveCanMonitorState.value = previousState.copy(
             consoleContextGeneration = ++canConsoleContextGeneration,
@@ -2639,7 +2643,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 frame = frame,
                 pendingContextGeneration = expectedContextGeneration,
                 currentContextGeneration = state.consoleContextGeneration,
-                monitorAvailable = frame != null && DiagnosticRouteSelector.elmCanProtocol(frame.isExtended, state.bitrate) in availableRawCanProfiles(),
+                monitorAvailable = frame != null && state.bitrate in setOf(250_000, 500_000) &&
+                    DiagnosticRouteSelector.rawCanProfile(frame.isExtended, state.bitrate) in availableRawCanProfiles(),
                 canTransmit = _adapter.value.supportsCanTransmit,
                 busy = state.isCapturing || state.isSendingRequest
             )) return

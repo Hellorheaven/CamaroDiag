@@ -118,7 +118,8 @@ data class AdapterCapabilities(
     /** Firmware-reported hardware identification, not the Bluetooth display name. */
     val hardwareId: String = "",
     /** Accepted configuration commands only; neither wiring nor ECU support is implied. */
-    val acceptedElmProtocols: Set<Int> = emptySet()
+    val acceptedElmProtocols: Set<Int> = emptySet(),
+    val acceptedStnProtocols: Set<Int> = emptySet()
 )
 
 enum class ModuleStatus { ACCESSIBLE, REQUIRES_SWCAN, UNSUPPORTED_BY_ADAPTER, NOT_EQUIPPED, DISCOVERY_REQUIRED }

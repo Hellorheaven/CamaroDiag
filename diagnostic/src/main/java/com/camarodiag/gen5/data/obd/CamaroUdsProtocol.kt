@@ -18,7 +18,8 @@ object CamaroUdsProtocol {
         swCanWiringVerified: Boolean = false,
         transmitProbeResp: String = "",
         hardwareResp: String = "",
-        elmProtocolProbe: Map<Int, String> = emptyMap()
+        elmProtocolProbe: Map<Int, String> = emptyMap(),
+        stnProtocolProbe: Map<Int, String> = emptyMap()
     ): AdapterCapabilities {
         val logs = listOf(
             "> ATZ  -> $atzResp",
@@ -31,7 +32,7 @@ object CamaroUdsProtocol {
             "> 0100 (physical TX verification) -> $transmitProbeResp"
         ) + elmProtocolProbe.toSortedMap().map { (number, answer) ->
             "> ATTP${number.toString(16).uppercase(Locale.ROOT)} -> $answer"
-        }
+        } + stnProtocolProbe.toSortedMap().map { (number, answer) -> "> STP $number -> $answer" }
 
         // Select STN-only monitor commands only when the adapter's firmware response
         // identifies an STN chipset. A Bluetooth name or the OBDLink product banner is
@@ -67,7 +68,10 @@ object CamaroUdsProtocol {
             hardwareId = hardwareResp.trim(),
             acceptedElmProtocols = elmProtocolProbe.filter { (number, answer) ->
                 number in 1..10 && hasStandaloneOk(answer)
-            }.keys.toSet() + if (hasStandaloneOk(protocolResp)) setOf(6) else emptySet()
+            }.keys.toSet() + (if (hasStandaloneOk(protocolResp)) setOf(6) else emptySet()),
+            acceptedStnProtocols = if (isStn) stnProtocolProbe.filter { (number, answer) ->
+                number in setOf(61, 62) && supportsSwCan && hasStandaloneOk(answer)
+            }.keys.toSet() + (if (supportsSwCan) setOf(61) else emptySet()) else emptySet()
         )
     }
 

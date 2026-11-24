@@ -200,13 +200,18 @@ class CanMonitorErrorTracker {
 
 object CanMonitorProtocolPolicy {
     fun protocolCommand(can29Bit: Boolean, bitrate: Int = 500_000): String =
-        "ATSP" + DiagnosticRouteSelector.elmCanProtocol(can29Bit, bitrate)
+        if (bitrate == DiagnosticRouteSelector.SW_CAN_BITRATE)
+            "STP " + DiagnosticRouteSelector.rawCanProfile(can29Bit, bitrate)
+        else "ATSP" + DiagnosticRouteSelector.elmCanProtocol(can29Bit, bitrate)
     fun clearFilter(can29Bit: Boolean): String = if (can29Bit) "00000000" else "000"
 
     fun setupCommands(can29Bit: Boolean, stn: Boolean, bitrate: Int = 500_000): List<String> = buildList {
+        require(bitrate != DiagnosticRouteSelector.SW_CAN_BITRATE || stn)
         add(protocolCommand(can29Bit, bitrate))
         addAll(listOf("ATE0", "ATL0", "ATS1", "ATH1", "ATCAF0"))
         if (stn) {
+            if (bitrate == DiagnosticRouteSelector.SW_CAN_BITRATE)
+                addAll(listOf("STCMM 0", "STCSEGR 0", "STCSEGT 0"))
             val filter = clearFilter(can29Bit)
             addAll(listOf("ATCF $filter", "ATCM $filter", "STFAC"))
         }

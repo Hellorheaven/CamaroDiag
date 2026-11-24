@@ -1802,9 +1802,10 @@ fun CanSnifferScreen(
     }
     // Only identify a module by name if its actual CAN responder was observed
     // during a verified physical scan, not from the predicted vehicle topology.
-    val physicallyIdentifiedModules = remember(knownModules, observedCanIds) {
+    val physicallyIdentifiedModules = remember(knownModules, observedCanIds, state.bitrate) {
+        // A CAN ID on SW-CAN/250k is not the same physical responder as on HS-CAN 500k.
         knownModules.filter { module ->
-            module.status == ModuleStatus.ACCESSIBLE &&
+            state.bitrate == 500_000 && module.status == ModuleStatus.ACCESSIBLE &&
                 module.notesEn.startsWith("Observed ") &&
                 observedCanIds.any { it.hex.equals(module.rxHeader, ignoreCase = true) }
         }.associateBy { module ->
@@ -1813,19 +1814,23 @@ fun CanSnifferScreen(
     }
     val parsedRawFrame = remember(requestInput) { RawCanFrameParser.parse(requestInput) }
     val rawCanFrameInput = parsedRawFrame != null
-    fun profile(extended: Boolean, bitrate: Int) = if (bitrate == 250_000) {
-        if (extended) 9 else 8
-    } else if (extended) 7 else 6
+    fun profile(extended: Boolean, bitrate: Int) =
+        com.camarodiag.gen5.data.obd.DiagnosticRouteSelector.rawCanProfile(extended, bitrate)
+    fun speedForProfile(selected: Int) = when (selected) {
+        61, 62 -> 33_333
+        8, 9 -> 250_000
+        else -> 500_000
+    }
     val selectedMonitorProfile = profile(monitorCan29Bit, state.bitrate)
-    val rawProfileAvailable = parsedRawFrame?.let {
+    val rawProfileAvailable = state.bitrate != 33_333 && parsedRawFrame?.let {
         profile(it.isExtended, state.bitrate) in availableRawCanProfiles
     } == true
     LaunchedEffect(availableRawCanProfiles, state.bitrate, state.isCapturing, state.isSendingRequest) {
         if (!state.isCapturing && !state.isSendingRequest &&
             selectedMonitorProfile !in availableRawCanProfiles && availableRawCanProfiles.size == 1) {
             val selected = availableRawCanProfiles.single()
-            monitorCan29Bit = selected in setOf(7, 9)
-            onBitrateChange(if (selected in setOf(8, 9)) 250_000 else 500_000)
+            monitorCan29Bit = selected in setOf(7, 9, 62)
+            onBitrateChange(speedForProfile(selected))
         }
     }
     val unsafeRawCanInput = remember(requestInput) {
@@ -1872,16 +1877,18 @@ fun CanSnifferScreen(
                             enabled = !state.isCapturing && !state.isSendingRequest && availableRawCanProfiles.isNotEmpty(),
                             modifier = Modifier.fillMaxWidth()) {
                             Text(if (selectedMonitorProfile in availableRawCanProfiles)
-                                stringResource(R.string.can_console_capture_profile, state.bitrate / 1000, if (monitorCan29Bit) 29 else 11)
+                                if (state.bitrate == 33_333) stringResource(R.string.can_console_swcan_profile, if (monitorCan29Bit) 29 else 11)
+                                else stringResource(R.string.can_console_capture_profile, state.bitrate / 1000, if (monitorCan29Bit) 29 else 11)
                             else stringResource(R.string.cal_choose_compatible_profile))
                         }
                         DropdownMenu(expanded = monitorFormatMenuExpanded,
                             onDismissRequest = { monitorFormatMenuExpanded = false }) {
                             availableRawCanProfiles.sorted().forEach { selected ->
-                                val extended = selected in setOf(7, 9)
-                                val speed = if (selected in setOf(8, 9)) 250_000 else 500_000
+                                val extended = selected in setOf(7, 9, 62)
+                                val speed = speedForProfile(selected)
                                 DropdownMenuItem(text = {
-                                    Text(stringResource(R.string.can_console_capture_profile, speed / 1000, if (extended) 29 else 11))
+                                    Text(if (speed == 33_333) stringResource(R.string.can_console_swcan_profile, if (extended) 29 else 11)
+                                        else stringResource(R.string.can_console_capture_profile, speed / 1000, if (extended) 29 else 11))
                                 }, onClick = {
                                     monitorCan29Bit = extended
                                     onBitrateChange(speed)
@@ -1892,6 +1899,8 @@ fun CanSnifferScreen(
                     }
                     Text(stringResource(R.string.can_monitor_format_notice),
                         color = TextMuted, fontSize = 10.sp)
+                    if (state.bitrate == 33_333)
+                        Text(stringResource(R.string.can_console_swcan_receive_only), color = CamaroAmber, fontSize = 11.sp)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(
                             onClick = { onStart(monitorCan29Bit) },
@@ -2400,7 +2409,7 @@ fun CanSnifferScreen(
             frame = RawCanFrameParser.parse(frame),
             pendingContextGeneration = pendingEpoch,
             currentContextGeneration = state.consoleContextGeneration,
-            monitorAvailable = isAvailable && RawCanFrameParser.parse(frame)?.let {
+            monitorAvailable = isAvailable && state.bitrate != 33_333 && RawCanFrameParser.parse(frame)?.let {
                 profile(it.isExtended, state.bitrate) in availableRawCanProfiles
             } == true,
             canTransmit = canTransmitAvailable,

@@ -46,6 +46,13 @@ object DiagnosticRouteSelector {
             .thenBy { it.capability.protocol.service.name }), excluded)
     }
 
+    const val SW_CAN_BITRATE = 33_333
+
+    /** 61/62 are STN raw ISO 11898, not segmented ISO 15765 presets. */
+    fun rawCanProfile(extended: Boolean, bitrate: Int): Int =
+        if (bitrate == SW_CAN_BITRATE) { if (extended) 62 else 61 }
+        else elmCanProtocol(extended, bitrate)
+
     /** Explicit CAN wire profile, never inferred from an adapter brand. */
     fun elmCanProtocol(extended: Boolean, bitrate: Int): Int = when (bitrate) {
         500_000 -> if (extended) 7 else 6

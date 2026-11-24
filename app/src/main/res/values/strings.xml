@@ -1024,4 +1024,7 @@
     <string name="cal_doip_monitor_export">Export measurements (CSV)</string>
     <string name="cal_doip_monitor_exported">Measurements saved: %1$s</string>
     <string name="cal_doip_monitor_export_failed">Could not export DoIP measurements.</string>
+    <string name="can_console_swcan_profile">SW-CAN capture 33.3 kbit/s, %1$d-bit</string>
+    <string name="can_console_swcan_changed">SW-CAN 33.3 kbit/s</string>
+    <string name="can_console_swcan_receive_only">SW-CAN: receive-only in this console.</string>
 </resources>

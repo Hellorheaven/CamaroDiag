@@ -91,7 +91,11 @@ class BluetoothObdManager(context: Context) {
     fun availableRawCanProfiles(): Set<Int> {
         val adapter = activeAdapterCapabilities ?: return emptySet()
         if (!isObdCommandChannelAvailable || !adapter.supportsCanHeaders) return emptySet()
-        return adapter.acceptedElmProtocols.intersect(setOf(6, 7, 8, 9))
+        val classical = adapter.acceptedElmProtocols.intersect(setOf(6, 7, 8, 9))
+        val singleWire = if (adapter.supportsSwCan && adapter.tier == AdapterTier.PRO_STN &&
+            StnUdsPayloadTransport.hardwareModel(adapter.hardwareId) in setOf("MX", "MX+"))
+            adapter.acceptedStnProtocols.intersect(setOf(61, 62)) else emptySet()
+        return classical + singleWire
     }
 
     /** A candidate is a configured software path, not proof of ECU response. */
@@ -395,6 +399,7 @@ class BluetoothObdManager(context: Context) {
             val hardware = probeCommand("STDI")
             val atal = probeCommand("ATAL")
             val stp61 = probeCommand("STP 61")
+            val stp62 = probeCommand("STP 62")
             // ATTP selects a trial configuration without sending a vehicle request.
             // Keep acceptance separate from physical wiring and ECU evidence.
             val protocolProbe = linkedMapOf<Int, String>()
@@ -417,7 +422,8 @@ class BluetoothObdManager(context: Context) {
                 protocolResp = protocolResp,
                 transmitProbeResp = transmitProbeResp,
                 hardwareResp = hardware,
-                elmProtocolProbe = protocolProbe
+                elmProtocolProbe = protocolProbe,
+                stnProtocolProbe = mapOf(61 to stp61, 62 to stp62)
             )
             synchronized(adapterLifecycleLock) {
                 transportSessionEpoch.requireQueuedCurrent(expectedEpoch)
@@ -761,7 +767,7 @@ class BluetoothObdManager(context: Context) {
         check(capabilities.supportsCanHeaders) {
             "The connected adapter does not report CAN header support."
         }
-        require(DiagnosticRouteSelector.elmCanProtocol(can29Bit, bitrate) in availableRawCanProfiles()) {
+        require(DiagnosticRouteSelector.rawCanProfile(can29Bit, bitrate) in availableRawCanProfiles()) {
             "Selected CAN capture profile was not accepted by the connected adapter."
         }
         require(durationMs >= 1_000L) {
@@ -770,7 +776,7 @@ class BluetoothObdManager(context: Context) {
 
         commandSessionMutex.withLock {
             transportSessionEpoch.requireQueuedCurrent(requestedEpoch)
-            check(DiagnosticRouteSelector.elmCanProtocol(can29Bit, bitrate) in availableRawCanProfiles()) {
+            check(DiagnosticRouteSelector.rawCanProfile(can29Bit, bitrate) in availableRawCanProfiles()) {
                 "CAN monitor profile changed while waiting."
             }
             suspend fun boundCommand(command: String, timeoutMs: Long, onChunk: ((String) -> Unit)? = null): String =
@@ -862,6 +868,7 @@ class BluetoothObdManager(context: Context) {
         check(activeTransport in setOf("BLUETOOTH", "BLE", "USB", "WIFI")) {
             "Raw CAN transmission is not available on this transport."
         }
+        require(bitrate in setOf(250_000, 500_000)) { "SW-CAN raw console is receive-only until its TX path is qualified." }
         require(frame.data.size in 1..8) { "Classical CAN payloads must contain 1 to 8 bytes." }
         require(if (frame.isExtended) frame.canId in 0..0x1FFFFFFFL else frame.canId in 0..0x7FFL) {
             "CAN identifier is outside the selected 11-bit/29-bit range."
