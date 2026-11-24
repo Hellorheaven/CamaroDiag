@@ -127,8 +127,25 @@ object DoIpDirectRead {
         }
         when (request[0].u8()) {
             0x22 -> { echo(2); require(reply.size >= 4) }
-            0x2E, 0x2F -> echo(2)
-            0x19 -> { echo(1); require(reply.size >= 3) }
+            0x24, 0x2E, 0x2F -> echo(2)
+            0x19 -> {
+                require(request.size >= 2 && reply.size >= 3 && reply[1].u8() == (request[1].u8() and 0x7F))
+                val subfunction = request[1].u8() and 0x7F
+                if (subfunction in setOf(0x04, 0x06)) {
+                    require(request.size == 6 && reply.size >= 6 &&
+                        request.copyOfRange(2, 5).contentEquals(reply.copyOfRange(2, 5)))
+                    val selected = request[5].u8()
+                    if (reply.size >= 7 && selected != 0xFF && (subfunction != 0x06 || selected != 0xFE))
+                        require(reply[6].u8() == selected) { "UDS DTC record mismatch." }
+                }
+                if (subfunction in setOf(0x42, 0x55, 0x56)) {
+                    require(request.size >= 3 && request[2] == reply[2]) { "WWH group mismatch." }
+                    if (subfunction == 0x56)
+                        require(request.size == 4 && reply.size >= 6 && reply[5] == request[3]) {
+                            "WWH readiness group mismatch."
+                        }
+                }
+            }
             0x10, 0x11, 0x27, 0x28, 0x3E, 0x85 -> {
                 require(request.size >= 2 && reply.size >= 2 &&
                     reply[1].u8() == (request[1].u8() and 0x7F))

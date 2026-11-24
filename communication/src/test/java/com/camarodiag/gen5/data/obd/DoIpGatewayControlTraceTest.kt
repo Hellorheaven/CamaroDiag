@@ -280,6 +280,23 @@ class DoIpGatewayControlTraceTest {
         assertFalse(DoIpDirectRead.isObdDid(0xF190))
     }
 
+    @Test fun rawDtcResponsesMustCorrelateRecordAndFunctionalGroup() {
+        fun hex(s: String) = s.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
+        val valid = listOf("190412345601" to "5904123456080100",
+            "1906123456FE" to "5906123456089001",
+            "19563307" to "595633FF0407",
+            "241234" to "64123400")
+        valid.forEach { (tx, rx) -> DoIpDirectRead.requirePositiveResponse(hex(tx), hex(rx)) }
+        val invalid = listOf("190412345601" to "5904123456080200",
+            "190612345690" to "5906123457089001",
+            "195533" to "595534FF04",
+            "19563307" to "595633FF0408",
+            "241234" to "64123500")
+        invalid.forEach { (tx, rx) ->
+            assertTrue(runCatching { DoIpDirectRead.requirePositiveResponse(hex(tx), hex(rx)) }.isFailure)
+        }
+    }
+
     @Test fun explicitCommandPreservesBytesAndCorrelatesStandardResponse() {
         val commands = DoIpDirectRead.parseCommands("22 F1 90;19 01 FF")
         assertEquals(2, commands.size)

@@ -370,12 +370,31 @@ def decode_did_layout(reply: bytes, layout: tuple[tuple[int, int], ...]) -> list
 
 
 def positive(request: bytes, reply: bytes) -> bytes:
-    if not reply or reply[0] != request[0] + 0x40:
+    if not request or not reply or reply[0] != (request[0] + 0x40) & 0xFF:
         raise DoIpError("UDS response service mismatch")
-    echo = {0x22: 2, 0x2E: 2, 0x2F: 2, 0x19: 1, 0x36: 1}.get(request[0], 0)
+    echo = {0x22: 2, 0x24: 2, 0x2E: 2, 0x2F: 2, 0x36: 1}.get(request[0], 0)
     if echo and (len(request) < echo + 1 or len(reply) < echo + 1 or
                  reply[1:echo+1] != request[1:echo+1]):
         raise DoIpError("UDS response echo mismatch")
+    if request[0] == 0x22 and len(reply) < 4:
+        raise DoIpError("Missing DID data")
+    if request[0] == 0x23 and len(reply) < 2:
+        raise DoIpError("Missing memory data")
+    if request[0] == 0x19:
+        if len(request) < 2 or len(reply) < 3 or reply[1] != request[1] & 0x7F:
+            raise DoIpError("UDS DTC subfunction mismatch")
+        subfunction = request[1] & 0x7F
+        if subfunction in (0x04, 0x06):
+            if len(request) != 6 or len(reply) < 6 or reply[2:5] != request[2:5]:
+                raise DoIpError("UDS DTC identity mismatch")
+            selected = request[5]
+            if len(reply) >= 7 and selected != 0xFF and (subfunction != 0x06 or selected != 0xFE) and reply[6] != selected:
+                raise DoIpError("UDS DTC record mismatch")
+        if subfunction in (0x42, 0x55, 0x56):
+            if len(request) < 3 or reply[2] != request[2]:
+                raise DoIpError("WWH functional group mismatch")
+            if subfunction == 0x56 and (len(request) != 4 or len(reply) < 6 or reply[5] != request[3]):
+                raise DoIpError("WWH readiness group mismatch")
     if request[0] in (0x10, 0x11, 0x27, 0x28, 0x3E, 0x85, 0x31):
         if len(request) < 2 or len(reply) < 2 or reply[1] != request[1] & 0x7F:
             raise DoIpError("UDS subfunction mismatch")

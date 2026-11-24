@@ -207,6 +207,18 @@ class DoIpTests(unittest.TestCase):
             self.assertEqual(confirm_commands(commands, GATEWAY, 0xE80, 0x1234, True,
                 lambda: next(values), lambda _: None, french), expected)
 
+    def test_raw_dtc_responses_correlate_record_and_functional_group(self):
+        for request, reply in (("190412345601", "5904123456080100"),
+                               ("1906123456FE", "5906123456089001"),
+                               ("19563307", "595633FF0407"), ("241234", "64123400")):
+            self.assertEqual(positive(bytes.fromhex(request), bytes.fromhex(reply)), bytes.fromhex(reply))
+        for request, reply in (("190412345601", "5904123456080200"),
+                               ("190612345690", "5906123457089001"),
+                               ("195533", "595534FF04"), ("19563307", "595633FF0408"),
+                               ("241234", "64123500")):
+            with self.assertRaises(DoIpError):
+                positive(bytes.fromhex(request), bytes.fromhex(reply))
+
     def test_multi_did_layout_and_same_session(self):
         layout = parse_did_layout("F40C:2,F40D:1")
         reply = bytes.fromhex("62F40C1234F40D56")

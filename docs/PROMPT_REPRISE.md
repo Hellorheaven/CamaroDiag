@@ -1,3 +1,7 @@
+## PR117 — corrélation UDS DoIP Android/Connectors (24/11/2026)
+
+- Alignement du contrôle de réponse brute sur le comportement déjà présent Windows : SID 24, DTC 19/04 et 19/06 avec identifiant 24 bits et numéro de record spécifique (sélecteurs FE/FF préservés), groupe fonctionnel WWH et groupe 19/56. Les réponses contradictoires sont refusées au niveau transport, pas seulement dans les écrans spécialisés. Tests positifs/négatifs ajoutés, aucune restriction d’émission SID.
+
 ## PR117 — lecture CLI Windows vérifiée (24/11/2026)
 
 - Les lectures typées existantes (WWH/OBD/DTC/multi-DID) peuvent sélectionner explicitement `--expected-vin` : relecture passerelle après consentement, F802/F810 pour OBD ou F190 pour multi-DID générique avant/après sur même session, TLS par défaut dans ce mode, options P2/P2* bornées, résultat complet seulement après vérification. `--obd-verified true` pour multi-DID réglementaires ; échange brut historique et séquence bidirectionnelle conservés. Tests de parseur ajoutés, validation à venir.
