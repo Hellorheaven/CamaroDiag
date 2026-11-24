@@ -86,6 +86,27 @@ class SecureTransportTests(unittest.TestCase):
                     accept(self.server(), stream,
                            allowed_host_sha256=(self.pin("host"),))
 
+    def test_failed_tls_wrap_closes_original_socket_on_both_sides(self):
+        class BrokenHandshake:
+            minimum_version = ssl.TLSVersion.TLSv1_3
+            maximum_version = ssl.TLSVersion.TLSv1_3
+            verify_mode = ssl.CERT_REQUIRED
+            check_hostname = True
+            def wrap_socket(self, stream, **kwargs):
+                raise ssl.SSLError("synthetic failed TLS handshake")
+        for server in (False, True):
+            with self.subTest(server=server):
+                with socket.socket() as stream:
+                    stream.settimeout(2)
+                    with self.assertRaisesRegex(ssl.SSLError, "failed TLS handshake"):
+                        if server:
+                            accept(BrokenHandshake(), stream,
+                                   allowed_host_sha256=("0" * 64,))
+                        else:
+                            connect(BrokenHandshake(), stream, "connector",
+                                    device_sha256="0" * 64)
+                    self.assertTrue(stream._closed)
+
     def test_mutual_auth(self):
         self.exchange(self.client(),self.server())
     def test_wrong_device_identity(self):
