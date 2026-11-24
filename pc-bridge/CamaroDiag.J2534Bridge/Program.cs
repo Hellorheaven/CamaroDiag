@@ -48,6 +48,10 @@ internal static class Program
         if (args.Contains(StandardProtocolCli.RawIsoTpCommand,
             StringComparer.OrdinalIgnoreCase))
             return await StandardProtocolCli.RunIsoTpAsync(args);
+        // Entirely offline: never discover or open a J2534 adapter.
+        if (args.Contains(IsoTpClassicCaptureAudit.Command,
+            StringComparer.OrdinalIgnoreCase))
+            return IsoTpClassicCaptureAudit.Run(args);
         if (args.Contains(StandardProtocolCli.ObdProtocolAutoDetectCommand,
             StringComparer.OrdinalIgnoreCase))
             return await StandardProtocolCli.RunObdProtocolAutoDetectAsync(args);

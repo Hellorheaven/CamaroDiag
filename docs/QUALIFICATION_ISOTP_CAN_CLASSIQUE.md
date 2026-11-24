@@ -51,3 +51,15 @@ L'option `--trace-file isotp-essai-01.csv` ajoutée à la commande `--isotp-exch
 Consigner pour chaque campagne : commit exact et CI Windows réussie, date, adaptateur/firmware/DLL, type et débit CAN, identité ECU ou simulateur, trames horodatées, essais positifs/négatifs, erreurs, différences et signatures de l'opérateur responsable.
 
 **Statut tant que ces preuves manquent :** couche ISO-TP logicielle testée, **transport physique non qualifié**, validation d'écriture ECU **non établie**. Le protocole n'est déclaré achevé sur un matériel déterminé que lorsque tous les scénarios pertinents ci-dessus sont prouvés, et non sur la seule base d'un pourcentage ou d'une CI verte.
+
+## Audit hors ligne de capture CAN classique (sans accès ECU)
+
+La commande `--isotp-audit-trace` analyse un CSV de **capture CAN indépendante et horodatée sur le bus**. Son en-tête exact est `timestamp_us,direction,can_id,payload_hex`. Exemple de ligne : `1000,TX,0x7E0,1014010203040506`. `TX` est une émission du testeur et `RX` une émission de l’ECU. Aucun pilote, adaptateur ou véhicule n’est contacté par cette commande.
+
+```powershell
+CamaroDiag.J2534Bridge.exe --isotp-audit-trace --capture-file capture-banc.csv --tx-id 7E0 --rx-id 7E8 --sender tx --extended false --n-bs-ms 1000
+```
+
+`--sender rx` analyse à la place le premier message segmenté émis par l’ECU. L’analyse vérifie SF/FF/FC/CF, CTS/WAIT/OVFLW, Block Size, numéros de séquence, STmin entre CF et N_Bs entre blocs. Elle est limitée à **CAN classique 11 ou 29 bits avec adressage ISO-TP normal**, pas aux adressages étendu/mixte ni à CAN-FD. Code de retour `0` : trame/PDU étudiée cohérente ; `7` : violation ; `8` : transfert incomplet ou abandonné ; `6` : format/argument invalide.
+
+**Preuve limitée :** le programme ne peut pas attester la provenance d’un CSV fourni par l’utilisateur. Conserver le fichier brut original et les informations modèle/firmware de l’analyseur et de la DLL J2534. Les journaux `--trace-file` de Windows contenant `TX_QUEUED` sont volontairement rejetés : leurs timestamps PC ne sont pas des temps physiques CAN. Un rapport conforme ne valide ni ECU, ni pilote, ni programmation/restauration.
