@@ -167,3 +167,8 @@ PR #95 toujours draft ; ne pas fusionner ni démarrer un protocole suivant avant
 Code HEAD avant marqueur : 938f9ece67c39631e730ee08f93a09eca66ed506.
 Audit CSV indépendant --isotp-audit-trace : SF/FF 12 et 32 bits (4096 octets), CAN 11/29 bits, adressages normal/étendu/mixte, FC CTS/WAIT/OVFLW et WFTmax, N_Bs/N_Cr, STmin, BlockSize, CF séquence et rôles TX/RX. Tests de non-régression positifs et négatifs intégrés aux autotests J2534 ; aucune émission ni lecture ECU.
 Demande unique de campagne Debug groupée au SHA de CE commit marqueur : Windows -warnaserror + --self-test, Android tests/lint/assemble Debug, natif, Connectors. Pas de Release, pas de fusion, pas d'essais matériels avant Release propriétaire.
+
+24/11/2026 — ISO-TP CAN-FD audit logiciel et vecteurs de non-regression (#110)
+HEAD des modifications avant marqueur : b8e7621eca9fd6bdb18c31faa2f51bb1c6ad6d1b.
+Deuxieme protocole apres validation logicielle Windows et CI globale ISO-TP CAN classique sur run #45304636194 : audit offline CAN-FD option --isotp-fd-audit-trace, DLC FD canonique (8,12,16,20,24,32,48,64), SF echappee, FF 12/32 bit, CF RX_DL, N_Cr/N_Bs, STmin, BlockSize, adressages et 11/29-bit. Selftests Windows sans DLL VCI et documentation Release ; aucune pretention de validation reelle/flash ECU.
+Demander UNE validation globale Debug du HEAD marqueur : Windows -warnaserror / --self-test, Android, natif et connecteurs. Ne pas fusionner PR95 ni publier Release, aucun essai voiture avant Release du proprietaire.
