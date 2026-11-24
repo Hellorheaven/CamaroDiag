@@ -45,6 +45,50 @@ class CamaroDiagConnectorDiscoveryTest {
         assertEquals(listOf("PING\n", "CAPS\n"), trailing.sent)
     }
 
+    @Test fun slowDripUsbReplyCannotExtendDiscoveryDeadline() {
+        val c = FakeChannel(listOf("$ping\n", "$caps\n", "$status\n"), chunkSize = 1)
+        var clockNanos = 0L
+        val error = runCatching {
+            CamaroDiagConnectorDiscovery.inspectWithClock(c, clock = {
+                clockNanos += 500_000_000L
+                clockNanos
+            })
+        }.exceptionOrNull()
+        assertTrue(error is IOException)
+        assertEquals(listOf("PING\n"), c.sent)
+    }
+
+    @Test fun slowUsbWriteConsumesTheSameThreeSecondDeadline() {
+        var nanos = 0L
+        var reads = 0
+        var writes = 0
+        val c = object : CamaroDiagConnectorDiscovery.Channel {
+            override fun write(bytes: ByteArray) {
+                writes++
+                nanos = 3_000_000_000L
+            }
+            override fun read(buffer: ByteArray, timeoutMs: Int): Int {
+                reads++
+                return 0
+            }
+        }
+        val error = runCatching {
+            CamaroDiagConnectorDiscovery.inspectWithClock(c, clock = { nanos })
+        }.exceptionOrNull()
+        assertTrue(error is IOException)
+        assertEquals(1, writes)
+        assertEquals(0, reads)
+    }
+
+    @Test fun replyArrivingExactlyAtDeadlineIsNotAccepted() {
+        val c = FakeChannel(listOf("$ping\n"), chunkSize = 512)
+        val times = listOf(0L, 0L, 3_000_000_000L).iterator()
+        assertTrue(runCatching {
+            CamaroDiagConnectorDiscovery.inspectWithClock(c, clock = { times.next() })
+        }.exceptionOrNull() is IOException)
+        assertEquals(listOf("PING\n"), c.sent)
+    }
+
     @Test fun publicDiscoveryNeverAuthenticatesOrEnablesEcuTraffic() {
         val c = FakeChannel(listOf("$ping\n", "$caps\n", "$status\n"))
         val report = CamaroDiagConnectorDiscovery.inspect(c)
@@ -79,6 +123,65 @@ class CamaroDiagConnectorDiscoveryTest {
         assertFalse(CamaroDiagConnectorDiscovery.requiresDedicatedUsbDiscovery(7, emptyList()))
     }
 
+    @Test fun deviceIdAlwaysUsesTheFinalUsbSuffix() {
+        assertEquals(17, CamaroDiagConnectorDiscovery.deviceIdFromLabel(
+            "CamaroDiagConnectors (#999 embedded) (#17)"
+        ))
+        assertEquals(17, CamaroDiagConnectorDiscovery.deviceIdFromLabel(
+            "CamaroDiagConnectors #999 internal (#17)"
+        ))
+        assertEquals(17, CamaroDiagConnectorDiscovery.deviceIdFromLabel(
+            "CamaroDiagConnectors #17"
+        ))
+        assertEquals(null, CamaroDiagConnectorDiscovery.deviceIdFromLabel(
+            "CamaroDiagConnectors (#17) trailing"
+        ))
+        assertEquals(null, CamaroDiagConnectorDiscovery.deviceIdFromLabel(
+            "CamaroDiagConnectors (#999999999999999999999)"
+        ))
+        assertTrue(CamaroDiagConnectorDiscovery.allowsDedicatedUsbDiscovery(
+            17, listOf("CamaroDiagConnectors #999 internal (#17)")
+        ))
+        assertFalse(CamaroDiagConnectorDiscovery.allowsDedicatedUsbDiscovery(
+            999, listOf("CamaroDiagConnectors #999 internal (#17)")
+        ))
+    }
+
+    @Test fun liveUsbDriverFamilyCannotSwitchBetweenElmAndIsolatedConnector() {
+        val policy = CamaroDiagConnectorDiscovery::allowsUsbDriverFamily
+        // Normal adapters may expose generic descriptors, while expressly
+        // named connector/KKL devices must never be opened through ELM.
+        assertTrue(policy("OBDLink USB", false))
+        assertTrue(policy("FT232R USB UART", false))
+        assertTrue(policy(null, false))
+        assertFalse(policy("CamaroDiagConnectors CDC", false))
+        assertFalse(policy("FTDI KKL", false))
+        assertFalse(policy("CamaroDiagConnectors K-Line", false))
+        // Discovery only requires a named isolated board; its public ID does
+        // not authenticate firmware or enable any ECU service.
+        assertTrue(policy("CamaroDiagConnectors CDC", true))
+        assertFalse(policy("ELM327 USB", true))
+        assertFalse(policy(null, true))
+        assertFalse(policy("CamaroDiagConnectors K-Line", true))
+    }
+
+    @Test fun onlyEnumeratedNamedNonKklUsbBoardCanBeDiscovered() {
+        val labels = listOf(
+            "CamaroDiagConnectors (#17)",
+            "FT232R generic ELM327 (#18)",
+            "CamaroDiagConnectors K-Line (#19)",
+            "FTDI KKL (#20)"
+        )
+        assertTrue(CamaroDiagConnectorDiscovery.allowsDedicatedUsbDiscovery(17, labels))
+        assertFalse(CamaroDiagConnectorDiscovery.allowsDedicatedUsbDiscovery(18, labels))
+        assertFalse(CamaroDiagConnectorDiscovery.allowsDedicatedUsbDiscovery(19, labels))
+        assertFalse(CamaroDiagConnectorDiscovery.allowsDedicatedUsbDiscovery(20, labels))
+        assertFalse(CamaroDiagConnectorDiscovery.allowsDedicatedUsbDiscovery(21, labels))
+        assertFalse(CamaroDiagConnectorDiscovery.allowsDedicatedUsbDiscovery(17, emptyList()))
+        // Legacy routing cannot grant ECU permission even after a valid discovery.
+        assertFalse(CamaroDiagConnectorDiscovery.Report("0.1.0", emptyList()).vehicleAccessAllowed)
+    }
+
     @Test fun unknownIdentityAndFutureVersionsCannotEnterLegacyDiscovery() {
         for (response in listOf("ELM327 v1.5", "PONG CamaroDiagConnectors 1.0.0", "PONG Other 0.1.0")) {
             val c = FakeChannel(listOf("$response\n"))
@@ -90,6 +193,8 @@ class CamaroDiagConnectorDiscoveryTest {
     @Test fun malformedAndEnabledCapabilitiesAreRejectedRatherThanActivatingHardware() {
         val replies = listOf(
             caps.replace("hs_can=disabled", "hs_can=enabled"),
+            caps.replace("hs_can=disabled sw_can=disabled", "sw_can=disabled hs_can=disabled"),
+            caps.replace(" hs_can=disabled", "  hs_can=disabled"),
             caps.replace("ecu_flash=disabled", "ecu_flash=enabled"),
             caps.replace("j2534=disabled", "hs_can=disabled"),
             caps.replace(" j2534=disabled", ""),

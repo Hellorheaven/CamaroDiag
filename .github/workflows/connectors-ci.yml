@@ -1,0 +1,132 @@
+name: Connectors CI
+# Heavy tests are never triggered by pull_request synchronize.
+# Run manually at ~50-commit checkpoints and before merging; ready_for_review is a final gate.
+# One cross-component gate for the common firmware/host contract. A hardware
+# documentation-only change does not trigger compilation; run manually for bench work.
+on:
+  # Manual component checkpoint only. Full PR check is orchestrated by pr-unit-tests.yml.
+  # Disabled implicit PR triggers to prevent duplicate Debug validation.
+  # No automatic runs per commit or Ready transition.
+  workflow_dispatch:
+  workflow_call:
+permissions:
+  contents: read
+concurrency:
+  group: connectors-ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  native-parser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Build and run native USB parser tests
+        run: |
+          g++ -std=c++11 -Wall -Wextra -Werror -pedantic connectors/firmware/esp32s3/native-tests/discovery_parser_test.cpp -o /tmp/discovery_parser_test
+          /tmp/discovery_parser_test
+          g++ -std=c++11 -Wall -Wextra -Werror -pedantic connectors/firmware/esp32s3/native-tests/programming_policy_test.cpp -o /tmp/programming_policy_test
+          /tmp/programming_policy_test
+          g++ -std=c++11 -Wall -Wextra -Werror -pedantic connectors/firmware/esp32s3/native-tests/host_interface_policy_test.cpp -o /tmp/host_interface_policy_test
+          /tmp/host_interface_policy_test
+          g++ -std=c++11 -Wall -Wextra -Werror -pedantic connectors/firmware/esp32s3/native-tests/host_session_arbiter_test.cpp -o /tmp/host_session_arbiter_test
+          /tmp/host_session_arbiter_test
+          g++ -std=c++11 -Wall -Wextra -Werror -pedantic connectors/firmware/esp32s3/native-tests/binary_frame_test.cpp -o /tmp/binary_frame_test
+          /tmp/binary_frame_test
+          g++ -std=c++11 -Wall -Wextra -Werror -pedantic connectors/firmware/esp32s3/native-tests/frame_receiver_test.cpp -o /tmp/frame_receiver_test
+          /tmp/frame_receiver_test
+          g++ -std=c++11 -Wall -Wextra -Werror -pedantic connectors/firmware/esp32s3/native-tests/discovery_session_test.cpp -o /tmp/discovery_session_test
+          /tmp/discovery_session_test
+          g++ -std=c++11 -Wall -Wextra -Werror -pedantic connectors/firmware/esp32s3/native-tests/journal_record_test.cpp -o /tmp/journal_record_test
+          /tmp/journal_record_test
+          g++ -std=c++11 -Wall -Wextra -Werror -pedantic connectors/firmware/esp32s3/native-tests/journal_writer_gate_test.cpp -o /tmp/journal_writer_gate_test
+          /tmp/journal_writer_gate_test
+          g++ -std=c++11 -Wall -Wextra -Werror -pedantic connectors/firmware/shared/native-tests/interprocessor_link_test.cpp -o /tmp/interprocessor_link_test
+          /tmp/interprocessor_link_test
+          g++ -std=c++11 -Wall -Wextra -Werror -pedantic connectors/firmware/shared/native-tests/isotp_observer_test.cpp -o /tmp/isotp_observer_test
+          /tmp/isotp_observer_test
+          g++ -std=c++11 -Wall -Wextra -Werror -pedantic connectors/firmware/shared/native-tests/kline_observer_test.cpp -o /tmp/kline_observer_test
+          /tmp/kline_observer_test
+  esp32-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - run: python -m pip install platformio==6.1.18
+      - run: pio run -d connectors/firmware/esp32s3
+
+  stm32-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - run: python -m pip install platformio==6.1.18
+      - run: pio run -d connectors/firmware/stm32g4
+  native-usb-client:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Test portable Java protocol
+        run: |
+          mkdir -p /tmp/android-protocol
+          javac -Xlint:all -Werror -d /tmp/android-protocol connectors/host/android/src/main/java/com/camarodiag/connectors/BinaryDiscovery.java connectors/host/android/src/test/java/com/camarodiag/connectors/BinaryDiscoveryTest.java
+          java -ea -cp /tmp/android-protocol com.camarodiag.connectors.BinaryDiscoveryTest
+      - name: Use runner Android SDK
+        run: |
+          test -n "$ANDROID_HOME"
+          if [ ! -f "$ANDROID_HOME/platforms/android-35/android.jar" ]; then
+            "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-35"
+          fi
+          test -f "$ANDROID_HOME/platforms/android-35/android.jar"
+      - name: Compile native USB Host adapter
+        run: |
+          javac -Xlint:all -Werror -cp "$ANDROID_HOME/platforms/android-35/android.jar" -d /tmp/android-protocol connectors/host/android/src/main/java/com/camarodiag/connectors/*.java
+  python-host-tests:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.11', '3.12', '3.13']
+    defaults:
+      run:
+        working-directory: connectors/host/python
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: python -m unittest discover -s tests -v
+      - run: python -m compileall -q camarodiagconnectors tests
+  windows-discovery:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '8.0.x'
+      - run: dotnet build connectors/host/windows-discovery/WindowsDiscovery.csproj -c Debug -warnaserror
+      - run: dotnet run --project connectors/host/windows-discovery/WindowsDiscovery.csproj -c Debug --no-build -- --self-test

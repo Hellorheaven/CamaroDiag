@@ -51,11 +51,23 @@ Les adaptateurs Bluetooth classiques et Bluetooth LE ne sont pas interchangeable
 
 Les fonctions sont proposées uniquement lorsque le véhicule et l’interface peuvent réellement fournir les informations nécessaires. Une donnée absente n’est pas remplacée par une valeur estimée.
 
+## Essais individuels avec la console CAN / OBD
+
+Dans l'onglet **Console CAN / OBD**, connectez d'abord une interface réelle compatible. Les requêtes standard en lecture seule (`010C` pour le régime, `0902` pour le VIN, `03` pour les défauts) utilisent le transport OBD actif. Avec un pont J2534 compatible, cette lecture peut rester disponible sans capture CAN passive.
+
+Le PID `0152` peut afficher un taux d'éthanol **uniquement si le calculateur le fournit réellement**. Une absence de donnée ne doit pas être interprétée comme 0 % d'éthanol ni comme une preuve d'incompatibilité FlexFuel. Les historiques affichent séparément les requêtes envoyées, les réponses ECU et les messages de l'adaptateur.
+
+L'envoi de trames CAN brutes requiert une interface dont la capacité physique a été vérifiée et une confirmation avant transmission. Les services de reprogrammation, d'effacement ou de sécurité ECU ne sont pas autorisés par la console de diagnostic. Les trames OEM arbitraires peuvent avoir des effets sur le véhicule et **ne sont pas certifiées sûres** par ce contrôle ; ne les utiliser que dans un cadre de diagnostic documenté.
+
+Ces essais individuels sont possibles pendant le développement sous réserve des préconditions de sécurité ; ils ne remplacent pas la validation exhaustive sur véhicule prévue au tout dernier lot du projet.
+
 ## Calculateurs accessibles et limites
 
 Le diagnostic OBD-II standard concerne principalement le groupe motopropulseur. Certaines lectures étendues peuvent être disponibles selon le véhicule et l’interface.
 
 CamaroDiag ne garantit pas actuellement un scan exhaustif de tous les calculateurs BCM, TCM, ABS/EBCM, tableau de bord (IPC), airbag (SDM) ou des autres modules GM. Les commandes de carrosserie, le codage, les procédures de sécurité, la programmation et le flashage ne sont pas proposés comme fonctions validées.
+
+Un moteur de scan UDS **en lecture seule** permet de préparer un inventaire ECM, TCM, BCM, IPC, EBCM/ABS et SDM. Chaque calculateur doit disposer d'un profil correspondant au VIN et à la calibration du véhicule, et son identité (famille, matériel, OS, calibration, CVN, VIN) doit être confirmée avant la lecture des défauts. En l'absence de ce profil ou de réponse valide, le calculateur est indiqué comme non vérifié, jamais comme sain. Une boîte manuelle n'est pas présentée comme équipée d'un TCM automatique. Ces composants logiciels ne signifient pas que le balayage physique de tous ces calculateurs est déjà qualifié sur une Camaro réelle.
 
 ## Précautions
 

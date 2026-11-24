@@ -21,7 +21,13 @@ object EcuBackupIntegrity {
         DIVERGENT_INDEPENDENT_READ,
         ALIASED_INDEPENDENT_READ,
         EMPTY_CAPTURE,
-        INVALID_VIN
+        INVALID_VIN,
+        PHYSICAL_ORIGIN_MISSING_VIN,
+        PHYSICAL_CHANNEL_MISSING_VIN,
+        FIRMWARE_EVIDENCE_WITHOUT_CHANNEL,
+        FIRMWARE_EVIDENCE_WITHOUT_REPORTED_HARDWARE_READ,
+        ROUTED_SCOPE_INVALID,
+        INVALID_CAPTURE_TIMESTAMP
     }
 
     data class Result(val problems: Set<Problem>) {
@@ -35,8 +41,41 @@ object EcuBackupIntegrity {
     ): Result {
         val problems = mutableSetOf<Problem>()
         if (captures.isEmpty()) problems += Problem.EMPTY_BACKUP
+        // An archive or manifest with no valid acquisition timestamp cannot
+        // be treated as verified evidence of when these ECU bytes were captured.
+        if (manifest.createdAtUtcMillis <= 0L) problems += Problem.INVALID_CAPTURE_TIMESTAMP
         if (manifest.vehicleVin != null && !manifest.vehicleVin.matches(Regex("[A-HJ-NPR-Z0-9]{17}"))) {
             problems += Problem.INVALID_VIN
+        }
+        // A reported physical read must at least identify the ECU's vehicle.
+        // This is still a declaration, not independent proof of provenance.
+        if (captures.any { it.origin == EcuBackupManifest.Origin.REPORTED_HARDWARE_READ } &&
+            manifest.vehicleVin == null
+        ) {
+            problems += Problem.PHYSICAL_ORIGIN_MISSING_VIN
+        }
+        if (manifest.channel != null && manifest.vehicleVin == null) {
+            problems += Problem.PHYSICAL_CHANNEL_MISSING_VIN
+        }
+        if (manifest.firmwareEvidence != null && manifest.channel == null) {
+            problems += Problem.FIRMWARE_EVIDENCE_WITHOUT_CHANNEL
+        }
+        if (manifest.firmwareEvidence != null &&
+            captures.any { it.origin != EcuBackupManifest.Origin.REPORTED_HARDWARE_READ }
+        ) {
+            problems += Problem.FIRMWARE_EVIDENCE_WITHOUT_REPORTED_HARDWARE_READ
+        }
+        if (manifest.channel != null && (
+            captures.size != 1 || requiredRegions.isNotEmpty() ||
+            captures.any {
+                !EcuBackupArchive.isPortableJ2534Range(it.startAddress, it.expectedBytes) ||
+                    it.firstRead.size.toLong() != it.expectedBytes ||
+                    it.independentRead?.size?.toLong() != it.expectedBytes
+            }
+        )) {
+            // A 32-bit J2534 route proves at most one double-read span.
+            // Full ECU coverage cannot be inferred from an operator label.
+            problems += Problem.ROUTED_SCOPE_INVALID
         }
         if (manifest.hardwareProvenanceVerified) {
             // No hardware reader currently issues an independently authenticated attestation.

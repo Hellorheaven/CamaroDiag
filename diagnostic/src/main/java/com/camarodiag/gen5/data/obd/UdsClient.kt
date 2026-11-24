@@ -5,9 +5,10 @@ import java.util.Locale
 /**
  * Explicit UDS permissions. The default policy is read-only.
  *
- * A write/programming grant must be created by the trusted profile-validation path after
- * vehicle VIN, ECU identity, CAL ID/CVN and documentary evidence have been checked.
- * No GM write profile is bundled until those values and procedures are documented.
+ * For a documented write service, callers supply the actual ECU profile and
+ * observed identity. No CamaroDiag signing authority or mandatory seed/key
+ * is inserted when the ECU protocol does not require one. In the absence
+ * of any verified write profile the default remains diagnostic read-only.
  */
 @ConsistentCopyVisibility
 data class UdsAccessPolicy internal constructor(
@@ -28,8 +29,37 @@ data class UdsAccessPolicy internal constructor(
     val evidenceReference: String
 ) {
     companion object {
+        // All published policy collections must be immutable, even when the
+        // caller retains a mutable source set/map or casts a returned Set.
+        // Authorization is checked against these snapshots, never live UI data.
+        private fun <T> frozenSet(items: Collection<T>): Set<T> =
+            java.util.Collections.unmodifiableSet(LinkedHashSet(items))
+
+        private fun <T> frozenList(items: Collection<T>): List<T> =
+            java.util.Collections.unmodifiableList(ArrayList(items))
+
+        private fun <K, V> frozenMapOfSets(items: Map<K, Set<V>>): Map<K, Set<V>> =
+            java.util.Collections.unmodifiableMap(
+                items.mapValues { (_, allowed) -> frozenSet(allowed) }
+            )
+
+        private fun validEcuIdentifier(value: String?): Boolean {
+            // Hardware identification comes from printable ECU bytes, not
+            // Unicode lookalikes or line-control characters in a profile.
+            if (value == null || value.any { it.code !in 0x20..0x7E }) return false
+            val normalized = value.trim().uppercase(Locale.ROOT)
+            if (normalized.isBlank() || normalized in setOf(
+                    "UNKNOWN", "NONE", "N/A", "NULL", "PENDING", "TBD",
+                    "NO DATA", "NO RESPONSE", "INVALID", "ERROR", "TEST",
+                    "SIMULATED", "NOT SUPPORTED"
+                )) return false
+            val compact = normalized.removePrefix("0X").filter(Char::isLetterOrDigit)
+            return compact.isNotEmpty() && !compact.all { it == '0' } &&
+                !compact.all { it == 'F' }
+        }
+
         fun readOnly(readDids: Set<Int> = emptySet()) = UdsAccessPolicy(
-            readDids = readDids,
+            readDids = frozenSet(readDids),
             writeDids = emptySet(),
             allowedSessions = setOf(0x01),
             routineControlPermissions = emptyMap(),
@@ -46,7 +76,7 @@ data class UdsAccessPolicy internal constructor(
             evidenceReference = "Built-in read-only policy"
         )
 
-        internal fun verified(
+        fun verified(
             vehicleVin: String,
             identity: UdsEcuIdentity,
             expectedVin: String,
@@ -79,21 +109,57 @@ data class UdsAccessPolicy internal constructor(
             require(identity.controllerFamily.equals(expectedControllerFamily, true)) { "Controller family verification failed." }
             require(identity.hardwarePartNumber.equals(expectedHardwarePartNumber, true)) { "Hardware part number verification failed." }
             require(identity.operatingSystemId.equals(expectedOperatingSystemId, true)) { "Operating-system verification failed." }
-            require(evidenceReference.isNotBlank()) { "Traceable OEM evidence is required." }
-            require(readDids.all { it in 0..0xFFFF } && writeDids.all { it in 0..0xFFFF })
-            require(allowedSessions.isNotEmpty() && allowedSessions.all { it in 1..0x7F })
-            require(routineControlPermissions.all { (id, types) -> id in 0..0xFFFF && types.isNotEmpty() && types.all { it in 1..3 } })
-            require(ioControlPermissions.all { (id, types) -> id in 0..0xFFFF && types.isNotEmpty() && types.all { it in 0..0xFF } })
-            require(allowedSecurityLevels.all { it in 1..0x7D && it % 2 == 1 })
-            require(allowedCommunicationControls.all { (type, communication) -> type in 0..3 && communication in 0..0xFF })
-            require(allowedDtcSettingTypes.all { it in 1..2 })
-            require(allowedDtcGroups.all { it in 0..0xFFFFFF })
-            require(allowedEcuResetTypes.all { it in 1..0x7F })
+            require(listOf(expectedCalId, expectedCvn, expectedControllerFamily,
+                    expectedHardwarePartNumber, expectedOperatingSystemId,
+                    identity.calibrationId, identity.calibrationVerificationNumber,
+                    identity.controllerFamily, identity.hardwarePartNumber,
+                    identity.operatingSystemId).all(::validEcuIdentifier)) {
+                "Placeholder or invalid ECU identity cannot authorize programming."
+            }
+            // A free-text document reference is useful for diagnostics, but
+            // it is not a manufacturer unlock mechanism or a condition of the
+            // on-wire UDS protocol. Do not turn it into another authorization key.
+            // Freeze *before* validating: source collections may be mutable and
+            // must not be able to widen later, even via their nested map sets.
+            val safeReadDids = frozenSet(readDids)
+            val safeWriteDids = frozenSet(writeDids)
+            val safeSessions = frozenSet(allowedSessions)
+            val safeRoutineControls = frozenMapOfSets(routineControlPermissions)
+            val safeIoControls = frozenMapOfSets(ioControlPermissions)
+            val safeSecurityLevels = frozenSet(allowedSecurityLevels)
+            val safeCommunicationControls = frozenSet(allowedCommunicationControls)
+            val safeDtcSettings = frozenSet(allowedDtcSettingTypes)
+            val safeDtcGroups = frozenSet(allowedDtcGroups)
+            val safeEcuResets = frozenSet(allowedEcuResetTypes)
+            val safeReadableRegions = frozenList(readableMemoryRegions)
+            val safeWritableRegions = frozenList(writableMemoryRegions)
+            require(safeReadDids.all { it in 0..0xFFFF } &&
+                safeWriteDids.all { it in 0..0xFFFF })
+            require(safeSessions.isNotEmpty() && safeSessions.all { it in 1..0x7F })
+            require(safeRoutineControls.all { (id, types) -> id in 0..0xFFFF && types.isNotEmpty() && types.all { it in 1..3 } })
+            require(safeIoControls.all { (id, types) -> id in 0..0xFFFF && types.isNotEmpty() && types.all { it in 0..0xFF } })
+            require(safeSecurityLevels.all { it in 1..0x7D && it % 2 == 1 })
+            require(safeCommunicationControls.all { (type, communication) -> type in 0..3 && communication in 0..0xFF })
+            require(safeDtcSettings.all { it in 1..2 })
+            require(safeDtcGroups.all { it in 0..0xFFFFFF })
+            require(safeEcuResets.all { it in 1..0x7F })
             require(maxTransferBytes >= 0)
+            val mutatingCapabilitiesGranted = safeWriteDids.isNotEmpty() ||
+                safeWritableRegions.isNotEmpty() || safeRoutineControls.isNotEmpty() ||
+                safeIoControls.isNotEmpty() || safeCommunicationControls.isNotEmpty() ||
+                safeDtcSettings.isNotEmpty() || safeDtcGroups.isNotEmpty() ||
+                safeEcuResets.isNotEmpty()
+            // OEM-dependent: only require a seed/key when this ECU's actual
+            // protocol demands SecurityAccess. Do not manufacture a universal
+            // CamaroDiag key requirement for every state-changing operation.
+            require(!mutatingCapabilitiesGranted || !requireSecurityAccess ||
+                safeSecurityLevels.isNotEmpty()) {
+                "This ECU requires SecurityAccess, but no supported seed/key level is configured."
+            }
             return UdsAccessPolicy(
-                readDids, writeDids, allowedSessions, routineControlPermissions, ioControlPermissions,
-                allowedSecurityLevels, allowedCommunicationControls, allowedDtcSettingTypes,
-                allowedDtcGroups, allowedEcuResetTypes, readableMemoryRegions, writableMemoryRegions,
+                safeReadDids, safeWriteDids, safeSessions, safeRoutineControls, safeIoControls,
+                safeSecurityLevels, safeCommunicationControls, safeDtcSettings,
+                safeDtcGroups, safeEcuResets, safeReadableRegions, safeWritableRegions,
                 maxTransferBytes, requireSecurityAccess, evidenceReference
             )
         }
@@ -142,6 +208,10 @@ class UdsClient private constructor(
         timeoutMs: Long = 3000L
     ) : this(payloadTransport, policy, timeoutMs, true)
 
+    init {
+        require(timeoutMs in 1..30_000L) { "UDS timeout must be between 1 and 30000 ms." }
+    }
+
     private var activeSession = 0x01
     private val requestedSecuritySeeds = mutableSetOf<Int>()
     private var securityUnlocked = false
@@ -155,7 +225,13 @@ class UdsClient private constructor(
     suspend fun diagnosticSessionControl(session: Int): ByteArray {
         require(session in policy.allowedSessions) { "Diagnostic session is not allowed by the verified ECU profile." }
         val response = request(0x10, byteArrayOf(session.toByte()))
-        require(response.size >= 2 && (response[1].toInt() and 0x7F) == session) {
+        // ISO 14229 positive session response: SID + echoed subfunction,
+        // optionally followed by the complete four-byte P2/P2* timing tuple.
+        // A partial timing tuple cannot authorize later security/write calls.
+        require(response.size == 2 || response.size == 6) {
+            "ECU returned a truncated or overlong diagnostic session acknowledgement."
+        }
+        require((response[1].toInt() and 0xFF) == session) {
             "ECU did not echo the requested diagnostic session."
         }
         activeSession = session
@@ -250,7 +326,9 @@ class UdsClient private constructor(
     suspend fun requestSecuritySeed(level: Int): ByteArray {
         require(level in policy.allowedSecurityLevels) { "Security level is not allowlisted for this ECU." }
         require(level in 1..0x7D && level % 2 == 1)
-        require(activeSession != 0x01) { "Security access requires a non-default diagnostic session." }
+        require(activeSession in policy.allowedSessions) {
+            "SecurityAccess is not available in the configured ECU session."
+        }
         val response = request(0x27, byteArrayOf(level.toByte()))
         require(response.size >= 2 && (response[1].toInt() and 0x7F) == level)
         requestedSecuritySeeds += level
@@ -306,9 +384,17 @@ class UdsClient private constructor(
         requireSecurityIfConfigured()
         // ISO 14229 ALFI: upper nibble = memory size width, lower nibble = address width.
         val format = sizeLength shl 4 or addressLength
-        val requestData = byteArrayOf(format.toByte()) + encodeUnsigned(address, addressLength) +
-            encodeUnsigned(data.size.toLong(), sizeLength) + data
-        request(0x3D, requestData)
+        val addressAndLength = byteArrayOf(format.toByte()) +
+            encodeUnsigned(address, addressLength) +
+            encodeUnsigned(data.size.toLong(), sizeLength)
+        val response = request(0x3D, addressAndLength + data)
+        // ISO 14229 WriteMemoryByAddress (0x3D) requires the ECU to echo
+        // ALFID, the exact memory address, and the exact memory size.
+        // An uncorrelated 0x7D alone cannot prove this request was accepted.
+        require(response.size == addressAndLength.size + 1 &&
+            response.copyOfRange(1, response.size).contentEquals(addressAndLength)) {
+            "ECU did not acknowledge the requested memory address and size."
+        }
     }
 
     suspend fun requestDownload(address: Long, size: Long, dataFormatIdentifier: Int = 0, addressLength: Int = 4, sizeLength: Int = 4) {
@@ -330,7 +416,9 @@ class UdsClient private constructor(
         // ISO 14229 lengthFormatIdentifier: upper nibble declares block-length bytes.
         val lengthBytes = lengthFormat ushr 4
         require(lengthFormat and 0x0F == 0) { "Reserved LFI bits must be zero." }
-        require(lengthBytes in 1..4 && response.size >= 2 + lengthBytes)
+        require(lengthBytes in 1..4 && response.size == 2 + lengthBytes) {
+            "ECU transfer block length response is truncated or contains unexpected bytes."
+        }
         val maxBlockLength = readUnsigned(response, 2, lengthBytes)
         require(maxBlockLength in 3L..4095L) { "ECU block length exceeds supported UDS framing." }
         downloadMaxBlockLength = maxBlockLength.toInt()
@@ -369,7 +457,9 @@ class UdsClient private constructor(
         val lengthFormat = response[1].toInt() and 0xFF
         val lengthBytes = lengthFormat ushr 4
         require(lengthFormat and 0x0F == 0) { "Reserved LFI bits must be zero." }
-        require(lengthBytes in 1..4 && response.size >= 2 + lengthBytes)
+        require(lengthBytes in 1..4 && response.size == 2 + lengthBytes) {
+            "ECU transfer block length response is truncated or contains unexpected bytes."
+        }
         val maxBlockLength = readUnsigned(response, 2, lengthBytes)
         require(maxBlockLength in 3L..4095L) { "ECU block length exceeds supported UDS framing." }
         downloadMaxBlockLength = maxBlockLength.toInt()
@@ -457,8 +547,10 @@ class UdsClient private constructor(
     }
 
     private fun requireProgrammingSession() {
-        require(activeSession != 0x01 && activeSession in policy.allowedSessions) {
-            "A verified non-default diagnostic session is required for this operation."
+        // Session 0x01 is valid for writes on some ECU implementations.
+        // The target ECU itself decides which services its active session accepts.
+        require(activeSession in policy.allowedSessions) {
+            "The selected ECU session is not supported by this protocol profile."
         }
     }
 

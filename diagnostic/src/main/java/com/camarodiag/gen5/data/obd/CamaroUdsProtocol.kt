@@ -31,16 +31,16 @@ object CamaroUdsProtocol {
         // Select STN-only monitor commands only when the adapter's firmware response
         // identifies an STN chipset. A Bluetooth name or the OBDLink product banner is
         // not sufficient: some adapters expose ELM-compatible firmware instead.
-        val isStn = stiResp.contains("STN", ignoreCase = true) ||
-            atzResp.contains("STN", ignoreCase = true)
+        val isStn = hasStnFirmwareBanner(stiResp) ||
+            hasStnFirmwareBanner(atzResp)
 
         // STP 61 alone is not proof of DLC pin-1 wiring. MX/MX+ are explicitly listed by the adapter maker as SW-CAN capable.
         val normalizedDeviceName = deviceName.uppercase(Locale.ROOT)
         val verifiedObdLinkMxHardware = normalizedDeviceName.contains("OBDLINK MX+") ||
             Regex("\\bOBDLINK MX\\b").containsMatchIn(normalizedDeviceName)
         val supportsSwCan = (swCanWiringVerified || verifiedObdLinkMxHardware) && isStn &&
-            stp61Resp.contains("OK", ignoreCase = true)
-        val supportsLong = atalResp.contains("OK", ignoreCase = true)
+            hasStandaloneOk(stp61Resp)
+        val supportsLong = hasStandaloneOk(atalResp)
 
         val tier = when {
             isStn -> AdapterTier.PRO_STN
@@ -55,11 +55,35 @@ object CamaroUdsProtocol {
             firmwareId = if (stiResp.isNotBlank() && !stiResp.contains("?")) stiResp else atzResp,
             supportsLongFrames = supportsLong,
             supportsSwCan = supportsSwCan,
-            supportsCanHeaders = headersResp.contains("OK", ignoreCase = true) &&
-                protocolResp.contains("OK", ignoreCase = true),
+            supportsCanHeaders = hasStandaloneOk(headersResp) &&
+                hasStandaloneOk(protocolResp),
             rawProbeLog = logs,
             supportsCanTransmit = hasPositiveMode01Pid00Response(transmitProbeResp)
         )
+    }
+
+    /** STN status must be a real firmware banner, never an arbitrary substring. */
+    private fun hasStnFirmwareBanner(response: String): Boolean {
+        val banner = Regex("^STN[0-9]{4}(?:\\s+v[0-9]+(?:\\.[0-9]+){1,3})?$", RegexOption.IGNORE_CASE)
+        return response.lineSequence().any { banner.matches(it.trim()) }
+    }
+
+    /** Accept an adapter's isolated OK acknowledgement, not substrings such
+     * as NOT OK or NOK in its diagnostic chatter. Echoes and prompts are allowed. */
+    private fun hasStandaloneOk(response: String): Boolean {
+        // The final non-prompt status must be OK; a stale OK followed by
+        // ERROR, NO DATA or another rejection is not a capability grant.
+        val lines = response.lineSequence()
+            .map { it.trim().removeSuffix(">").trim() }
+            .filter(String::isNotEmpty)
+            .toList()
+        return lines.lastOrNull()?.equals("OK", ignoreCase = true) == true &&
+            lines.none { line ->
+                line.equals("ERROR", ignoreCase = true) ||
+                    line.equals("NO DATA", ignoreCase = true) ||
+                    line.equals("?", ignoreCase = true) ||
+                    line.equals("UNABLE TO CONNECT", ignoreCase = true)
+            }
     }
 
     /**
@@ -69,7 +93,7 @@ object CamaroUdsProtocol {
      */
     private fun hasPositiveMode01Pid00Response(response: String): Boolean {
         val responseLine = Regex(
-            "^(?:(?:[0-9A-F]{3}|[0-9A-F]{8}))?(?:06)?4100[0-9A-F]{8}$"
+            "^(?:(?:7E[8-F]|18DAF1[0-9A-F]{2}))?(?:06)?4100[0-9A-F]{8}$"
         )
         return response.lineSequence().any { line ->
             val compact = line.uppercase(Locale.ROOT).replace(Regex("[^0-9A-F]"), "")
@@ -162,14 +186,111 @@ object CamaroUdsProtocol {
         }
     }
 
-    fun parsePidBytes(response: String, pid: String): IntArray? {
-        val cleaned = response.uppercase().replace(Regex("[^0-9A-F]"), "")
-        val marker = "41${pid.uppercase().padStart(2, '0')}"
-        val index = cleaned.indexOf(marker)
-        if (index < 0) return null
-        val payload = cleaned.substring(index + marker.length)
-        if (payload.length < 2 || payload.length % 2 != 0) return null
-        return runCatching { payload.chunked(2).map { it.toInt(16) }.toIntArray() }.getOrNull()
+    /**
+     * Only interpret a complete, single-line positive Mode 01 response.
+     * Adapter banners, echoed requests and neighbouring ECU replies cannot
+     * contribute bytes to a sensor or an odometer calculation.
+     */
+    fun parsePidBytes(
+        response: String,
+        pid: String,
+        primaryPowertrainResponderOnly: Boolean = false
+    ): IntArray? {
+        val pidHex = pid.trim().uppercase(Locale.ROOT).padStart(2, '0')
+        if (!Regex("[0-9A-F]{2}").matches(pidHex)) return null
+        val expectedPid = pidHex.toInt(16)
+        val hexPairData = Regex("(?:[0-9A-F]{2}){3,10}")
+        // A Mode 01 reply must use a documented OBD responder header, not
+        // arbitrary three hex characters that could be adapter chatter.
+        val canHeader = Regex("(?:7E[8-F]|18DAF1[0-9A-F]{2})")
+        for (sourceLine in response.lineSequence()) {
+            val line = sourceLine.trim().removeSuffix(">").trimEnd().uppercase(Locale.ROOT)
+            if (line.isEmpty()) continue
+            val parts = line.split(Regex("\\s+"))
+            val responder = when {
+                parts.size > 1 && canHeader.matches(parts[0]) -> parts[0]
+                parts.size == 1 && line.length % 2 == 1 &&
+                    canHeader.matches(line.take(3)) -> line.take(3)
+                parts.size == 1 && line.length >= 14 && line.length % 2 == 0 &&
+                    canHeader.matches(line.take(8)) -> line.take(8)
+                else -> null
+            }
+            // When physical CAN headers are available, never attribute another
+            // ECU's response to primary powertrain telemetry. Headerless ELM
+            // output still depends on the adapter's selected OBD channel.
+            if (primaryPowertrainResponderOnly && responder != null &&
+                responder !in setOf("7E8", "18DAF110")) continue
+            val data = when {
+                parts.size > 1 && canHeader.matches(parts[0]) ->
+                    parts.drop(1).joinToString("")
+                // 11-bit (3 hex chars) or 29-bit (8 hex chars) CAN
+                // responder header without spacing, never an arbitrary prefix.
+                parts.size == 1 && line.length % 2 == 1 &&
+                    canHeader.matches(line.take(3)) -> line.drop(3)
+                parts.size == 1 && line.length >= 14 &&
+                    line.length % 2 == 0 && canHeader.matches(line.take(8)) ->
+                    line.drop(8)
+                else -> parts.joinToString("")
+            }
+            if (!hexPairData.matches(data)) continue
+            var bytes = data.chunked(2).map { it.toInt(16) }
+            if (bytes.first() != 0x41) {
+                val dlc = bytes.first()
+                if (dlc !in 1..8 || dlc != bytes.size - 1) continue
+                bytes = bytes.drop(1)
+            }
+            if (bytes.size < 3 || bytes[0] != 0x41 || bytes[1] != expectedPid) continue
+            // Apply the same exact SAE lengths as the read-only console and
+            // the physical J2534 bridge. An extra byte must never turn a
+            // malformed live sensor frame into an apparently valid reading.
+            val expectedLength = SafeObdRequestPolicy.expectedMode01DataBytes(expectedPid)
+            if (expectedLength != null && bytes.size != expectedLength + 2) continue
+            return bytes.drop(2).toIntArray()
+        }
+        return null
+    }
+
+    /**
+     * SAE J1979 PID 0x43 absolute load is not limited to 100%.
+     * Formula: (256*A + B) * 100/255; the maximum encoded value is 25700%.
+     */
+    fun decodeAbsoluteLoadPercent(bytes: IntArray?): Double? {
+        if (bytes?.size != 2 || bytes.any { it !in 0..255 }) return null
+        return ((bytes[0] shl 8) or bytes[1]) * 100.0 / 255.0
+    }
+
+    /** Commanded equivalence ratio PID 0x44 is (256*A + B) / 32768. */
+    fun decodeCommandedEquivalenceRatio(bytes: IntArray?): Double? {
+        if (bytes?.size != 2 || bytes.any { it !in 0..255 }) return null
+        return ((bytes[0] shl 8) or bytes[1]) / 32768.0
+    }
+
+    /**
+     * SAE wideband O2 PID 0x24..0x2B or 0x34..0x3B.
+     * A/B encode lambda (2/65535); C/D encode either voltage (8/65535 V)
+     * or signed current (1/256 mA offset by -128), depending on PID family.
+     * Scaling overrides advertised through PID 0x4F require separate handling.
+     */
+    fun decodeWidebandLambda(bytes: IntArray?): Double? {
+        if (bytes?.size != 4 || bytes.any { it !in 0..255 }) return null
+        return ((bytes[0] shl 8) or bytes[1]) * 2.0 / 65535.0
+    }
+
+    fun decodeWidebandVoltage(bytes: IntArray?): Double? {
+        if (bytes?.size != 4 || bytes.any { it !in 0..255 }) return null
+        return ((bytes[2] shl 8) or bytes[3]) * 8.0 / 65535.0
+    }
+
+    fun decodeWidebandCurrent(bytes: IntArray?): Double? {
+        if (bytes?.size != 4 || bytes.any { it !in 0..255 }) return null
+        return ((bytes[2] shl 8) or bytes[3]) / 256.0 - 128.0
+    }
+
+    /** SAE J1979 Mode 01 PID 0x52 returns exactly one unsigned ethanol byte. */
+    fun decodeEthanolPercent(bytes: IntArray?): Double? {
+        val raw = bytes?.singleOrNull() ?: return null
+        if (raw !in 0..255) return null
+        return raw * 100.0 / 255.0
     }
 
     fun parseOdometerPidA6(response: String): Double? = parseOdometerPid(response, "A6")
@@ -177,14 +298,12 @@ object CamaroUdsProtocol {
     fun parseOdometerPidD3(response: String): Double? = parseOdometerPid(response, "D3")
 
     private fun parseOdometerPid(response: String, pid: String): Double? {
-        val cleaned = response.uppercase().replace(Regex("[^0-9A-F]"), "")
-        val marker = cleaned.indexOf("41$pid")
-        if (marker < 0 || cleaned.length < marker + 12) return null
-        return runCatching {
-            val raw = cleaned.substring(marker + 4, marker + 12).toLong(16)
-            raw / 10.0
-        }.getOrNull()
+        val bytes = parsePidBytes(response, pid) ?: return null
+        // The four-byte definition is required; a truncated or concatenated
+        // reply must never become a plausible vehicle mileage reading.
+        if (bytes.size != 4) return null
+        val value = bytes.fold(0L) { acc, byte -> (acc shl 8) or byte.toLong() }
+        return value / 10.0
     }
-
 
 }

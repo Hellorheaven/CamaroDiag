@@ -1055,4 +1055,95 @@ class CanTraceAnalyzerTest {
         val report = CanTraceAnalyzer.analyze("id,data\n7E8,020x4100\n7E9,0x\n7EA,0x02 0X41 00", "capture.csv")
         assertEquals(0x7EA, report.frames.single().canId)
     }
+
+    @Test
+    fun separatesSameNumericCanIdByElevenAndTwentyNineBitFormatDuringIsoTpReassembly() {
+        val log = listOf(
+            "7E8 08 10 0A 62 F1 90 31 32 33",
+            "000007E8 05 21 34 35 36 37", // Must NOT complete the 11-bit message.
+            "7E8 05 21 34 35 36 37",
+            "000007E8 08 10 0A 62 F1 90 41 42 43",
+            "000007E8 05 21 44 45 46 47"
+        ).joinToString("\n")
+        val report = CanTraceAnalyzer.analyze(log, "mixed-can-width.log")
+        assertEquals(listOf(false, true, false, true, true),
+            report.frames.map { it.extendedId })
+        assertEquals(2, report.messages.size)
+        assertEquals(setOf(false, true), report.messages.map { it.extendedId }.toSet())
+        assertTrue(report.messages.any { !it.extendedId!! &&
+            it.payload.takeLast(4) == listOf(0x34, 0x35, 0x36, 0x37) })
+        assertTrue(report.messages.any { it.extendedId!! &&
+            it.payload.takeLast(4) == listOf(0x44, 0x45, 0x46, 0x47) })
+        assertTrue(report.errors.any { it.contains("no matching first frame") })
+    }
+
+    @Test
+    fun recognizesVectorAscExtendedIdentifierMarkerEvenForThreeHexDigits() {
+        val report = CanTraceAnalyzer.analyze(
+            "0.000000 1 7E8x Rx d 4 03 62 F1 90\n" +
+            "0.000001 1 7E8 Rx d 4 03 62 F1 90", "format.asc"
+        )
+        assertEquals(2, report.frames.size)
+        assertEquals(listOf(true, false), report.frames.map { it.extendedId })
+        assertEquals(listOf(true, false), report.messages.map { it.extendedId })
+    }
+
+    @Test
+    fun cannotCorrelateObdReplyAcrossElevenAndTwentyNineBitBusFormats() {
+        val trace = listOf(
+            "0.000000 1 7E0 Tx d 8 02 01 0C 00 00 00 00 00",
+            "0.010000 1 000007E8x Rx d 8 04 41 0C 1A F8 00 00 00",
+            "0.020000 1 7E8 Rx d 8 04 41 0C 1A F8 00 00 00"
+        ).joinToString("\n")
+        val report = CanTraceAnalyzer.analyze(trace, "obd-mixed-can-formats.asc")
+        assertEquals(listOf(false, true, false), report.frames.map { it.extendedId })
+        assertEquals(1, report.exchanges.size)
+        val exchange = report.exchanges.single()
+        assertEquals(UdsExchangeStatus.COMPLETED, exchange.status)
+        assertEquals(1, exchange.responses.size)
+        assertEquals(false, exchange.responses.single().extendedId)
+        assertEquals(20.0, exchange.elapsedMilliseconds!!, 0.001)
+    }
+
+    @Test
+    fun extendedIdentifiersWithObdLikeNumericValuesAreNotStandardObdChannels() {
+        val trace = listOf(
+            "0.000000 1 000007E0x Tx d 8 02 01 0C 00 00 00 00 00",
+            "0.020000 1 000007E8x Rx d 8 04 41 0C 1A F8 00 00 00"
+        ).joinToString("\n")
+        val report = CanTraceAnalyzer.analyze(trace, "extended-not-standard-obd.asc")
+        assertEquals(listOf(true, true), report.messages.map { it.extendedId })
+        assertEquals(1, report.exchanges.size)
+        assertEquals(UdsExchangeStatus.UNANSWERED, report.exchanges.single().status)
+        assertTrue(report.exchanges.single().responses.isEmpty())
+    }
+
+    @Test
+    fun physicalTwentyNineBitExchangeUsesOnlyTheAddressedResponder() {
+        val trace = listOf(
+            "0.000000 1 18DA10F1x Tx d 8 03 22 F1 90 00 00 00 00",
+            "0.010000 1 18DAF111x Rx d 8 04 62 F1 90 01 00 00 00",
+            "0.020000 1 18DAF110x Rx d 8 04 62 F1 90 02 00 00 00"
+        ).joinToString("\n")
+        val report = CanTraceAnalyzer.analyze(trace, "physical-29-bit.asc")
+        assertEquals(listOf(true, true, true), report.frames.map { it.extendedId })
+        assertEquals(1, report.exchanges.size)
+        val exchange = report.exchanges.single()
+        assertEquals(UdsExchangeStatus.COMPLETED, exchange.status)
+        assertEquals(0x18DAF110, exchange.responses.single().canId)
+        assertEquals(true, exchange.responses.single().extendedId)
+        assertEquals(20.0, exchange.elapsedMilliseconds!!, 0.001)
+        assertEquals(3, report.frames.size) // Unrelated ECU is still visible.
+    }
+
+    @Test
+    fun physicalTwentyNineBitRequestCannotUseAnotherEcUsResponse() {
+        val trace = listOf(
+            "0.000000 1 18DA10F1x Tx d 8 03 22 F1 90 00 00 00 00",
+            "0.010000 1 18DAF111x Rx d 8 04 62 F1 90 01 00 00 00"
+        ).joinToString("\n")
+        val exchange = CanTraceAnalyzer.analyze(trace, "wrong-29-bit-ecu.asc").exchanges.single()
+        assertEquals(UdsExchangeStatus.UNANSWERED, exchange.status)
+        assertTrue(exchange.responses.isEmpty())
+    }
 }

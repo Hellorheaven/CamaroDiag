@@ -1,0 +1,11 @@
+C6 grouped retry after #45274227208 — 2026-11-23
+Source HEAD before gate request: f11670edad938def4b187c3ed6fe3fc652ef53a5.
+Previous job: Windows/J2534 success, Android 574 tests and 2 failures.
+Resolved C6 test count: ed26b75; C1 failed-flush handling: 85d031d, ae5b9b6.
+Raw CAN console double-confirmation now carries a real approval from the UI
+to the live transport and rechecks operator/account/adapter/vehicle/console
+at physical CAN payload TX: 8b475e0, 78e5530, 20365b5.
+Existing DTC clear J2534 / ELM at-TX authorization checks preserved.
+Run this C6 Android communication, diagnostic and app suite plus Windows
+Debug -warnaserror/self-tests ONCE; do not merge, release or claim ECU validation.
+Report any failing test by name. No artificial programming keys/service bans.

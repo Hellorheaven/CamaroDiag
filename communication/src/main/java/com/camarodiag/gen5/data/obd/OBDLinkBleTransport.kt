@@ -16,6 +16,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.selects.select
 import java.util.UUID
 
@@ -40,12 +41,20 @@ internal class OBDLinkBleTransport(private val context: Context) {
     val isConnected: Boolean
         get() = gatt != null && connectionFailure == null
 
-    private val incoming = Channel<ByteArray>(Channel.UNLIMITED)
+    // Fixed upper bound: an unexpectedly chatty adapter must never exhaust
+    // the Android process heap while the UI pauses consumption.
+    private val incoming = BleNotificationBuffer()
     private var pending = ByteArray(0)
     @Volatile private var connectionFailure: Throwable? = null
 
     private var connectResult: CompletableDeferred<Unit>? = null
     private var writeResult: CompletableDeferred<Unit>? = null
+    /**
+     * One GATT handshake at a time. Without this lock, a delayed failure from
+     * a superseded connect() could call close() against the newly selected
+     * BLE adapter and clear its notification or write state.
+     */
+    private val connectionMutex = Mutex()
     /** Serializes GATT writes so callbacks cannot complete the wrong operation. */
     private val writeMutex = Mutex()
     /** Only one reader may consume the shared response buffer at a time. */
@@ -136,19 +145,23 @@ internal class OBDLinkBleTransport(private val context: Context) {
         }
 
         override fun onDescriptorWrite(g: BluetoothGatt, descriptor: BluetoothGattDescriptor, status: Int) {
-            if (g !== gatt) return
+            if (g !== gatt || !BleGattCallbackPolicy.isExpectedNotificationDescriptor(
+                    descriptor.uuid, descriptor.characteristic?.uuid
+                )) return
+            // An unrelated descriptor callback must never make the serial
+            // UART connection appear ready to send vehicle requests.
             if (status == BluetoothGatt.GATT_SUCCESS) connectResult?.complete(Unit)
             else connectResult?.completeExceptionally(IllegalStateException("BLE notification subscription failed ($status)"))
         }
 
         override fun onMtuChanged(g: BluetoothGatt, mtu: Int, status: Int) {
             if (g !== gatt) return
-            if (status == BluetoothGatt.GATT_SUCCESS) mtuPayload = (mtu - 3).coerceAtLeast(20)
+            if (status == BluetoothGatt.GATT_SUCCESS) mtuPayload = BleGattCallbackPolicy.payloadForMtu(mtu)
             mtuResult?.complete(Unit)
         }
 
         override fun onCharacteristicWrite(g: BluetoothGatt, characteristic: BluetoothGattCharacteristic, status: Int) {
-            if (g !== gatt) return
+            if (g !== gatt || characteristic.uuid != writeUuid) return
             if (status == BluetoothGatt.GATT_SUCCESS) writeResult?.complete(Unit)
             else writeResult?.completeExceptionally(IllegalStateException("BLE write failed ($status)"))
         }
@@ -156,7 +169,7 @@ internal class OBDLinkBleTransport(private val context: Context) {
         override fun onCharacteristicChanged(g: BluetoothGatt, characteristic: BluetoothGattCharacteristic) {
             if (g !== gatt) return
             if (characteristic.uuid == notifyUuid) {
-                readLegacyNotificationValue(characteristic)?.let { incoming.trySend(it) }
+                readLegacyNotificationValue(characteristic)?.let { enqueueNotification(g, it) }
             }
         }
 
@@ -166,27 +179,46 @@ internal class OBDLinkBleTransport(private val context: Context) {
             value: ByteArray
         ) {
             if (g !== gatt) return
-            if (characteristic.uuid == notifyUuid) incoming.trySend(value.copyOf())
+            if (characteristic.uuid == notifyUuid) enqueueNotification(g, value)
         }
     }
 
-    suspend fun connect(device: BluetoothDevice): Result<Unit> {
-        return try {
-            close()
-            connectionFailure = null
-            connectResult = CompletableDeferred()
-            gatt = device.connectGatt(context, false, callback, BluetoothDevice.TRANSPORT_LE)
-                ?: throw IllegalStateException("Unable to create BLE connection")
-            withTimeout(15_000) { connectResult!!.await() }
-            mtuResult = CompletableDeferred()
-            gatt?.requestMtu(247)
-            withTimeoutOrNull(3_000) { mtuResult?.await() }
-            Result.success(Unit)
-        } catch (e: Exception) {
-            close()
-            Result.failure(e)
+    private fun enqueueNotification(session: BluetoothGatt, bytes: ByteArray) {
+        if (gatt !== session) return
+        if (!incoming.offer(bytes)) {
+            // Dropping a byte from an ELM serial response changes its meaning.
+            // Retire the transport instead of silently truncating the stream.
+            invalidateSession(session, ObdTransportDisconnectedException(
+                "OBDLink BLE receive buffer full or invalid notification"
+            ))
         }
     }
+
+    suspend fun connect(device: BluetoothDevice): Result<Unit> =
+        connectionMutex.withLock {
+            try {
+                close()
+                connectionFailure = null
+                connectResult = CompletableDeferred()
+                gatt = device.connectGatt(context, false, callback, BluetoothDevice.TRANSPORT_LE)
+                    ?: throw IllegalStateException("Unable to create BLE connection")
+                withTimeout(15_000) { connectResult!!.await() }
+                mtuResult = CompletableDeferred()
+                gatt?.requestMtu(247)
+                withTimeoutOrNull(3_000) { mtuResult?.await() }
+                Result.success(Unit)
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                close()
+                // A cancelled adapter switch must propagate to the ViewModel.
+                // A timeout started by this BLE handshake, however, leaves the
+                // caller job active and is a normal connection failure.
+                if (!kotlinx.coroutines.currentCoroutineContext().isActive) throw cancelled
+                Result.failure(cancelled)
+            } catch (e: Exception) {
+                close()
+                Result.failure(e)
+            }
+        }
 
     suspend fun write(data: ByteArray) = writeMutex.withLock {
         var writeSession: BluetoothGatt? = null
@@ -308,7 +340,7 @@ internal class OBDLinkBleTransport(private val context: Context) {
                                 cause
                             )
                         }
-                        incoming.onReceive { it }
+                        incoming.packets.onReceive { it }
                     }
                 } ?: run {
                     if (gatt !== readSession) {
@@ -350,21 +382,25 @@ internal class OBDLinkBleTransport(private val context: Context) {
     }
 
     fun close() {
+        // Detach before invoking Bluetooth API teardown. Some vendor stacks
+        // deliver synchronous disconnect/descriptor callbacks from disconnect()
+        // or close(); none may mutate a replacement session's state.
+        val closingGatt = gatt
+        gatt = null
         // Wake readers without enqueuing a fake packet that a new session could consume.
         val closed = ObdTransportDisconnectedException("OBDLink BLE session was closed")
         readWakeup.signal(closed)
         connectResult?.completeExceptionally(closed)
         writeResult?.completeExceptionally(closed)
         mtuResult?.completeExceptionally(closed)
-        try { gatt?.disconnect() } catch (_: Exception) {}
-        try { gatt?.close() } catch (_: Exception) {}
-        gatt = null
+        try { closingGatt?.disconnect() } catch (_: Exception) {}
+        try { closingGatt?.close() } catch (_: Exception) {}
         writeCharacteristic = null
         characteristicWriteType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
         // A new GATT session starts at the default ATT MTU until negotiation succeeds.
         mtuPayload = 20
         pending = ByteArray(0)
-        while (incoming.tryReceive().isSuccess) { }
+        incoming.clear()
         connectResult = null
         writeResult = null
         connectionFailure = null
@@ -372,6 +408,43 @@ internal class OBDLinkBleTransport(private val context: Context) {
     }
 }
 
+
+/**
+ * Bounded loss-intolerant BLE serial receive buffer.
+ * 128 packets * at most 514 bytes (maximum ATT payload at MTU 517) keeps
+ * pending notifications under 65 KiB. Full queues fail closed: dropping bytes
+ * and continuing would silently corrupt diagnostics or a command response.
+ */
+internal class BleNotificationBuffer(
+    capacity: Int = 128
+) {
+    init { require(capacity in 1..1024) }
+    val packets = Channel<ByteArray>(capacity)
+
+    fun offer(bytes: ByteArray): Boolean =
+        bytes.isNotEmpty() && bytes.size <= 514 &&
+            packets.trySend(bytes.copyOf()).isSuccess
+
+    fun clear() {
+        while (packets.tryReceive().isSuccess) { }
+    }
+}
+
+/**
+ * BLE GATT callback correlation for the selected UART service. Android may
+ * deliver callbacks for other descriptors or GATT characteristics on the same
+ * connection; those callbacks must not complete the OBD serial handshake.
+ */
+internal object BleGattCallbackPolicy {
+    private val cccd = UUID.fromString("00002902-0000-1000-8000-00805F9B34FB")
+    private val uartNotify = UUID.fromString("0000FFF1-0000-1000-8000-00805F9B34FB")
+    fun isExpectedNotificationDescriptor(descriptor: UUID?, characteristic: UUID?): Boolean =
+        descriptor == cccd && characteristic == uartNotify
+
+    /** BLE ATT MTU is 23..517 bytes; invalid driver values keep the default. */
+    fun payloadForMtu(mtu: Int): Int =
+        if (mtu in 23..517) (mtu - 3).coerceIn(20, 514) else 20
+}
 
 /** One-shot wakeup for the single active BLE reader; signals are never queued across sessions. */
 internal class ObdReadWakeup {

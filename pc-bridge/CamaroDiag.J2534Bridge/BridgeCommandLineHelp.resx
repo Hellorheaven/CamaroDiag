@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms</value></resheader>
+  <data name="HelpText" xml:space="preserve"><value>CamaroDiag Windows J2534 Bridge — command line
+Run without arguments to open the graphical interface.
+
+Usage:
+  CamaroDiag.J2534Bridge.exe --help
+  CamaroDiag.J2534Bridge.exe --list-ports
+  CamaroDiag.J2534Bridge.exe --self-test
+  CamaroDiag.J2534Bridge.exe --probe-drivers
+  CamaroDiag.J2534Bridge.exe --discover-connector COM5
+  CamaroDiag.J2534Bridge.exe --inspect-connector-checkpoint checkpoint.bin
+  CamaroDiag.J2534Bridge.exe --inspect-write-journal attempt.jsonl
+  CamaroDiag.J2534Bridge.exe --inspect-e39-image original-3MiB.bin
+  CamaroDiag.J2534Bridge.exe --port 35001
+  CamaroDiag.J2534Bridge.exe --port 35001 --memory-read-profile profile.json
+  CamaroDiag.J2534Bridge.exe --port 35001 --allow-obd-clear
+  CamaroDiag.J2534Bridge.exe --doip-discover --host 192.0.2.10 --timeout-ms 1500
+  CamaroDiag.J2534Bridge.exe --doip-discover --listen true --listen-ipv6-ifindex 3
+  CamaroDiag.J2534Bridge.exe --doip-discover --multicast-ipv6-ifindex 3
+  CamaroDiag.J2534Bridge.exe --doip-discover --broadcast-ip 192.168.1.255
+  CamaroDiag.J2534Bridge.exe --doip-discover --host 192.0.2.10 --vin 1G1FA1RXXR0123456
+  CamaroDiag.J2534Bridge.exe --doip-status --host 192.0.2.10 --doip-version 3
+  CamaroDiag.J2534Bridge.exe --doip-exchange --host 192.0.2.10 --tester 0E80 --ecu 1234 --payload 22F190 --uds-p2-ms 100 --uds-p2-star-ms 2000
+
+Examples:
+  --self-test                 Software simulation only. No ECU or adapter.
+  --probe-drivers             Inspect installed Windows J2534 drivers; no ECU.
+  --discover-connector COM5   USB serial CD/1 discovery only, isolated prototype.
+  --inspect-write-journal attempt.jsonl
+                              Inspect an offline write journal; never recover or erase.
+  --port 35001                Start the TLS-paired LAN bridge using a selected J2534 driver.
+                              It may check for app updates; never forward the LAN port to the Internet.
+  --allow-obd-clear           Explicitly enable OBD DTC clear on this local bridge run.
+                              The Android user must also confirm OK then YES.
+  --doip-discover             ISO 13400 gateway identity over UDP, not ECU authentication.
+                              --host unicast IPv4/IPv6, --broadcast-ip IPv4,
+                              --listen true passive; IPv6 ff02::1 uses an explicit
+                              --listen-ipv6-ifindex (passive) or --multicast-ipv6-ifindex
+                              (one ACTIVE UDP identity request). Replace interface 3
+                              with the known link-local interface; never guess it.
+                              --vin or --eid filters discoveries; not both.
+                              Output includes version=0x02/0x03/0x04 as observed;
+                              verify gateway identity before selecting --doip-version.
+  --doip-status               Read entity status or --power-mode true over UDP.
+                              --doip-version 2, 3 or 4; version 255 is discovery-only.
+  --doip-exchange             TCP/TLS UDS diagnostic exchange: user-selected --host,
+                              --tester, --ecu and hex --payload; --tls true selects
+                              validated TLS with no plaintext fallback; P2/P2* flags
+                              control deadlines. May change ECU state: require the
+                              correct authorized identity and explicit consent.
+                              No OEM security bypass, flash recovery or vehicle tests.
+
+Use each option with the exact arguments described above. --help must be alone:
+mixing it with a programming command fails without contacting hardware.
+Raw UDS, flash and EEPROM operations are NOT enabled by this help.
+A simulated pass does not qualify the device on a real ECU.
+Linux x64/ARM64 bridge and matching CLI remain planned in issue #115.</value></data>
+</root>

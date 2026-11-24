@@ -15,10 +15,25 @@ import java.util.zip.ZipOutputStream
  */
 object EcuBackupArchive {
     private const val FORMAT_WITH_VIN = "CamaroDiag ECU offline archive v2"
+    private const val FORMAT_WITH_CHANNEL = "CamaroDiag ECU offline archive v3"
     private const val FORMAT = "CamaroDiag ECU offline archive v1"
     private const val MAX_ENTRIES = 128
     private const val MAX_REGION_BYTES = 64 * 1024 * 1024
     private const val MAX_ARCHIVE_BYTES = 256L * 1024 * 1024
+
+    /** J2534 0x23 portable records use a 32-bit address and at most one 16 MiB scope. */
+    internal fun isPortableJ2534Range(address: Long, length: Long): Boolean =
+        address in 0L..0xFFFF_FFFFL &&
+            length in 1L..(16L * 1024 * 1024) &&
+            address + length <= 0x1_0000_0000L
+
+    /**
+     * A Windows J2534 scoped capture may contain two separate 16 MiB reads.
+     * Include room for the manifest; an exact 32 MiB Android import cap
+     * rejected Windows' largest valid two-pass archive.
+     */
+    const val MAX_J2534_IMPORT_UNCOMPRESSED_BYTES =
+        2L * 16 * 1024 * 1024 + 64L * 1024
 
     /**
      * The import limit includes decompressed manifest bytes, not just payloads.
@@ -42,10 +57,33 @@ object EcuBackupArchive {
         requiredRegions: Set<EcuBackupCoverage.Region>,
         controllerLabel: String? = null,
         createdAtUtcMillis: Long = System.currentTimeMillis(),
-        vehicleVin: String? = null
+        vehicleVin: String? = null,
+        channel: EcuBackupManifest.Channel? = null,
+        firmwareEvidence: EcuBackupManifest.FirmwareEvidence? = null
     ) {
+        require(createdAtUtcMillis > 0L) { "Invalid ECU archive creation timestamp" }
         require(captures.isNotEmpty()) { "Cannot export an empty ECU backup" }
         require(captures.size <= MAX_ENTRIES) { "Too many memory segments" }
+        if (channel != null) {
+            // The portable Windows verifier understands one completely read
+            // physical scope, not an inferred full-ECU memory map. A v3 archive
+            // must not advertise complete coverage from a single approved span.
+            require(captures.size == 1 && requiredRegions.isEmpty()) {
+                "A physical J2534 archive must contain one scope with unknown ECU-wide coverage."
+            }
+            require(captures.all { isPortableJ2534Range(it.startAddress, it.expectedBytes) }) {
+                "A J2534 archive must contain one physically addressable 32-bit memory scope."
+            }
+            require(captures.all {
+                it.expectedBytes == it.firstRead.size.toLong() &&
+                    it.independentRead?.size?.toLong() == it.expectedBytes
+            }) { "A physical J2534 archive cannot publish incomplete double reads." }
+            require(controllerLabel == null ||
+                (controllerLabel.length <= 128 &&
+                    controllerLabel.none { Character.isISOControl(it) })) {
+                "Controller label is not compatible with the portable J2534 manifest."
+            }
+        }
         require(captures.all { it.firstRead.isNotEmpty() && it.expectedBytes > 0 &&
             it.startAddress >= 0 && it.startAddress <= Long.MAX_VALUE - it.expectedBytes &&
             it.firstRead.size.toLong() <= it.expectedBytes }) { "Invalid capture range" }
@@ -65,11 +103,28 @@ object EcuBackupArchive {
         // Reject inconsistent captures before writing any archive header or bytes.
         // In particular, two independent reads must agree, or the archive
         // would be rejected by the corresponding import validation.
-        val manifest = EcuBackupManifest.inspect(controllerLabel, createdAtUtcMillis, snapshots, requiredRegions, vehicleVin)
+        val manifest = EcuBackupManifest.inspect(
+            controllerLabel, createdAtUtcMillis, snapshots, requiredRegions,
+            vehicleVin, channel, firmwareEvidence
+        )
         val verification = EcuBackupIntegrity.verify(manifest, snapshots, requiredRegions)
         require(verification.consistent) { "Inconsistent backup captures: ${verification.problems}" }
         val properties = Properties()
-        properties.setProperty("format", if (vehicleVin == null) FORMAT else FORMAT_WITH_VIN)
+        properties.setProperty("format", when {
+            channel != null -> FORMAT_WITH_CHANNEL
+            vehicleVin != null -> FORMAT_WITH_VIN
+            else -> FORMAT
+        })
+        if (channel != null) {
+            properties.setProperty("channel.requestCanId", channel.requestCanId.toString())
+            properties.setProperty("channel.responseCanId", channel.responseCanId.toString())
+            properties.setProperty("channel.protocolNumber", channel.protocolNumber.toString())
+            properties.setProperty("channel.session", channel.diagnosticSession.toString())
+        }
+        if (firmwareEvidence != null) {
+            properties.setProperty("ecu.osId", firmwareEvidence.operatingSystemId.toString())
+            properties.setProperty("ecu.osDid", firmwareEvidence.osDid.toString())
+        }
         if (vehicleVin != null) properties.setProperty("vin", vehicleVin)
         properties.setProperty("controller", manifest.controllerLabel.orEmpty())
         properties.setProperty("created", createdAtUtcMillis.toString())
@@ -109,7 +164,10 @@ object EcuBackupArchive {
         require(maxUncompressedBytes in 1..MAX_ARCHIVE_BYTES) { "Invalid archive size limit" }
         val files = linkedMapOf<String, ByteArray>()
         var total = 0L
-        ZipInputStream(input).use { zip ->
+        // A stream containing intact local entries but no ZIP footer must
+        // never be reported as a complete ECU archive.
+        val compressed = EcuZipCompletionGuard(input, MAX_ARCHIVE_BYTES + 4L * 1024 * 1024)
+        ZipInputStream(compressed).use { zip ->
             while (true) {
                 val entry = zip.nextEntry ?: break
                 require(!entry.isDirectory) { "Unexpected archive directory" }
@@ -134,6 +192,7 @@ object EcuBackupArchive {
                 files[entry.name] = data.toByteArray()
                 zip.closeEntry()
             }
+            compressed.requireCompletedArchive(files.keys.toList())
         }
         val metadata = files.remove("manifest.properties")
             ?: throw IllegalArgumentException("Missing archive manifest")
@@ -150,13 +209,74 @@ object EcuBackupArchive {
                 require("vin" !in properties.stringPropertyNames()) { "Unexpected VIN in v1 archive" }
                 null
             }
-            FORMAT_WITH_VIN -> requireNotNull(properties.getProperty("vin")) { "Missing archive VIN" }
+            FORMAT_WITH_VIN, FORMAT_WITH_CHANNEL ->
+                requireNotNull(properties.getProperty("vin")) { "Missing archive VIN" }
             else -> throw IllegalArgumentException("Unsupported archive format")
         }
+        val channel = if (properties.getProperty("format") == FORMAT_WITH_CHANNEL) {
+            fun integer(name: String): Int {
+                val raw = properties.getProperty("channel.$name")
+                    ?: throw IllegalArgumentException("Missing ECU backup channel.$name")
+                val parsed = raw.toIntOrNull()
+                    ?: throw IllegalArgumentException("Invalid ECU backup channel.$name")
+                require(parsed.toString() == raw) { "Noncanonical channel.$name" }
+                return parsed
+            }
+            EcuBackupManifest.Channel(
+                requestCanId = integer("requestCanId"),
+                responseCanId = integer("responseCanId"),
+                protocolNumber = integer("protocolNumber"),
+                diagnosticSession = integer("session")
+            )
+        } else null
+        val firmwareEvidence = if (properties.getProperty("format") == FORMAT_WITH_CHANNEL &&
+            (properties.containsKey("ecu.osId") || properties.containsKey("ecu.osDid"))
+        ) {
+            fun canonicalLong(name: String): Long {
+                val raw = properties.getProperty(name)
+                    ?: throw IllegalArgumentException("Incomplete ECU firmware evidence.")
+                val parsed = raw.toLongOrNull()
+                    ?: throw IllegalArgumentException("Invalid ECU firmware evidence.")
+                require(parsed.toString() == raw) { "Noncanonical ECU firmware evidence." }
+                return parsed
+            }
+            val did = canonicalLong("ecu.osDid")
+            require(did in 0..255) { "Invalid ECU firmware DID." }
+            EcuBackupManifest.FirmwareEvidence(canonicalLong("ecu.osId"), did.toInt())
+        } else null
         val count = properties.getProperty("count")?.toIntOrNull()
         require(count != null && count in 1..MAX_ENTRIES) { "Invalid segment count" }
-        val required = properties.getProperty("required", "").takeIf { it.isNotBlank() }
-            ?.split(",")?.map { EcuBackupCoverage.Region.valueOf(it) }?.toSet().orEmpty()
+        val declaredRegions = properties.getProperty("required", "")
+        val requiredNames = if (declaredRegions.isEmpty()) emptyList()
+            else declaredRegions.split(",")
+        require(requiredNames.size == requiredNames.toSet().size &&
+            requiredNames.none(String::isBlank)) {
+            "Duplicate or empty required ECU region"
+        }
+        val required = requiredNames.map { EcuBackupCoverage.Region.valueOf(it) }.toSet()
+        // The v3 J2534 format describes ONE explicitly authorized read span;
+        // its existence can never establish a complete ECU memory map.
+        // Preserve legacy v1/v2 archive semantics for offline imports.
+        if (channel != null) {
+            val label = properties.getProperty("controller").orEmpty()
+            require(label.length <= 128 && label.none { Character.isISOControl(it) }) {
+                "Routed ECU archive controller labels may not contain control characters."
+            }
+            require(count == 1 && required.isEmpty()) {
+                "A routed ECU archive cannot claim complete firmware coverage."
+            }
+            // Windows writes canonical decimal fields; accepting 00001 or
+            // signs in Android only makes a forged v3 manifest ambiguous.
+            // Keep legacy v1/v2 parsing unchanged for existing files.
+            for (name in listOf("created", "count", "capture.0.start", "capture.0.expected")) {
+                val raw = properties.getProperty(name)
+                    ?: throw IllegalArgumentException("Missing routed ECU archive field $name")
+                val decimal = raw.toLongOrNull()
+                require(decimal != null && decimal >= 0L && decimal.toString() == raw) {
+                    "Noncanonical routed ECU archive field $name"
+                }
+            }
+        }
         val captures = (0 until count).map { index ->
             val prefix = "capture.$index."
             fun field(key: String) = properties.getProperty(prefix + key)
@@ -185,18 +305,33 @@ object EcuBackupArchive {
             )
         }
         require(files.isEmpty()) { "Unreferenced archive data" }
+        if (channel != null) {
+            val only = captures.single()
+            require(only.firstRead.size.toLong() == only.expectedBytes &&
+                isPortableJ2534Range(only.startAddress, only.expectedBytes)) {
+                "A routed ECU backup must contain a complete, addressable 32-bit read scope."
+            }
+        }
+        val allowedChannelKeys = if (channel != null) setOf(
+            "channel.requestCanId", "channel.responseCanId",
+            "channel.protocolNumber", "channel.session"
+        ) else emptySet()
+        val allowedFirmwareKeys = if (firmwareEvidence != null)
+            setOf("ecu.osId", "ecu.osDid") else emptySet()
         require(properties.stringPropertyNames().all { key ->
             key in setOf("format", "controller", "created", "count", "required", "vin") ||
+                key in allowedChannelKeys || key in allowedFirmwareKeys ||
                 (0 until count).any { index ->
                     key in setOf("region", "start", "expected", "origin", "sha256", "second")
                         .map { "capture.$index.$it" }
                 }
         }) { "Unknown archive manifest property" }
         val created = properties.getProperty("created")?.toLongOrNull()
+            ?.takeIf { it > 0L }
             ?: throw IllegalArgumentException("Invalid creation timestamp")
         val manifest = EcuBackupManifest.inspect(
             properties.getProperty("controller").orEmpty().ifBlank { null },
-            created, captures, required, vehicleVin
+            created, captures, required, vehicleVin, channel, firmwareEvidence
         )
         val verification = EcuBackupIntegrity.verify(manifest, captures, required)
         require(verification.consistent) { "Archive failed offline verification: ${verification.problems}" }

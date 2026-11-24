@@ -1,53 +1,46 @@
-name: Delete merged pull request branches
-
+name: Single PR and branch policy
+# Branch deletion occurs only after a successful main Release build (release-apk.yml).
 on:
-  push:
-    branches:
-      - main
   pull_request:
-    types:
-      - closed
-    branches:
-      - main
-
+    types: [opened, reopened, ready_for_review]
+  workflow_dispatch:
 permissions:
-  contents: write
+  contents: read
   pull-requests: read
-
 jobs:
-  delete-merged-pr-branches:
-    if: github.event_name == 'push' || github.event.pull_request.merged == true
+  single-pr-policy:
+    name: Single PR and branch policy
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
-      - name: Delete head branches of merged pull requests
-        uses: actions/github-script@v7
+      - name: Verify the complete branch and open PR inventory
+        uses: actions/github-script@v8
         with:
           script: |
-            const { owner, repo } = context.repo;
-            const pullRequests = await github.paginate(github.rest.pulls.list, {
-              owner,
-              repo,
-              state: "closed",
-              per_page: 100
+            const {owner, repo} = context.repo;
+            const branches = await github.paginate(github.rest.repos.listBranches, {
+              owner, repo, per_page: 100
             });
-
-            for (const pr of pullRequests) {
-              if (!pr.merged_at) continue;
-              if (!pr.head?.ref || pr.head.ref === "main") continue;
-              if (pr.head.repo?.full_name !== `${owner}/${repo}`) continue;
-
-              try {
-                await github.rest.git.deleteRef({
-                  owner,
-                  repo,
-                  ref: `heads/${pr.head.ref}`
-                });
-                core.info(`Deleted merged PR #${pr.number} branch: ${pr.head.ref}`);
-              } catch (error) {
-                if (error.status === 404 || error.status === 422) {
-                  core.info(`Branch already absent: ${pr.head.ref}`);
-                  continue;
-                }
-                throw error;
-              }
+            const prs = await github.paginate(github.rest.pulls.list, {
+              owner, repo, state: 'open', per_page: 100
+            });
+            const names = branches.map(branch => branch.name);
+            const expected = new Set(['main']);
+            if (prs.length > 1) {
+              core.setFailed('Only one open PR is allowed, including drafts.');
+              return;
             }
+            if (prs.length === 1) {
+              const pr = prs[0];
+              if (pr.base.ref !== 'main' || pr.head.ref === 'main' ||
+                  pr.head.repo?.full_name !== owner + '/' + repo) {
+                core.setFailed('The single development PR must use a local branch targeting main.');
+                return;
+              }
+              expected.add(pr.head.ref);
+            }
+            if (names.length !== expected.size || names.some(name => !expected.has(name))) {
+              core.setFailed('Expected only ' + [...expected].join(', ') + '; found ' + names.join(', '));
+              return;
+            }
+            core.info('Repository policy satisfied: ' + prs.length + ' open PR, ' + names.length + ' branches.');

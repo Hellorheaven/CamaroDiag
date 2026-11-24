@@ -6,6 +6,7 @@ import com.camarodiag.gen5.domain.model.VehicleProfile
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.util.ArrayDeque
@@ -45,9 +46,10 @@ class ReadOnlyUdsDiagnosticsTest {
     fun receivesMultiFrameVinAndSendsFlowControl() = runBlocking {
         val transport = FakeCanTransport(
             listOf(
-                CanFrame(0x7E8, byteArrayOf(0x10, 0x14, 0x62, 0xF1.toByte(), 0x90.toByte(), 0x31, 0x47, 0x31)),
+                CanFrame(0x7E8, byteArrayOf(0x10, 0x15, 0x62, 0xF1.toByte(), 0x90.toByte(), 0x31, 0x47, 0x31)),
                 CanFrame(0x7E8, byteArrayOf(0x21, 0x46, 0x41, 0x31, 0x52, 0x58, 0x58, 0x52)),
-                CanFrame(0x7E8, byteArrayOf(0x22, 0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36))
+                CanFrame(0x7E8, byteArrayOf(0x22, 0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36)),
+                CanFrame(0x7E8, byteArrayOf(0x23, 0x00))
             )
         )
         val client = UdsReadOnlyClient(transport, 0x7E0, 0x7E8)
@@ -118,6 +120,30 @@ class ReadOnlyUdsDiagnosticsTest {
     }
 
     @Test
+    fun placeholderEcuIdentityLabelsCannotEnableAnyEnhancedModuleRead() = runBlocking {
+        val vehicle = VehicleProfile(
+            modelYear = 2013, engine = CamaroEngine.LFX, vin = "1G1FA1RXXR0123456")
+        val original = syntheticReadProfile()
+        val profiles = listOf(
+            original.copy(hardwarePartNumber = "unknown"),
+            original.copy(operatingSystemId = "0x00000000"),
+            original.copy(calibrationId = "PENDING"),
+            original.copy(calibrationVerificationNumber = "FFFFFFFF"),
+            original.copy(controllerFamily = "n/a")
+        )
+        for (profile in profiles) {
+            val transport = FakeCanTransport()
+            val issues = profile.compatibilityDefinitionIssues(vehicle)
+            assertTrue(issues.isNotEmpty())
+            assertTrue(runCatching {
+                ProfiledUdsReadSession.open(transport, vehicle, profile)
+            }.isFailure)
+            assertTrue("Rejected module profile must send no CAN frames.",
+                transport.sent.isEmpty())
+        }
+    }
+
+    @Test
     fun refusesToOpenProfileWhenSelectedVehicleVinDoesNotMatch() = runBlocking {
         val transport = FakeCanTransport()
         val otherVin = "1G1FA1RXXR0123457"
@@ -138,7 +164,7 @@ class ReadOnlyUdsDiagnosticsTest {
     fun opensProfiledSessionOnlyAfterReadingAndMatchingEveryIdentityDid() = runBlocking {
         val vin = "1G1FA1RXXR0123456".toByteArray(Charsets.US_ASCII)
         val responses = listOf(
-            singleFrameResponse(0x0101, "BCM".toByteArray(Charsets.US_ASCII)),
+            singleFrameResponse(0x0101, byteArrayOf(0x42, 0x43, 0x4D, 0x00)),
             singleFrameResponse(0x0102, "HW1".toByteArray(Charsets.US_ASCII)),
             singleFrameResponse(0x0103, "OS1".toByteArray(Charsets.US_ASCII)),
             singleFrameResponse(0x0104, "CAL1".toByteArray(Charsets.US_ASCII)),
@@ -150,11 +176,22 @@ class ReadOnlyUdsDiagnosticsTest {
         )
         val transport = FakeCanTransport(responses)
 
+        val mutableAllowedDids = syntheticReadProfile().readableDids.toMutableSet()
+        val mutableIdentityDids = syntheticReadProfile().identityDids.toMutableList()
+        val callerProfile = syntheticReadProfile().copy(
+            readableDids = mutableAllowedDids, identityDids = mutableIdentityDids
+        )
         val session = ProfiledUdsReadSession.open(
             transport = transport,
             vehicle = VehicleProfile(modelYear = 2013, engine = CamaroEngine.LFX, vin = "1G1FA1RXXR0123456"),
-            profile = syntheticReadProfile()
+            profile = callerProfile
         )
+        // Simulate UI/protocol-pack edits after authorization. The frozen
+        // session cannot acquire fresh DID permissions or lose identity fields.
+        mutableAllowedDids.add(0x0108)
+        mutableIdentityDids.clear()
+        assertFalse(session.profile.allowsDid(0x0108))
+        assertEquals(6, session.profile.identityDids.size)
 
         assertEquals("BCM", session.identity.controllerFamily)
         assertEquals("HW1", session.identity.hardwarePartNumber)
@@ -164,6 +201,43 @@ class ReadOnlyUdsDiagnosticsTest {
         assertEquals("1G1FA1RXXR0123456", session.identity.vin)
         assertArrayEquals(byteArrayOf(0x55), session.readDid(0x0107))
         assertTrue(runCatching { session.readDid(0x0108) }.isFailure)
+    }
+
+    @Test
+    fun malformedAsciiIdentityDidsCannotAuthorizeProfiledReads() = runBlocking {
+        val vin = "1G1FA1RXXR0123456".toByteArray(Charsets.US_ASCII)
+        for (corrupt in listOf(
+                byteArrayOf(0x01, 0x43, 0x4D),
+                byteArrayOf(0x7F, 0x43, 0x4D),
+                byteArrayOf(0xFF.toByte(), 0x43, 0x4D),
+                byteArrayOf(0x00, 0x42, 0x43, 0x4D),
+                byteArrayOf(0x42, 0x00, 0x43, 0x4D)
+            )) {
+            val responses = listOf(
+                singleFrameResponse(0x0101, corrupt),
+                singleFrameResponse(0x0102, "HW1".toByteArray()),
+                singleFrameResponse(0x0103, "OS1".toByteArray()),
+                singleFrameResponse(0x0104, "CAL1".toByteArray()),
+                singleFrameResponse(0x0105, byteArrayOf(0xA1.toByte(), 0xB2.toByte())),
+                CanFrame(0x7A8, byteArrayOf(0x10, 0x14, 0x62, 0x01, 0x06,
+                    vin[0], vin[1], vin[2])),
+                CanFrame(0x7A8, byteArrayOf(0x21, vin[3], vin[4], vin[5], vin[6],
+                    vin[7], vin[8], vin[9])),
+                CanFrame(0x7A8, byteArrayOf(0x22, vin[10], vin[11], vin[12],
+                    vin[13], vin[14], vin[15], vin[16]))
+            )
+            val transport = FakeCanTransport(responses)
+            val rejected = runCatching {
+                ProfiledUdsReadSession.open(transport,
+                    VehicleProfile(modelYear = 2013, engine = CamaroEngine.LFX,
+                        vin = "1G1FA1RXXR0123456"),
+                    syntheticReadProfile())
+            }.exceptionOrNull()
+            assertTrue(rejected is IllegalArgumentException)
+            assertTrue(rejected?.message?.contains("identity") == true)
+            assertTrue(transport.sent.none { it.data.size >= 2 &&
+                (it.data[1].toInt() and 0xFF) == 0x19 })
+        }
     }
 
     @Test
@@ -194,6 +268,49 @@ class ReadOnlyUdsDiagnosticsTest {
     }
 
     @Test
+    fun repeatedInvalidFlowControlFramesCannotKeepIsoTpSendAliveForever() = runBlocking {
+        val wrongFrames = List(9) { CanFrame(0x7E8, byteArrayOf(0x21, 0x00, 0x00)) }
+        val transport = FakeCanTransport(wrongFrames)
+        val channel = IsoTpChannel(transport, 0x7E0, 0x7E8)
+        val error = runCatching {
+            channel.sendOnly(byteArrayOf(1, 2, 3, 4, 5, 6, 7, 8), 100)
+        }.exceptionOrNull()
+        assertTrue(error is IsoTpException)
+        assertTrue(error?.message?.contains("non-flow-control") == true)
+        assertEquals(1, transport.sent.size)
+    }
+
+    @Test
+    fun flowControlWaitFramesConsumeOneTotalTimeoutRatherThanRestartingIt() = runBlocking {
+        val wait = CanFrame(0x7E8, byteArrayOf(0x31, 0x00, 0x00))
+        val continueSending = CanFrame(0x7E8, byteArrayOf(0x30, 0x00, 0x00))
+        val transport = FakeCanTransport(List(5) { wait } + continueSending)
+        var elapsedNanos = -40_000_000L
+        val channel = IsoTpChannel(transport, 0x7E0, 0x7E8,
+            clock = { elapsedNanos += 40_000_000L; elapsedNanos })
+        val failure = runCatching {
+            channel.sendOnly(byteArrayOf(1, 2, 3, 4, 5, 6, 7, 8), 100L)
+        }.exceptionOrNull()
+        assertTrue(failure is IsoTpException)
+        assertTrue(failure?.message?.contains("flow-control deadline") == true)
+        assertEquals(1, transport.sent.size)
+    }
+
+    @Test
+    fun invalidProfileTimeoutIsRejectedBeforeIdentityCanTraffic() = runBlocking {
+        val profile = syntheticReadProfile()
+        val vehicle = VehicleProfile(modelYear = 2013,
+            engine = CamaroEngine.LFX, vin = "1G1FA1RXXR0123456")
+        for (timeout in listOf(-1L, 0L, 30_001L, Long.MAX_VALUE)) {
+            val transport = FakeCanTransport()
+            assertTrue(runCatching {
+                ProfiledUdsReadSession.open(transport, vehicle, profile, timeout)
+            }.isFailure)
+            assertTrue("Invalid deadline must not send a CAN frame", transport.sent.isEmpty())
+        }
+    }
+
+    @Test
     fun acceptsExactlyFiveIsoTpFlowControlWaitFramesBeforeContinueToSend() = runBlocking {
         val flowControlWait = CanFrame(0x7E8, byteArrayOf(0x31, 0x00, 0x00))
         val flowControlContinue = CanFrame(0x7E8, byteArrayOf(0x30, 0x00, 0x00))
@@ -220,6 +337,21 @@ class ReadOnlyUdsDiagnosticsTest {
         assertTrue(error is IsoTpException)
         assertTrue(error?.message?.contains("wait limit") == true)
         assertEquals(1, transport.sent.size)
+    }
+
+    @Test
+    fun invalidIsoTpDeadlinesCannotSendAFirstCanFrame() = runBlocking {
+        for (deadline in listOf(-1L, 0L, 30_001L, Long.MAX_VALUE)) {
+            val transport = FakeCanTransport()
+            val channel = IsoTpChannel(transport, 0x7E0, 0x7E8)
+            assertTrue(runCatching {
+                channel.sendOnly(byteArrayOf(0x22, 0xF1.toByte(), 0x90.toByte()), deadline)
+            }.isFailure)
+            assertTrue(runCatching {
+                channel.exchange(byteArrayOf(0x22, 0xF1.toByte(), 0x90.toByte()), deadline)
+            }.isFailure)
+            assertTrue("Invalid timeout must send zero CAN frames", transport.sent.isEmpty())
+        }
     }
 
     @Test

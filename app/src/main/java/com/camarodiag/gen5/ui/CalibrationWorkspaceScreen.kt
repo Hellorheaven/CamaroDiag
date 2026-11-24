@@ -64,6 +64,8 @@ import com.camarodiag.gen5.data.obd.CamaroCalibrationCatalog
 import com.camarodiag.gen5.data.obd.J2534BridgePairingCodeFormat
 import com.camarodiag.gen5.data.obd.Lfx2012ControllerReferences
 import com.camarodiag.gen5.data.obd.Lfx2012FlexFuelPreflight
+import com.camarodiag.gen5.data.obd.Lfx2012FuelReadOnly
+import com.camarodiag.gen5.data.obd.Lfx2012FuelSessionHistory
 import com.camarodiag.gen5.data.obd.Lfx2012ProgrammingAudit
 import com.camarodiag.gen5.data.obd.EcuBenchExpertPlan
 import com.camarodiag.gen5.data.obd.CamaroDiagConnectorWiringGuide
@@ -87,6 +89,11 @@ sealed interface ArchiveVerification {
 data class CalibrationWorkspaceState(
     val isReading: Boolean = false,
     val isGmlanReading: Boolean = false,
+    val isFuelSnapshotReading: Boolean = false,
+    val fuelReadOnlySnapshot: Lfx2012FuelReadOnly.Snapshot? = null,
+    val fuelHistoryCount: Int = 0,
+    val fuelHistorySummary: Lfx2012FuelSessionHistory.Report? = null,
+    val fuelSnapshotError: String = "",
     val gmlanIdentity: GmlanIdentityEvidence? = null,
     val gmlanIdentityFailed: Boolean = false,
     val ecuVinResponse: String = "",
@@ -233,6 +240,8 @@ fun CalibrationWorkspaceScreen(
     canReadEnhancedUds: Boolean,
     onReadIdentification: () -> Unit,
     onReadGmlanIdentification: () -> Unit,
+    onReadLfx2012FuelSnapshot: () -> Unit,
+    onExportLfx2012FuelHistory: () -> Unit,
     onExportIdentification: () -> Unit,
     onCreateVehicleFromEcuVin: (String) -> Unit,
     onSyncVehicleVinFromEcu: (String) -> Unit,
@@ -268,7 +277,7 @@ fun CalibrationWorkspaceScreen(
     var memoryReadAddressHex by remember { mutableStateOf("") }
     var memoryReadLengthText by remember { mutableStateOf("") }
     var memoryReadSessionExtended by remember { mutableStateOf(false) }
-    var memoryReadRegion by remember { mutableStateOf(EcuBackupCoverage.Region.CALIBRATION) }
+    var memoryReadRegion by remember { mutableStateOf(EcuBackupCoverage.Region.OTHER) }
     var memoryReadRegionMenuExpanded by remember { mutableStateOf(false) }
     var expertExpanded by remember { mutableStateOf(false) }
     var expertControllerFamily by remember { mutableStateOf("") }
@@ -366,6 +375,141 @@ fun CalibrationWorkspaceScreen(
                         verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(stringResource(R.string.flexfuel_lfx2012_title),
                             color = CamaroAmber, fontWeight = FontWeight.Bold)
+
+                        // Independent SAE fuel survey, never an ECU flash/
+                        // FlexFuel activation command. Values are only from
+                        // the physical ELM/STN or J2534 channel selected.
+                        OutlinedButton(
+                            onClick = onReadLfx2012FuelSnapshot,
+                            enabled = (isConnected || state.isJ2534BridgeConnected) &&
+                                !state.isFuelSnapshotReading
+                        ) {
+                            Text(stringResource(R.string.flexfuel_lfx2012_read_fuel))
+                        }
+                        val ethanolHistory = state.fuelHistorySummary?.readings
+                            ?.firstOrNull { it.pid == Lfx2012FuelReadOnly.ETHANOL }
+                        if (ethanolHistory != null &&
+                            ethanolHistory.reportedCount > 0 &&
+                            ethanolHistory.minimum != null &&
+                            ethanolHistory.maximum != null
+                        ) {
+                            Text(
+                                stringResource(
+                                    R.string.flexfuel_lfx2012_history_range,
+                                    ethanolHistory.reportedCount,
+                                    requireNotNull(ethanolHistory.minimum),
+                                    requireNotNull(ethanolHistory.maximum)
+                                ),
+                                color = TextMuted, fontSize = 11.sp
+                            )
+                        }
+                        if (ethanolHistory != null && ethanolHistory.reportedCount > 0 &&
+                            ethanolHistory.currentSnapshotPercent == null
+                        ) {
+                            Text(
+                                stringResource(R.string.flexfuel_lfx2012_ethanol_no_current_measurement),
+                                color = WarnRed, fontSize = 11.sp
+                            )
+                        }
+                        state.fuelHistorySummary?.readings
+                            ?.filter { it.pid != Lfx2012FuelReadOnly.ETHANOL &&
+                                it.reportedCount > 0 &&
+                                it.minimum != null && it.maximum != null }
+                            ?.forEach { reading ->
+                                val label = when (reading.pid) {
+                                    Lfx2012FuelReadOnly.STFT_BANK_1 ->
+                                        R.string.flexfuel_lfx2012_pid_stft_b1
+                                    Lfx2012FuelReadOnly.LTFT_BANK_1 ->
+                                        R.string.flexfuel_lfx2012_pid_ltft_b1
+                                    Lfx2012FuelReadOnly.STFT_BANK_2 ->
+                                        R.string.flexfuel_lfx2012_pid_stft_b2
+                                    else -> R.string.flexfuel_lfx2012_pid_ltft_b2
+                                }
+                                Text(
+                                    stringResource(
+                                        R.string.flexfuel_lfx2012_history_trim_range,
+                                        stringResource(label), reading.reportedCount,
+                                        requireNotNull(reading.minimum),
+                                        requireNotNull(reading.maximum)
+                                    ),
+                                    color = TextMuted, fontSize = 11.sp
+                                )
+                            }
+                        if (state.fuelHistoryCount > 0) {
+                            OutlinedButton(
+                                onClick = onExportLfx2012FuelHistory,
+                                enabled = !state.isFuelSnapshotReading
+                            ) {
+                                Text(stringResource(
+                                    R.string.flexfuel_lfx2012_export_history,
+                                    state.fuelHistoryCount
+                                ))
+                            }
+                        }
+                        if (state.isFuelSnapshotReading) {
+                            CircularProgressIndicator()
+                            Text(stringResource(R.string.flexfuel_lfx2012_reading_fuel),
+                                color = TextMuted, fontSize = 11.sp)
+                        }
+                        val fuelSnapshot = state.fuelReadOnlySnapshot
+                        if (fuelSnapshot != null) {
+                            val source = if (fuelSnapshot.source == Lfx2012FuelReadOnly.Source.J2534)
+                                stringResource(R.string.flexfuel_lfx2012_source_j2534)
+                            else stringResource(R.string.flexfuel_lfx2012_source_elm)
+                            Text(
+                                stringResource(
+                                    R.string.flexfuel_lfx2012_observed_source, source,
+                                    java.text.DateFormat.getDateTimeInstance()
+                                        .format(java.util.Date(fuelSnapshot.observedAtUtcMillis))
+                                ),
+                                color = TextMuted, fontSize = 11.sp
+                            )
+                            fuelSnapshot.readings.forEach { reading ->
+                                val label = when (reading.pid) {
+                                    Lfx2012FuelReadOnly.ETHANOL ->
+                                        R.string.flexfuel_lfx2012_pid_ethanol
+                                    Lfx2012FuelReadOnly.STFT_BANK_1 ->
+                                        R.string.flexfuel_lfx2012_pid_stft_b1
+                                    Lfx2012FuelReadOnly.LTFT_BANK_1 ->
+                                        R.string.flexfuel_lfx2012_pid_ltft_b1
+                                    Lfx2012FuelReadOnly.STFT_BANK_2 ->
+                                        R.string.flexfuel_lfx2012_pid_stft_b2
+                                    else -> R.string.flexfuel_lfx2012_pid_ltft_b2
+                                }
+                                val value = reading.percent
+                                val reported = when {
+                                    reading.availability == Lfx2012FuelReadOnly.Availability.REPORTED &&
+                                        value != null ->
+                                        stringResource(R.string.flexfuel_lfx2012_reported_percent, value)
+                                    reading.availability == Lfx2012FuelReadOnly.Availability.UNSUPPORTED ->
+                                        stringResource(R.string.flexfuel_lfx2012_pid_unsupported)
+                                    else -> stringResource(R.string.flexfuel_lfx2012_pid_no_response)
+                                }
+                                Text(
+                                    stringResource(label) + ": " + reported,
+                                    color = TextPrimary, fontSize = 12.sp
+                                )
+                            }
+                            val physicalVinMatched = !state.ecuIdentityFromSimulation &&
+                                state.vinComparison?.matches == true &&
+                                state.ecuVinResponse.trim().uppercase() == vehicle.vin.trim().uppercase() &&
+                                vehicle.vin.isNotBlank()
+                            if (!physicalVinMatched) {
+                                Text(stringResource(R.string.flexfuel_lfx2012_vin_unverified),
+                                    color = WarnRed, fontSize = 11.sp)
+                            }
+                            Text(stringResource(R.string.flexfuel_lfx2012_observation_warning),
+                                color = CamaroAmber, fontSize = 11.sp)
+                            Text(stringResource(R.string.flexfuel_lfx2012_continuous_telemetry),
+                                color = TextMuted, fontSize = 11.sp)
+                        }
+                        if (state.fuelSnapshotError.isNotBlank()) {
+                            Text(
+                                stringResource(R.string.flexfuel_lfx2012_fuel_failed) +
+                                    " " + state.fuelSnapshotError,
+                                color = WarnRed, fontSize = 11.sp
+                            )
+                        }
                         Lfx2012ControllerReferences.servicePartGroups.forEach { group ->
                             Text(stringResource(R.string.flexfuel_lfx2012_parts,
                                 Lfx2012ControllerReferences.controllerFamily, group.servicePart,
@@ -484,6 +628,11 @@ fun CalibrationWorkspaceScreen(
                         )
                         Text(stringResource(R.string.flexfuel_lfx2012_audit_post_not_performed),
                             color = WarnRed, fontSize = 11.sp)
+                        Text(
+                            stringResource(R.string.flexfuel_lfx2012_readonly_testing_notice),
+                            color = TextMuted,
+                            fontSize = 11.sp
+                        )
                         OutlinedButton(
                             onClick = onReadIdentification,
                             enabled = (isConnected || state.isJ2534BridgeConnected) && !state.isReading,
@@ -761,7 +910,7 @@ fun CalibrationWorkspaceScreen(
                                         EcuBackupCoverage.Region.EXTERNAL_EEPROM ->
                                             stringResource(R.string.cal_expert_region_eeprom)
                                         EcuBackupCoverage.Region.OTHER ->
-                                            stringResource(R.string.cal_expert_region_title)
+                                            stringResource(R.string.cal_live_memory_region_other)
                                     })
                                 }
                                 DropdownMenu(
@@ -769,6 +918,7 @@ fun CalibrationWorkspaceScreen(
                                     onDismissRequest = { memoryReadRegionMenuExpanded = false }
                                 ) {
                                     listOf(
+                                        EcuBackupCoverage.Region.OTHER,
                                         EcuBackupCoverage.Region.CALIBRATION,
                                         EcuBackupCoverage.Region.PROGRAM_FLASH,
                                         EcuBackupCoverage.Region.DATA_FLASH,
@@ -785,7 +935,7 @@ fun CalibrationWorkspaceScreen(
                                                 EcuBackupCoverage.Region.EXTERNAL_EEPROM ->
                                                     stringResource(R.string.cal_expert_region_eeprom)
                                                 EcuBackupCoverage.Region.OTHER ->
-                                                    stringResource(R.string.cal_expert_region_title)
+                                                    stringResource(R.string.cal_live_memory_region_other)
                                             }) },
                                             onClick = {
                                                 memoryReadRegion = region
@@ -795,6 +945,10 @@ fun CalibrationWorkspaceScreen(
                                     }
                                 }
                             }
+                            Text(
+                                stringResource(R.string.cal_live_memory_region_profile_match),
+                                color = TextMuted, fontSize = 11.sp
+                            )
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Checkbox(
                                     checked = memoryReadSessionExtended,
@@ -1185,6 +1339,38 @@ fun CalibrationWorkspaceScreen(
                                 Text(stringResource(R.string.cal_archive_partial), color = CamaroAmber)
                             }
                             manifest.vehicleVin?.let { Text("${stringResource(R.string.obd_vin)} $it", color = TextPrimary) }
+                            val route = manifest.channel
+                            if (route != null) {
+                                Text(
+                                    stringResource(
+                                        R.string.cal_archive_channel,
+                                        route.requestCanId.toString(16).uppercase(),
+                                        route.responseCanId.toString(16).uppercase(),
+                                        route.protocolNumber,
+                                        route.diagnosticSession
+                                    ),
+                                    color = TextMuted, fontSize = 11.sp
+                                )
+                            } else {
+                                Text(stringResource(R.string.cal_archive_legacy_route),
+                                    color = CamaroAmber, fontSize = 11.sp)
+                            }
+                            val firmware = manifest.firmwareEvidence
+                            if (firmware != null) {
+                                Text(
+                                    stringResource(
+                                        R.string.cal_archive_osid,
+                                        firmware.operatingSystemId,
+                                        firmware.osDid.toString(16).uppercase()
+                                    ),
+                                    color = TextPrimary, fontSize = 11.sp
+                                )
+                            } else {
+                                Text(stringResource(R.string.cal_archive_osid_missing),
+                                    color = TextMuted, fontSize = 11.sp)
+                            }
+                            Text(stringResource(R.string.cal_archive_unattested),
+                                color = CamaroAmber, fontSize = 11.sp)
                             Text(stringResource(R.string.cal_payload_size, manifest.coverage.capturedBytes), color = TextPrimary)
                             for (entry in manifest.entries) {
                                 val end = entry.startAddress + entry.bytesCaptured - 1

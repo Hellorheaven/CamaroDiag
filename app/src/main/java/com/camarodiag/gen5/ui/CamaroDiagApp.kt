@@ -51,8 +51,15 @@ import com.camarodiag.gen5.control.VehicleGear
 import com.camarodiag.gen5.control.VehicleSignal
 import com.camarodiag.gen5.control.VehicleControlId
 import com.camarodiag.gen5.data.obd.VxdiagProfiles
+import com.camarodiag.gen5.data.obd.CanConsoleCapabilityPolicy
+import com.camarodiag.gen5.data.obd.CanConsoleDisplayFilter
+import com.camarodiag.gen5.data.obd.CanConsoleExportPolicy
+import com.camarodiag.gen5.data.obd.ObservedCanId
+import com.camarodiag.gen5.data.obd.ParsedCanConsoleRecord
 import com.camarodiag.gen5.data.obd.CanTraceFilter
 import com.camarodiag.gen5.data.obd.RawCanFrameParser
+import com.camarodiag.gen5.data.obd.SafeRawCanTransmitPolicy
+import com.camarodiag.gen5.data.obd.EcuWriteConsentFlow
 import com.camarodiag.gen5.data.obd.CanTraceDirection
 import com.camarodiag.gen5.data.obd.filterCanTrace
 import com.camarodiag.gen5.data.obd.UdsNegativeResponse
@@ -96,7 +103,7 @@ enum class DiagTab(val labelEn: String, val labelFr: String, val labelResourceId
     ADAPTER("Adapter", "Interface", R.string.tab_connect),
     MODULES("Modules", "Modules", R.string.tab_modules),
     LIVE("Live", "Direct", R.string.tab_live),
-    CAN_SNIFFER("CAN Sniffer", "CAN Sniffer", R.string.tab_can_sniffer),
+    CAN_SNIFFER("CAN / OBD Console", "Console CAN / OBD", R.string.tab_can_sniffer),
     DTCS("DTCs", "Défauts", R.string.tab_dtcs),
     MILEAGE("Mileage", "Odomètre", R.string.tab_mileage),
     CALIBRATION("ECU / Maps", "ECU / Cartographie", R.string.tab_calibration),
@@ -180,6 +187,7 @@ fun CamaroDiagApp(
     val legacyVehicleImportAvailable by viewModel.legacyVehicleImportAvailable.collectAsState()
     val selectedSavedVehicleId by viewModel.selectedSavedVehicleId.collectAsState()
     val adapter by viewModel.adapter.collectAsState()
+    val connectionGeneration by viewModel.connectionGeneration.collectAsState()
     val lastConnectionProfile by viewModel.lastConnectionProfile.collectAsState()
     val pairedDevices by viewModel.pairedDevices.collectAsState()
     val usbDevices by viewModel.usbDevices.collectAsState()
@@ -202,6 +210,7 @@ fun CamaroDiagApp(
     val functionalTests by viewModel.functionalTestState.collectAsState()
 
     var currentTab by remember { mutableStateOf(DiagTab.SETUP) }
+    var premiumPreviewTab by remember { mutableStateOf<DiagTab?>(null) }
     var moreExpanded by remember { mutableStateOf(false) }
     LaunchedEffect(licenseLevel) {
         if (!LicenseRolloutConfig.ENABLED && currentTab == DiagTab.LICENSE)
@@ -358,6 +367,38 @@ fun CamaroDiagApp(
         uri?.let { viewModel.importCalibrationDefinitions(it) }
     }
 
+    val premiumPreview = premiumPreviewTab
+    if (premiumPreview != null) {
+        val frenchPreview = LocalConfiguration.current.locales[0].language == "fr"
+        val summary = when (premiumPreview) {
+            DiagTab.MODULES -> if (frenchPreview) "Explorer les calculateurs et consulter leurs informations détaillées." else "Explore ECU modules and inspect detailed module information."
+            DiagTab.CAN_SNIFFER -> if (frenchPreview) "Analyser les trames CAN, filtrer les échanges et utiliser les outils de diagnostic bus autorisés." else "Inspect and filter CAN traffic with supported bus diagnostics."
+            DiagTab.MILEAGE -> if (frenchPreview) "Comparer les informations kilométriques disponibles et générer un rapport d'analyse." else "Compare available mileage information and generate an analysis report."
+            DiagTab.CALIBRATION -> if (frenchPreview) "Consulter et gérer les fonctions ECU, sauvegardes et cartographies selon la compatibilité du calculateur." else "Access supported ECU, backup and calibration workflows."
+            DiagTab.OBD_SCAN -> if (frenchPreview) "Effectuer un scan complet des modules et centraliser les résultats." else "Run a full module scan and review combined results."
+            DiagTab.CONTROL -> if (frenchPreview) "Accéder aux commandes véhicule compatibles, avec les protections de sécurité nécessaires." else "Use supported vehicle controls with required safeguards."
+            else -> if (frenchPreview) "Fonctionnalité avancée de diagnostic CamaroDiag." else "Advanced CamaroDiag diagnostic feature."
+        }
+        AlertDialog(
+            onDismissRequest = { premiumPreviewTab = null },
+            title = { Text(stringResource(premiumPreview.labelResourceId)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(summary)
+                    Text(
+                        if (frenchPreview) "Cette fonction nécessite une licence CamaroDiag. Les données temps réel et les codes défauts restent gratuits."
+                        else "This feature requires a CamaroDiag license. Live data and trouble codes remain free."
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { premiumPreviewTab = null }) {
+                    Text(if (frenchPreview) "Compris" else "Got it")
+                }
+            }
+        )
+    }
+
      Scaffold(
         topBar = {
             TopAppBar(
@@ -387,6 +428,9 @@ fun CamaroDiagApp(
                         adapter.deviceName.contains("Demo", ignoreCase = true) ||
                             adapter.deviceName.contains("Simulated", ignoreCase = true) -> {
                             Text("DEMO", color = CamaroAmber, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                        }
+                        calibrationWorkspace.isJ2534BridgeConnected -> {
+                            Text("PC J2534", color = OkGreen, fontWeight = FontWeight.Bold, fontSize = 11.sp)
                         }
                         adapter.tier != AdapterTier.DISCONNECTED -> {
                             Text("OBD", color = OkGreen, fontWeight = FontWeight.Bold, fontSize = 11.sp)
@@ -486,12 +530,16 @@ fun CamaroDiagApp(
                             text = {
                                 Text(
                                     (if (!premiumAllowed && tab in premiumTabs) "🔒 " else "") +
-                                        stringResource(tab.labelResourceId)
+                                        stringResource(tab.labelResourceId),
+                                    color = if (!premiumAllowed && tab in premiumTabs) TextMuted else TextPrimary
                                 )
                             },
                             onClick = {
-                                currentTab = if (!premiumAllowed && tab in premiumTabs)
-                                    DiagTab.LICENSE else tab
+                                if (!premiumAllowed && tab in premiumTabs) {
+                                    premiumPreviewTab = tab
+                                } else {
+                                    currentTab = tab
+                                }
                                 moreExpanded = false
                             }
                         )
@@ -582,6 +630,7 @@ fun CamaroDiagApp(
                 )
                 DiagTab.ADAPTER -> AdapterScreen(
                     adapter = adapter,
+                    isJ2534BridgeConnected = calibrationWorkspace.isJ2534BridgeConnected,
                     isBusy = isBusy || isObdScanning || calibrationWorkspace.isReading,
                     pairedDevices = pairedDevices,
                     errorMsg = connError,
@@ -591,8 +640,10 @@ fun CamaroDiagApp(
                     usbDevices = usbDevices,
                     onRefreshUsb = { viewModel.refreshUsbDevices() },
                     onConnectUsb = { viewModel.connectUsb(it) },
+                    onDisconnectAdapter = { viewModel.disconnectSelectedAdapter() },
                     onDiscoverConnector = { viewModel.discoverCamaroDiagConnector(it) },
                     onDiscoverBinaryConnector = { viewModel.discoverCamaroDiagConnector(it, binary = true) },
+                    // Physical CDJ/USB checkpoint capture is not implemented (C5): never enable it as a working export.
                     onConnectWifi = { host, port -> viewModel.connectWifi(host, port) }
                 )
                 DiagTab.MODULES -> ModulesScreen(modules)
@@ -651,14 +702,20 @@ fun CamaroDiagApp(
                 DiagTab.CAN_SNIFFER -> CanSnifferScreen(
                     state = liveCanMonitorState,
                     isAvailable = viewModel.canMonitorAvailable(),
+                    canReadObdAvailable = viewModel.canConsoleReadObd(),
                     canTransmitAvailable = adapter.supportsCanTransmit,
-                    onStart = { viewModel.startCanMonitor() },
+                    canExportAvailable = viewModel.canExportCanCapture(),
+                    knownModules = modules,
+                    onStart = { can29Bit -> viewModel.startCanMonitor(can29Bit = can29Bit) },
                     onStop = { viewModel.stopCanMonitor() },
                     onSendRequest = { viewModel.sendCanConsoleInput(it) },
+                    onConfirmRawFrame = { frame, epoch, approval ->
+                        viewModel.confirmRawCanConsoleFrame(frame, epoch, approval)
+                    },
                     onClearHistory = { viewModel.clearCanConsoleHistory() },
                     onExport = { withExportFolder { viewModel.exportCanCapture("CamaroDiag_CAN_${System.currentTimeMillis()}.txt") } }
                 )
-                DiagTab.DTCS -> DtcScreen(dtcs, vehicle, calibrationWorkspace.vinComparison, { viewModel.scanDtcs() }, { viewModel.clearDtcs() })
+                DiagTab.DTCS -> DtcScreen(dtcs, vehicle, calibrationWorkspace.vinComparison, connectionGeneration, { viewModel.scanDtcs() }, { approval, epoch, confirmedVehicle -> viewModel.clearDtcs(approval, epoch, confirmedVehicle) })
                 DiagTab.MILEAGE -> MileageScreen(mileageReport, { viewModel.runMileageAudit() }, { withExportFolder { viewModel.saveCurrentSession() } })
                 DiagTab.ABOUT -> LazyColumn {
                     item { AboutUpdateCard() }
@@ -685,6 +742,12 @@ fun CamaroDiagApp(
                     vehicle = vehicle,
                     onReadIdentification = { viewModel.readCalibrationIdentification() },
                     onReadGmlanIdentification = { viewModel.readGmlanIdentification() },
+                    onReadLfx2012FuelSnapshot = { viewModel.readLfx2012FuelSnapshot() },
+                    onExportLfx2012FuelHistory = {
+                        withExportFolder {
+                            viewModel.exportLfx2012FuelHistory("CamaroDiag_LFX_fuel_${System.currentTimeMillis()}.csv")
+                        }
+                    },
                     onExportIdentification = {
                         withExportFolder {
                             viewModel.exportEcuIdentification("CamaroDiag_ECU_identity_${System.currentTimeMillis()}.json")
@@ -712,7 +775,9 @@ fun CamaroDiagApp(
                                 address = address,
                                 lengthBytes = bytes,
                                 diagnosticSession = session,
-                                controllerLabel = vehicle.engine.ecmType
+                                // The selected engine profile is not an observed
+                                // ECU controller / firmware identity.
+                                controllerLabel = null
                             )
                             withExportFolder {
                                 viewModel.captureJ2534Memory("CamaroDiag_ECU_memory_${System.currentTimeMillis()}.zip", request)
@@ -964,6 +1029,7 @@ fun VehicleSetupScreen(
 @Composable
 fun AdapterScreen(
     adapter: AdapterCapabilities,
+    isJ2534BridgeConnected: Boolean,
     isBusy: Boolean,
     pairedDevices: List<Pair<String, String>>,
     errorMsg: String?,
@@ -973,6 +1039,7 @@ fun AdapterScreen(
     usbDevices: List<String>,
     onRefreshUsb: () -> Unit,
     onConnectUsb: (String) -> Unit,
+    onDisconnectAdapter: () -> Unit,
     onConnectWifi: (String, Int) -> Unit,
     onDiscoverConnector: ((String) -> Unit)? = null,
     onDiscoverBinaryConnector: ((String) -> Unit)? = null
@@ -993,13 +1060,35 @@ fun AdapterScreen(
         item {
             Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(adapter.deviceName, fontWeight = FontWeight.Bold, color = CamaroAmber, fontSize = 16.sp)
-                    Text(localizedAdapterTierName(adapter.tier), fontSize = 13.sp)
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        BadgeChip("CAN 11-bit / 500k", adapter.supportsCanHeaders)
-                        BadgeChip("CAN TX", adapter.supportsCanTransmit)
-                        BadgeChip(stringResource(R.string.swcan_wiring_verified), adapter.supportsSwCan)
-                        BadgeChip(stringResource(R.string.long_response_mode), adapter.supportsLongFrames)
+                    Text(
+                        if (isJ2534BridgeConnected) stringResource(R.string.adapter_j2534_bridge_connected)
+                        else adapter.deviceName,
+                        fontWeight = FontWeight.Bold, color = CamaroAmber, fontSize = 16.sp
+                    )
+                    if (!isJ2534BridgeConnected) {
+                        Text(localizedAdapterTierName(adapter.tier), fontSize = 13.sp)
+                    }
+                    if (isJ2534BridgeConnected || adapter.tier != AdapterTier.DISCONNECTED) {
+                        OutlinedButton(
+                            onClick = onDisconnectAdapter,
+                            enabled = !isBusy,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(stringResource(R.string.adapter_disconnect_label))
+                        }
+                    }
+                    if (isJ2534BridgeConnected) {
+                        Text(
+                            stringResource(R.string.adapter_j2534_capabilities_guidance),
+                            fontSize = 12.sp, color = TextMuted
+                        )
+                    } else {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            BadgeChip("CAN 11-bit / 500k", adapter.supportsCanHeaders)
+                            BadgeChip("CAN TX", adapter.supportsCanTransmit)
+                            BadgeChip(stringResource(R.string.swcan_wiring_verified), adapter.supportsSwCan)
+                            BadgeChip(stringResource(R.string.long_response_mode), adapter.supportsLongFrames)
+                        }
                     }
                     if (adapter.rawProbeLog.isNotEmpty()) {
                         Spacer(Modifier.height(6.dp))
@@ -1059,7 +1148,7 @@ fun AdapterScreen(
                                 Text(stringResource(R.string.adapter_connect_label, label))
                             }
                         }
-                        if (!kklOnly && onDiscoverConnector != null) {
+                        if (!kklOnly && label.contains("CamaroDiagConnectors", ignoreCase = true) && onDiscoverConnector != null) {
                             OutlinedButton(onClick = { onDiscoverConnector(label) }, enabled = !isBusy,
                                 modifier = Modifier.fillMaxWidth()) {
                                 Column {
@@ -1069,7 +1158,7 @@ fun AdapterScreen(
                                 }
                             }
                         }
-                        if (!kklOnly && onDiscoverBinaryConnector != null) {
+                        if (!kklOnly && label.contains("CamaroDiagConnectors", ignoreCase = true) && onDiscoverBinaryConnector != null) {
                             OutlinedButton(onClick = { onDiscoverBinaryConnector(label) }, enabled = !isBusy,
                                 modifier = Modifier.fillMaxWidth()) {
                                 Column {
@@ -1402,7 +1491,11 @@ fun LiveDataScreen(
         "WBO2_B1S1" to R.string.live_pid_wbo2_b1s1,
         "WBO2_B1S2" to R.string.live_pid_wbo2_b1s2,
         "WBO2_B2S1" to R.string.live_pid_wbo2_b2s1,
-        "WBO2_B2S2" to R.string.live_pid_wbo2_b2s2
+        "WBO2_B2S2" to R.string.live_pid_wbo2_b2s2,
+        "WBO2_I_B1S1" to R.string.live_pid_wbo2_i_b1s1,
+        "WBO2_I_B1S2" to R.string.live_pid_wbo2_i_b1s2,
+        "WBO2_I_B2S1" to R.string.live_pid_wbo2_i_b2s1,
+        "WBO2_I_B2S2" to R.string.live_pid_wbo2_i_b2s2
     )
     val sensorContext = LocalContext.current
     val sensorLabels = liveCatalog.associate { signal ->
@@ -1594,22 +1687,68 @@ fun LiveDataScreen(
 fun CanSnifferScreen(
     state: LiveCanMonitorState,
     isAvailable: Boolean,
+    canReadObdAvailable: Boolean,
     canTransmitAvailable: Boolean,
-    onStart: () -> Unit,
+    canExportAvailable: Boolean,
+    knownModules: List<EcuModule>,
+    onStart: (Boolean) -> Unit,
     onStop: () -> Unit,
     onSendRequest: (String) -> Unit,
+    onConfirmRawFrame: (String, Long, EcuWriteConsentFlow.Approval) -> Unit,
     onClearHistory: () -> Unit,
     onExport: () -> Unit
 ) {
     var requestInput by remember { mutableStateOf("01 0C") }
-    var pendingRawFrameInput by remember { mutableStateOf<String?>(null) }
+    var monitorCan29Bit by remember { mutableStateOf(false) }
+    var monitorFormatMenuExpanded by remember { mutableStateOf(false) }
+    var pendingRawFrameInput by remember { mutableStateOf<Pair<String, Long>?>(null) }
+    var writeConsentStep by remember { mutableStateOf(EcuWriteConsentFlow.Step.WARNING) }
     var frameSearch by remember { mutableStateOf("") }
     var canIdFilter by remember { mutableStateOf("") }
     var dataPrefixFilter by remember { mutableStateOf("") }
     var directionFilter by remember { mutableStateOf("ALL") }
+    var selectedObservedCanId by remember { mutableStateOf<ObservedCanId?>(null) }
+    var observedEcuMenuExpanded by remember { mutableStateOf(false) }
     var expandedFrameLine by remember { mutableStateOf<Int?>(null) }
     val report = state.report
+    // A vehicle or adapter change invalidates even an already opened TX dialog.
+    LaunchedEffect(state.consoleContextGeneration) {
+        pendingRawFrameInput = null
+        writeConsentStep = EcuWriteConsentFlow.Step.WARNING
+    }
+    // The menu describes CAN IDs seen in this session, not assumed ECU identities.
+    val observedCanIds = remember(state.observedCanIds, report) {
+        // Old log entries remain visible in the global monitor, but cannot
+        // advertise an ECU as present in a newly started physical capture.
+        CanConsoleDisplayFilter.observedFrameIds(
+            emptyList(),
+            report?.frames.orEmpty(),
+            state.observedCanIds
+        )
+    }
+    // If capture/vehicle changes, do not retain a stale selected identifier.
+    LaunchedEffect(observedCanIds) {
+        if (selectedObservedCanId != null && selectedObservedCanId !in observedCanIds) {
+            selectedObservedCanId = null
+        }
+    }
+    // Only identify a module by name if its actual CAN responder was observed
+    // during a verified physical scan, not from the predicted vehicle topology.
+    val physicallyIdentifiedModules = remember(knownModules, observedCanIds) {
+        knownModules.filter { module ->
+            module.status == ModuleStatus.ACCESSIBLE &&
+                module.notesEn.startsWith("Observed ") &&
+                observedCanIds.any { it.hex.equals(module.rxHeader, ignoreCase = true) }
+        }.associateBy { module ->
+            observedCanIds.first { it.hex.equals(module.rxHeader, ignoreCase = true) }
+        }
+    }
     val rawCanFrameInput = remember(requestInput) { RawCanFrameParser.parse(requestInput) != null }
+    val unsafeRawCanInput = remember(requestInput) {
+        RawCanFrameParser.parse(requestInput)?.let {
+            !SafeRawCanTransmitPolicy.allows(it)
+        } == true
+    }
     val parsedCanId = remember(canIdFilter) {
         if (canIdFilter.isBlank()) null else CanTraceFilter.parseCanId(canIdFilter)
     }
@@ -1631,7 +1770,9 @@ fun CanSnifferScreen(
         )
     }
     val visibleFrames = if (filterInputValid) {
-        report?.frames.orEmpty().filterCanTrace(traceFilter).asReversed()
+        report?.frames.orEmpty().filterCanTrace(traceFilter)
+            .filter { CanConsoleDisplayFilter.visibleTrace(it, selectedObservedCanId) }
+            .asReversed()
     } else emptyList()
     LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item {
@@ -1642,9 +1783,42 @@ fun CanSnifferScreen(
                     Text(stringResource(R.string.can_sniffer_safety), color = CamaroAmber, fontSize = 11.sp)
                     Text(stringResource(R.string.can_sniffer_bus_limit), color = TextMuted, fontSize = 10.sp)
                     Text(stringResource(R.string.can_sniffer_stn_filter_notice), color = TextMuted, fontSize = 10.sp)
+                    Box {
+                        OutlinedButton(
+                            onClick = { monitorFormatMenuExpanded = true },
+                            enabled = !state.isCapturing && !state.isSendingRequest,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(stringResource(
+                                if (monitorCan29Bit) R.string.can_monitor_format_29
+                                else R.string.can_monitor_format_11
+                            ))
+                        }
+                        DropdownMenu(
+                            expanded = monitorFormatMenuExpanded,
+                            onDismissRequest = { monitorFormatMenuExpanded = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.can_monitor_format_11)) },
+                                onClick = {
+                                    monitorCan29Bit = false
+                                    monitorFormatMenuExpanded = false
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.can_monitor_format_29)) },
+                                onClick = {
+                                    monitorCan29Bit = true
+                                    monitorFormatMenuExpanded = false
+                                }
+                            )
+                        }
+                    }
+                    Text(stringResource(R.string.can_monitor_format_notice),
+                        color = TextMuted, fontSize = 10.sp)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(
-                            onClick = onStart,
+                            onClick = { onStart(monitorCan29Bit) },
                             enabled = isAvailable && !state.isCapturing && !state.isSendingRequest,
                             modifier = Modifier.weight(1f)
                         ) {
@@ -1663,7 +1837,16 @@ fun CanSnifferScreen(
                         }
                     }
                     if (!isAvailable) {
-                        Text(stringResource(R.string.can_sniffer_unavailable), color = WarnRed, fontSize = 11.sp)
+                        Text(
+                            stringResource(if (canReadObdAvailable)
+                                R.string.can_console_read_only_available
+                            else R.string.can_sniffer_unavailable),
+                            color = if (canReadObdAvailable) TextMuted else WarnRed,
+                            fontSize = 11.sp
+                        )
+                    } else if (!canReadObdAvailable) {
+                        Text(stringResource(R.string.can_console_obd_unavailable),
+                            color = TextMuted, fontSize = 11.sp)
                     }
                     state.message?.takeIf { it.isNotBlank() }?.let {
                         Text(it, color = TextMuted, fontSize = 11.sp)
@@ -1682,8 +1865,7 @@ fun CanSnifferScreen(
                         Text(stringResource(R.string.can_console_history), color = CamaroAmber, fontWeight = FontWeight.Bold)
                         TextButton(
                             onClick = onExport,
-                            enabled = !state.isCapturing &&
-                                (state.consoleHistory.isNotEmpty() || state.rawText.isNotBlank())
+                            enabled = canExportAvailable
                         ) {
                             Text(stringResource(R.string.can_sniffer_export_raw), color = CamaroBlue)
                         }
@@ -1695,14 +1877,90 @@ fun CanSnifferScreen(
                             Text(stringResource(R.string.can_console_clear), color = CamaroBlue)
                         }
                     }
+                    Box {
+                        OutlinedButton(
+                            onClick = { observedEcuMenuExpanded = true },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                if (selectedObservedCanId == null)
+                                    stringResource(R.string.can_console_filter_all_ecus)
+                                else {
+                                    val id = selectedObservedCanId!!
+                                    val module = physicallyIdentifiedModules[id]
+                                    if (module == null) stringResource(
+                                        R.string.can_console_filter_observed_id,
+                                        CanConsoleDisplayFilter.displayId(id)
+                                    ) else stringResource(
+                                        R.string.can_console_filter_verified_ecu,
+                                        if (LocalConfiguration.current.locales[0].language == "fr")
+                                            module.nameFr else module.nameEn,
+                                        CanConsoleDisplayFilter.displayId(id)
+                                    )
+                                }
+                            )
+                        }
+                        DropdownMenu(
+                            expanded = observedEcuMenuExpanded,
+                            onDismissRequest = { observedEcuMenuExpanded = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.can_console_filter_all_ecus)) },
+                                onClick = {
+                                    selectedObservedCanId = null
+                                    observedEcuMenuExpanded = false
+                                }
+                            )
+                            observedCanIds.forEach { id ->
+                                DropdownMenuItem(
+                                    text = {
+                                        val module = physicallyIdentifiedModules[id]
+                                        Text(
+                                            if (module == null)
+                                                stringResource(
+                                                    R.string.can_console_filter_observed_id,
+                                                    CanConsoleDisplayFilter.displayId(id)
+                                                )
+                                            else stringResource(
+                                                R.string.can_console_filter_verified_ecu,
+                                                if (LocalConfiguration.current.locales[0].language == "fr")
+                                                    module.nameFr else module.nameEn,
+                                                CanConsoleDisplayFilter.displayId(id)
+                                            )
+                                        )
+                                    },
+                                    onClick = {
+                                        selectedObservedCanId = id
+                                        observedEcuMenuExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                    Text(
+                        stringResource(R.string.can_console_filter_observed_note),
+                        color = TextMuted, fontSize = 10.sp
+                    )
+                    if (state.consoleHistory.isNotEmpty()) {
+                        Text(
+                            stringResource(R.string.can_console_history_recent_scope),
+                            color = TextMuted, fontSize = 10.sp
+                        )
+                    }
+                    val visibleConsoleHistory = state.consoleHistory.filter { entry ->
+                        CanConsoleDisplayFilter.visible(
+                            ParsedCanConsoleRecord(entry.direction, entry.content, entry.succeeded),
+                            selectedObservedCanId
+                        )
+                    }
                     Column(
                         Modifier.fillMaxWidth().height(220.dp).verticalScroll(rememberScrollState()),
                         verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        if (state.consoleHistory.isEmpty()) {
+                        if (visibleConsoleHistory.isEmpty()) {
                             Text(stringResource(R.string.can_console_empty), color = TextMuted, fontSize = 11.sp)
                         } else {
-                            state.consoleHistory.forEach { entry ->
+                            visibleConsoleHistory.forEach { entry ->
                                 val time = java.text.DateFormat.getTimeInstance(
                                     java.text.DateFormat.MEDIUM,
                                     LocalConfiguration.current.locales[0]
@@ -1744,16 +2002,28 @@ fun CanSnifferScreen(
                     if (rawCanFrameInput && !canTransmitAvailable) {
                         Text(stringResource(R.string.can_console_tx_unverified), color = WarnRed, fontSize = 11.sp)
                     }
+                    if (unsafeRawCanInput) {
+                        Text(stringResource(R.string.can_console_unsafe_can_payload),
+                            color = WarnRed, fontSize = 11.sp)
+                    }
                     Button(
                         onClick = {
                             if (RawCanFrameParser.parse(requestInput) != null) {
-                                pendingRawFrameInput = requestInput.trim()
+                                writeConsentStep = EcuWriteConsentFlow.Step.WARNING
+                                pendingRawFrameInput =
+                                    requestInput.trim() to state.consoleContextGeneration
                             } else {
                                 onSendRequest(requestInput)
                             }
                         },
-                        enabled = isAvailable && !state.isCapturing && !state.isSendingRequest &&
-                            requestInput.isNotBlank() && (!rawCanFrameInput || canTransmitAvailable),
+                        enabled = CanConsoleCapabilityPolicy.canSubmit(
+                            rawCanFrame = rawCanFrameInput,
+                            monitorAvailable = isAvailable,
+                            canTransmit = canTransmitAvailable,
+                            readObdAvailable = canReadObdAvailable,
+                            inputPresent = requestInput.isNotBlank(),
+                            busy = state.isCapturing || state.isSendingRequest
+                        ),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(stringResource(R.string.can_sniffer_send))
@@ -1826,6 +2096,7 @@ fun CanSnifferScreen(
                         canIdFilter = ""
                         dataPrefixFilter = ""
                         directionFilter = "ALL"
+                        selectedObservedCanId = null
                     },
                     enabled = frameSearch.isNotBlank() || canIdFilter.isNotBlank() ||
                         dataPrefixFilter.isNotBlank() || directionFilter != "ALL",
@@ -2048,25 +2319,73 @@ fun CanSnifferScreen(
             }
         }
     }
-    pendingRawFrameInput?.let { frame ->
+    pendingRawFrameInput?.let { (frame, pendingEpoch) ->
+        val canConfirm = CanConsoleCapabilityPolicy.canConfirmPhysicalTx(
+            frame = RawCanFrameParser.parse(frame),
+            pendingContextGeneration = pendingEpoch,
+            currentContextGeneration = state.consoleContextGeneration,
+            monitorAvailable = isAvailable,
+            canTransmit = canTransmitAvailable,
+            busy = state.isCapturing || state.isSendingRequest
+        )
         AlertDialog(
-            onDismissRequest = { pendingRawFrameInput = null },
-            title = { Text(stringResource(R.string.can_console_raw_tx_confirm_title)) },
+            onDismissRequest = {
+                pendingRawFrameInput = null
+                writeConsentStep = EcuWriteConsentFlow.Step.WARNING
+            },
+            title = {
+                Text(stringResource(
+                    if (writeConsentStep == EcuWriteConsentFlow.Step.WARNING)
+                        R.string.ecu_write_warning_title
+                    else R.string.ecu_write_confirm_title
+                ))
+            },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(frame, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
-                    Text(stringResource(R.string.can_console_raw_tx_confirm_message))
+                    Text(stringResource(
+                        if (writeConsentStep == EcuWriteConsentFlow.Step.WARNING)
+                            R.string.ecu_write_warning_message
+                        else R.string.ecu_write_confirm_message
+                    ))
                 }
             },
             confirmButton = {
-                TextButton(onClick = {
-                    onSendRequest(frame)
-                    pendingRawFrameInput = null
-                }) { Text(stringResource(android.R.string.ok)) }
+                TextButton(
+                    enabled = canConfirm,
+                    onClick = {
+                        if (writeConsentStep == EcuWriteConsentFlow.Step.WARNING) {
+                            // OK only acknowledges the risk notice: it NEVER sends.
+                            writeConsentStep = EcuWriteConsentFlow.afterWarningOk(writeConsentStep)
+                        } else {
+                            EcuWriteConsentFlow.approval(
+                                writeConsentStep, confirmedYes = true,
+                                sameConnection = canConfirm
+                            )?.let { approval ->
+                                onConfirmRawFrame(frame, pendingEpoch, approval)
+                            }
+                            pendingRawFrameInput = null
+                            writeConsentStep = EcuWriteConsentFlow.Step.WARNING
+                        }
+                    }
+                ) {
+                    Text(stringResource(
+                        if (writeConsentStep == EcuWriteConsentFlow.Step.WARNING)
+                            R.string.ecu_write_ok
+                        else R.string.ecu_write_yes
+                    ))
+                }
             },
             dismissButton = {
-                TextButton(onClick = { pendingRawFrameInput = null }) {
-                    Text(stringResource(android.R.string.cancel))
+                TextButton(onClick = {
+                    pendingRawFrameInput = null
+                    writeConsentStep = EcuWriteConsentFlow.Step.WARNING
+                }) {
+                    Text(stringResource(
+                        if (writeConsentStep == EcuWriteConsentFlow.Step.WARNING)
+                            R.string.ecu_write_cancel
+                        else R.string.ecu_write_no
+                    ))
                 }
             }
         )
@@ -2161,8 +2480,17 @@ private fun localizedDtcDescription(dtc: DiagnosticDtc): String {
 }
 
 @Composable
-fun DtcScreen(dtcs: List<DiagnosticDtc>, vehicle: VehicleProfile, ecuVinComparison: VehicleVinComparison?, onScan: () -> Unit, onClear: () -> Unit) {
+fun DtcScreen(dtcs: List<DiagnosticDtc>, vehicle: VehicleProfile, ecuVinComparison: VehicleVinComparison?, connectionGeneration: Long, onScan: () -> Unit, onClear: (EcuWriteConsentFlow.Approval, Long, VehicleProfile) -> Unit) {
     var confirmClear by remember { mutableStateOf(false) }
+    var pendingClearGeneration by remember { mutableStateOf<Long?>(null) }
+    var pendingClearVehicle by remember { mutableStateOf<VehicleProfile?>(null) }
+    var clearConsentStep by remember { mutableStateOf(EcuWriteConsentFlow.Step.WARNING) }
+    LaunchedEffect(vehicle.vin, vehicle.modelYear, connectionGeneration) {
+        confirmClear = false
+        pendingClearGeneration = null
+        pendingClearVehicle = null
+        clearConsentStep = EcuWriteConsentFlow.Step.WARNING
+    }
     val isFrench = LocalConfiguration.current.locales[0].language.equals("fr", ignoreCase = true)
     var selectedDtc by remember { mutableStateOf<DiagnosticDtc?>(null) }
     selectedDtc?.let { selected ->
@@ -2234,7 +2562,12 @@ fun DtcScreen(dtcs: List<DiagnosticDtc>, vehicle: VehicleProfile, ecuVinComparis
                 SectionTitle(stringResource(R.string.dtc_title))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(onClick = onScan) { Text(stringResource(R.string.dtc_scan)) }
-                    Button(onClick = { confirmClear = true }, colors = ButtonDefaults.buttonColors(containerColor = WarnRed)) {
+                    Button(onClick = {
+                        clearConsentStep = EcuWriteConsentFlow.Step.WARNING
+                        pendingClearGeneration = connectionGeneration
+                        pendingClearVehicle = vehicle
+                        confirmClear = true
+                    }, colors = ButtonDefaults.buttonColors(containerColor = WarnRed)) {
                         Text(stringResource(R.string.dtc_clear), color = Color.White)
                     }
                 }
@@ -2290,20 +2623,70 @@ fun DtcScreen(dtcs: List<DiagnosticDtc>, vehicle: VehicleProfile, ecuVinComparis
 
     if (confirmClear) {
         AlertDialog(
-            onDismissRequest = { confirmClear = false },
-            title = { Text(stringResource(R.string.dtc_confirm_clear)) },
-            text = { Text(stringResource(R.string.dtc_clear_description)) },
+            onDismissRequest = {
+                confirmClear = false
+                pendingClearGeneration = null
+                pendingClearVehicle = null
+                clearConsentStep = EcuWriteConsentFlow.Step.WARNING
+            },
+            title = {
+                Text(stringResource(
+                    if (clearConsentStep == EcuWriteConsentFlow.Step.WARNING)
+                        R.string.ecu_write_warning_title
+                    else R.string.dtc_confirm_clear
+                ))
+            },
+            text = {
+                Text(stringResource(
+                    if (clearConsentStep == EcuWriteConsentFlow.Step.WARNING)
+                        R.string.ecu_write_warning_message
+                    else R.string.dtc_clear_description
+                ))
+            },
             confirmButton = {
                 Button(
                     onClick = {
-                        confirmClear = false
-                        onClear()
+                        if (clearConsentStep == EcuWriteConsentFlow.Step.WARNING) {
+                            // Acknowledging the warning never clears DTCs.
+                            clearConsentStep = EcuWriteConsentFlow.afterWarningOk(clearConsentStep)
+                        } else {
+                            val expectedVehicle = pendingClearVehicle
+                            val approval = EcuWriteConsentFlow.approvalForContext(
+                                clearConsentStep, confirmedYes = true,
+                                warningConnection = pendingClearGeneration,
+                                currentConnection = connectionGeneration,
+                                sameVehicle = expectedVehicle != null && expectedVehicle == vehicle
+                            )
+                            val epoch = pendingClearGeneration
+                            confirmClear = false
+                            pendingClearGeneration = null
+                            pendingClearVehicle = null
+                            clearConsentStep = EcuWriteConsentFlow.Step.WARNING
+                            if (approval != null && epoch != null && expectedVehicle != null) {
+                                onClear(approval, epoch, expectedVehicle)
+                            }
+                        }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = WarnRed)
-                ) { Text(stringResource(R.string.dtc_clear_action)) }
+                ) {
+                    Text(stringResource(
+                        if (clearConsentStep == EcuWriteConsentFlow.Step.WARNING)
+                            R.string.ecu_write_ok else R.string.ecu_write_yes
+                    ))
+                }
             },
             dismissButton = {
-                TextButton(onClick = { confirmClear = false }) { Text(stringResource(R.string.common_cancel)) }
+                TextButton(onClick = {
+                    confirmClear = false
+                    pendingClearGeneration = null
+                    pendingClearVehicle = null
+                    clearConsentStep = EcuWriteConsentFlow.Step.WARNING
+                }) {
+                    Text(stringResource(
+                        if (clearConsentStep == EcuWriteConsentFlow.Step.WARNING)
+                            R.string.ecu_write_cancel else R.string.ecu_write_no
+                    ))
+                }
             }
         )
     }

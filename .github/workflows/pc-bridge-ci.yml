@@ -1,32 +1,19 @@
 name: PC J2534 Bridge CI
+# Heavy tests are never triggered by pull_request synchronize.
+# Run manually at ~50-commit checkpoints and before merging; ready_for_review is a final gate.
 
 # Validate Windows-relevant PR updates at the configured build checkpoint.
 # Keep manual full validation available even when no Windows files changed.
 on:
-  pull_request:
-    branches: [main]
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - 'pc-bridge/**'
-      - 'global.json'
-      - '.editorconfig'
-      - '.github/actions/**'
-      - 'NuGet.Config'
-      - 'nuget.config'
-      - '**/Directory.Build.props'
-      - '**/Directory.Build.targets'
-      - '**/Directory.Packages.props'
-      - '**/*.sln'
-      - '**/*.slnx'
-      - '**/*.props'
-      - '**/*.targets'
-      - '.github/workflows/pc-bridge-ci.yml'
+  # Manual component checkpoint only. Full PR check is orchestrated by pr-unit-tests.yml.
+  # Disabled implicit PR triggers to prevent duplicate Debug validation.
+  # No automatic runs per commit or Ready transition.
   workflow_dispatch:
     inputs:
       target_ref:
         description: "Branch or commit to validate"
         required: true
-        default: "feat/ecu-backup-integrity"
+        default: "main"
         type: string
       pr_number:
         description: "Pull request number (optional)"
@@ -106,12 +93,12 @@ jobs:
         with:
           script: |
             const pr = context.payload.pull_request;
-            const runs = await github.paginate(github.rest.actions.listWorkflowRuns, {
+            const response = await github.rest.actions.listWorkflowRuns({
               owner: context.repo.owner, repo: context.repo.repo,
               workflow_id: 'pc-bridge-ci.yml', branch: pr.head.ref,
-              event: 'pull_request', status: 'completed', per_page: 100
+              event: 'pull_request', status: 'completed', per_page: 30
             });
-            const candidates = runs
+            const candidates = response.data.workflow_runs
               .filter(run => run.conclusion === 'success' && run.head_sha !== pr.head.sha &&
                 (run.pull_requests || []).some(item => item.number === pr.number))
               .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
@@ -342,7 +329,7 @@ jobs:
           fi
   build-windows-debug:
     needs: evaluate-build-checkpoint
-    if: always() && (github.event_name == 'workflow_dispatch' || needs.evaluate-build-checkpoint.outputs.build_required == 'true')
+    if: needs.evaluate-build-checkpoint.result == 'success' && needs.evaluate-build-checkpoint.outputs.build_required == 'true'
     runs-on: windows-latest
     steps:
       - name: Checkout pull request commit
@@ -443,7 +430,7 @@ jobs:
       - name: Upload Windows Debug installers for this PR commit
         uses: actions/upload-artifact@v7
         with:
-          name: CamaroDiag-J2534-Bridge-debug-pr-${{ inputs.pr_number || github.event.pull_request.number || 'manual' }}-${{ inputs.target_ref || github.event.pull_request.head.sha }}
+          name: CamaroDiag-J2534-Bridge-debug-pr-${{ inputs.pr_number || github.event.pull_request.number || 'manual' }}-${{ needs.evaluate-build-checkpoint.outputs.validated_sha }}
           path: |
             dist/CamaroDiag-J2534-Bridge-Setup-debug-pr*-x64.exe
             dist/CamaroDiag-J2534-Bridge-Setup-debug-pr*-x86.exe

@@ -152,7 +152,7 @@ class Lfx2012ControllerReferencesTest {
 
     @Test fun aCompleteReadOnlyFingerprintNeverAuthorizesAWrite() {
         val vehicle = Lfx2012FlexFuelPreflight.Vehicle(
-            2012, "LFX", 5, "2G1FF3D36C9104199", "2G1FF3D36C9104199"
+            2012, "LFX", 5, "2G1TEST00C0000001", "2G1TEST00C0000001"
         )
         val evidence = Lfx2012FlexFuelPreflight.Evidence(
             controllerId = "E39",

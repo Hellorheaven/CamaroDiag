@@ -35,6 +35,21 @@ class BluetoothObdManager(context: Context) {
     private var outputStream: OutputStream? = null
     private val commandMutex = Mutex()
     private val commandSessionMutex = Mutex()
+    // A superseded Wi-Fi handshake may finish after a new adapter selection.
+    // Serialize teardown with epoch-based cleanup and state publication.
+    private val adapterLifecycleLock = Any()
+
+    private fun beginAdapterConnection(): Long = synchronized(adapterLifecycleLock) {
+        disconnect()
+        transportSessionEpoch.capture()
+    }
+
+    private fun disconnectIfCurrent(expectedEpoch: Long) {
+        synchronized(adapterLifecycleLock) {
+            if (transportSessionEpoch.isCurrent(expectedEpoch)) disconnect()
+        }
+    }
+
     private val supportedMode01PidsMutex = Mutex()
     @Volatile private var cachedSupportedMode01Pids: Set<Int>? = null
     @Volatile private var cachedSupportedMode01PidsAtMillis: Long = 0L
@@ -124,7 +139,8 @@ class BluetoothObdManager(context: Context) {
 
     @SuppressLint("MissingPermission")
     suspend fun connectAndProbe(macAddress: String): Result<AdapterCapabilities> = withContext(Dispatchers.IO) {
-        disconnect()
+        val epoch = beginAdapterConnection()
+        var ownClassicSocket: BluetoothSocket? = null
         try {
             val device: BluetoothDevice = bluetoothAdapter?.getRemoteDevice(macAddress)
                 ?: return@withContext Result.failure(IllegalStateException("Bluetooth adapter unavailable"))
@@ -135,69 +151,117 @@ class BluetoothObdManager(context: Context) {
             if (useBle) {
                 val bleResult = bleTransport.connect(device)
                 if (bleResult.isFailure) {
-                    disconnect()
+                    disconnectIfCurrent(epoch)
                     return@withContext Result.failure(bleResult.exceptionOrNull()!!)
                 }
-                activeTransport = "BLE"
+                synchronized(adapterLifecycleLock) {
+                    transportSessionEpoch.requireQueuedCurrent(epoch)
+                    activeTransport = "BLE"
+                }
             } else {
                 val btSocket = device.createRfcommSocketToServiceRecord(sppUuid)
-                // Retain the socket before connecting so disconnect() also closes a
-                // failed RFCOMM handshake instead of leaking its descriptor.
-                socket = btSocket
+                ownClassicSocket = btSocket
+                // A pending RFCOMM connect must be owned by its exact epoch;
+                // disconnect() can then close the pending handshake on a switch.
+                synchronized(adapterLifecycleLock) {
+                    transportSessionEpoch.requireQueuedCurrent(epoch)
+                    socket = btSocket
+                }
                 btSocket.connect()
-                activeTransport = "BLUETOOTH"
-                inputStream = btSocket.inputStream
-                outputStream = btSocket.outputStream
+                val connectedInput = btSocket.inputStream
+                val connectedOutput = btSocket.outputStream
+                synchronized(adapterLifecycleLock) {
+                    transportSessionEpoch.requireQueuedCurrent(epoch)
+                    activeTransport = "BLUETOOTH"
+                    inputStream = connectedInput
+                    outputStream = connectedOutput
+                }
             }
-            probeConnectedAdapter(device.name ?: "Bluetooth OBD-II", macAddress)
+            probeConnectedAdapter(device.name ?: "Bluetooth OBD-II", macAddress, epoch)
         } catch (cancelled: kotlinx.coroutines.CancellationException) {
-            // Propagate cancellation after cleanup: a replacement connection
-            // must not race the teardown of this handshake.
-            disconnect()
+            runCatching { ownClassicSocket?.close() }
+            disconnectIfCurrent(epoch)
             throw cancelled
         } catch (error: Exception) {
-            disconnect()
+            runCatching { ownClassicSocket?.close() }
+            disconnectIfCurrent(epoch)
             Result.failure(error)
         }
     }
 
     suspend fun connectWifi(host: String, port: Int = 35000): Result<AdapterCapabilities> = withContext(Dispatchers.IO) {
-        disconnect()
+        // Invalid manual input must not tear down an otherwise working adapter.
+        try {
+            ElmWifiConnectionPolicy.validate(host, port, 4000)
+        } catch (invalid: IllegalArgumentException) {
+            return@withContext Result.failure(invalid)
+        }
+        val epoch = beginAdapterConnection()
         try {
             val connected = wifiTransport.connect(host, port)
             if (connected.isFailure) {
-                disconnect()
+                disconnectIfCurrent(epoch)
                 return@withContext Result.failure(connected.exceptionOrNull()!!)
             }
-            activeTransport = "WIFI"
-            probeConnectedAdapter("ELM327 Wi-Fi ($host:$port)", host)
+            synchronized(adapterLifecycleLock) {
+                transportSessionEpoch.requireQueuedCurrent(epoch)
+                activeTransport = "WIFI"
+            }
+            probeConnectedAdapter("ELM327 Wi-Fi ($host:$port)", host, epoch)
         } catch (cancelled: kotlinx.coroutines.CancellationException) {
-            // Propagate cancellation after cleanup: a replacement connection
-            // must not race the teardown of this handshake.
-            disconnect()
+            // An older connection's cancellation cannot tear down a successor.
+            disconnectIfCurrent(epoch)
             throw cancelled
         } catch (error: Exception) {
-            disconnect()
+            disconnectIfCurrent(epoch)
             Result.failure(error)
         }
     }
 
     /** Discovery only. Close the probe before returning: never expose an ELM channel. */
     suspend fun discoverCamaroDiagConnector(deviceId: Int, binary: Boolean = false): Result<AdapterCapabilities> =
-        withContext(Dispatchers.IO) {
+        isolatedConnectorUsb(deviceId, binary) { channel, ensureCurrent ->
+            val report = if (binary) {
+                CamaroDiagConnectorBinaryDiscovery.inspect(channel, ensureCurrent)
+            } else {
+                CamaroDiagConnectorDiscovery.inspect(channel, ensureCurrent)
+            }
+            report.toAdapterCapabilities()
+        }
+
+    /** Offline CDJ inspection remains; physical USB checkpoint capture is deferred to C5. */
+    suspend fun captureConnectorCheckpoint(deviceId: Int, isolatedConfirmed: Boolean): Result<ByteArray?> {
+        if (!isolatedConfirmed) return Result.failure(IllegalArgumentException("Isolated board confirmation required"))
+        // Do not reference the removed experimental CDJ/USB physical reader or
+        // mistake an offline checkpoint for a verified board acquisition.
+        return Result.failure(UnsupportedOperationException(
+            "Physical CDJ/USB checkpoint capture on device $deviceId is deferred to C5."
+        ))
+    }
+
+    private suspend fun <T> isolatedConnectorUsb(
+        deviceId: Int,
+        requireCdc: Boolean,
+        inspect: (CamaroDiagConnectorDiscovery.Channel, () -> Unit) -> T
+    ): Result<T> = withContext(Dispatchers.IO) {
             connectorDiscoveryMutex.withLock {
+                // This manager boundary is entered only after the ViewModel
+                // selected a new adapter and cleared the previous UI session.
+                // Keep physical teardown in step with that state transition.
                 disconnect()
                 val epoch = transportSessionEpoch.capture()
-                // The discovery handle is never the shared ELM transport.
-                // A stale probe can close only its own handle, never a new OBD session.
                 val probe = ElmUsbTransport(connectorUsbContext)
                 try {
-                    if (CamaroDiagConnectorDiscovery.requiresLegacyKklIsolation(deviceId, probe.availableDevices())) {
-                        return@withLock Result.failure(IllegalStateException("KKL requires its own qualified transport"))
+                    val enumerated = probe.availableDevices()
+                    if (!CamaroDiagConnectorDiscovery.allowsDedicatedUsbDiscovery(deviceId, enumerated)) {
+                        return@withLock Result.failure(IllegalStateException(
+                            "USB connector discovery requires a named non-KKL CamaroDiagConnectors device"
+                        ))
                     }
+                    // A dedicated probe never shares the old ELM channel.
                     probe.connect(
                         deviceId, CamaroDiagConnectorDiscovery.BAUD_RATE,
-                        discoveryOnly = true, requireCdc = binary
+                        discoveryOnly = true, requireCdc = requireCdc
                     ).getOrThrow()
                     val context = currentCoroutineContext()
                     val ensureCurrent = {
@@ -214,13 +278,9 @@ class BluetoothObdManager(context: Context) {
                             return probe.read(buffer, timeoutMs)
                         }
                     }
-                    val report = if (binary) {
-                        CamaroDiagConnectorBinaryDiscovery.inspect(channel, ensureCurrent)
-                    } else {
-                        CamaroDiagConnectorDiscovery.inspect(channel, ensureCurrent)
-                    }
+                    val result = inspect(channel, ensureCurrent)
                     ensureCurrent()
-                    Result.success(report.toAdapterCapabilities())
+                    Result.success(result)
                 } catch (cancelled: kotlinx.coroutines.CancellationException) {
                     throw cancelled
                 } catch (error: Exception) {
@@ -232,7 +292,12 @@ class BluetoothObdManager(context: Context) {
         }
 
     suspend fun connectUsb(deviceId: Int, baudRate: Int = 38400): Result<AdapterCapabilities> = withContext(Dispatchers.IO) {
-        disconnect()
+        try {
+            UsbAdapterConnectParameters.requireValid(deviceId, baudRate)
+        } catch (invalid: IllegalArgumentException) {
+            return@withContext Result.failure(invalid)
+        }
+        val epoch = beginAdapterConnection()
         try {
             // Re-check the currently enumerated USB device at the manager boundary.
             // Neither a legacy UI entry nor a saved ELM profile may bypass discovery.
@@ -245,38 +310,48 @@ class BluetoothObdManager(context: Context) {
             }
             val connected = usbTransport.connect(deviceId, baudRate)
             if (connected.isFailure) {
-                disconnect()
+                disconnectIfCurrent(epoch)
                 return@withContext Result.failure(connected.exceptionOrNull()!!)
             }
-            activeTransport = "USB"
-            probeConnectedAdapter("ELM327 USB #$deviceId", "USB:$deviceId")
+            synchronized(adapterLifecycleLock) {
+                transportSessionEpoch.requireQueuedCurrent(epoch)
+                activeTransport = "USB"
+            }
+            probeConnectedAdapter("ELM327 USB #$deviceId", "USB:$deviceId", epoch)
         } catch (cancelled: kotlinx.coroutines.CancellationException) {
-            // Propagate cancellation after cleanup: a replacement connection
-            // must not race the teardown of this handshake.
-            disconnect()
+            disconnectIfCurrent(epoch)
             throw cancelled
         } catch (error: Exception) {
-            disconnect()
+            disconnectIfCurrent(epoch)
             Result.failure(error)
         }
     }
 
     private suspend fun probeConnectedAdapter(
         deviceName: String,
-        address: String
+        address: String,
+        expectedEpoch: Long = transportSessionEpoch.capture()
     ): Result<AdapterCapabilities> {
+        // Every probe request is tied to the original adapter generation,
+        // including the last 0100. A newer selection must never receive the
+        // remaining AT commands of the cancelled probe.
+        suspend fun probeCommand(command: String, timeoutMs: Long = 1200L): String =
+            commandSessionMutex.withLock {
+                transportSessionEpoch.requireQueuedCurrent(expectedEpoch)
+                sendAtCommandInternal(command, timeoutMs, expectedEpoch = expectedEpoch)
+            }
         return try {
-            val atz = sendAtCommand("ATZ")
-            sendAtCommand("ATE0")
-            sendAtCommand("ATL0")
-            val headersResp = sendAtCommand("ATH1")
-            val sti = sendAtCommand("STI")
-            val atal = sendAtCommand("ATAL")
-            val stp61 = sendAtCommand("STP 61")
-            val protocolResp = sendAtCommand("ATSP 6")
+            val atz = probeCommand("ATZ")
+            probeCommand("ATE0")
+            probeCommand("ATL0")
+            val headersResp = probeCommand("ATH1")
+            val sti = probeCommand("STI")
+            val atal = probeCommand("ATAL")
+            val stp61 = probeCommand("STP 61")
+            val protocolResp = probeCommand("ATSP 6")
             // A real 0100 response proves that the connected physical command path
             // transmitted a request and received an ECU reply; AT header support alone does not.
-            val transmitProbeResp = sendAtCommand("0100", 2_500L)
+            val transmitProbeResp = probeCommand("0100", 2_500L)
 
             val capabilities = CamaroUdsProtocol.evaluateAdapterProbe(
                 deviceName = deviceName,
@@ -289,20 +364,32 @@ class BluetoothObdManager(context: Context) {
                 protocolResp = protocolResp,
                 transmitProbeResp = transmitProbeResp
             )
-            isDemoMode = false
-            activeAdapterCapabilities = capabilities
+            synchronized(adapterLifecycleLock) {
+                transportSessionEpoch.requireQueuedCurrent(expectedEpoch)
+                isDemoMode = false
+                activeAdapterCapabilities = capabilities
+            }
             Result.success(capabilities)
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            disconnectIfCurrent(expectedEpoch)
+            throw cancelled
         } catch (error: Exception) {
-            disconnect()
+            disconnectIfCurrent(expectedEpoch)
             Result.failure(error)
         }
     }
 
     suspend fun activateSimulatedAdapter(preset: String): AdapterCapabilities = withContext(Dispatchers.Default) {
-        disconnect()
-        isDemoMode = true
-        isSimulationActive = true
+        val epoch = synchronized(adapterLifecycleLock) {
+            disconnect()
+            isDemoMode = true
+            isSimulationActive = true
+            transportSessionEpoch.capture()
+        }
         delay(350)
+        // A pending demo animation cannot report its simulated adapter as
+        // current after USB/BLE/Wi-Fi/J2534 was selected instead.
+        transportSessionEpoch.requireQueuedCurrent(epoch)
         when (preset) {
             "MX_PLUS" -> CamaroUdsProtocol.evaluateAdapterProbe(
                 deviceName = "OBDLink MX+ (Simulated)",
@@ -384,6 +471,86 @@ class BluetoothObdManager(context: Context) {
         }
         return withObdCommandSession { engine ->
             engine.readMode01PidIfSupported(pid, supported)
+        }
+    }
+
+    /**
+     * One physical, read-only Mode 01 survey of the fuel-composition and trim
+     * PIDs on the same connection epoch. An unsupported PID is NOT read.
+     * No ELM fallback while a J2534 bridge is selected, and no simulator.
+     */
+    suspend fun readPhysicalFuelSurvey(): Lfx2012FuelReadOnly.Survey {
+        check(!isDemoMode && !isSimulationActive) {
+            "FlexFuel observations require a physical ECU connection, never demo data."
+        }
+        val epoch = transportSessionEpoch.capture()
+        if (activeTransport == "J2534_BRIDGE") {
+            check(isJ2534BridgeConnected()) {
+                "The selected J2534 physical fuel channel disconnected; no ELM fallback."
+            }
+            return commandSessionMutex.withLock {
+                transportSessionEpoch.requireQueuedCurrent(epoch)
+                check(isJ2534StandardObdAvailable()) {
+                    "The connected J2534 channel cannot read standard OBD fuel PIDs."
+                }
+                val bridge = checkNotNull(j2534BridgeTransport)
+                val supported = bridge.discoverStandardObdPids()
+                transportSessionEpoch.requireQueuedCurrent(epoch)
+                val replies = linkedMapOf<Int, String?>()
+                for (pid in Lfx2012FuelReadOnly.PIDS) {
+                    transportSessionEpoch.requireQueuedCurrent(epoch)
+                    replies[pid] = if (pid in supported)
+                        bridge.readStandardObdPid(pid) else null
+                    transportSessionEpoch.requireQueuedCurrent(epoch)
+                }
+                Lfx2012FuelReadOnly.Survey(
+                    Lfx2012FuelReadOnly.Source.J2534, supported, replies
+                )
+            }
+        }
+        check(isObdCommandChannelAvailable) {
+            "No physical ELM/STN OBD channel is connected for the fuel survey."
+        }
+        return withObdCommandSession { engine ->
+            transportSessionEpoch.requireQueuedCurrent(epoch)
+            val discovery = engine.discoverPidAvailability(primaryPowertrainResponderOnly = true)
+            transportSessionEpoch.requireQueuedCurrent(epoch)
+            val replies = linkedMapOf<Int, String?>()
+            for (pid in Lfx2012FuelReadOnly.PIDS) {
+                transportSessionEpoch.requireQueuedCurrent(epoch)
+                replies[pid] = engine.readMode01PidIfSupported(pid, discovery.supported)
+                transportSessionEpoch.requireQueuedCurrent(epoch)
+            }
+            Lfx2012FuelReadOnly.Survey(
+                Lfx2012FuelReadOnly.Source.ELM, discovery.supported, replies, discovery.firstUnresolvedPid
+            )
+        }
+    }
+
+    /**
+     * Console operator read, using the active real transport without silently
+     * falling back from J2534 to an ELM adapter or to simulation.
+     */
+    suspend fun sendReadOnlyConsoleCommand(request: SafeObdRequest): String {
+        require(SafeObdRequestPolicy.parse(request.elmCommand) == request) {
+            "Invalid operator OBD read command."
+        }
+        if (!isJ2534BridgeConnected()) {
+            check(isObdCommandChannelAvailable) { "No connected OBD read channel." }
+            val epoch = transportSessionEpoch.capture()
+            return commandSessionMutex.withLock {
+                transportSessionEpoch.requireQueuedCurrent(epoch)
+                check(isObdCommandChannelAvailable) { "OBD channel disconnected." }
+                sendAtCommandInternal(request.elmCommand, 4_000L, expectedEpoch = epoch)
+            }
+        }
+        val epoch = transportSessionEpoch.capture()
+        return commandSessionMutex.withLock {
+            transportSessionEpoch.requireQueuedCurrent(epoch)
+            check(isJ2534StandardObdAvailable()) { "Physical J2534 OBD reading unavailable." }
+            val result = checkNotNull(j2534BridgeTransport).readOnlyConsoleRequest(request)
+            transportSessionEpoch.requireQueuedCurrent(epoch)
+            result
         }
     }
 
@@ -492,13 +659,22 @@ class BluetoothObdManager(context: Context) {
     fun isJ2534StandardObdClearAvailable(): Boolean =
         isJ2534StandardObdAvailable() && j2534BridgeTransport?.isStandardObdClearEnabled == true
 
-    suspend fun clearJ2534StandardDtcs() {
+    suspend fun clearJ2534StandardDtcs(
+        approval: EcuWriteConsentFlow.Approval,
+        beforeTransmit: () -> Unit
+    ) {
+        require(approval.warningAcknowledged && approval.confirmedYes) {
+            "Risk notice OK and separate YES are required before clearing ECU DTCs."
+        }
         val epoch = transportSessionEpoch.capture()
         check(isJ2534StandardObdClearAvailable())
         commandSessionMutex.withLock {
             transportSessionEpoch.requireQueuedCurrent(epoch)
             check(isJ2534StandardObdClearAvailable())
-            checkNotNull(j2534BridgeTransport).clearStandardObdDtcs()
+            checkNotNull(j2534BridgeTransport).clearStandardObdDtcs(approval) {
+                transportSessionEpoch.requireQueuedCurrent(epoch)
+                beforeTransmit()
+            }
             transportSessionEpoch.requireQueuedCurrent(epoch)
         }
     }
@@ -516,6 +692,7 @@ class BluetoothObdManager(context: Context) {
      */
     suspend fun captureCanMonitor(
         durationMs: Long = Long.MAX_VALUE,
+        can29Bit: Boolean = false,
         onChunk: (String) -> Unit
     ): String = withContext(Dispatchers.IO) {
         val requestedEpoch = transportSessionEpoch.capture()
@@ -542,50 +719,47 @@ class BluetoothObdManager(context: Context) {
             // automatic OBD filtering after the capture.
             val monitorCommand = if (isStnAdapter) "STM" else "ATMA"
             val captured = CanCaptureTextBuffer()
+            val monitorErrors = CanMonitorErrorTracker()
             try {
-                boundCommand("ATE0", 1_000L)
-                boundCommand("ATL0", 1_000L)
-                boundCommand("ATS1", 1_000L)
-                boundCommand("ATH1", 1_000L)
-                val formattingResponse = boundCommand("ATCAF0", 1_000L)
-                check(!formattingResponse.contains("?")) {
-                    "The connected adapter cannot switch to raw CAN formatting."
-                }
-                if (isStnAdapter) {
-                    val canFilterResponse = boundCommand("ATCF 000", 1_000L)
-                    val canMaskResponse = boundCommand("ATCM 000", 1_000L)
-                    val filterResponse = boundCommand("STFAC", 1_000L)
-                    check(
-                        !canFilterResponse.contains("?") &&
-                            !canMaskResponse.contains("?") &&
-                            !filterResponse.contains("?")
-                    ) {
-                        "The STN adapter could not clear its temporary CAN filters."
-                    }
+                // Configure one physical CAN format and clear STN receive filters.
+                // All steps require explicit adapter acknowledgement before streaming.
+                for (command in CanMonitorProtocolPolicy.setupCommands(can29Bit, isStnAdapter)) {
+                    val timeout = if (command.startsWith("ATSP")) 1_500L else 1_000L
+                    val answer = boundCommand(command, timeout)
+                    if (!CanConsoleAdapterRestorationPolicy.accepted(answer))
+                        throw CanAdapterRestorationException()
                 }
                 val monitorResponse = boundCommand(monitorCommand, durationMs) { chunk ->
                     captured.append(chunk)
+                    monitorErrors.append(chunk)
                     onChunk(chunk)
                 }
-                check(monitorResponse.trim() != "?") {
-                    "The connected adapter does not support the selected CAN monitor command."
+                check(CanMonitorCompletionPolicy.accepted(monitorResponse) &&
+                    !monitorErrors.hasFailureAtEnd()) {
+                    "The connected adapter failed or rejected the CAN monitor command."
                 }
             } finally {
                 // ELM/STN monitor mode has no normal prompt; ESC returns the adapter
                 // to command mode even when the caller cancels the capture.
                 withContext(NonCancellable) {
-                    runCatching { boundCommand("\u001B", 1_000L) }
-                    if (isStnAdapter) {
-                        runCatching { boundCommand("ATAR", 1_000L) }
+                    // ESC may return only a prompt. A failed ESC still requires a
+                    // fail-closed session even if later configuration commands respond.
+                    var restored = runCatching { boundCommand("\u001B", 1_000L) }.isSuccess
+                    val commands = CanMonitorProtocolPolicy.restoreCommands(isStnAdapter)
+                    // Restore the command-channel formatting established at probe time.
+                    for (command in commands) {
+                        val answer = runCatching { boundCommand(command, 1_000L) }.getOrNull()
+                        if (answer == null || !CanConsoleAdapterRestorationPolicy.accepted(answer))
+                            restored = false
                     }
-                    // Restore the command-channel formatting established during adapter probing.
-                    // A bare "AT" is not an ELM reset command; ATD would reset protocol and
-                    // other settings that the app relies on, so restore each changed setting.
-                    runCatching { boundCommand("ATE0", 1_000L) }
-                    runCatching { boundCommand("ATL0", 1_000L) }
-                    runCatching { boundCommand("ATH1", 1_000L) }
-                    runCatching { boundCommand("ATS0", 1_000L) }
-                    runCatching { boundCommand("ATCAF1", 1_000L) }
+                    if (!restored) {
+                        // An old operation cannot tear down a replacement adapter.
+                        if (!transportSessionEpoch.isCurrent(requestedEpoch))
+                            throw ObdSupersededSessionException(CanAdapterRestorationException())
+                        val transportKind = activeTransport
+                        disconnect()
+                        throw CanAdapterRestorationException(transportKind)
+                    }
                 }
             }
             captured.snapshot()
@@ -597,8 +771,20 @@ class BluetoothObdManager(context: Context) {
      * adapter. Receive/header support is checked separately from simulation state; this
      * path never routes through the demo adapter or the ISO-TP-only J2534 bridge.
      */
-    suspend fun sendRawCanFrame(frame: RawCanFrame): String = withContext(Dispatchers.IO) {
+    suspend fun sendRawCanFrameWithStatus(
+        frame: RawCanFrame,
+        approval: EcuWriteConsentFlow.Approval,
+        // Passive read-only observation, never an alternative TX permission.
+        // The console stores all physical RX chunks before the matcher drops
+        // older events from its deliberately bounded recent-record window.
+        onPhysicalResponseChunk: (String, Long) -> Unit = { _, _ -> },
+        isOperatorContextCurrent: () -> Boolean
+    ): CanConsoleRawTransmissionResult =
+        withContext(Dispatchers.IO) {
         val requestedEpoch = transportSessionEpoch.capture()
+        // The raw payload may be a mutating ECU command. No public no-approval
+        // convenience entrypoint may bypass the two independent UI actions.
+        EcuWriteConsentFlow.requireCurrentForTransmit(approval, isOperatorContextCurrent)
         check(isObdCommandChannelAvailable && !isDemoMode && !isSimulationActive) {
             "Raw CAN transmission requires a connected physical adapter."
         }
@@ -617,60 +803,161 @@ class BluetoothObdManager(context: Context) {
         require(if (frame.isExtended) frame.canId in 0..0x1FFFFFFFL else frame.canId in 0..0x7FFL) {
             "CAN identifier is outside the selected 11-bit/29-bit range."
         }
+        require(SafeRawCanTransmitPolicy.allows(frame)) {
+            "The raw CAN console refused an unsafe or unqualified diagnostic request."
+        }
 
         commandSessionMutex.withLock {
             transportSessionEpoch.requireQueuedCurrent(requestedEpoch)
             check(isObdCommandChannelAvailable) { "CAN transmission connection changed while waiting." }
-            suspend fun boundCommand(command: String, timeoutMs: Long): String =
-                sendAtCommandInternal(command, timeoutMs, expectedEpoch = requestedEpoch)
+            suspend fun boundCommand(
+                command: String,
+                timeoutMs: Long,
+                onChunk: ((String) -> Unit)? = null,
+                beforeTransmit: () -> Unit = {}
+            ): String = sendAtCommandInternal(
+                command, timeoutMs, expectedEpoch = requestedEpoch,
+                onChunk = onChunk, beforeTransmit = beforeTransmit
+            )
             val protocol = if (frame.isExtended) "7" else "6"
             val header = if (frame.isExtended) {
                 frame.canId.toString(16).uppercase().padStart(8, '0')
             } else {
                 frame.canId.toString(16).uppercase().padStart(3, '0')
             }
+            val timedCorrelation = CanConsoleLiveDiagnosticCorrelation(
+                frame, requireExplicitStart = true
+            )
             try {
                 val protocolResponse = boundCommand("ATSP$protocol", 1_500L)
-                check(!protocolResponse.contains("?")) {
+                check(CanConsoleAdapterRestorationPolicy.accepted(protocolResponse)) {
                     "The adapter rejected the selected CAN protocol."
                 }
                 val formattingResponse = boundCommand("ATCAF0", 1_500L)
-                check(!formattingResponse.contains("?")) {
+                check(CanConsoleAdapterRestorationPolicy.accepted(formattingResponse)) {
                     "The adapter cannot enter raw CAN formatting mode."
                 }
+                // CAF0 controls formatting, not automatic ISO-TP Flow Control.
+                // Reset any previous user-defined FC header/bytes to mode 0,
+                // then require CFC1 on the actual physical adapter.
+                for (command in CanConsoleIsotpFlowControlPolicy.setupCommands()) {
+                    val flowControlResponse = boundCommand(command, 1_500L)
+                    check(CanConsoleIsotpFlowControlPolicy.adapterConfirmed(flowControlResponse)) {
+                        "The adapter did not confirm ISO-TP automatic flow control."
+                    }
+                }
                 val headerResponse = boundCommand("ATSH $header", 1_500L)
-                check(!headerResponse.contains("?")) {
+                check(CanConsoleAdapterRestorationPolicy.accepted(headerResponse)) {
                     "The adapter rejected CAN header $header."
                 }
                 val headersResponse = boundCommand("ATH1", 1_000L)
                 val spacesResponse = boundCommand("ATS1", 1_000L)
-                check(!headersResponse.contains("?") && !spacesResponse.contains("?")) {
+                check(CanConsoleAdapterRestorationPolicy.accepted(headersResponse) &&
+                    CanConsoleAdapterRestorationPolicy.accepted(spacesResponse)) {
                     "The adapter cannot expose received CAN identifiers and byte boundaries."
                 }
                 val payload = frame.data.joinToString(" ") {
                     "%02X".format(java.util.Locale.ROOT, it.toInt() and 0xFF)
                 }
-                val frameResponse = boundCommand(payload, 4_000L)
-                check(!frameResponse.contains("?")) {
-                    "The adapter rejected the raw CAN frame."
+                timedCorrelation.beginRequest(System.nanoTime() / 1_000_000L)
+                // AT configuration may be queued, but the ECU payload itself
+                // must still belong to the originally confirmed account,
+                // vehicle and adapter at the exact physical TX boundary.
+                val frameResponse = boundCommand(
+                    payload, 4_000L,
+                    onChunk = { chunk ->
+                        val receivedAtWallClock = System.currentTimeMillis()
+                        timedCorrelation.append(
+                            chunk, System.nanoTime() / 1_000_000L, receivedAtWallClock
+                        )
+                        // This callback gets the actual adapter RX chunks,
+                        // including records beyond the 300-item diagnostic window.
+                        onPhysicalResponseChunk(chunk, receivedAtWallClock)
+                    },
+                    beforeTransmit = {
+                        transportSessionEpoch.requireQueuedCurrent(requestedEpoch)
+                        EcuWriteConsentFlow.requireCurrentForTransmit(
+                            approval, isOperatorContextCurrent
+                        )
+                    }
+                )
+                val diagnosticStatus = timedCorrelation.complete(
+                    System.nanoTime() / 1_000_000L, System.currentTimeMillis()
+                )
+                // An explicit adapter OK establishes TX only. A correlated ECU
+                // reply may also establish completion, but unmatched bus traffic
+                // and late ISO-TP continuations never do.
+                check(CanConsolePhysicalTransmissionPolicy.confirmed(
+                    adapterOutput = frameResponse,
+                    diagnosticStatus = diagnosticStatus,
+                    hasExplicitAck = timedCorrelation.hasExplicitAdapterAck(),
+                    hasAdapterError = timedCorrelation.hasAdapterError()
+                )) {
+                    "The adapter did not confirm the raw CAN transmission."
                 }
-                frameResponse
+                CanConsoleRawTransmissionResult(
+                    frameResponse, diagnosticStatus, timedCorrelation.recentReceivedRecords()
+                )
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                // A complete CAN line may be missing only its CR/LF when the
+                // stream was cancelled. Drain it for the history, not for TX success.
+                timedCorrelation.complete(
+                    System.nanoTime() / 1_000_000L, System.currentTimeMillis()
+                )
+                throw CanConsolePhysicalExchangeCancelled(
+                    timedCorrelation.recentReceivedRecords(), cancelled
+                )
+            } catch (superseded: ObdSupersededSessionException) {
+                throw superseded
+            } catch (error: Exception) {
+                // An adapter error/timeout does not erase already observed RX.
+                timedCorrelation.complete(
+                    System.nanoTime() / 1_000_000L, System.currentTimeMillis()
+                )
+                throw CanConsolePhysicalExchangeException(
+                    timedCorrelation.recentReceivedRecords(), error
+                )
             } finally {
                 // Return to the app's configured 11-bit HS-CAN / automatic-format state.
                 withContext(NonCancellable) {
-                    runCatching { boundCommand("ATSP6", 1_500L) }
-                    // Restore the app's standard functional OBD request header as well
-                    // as formatting; otherwise later requests could remain physically addressed.
-                    runCatching { boundCommand("ATSH 7DF", 1_500L) }
-                    runCatching { boundCommand("ATCAF1", 1_500L) }
-                    runCatching { boundCommand("ATH1", 1_000L) }
-                    runCatching { boundCommand("ATS0", 1_000L) }
+                    // A successful TX is not permission to keep using an adapter whose
+                    // CAN protocol/header could not be restored. Try every cleanup step,
+                    // then close the physical session if *any* step was unconfirmed.
+                    var restored = true
+                    for ((command, timeout) in listOf(
+                        "ATSP6" to 1_500L,
+                        "ATSH 7DF" to 1_500L,
+                        "ATCAF1" to 1_500L,
+                        CanConsoleIsotpFlowControlPolicy.RESTORE_AUTOMATIC_MODE to 1_500L,
+                        CanConsoleIsotpFlowControlPolicy.ENABLE_AUTOMATIC to 1_500L,
+                        "ATH1" to 1_000L,
+                        "ATS0" to 1_000L
+                    )) {
+                        val answer = runCatching { boundCommand(command, timeout) }.getOrNull()
+                        if (answer == null || !CanConsoleAdapterRestorationPolicy.accepted(answer))
+                            restored = false
+                    }
+                    if (!restored) {
+                        // An old operation cannot tear down a replacement adapter.
+                        if (!transportSessionEpoch.isCurrent(requestedEpoch))
+                            throw ObdSupersededSessionException(CanAdapterRestorationException())
+                        val transportKind = activeTransport
+                        disconnect()
+                        throw CanConsolePhysicalExchangeException(
+                            timedCorrelation.recentReceivedRecords(),
+                            CanAdapterRestorationException(transportKind)
+                        )
+                    }
                 }
             }
         }
     }
 
-    suspend fun sendAtCommand(command: String, timeoutMs: Long = 1200L): String {
+    suspend fun sendAtCommand(
+        command: String,
+        timeoutMs: Long = 1200L,
+        beforeTransmit: () -> Unit = {}
+    ): String {
         val requestedEpoch = transportSessionEpoch.capture()
         return withContext(Dispatchers.IO) {
             commandSessionMutex.withLock {
@@ -678,7 +965,10 @@ class BluetoothObdManager(context: Context) {
                 // Adapter probing calls this before capability detection has cleared
                 // demo mode. The epoch check is valid here; a channel-available
                 // check would incorrectly reject every initial ATZ/0100 probe.
-                sendAtCommandInternal(command, timeoutMs, expectedEpoch = requestedEpoch)
+                sendAtCommandInternal(
+                    command, timeoutMs, expectedEpoch = requestedEpoch,
+                    beforeTransmit = beforeTransmit
+                )
             }
         }
     }
@@ -687,7 +977,8 @@ class BluetoothObdManager(context: Context) {
         command: String,
         timeoutMs: Long,
         expectedEpoch: Long? = null,
-        onChunk: ((String) -> Unit)? = null
+        onChunk: ((String) -> Unit)? = null,
+        beforeTransmit: () -> Unit = {}
     ): String = withContext(Dispatchers.IO) {
         commandMutex.withLock {
             // The operation may have waited on the command mutex across a reconnect.
@@ -703,6 +994,11 @@ class BluetoothObdManager(context: Context) {
                 }
             }
             val payload = (command.trim() + "\r").toByteArray(Charsets.US_ASCII)
+            ensureSameSession()
+            // Check the operator's account, vehicle and connection consent
+            // at the physical command boundary, not only at queue admission.
+            // Read-only commands use the default no-op callback.
+            beforeTransmit()
             ensureSameSession()
             try {
             if (sessionTransport == "USB") {
@@ -726,7 +1022,11 @@ class BluetoothObdManager(context: Context) {
                     } else delay(10)
                 }
                 ensureSameSession()
-                ElmResponseCompletion.requirePrompt(command, streaming = onChunk != null, promptReceived = promptReceived)
+                ElmResponseCompletion.requirePrompt(
+                    command,
+                    streaming = ElmResponseCompletion.isUnterminatedMonitorCommand(command, onChunk != null),
+                    promptReceived = promptReceived
+                )
                 ensureSameSession()
                 normalizeElmReply(buffer.toString(), command)
             } else if (sessionTransport == "BLE") {
@@ -748,7 +1048,11 @@ class BluetoothObdManager(context: Context) {
                     } else delay(10)
                 }
                 ensureSameSession()
-                ElmResponseCompletion.requirePrompt(command, streaming = onChunk != null, promptReceived = promptReceived)
+                ElmResponseCompletion.requirePrompt(
+                    command,
+                    streaming = ElmResponseCompletion.isUnterminatedMonitorCommand(command, onChunk != null),
+                    promptReceived = promptReceived
+                )
                 ensureSameSession()
                 normalizeElmReply(buffer.toString(), command)
             } else if (sessionTransport == "WIFI") {
@@ -775,7 +1079,11 @@ class BluetoothObdManager(context: Context) {
                     delay(10)
                 }
                 ensureSameSession()
-                ElmResponseCompletion.requirePrompt(command, streaming = onChunk != null, promptReceived = promptReceived)
+                ElmResponseCompletion.requirePrompt(
+                    command,
+                    streaming = ElmResponseCompletion.isUnterminatedMonitorCommand(command, onChunk != null),
+                    promptReceived = promptReceived
+                )
                 ensureSameSession()
                 normalizeElmReply(buffer.toString(), command)
             } else {
@@ -818,7 +1126,11 @@ class BluetoothObdManager(context: Context) {
                 }
                 if (callbackBuffer.isNotEmpty()) onChunk?.invoke(callbackBuffer.toString())
                 ensureSameSession()
-                ElmResponseCompletion.requirePrompt(command, streaming = onChunk != null, promptReceived = promptReceived)
+                ElmResponseCompletion.requirePrompt(
+                    command,
+                    streaming = ElmResponseCompletion.isUnterminatedMonitorCommand(command, onChunk != null),
+                    promptReceived = promptReceived
+                )
                 ensureSameSession()
                 normalizeElmReply(buffer.toString(), command)
             }
@@ -848,17 +1160,32 @@ class BluetoothObdManager(context: Context) {
         can29Bit: Boolean,
         protocolNumber: Int = 33
     ): Result<String> = withContext(Dispatchers.IO) {
-        disconnect()
+        // A malformed token, public host or incompatible CAN profile must
+        // never tear down an already working Bluetooth/USB/Wi-Fi adapter.
+        try {
+            J2534BridgeConnectionPreflight.requireValid(
+                host, port, pairingToken, requestCanId, responseCanId,
+                can29Bit, protocolNumber
+            )
+        } catch (invalid: IllegalArgumentException) {
+            return@withContext Result.failure(invalid)
+        }
+        val epoch = beginAdapterConnection()
         val bridge = J2534BridgeTransport(host, port, pairingToken)
         try {
             val info = bridge.connect(requestCanId, responseCanId, can29Bit, protocolNumber)
-            j2534BridgeTransport = bridge
-            j2534BridgeRequestCanId = requestCanId
-            j2534BridgeResponseCanId = responseCanId
-            j2534BridgeProtocolNumber = protocolNumber
-            activeTransport = "J2534_BRIDGE"
-            isDemoMode = false
-            isSimulationActive = false
+            // The TLS handshake can finish after a different adapter has been
+            // selected. Never publish a stale bridge over the replacement.
+            synchronized(adapterLifecycleLock) {
+                transportSessionEpoch.requireQueuedCurrent(epoch)
+                j2534BridgeTransport = bridge
+                j2534BridgeRequestCanId = requestCanId
+                j2534BridgeResponseCanId = responseCanId
+                j2534BridgeProtocolNumber = protocolNumber
+                activeTransport = "J2534_BRIDGE"
+                isDemoMode = false
+                isSimulationActive = false
+            }
             Result.success(info)
         } catch (cancelled: kotlinx.coroutines.CancellationException) {
             bridge.close()
@@ -940,15 +1267,111 @@ class BluetoothObdManager(context: Context) {
             check(isJ2534BridgeConnected() && bridge.isScopedMemoryReadEnabled) {
                 "The J2534 bridge has no approved physical ECU memory read scope."
             }
+            // Never allow the UI to relabel a Windows-approved address span,
+            // session or region when exporting the physical acquisition.
+            bridge.requireApprovedMemoryReadScope(request)
+            // GM GMLAN OSID is optional: other ECUs may support scoped 0x23
+            // memory reads but not legacy 0x1A identity. Never infer an OSID
+            // from the VIN, adapter name, model year or an imported calibration.
+            val identityBefore = try {
+                bridge.readGmlanIdentification()
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (unavailable: GmlanIdentityUnavailableException) {
+                // A genuinely unsupported legacy identity is optional, but
+                // malformed, denied or mismatched evidence is never optional.
+                transportSessionEpoch.requireQueuedCurrent(epoch)
+                check(bridge.isConnected && bridge.isScopedMemoryReadEnabled) {
+                    "Physical J2534 bridge disconnected during GM identity discovery."
+                }
+                null
+            }
+            if (identityBefore != null) {
+                require(identityBefore.vin == request.expectedVin) {
+                    "Physical GM identity VIN differs from the memory-read scope."
+                }
+            }
             val result = try {
                 J2534LiveMemoryBackup.capture(bridge, request, progress)
             } finally {
                 // A reconnect can use the same VIN with a different adapter.
                 transportSessionEpoch.requireQueuedCurrent(epoch)
             }
-            result.export(output)
+            val firmwareEvidence = identityBefore?.let { before ->
+                // A second physical identity read is mandatory if the first
+                // succeeded. Any OSID, VIN or responder change fails closed.
+                val after = bridge.readGmlanIdentification()
+                J2534LiveMemoryBackup.verifiedStableFirmware(
+                    before, after, request.expectedVin
+                )
+            }
+            // Bind the physical acquisition to the selected CAN channel and
+            // approved read session. The ZIP may be opened on another device,
+            // so these observations must travel with the bytes and VIN.
+            val channel = EcuBackupManifest.Channel(
+                requestCanId = checkNotNull(j2534BridgeRequestCanId),
+                responseCanId = checkNotNull(j2534BridgeResponseCanId),
+                protocolNumber = checkNotNull(j2534BridgeProtocolNumber),
+                diagnosticSession = request.diagnosticSession
+            )
             transportSessionEpoch.requireQueuedCurrent(epoch)
-            result
+            val bound = result.copy(
+                manifest = result.manifest.copy(
+                    channel = channel,
+                    firmwareEvidence = firmwareEvidence
+                )
+            )
+            check(EcuBackupIntegrity.verify(
+                bound.manifest, listOf(bound.capture), emptySet()
+            ).consistent) {
+                "Physical ECU backup evidence became inconsistent before export."
+            }
+            bound.export(output)
+            transportSessionEpoch.requireQueuedCurrent(epoch)
+            bound
+        }
+    }
+
+    /** Explicit low-level ECU UDS over a paired Windows J2534 adapter.
+     *  The operator selects CAN addressing and payload; no extra CamaroDiag
+     *  key, license or invented service-level write filter is inserted here.
+     *  App feature entitlements remain enforced by its presentation layer.
+     */
+    suspend fun exchangeJ2534OperatorUds(
+        payload: ByteArray,
+        approval: EcuWriteConsentFlow.Approval,
+        timeoutMs: Long = 3000L,
+        isOperatorContextCurrent: () -> Boolean
+    ): ByteArray {
+        val epoch = transportSessionEpoch.capture()
+        return commandSessionMutex.withLock {
+            transportSessionEpoch.requireQueuedCurrent(epoch)
+            check(isJ2534BridgeConnected()) { "Connect a physical Windows J2534 bridge." }
+            val reply = checkNotNull(j2534BridgeTransport).exchangeOperatorUds(
+                payload, timeoutMs, approval
+            ) {
+                transportSessionEpoch.requireQueuedCurrent(epoch)
+                EcuWriteConsentFlow.requireCurrentForTransmit(approval, isOperatorContextCurrent)
+            }
+            transportSessionEpoch.requireCurrent(epoch)
+            reply
+        }
+    }
+
+    suspend fun sendJ2534OperatorUdsOnly(
+        payload: ByteArray,
+        approval: EcuWriteConsentFlow.Approval,
+        isOperatorContextCurrent: () -> Boolean
+    ) {
+        val epoch = transportSessionEpoch.capture()
+        commandSessionMutex.withLock {
+            transportSessionEpoch.requireQueuedCurrent(epoch)
+            check(isJ2534BridgeConnected()) { "Connect a physical Windows J2534 bridge." }
+            checkNotNull(j2534BridgeTransport).sendOperatorUdsOnly(payload, approval) {
+                transportSessionEpoch.requireQueuedCurrent(epoch)
+                EcuWriteConsentFlow.requireCurrentForTransmit(approval, isOperatorContextCurrent)
+            }
+            transportSessionEpoch.requireCurrent(epoch)
         }
     }
 
@@ -988,13 +1411,16 @@ class BluetoothObdManager(context: Context) {
             j2534BridgeTransport?.isConnected == true
 
     /**
-     * Read-only UDS transaction over a physically connected OBDLink STN adapter.
+     * UDS transaction over a physically connected OBDLink STN adapter.
      * STPX's hardware identification (STI + STDI) is still checked by the transport.
      *
      * Keep the adapter configuration and all UDS requests under one exclusive
      * command session. This prevents telemetry, a CAN console or a queued OBD
      * command from changing STP/filters between ISO-TP request and response.
-     * Only the documented UDS/ISO-TP transport is used; this is not ECU flashing.
+     * A target-specific UdsAccessPolicy enables exactly the ECU operations
+     * the operator's profile describes. Do not impose a global read-only
+     * command filter or an additional CamaroDiag key requirement.
+     * Unconfigured callers retain a non-destructive default.
      */
     suspend fun <T> withStnUdsSession(
         requestCanId: Int,
@@ -1002,6 +1428,7 @@ class BluetoothObdManager(context: Context) {
         protocolNumber: Int = 33,
         timeoutMs: Long = 3000L,
         readDids: Set<Int> = emptySet(),
+        policy: UdsAccessPolicy? = null,
         block: suspend (UdsClient) -> T
     ): T {
         val requestedEpoch = transportSessionEpoch.capture()
@@ -1021,7 +1448,7 @@ class BluetoothObdManager(context: Context) {
                 sendAtCommandInternal(command, commandTimeout, expectedEpoch = requestedEpoch)
             }
             val result = try {
-                block(UdsClient(transport, UdsAccessPolicy.readOnly(readDids), timeoutMs))
+                block(UdsClient(transport, policy ?: UdsAccessPolicy.readOnly(readDids), timeoutMs))
             } finally {
                 // STPX changes the adapter's CAN filter, protocol and ISO-TP
                 // segmentation settings. Always restore functional OBD mode
@@ -1087,31 +1514,33 @@ class BluetoothObdManager(context: Context) {
         CamaroLfxObdSimulator.createEngine()
 
     fun disconnect() {
-        // Publish teardown before sockets are closed: in-flight commands must not
-        // attach their remaining read/write steps to the next adapter session.
-        transportSessionEpoch.invalidate()
-        // Close every transport independently: one failing close must not leak the others.
-        runCatching { usbTransport.close() }
-        runCatching { wifiTransport.close() }
-        runCatching { bleTransport.close() }
-        runCatching { j2534BridgeTransport?.close() }
-        j2534BridgeTransport = null
-        j2534BridgeRequestCanId = null
-        j2534BridgeResponseCanId = null
-        j2534BridgeProtocolNumber = null
-        runCatching { inputStream?.close() }
-        runCatching { outputStream?.close() }
-        runCatching { socket?.close() }
+        synchronized(adapterLifecycleLock) {
+            // Publish teardown before sockets are closed: in-flight commands must not
+            // attach their remaining read/write steps to the next adapter session.
+            transportSessionEpoch.invalidate()
+            // Close every transport independently: one failing close must not leak the others.
+            runCatching { usbTransport.close() }
+            runCatching { wifiTransport.close() }
+            runCatching { bleTransport.close() }
+            runCatching { j2534BridgeTransport?.close() }
+            j2534BridgeTransport = null
+            j2534BridgeRequestCanId = null
+            j2534BridgeResponseCanId = null
+            j2534BridgeProtocolNumber = null
+            runCatching { inputStream?.close() }
+            runCatching { outputStream?.close() }
+            runCatching { socket?.close() }
 
-        inputStream = null
-        outputStream = null
-        socket = null
-        activeTransport = "BLUETOOTH"
-        cachedSupportedMode01Pids = null
-        cachedSupportedMode01PidsAtMillis = 0L
-        isDemoMode = true
-        isSimulationActive = false
-        activeAdapterCapabilities = null
+            inputStream = null
+            outputStream = null
+            socket = null
+            activeTransport = "BLUETOOTH"
+            cachedSupportedMode01Pids = null
+            cachedSupportedMode01PidsAtMillis = 0L
+            isDemoMode = true
+            isSimulationActive = false
+            activeAdapterCapabilities = null
+        }
     }
 }
 

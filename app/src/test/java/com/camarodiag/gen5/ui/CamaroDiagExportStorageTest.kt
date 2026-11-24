@@ -4,6 +4,7 @@ import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.io.OutputStream
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -20,6 +21,37 @@ class CamaroDiagExportStorageTest {
             assertFalse(id, CamaroDiagExportStorage.isExpectedDocument(authority, id))
         }
         assertFalse(CamaroDiagExportStorage.isExpectedDocument("other.provider", "primary:CamaroDiag"))
+    }
+
+    @Test fun categoryPathsAreUniqueAndStayBelowAuthorizedRoot() {
+        val categories = CamaroDiagExportStorage.Category.entries
+        assertEquals(categories.size, categories.map { it.folder }.toSet().size)
+        for (category in categories) {
+            assertTrue(category.folder.split('/').all { it.matches(Regex("[A-Za-z]+")) })
+            assertEquals("primary:CamaroDiag/" + category.folder,
+                CamaroDiagExportStorage.categoryDocumentId(category))
+            assertEquals("/storage/emulated/0/CamaroDiag/" + category.folder + "/",
+                CamaroDiagExportStorage.displayPath(category))
+        }
+        assertNotEquals(CamaroDiagExportStorage.Category.ECU_BACKUPS.folder,
+            CamaroDiagExportStorage.Category.RECOVERY.folder)
+    }
+
+    @Test fun publishedFileIdentityAndDisplayedPathMustMatchItsCategory() {
+        val storage = CamaroDiagExportStorage
+        val category = CamaroDiagExportStorage.Category.RECOVERY
+        val file = "checkpoint_safe.cdj"
+        assertEquals("/storage/emulated/0/CamaroDiag/Logs/Recovery/$file",
+            storage.fileDisplayPath(category, file))
+        assertTrue(storage.isCategoryFile(storage.AUTHORITY,
+            "primary:CamaroDiag/Logs/Recovery/$file", category, file))
+        for (id in listOf("primary:CamaroDiag/$file", "primary:CamaroDiag/Backups/ECU/$file",
+            "primary:CamaroDiag/Logs/Recovery/other.cdj")) {
+            assertFalse(storage.isCategoryFile(storage.AUTHORITY, id, category, file))
+        }
+        assertFalse(storage.isCategoryFile("other.provider",
+            "primary:CamaroDiag/Logs/Recovery/$file", category, file))
+        assertTrue(runCatching { storage.fileDisplayPath(category, "../$file") }.isFailure)
     }
 
     @Test fun preservesBackupAndReportExtensionsWhilePreventingCollisions() {
@@ -61,6 +93,39 @@ class CamaroDiagExportStorageTest {
             expected.sha256)
         assertEquals(expected, CamaroDiagExportStorage.fingerprint(ByteArrayInputStream(sink.toByteArray())))
         assertNotEquals(expected, CamaroDiagExportStorage.fingerprint(ByteArrayInputStream(byteArrayOf(0x61, 0x62, 0))))
+    }
+
+    @Test fun stagedZipVerificationFailureIsStorageErrorNotAnEcuDisconnect() = runBlocking {
+        val original = IOException("ZIP entry CRC mismatch")
+        val failure = runCatching {
+            CamaroDiagExportStorage.verifyStagedArchive(
+                ByteArrayInputStream(byteArrayOf(1, 2, 3))
+            ) { throw original }
+        }.exceptionOrNull()
+        assertTrue(failure is CamaroDiagExportStorage.ExportStorageException)
+        assertTrue(failure?.cause === original)
+
+        val semanticFailure = runCatching {
+            CamaroDiagExportStorage.verifyStagedArchive(ByteArrayInputStream(byteArrayOf(0))) {
+                throw IllegalArgumentException("Forged VIN, route or memory scope")
+            }
+        }.exceptionOrNull()
+        assertTrue(semanticFailure is CamaroDiagExportStorage.ExportStorageException)
+        assertTrue(semanticFailure?.cause is IllegalArgumentException)
+    }
+
+    @Test fun cancelledStagedVerificationIsNeverDowngradedToStorageFailure() = runBlocking {
+        val cancellation = CancellationException("Account or capture was replaced")
+        val error = runCatching {
+            CamaroDiagExportStorage.verifyStagedArchive(ByteArrayInputStream(byteArrayOf(0))) {
+                throw cancellation
+            }
+        }.exceptionOrNull()
+        assertTrue(error === cancellation)
+        val good = byteArrayOf(2, 3, 4)
+        CamaroDiagExportStorage.verifyStagedArchive(ByteArrayInputStream(good)) { input ->
+            assertTrue(input.readBytes().contentEquals(good))
+        }
     }
 
     @Test fun diskWriteFailureIsNotReportedAsAnAdapterFailure() {

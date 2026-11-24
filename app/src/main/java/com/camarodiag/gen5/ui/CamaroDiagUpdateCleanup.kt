@@ -18,7 +18,8 @@ import java.io.File
 /**
  * A download is removed ONLY after the installed application's versionCode
  * proves that an update has been installed successfully. Cancellation or
- * rejection by the package installer leaves the APK in public Downloads.
+ * rejection by the package installer preserves the private transit download.
+ * Verified public copies in CamaroDiag/APK have independent five-file retention.
  */
 internal data class PendingCamaroDiagApk(val downloadId: Long, val targetVersionCode: Long) {
     init {
@@ -41,7 +42,7 @@ internal data class PendingCamaroDiagApk(val downloadId: Long, val targetVersion
             if (parts.size != 2) return null
             val id = parts[0].toLongOrNull() ?: return null
             val code = parts[1].toLongOrNull() ?: return null
-            if (id <= 0 || code <= 0) return null
+            if (id <= 0 || code <= 0 || value != "$id:$code") return null
             return PendingCamaroDiagApk(id, code)
         }
     }
@@ -124,8 +125,15 @@ internal object CamaroDiagUpdateCleanup {
      * DownloadManager.remove(id) deletes the file even when it is in the
      * public /storage/emulated/0/Download folder (scoped-storage compatible).
      */
+    suspend fun cleanupAfterSuccessfulInstall(context: Context, packageWasReplaced: Boolean = false) {
+        try { CamaroDiagApkArchive.prune(context) }
+        catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+        catch (_: Exception) { /* Retry archive cleanup after access is restored. */ }
+        cleanupTransit(context, packageWasReplaced)
+    }
+
     @Synchronized
-    fun cleanupAfterSuccessfulInstall(context: Context, packageWasReplaced: Boolean = false) {
+    private fun cleanupTransit(context: Context, packageWasReplaced: Boolean) {
         val prefs = context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
         val original = prefs.getStringSet(PENDING_KEY, emptySet()).orEmpty()
         // The previous updater did not record IDs. After an actual replacement,

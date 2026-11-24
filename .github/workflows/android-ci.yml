@@ -1,27 +1,23 @@
 name: Android CI
+# Heavy tests are never triggered by pull_request synchronize.
+# Run manually at ~50-commit checkpoints and before merging; ready_for_review is a final gate.
 # Full Android validation remains available manually. For draft PRs,
 # evaluate the configurable 50-Android-commit checkpoint automatically.
 on:
-  pull_request:
-    branches: [main]
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - 'app/**'
-      - 'communication/**'
-      - 'core/**'
-      - 'diagnostic/**'
-      - 'control/**'
-      - 'mileageaudit/**'
-      - 'storage/**'
-      - 'third_party/**'
-      - '**/*.gradle'
-      - '**/*.gradle.kts'
-      - 'gradle/**'
-      - 'gradle.properties'
-      - 'gradlew'
-      - 'gradlew.bat'
-      - 'version.properties'
-      - '.github/workflows/android-ci.yml'
+  # Manual component checkpoint only. Full PR check is orchestrated by pr-unit-tests.yml.
+  # Disabled implicit PR triggers to prevent duplicate Debug validation.
+  # No automatic runs per commit or Ready transition.
+  workflow_dispatch:
+    inputs:
+      target_ref:
+        description: "Branch or exact SHA to validate"
+        required: true
+        default: "main"
+        type: string
+      pr_number:
+        description: "Pull request number (optional, for artifact naming)"
+        required: false
+        type: string
 
 concurrency:
   group: android-debug-pr-${{ inputs.pr_number || github.event.pull_request.number || inputs.target_ref || 'manual' }}
@@ -34,7 +30,7 @@ permissions:
 
 jobs:
   evaluate-build-checkpoint:
-    if: github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main'
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main')
     runs-on: ubuntu-latest
     outputs:
       validated_sha: ${{ steps.resolve_revision.outputs.sha }}
@@ -146,6 +142,13 @@ jobs:
           configured="${BUILD_INTERVAL:-}"
           if [[ "$configured" =~ ^[1-9][0-9]*$ ]]; then interval="$configured"; else interval=50; fi
           echo "interval=$interval" >> "$GITHUB_OUTPUT"
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            echo "validation_applies=true" >> "$GITHUB_OUTPUT"
+            echo "build_required=true" >> "$GITHUB_OUTPUT"
+            echo "commits_since_build=0" >> "$GITHUB_OUTPUT"
+            echo "Manual Android validation, independent of PR changes."
+            exit 0
+          fi
           if [[ "$ANDROID_CHANGED" != "true" ]]; then
             echo "validation_applies=false" >> "$GITHUB_OUTPUT"
             echo "build_required=false" >> "$GITHUB_OUTPUT"
@@ -167,13 +170,8 @@ jobs:
           commits_since_build="$(git rev-list --count "$count_base..$HEAD_SHA" -- "${paths[@]}")"
           echo "commits_since_build=$commits_since_build" >> "$GITHUB_OUTPUT"
 
-          # Manual dispatch is an explicit request for a complete validation, independent of the 50-commit draft checkpoint.
-          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
-            echo "validation_applies=true" >> "$GITHUB_OUTPUT"
-            echo "build_required=true" >> "$GITHUB_OUTPUT"
-            echo "Manual Android Debug validation explicitly requested."
-          # Ready transition validates the PR scope; subsequent Ready synchronize events validate only files changed in that commit.
-          elif [[ "$IS_DRAFT" == "true" ]]; then
+          # Full validation at ready-for-review, periodic checkpoints on draft PRs.
+          if [[ "$IS_DRAFT" == "true" ]]; then
             # The secure bridge must never be called "CI-green" on a
             # checkpoint-only run. Force a complete Android build/lint/test
             # whenever its TLS client or network policy changed since the
@@ -190,6 +188,7 @@ jobs:
                 'communication/src/main/java/com/camarodiag/gen5/data/obd/CamaroDiagConnectorDiscovery.kt' \
                 'communication/src/main/java/com/camarodiag/gen5/data/obd/CamaroDiagConnectorBinaryDiscovery.kt' \
                 'communication/src/main/java/com/camarodiag/gen5/data/obd/CamaroDiagConnectorCheckpoint.kt' \
+                'communication/src/main/java/com/camarodiag/gen5/data/obd/CamaroDiagConnectorCheckpointUsb.kt' \
                 'communication/src/main/java/com/camarodiag/gen5/data/obd/CamaroDiagConnectorTlsReference.kt' \
                 'communication/src/main/java/com/camarodiag/gen5/data/obd/KwpFrameInspector.kt' \
                 'communication/src/main/java/com/camarodiag/gen5/data/obd/CamaroDiagConnectorWiringGuide.kt' \
@@ -251,7 +250,7 @@ jobs:
           fi
   test-and-build:
     needs: evaluate-build-checkpoint
-    if: always() && (github.event_name == 'workflow_dispatch' || needs.evaluate-build-checkpoint.outputs.build_required == 'true')
+    if: needs.evaluate-build-checkpoint.result == 'success' && needs.evaluate-build-checkpoint.outputs.build_required == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout requested validation commit
@@ -290,7 +289,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: CamaroDiag-unit-tests-pr-${{ inputs.pr_number || github.event.pull_request.number || 'manual' }}-${{ inputs.target_ref || github.event.pull_request.head.sha }}
+          name: CamaroDiag-unit-tests-pr-${{ inputs.pr_number || github.event.pull_request.number || 'manual' }}-${{ needs.evaluate-build-checkpoint.outputs.validated_sha }}
           path: |
             **/build/reports/tests/testDebugUnitTest/**
             **/build/test-results/testDebugUnitTest/**
@@ -302,12 +301,11 @@ jobs:
         run: |
           python3 - <<'PY'
           import pathlib
-          import re
+          import xml.etree.ElementTree as ET
           import sys
 
           def keys(path):
-              content = pathlib.Path(path).read_text(encoding="utf-8")
-              return set(re.findall(r'<string\\s+name="([^"]+)"', content))
+              return {entry.attrib["name"] for entry in ET.parse(path).getroot().findall("string")}
 
           english = keys("app/src/main/res/values/strings.xml")
           french = keys("app/src/main/res/values-fr/strings.xml")
@@ -364,7 +362,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: CamaroDiag-lint-pr-${{ inputs.pr_number || github.event.pull_request.number || 'manual' }}-${{ inputs.target_ref || github.event.pull_request.head.sha || 'manual' }}
+          name: CamaroDiag-lint-pr-${{ inputs.pr_number || github.event.pull_request.number || 'manual' }}-${{ needs.evaluate-build-checkpoint.outputs.validated_sha }}
           path: |
             **/build/reports/lint-results-debug.html
             **/build/reports/lint-results-debug.xml
@@ -382,7 +380,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test -s app/build/outputs/apk/debug/CamaroDiag-debug.apk
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --Werr \
+            app/build/outputs/apk/debug/CamaroDiag-debug.apk
           test -s app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
           python3 - <<'PY'
           import pathlib
@@ -396,7 +395,7 @@ jobs:
       - name: Upload debug APK for this PR commit
         uses: actions/upload-artifact@v7
         with:
-          name: CamaroDiag-debug-pr-${{ inputs.pr_number || github.event.pull_request.number || 'manual' }}-${{ inputs.target_ref || github.event.pull_request.head.sha || 'manual' }}
+          name: CamaroDiag-debug-pr-${{ inputs.pr_number || github.event.pull_request.number || 'manual' }}-${{ needs.evaluate-build-checkpoint.outputs.validated_sha }}
           path: app/build/outputs/apk/debug/CamaroDiag-debug.apk
           if-no-files-found: error
           retention-days: 30

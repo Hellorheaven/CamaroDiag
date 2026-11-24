@@ -51,9 +51,11 @@ internal class IsoTpChannel(
     private val transport: RawCanFrameTransport,
     private val requestCanId: Int,
     private val responseCanId: Int,
-    private val extendedCanId: Boolean = false
+    private val extendedCanId: Boolean = false,
+    private val clock: () -> Long = System::nanoTime
 ) {
     suspend fun exchange(payload: ByteArray, timeoutMs: Long): ByteArray {
+        require(timeoutMs in 1..30_000L) { "ISO-TP timeout must be bounded." }
         require(payload.isNotEmpty()) { "ISO-TP payload cannot be empty." }
         require(payload.size <= MAX_PAYLOAD_BYTES) { "ISO-TP payload exceeds the supported 12-bit length." }
         sendPayload(payload, timeoutMs)
@@ -78,6 +80,7 @@ internal class IsoTpChannel(
     }
 
     suspend fun sendOnly(payload: ByteArray, timeoutMs: Long) {
+        require(timeoutMs in 1..30_000L) { "ISO-TP timeout must be bounded." }
         require(payload.isNotEmpty()) { "ISO-TP payload cannot be empty." }
         require(payload.size <= MAX_PAYLOAD_BYTES) { "ISO-TP payload exceeds the supported 12-bit length." }
         sendPayload(payload, timeoutMs)
@@ -130,11 +133,25 @@ internal class IsoTpChannel(
     }
 
     private suspend fun awaitFlowControl(timeoutMs: Long): Pair<Int, Long> {
+        require(timeoutMs in 1..30_000L) { "Flow-control timeout is out of range." }
+        val deadline = clock() + timeoutMs * NANOS_PER_MILLISECOND
         var waits = 0
+        var unrelated = 0
         while (true) {
-            val frame = awaitFrame(timeoutMs)
+            // Wait/irrelevant flow-control frames consume a single deadline;
+            // they must not repeatedly reset the adapter's timeout budget.
+            val remaining = deadline - clock()
+            if (remaining <= 0L)
+                throw IsoTpException("ISO-TP flow-control deadline exceeded.")
+            val remainingMs =
+                ((remaining + NANOS_PER_MILLISECOND - 1) / NANOS_PER_MILLISECOND).coerceAtLeast(1L)
+            val frame = awaitFrame(remainingMs)
             requireFrameLength(frame, 3, "Flow-control frame")
-            if ((frame.data[0].toInt() and 0xF0) != 0x30) continue
+            if ((frame.data[0].toInt() and 0xF0) != 0x30) {
+                if (++unrelated > MAX_UNEXPECTED_FLOW_CONTROL_FRAMES)
+                    throw IsoTpException("Repeated non-flow-control frames from the expected ECU.")
+                continue
+            }
 
             when (frame.data[0].toInt() and 0x0F) {
                 0x00 -> return (frame.data[1].toInt() and 0xFF) to decodeSeparationTime(frame.data[2].toInt() and 0xFF)
@@ -229,6 +246,7 @@ internal class IsoTpChannel(
         const val SINGLE_FRAME_MAX_BYTES = 7
         const val MAX_PAYLOAD_BYTES = 0x0FFF
         const val MAX_FLOW_CONTROL_WAIT_FRAMES = 5
+        const val MAX_UNEXPECTED_FLOW_CONTROL_FRAMES = 8
         const val NANOS_PER_MILLISECOND = 1_000_000L
     }
 }
@@ -271,7 +289,7 @@ class UdsReadOnlyClient(
 
     suspend fun readVin(): String {
         val data = readDataByIdentifier(0xF190)
-        val vin = data.toString(Charsets.US_ASCII).trim()
+        val vin = decodeAsciiEcuIdentity(data)
         require(vin.matches(Regex("[A-HJ-NPR-Z0-9]{17}"))) {
             "ECU did not return a valid 17-character VIN in DID F190."
         }
@@ -305,6 +323,26 @@ class UdsReadOnlyClient(
             "Unexpected UDS positive service 0x" + service.toString(16).uppercase(Locale.ROOT) + "."
         }
     }
+}
+
+/** Decode only printable US-ASCII with optional *trailing* NUL padding. */
+private fun decodeAsciiEcuIdentity(bytes: ByteArray): String {
+    var nullPaddingStarted = false
+    require(bytes.isNotEmpty() && bytes.all { byte ->
+        val value = byte.toInt() and 0xFF
+        if (value == 0) {
+            nullPaddingStarted = true
+            true
+        } else {
+            !nullPaddingStarted && value in 0x20..0x7E
+        }
+    }) {
+        "ECU identity contains non-ASCII bytes or invalid NUL padding."
+    }
+    return bytes.toString(Charsets.US_ASCII)
+        .trimEnd('\u0000')
+        .trim()
+        .uppercase(Locale.ROOT)
 }
 
 enum class UdsIdentityField {
@@ -350,10 +388,19 @@ data class DocumentedUdsReadProfile(
     val verifiedVin: String,
     val evidenceReference: String
 ) {
+    private fun unverifiedIdentityLabel(value: String?): Boolean {
+        val text = value?.trim()?.lowercase(Locale.ROOT).orEmpty()
+        if (text.isBlank() || text in setOf("unknown", "n/a", "none", "null",
+                "pending", "tbd", "test", "simulated", "invalid", "no data",
+                "not supported", "-", "0", "ff")) return true
+        val bytes = text.removePrefix("0x").replace(Regex("[\\s:_-]"), "")
+        return bytes.isNotEmpty() && (bytes.all { it == '0' } || bytes.all { it == 'f' })
+    }
+
     fun compatibilityDefinitionIssues(vehicle: VehicleProfile): List<String> = buildList {
         if (profileId.isBlank()) add("Profile ID is missing.")
         if (moduleId.isBlank()) add("Module ID is missing.")
-        if (controllerFamily.isBlank()) add("Controller family is missing.")
+        if (unverifiedIdentityLabel(controllerFamily)) add("A real ECU controller family is required.")
         if (vehicle.generation != generation || vehicle.modelYear !in modelYears) add("Model year/generation does not match.")
         if (!vehicle.engine.rpo.equals(engineRpo, ignoreCase = true)) add("Engine RPO does not match.")
 
@@ -364,8 +411,10 @@ data class DocumentedUdsReadProfile(
         if (!profileVin.matches(vinPattern)) add("The verified profile VIN must be a valid 17-character VIN.")
         if (selectedVin != profileVin) add("Selected vehicle VIN does not match the VIN validated for this profile.")
 
-        if (hardwarePartNumber.isBlank() || operatingSystemId.isBlank() || calibrationId.isBlank() ||
-            calibrationVerificationNumber.isBlank()) add("Exact hardware, OS, calibration and CVN values are required.")
+        if (listOf(hardwarePartNumber, operatingSystemId, calibrationId,
+                calibrationVerificationNumber).any(::unverifiedIdentityLabel)) {
+            add("Exact non-placeholder hardware, OS, calibration and CVN values are required.")
+        }
 
         val maxCanId = if (extendedCanId) 0x1FFFFFFF else 0x7FF
         if (requestCanId !in 0..maxCanId || responseCanId !in 0..maxCanId || requestCanId == responseCanId) {
@@ -451,45 +500,54 @@ class ProfiledUdsReadSession private constructor(
             profile: DocumentedUdsReadProfile,
             timeoutMs: Long = 3000L
         ): ProfiledUdsReadSession {
-            val issuesBeforeReading = profile.compatibilityDefinitionIssues(vehicle)
+            require(timeoutMs in 1..30_000L) {
+                "UDS ECU identification timeout must be between 1 and 30000 ms."
+            }
+            // Snapshot caller-owned mutable allowlists before any suspending CAN
+            // exchange. A concurrent UI/profile edit cannot broaden this session.
+            val approved = profile.copy(
+                readableDids = profile.readableDids.toSet(),
+                identityDids = profile.identityDids.toList()
+            )
+            val issuesBeforeReading = approved.compatibilityDefinitionIssues(vehicle)
             require(issuesBeforeReading.isEmpty()) {
                 "UDS read profile rejected: " + issuesBeforeReading.joinToString("; ")
             }
             val client = UdsReadOnlyClient(
                 transport = transport,
-                requestCanId = profile.requestCanId,
-                responseCanId = profile.responseCanId,
-                extendedCanId = profile.extendedCanId,
+                requestCanId = approved.requestCanId,
+                responseCanId = approved.responseCanId,
+                extendedCanId = approved.extendedCanId,
                 timeoutMs = timeoutMs
             )
-            val rawIdentity = profile.identityDids.associate { definition ->
+            val rawIdentity = approved.identityDids.associate { definition ->
                 definition.field to client.readDataByIdentifier(definition.did)
             }
             val identity = UdsEcuIdentity(
                 controllerFamily = rawIdentity[UdsIdentityField.CONTROLLER_FAMILY]?.let {
-                    decodeIdentity(it, profile.identityDids, UdsIdentityField.CONTROLLER_FAMILY)
+                    decodeIdentity(it, approved.identityDids, UdsIdentityField.CONTROLLER_FAMILY)
                 }.orEmpty(),
                 hardwarePartNumber = rawIdentity[UdsIdentityField.HARDWARE_PART_NUMBER]?.let {
-                    decodeIdentity(it, profile.identityDids, UdsIdentityField.HARDWARE_PART_NUMBER)
+                    decodeIdentity(it, approved.identityDids, UdsIdentityField.HARDWARE_PART_NUMBER)
                 },
                 operatingSystemId = rawIdentity[UdsIdentityField.OPERATING_SYSTEM_ID]?.let {
-                    decodeIdentity(it, profile.identityDids, UdsIdentityField.OPERATING_SYSTEM_ID)
+                    decodeIdentity(it, approved.identityDids, UdsIdentityField.OPERATING_SYSTEM_ID)
                 },
                 calibrationId = rawIdentity[UdsIdentityField.CALIBRATION_ID]?.let {
-                    decodeIdentity(it, profile.identityDids, UdsIdentityField.CALIBRATION_ID)
+                    decodeIdentity(it, approved.identityDids, UdsIdentityField.CALIBRATION_ID)
                 },
                 calibrationVerificationNumber = rawIdentity[UdsIdentityField.CALIBRATION_VERIFICATION_NUMBER]?.let {
-                    decodeIdentity(it, profile.identityDids, UdsIdentityField.CALIBRATION_VERIFICATION_NUMBER)
+                    decodeIdentity(it, approved.identityDids, UdsIdentityField.CALIBRATION_VERIFICATION_NUMBER)
                 },
                 vin = rawIdentity[UdsIdentityField.VIN]?.let {
-                    decodeIdentity(it, profile.identityDids, UdsIdentityField.VIN)
+                    decodeIdentity(it, approved.identityDids, UdsIdentityField.VIN)
                 }
             )
-            val issues = profile.compatibilityIssues(vehicle, identity)
+            val issues = approved.compatibilityIssues(vehicle, identity)
             require(issues.isEmpty()) {
                 "UDS module identity rejected: " + issues.joinToString("; ")
             }
-            return ProfiledUdsReadSession(profile, identity, client)
+            return ProfiledUdsReadSession(approved, identity, client)
         }
 
         private fun decodeIdentity(
@@ -499,12 +557,12 @@ class ProfiledUdsReadSession private constructor(
         ): String {
             val encoding = definitions.single { it.field == field }.encoding
             return when (encoding) {
-                UdsIdentityEncoding.ASCII -> bytes.toString(Charsets.US_ASCII)
-                    .trim()
-                    .trim('\u0000')
-                    .uppercase(Locale.ROOT)
-                UdsIdentityEncoding.HEX -> bytes.joinToString("") {
-                    "%02X".format(Locale.ROOT, it.toInt() and 0xFF)
+                UdsIdentityEncoding.ASCII -> decodeAsciiEcuIdentity(bytes)
+                UdsIdentityEncoding.HEX -> {
+                    require(bytes.isNotEmpty()) { "ECU identity hex field is empty." }
+                    bytes.joinToString("") {
+                        "%02X".format(Locale.ROOT, it.toInt() and 0xFF)
+                    }
                 }
             }
         }

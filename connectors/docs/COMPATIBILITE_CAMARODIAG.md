@@ -1,6 +1,6 @@
 # Compatibilité des deux projets — lot CD/1 et CDJ/1
 
-Les PR CamaroDiag #70 et CamaroDiagConnectors #6 sont développées de façon coordonnée, chacune dans sa branche active. Aucun accès véhicule n'est autorisé par les protocoles publics de découverte.
+Les composants Android, Connectors et pont Windows sont désormais développés et validés ensemble dans la PR CamaroDiag #95. Aucun accès véhicule n'est autorisé par les protocoles publics de découverte.
 
 - CD/1 : PING (0), CAPABILITIES (1), STATUS (2), puis fermeture. Réponses canoniques, longueur bornée, CRC32 et séquence vérifiés ; pas de repli ASCII.
 - CDJ/1 : enregistrement hors ligne de 64 octets. Magie CDJ, version 1, étape, trois octets réservés nuls, séquence uint32 LE, transaction 16 octets, SHA-256 manifeste 32 octets, CRC32 LE sur les 60 premiers octets.

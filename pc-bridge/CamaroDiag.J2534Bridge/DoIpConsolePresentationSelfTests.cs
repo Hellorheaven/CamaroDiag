@@ -1,0 +1,66 @@
+using System.Globalization;
+using System.Net;
+
+namespace CamaroDiag.J2534Bridge;
+
+internal static class DoIpConsolePresentationSelfTests
+{
+    internal static int Run()
+    {
+        var checks = 0;
+        void Check(bool condition, string name)
+        {
+            checks++;
+            if (!condition) throw new InvalidOperationException("DoIP console: " + name);
+        }
+
+        var observed = new DoIpVehicleDiscovery.Identity(
+            "1G1FA1RXXR0123456", 0x1234, [1, 2, 3, 4, 5, 6],
+            [7, 8, 9, 10, 11, 12], 0x10, 0x00, IPAddress.Loopback, 3);
+        foreach (var language in new[] { "fr-FR", "en-US" })
+        {
+            var culture = CultureInfo.GetCultureInfo(language);
+            var text = DoIpConsolePresentation.FormatIdentity(observed, culture);
+            Check(text.Contains("127.0.0.1") && text.Contains("0x03") &&
+                text.Contains("0x1234") && text.Contains(observed.Vin!) &&
+                text.Contains("010203040506") && text.Contains("0708090A0B0C"),
+                "Gateway identity preserves observed values in " + language);
+            var unavailable = DoIpConsolePresentation.FormatIdentity(
+                observed with { Vin = null, VinGidStatus = null }, culture);
+            Check(unavailable.Contains("VIN=" +
+                DoIpConsolePresentation.Text("Unavailable", culture)) &&
+                !unavailable.Contains(observed.Vin!),
+                "Missing VIN stays unavailable in " + language);
+            var status = DoIpCodec.Decode(DoIpCodec.Encode(
+                DoIpCodec.EntityStatusResponse, [0, 4, 2, 0, 0, 1, 0]));
+            var statusText = DoIpConsolePresentation.FormatStatus(status, false, culture);
+            Check(statusText.Contains("2/4") && statusText.Contains("256"),
+                "Entity status preserves observed socket counts and maximum size in " + language);
+            var withoutSize = DoIpCodec.Decode(DoIpCodec.Encode(
+                DoIpCodec.EntityStatusResponse, [1, 3, 1]));
+            Check(DoIpConsolePresentation.FormatStatus(withoutSize, false, culture)
+                .Contains(DoIpConsolePresentation.Text("Unavailable", culture)),
+                "Absent maximum data size stays unavailable in " + language);
+            foreach (var mode in new byte[] { 0, 1, 2 })
+            {
+                var power = DoIpCodec.Decode(DoIpCodec.Encode(
+                    DoIpCodec.PowerModeResponse, [mode]));
+                var key = mode == 0 ? "PowerNotReady" :
+                    mode == 1 ? "PowerReady" : "PowerUnsupported";
+                Check(DoIpConsolePresentation.FormatStatus(power, true, culture)
+                    .Contains(DoIpConsolePresentation.Text(key, culture)),
+                    "Power mode decoded in " + language);
+            }
+            var rejected = false;
+            try { _ = DoIpConsolePresentation.FormatStatus(status, true, culture); }
+            catch (InvalidDataException) { rejected = true; }
+            Check(rejected, "Wrong response type rejected in " + language);
+            foreach (var key in new[] { "Host", "Discover", "Cancel", "Notice",
+                "Started", "Canceled", "Busy", "InvalidHost", "Status", "Power",
+                "StatusNotice", "StatusStarted", "IdentifyFirst" })
+                Check(!string.IsNullOrWhiteSpace(DoIpConsolePresentation.Text(key, culture)),
+                    "Resource " + key + " in " + language);
+        }
+        return checks;
+    }
+}

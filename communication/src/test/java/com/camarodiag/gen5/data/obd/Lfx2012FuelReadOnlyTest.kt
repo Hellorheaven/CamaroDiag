@@ -1,0 +1,166 @@
+package com.camarodiag.gen5.data.obd
+
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class Lfx2012FuelReadOnlyTest {
+    private val pids = Lfx2012FuelReadOnly.PIDS
+    private fun responses(): Map<Int, String?> =
+        pids.associateWith { "41%02X80".format(it) }
+
+    @Test fun reportedEthanolAndBothBankTrimsAreReadOnlyEcuValues() {
+        val survey = Lfx2012FuelReadOnly.Survey(
+            Lfx2012FuelReadOnly.Source.J2534, pids.toSet(), responses()
+        )
+        val raw = mapOf(
+            0x52 to intArrayOf(255),
+            0x06 to intArrayOf(128),
+            0x07 to intArrayOf(64),
+            0x08 to intArrayOf(0),
+            0x09 to intArrayOf(255)
+        )
+        val snapshot = Lfx2012FuelReadOnly.inspect(survey, raw, 1795320000000L)
+        assertEquals(100.0, snapshot.ethanolPercent!!, 0.00001)
+        assertEquals(0.0, snapshot.reading(0x06).percent!!, 0.00001)
+        assertEquals(-50.0, snapshot.reading(0x07).percent!!, 0.00001)
+        assertEquals(-100.0, snapshot.reading(0x08).percent!!, 0.00001)
+        assertEquals(99.21875, snapshot.reading(0x09).percent!!, 0.00001)
+        assertFalse(snapshot.flexFuelCalibratedOrSensorVerified)
+    }
+
+    @Test fun unsupportedAndMissingValuesNeverBecomeAnInventedZeroPercent() {
+        val supported = setOf(0x06, 0x52)
+        val responses = pids.associateWith { if (it in supported) "ok" else null }
+        val survey = Lfx2012FuelReadOnly.Survey(
+            Lfx2012FuelReadOnly.Source.ELM, supported, responses
+        )
+        val raw = pids.associateWith { pid -> when (pid) {
+            0x06 -> intArrayOf(128)
+            0x52 -> null
+            else -> null
+        } }
+        val snapshot = Lfx2012FuelReadOnly.inspect(survey, raw, 1L)
+        assertNull(snapshot.ethanolPercent)
+        assertEquals(Lfx2012FuelReadOnly.Availability.NO_VALID_RESPONSE,
+            snapshot.reading(0x52).availability)
+        assertEquals(Lfx2012FuelReadOnly.Availability.UNSUPPORTED,
+            snapshot.reading(0x07).availability)
+        assertEquals(0.0, snapshot.reading(0x06).percent!!, 0.000001)
+        assertEquals(0L, snapshot.reading(0x06).raw!!.toLong() - 128L)
+    }
+
+    @Test fun unansweredSupportPageLeavesEthanolUnknownAndPreservesKnownTrims() {
+        val supported = setOf(0x06)
+        val survey = Lfx2012FuelReadOnly.Survey(
+            Lfx2012FuelReadOnly.Source.ELM, supported,
+            pids.associateWith { if (it == 0x06) "410680" else null }, firstUnresolvedPid = 0x41
+        )
+        val readings = Lfx2012FuelReadOnly.inspect(
+            survey, pids.associateWith { if (it == 0x06) intArrayOf(128) else null }, 1L
+        )
+        assertEquals(Lfx2012FuelReadOnly.Availability.NO_VALID_RESPONSE, readings.reading(0x52).availability)
+        assertEquals(Lfx2012FuelReadOnly.Availability.UNSUPPORTED, readings.reading(0x07).availability)
+        assertEquals(0.0, readings.reading(0x06).percent!!, 0.0)
+    }
+
+    @Test fun unavailableReadingCannotCarryAPercentageOrRawByteIntoHistory() {
+        for (status in listOf(Lfx2012FuelReadOnly.Availability.UNSUPPORTED,
+            Lfx2012FuelReadOnly.Availability.NO_VALID_RESPONSE)) {
+            assertThrows(IllegalArgumentException::class.java) {
+                Lfx2012FuelReadOnly.Reading(0x52, status, percent = 0.0)
+            }
+            assertThrows(IllegalArgumentException::class.java) {
+                Lfx2012FuelReadOnly.Reading(0x52, status, raw = 0)
+            }
+        }
+    }
+
+    @Test fun explicitZeroEthanolIsDifferentFromUnsupportedEthanol() {
+        val p = setOf(0x52)
+        val survey = Lfx2012FuelReadOnly.Survey(
+            Lfx2012FuelReadOnly.Source.J2534,
+            p, pids.associateWith { if (it == 0x52) "415200" else null }
+        )
+        val zero = Lfx2012FuelReadOnly.inspect(
+            survey, pids.associateWith { if (it == 0x52) intArrayOf(0) else null }, 1L
+        )
+        assertEquals(0.0, zero.ethanolPercent!!, 0.0)
+        assertEquals(Lfx2012FuelReadOnly.Availability.REPORTED,
+            zero.reading(0x52).availability)
+        assertFalse(zero.flexFuelCalibratedOrSensorVerified)
+    }
+
+    @Test fun badSupportedPidPayloadIsUnavailableNotAnEthanolMeasurement() {
+        val pids = Lfx2012FuelReadOnly.PIDS
+        val support = pids.toSet()
+        val survey = Lfx2012FuelReadOnly.Survey(
+            Lfx2012FuelReadOnly.Source.ELM, support, responses()
+        )
+        for (bad in listOf(intArrayOf(), intArrayOf(-1), intArrayOf(256),
+            intArrayOf(0, 0), intArrayOf(0x41, 0x52, 0x00))) {
+            val raw = pids.associateWith { pid -> if (pid == 0x52) bad else intArrayOf(128) }
+            val snapshot = Lfx2012FuelReadOnly.inspect(survey, raw, 1L)
+            assertNull(snapshot.ethanolPercent)
+            assertEquals(Lfx2012FuelReadOnly.Availability.NO_VALID_RESPONSE,
+                snapshot.reading(0x52).availability)
+            assertEquals(0.0, snapshot.reading(0x06).percent!!, 0.00001)
+        }
+    }
+
+    @Test fun incompleteAndForgedSurveysAreRejectedBeforeDisplay() {
+        assertTrue(runCatching { Lfx2012FuelReadOnly.Survey(
+            Lfx2012FuelReadOnly.Source.J2534, emptySet(), mapOf(0x52 to "415200")
+        ) }.isFailure)
+        assertTrue(runCatching { Lfx2012FuelReadOnly.Survey(
+            Lfx2012FuelReadOnly.Source.ELM,
+            emptySet(), pids.associateWith { if (it == 0x52) "415200" else null }
+        ) }.isFailure)
+        val survey = Lfx2012FuelReadOnly.Survey(
+            Lfx2012FuelReadOnly.Source.ELM, pids.toSet(), responses()
+        )
+        assertTrue(runCatching { Lfx2012FuelReadOnly.inspect(
+            survey, mapOf(0x52 to intArrayOf(0)), 1L
+        ) }.isFailure)
+        assertTrue(runCatching { Lfx2012FuelReadOnly.inspect(
+            survey, pids.associateWith { intArrayOf(0) }, 0L
+        ) }.isFailure)
+    }
+    @Test fun missingPhysicalReplyCannotBePromotedFromUntrustedDecodedBytes() {
+        val survey = Lfx2012FuelReadOnly.Survey(
+            Lfx2012FuelReadOnly.Source.ELM,
+            pids.toSet(),
+            pids.associateWith { pid -> if (pid == 0x52) null else "reported" }
+        )
+        val decoded = pids.associateWith { intArrayOf(128) }
+        val snapshot = Lfx2012FuelReadOnly.inspect(survey, decoded, 1L)
+        assertNull(snapshot.ethanolPercent)
+        assertEquals(
+            Lfx2012FuelReadOnly.Availability.NO_VALID_RESPONSE,
+            snapshot.reading(Lfx2012FuelReadOnly.ETHANOL).availability
+        )
+        assertEquals(
+            Lfx2012FuelReadOnly.Availability.REPORTED,
+            snapshot.reading(Lfx2012FuelReadOnly.STFT_BANK_1).availability
+        )
+    }
+
+    @Test fun blankPhysicalReplyIsNotAnObservedPidValue() {
+        val survey = Lfx2012FuelReadOnly.Survey(
+            Lfx2012FuelReadOnly.Source.J2534,
+            pids.toSet(),
+            pids.associateWith { pid -> if (pid == 0x52) "   " else "reported" }
+        )
+        val raw = pids.associateWith { intArrayOf(255) }
+        val snapshot = Lfx2012FuelReadOnly.inspect(survey, raw, 1L)
+        assertNull(snapshot.ethanolPercent)
+        assertEquals(
+            Lfx2012FuelReadOnly.Availability.NO_VALID_RESPONSE,
+            snapshot.reading(Lfx2012FuelReadOnly.ETHANOL).availability
+        )
+    }
+
+}

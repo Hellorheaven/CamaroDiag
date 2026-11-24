@@ -117,13 +117,21 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
     }
 
     /** Reads Mode 01 supported-PID bitmaps (PID 00, 20, ... E0). */
-    suspend fun discoverSupportedPids(): Set<Int> {
+    data class PidDiscovery(val supported: Set<Int>, val firstUnresolvedPid: Int?)
+
+    suspend fun discoverSupportedPids(): Set<Int> = discoverPidAvailability().supported
+
+    suspend fun discoverPidAvailability(primaryPowertrainResponderOnly: Boolean = false): PidDiscovery {
         val supported = linkedSetOf<Int>()
         var basePid = 0x00
         repeat(8) {
-            val response = ask("01%02X".format(Locale.US, basePid))
-            val bytes = payload(response, 0x41, basePid) ?: return supported
-            if (bytes.size < 4) return supported
+            val pidHex = "%02X".format(Locale.US, basePid)
+            val response = ask("01$pidHex")
+            val bytes = if (primaryPowertrainResponderOnly) {
+                CamaroUdsProtocol.parsePidBytes(response, pidHex, primaryPowertrainResponderOnly = true)
+                    ?.takeIf { it.size == 4 }?.asList()
+            } else payload(response, 0x41, basePid)
+            if (bytes == null || bytes.size < 4) return PidDiscovery(supported, basePid + 1)
 
             for (bit in 0 until 32) {
                 val mask = 1 shl (7 - (bit % 8))
@@ -135,10 +143,10 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
             }
 
             val hasNextPage = (bytes[3] and 0x01) != 0
-            if (!hasNextPage) return supported
+            if (!hasNextPage) return PidDiscovery(supported, null)
             basePid += 0x20
         }
-        return supported
+        return PidDiscovery(supported, null)
     }
 
     /**
@@ -190,9 +198,11 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
         val pending = ask("07")
         val permanent = ask("0A")
         val proved = listOf(
-            confirmed to 0x43, pending to 0x47, permanent to 0x4A
-        ).any { (raw, service) ->
-            parseResponseBytes(raw)?.contains(service) == true
+            Triple(confirmed, 0x43, "confirmed"),
+            Triple(pending, 0x47, "pending"),
+            Triple(permanent, 0x4A, "permanent")
+        ).any { (raw, service, status) ->
+            decodeDtcResponseOrNull(raw, service, status) != null
         }
         return Triple(
             decodeDtcResponse(confirmed, 0x43, "confirmed"),
@@ -257,7 +267,8 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
     }
 
     suspend fun readVin(): String? =
-        decodeAsciiRecords(ask("0902"), 0x49, 0x02, 17).firstOrNull()?.takeIf { it.length == 17 }
+        decodeAsciiRecords(ask("0902"), 0x49, 0x02, 17).singleOrNull()
+            ?.takeIf { it.matches(Regex("[A-HJ-NPR-Z0-9]{17}")) }
 
     suspend fun readCalibrationIds(): List<String> =
         decodeAsciiRecords(ask("0904"), 0x49, 0x04, 16)
@@ -373,7 +384,7 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
 
     private fun payload(response: String, service: Int, pid: Int): List<Int>? {
         if (service == 0x49 && ':' in response) {
-            val bytes = parseNumberedIdentityReply(response) ?: return null
+            val bytes = ObdNumberedIdentityFrames.parse(response) ?: return null
             if (bytes.getOrNull(0) != service || bytes.getOrNull(1) != pid) return null
             return bytes.drop(2)
         }
@@ -407,27 +418,6 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
         return bytes.takeIf { it.isNotEmpty() }
     }
 
-    /** ELM CAN autoformat: total byte count followed by rows 0..F, wrapping at F. */
-    private fun parseNumberedIdentityReply(response: String): List<Int>? {
-        val text = response.trim().removeSuffix(">").trim().uppercase(Locale.ROOT)
-            .removePrefix("SEARCHING...").trim()
-        val markers = Regex("""(?:^|\s)([0-9A-F]):""").findAll(text).toList()
-        if (markers.isEmpty()) return null
-        val header = text.substring(0, markers.first().range.first).trim()
-        if (!header.matches(Regex("[0-9A-F]{3}"))) return null
-        val expected = header.toInt(16)
-        val bytes = mutableListOf<Int>()
-        for ((row, marker) in markers.withIndex()) {
-            if (marker.groupValues[1].toInt(16) != row % 16) return null
-            val end = markers.getOrNull(row + 1)?.range?.first ?: text.length
-            val hex = text.substring(marker.range.last + 1, end).filterNot(Char::isWhitespace)
-            val rowSize = minOf(if (row == 0) 6 else 7, expected - bytes.size)
-            if (rowSize <= 0 || hex.length != 2 * rowSize || hex.any { it !in "0123456789ABCDEF" }) return null
-            bytes += hex.chunked(2).map { it.toInt(16) }
-        }
-        return bytes.takeIf { it.size == expected }
-    }
-
     private fun decodeAsciiRecords(
         response: String,
         service: Int,
@@ -436,9 +426,15 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
     ): List<String> {
         val data = payload(response, service, pid) ?: return emptyList()
         val records = recordData(data, recordWidth) ?: return emptyList()
-        return records.map { record ->
-            record.filter { it in 0x20..0x7E }.map(Int::toChar).joinToString("").trim()
-        }.filter(String::isNotBlank)
+        val decoded = records.map { record ->
+            val raw = record.map(Int::toChar).joinToString("")
+            val trimmed = raw.trim(' ', '\u0000')
+            // Padding is allowed only at either end. Do not silently discard
+            // embedded control bytes and turn corrupted ECU IDs into real IDs.
+            if (trimmed.isBlank() || trimmed.any { it !in ' '..'~' }) return emptyList()
+            trimmed
+        }
+        return decoded
     }
 
     private fun decodeHexRecords(
@@ -460,19 +456,81 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
     private fun recordData(data: List<Int>, recordWidth: Int): List<List<Int>>? {
         if (data.isEmpty() || recordWidth <= 0) return null
         val count = data.first()
-        if (count in 1..32 && data.size >= 1 + count * recordWidth) {
-            return data.drop(1).take(count * recordWidth).chunked(recordWidth)
+        if (count in 1..32) {
+            // Never truncate an overlong response or reinterpret its declared
+            // count byte as a count-less identity record.
+            if (data.size != 1 + count * recordWidth) return null
+            return data.drop(1).chunked(recordWidth)
         }
         if (data.size % recordWidth == 0) return data.chunked(recordWidth)
         return null
     }
 
-    private fun decodeDtcResponse(response: String, positiveService: Int, status: String): List<ObdDtc> {
-        val bytes = parseResponseBytes(response) ?: return emptyList()
-        val start = bytes.indexOf(positiveService)
-        if (start < 0) return emptyList()
-        val payload = bytes.drop(start + 1)
-        return payload.chunked(2).filter { it.size == 2 }.mapNotNull { pair ->
+    private fun decodeDtcResponse(response: String, positiveService: Int, status: String): List<ObdDtc> =
+        decodeDtcResponseOrNull(response, positiveService, status).orEmpty()
+
+    /**
+     * Distinguish counted physical CAN frames from legacy ELM DTC pairs,
+     * rejecting ambiguous truncated packets rather than returning fake codes.
+     * Non-null also proves that the read was physically acknowledged, even
+     * when the ECU returned a valid zero-DTC response.
+     */
+    private fun decodeDtcResponseOrNull(
+        response: String, positiveService: Int, status: String
+    ): List<ObdDtc>? {
+        val decoded = response.lineSequence().mapNotNull { rawLine ->
+            val line = rawLine.trim().uppercase(Locale.ROOT)
+            if (line.isEmpty()) return@mapNotNull null
+            // Decode each physical responder independently. Concatenating
+            // several CAN frames can create synthetic fault codes.
+            val tagged = Regex("""^(?:7E[8-F]|18DAF1[0-9A-F]{2})(?:\s+|(?=[0-9A-F]{4}))""")
+            val compactHeader = when {
+                line.matches(Regex("^7E[8-F][0-9A-F]{6,}$")) -> line.substring(3)
+                line.matches(Regex("^18DAF1[0-9A-F]{2}[0-9A-F]{6,}$")) -> line.substring(8)
+                else -> null
+            }
+            val dataText = when {
+                compactHeader != null -> compactHeader
+                tagged.containsMatchIn(line) -> {
+                    val body = line.replaceFirst(tagged, "").trim()
+                    val tokens = body.split(Regex("""\s+"""))
+                    // ELM/STN may emit the CAN DLC as either 4 or 04.
+                    // Normalize one-nibble DLC without touching payload bytes.
+                    if (tokens.size > 1 && tokens.first().length == 1)
+                        "0" + tokens.joinToString("")
+                    else tokens.joinToString("")
+                }
+                else -> line.replace(Regex("""\s+"""), "")
+            }
+            if (dataText.length % 2 != 0 ||
+                dataText.isEmpty() ||
+                dataText.any { it !in '0'..'9' && it !in 'A'..'F' }
+            ) return@mapNotNull null
+            val raw = dataText.chunked(2).map { it.toInt(16) }
+            val bytes = if (raw.first() in 1..8 && raw.first() == raw.size - 1) raw.drop(1)
+                else raw
+            if (bytes.firstOrNull() != positiveService) return@mapNotNull null
+            decodeSingleDtcPayload(bytes.drop(1), status)
+        }.toList()
+        if (decoded.isEmpty()) return null
+        return decoded.flatten().distinctBy(ObdDtc::code)
+    }
+
+    private fun decodeSingleDtcPayload(payload: List<Int>, status: String): List<ObdDtc>? {
+        if (payload.isEmpty()) return null
+        val count = payload.first()
+        val data = when {
+            count == 0 && payload.size == 1 -> emptyList()
+            count > 0 && payload.size == 1 + 2 * count -> payload.drop(1)
+            payload.size == 2 && payload.all { it == 0 } -> payload
+            // Legacy ELM pairs often include a trailing 0000 DTC slot.
+            // A single ambiguous 2-byte pair could be a truncated count.
+            payload.size >= 4 && payload.size % 2 == 0 -> payload
+            else -> return null
+        }
+        val records = data.chunked(2)
+        if (records.any { it.size != 2 }) return null
+        return records.mapNotNull { pair ->
             val raw = (pair[0] shl 8) or pair[1]
             if (raw == 0) null else {
                 val prefix = "PCBU"[(raw shr 14) and 0x03]
@@ -507,28 +565,25 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
             )
         )
 
-        if (pid in 0x24..0x2B) {
-            if (data.size < 4) return emptyList()
-            val sensorIndex = pid - 0x24
-            val bank = if (sensorIndex < 4) 1 else 2
-            val sensor = sensorIndex % 4 + 1
+        if (pid in 0x24..0x2B || pid in 0x34..0x3B) {
+            if (data.size != 4) return emptyList()
+            // Camaro uses a two-bank layout; the 3/4-bank PID-to-sensor
+            // arrangement is a different SAE table and needs explicit detection.
+            val currentFamily = pid in 0x34..0x3B
+            val index = pid - (if (currentFamily) 0x34 else 0x24)
+            val bank = if (index < 4) 1 else 2
+            val sensor = index % 4 + 1
             val sensorLabel = "Bank $bank sensor $sensor"
-            val equivalenceRatio = ((data[0] shl 8) or data[1]) * 2.0 / 65536.0
-            val voltage = ((data[2] shl 8) or data[3]) * 8.0 / 65536.0
-            return value("O2 $sensorLabel equivalence ratio", equivalenceRatio, "lambda") +
-                value("O2 $sensorLabel voltage", voltage, "V")
-        }
-
-        if (pid in 0x34..0x3B) {
-            if (data.size < 4) return emptyList()
-            val sensorIndex = pid - 0x34
-            val bank = if (sensorIndex < 4) 1 else 2
-            val sensor = sensorIndex % 4 + 1
-            val sensorLabel = "Bank $bank sensor $sensor"
-            val equivalenceRatio = ((data[0] shl 8) or data[1]) * 2.0 / 65536.0
-            val current = ((data[2] shl 8) or data[3]) / 256.0 - 128.0
-            return value("O2 $sensorLabel equivalence ratio", equivalenceRatio, "lambda") +
-                value("O2 $sensorLabel current", current, "mA")
+            val four = data.toIntArray()
+            val ratio = CamaroUdsProtocol.decodeWidebandLambda(four) ?: return emptyList()
+            val secondary = if (currentFamily)
+                CamaroUdsProtocol.decodeWidebandCurrent(four)
+            else CamaroUdsProtocol.decodeWidebandVoltage(four)
+            val reading = secondary ?: return emptyList()
+            val secondaryName = if (currentFamily) "current" else "voltage"
+            return value("O2 $sensorLabel equivalence ratio", ratio, "lambda") +
+                value("O2 $sensorLabel $secondaryName",
+                    reading, if (currentFamily) "mA" else "V")
         }
 
         val decoded: Pair<String, Pair<Double, String>> = when (pid) {
@@ -583,7 +638,10 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
             0x4C -> "Commanded throttle actuator" to (percent(a) to "%")
             0x4D -> "Time with MIL on" to ((word() ?: return emptyList()).toDouble() to "min")
             0x4E -> "Time since DTC clear" to ((word() ?: return emptyList()).toDouble() to "min")
-            0x52 -> "Ethanol fuel percentage" to (percent(a) to "%")
+            0x52 -> {
+                if (data.size != 1) return emptyList()
+                "Ethanol fuel percentage" to (percent(a) to "%")
+            }
             0x59 -> "Fuel rail absolute pressure" to ((word() ?: return emptyList()) * 10.0 to "kPa")
             0x5A -> "Relative accelerator pedal position" to (percent(a) to "%")
             0x5B -> "Hybrid battery pack remaining life" to (percent(a) to "%")

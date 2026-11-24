@@ -9,14 +9,17 @@ data class CanTraceFrame(
     val timestampSeconds: Double?,
     val canId: Int,
     val direction: CanTraceDirection,
-    val data: List<Int>
+    val data: List<Int>,
+    /** Null only when the source did not preserve CAN-ID width. */
+    val extendedId: Boolean? = null
 )
 
 data class UdsTraceMessage(
     val timestampSeconds: Double?,
     val canId: Int,
     val direction: CanTraceDirection,
-    val payload: List<Int>
+    val payload: List<Int>,
+    val extendedId: Boolean? = null
 ) {
     val responseService: Int? get() = payload.firstOrNull()
     val service: Int?
@@ -177,7 +180,7 @@ object CanTraceAnalyzer {
     private const val MAX_ISOTP_CONSECUTIVE_FRAME_GAP_SECONDS = 1.0
 
     private val ascFrameRegex = Regex(
-        """^\s*([+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?|NaN|Infinity)\s+\d+\s+([0-9A-Fa-f]{3,8})(?:x)?\s+(Tx|Rx)\s+[dD]\s+(\d+)\s*(.*)$""",
+        """^\s*([+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?|NaN|Infinity)\s+\d+\s+([0-9A-Fa-f]{3,8})(x)?\s+(Tx|Rx)\s+[dD]\s+(\d+)\s*(.*)$""",
         RegexOption.IGNORE_CASE
     )
 
@@ -267,12 +270,18 @@ object CanTraceAnalyzer {
                 val matchingIndexes = pending.indices.filter { index ->
                     val request = pending[index].request
                     request.direction != message.direction &&
-                        isCompatibleObdCanResponseId(request.canId, message.canId) &&
+                        // Respect the CAN format: 11-bit SAE OBD IDs and
+                        // 29-bit physical 18DA[target]F1 channels never overlap.
+                        request.extendedId != null && request.extendedId == message.extendedId &&
+                        isCompatibleObdCanResponseId(
+                            request.canId, message.canId, request.extendedId == true
+                        ) &&
                         // A physical ECU may send several NRC 0x78 responses before its final reply.
                         // For functional requests, also allow that same ECU to complete a pending
                         // exchange, but do not count duplicate terminal replies from one responder.
                         pending[index].responses.none {
-                            it.canId == message.canId && it.negativeResponseCode != 0x78
+                            it.canId == message.canId && it.extendedId == message.extendedId &&
+                                it.negativeResponseCode != 0x78
                         } &&
                         request.service == service &&
                         // If both timestamps exist, never pair a response that predates
@@ -306,7 +315,8 @@ object CanTraceAnalyzer {
                     // A functional 7DF request can receive one response from
                     // several ECUs. Keep it pending for distinct responder IDs and
                     // aggregate those replies into one exchange until capture end.
-                    val functionalRequest = candidate.request.canId == 0x7DF
+                    val functionalRequest =
+                        candidate.request.extendedId == false && candidate.request.canId == 0x7DF
                     if (!functionalRequest && message.negativeResponseCode != 0x78) {
                         pending.removeAt(matchIndex)
                         exchanges += candidate.toExchange(UdsExchangeStatus.COMPLETED)
@@ -336,9 +346,17 @@ object CanTraceAnalyzer {
      * Correlate only the conventional 11-bit OBD-II response ranges.
      * For physical requests 7E0..7E7 the matching response is +8;
      * functional request 7DF may be answered by 7E8..7EF.
-     * Unknown/29-bit addressing is deliberately left unpaired.
+     * 29-bit physical responses require verified normal-fixed address pairing.
      */
-    private fun isCompatibleObdCanResponseId(requestId: Int, responseId: Int): Boolean {
+    private fun isCompatibleObdCanResponseId(
+        requestId: Int, responseId: Int, extended: Boolean
+    ): Boolean {
+        if (extended) {
+            // 29-bit normal fixed physical addressing: request 18DA[target]F1,
+            // responder 18DAF1[target]. No generalized functional mapping.
+            if ((requestId.toLong() and 0xFFFF00FFL) != 0x18DA00F1L) return false
+            return responseId == (0x18DAF100L or ((requestId.toLong() shr 8) and 0xFFL)).toInt()
+        }
         if (requestId == 0x7DF) return responseId in 0x7E8..0x7EF
         if (requestId in 0x7E0..0x7E7) return responseId == requestId + 0x08
         return false
@@ -492,9 +510,9 @@ object CanTraceAnalyzer {
             val match = ascFrameRegex.matchEntire(line) ?: return@forEachIndexed
             val timestamp = match.groupValues[1].toDoubleOrNull()
             val canId = parseCanId(match.groupValues[2])
-            val direction = parseDirection(match.groupValues[3])
-            val dlc = match.groupValues[4].toIntOrNull()
-            val bytes = parseHexBytes(match.groupValues[5])
+            val direction = parseDirection(match.groupValues[4])
+            val dlc = match.groupValues[5].toIntOrNull()
+            val bytes = parseHexBytes(match.groupValues[6])
             if (timestamp == null || !timestamp.isFinite() || canId == null || dlc == null || bytes == null) {
                 errors += "Line ${index + 1}: invalid ASC frame header or hexadecimal data."
                 return@forEachIndexed
@@ -503,7 +521,8 @@ object CanTraceAnalyzer {
                 errors += "Line ${index + 1}: DLC does not match the available data bytes."
                 return@forEachIndexed
             }
-            frames += CanTraceFrame(index + 1, timestamp, canId, direction, bytes.take(dlc))
+            frames += CanTraceFrame(index + 1, timestamp, canId, direction, bytes.take(dlc),
+                extendedId = match.groupValues[2].length > 3 || match.groupValues[3].isNotEmpty())
         }
         return ParsedFrames(frames, errors)
     }
@@ -524,7 +543,8 @@ object CanTraceAnalyzer {
                 errors += "Line ${index + 1}: invalid ELM327 header/DLC/data record."
                 return@forEachIndexed
             }
-            frames += CanTraceFrame(index + 1, null, canId, CanTraceDirection.UNKNOWN, bytes.take(dlc))
+            frames += CanTraceFrame(index + 1, null, canId, CanTraceDirection.UNKNOWN, bytes.take(dlc),
+                extendedId = match.groupValues[1].length > 3)
         }
         if (frames.isEmpty()) errors += "No ELM327 header records found; enable CAN headers and save the monitor output."
         return ParsedFrames(frames, errors)
@@ -611,7 +631,8 @@ object CanTraceAnalyzer {
                 errors += "Line ${lineIndex + 1}: invalid CSV CAN frame."
                 continue
             }
-            frames += CanTraceFrame(lineIndex + 1, timestamp, canId, direction, bytes.take(dlc))
+            frames += CanTraceFrame(lineIndex + 1, timestamp, canId, direction, bytes.take(dlc),
+                extendedId = field(canIdIndex).trim().removePrefix("0x").removePrefix("0X").length > 3)
         }
         return ParsedFrames(frames, errors)
     }
@@ -674,7 +695,8 @@ object CanTraceAnalyzer {
         val direction: CanTraceDirection,
         val expectedLength: Int,
         val payload: MutableList<Int>,
-        var nextSequence: Int
+        var nextSequence: Int,
+        val extendedId: Boolean? = null
     ) {
         var lastFrameTimestampSeconds: Double? = timestampSeconds
     }
@@ -707,7 +729,7 @@ object CanTraceAnalyzer {
     private fun reassemble(frames: List<CanTraceFrame>): ReassemblyResult {
         val messages = mutableListOf<UdsTraceMessage>()
         val errors = mutableListOf<String>()
-        val pending = mutableMapOf<Pair<Int, CanTraceDirection>, PendingIsoTp>()
+        val pending = mutableMapOf<Triple<Int, Boolean?, CanTraceDirection>, PendingIsoTp>()
         var discardedIncompleteMessages = 0
 
         frames.forEach { frame ->
@@ -715,7 +737,7 @@ object CanTraceAnalyzer {
             val pci = frame.data[0]
             when (pci and 0xF0) {
                 0x00 -> {
-                    val key = frame.canId to frame.direction
+                    val key = Triple(frame.canId, frame.extendedId, frame.direction)
                     if (pending.remove(key) != null) {
                         errors += "Line ${frame.lineNumber}: single frame interrupted an unfinished ISO-TP message."
                         discardedIncompleteMessages++
@@ -732,12 +754,12 @@ object CanTraceAnalyzer {
                     } else {
                         messages += UdsTraceMessage(
                             frame.timestampSeconds, frame.canId, frame.direction,
-                            frame.data.drop(headerLength).take(length)
+                            frame.data.drop(headerLength).take(length), frame.extendedId
                         )
                     }
                 }
                 0x10 -> {
-                    val key = frame.canId to frame.direction
+                    val key = Triple(frame.canId, frame.extendedId, frame.direction)
                     if (pending.remove(key) != null) {
                         errors += "Line ${frame.lineNumber}: replaced an unfinished ISO-TP message."
                         discardedIncompleteMessages++
@@ -772,13 +794,14 @@ object CanTraceAnalyzer {
                                 val bytes = frame.data.drop(headerLength).take(length).toMutableList()
                                 if (bytes.size >= length) {
                                     messages += UdsTraceMessage(
-                                        frame.timestampSeconds, frame.canId, frame.direction, bytes.take(length)
+                                        frame.timestampSeconds, frame.canId, frame.direction, bytes.take(length),
+                                        frame.extendedId
                                     )
                                     pending.remove(key)
                                 } else {
                                     pending[key] = PendingIsoTp(
                                         frame.timestampSeconds, frame.canId, frame.direction,
-                                        length, bytes, nextSequence = 1
+                                        length, bytes, nextSequence = 1, extendedId = frame.extendedId
                                     )
                                 }
                             }
@@ -786,7 +809,7 @@ object CanTraceAnalyzer {
                     }
                 }
                 0x20 -> {
-                    val key = frame.canId to frame.direction
+                    val key = Triple(frame.canId, frame.extendedId, frame.direction)
                     val state = pending[key]
                     if (state == null) {
                         errors += "Line ${frame.lineNumber}: ISO-TP consecutive frame has no matching first frame."
@@ -826,7 +849,7 @@ object CanTraceAnalyzer {
                             if (state.payload.size >= state.expectedLength) {
                                 messages += UdsTraceMessage(
                                     state.timestampSeconds, state.canId, state.direction,
-                                    state.payload.take(state.expectedLength)
+                                    state.payload.take(state.expectedLength), state.extendedId
                                 )
                                 pending.remove(key)
                             }

@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms</value></resheader>
+  <data name="Host" xml:space="preserve"><value>IP passerelle DoIP</value></data>
+  <data name="Discover" xml:space="preserve"><value>Identifier DoIP</value></data>
+  <data name="Cancel" xml:space="preserve"><value>Annuler l’opération DoIP</value></data>
+  <data name="Unavailable" xml:space="preserve"><value>indisponible</value></data>
+  <data name="Identity" xml:space="preserve"><value>Passerelle DoIP={0} version=0x{1:X2} logique=0x{2:X4} VIN={3} EID={4} GID={5} suite=0x{6:X2} synchro={7}</value></data>
+  <data name="Notice" xml:space="preserve"><value>Une identité UDP ne prouve ni l’authentification ECU ni la qualification de programmation.</value></data>
+  <data name="Started" xml:space="preserve"><value>Requête d’identification DoIP / ISO 13400 UDP vers {0}.</value></data>
+  <data name="Canceled" xml:space="preserve"><value>Opération DoIP annulée.</value></data>
+  <data name="Busy" xml:space="preserve"><value>Fermez le canal J2534 local et arrêtez le pont Android avant la découverte DoIP.</value></data>
+  <data name="InvalidHost" xml:space="preserve"><value>Saisissez une adresse IPv4 ou IPv6 unicast explicite de la passerelle.</value></data>
+  <data name="Status" xml:space="preserve"><value>État de la passerelle</value></data>
+  <data name="Power" xml:space="preserve"><value>Alimentation diagnostic</value></data>
+  <data name="PowerNotReady" xml:space="preserve"><value>non prêt</value></data>
+  <data name="PowerReady" xml:space="preserve"><value>prêt</value></data>
+  <data name="PowerUnsupported" xml:space="preserve"><value>non pris en charge</value></data>
+  <data name="PowerResult" xml:space="preserve"><value>Mode d’alimentation diagnostic DoIP={0} ({1})</value></data>
+  <data name="StatusResult" xml:space="preserve"><value>Type de nœud DoIP={0} sockets={1}/{2} taille maximale des données={3}</value></data>
+  <data name="StatusNotice" xml:space="preserve"><value>L’état UDP DoIP est informatif et ne constitue pas une autorisation ECU.</value></data>
+  <data name="StatusStarted" xml:space="preserve"><value>Requête d’état DoIP / ISO 13400 UDP vers {0}, version 0x{1:X2}.</value></data>
+  <data name="IdentifyFirst" xml:space="preserve"><value>Identifiez d’abord cette passerelle pour obtenir sa version DoIP observée.</value></data>
+  <data name="ContextChanged" xml:space="preserve"><value>Adresse de passerelle modifiée ; identifiez-la à nouveau.</value></data>
+  <data name="ReadVin" xml:space="preserve"><value>Lire VIN ECU (UDS)</value></data>
+  <data name="TesterAddress" xml:space="preserve"><value>Adresse logique testeur (hex)</value></data>
+  <data name="EcuAddress" xml:space="preserve"><value>Adresse logique ECU (hex)</value></data>
+  <data name="UseTls" xml:space="preserve"><value>DoIP sécurisé (TLS)</value></data>
+  <data name="CertThumbprint" xml:space="preserve"><value>Empreinte certificat client (facultatif)</value></data>
+  <data name="VinStarted" xml:space="preserve"><value>DoIP / {0} / UDS : lecture VIN via {1}, ECU 0x{2:X4}, testeur 0x{3:X4}, version 0x{4:X2}.</value></data>
+  <data name="VinResult" xml:space="preserve"><value>VIN ECU : {0}</value></data>
+  <data name="VinNotice" xml:space="preserve"><value>La concordance VIN ne constitue ni une authentification ECU ni une autorisation d’écriture.</value></data>
+  <data name="InvalidLogical" xml:space="preserve"><value>Saisissez deux adresses logiques distinctes de quatre chiffres hexadécimaux.</value></data>
+  <data name="InvalidCertificate" xml:space="preserve"><value>Le certificat client nécessite TLS et une empreinte hexadécimale valide de 40 chiffres.</value></data>
+</root>

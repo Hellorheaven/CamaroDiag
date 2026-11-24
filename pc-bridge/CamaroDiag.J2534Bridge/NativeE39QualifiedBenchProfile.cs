@@ -5,37 +5,26 @@ using System.Text.RegularExpressions;
 namespace CamaroDiag.J2534Bridge;
 
 /// <summary>
-/// Exact, independently signed bench evidence. A user-supplied JSON boolean
-/// or a self-generated signing key is not a hardware qualification.
+/// Operator-supplied local E39/E39A bench configuration. This is neither
+/// an OEM key nor a CamaroDiag license or independently signed permit.
+
 /// </summary>
 internal static class NativeE39QualifiedBenchProfile
 {
-    // Intentionally empty: no independent physical qualification authority
-    // or approved hardware artifacts have been established for this release.
-    private static readonly IReadOnlyDictionary<string, byte[]> TrustedKeys =
-        new Dictionary<string, byte[]>(StringComparer.Ordinal);
-
     internal sealed record Accepted(string Family, string ProfileSha256,
-        string BoardEvidenceSha256, string RecoveryEvidenceSha256,
         J2534MemoryReadScope Scope, NativeE39PhysicalAdmission.QualifiedChannel Channel,
         NativeE39BenchWorkflow.Policy Policy);
 
     private static readonly string[] Fields =
     [
-        "schema", "keyId", "family", "expectedVin", "expectedOsId", "driverSha256",
+        "schema", "family", "expectedVin", "expectedOsId",
         "registryView", "requestCanId", "responseCanId", "protocolNumber",
         "stockReadBytes", "stockReadSession", "minimumSupplyMillivolts",
         "maximumSupplyMillivolts", "kernelSha256", "maximumIsoTpPayloadBytes",
-        "maximumReadBytes", "maximumWriteBytes", "boardEvidenceSha256",
-        "recoveryEvidenceSha256"
+        "maximumReadBytes", "maximumWriteBytes"
     ];
 
-    internal static Accepted Load(string profilePath, string signaturePath)
-    {
-        if (TrustedKeys.Count == 0)
-            throw new UnauthorizedAccessException("No independently qualified ECU programming authority is installed.");
-        return Verify(ReadBounded(profilePath, 16384), ReadBounded(signaturePath, 64), TrustedKeys);
-    }
+    internal static Accepted Load(string profilePath) => Parse(ReadBounded(profilePath, 16384));
 
     internal static byte[] ReadBounded(string path, int maximum)
     {
@@ -48,23 +37,30 @@ internal static class NativeE39QualifiedBenchProfile
         return bytes;
     }
 
-    // Trust injection is only used by the hardware-free self-tests. The local
-    // production CLI calls Load, never this method with external keys.
-    internal static Accepted Verify(byte[] payload, byte[] signature,
-        IReadOnlyDictionary<string, byte[]> keys)
+    internal static Accepted Parse(byte[] payload)
     {
-        if (payload.Length is < 1 or > 16384 || signature.Length != 64)
-            throw new InvalidDataException("Invalid qualification payload or signature length.");
+        ArgumentNullException.ThrowIfNull(payload);
+        if (payload.Length is < 1 or > 16384)
+            throw new InvalidDataException("Invalid bench profile length.");
         payload = payload.ToArray();
-        signature = signature.ToArray();
         using var doc = JsonDocument.Parse(payload);
         var root = doc.RootElement;
         var expected = new HashSet<string>(Fields, StringComparer.Ordinal);
         if (root.ValueKind != JsonValueKind.Object)
-            throw new InvalidDataException("Qualification must be a JSON object.");
+            throw new InvalidDataException("Bench profile must be a JSON object.");
+        var hasDriverFingerprint = false;
         foreach (var property in root.EnumerateObject())
+        {
+            if (property.Name == "driverSha256")
+            {
+                if (hasDriverFingerprint)
+                    throw new InvalidDataException("Duplicate optional driver fingerprint.");
+                hasDriverFingerprint = true;
+                continue;
+            }
             if (!expected.Remove(property.Name))
-                throw new InvalidDataException("Unknown or duplicate qualification field: " + property.Name);
+                throw new InvalidDataException("Unknown or duplicate bench profile field: " + property.Name);
+        }
         if (expected.Count != 0 || root.GetProperty("schema").GetInt32() != 1)
             throw new InvalidDataException("Incomplete or unsupported qualification schema.");
         string Value(string name) => root.GetProperty(name).GetString()
@@ -72,21 +68,12 @@ internal static class NativeE39QualifiedBenchProfile
         string Digest(string name)
         {
             var value = Value(name);
-            if (!Regex.IsMatch(value, @"\A[0-9A-F]{64}\z"))
+            if (!Regex.IsMatch(value, @"\A[0-9A-Fa-f]{64}\z"))
                 throw new InvalidDataException("Invalid digest: " + name);
-            return value;
+            return value.ToUpperInvariant();
         }
         int Number(string name) => root.GetProperty(name).GetInt32();
         uint Unsigned(string name) => root.GetProperty(name).GetUInt32();
-        if (!keys.TryGetValue(Value("keyId"), out var key))
-            throw new UnauthorizedAccessException("Unknown qualification signing authority.");
-        using var verifier = ECDsa.Create();
-        verifier.ImportSubjectPublicKeyInfo(key, out var consumed);
-        if (consumed != key.Length || verifier.KeySize != 256 ||
-            verifier.ExportParameters(false).Curve.Oid.Value != "1.2.840.10045.3.1.7" ||
-            !verifier.VerifyData(payload, signature, HashAlgorithmName.SHA256,
-                DSASignatureFormat.IeeeP1363FixedFieldConcatenation))
-            throw new UnauthorizedAccessException("Qualification signature is invalid.");
         var family = Value("family");
         var registry = Value("registryView");
         var protocol = Number("protocolNumber");
@@ -106,12 +93,14 @@ internal static class NativeE39QualifiedBenchProfile
         var scope = new J2534MemoryReadScope(Value("expectedVin"), Number("requestCanId"),
             Number("responseCanId"), protocol, 0, NativeE39ImageInspector.ImageBytes,
             Number("stockReadBytes"), Number("stockReadSession"));
-        var channel = new NativeE39PhysicalAdmission.QualifiedChannel(Digest("driverSha256"),
+        var optionalDriverHash = hasDriverFingerprint ? Digest("driverSha256") : "";
+        var channel = new NativeE39PhysicalAdmission.QualifiedChannel(optionalDriverHash,
             registry, scope.RequestCanId, scope.ResponseCanId, protocol, scope.MaxReadBytes, scope.Session);
         var session = new NativeE39ProgrammingSession.Qualification(scope.ExpectedVin, os,
             true, true, true, minimum, maximum);
-        return new Accepted(family, Convert.ToHexString(SHA256.HashData(payload)),
-            Digest("boardEvidenceSha256"), Digest("recoveryEvidenceSha256"), scope, channel,
+        // Profile content is configuration, never proof of a physically
+        // qualified RAM kernel, complete backup or recovery procedure.
+        return new Accepted(family, Convert.ToHexString(SHA256.HashData(payload)), scope, channel,
             new NativeE39BenchWorkflow.Policy(session, Digest("kernelSha256"), payloadLimit,
                 readLimit, writeLimit));
     }

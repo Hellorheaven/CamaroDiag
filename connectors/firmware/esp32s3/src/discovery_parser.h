@@ -23,6 +23,7 @@ class DiscoveryParser {
       return result;
     }
     if (error_ != Result::None) return Result::None;
+    if (count_ == 0) first_ = now;
     last_ = now;
     if (terminal_cr_ || (byte != '\r' && (byte < 0x20 || byte > 0x7e))) {
       error_ = Result::Malformed;
@@ -37,7 +38,8 @@ class DiscoveryParser {
 
   // On timeout discard the remainder through LF, never execute a suffix.
   void expire(uint32_t now) {
-    if (count_ && error_ == Result::None && uint32_t(now - last_) >= 1000u)
+    if (count_ && error_ == Result::None &&
+        (uint32_t(now - last_) >= 1000u || uint32_t(now - first_) >= 3000u))
       error_ = Result::Timeout;
   }
 
@@ -47,12 +49,13 @@ class DiscoveryParser {
   }
   void reset() {
     count_ = 0;
+    first_ = 0;
     terminal_cr_ = false;
     error_ = Result::None;
   }
   char buffer_[96]{};
   size_t count_ = 0;
-  uint32_t last_ = 0;
+  uint32_t last_ = 0, first_ = 0;
   bool terminal_cr_ = false;
   Result error_ = Result::None;
 };

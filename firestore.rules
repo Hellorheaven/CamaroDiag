@@ -1,12 +1,9 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Only the signed-in license owner may read status; clients never write.
-    match /licenses/{uid} {
-      allow get: if request.auth != null && request.auth.uid == uid;
-      allow list, create, update, delete: if false;
-    }
-    // Billing ledgers, Stripe IDs, disputes and receipts are admin-only.
+    // CamaroDiag stores only license records under licenses/{firebaseUid}.
+    // Identity, account status and roles are handled by Firebase Authentication.
+    // Cloud Functions use the Admin SDK; clients cannot access Firestore.
     match /{document=**} {
       allow read, write: if false;
     }

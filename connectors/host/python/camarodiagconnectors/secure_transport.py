@@ -51,8 +51,20 @@ def _wrap(context, stream, *, allowed_peer_sha256, expected_name=None, server=Fa
         raise ValueError("TLS 1.3 required")
     if context.verify_mode != ssl.CERT_REQUIRED or (not server and not context.check_hostname):
         raise ValueError("Mutual certificate verification required")
-    wrapped = context.wrap_socket(stream, server_side=server,
-                                  server_hostname=None if server else expected_name)
+    # A valid certificate does not justify blocking a worker indefinitely.
+    # Deadline comes from the caller's socket and covers TLS handshake I/O.
+    timeout = stream.gettimeout()
+    if timeout is None or not 0 < timeout <= 5:
+        raise ValueError("Bounded TLS handshake socket timeout (<=5s) required")
+    # A failed TLS handshake can raise inside wrap_socket() before it
+    # returns an SSLSocket. That failure must also retire the original
+    # connection, not leave an unauthenticated transport alive for retry.
+    try:
+        wrapped = context.wrap_socket(stream, server_side=server,
+                                      server_hostname=None if server else expected_name)
+    except BaseException:
+        stream.close()
+        raise
     try:
         if wrapped.version() != "TLSv1.3" or wrapped.selected_alpn_protocol() != "camarodiag-discovery/1":
             raise ssl.SSLError("Unexpected TLS application protocol")

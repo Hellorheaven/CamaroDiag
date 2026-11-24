@@ -1,0 +1,72 @@
+name: C6 J2534 safety unit gate
+
+# One explicitly requested security campaign AFTER C6 code freeze.
+# Not triggered by ordinary code commits or PR synchronize.
+on:
+  push:
+    branches: [chore/unified-ci]
+    paths:
+      - '.github/c6-security-gate-request.txt'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: c6-j2534-security-unit-gate
+  cancel-in-progress: false
+
+jobs:
+  android-security:
+    name: C6 Android and diagnostic security unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: '8.11.1'
+      - uses: android-actions/setup-android@v4
+        with:
+          cmdline-tools-version: 14742923
+          packages: 'platform-tools platforms;android-36 build-tools;36.0.0'
+      - name: Generate repository wrapper
+        run: gradle wrapper --gradle-version 8.11.1
+      - name: Run affected Android security suites
+        run: ./gradlew :communication:testDebugUnitTest :diagnostic:testDebugUnitTest :app:testDebugUnitTest --warning-mode=fail --stacktrace
+      - name: Archive security test reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: c6-android-security-${{ github.sha }}
+          path: |
+            **/build/reports/tests/testDebugUnitTest/**
+            **/build/test-results/testDebugUnitTest/**
+          if-no-files-found: ignore
+          retention-days: 14
+
+  windows-security:
+    name: C6 J2534 safety policy, Debug build and self-tests
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '8.0.x'
+      - name: Validate local E39 bench access and remote write isolation
+        shell: pwsh
+        run: ./.github/scripts/verify-pr95-readonly.ps1
+      - name: Build and self-test Windows J2534 security
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          dotnet build ./pc-bridge/CamaroDiag.J2534Bridge/CamaroDiag.J2534Bridge.csproj --configuration Debug -warnaserror
+          if ($LASTEXITCODE -ne 0) { throw 'Windows security Debug build failed' }
+          dotnet run --project ./pc-bridge/CamaroDiag.J2534Bridge/CamaroDiag.J2534Bridge.csproj --configuration Debug --no-build -- --self-test
+          if ($LASTEXITCODE -ne 0) { throw 'Windows security self-test failed' }

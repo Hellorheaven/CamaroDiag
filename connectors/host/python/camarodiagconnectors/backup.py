@@ -14,6 +14,8 @@ import stat
 import re
 from pathlib import Path
 
+MAX_MANIFEST_BYTES = 64 * 1024
+
 
 def _open_regular_nofollow(path: Path):
     """Open a regular file without following a final-component symlink."""
@@ -73,8 +75,27 @@ def backup_manifest(
     )
 
 
+def _sync_parent_directory(parent: Path) -> None:
+    """Persist backup directory entries on POSIX after file data has been fsynced.
+
+    Windows does not expose portable directory fsync through Python; its files
+    are still explicitly flushed to stable storage before publishing metadata.
+    """
+    if os.name != "posix":
+        return
+    fd = os.open(parent, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+    try:
+        os.fsync(fd)
+    finally:
+        os.close(fd)
+
+
 def write_bundle(prefix: Path, image: bytes, manifest: Manifest) -> None:
-    """Create backup .bin/.json files exclusively, never overwrite."""
+    """Create and read back a durable OFFLINE backup; publish metadata last.
+
+    A matching digest proves file integrity only, never physical ECU provenance
+    or whether a future restoration can succeed.
+    """
     if sha256(image).hexdigest() != manifest.image_sha256 or len(image) != manifest.region_length:
         raise ValueError("Image does not match manifest")
     if (type(manifest.schema) is not int or type(manifest.declared_capacity) is not int
@@ -94,6 +115,10 @@ def write_bundle(prefix: Path, image: bytes, manifest: Manifest) -> None:
     )
     if manifest != expected:
         raise ValueError("Untrusted or inconsistent backup metadata")
+    encoded_manifest = (json.dumps(asdict(manifest), indent=2, sort_keys=True) + "\n").encode("utf-8")
+    if len(encoded_manifest) > MAX_MANIFEST_BYTES:
+        raise ValueError("Manifest exceeds 64 KiB")
+
     binary = prefix.with_suffix(".bin")
     metadata = prefix.with_suffix(".json")
     # Path.exists() follows symlinks and misses dangling links; reject those too.
@@ -103,18 +128,45 @@ def write_bundle(prefix: Path, image: bytes, manifest: Manifest) -> None:
     binary_created = False
     metadata_created = False
     try:
+        # The .json manifest is the publication marker. A crash leaving only
+        # .bin cannot be mistaken for a complete backup by verify_bundle().
         with binary.open("xb") as out:
             binary_created = True
             out.write(image)
-        with metadata.open("x", encoding="utf-8") as out:
+            out.flush()
+            os.fsync(out.fileno())
+        with _open_regular_nofollow(binary) as reread:
+            # Stream independent disk readback in bounded chunks: large ECU
+            # images must not need a second full-size in-memory byte array.
+            source = memoryview(image)
+            for start in range(0, len(source), 1024 * 1024):
+                expected = source[start:start + 1024 * 1024]
+                if reread.read(len(expected)) != expected:
+                    raise ValueError("Backup image readback differs from its source")
+            if reread.read(1):
+                raise ValueError("Backup image readback has unexpected trailing bytes")
+        # Persist the .bin filename before making a manifest visible.
+        _sync_parent_directory(binary.parent)
+        with metadata.open("xb") as out:
             metadata_created = True
-            json.dump(asdict(manifest), out, indent=2, sort_keys=True)
-            out.write("\n")
+            out.write(encoded_manifest)
+            out.flush()
+            os.fsync(out.fileno())
+        if verify_bundle(prefix) != manifest:
+            raise ValueError("Backup manifest readback differs from its source")
+        # Persist both directory entries after the final, verified manifest.
+        _sync_parent_directory(binary.parent)
     except BaseException:
         if metadata_created:
             metadata.unlink(missing_ok=True)
         if binary_created:
             binary.unlink(missing_ok=True)
+        # Make cleanup durable where the host filesystem permits it. Preserve
+        # the original error if the directory itself has already disappeared.
+        try:
+            _sync_parent_directory(binary.parent)
+        except OSError:
+            pass
         raise
 
 
@@ -136,8 +188,8 @@ def verify_bundle(prefix: Path) -> Manifest:
         if not stat.S_ISREG(mode):
             raise ValueError("Backup components must be regular files")
     with _open_regular_nofollow(metadata_path) as stream:
-        raw = stream.read(64 * 1024 + 1)
-    if len(raw) > 64 * 1024:
+        raw = stream.read(MAX_MANIFEST_BYTES + 1)
+    if len(raw) > MAX_MANIFEST_BYTES:
         raise ValueError("Manifest exceeds 64 KiB")
     metadata = json.loads(
         raw.decode("utf-8"),

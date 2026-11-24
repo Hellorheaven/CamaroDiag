@@ -31,10 +31,74 @@ internal static class Program
             return 2;
         }
 
-        // Explicit public CD/1 discovery. Never falls through to a vendor
-        // driver, network listener, updater or ECU operation.
+        // Help is intentionally resolved before updater, DLL enumeration,
+        // network listener and *all* protocol/ECU command dispatch.
+        // A mixed --help + destructive option is rejected without I/O.
+        if (BridgeCommandLineHelp.IsHelpRequest(args))
+            return BridgeCommandLineHelp.Run(args);
+
+        // Offline COM enumeration must win over every active diagnostic or
+        // programming flag. The handler rejects mixed invocations, rather
+        // than allowing any protocol handler to open a driver accidentally.
+        if (args.Contains(ConnectorDiscoveryCli.ListCommand, StringComparer.OrdinalIgnoreCase))
+            return ConnectorDiscoveryCli.ListPorts(args);
+
+        // Explicit public CD/1 prototype discovery rejects any extra flags.
         if (args.Contains(ConnectorDiscoveryCli.Command, StringComparer.OrdinalIgnoreCase))
             return ConnectorDiscoveryCli.Run(args);
+
+        // Explicit bidirectional ISO/SAE exchanges. No default startup
+        // programming and no network-listener fallback on malformed CLI.
+        if (args.Contains(StandardProtocolCli.J1939FdCmdtCommand,
+            StringComparer.OrdinalIgnoreCase))
+            return await StandardProtocolCli.RunJ1939FdAsync(args);
+        if (args.Contains(StandardProtocolCli.J1939FdBamCommand,
+            StringComparer.OrdinalIgnoreCase))
+            return await StandardProtocolCli.RunJ1939FdAsync(args);
+        if (args.Contains(StandardProtocolCli.J1939FdCommand,
+            StringComparer.OrdinalIgnoreCase))
+            return await StandardProtocolCli.RunJ1939FdAsync(args);
+        if (args.Contains(StandardProtocolCli.J1939Command,
+            StringComparer.OrdinalIgnoreCase))
+            return await StandardProtocolCli.RunJ1939Async(args);
+        if (args.Contains(StandardProtocolCli.RawIsoTpCommand,
+            StringComparer.OrdinalIgnoreCase))
+            return await StandardProtocolCli.RunIsoTpAsync(args);
+        // Entirely offline: never discover or open a J2534 adapter.
+        if (args.Contains(IsoTpClassicCaptureAudit.Command,
+            StringComparer.OrdinalIgnoreCase) ||
+            args.Contains(IsoTpClassicCaptureAudit.CommandFd,
+                StringComparer.OrdinalIgnoreCase))
+            return IsoTpClassicCaptureAudit.Run(args);
+        if (args.Contains(StandardProtocolCli.ObdProtocolAutoDetectCommand,
+            StringComparer.OrdinalIgnoreCase))
+            return await StandardProtocolCli.RunObdProtocolAutoDetectAsync(args);
+        if (args.Contains(StandardProtocolCli.J1979FunctionalDiscoveryCommand,
+            StringComparer.OrdinalIgnoreCase))
+            return await StandardProtocolCli.RunJ1979FunctionalDiscoveryAsync(args);
+        if (args.Contains(StandardProtocolCli.J1979PidDiscoveryCommand,
+            StringComparer.OrdinalIgnoreCase))
+            return await StandardProtocolCli.RunJ1979PidDiscoveryAsync(args);
+        if (args.Contains(StandardProtocolCli.ObdCanDiscoverCommand,
+            StringComparer.OrdinalIgnoreCase))
+            return await StandardProtocolCli.RunObdCanDiscoveryAsync(args);
+        if (args.Contains(StandardProtocolCli.DoIpStatusCommand,
+            StringComparer.OrdinalIgnoreCase))
+            return await StandardProtocolCli.RunDoIpStatusAsync(args);
+        if (args.Contains(StandardProtocolCli.DoIpDiscoverCommand,
+            StringComparer.OrdinalIgnoreCase))
+            return await StandardProtocolCli.RunDoIpDiscoveryAsync(args);
+        if (args.Contains(StandardProtocolCli.DoIpCommand,
+            StringComparer.OrdinalIgnoreCase))
+            return await StandardProtocolCli.RunDoIpAsync(args);
+        if (args.Contains(StandardProtocolCli.PassThruCommand,
+            StringComparer.OrdinalIgnoreCase))
+            return StandardProtocolCli.RunJ2534(args);
+
+        // Offline verification must never load a vendor DLL, contact an ECU,
+        // start the network bridge or launch the updater.
+        if (args.Contains(NativeScopedBackupImportCli.Command, StringComparer.OrdinalIgnoreCase))
+            return NativeScopedBackupImportCli.Run(args);
 
         // Explicit local programming path; malformed invocations cannot fall
         // through to a network listener, updater or another CLI operation.
@@ -81,26 +145,28 @@ internal static class Program
             return NativeE39CalibrationRepairCli.Run(args);
 
 
-        if (await BridgeUpdateManager.CheckAndOfferUpdateAsync()) return 0;
-        var port = ReadPort(args);
-        var allowObdClear = args.Contains("--allow-obd-clear", StringComparer.OrdinalIgnoreCase);
-        J2534MemoryReadScope? memoryReadScope = null;
-        var mapIndex = Array.FindIndex(args,
-            value => value.Equals("--memory-read-profile", StringComparison.OrdinalIgnoreCase));
-        if (mapIndex >= 0)
+        // Never silently reinterpret a mistyped CLI argument as "start the
+        // bridge on the default port". Parse before any updater, DLL lookup,
+        // vehicle connection or network listener.
+        if (!BridgeLaunchArguments.TryParse(args, out var launch, out var argumentError))
         {
-            if (mapIndex + 1 >= args.Length)
-            {
-                Console.Error.WriteLine("Missing JSON path after --memory-read-profile.");
-                return 6;
-            }
-            try { memoryReadScope = J2534MemoryReadScope.Load(args[mapIndex + 1]); }
+            Console.Error.WriteLine(argumentError);
+            Console.Error.WriteLine("Run --help alone for valid command examples.");
+            return 6;
+        }
+        var port = launch!.Port;
+        var allowObdClear = launch.AllowObdClear;
+        J2534MemoryReadScope? memoryReadScope = null;
+        if (launch.MemoryReadProfile is { } profilePath)
+        {
+            try { memoryReadScope = J2534MemoryReadScope.Load(profilePath); }
             catch (Exception ex)
             {
                 Console.Error.WriteLine("Invalid ECU memory read profile: " + ex.Message);
                 return 6;
             }
         }
+        if (await BridgeUpdateManager.CheckAndOfferUpdateAsync()) return 0;
         var adapters = J2534Registry.Discover();
         if (adapters.Count == 0)
         {
@@ -139,7 +205,7 @@ internal static class Program
         Console.WriteLine($"Port: {port}");
         Console.WriteLine("Available: physical standard OBD data/diagnostic reads, Mode 09 identity, UDS reads and TesterPresent.");
         if (allowObdClear) Console.WriteLine("Explicit emissions DTC reset enabled; engine off and stationary required. Readiness data will be reset.");
-        Console.WriteLine("ECU writes, security access, actuator controls and flash programming are blocked.");
+        Console.WriteLine("Standard background diagnostics remain read-only. Explicit paired raw UDS exchanges can send ECU services; actual ECU protocol restrictions apply.");
         if (memoryReadScope != null)
             Console.WriteLine("Memory read profile enabled: every 0x23 read is restricted to the configured " +
                 "range and requires an exact live ECU VIN match. No write privileges are granted.");
@@ -238,12 +304,4 @@ internal static class Program
         }
     }
 
-    private static int ReadPort(string[] args)
-    {
-        var index = Array.IndexOf(args, "--port");
-        if (index >= 0 && index + 1 < args.Length &&
-            int.TryParse(args[index + 1], out var port) && port is >= 1024 and <= 65535)
-            return port;
-        return 35001;
-    }
 }

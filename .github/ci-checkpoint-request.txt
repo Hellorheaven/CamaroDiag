@@ -1,0 +1,391 @@
+PR95 MERGE CONFLICT RESOLUTION — FULL DEBUG CHECKPOINT
+Preserve both UDS response deadline test suites and integrate main cfadb863d5ef9ffcadcde064bfd60224e3217058 into PR95 0ec8be1d7e7c8a0717d3333cf39273a1cd896e51. Validate exact merge candidate before final merge. No release or final C8 implied.
+
+PR95 SPLIT — FULL DEBUG PRE-MERGE CHECKPOINT — 2026-11-24
+Implementation and handoff HEAD: 7f28463935512e048a34c8bdd1ac06fdb29539d5
+Validate all Debug jobs on the exact resulting HEAD before owner-authorized merge. Intermediate stabilization only, not final C8. No physical qualification claimed. Preserve remaining scope in immediate continuation PR.
+
+C6 / DOIP CONSOLE INTEGRATION CHECKPOINT — 2026-11-24
+Implementation HEAD: 61c263944b2f068d743ad41b783ec9f1a091fe11
+Grouped Debug validation of Windows console DoIP identity, EntityStatus and PowerMode, observed-version routing, cancellation and FR/EN presentation; earlier UDP/TCP regression fixes included. Windows warnings-as-errors and self-tests, Android, native and Connectors. Intermediate validation, NOT C8; no physical tests, merge or Release. DoIP and C6 remain active.
+
+C6 + DOIP REGRESSION GROUPED CHECKPOINT — 2026-11-24
+Implementation HEAD: 7cc90d232c4384bf5f0dc755f5472005ed5eed6d
+Fix passive UDP offline test using actual OS-assigned bound UDP socket,
+not unrelated TCP reservation. Production port and source checks unchanged.
+Revalidate C6 TLS pairing and DoIP regression together, all Debug jobs.
+Single chat owns one active protocol and one active workstream.
+Not final C8. No physical tests or merge/Release without owner authorization.
+
+C6 COHERENT TLS PAIRING INPUT SAFETY CHECKPOINT — 2026-11-24
+Implementation HEAD before this grouped gate: 99ab376101a4f087282c58a3dc8f30a80b9ffd4b
+C4 software gate #45363634459 SUCCESS (c508902f), prerequisite completed.
+C6 change: reject CR/LF/TAB/NUL control characters in full pairing code
+BEFORE trimming/normalization in Android J2534 TLS parser and UI form.
+Keep harmless surrounding spaces accepted, pinned TLS verification unchanged.
+Offline regressions for invalid multiline pasted code, and old valid pairing.
+Do not modify ISO/SAE protocols (other session owns SAE J1979).
+One grouped software Debug checkpoint: Android unit/lint/assemble warnings fail,
+Windows/J2534 Debug, native ECU, all Connectors/firmware and backend.
+This is an intermediate C6 gate, NOT final C8. No real ECU/VCI/vehicle tests
+before owner's authorized Release #48; no merge/Release/branch/PR closure.
+
+C4 COHERENT READ-ONLY FUEL HISTORY CHECKPOINT — 2026-11-24
+Implementation HEAD before this one-time grouped gate: 25b9feb7961e92a869c5cf48c413a78ac5ae6f3c
+C4 (#52), no ISO/SAE protocol changes, no C6 work, NOT final C8.
+Changes: immutable snapshot of in-memory fuel survey/readings before CSV
+validation and streaming, preventing a concurrent caller clear/update from
+changing rows after acceptance; offline regression mutates both the caller
+list and its nested readings while Writer receives the header.
+Also verify C4 fuel export policy tests: changed ethanol content at identical
+timestamps and mixed-session history cannot be exported (3be145c5).
+Run ONE full software Debug checkpoint: Android unit/lint/assemble with warnings
+failing, Windows/J2534 Debug self-tests, native ECU and all Connectors.
+Do not assume previous successes validate this SHA; inspect each job.
+No vehicle/ECU/adapter tests in this PR. Owner's physical Release acceptance
+is issue #48. No merge, PR closure, new branch or Release without approval.
+
+C1 FOLLOW-UP ACCEPTANCE — 2026-11-24 (NOT FINAL C8)
+C1 fix: Physical RAW CAN replies exceeding the previous 300-item
+diagnostic correlation window now stream into the complete chronological
+console journal at each adapter RX callback, including segmented USB/BLE
+and Wi-Fi responses. Recent 300 events remain only a UI-memory window;
+full journal has every physical RX record plus TX and SYSTEM; eliminate
+duplicates by not replaying the matcher window in persistent export.
+Includes offline CanConsoleRawRxStreamTest: 1,200 RX, split CR/LF,
+trailing incomplete line, oversized malformed RX and adapter errors.
+Commits b9d5313, 21a305a, 6320aa9, db6b19c6.
+Group Android unit tests, lint, Debug APK once after implementation.
+C1 software acceptance only, no live vehicle/ECU tests in PR #95.
+Do not advance to C2 before C1 passing CI; C8 only at the very end,
+after C1/C2/C4/C6 software completion. ISO/SAE are other chat's scope.
+
+C1 SOFTWARE ACCEPTANCE GATE — 2026-11-24 (not C8 final quality)
+Pre-gate implementation HEAD: 49051e5df2d70f3e0a62a4f8edab8d3a08a7a5f4
+Scope: C1 console CAN/OBD only; ISO/SAE protocol work is owned by
+another chat. Group checks once after coherent C1 development (not per
+commit): Android :app:testDebugUnitTest and :communication:testDebugUnitTest
+including CanConsoleEventJournalStoreTest, CanConsoleRawArchiveIntegrityTest,
+CanConsoleEventJournalWriterTest, CanConsoleExportPolicyTest, Gradle warnings
+fail, lintDebug/assembleDebug, Windows/native/connectors regression.
+C1 fixes: SHA-256 and flush of full chronological TX/RX/SYSTEM journal
+only on Dispatchers.IO, revision-at-click; full raw CAN byte SHA-256
+revalidation before publish; detect same-size modifications/append/delete;
+Play/Stop cancellation before lazy capture starts is incomplete and logged;
+failed journal flush not retried in cleanup; export failure is visible only
+to unchanged operator session. No vehicle or hardware testing in PR #95.
+Owner validates physical Release via Lot 8 issue #48 after PR close.
+Final C8 stage must NOT begin until C1 then C2 then C4 then C6 are
+software-complete. This CI is solely C1 development acceptance, not C8.
+No merge, Release, branch creation, or protocol edits.
+
+C8 FINAL NON-PROTOCOL CONNECTIONS AND CONSENT CHECKPOINT — 2026-11-24
+Implementation HEAD immediately before CI request: 6060cf0940a24b5d57c13d9bf65f44be27f689d1
+One PR #95, branch chore/unified-ci. NO live vehicle/ECU tests.
+Since prior fully green #45311771440 (SHA 0bf30352):
+- C6 BLE: serialize GATT handshakes so delayed old connection teardown cannot
+  close the new BLE session.
+- C6 Windows J2534 Android: verify out-of-band TLS pairing, numeric private
+  LAN host, port, protocol and CAN IDs BEFORE disconnecting the active adapter.
+- C6 J2534 clear DTC: require explicit live operator context callback and
+  recheck physical adapter epoch at the exact network transmit boundary.
+- C1/C6 RAW CAN: remove approval-free public TX API; require existing two
+  independent UI confirmations and recheck account, adapter and vehicle
+  at actual CAN payload transmission, after adapter setup/queue.
+- Android USB: reject invalid selector/baud before tearing down active
+  adapter, with offline regression.
+- Android demo connection: obsolete delayed simulation cannot replace real
+  USB/Wi-Fi/BLE/J2534 session.
+- Concurrent 8-opener test for atomic USB handle publication.
+- Wi-Fi: classify read/write failure atomically with exact socket generation,
+  preserving a newer connection; socket allocation failure no longer drops it.
+- Windows CLI: listing/discovery commands are evaluated before ANY protocol
+  driver dispatch even with mixed arguments; mixed active commands refuse IO.
+Full Debug C8: Android unit/lint/assemble, Windows J2534 self-tests, native
+ECU, all Connectors (Python3.11-3.13, STM32/ESP32, USB/native/Windows).
+Hardware acceptance only on later owner-authorized Release, Lot 8 issue #48.
+No merge, new branch, PR closure, or release.
+
+C8 COHERENT USB AND BRIDGE COMPILE FIX CHECKPOINT — 2026-11-24
+Software HEAD before request: 027ddeafc1ef7e4e4491ae5d72ae11cd7938cbf2
+Scope (strictly NON-PROTOCOL; one PR #95):
+- Fix Android UsbSerialPort.write API: Unit-returning, not an Int byte count.
+  Do not claim raw accepted byte count or delivery; nonempty preflight and
+  ordinary IOException reporting, with offline unit tests.
+- Atomic USB connection-slot with generation ownership; stale opens cannot
+  publish/close new port; failure state belongs to exact USB session.
+- Wi-Fi/Bluetooth/BLE/J2534 connection session-generation isolation and
+  stale read/write results; simulation-only tests.
+- Bounded BLE notification queue; overflow disconnects rather than silently
+  losing bytes.
+- Python Connectors and Windows J2534 bridge: list local serial COM/USB ports
+  without opening hardware; tests; Windows bilingual CLI --help updated.
+- Other protocol session owns DoIP compile corrections concurrently.
+Run full Android unit/lint/Debug build, Windows J2534 Debug, native ECU,
+Python Connector 3.11-3.13, STM32/ESP32 and Windows USB discover tests.
+No physical ECU/vehicle tests in PR; post-Release Lot 8 issue #48 only.
+Do not merge, release or create a new PR/branch.
+
+C8 GROUPED CONNECTION LIFECYCLE CHECKPOINT — 2026-11-24
+Implementation HEAD: e509113810a78528f702344c27ef710d49d0120c
+Scope: C6 / all adapter connections, NON-PROTOCOL (ISO/SAE owned by other chat).
+- Wi-Fi: socket generation prevents stale connect/read/write completions, test
+  fake TCP sockets with no real network, manager ties AT probe and cleanup to
+  original session/vehicle adapter epoch.
+- Bluetooth Classic and BLE: manager refuses a stale completed handshake,
+  GATT closes before callbacks can change a later session, BLE receive queue
+  bounded without silently dropping bytes.
+- J2534 TLS bridge: late handshake may never replace the latest paired bridge.
+- USB: atomic connection-slot ownership, open/configure before publication,
+  exact I/O loss state per session, no read/write result attributed to a
+  newly selected adapter, partial serial writes rejected, tests of generation
+  isolation and size validation without USB hardware.
+- Full C8: Android Debug unit/lint/assemble, Windows/J2534 Debug, native ECU,
+  ESP32-S3/STM32 firmware build, native/Python/Windows connector tests.
+Validation policy: zero real vehicle/ECU testing until the Release after PR
+closure. Lot 8 issue #48 is the owner's post-Release acceptance workbook.
+No merge, branch, release or PR creation.
+
+C8 COHERENT ANDROID CONNECTION CHECKPOINT — 2026-11-24
+Implementation SHA before checkpoint: b2d9251e26bdd25ffec65344ddeae2feb6b297bf
+Scope: outside ISO/SAE protocols, PR #95 only.
+- C6 Wi-Fi ELM/STN socket generation: stale attempts may not disconnect a
+  newer connection, invalid reconnect leaves the current connection intact;
+  tests simulate overlapping connect/failure and zero live networking.
+- C6 OBDLink BLE: fixed 128-packet receive queue, strict max ATT payload,
+  fail closed without silent byte drops, detach GATT before teardown callbacks;
+  bounded queue and defensive-copy offline regression tests.
+- Full Android unit tests, lint warnings-fail, APK Debug build, Windows Debug
+  bridge self-tests, all Connectors/firmware/native checks.
+- Policy: no live vehicle, ECU, or adapter qualification during PR #95.
+  Owner runs release-only physical acceptance via Lot 8 issue #48.
+No merge, release, other PR or branch; protocol chat owns ISO/SAE sources.
+
+C8 SINGLE GROUPED CHECKPOINT — 2026-11-24 — C2/C6 non-protocol work
+Implementation HEAD before gate: f7da32776d382eb38563e8ebfad0033ecf4157cc
+Developer work: persistent Android ECU sector archive streams write/readback by
+bounded chunks; multi-MiB simulation regression. Windows bridge --help/-h/?,
+FR/EN .resx user CLI examples, safe help dispatch BEFORE updater/VCI/ECU,
+strict startup parser rejecting unknown/duplicate/malformed port or memory
+profile before any network activity, plus hardware-free regression tests.
+Process decision: NO real vehicle/ECU/hardware test during PR #95.
+User's physical validation only AFTER PR close, on authorized Release with
+Lot 8 test workbook issue #48. Before merge, require full Debug software
+checks, lint and builds, C8 merge/conflict audit. No merge or release here.
+Run Android testDebugUnitTest/lintDebug/assembleDebug, Windows Debug self-test,
+native ECU and Connectors all platforms, backend on the exact resulting SHA.
+
+C8 GROUPED CHECKPOINT — connectors discovery / C2 durability / C6 pairing — 2026-11-23
+Exact implementation HEAD before gate: 504ca9dcd25253c7b924233214f5950e36b79265
+Scope of this non-protocol increment:
+- Python host offline backup: durable fsync and independent readback, atomic-ish
+  completion marker is .json written after .bin; simulated sync failure cleanup
+  and verification failure regression.
+- Android USB CamaroDiagConnectors binary discovery: shared timeout starts
+  BEFORE USB write; cancellation and stall unit tests.
+- Windows COM selected-port discovery: reject no longer enumerated or duplicate
+  COM names; simulation self-tests.
+- Windows J2534 bridge: copied TLS pairing code validates the same 43-char
+  base64url token + 64 hex SHA-256 shape required by Android; injection tests.
+Run ONE full Debug C8 checkpoint at the resulting SHA (Android units, lint,
+APK Debug, Windows self-tests, native ECU, connector Python 3.11/3.12/3.13
+and firmware builds, backend). No Release; never equate with ECU hardware tests.
+PR #95 remains draft. Merge conflicts currently pending, do not auto-merge.
+This request is a one-time checkpoint; no CI on ordinary code commits.
+
+C8 RECHECK after grouped Android JUnit correction — 2026-11-23
+Implementation HEAD before checkpoint: 09aefe63ac5f1ec8560d36e5b5866c6890442a4e
+Previous full checkpoint #45134903898: Windows Debug SUCCESS with 0 warnings/0 errors and 644 selftests,
+native C/C# ECU model SUCCESS; ALL connectors CI jobs SUCCESS.
+Android :communication:testDebugUnitTest compiled and ran 481 tests, one test-class
+initialization error because new @Test expression methods returned JUnit AssertionError
+objects instead of Kotlin Unit. Explicit Unit return now corrected; no weakened validation.
+Run the SAME COMPLETE multi-component Debug checkpoint to verify all source,
+Android unit tests + lint + assembleDebug, Windows, native ECU kernel and Connectors.
+Still no claim of real ECU qualification, firmware compatibility or verified full restoration.
+Do not merge PR #95.
+
+
+23/11/2026 - ISO/SAE bidirectional protocol chantier checkpoint (#110)
+Run complete Debug suite now that protocol writes, DoIP TCP read/write,
+J2534 dynamic transports, K-Line 5-baud/fast init, UDS standard services,
+post-write inspection and hardware-free regression tests are committed.
+No per-commit CI; do not build Release, merge or activate unqualified ECU flash.
+Verify Android, Windows, kernel, connectors and backend at this exact commit.
+
+
+23/11/2026 — grouped standard protocols read/write checkpoint (issue #110).
+New J1939-21 BAM/RTS/CTS/TP.DT/EOM_ACK, ISO-TP CAN-FD SF/FF/CF/FC,
+J2534 raw CAN-FD adapter, SET_CONFIG FD data phase rate, CLI dispatch,
+negative regression tests and updated docs. One full Debug checkpoint only
+after coherent protocol chantier. C2 parallel changes require separate
+assessment; do not merge PR #95 and never claim real vehicle proof.
+
+23/11/2026 — grouped Windows CAN-FD/J1939 compilation corrections:
+resolve CS0136 x2 and CS1929 after first full checkpoint #45145349219.
+Retest Debug bridge, protocol suites; other C2 Android work is owned by concurrent chat.
+
+23/11/2026 — protocol correction checkpoint: FD escaped single frame must start 0x00 (SHA ed4cadb), caught by Windows tests. Re-run once after grouped corrections; PR #95 remains draft.
+
+
+23/11/2026 — grouped protocol checkpoint after UDS and J1850 improvements.
+Implementation HEAD before checkpoint: 9d6a321a73bcd5e68de3871ebd1a12abbc21187e
+Changes: multi-DID reads ISO-TP/DoIP; UDS RequestDownload/Upload
+maxNumberOfBlockLength LFI parser; generalized 1–8 byte ALFI; read-only
+UDS RequestUpload two-acquisition comparison and regression tests;
+J1850 CRC-8 reference + optional wire CRC check; J2534 CAN_29BIT_ID RX
+validation; corrected fourteen-entry protocol catalog self-test.
+Run one COMPLETE Debug CI checkpoint; NO per-commit builds and no Release.
+Do not claim driver/ECU certification or merge PR95 on CI completion.
+
+23/11/2026 — ISO-TP CAN CLASSIQUE: checkpoint unique de fin de tranche logicielle (#110)
+HEAD des modifications avant checkpoint: 1aa147ed74aa6fc352336e3439f2c6e9a30248da
+Correctifs ISO 15765-2 sur la même PR #95: FC/OVFLW sur FirstFrame dont
+la taille dépasse 1 Mio, limites SF/FF 7/8 et 4095/4096 octets,
+trames avec adresse étendue, réception et émission multi-trames;
+N_Bs/N_Cr paramétrables, budget global inchangé, STmin réservé reçu=127 ms.
+Tests offline spécialisés ajoutés, PAS encore exécutés. Déclencher une
+campagne groupée Debug au SHA de ce commit marqueur: Windows -warnaserror
+et --self-test, Android, noyau natif et connecteurs. Aucune qualification
+électrique sur VCI, ECU ou véhicule; ne pas merger ou publier Release.
+
+23/11/2026 — recheck groupé après correction Windows Debug ISO-TP (#110)
+Le run #45266205498 a révélé 15 erreurs C# (suite UDS absente,
+local J1979 incorrect et 13 appels SequenceEqual avec type non inféré).
+Correctif de compilation regroupé au SHA 277d5a8d2cdb7806cd098602dbc3cca8060d2981.
+Relancer UNE campagne complète Debug de validation de ce lot,
+Windows -warnaserror + selftests, Android, native ECU, connecteurs.
+Pas de tests par commit; aucune Release, aucun merge, aucune preuve ECU physique.
+
+23/11/2026 — ISO-TP software checkpoint correction round 2 (#110)
+Run #45266918219 built Windows Debug with 0 warnings and 0 errors,
+but aborted bridge self-tests before ISO-TP on an earlier UDS upload
+memory-range regression. Added address-space boundary guard and tests in
+53b07df0ca06bd1e024e61823383fa847f0c2315. Re-run single grouped Debug after this fix.
+No per-commit tests, no Release/merge, and no physical ECU claim.
+
+23/11/2026 — ISO-TP software: grouped Debug validation after stale catalog expectation
+Prior grouped run #45267559627: Windows Debug BUILD PASS (0 errors, 0 warnings),
+self-tests interrupted before ISO-TP by stale J1939-22 scope *test text*,
+which was reconciled to actual existing catalog at 9deb193169502bf467791c04bbd2e1698489a8b0.
+Run one combined Debug Windows/Android/native/Connectors checkpoint at this
+marker commit. No new protocol begun; no hardware or ECU validation asserted.
+
+23/11/2026 — ISO-TP CAN classique, test de raccordement J2534 sans matériel (#110)
+Code HEAD avant checkpoint: 4f291dd5b7b8a1757a7d791e6e85bb6d7b61358f
+Adaptateur IRawChannel étroit autour du vrai J2534StandardChannel,
+conservation du même passage pilote. Vecteurs offline vérifiant octets
+CAN ID/payload, flags 11/29-bit FD/BRS, décodage RX, délai, annulation,
+format refusé et propagation d'erreur PassThruWriteMsgs.
+Une seule campagne Debug groupée au SHA de ce marqueur pour compiler/valider
+les nouveaux tests. Le run #45268234408 est vert Windows (1593 tests),
+Android échoue indépendamment sur Lfx2012FuelHistoryCsv.kt; déléguer sa
+correction au chantier Android, sans toucher les protocoles en parallèle.
+PAS de validation physique J2534/ECU, pas de merge/release.
+
+23/11/2026 — ISO-TP CAN classique, STmin CF-à-CF + qualification banc (#110)
+Implémentation HEAD avant checkpoint : ad7bcc27ecabeb6b345ddd806d1bc5db8615200b
+Correction de STmin exclusivement entre CF successives (première CF sans
+attente injustifiée, maintien du chronomètre à travers plusieurs fenêtres FC),
+tests calcul de séparation/WAIT/réservés et protocole de qualification terrain
+avec preuve CAN/J2534 indépendante dans docs/QUALIFICATION_ISOTP_CAN_CLASSIQUE.md.
+UNE campagne Debug groupée sur le SHA de ce commit : Windows -warnaserror,
+--self-test, Android, noyau natif, Connectors. Ne pas conclure qualification
+physique ECU/VCI sur une CI verte, ni exécuter d'écriture destructrice.
+Conserver PR #95 Draft, ne pas fusionner, pas de Release.
+
+23/11/2026 — ISO-TP CAN classique : recheck grouped final STmin reserved latch (#110)
+Implémentation avant checkpoint 9923b13c899af25b1698dd4b02d64b806cc50285.
+Les STmin réservés restent fixés à 127 ms pour toute la séquence,
+même si des FC ultérieurs demandent STmin 0 ; tests déterministes,
+banc de qualification documenté. Demander une seule suite Debug de
+compilation/tests (Windows bridge -warnaserror, Android, kernel,
+connecteurs) sur le SHA de ce marqueur. Ne pas fusionner ni Release.
+
+23/11/2026 — ISO-TP CAN : trace hôte explicitement optionnelle (#110)
+Checkpoint logiciel de la tranche : 7fc2a5b88a50f2cc95e5b7f8225b2abedba426c5.
+Option --trace-file sur --isotp-exchange; CSV TX_REQUEST/TX_QUEUED/RX
+avec temps hôte (jamais temps de bus), fichier CreateNew, pas d'écrasement,
+pas d'envoi après erreur de journal initiale, tests offline, mode réception
+sans TX. Demander UNE suite Debug groupée de compilation/tests sur le SHA
+de ce commit marqueur. Ne pas certifier de timing réel ECU ni fusionner PR.
+
+23/11/2026 — checkpoint groupe ISO-TP CAN classique : filtres J2534 et cancellation RX (#110)
+Deux correctifs ISO-TP dans la seule PR #95: ignorer les evenements J2534 TX/status et rejet de RX hors canal ou arrive apres cancellation dans le lien RAW, et appliquer CAN_29BIT_ID aux deux elements du filtre PASS_FILTER pour CAN 29 bits (SAE J2534-1). Autotests simules 11/29 bits, echo, mauvais protocole, cancellation et delai commun ajoutes. Valider Windows Debug -warnaserror et --self-test au SHA precis de ce checkpoint, puis Android, natif et connecteurs. Aucun test physique VCI/ECU, pas de merge, pas de Release.
+
+23/11/2026 — Checkpoint Debug groupe : ISO-TP CAN classique seulement (issue #110), tests J2534 simulés 11-bit BS=1 multi-trames + FC/OVFLW et 29-bit CAN_29BIT_ID ; commits 5b910cf8 et c592e2a4, correctifs précédents 07621a4e et a0e14673. Vérifier Windows 0 warning et autotests complets, Android, natif et connecteurs au SHA de ce commit. Aucune qualification VCI/ECU physique, aucun merge.
+
+23/11/2026 — lot logiciel ISO-TP CAN classique : annulation tardive J2534 et résultat TX incertain (#110).
+Code HEAD avant le checkpoint : 3bdb89a8347cab94a038d161b34e48a96dd2ae3c.
+Deux commits groupés f245429 et 3bdb89a : propagation de cancellation après appel synchrone PassThruWriteMsgs, aucune nouvelle CF après annulation, rejet du flag BRS sur CAN classique, trace CSV TX_UNCONFIRMED quand TX a une issue indéterminée, autotests offline et limites de qualification de banc documentées.
+Déclencher UNE campagne Debug complète sur le SHA de ce marqueur : Windows -warnaserror et --self-test, Android, natif ECU, Connectors. Pas de Release, merge ou revendication de support matériel ECU/VCI.
+
+24/11/2026 — ISO-TP CAN classique, contrôle hors ligne de captures CAN physiques (#110).
+HEAD du code avant checkpoint : bd71f94dd4c5a146571fed637ddf24568534829c.
+Nouvelle CLI --isotp-audit-trace sur CSV timestamp_us,direction,can_id,payload_hex, analyse SF/FF/FC/CF, BS, CTS/WAIT/OVFLW, STmin et N_Bs ; 11 et 29 bits classiques avec adressage normal ; tests avec faux bus sans driver et refus des journaux horodatés uniquement côté hôte.
+Un seul checkpoint Debug complet (Windows -warnaserror/self-test, Android unit/lint/assemble Debug, native ECU, firmware/connecteurs), vérifier les logs au SHA exact de ce marqueur. Aucun ECU réel, flash ni conformité constructeur attestés.
+PR #95 toujours draft ; ne pas fusionner ni démarrer un protocole suivant avant la qualification matérielle.
+
+24/11/2026 — checkpoint ISO-TP CAN classique, vecteurs hors matériel
+Code HEAD avant marqueur : 938f9ece67c39631e730ee08f93a09eca66ed506.
+Audit CSV indépendant --isotp-audit-trace : SF/FF 12 et 32 bits (4096 octets), CAN 11/29 bits, adressages normal/étendu/mixte, FC CTS/WAIT/OVFLW et WFTmax, N_Bs/N_Cr, STmin, BlockSize, CF séquence et rôles TX/RX. Tests de non-régression positifs et négatifs intégrés aux autotests J2534 ; aucune émission ni lecture ECU.
+Demande unique de campagne Debug groupée au SHA de CE commit marqueur : Windows -warnaserror + --self-test, Android tests/lint/assemble Debug, natif, Connectors. Pas de Release, pas de fusion, pas d'essais matériels avant Release propriétaire.
+
+24/11/2026 — ISO-TP CAN-FD audit logiciel et vecteurs de non-regression (#110)
+HEAD des modifications avant marqueur : b8e7621eca9fd6bdb18c31faa2f51bb1c6ad6d1b.
+Deuxieme protocole apres validation logicielle Windows et CI globale ISO-TP CAN classique sur run #45304636194 : audit offline CAN-FD option --isotp-fd-audit-trace, DLC FD canonique (8,12,16,20,24,32,48,64), SF echappee, FF 12/32 bit, CF RX_DL, N_Cr/N_Bs, STmin, BlockSize, adressages et 11/29-bit. Selftests Windows sans DLL VCI et documentation Release ; aucune pretention de validation reelle/flash ECU.
+Demander UNE validation globale Debug du HEAD marqueur : Windows -warnaserror / --self-test, Android, natif et connecteurs. Ne pas fusionner PR95 ni publier Release, aucun essai voiture avant Release du proprietaire.
+
+24/11/2026 — validation logicielle ISO 14229 UDS P2/P2* (#110)
+HEAD du code avant marqueur : 45d73af55ada03b138318c05ad153bc9419bbdee.
+Apres le checkpoint CAN-FD #45305792189 reussi : delais UDS P2 (premiere reponse) et P2* (apres NRC 0x78), avec budget global inchange et refus des reponses tardives d'un pilote; parametrage CLI ISO-TP --uds-p2-ms/--uds-p2-star-ms sur echanges UDS valides ; tests positifs et negatifs offline, doc FR/EN. DoIP et timing OEM physiques non qualifies, pas de modification ECU.
+Verifier UNE suite Debug complete au SHA de ce marqueur Windows 0 warnings / --self-test, Android test/lint/assemble, noyau natif, connecteurs. Pas de merge ni release sans accord. Tests vehicule uniquement Release par proprietaire.
+
+24/11/2026 — checkpoint de cloture logicielle UDS ISO 14229, P2/P2* via ISO-TP et DoIP (#110)
+HEAD des corrections avant marqueur : 8b5fe7820759319efc45e3734f51a40492efdf0a.
+Checkpoint UDS ISO-TP precedent #45306777798 SUCCESS au SHA 04ec829. Depuis : DoIpDiagnosticTransport utilise UdsResponseSequence pour P2/P2* avec ACK/AliveCheck intermediaires qui ne reinitialisent pas l'echeance ni la session, validation avant toute TX de P2/P2* explicites, options DoIP CLI --uds-p2-ms / --uds-p2-star-ms, tests parser et documentation FR/EN. P2/P2* OEM et hardware toujours a qualifier seulement sur Release.
+Demander un unique gate Debug complet au SHA exact de ce marqueur : Windows -warnaserror et --self-test, Android test/lint/assemble, noyau et firmware/connecteurs. Pas de Release, pas de merge ni essais ECU physiques en PR #95.
+
+2026-11-24 — Checkpoint DoIP ISO13400 logiciel, un seul protocole (#110)
+SHA code avant marqueur : 3fb63d01e08376160be65cb7483d5e2ed14b53d5.
+Chantier complet groupe : TCP routage et versions 7/11 octets OEM explicites sans invention de cle, exclusivite des echanges par socket et fermeture apres annulation/timeout/NACK, P2/P2* sans extension par ACK, tests TCP loopback (versions, routing pending, NACK, fragments, timeouts, refus de source ECU), UDP identification 0xFF seulement pour discovery, source IPv4/IPv6+port, discovery passive, NACK UDP et tests spoof sur loopback. Documentation FR/EN et limites OEM/IPv6 multicast/periodic, aucune ECU reel.
+Validation Debug globale requise a la revision EXACTE de ce marqueur : Windows warnaserror self-tests, Android tests/lint/assemble, natif et connecteurs/ESP32/STM32. Runs anciens #45310320249 et #45311128651 ne valident pas ce code; le dernier contenait des erreurs d'inference des tableaux C# corrigees par commits ulterieurs. Aucun essai vehicule avant Release, aucune fusion/Release sans accord.
+
+24/11/2026 — DOIP ISO13400 : IPv6 ff02::1 multicast passive and TCP robustness (#110)
+HEAD code before marker 6b5856575da9ba3839aa12d72b71bf70ab2423f9. Continue ONLY DoIP; no new protocol until full software scope. IPv6 passive multicast listener requires explicitly selected interface, source link-local plus port match, no vehicle TX. CLI --doip-discover --listen true --listen-ipv6-ifindex <id>. Offline tests validate source and configuration. TCP loopback tests cover stale ACK echo, wrong SID, mid-exchange version change, truncated response, multiple pending NRC 0x78/AliveCheck. Documentation FR/EN updated, physical multicast/gateway validation deferred to Release according to AGENTS.md.
+Run grouped complete Debug gate at marker SHA: Windows warnings-as-errors plus bridge selftests, Android tests/lint/assemble, native, ESP32 STM32 and host Connectors. No merger/release/branch create.
+
+24/11/2026 — DoIP ISO 13400 IPv6 active multicast, TLS and routing/UDP regressions (#110)
+Head before checkpoint: 3cec140123c17376d260197b7357c97b51b5a865. Previous DoIP isolated checkpoint run #45313914568 SUCCESS at 43f33c1 (Windows 1764 tests, 0 warning/0 error; full Android/native/Connectors passed).
+New DoIP-only software work after checkpoint: explicit-interface ff02::1 active multicast vehicle identification with VIN/EID or generic 0xFF, IPv6 interface source scope and UDP port validation, guarded CLI target choice, TCP TLS cleartext rejection loopback, gateway logical address stability between routing pending 0x11 and active 0x10, and hard UDP receive deadlines. Tests use local loopback or pure offline vectors only; no ECU, vehicle, adapter, TLS OEM trust or actual multicast qualification. All in PR #95, no other protocol touched.
+Please execute one grouped Debug CI at the exact SHA of THIS marker: Windows warnings-as-errors/self-test, Android unit/lint/assemble, native, ESP32 STM32 and Connectors host tests. No merge/Release without explicit owner approval. Continue DoIP only until software accepted.
+
+24/11/2026 — DoIP ISO13400 software completion, batch C, with Windows UDP test failure repaired (#110)
+Previous grouped checkpoint #45314762367 at 784f517: Windows C# compilation 0 errors/0 warnings, but offline UDP selftest failed because a delayed reply to a closed UDP endpoint caused Windows ICMP SocketException 10054 on the SAME reused loopback gateway (test-only defect, not vehicle evidence). Resolved by separate source sockets for each late-response scenario; no timer check removed.
+Current head before checkpoint 59929bbbb321b50962acf3e62973255e959b0fc3: plus explicit DoIP UDP EntityStatus/PowerMode version 0x02/0x03/0x04 via CLI --doip-version, strict response-version correlation and tests rejecting mismatched response and discovery-only 0xFF. IPv6 multicast active/passive on explicit interface with scope-filtering, TCP routing address consistency, stale ACK, truncated frame, TLS cleartext downgrade negative tests. Documentation FR/EN includes new options. No hardware validation and no protocol beyond DoIP.
+Please perform ONE full grouped Debug validation on this marker SHA: Windows warnings-as-errors/--self-test, Android unit/lint/assemble, native, Connectors firmware and hosts. Do not merge/Release or create a new PR. Owner tests only Release hardware later.
+
+24/11/2026 — DoIP ISO 13400 final TX/routing deadline regression
+Protocol-exclusive code additional to run #45315072869: DoIpDiagnosticTransport.ConnectAsync rechecks absolute routing activation deadline after received message and immediately before declaring session active; local TCP simulator sends pending 0x11 then delayed active 0x10, expects expired activation with no ECU request. Previous run #45315072869 has passed Windows (1789 selftests, zero warning/error), native and connectors; Android may still be running. This checkpoint exists to validate the *new* routing deadline fix on its own SHA. No physical ECU/VCI test before Release; same PR #95, no other protocol. Full Debug Android/natives/connectors with warnings-as-errors.
+Last HEAD before marker 3048298c7a67ba7400317655b6376a86aeb2e757.
+
+24/11/2026 — DoIP ISO13400 logiciel : aide CLI FR/EN, sûreté de requête et validation TCP v03/v04/IPv6 (#110)
+Protocol DoIP exclusive. Branch chore/unified-ci, PR #95 Draft, no new branch/merge. Pre-checkpoint HEAD a2ad4ec7fb0225603cca6d6fdad5f2b8e703a75c.
+Features since green DoIP baseline #45315460121 (SHA 3d1a971): real integrated CLI --help texts FR+EN now cover --doip-discover IPv4/IPv6 multicast active/passive, --doip-status v2/3/4, --doip-exchange TLS and P2/P2*, with tests that --help mixed with TX does not perform network operations. DoIP TCP simulates version 0x03/0x04 routing/ACK/AliveCheck and IPv6 localhost UDS. DoIpDiagnosticTransport copies user-approved UDS bytes before async I/O and uses frozen bytes consistently for ACK/SID correlation. TCP receive hard-rechecks stage token P2/P2* after I/O. Guide FR/EN updated. No VCI/ECU/vehicle testing; physical and OEM interoperability belongs only to Release issue #48.
+Run single grouped Debug checkpoint at marker exact SHA: Windows warnings-as-errors, 1,791+ offline bridge selftests, Android unit/lint/assemble with warnings-as-errors, native, ESP32/STM32 and all connectors. Don't claim normative full ISO conformity or hardware validation from CI.
+
+24/11/2026 — DoIP ISO 13400 closing software regression checkpoint, PR95 issue110
+HEAD before marker: 67c9bfc22409a84703d44fc737818c40b025207e. This checkpoint includes DoIP-only changes after baseline success #45315460121: FR+EN complete Windows CLI --help for discovery (IPv4/IPv6 multicast active/passive with explicit interface index), UDP gateway status, TCP/TLS UDS exchange with P2/P2*, verified offline help safety; P2/P2* receive deadline post-read hard check; defensive snapshot of UDS request bytes before asynchronous I/O; routed simulated TCP DoIP versions 0x03/0x04; IPv6 loopback TCP; simulated WriteDataByIdentifier SID 0x2E + ACK or negative NRC and socket retirement; optional routing response 13-byte OEM field v0x04. Tests do not touch a VCI, car, ECU or actual gateway. Documentation FR/EN updated.
+Run one FULL grouped Debug CI at exact SHA of marker (Windows 0 warnings/errors + DoIP/J2534 self-tests, Android testDebugUnitTest lintDebug app:assembleDebug --warning-mode=fail, native, STM32, ESP32, Python/USB and Windows connectors). Previous intermediate checkpoint #45332395559 passed Windows 1801 offline selftests and native/connectors; after-test write scenarios not yet validated until this final marker. No new branches, no merge, no Release. No ISO normative certification or vehicle proof claimed; Release-only physical qualification in issue #48.
+
+24/11/2026 — DoIP ISO 13400:2025 final software scope, UDP version discovery + exact bounded PDU tests (issue #110)
+Last DoIP-only head before marker 17c1de36244d9b6c406d5d754b9963d45c1e3656. Previous DoIP checkpoint #45332791241 at 5cc2c565 validated Windows 0 warnings/errors and 1807 hardware-free J2534 selftests plus native/Connectors (Android may have been in progress); must NOT apply this earlier SHA's result to new files. Since then: UDP Identity retains observed DoIP protocol version 0x02/0x03/0x04, --doip-discover CLI displays it, French and English help and user guide explain this untrusted announcement and explicit later --doip-version selection. Tests check version preservation across all three versions and bilingual help. Exact one-MiB bounded diagnostic PDU encode/decode and reject just-over-limit tested; docs explicitly distinguish ISO 13400 32-bit wire length from CamaroDiag supported in-memory bound. Earlier tranche includes simulated UDS read/write SID0x2E + ACK/NRC, IPv6 TCP, TCP routing 0x03/0x04, request snapshot, hard P2/P2* post-read deadlines, TLS no downgrade, IPv6 active/passive multicast and routing responses. No real ECU/VCI/vehicle, no OEM certification claimed. User-only Release hardware checks issue #48.
+Final group gate requested at the exact SHA of this marker: Windows warnings-as-errors + all bridge selftests, Android testDebugUnitTest lintDebug app:assembleDebug --warning-mode=fail, native, ESP32 STM32, Python/USB/Windows Connectors. NO new PR/branch/merge/Release. Remain on DoIP only until this final gate passes and software limitations are recorded.
+
+24/11/2026 — DoIP ISO 13400 session maintenance idle AliveCheck / bounded TCP receive pump (#110)
+Last DoIP HEAD before checkpoint 20863e689dad4805c54288415b896ef8c2c7a6ee. Previous checkpoint #45333376335 at e5707da validates earlier pre-pump software (Windows Debug pass, native/connectors pass, Android depending CI). NEW DoIP-only code: DoIpDiagnosticTransport now starts one bounded 32-message TCP reader pump after routing active; responds to AliveCheck while idle and during active exchanges, locks TCP/TLS writes to prevent interleaving, enqueues only in-flight diagnostic frames, retires socket on unexpected idle response or queue overflow, preserves previously queued final response through EOF, and keeps double DisposeAsync safe. TCP loopback selftests include idle AliveCheck before any UDS request, between two sequential UDS requests, unsolicited idle response rejected, plus existing routing/UDS/P2/TLS tests. Documentation FR/EN updated. No other protocol modified. No physical VCI/ECU/vehicle tests (Release-only issue #48). Full Debug/Windows/Android/native/Connectors gate at this checkpoint exact SHA, warnings-as-errors, no merge/Release/branch.
+
+24/11/2026 — DOIP ISO13400 final stale duplicate UDS response isolation #110
+HEAD before marker 9a19f6b196181c580e3ac2cd89664f5ef87a30b5; prior DoIP idle AliveCheck pump CI run #45333738310 at 56681530 validated Windows 1817 J2534 offline tests, zero C# warnings and errors, natives and all ESP32/STM32/Connectors; Android verdict belongs to exact prior SHA, never reattribute. Newly fixed: after a valid final UDS response, any *already queued* duplicate frame retires the DoIP TCP session instead of being credited to the next transaction; receiver also rechecks exchangeState after enqueue to reject frames crossing active->idle boundary. TCP simulated gateway sends two identical final replies in one burst and tests an immediate subsequent same-SID exchange is rejected, not falsely successful. Documentation FR/EN updated, connection/session still idempotently closable, no vehicles/VCI/ECU. Run a full grouped CI Windows warnings-as-errors+selftests, Android unit/lint/assemble, natives and Connectors on THIS checkpoint SHA. DoIP protocol exclusive; no new protocol, no merge/Release or branch; physical verification only Release owner #48.
+
+24/11/2026 — Checkpoint de fin du correctif DoIP #110 (VIN ASCII sur annonce UDP). Inclut les deux régressions C2 #63. Vérifier les jobs au SHA du checkpoint.

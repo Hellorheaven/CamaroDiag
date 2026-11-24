@@ -183,10 +183,36 @@ internal static class NativeE39FileWriteJournalSelfTests
             Assert(NativeE39FileWriteJournal.Inspect(path) ==
                 NativeE39FileWriteJournal.CompletionState.RecoveryRequired,
                 "Durable recovery-required status survives process exit");
+
+            // Original ECU bytes, not just a sector digest or source BIN, must
+            // survive a process restart before destructive programming.
+            File.Delete(path);
+            var liveBackup = new NativeE39FileWriteJournal(path);
+            var physicalBytes = Enumerable.Range(0, 16).Select(i => (byte)i).ToArray();
+            var originalSha = Convert.ToHexString(
+                System.Security.Cryptography.SHA256.HashData(physicalBytes));
+            liveBackup.PreserveOriginalBlockAsync(
+                0x20000u, physicalBytes, originalSha, CancellationToken.None)
+                .GetAwaiter().GetResult();
+            var physicalFile = Path.Combine(path + ".blocks", "00020000-16.ecu-block");
+            Assert(File.Exists(physicalFile) &&
+                File.ReadAllBytes(physicalFile).AsSpan()[^16..].SequenceEqual(physicalBytes),
+                "Physical ECU sector backup is durably persisted with exact bytes");
+            physicalBytes[0] ^= 0xFF;
+            Assert(File.ReadAllBytes(physicalFile)[^16] != physicalBytes[0],
+                "Mutating a caller's buffer cannot alter saved physical ECU bytes");
+            AssertThrows<IOException>(() =>
+                liveBackup.PreserveOriginalBlockAsync(0x20000u,
+                    physicalBytes.Select((b, i) => i == 0 ? (byte)0 : b).ToArray(),
+                    originalSha, CancellationToken.None).GetAwaiter().GetResult());
+            tests++;
+            liveBackup.DisposeAsync().AsTask().GetAwaiter().GetResult();
         }
         finally
         {
             if (File.Exists(path)) File.Delete(path);
+            if (Directory.Exists(path + ".blocks"))
+                Directory.Delete(path + ".blocks", recursive: true);
         }
         Console.WriteLine($"PASS: {tests} native ECU durable journal self-tests.");
         return tests;

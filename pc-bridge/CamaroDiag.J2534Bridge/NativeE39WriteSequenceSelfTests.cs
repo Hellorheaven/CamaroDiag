@@ -6,6 +6,18 @@ internal static class NativeE39WriteSequenceSelfTests
     private sealed class TestJournal : NativeE39WriteSequence.IDurableJournal
     {
         internal readonly List<NativeE39WriteSequence.Event> Events = [];
+        internal readonly Dictionary<uint, byte[]> SavedBlocks = [];
+        public Task PreserveOriginalBlockAsync(uint address, byte[] liveBytes,
+            string sha256, CancellationToken token)
+        {
+            token.ThrowIfCancellationRequested();
+            if (!string.Equals(Convert.ToHexString(
+                System.Security.Cryptography.SHA256.HashData(liveBytes)), sha256,
+                StringComparison.OrdinalIgnoreCase) ||
+                !SavedBlocks.TryAdd(address, liveBytes.ToArray()))
+                throw new InvalidDataException("Cannot save fresh physical sector.");
+            return Task.CompletedTask;
+        }
         public Task AppendAsync(NativeE39WriteSequence.Event evidence, CancellationToken token)
         {
             token.ThrowIfCancellationRequested();
@@ -125,11 +137,47 @@ internal static class NativeE39WriteSequenceSelfTests
             0x20000, 32, 16, 2, [], true);
         var plan = NativeEcuSectorPlanner.Preview(layout, origin, updated);
         var opts = new NativeE39WriteSequence.Options(8, 2, true, true, 12000, 15000);
+        // An embedded ECU address, payload, count or packet checksum that
+        // does not describe the requested block must NEVER reach ExchangeAsync.
+        var firstSector = plan.Sectors[0];
+        var correctFrame = NativeE39FlashCommands.BuildWriteBlock(
+            firstSector.Address, firstSector.Updated[..8], dryRun: false);
+        Assert(NativeE39WriteBlockVerifier.RequireExactFrame(
+            firstSector, correctFrame, 0, dryRun: false) == 8,
+            "Correct wire packet matches the exact target sector bytes");
+        foreach (var byteIndex in new[] { 1, 2, 3, 4, 5, 6, 7, correctFrame.Length - 1 })
+        {
+            var altered = correctFrame.ToArray();
+            altered[byteIndex] ^= 1;
+            Expect<InvalidDataException>(() =>
+                NativeE39WriteBlockVerifier.RequireExactFrame(
+                    firstSector, altered, 0, dryRun: false));
+            count++;
+        }
+        Expect<InvalidDataException>(() =>
+            NativeE39WriteBlockVerifier.RequireExactFrame(
+                firstSector, correctFrame, 8, dryRun: false));
+        count++;
+        Expect<InvalidDataException>(() =>
+            NativeE39WriteBlockVerifier.RequireCompleteBatch(
+                firstSector, [correctFrame], dryRun: false));
+        count++;
+        var completeFrames = new[] {
+            correctFrame, NativeE39FlashCommands.BuildWriteBlock(
+                firstSector.Address + 8, firstSector.Updated[8..16], dryRun: false)
+        };
+        NativeE39WriteBlockVerifier.RequireCompleteBatch(
+            firstSector, completeFrames, dryRun: false);
+        count++;
         var ecu = new TestEcu(origin);
         var journal = new TestJournal();
         var result = NativeE39WriteSequence.RunBenchSequenceAsync(
             ecu, journal, plan, opts, CancellationToken.None)
             .GetAwaiter().GetResult();
+        Assert(journal.SavedBlocks.Count == 2 &&
+               journal.SavedBlocks[0x20000].SequenceEqual(origin[..16]) &&
+               journal.SavedBlocks[0x20010].SequenceEqual(origin[16..]),
+            "Both original ECU sectors physically captured before any erase");
         Assert(result.SectorsWritten == 2 && result.BytesWritten == 32,
             "Both changed sectors are written exactly once");
         Assert(ecu.Memory.SequenceEqual(updated) && ecu.Erases == 2,

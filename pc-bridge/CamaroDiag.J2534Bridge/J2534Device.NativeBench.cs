@@ -13,7 +13,8 @@ internal sealed partial class J2534Device
     private void ClearNativeReceiveQueue()
     {
         if (!NativeLibrary.TryGetExport(_library, "PassThruIoctl", out var entry))
-            throw new IOException("Native bench transport requires PassThruIoctl.");
+            throw new IOException(
+                "Verified ECU memory/bench reading requires J2534 PassThruIoctl(CLEAR_RX_BUFFER).");
         var ioctl = Marshal.GetDelegateForFunctionPointer<NativeBenchIoctl>(entry);
         Check(ioctl(_channelId, 0x08, IntPtr.Zero, IntPtr.Zero),
             "PassThruIoctl(CLEAR_RX_BUFFER)");
@@ -33,6 +34,9 @@ internal sealed partial class J2534Device
         byte[] original, byte[] target, byte[] kernel,
         NativeE39WriteSequence.IDurableJournal journal, CancellationToken token)
     {
+        // Dedicated LOCAL E39 bench only, never exposed over BridgeServer.
+        // Full matching physical backup, VIN/OSID and voltage remain mandatory.
+        NativeEcuWriteAvailability.RequirePhysicalEcuProgrammingEnabled();
         ArgumentNullException.ThrowIfNull(adapter);
         ArgumentNullException.ThrowIfNull(scope);
         ArgumentNullException.ThrowIfNull(policy);

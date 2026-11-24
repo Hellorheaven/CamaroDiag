@@ -29,6 +29,21 @@ class J2534BridgeProtocolFramingTest {
         }
     }
 
+    @Test fun rejectsRawControlBytesButKeepsEscapedJsonAndUnicode() {
+        for (raw in listOf(
+            "{\"ok\":true}\u0000\n",
+            "{\"ok\":true}\t\n",
+            "{\"ok\":true}\u001B\n",
+            "{\"ok\":true}\u0001\n"
+        )) {
+            assertThrows(IOException::class.java) {
+                J2534BridgeProtocol.readBoundedLine(reader(raw))
+            }
+        }
+        val legal = "{\"ok\":true,\"adapter\":\"Pont éthanol\",\"text\":\"\\\\u0000\"}"
+        assertEquals(legal, J2534BridgeProtocol.readBoundedLine(reader(legal + "\n")))
+    }
+
     @Test fun limitsFrameAndPayloadLengths() {
         val max = "a".repeat(32 * 1024)
         assertEquals(max, J2534BridgeProtocol.readBoundedLine(reader(max + "\n")))

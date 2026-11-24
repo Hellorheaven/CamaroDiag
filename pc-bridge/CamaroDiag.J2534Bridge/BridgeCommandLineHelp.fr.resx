@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms</value></resheader>
+  <data name="HelpText" xml:space="preserve"><value>Pont Windows J2534 CamaroDiag — ligne de commande
+Lancer sans argument pour ouvrir l'interface graphique.
+
+Utilisation :
+  CamaroDiag.J2534Bridge.exe --help
+  CamaroDiag.J2534Bridge.exe --list-ports
+  CamaroDiag.J2534Bridge.exe --self-test
+  CamaroDiag.J2534Bridge.exe --probe-drivers
+  CamaroDiag.J2534Bridge.exe --discover-connector COM5
+  CamaroDiag.J2534Bridge.exe --inspect-connector-checkpoint checkpoint.bin
+  CamaroDiag.J2534Bridge.exe --inspect-write-journal attempt.jsonl
+  CamaroDiag.J2534Bridge.exe --inspect-e39-image original-3MiB.bin
+  CamaroDiag.J2534Bridge.exe --port 35001
+  CamaroDiag.J2534Bridge.exe --port 35001 --memory-read-profile profile.json
+  CamaroDiag.J2534Bridge.exe --port 35001 --allow-obd-clear
+  CamaroDiag.J2534Bridge.exe --doip-discover --host 192.0.2.10 --timeout-ms 1500
+  CamaroDiag.J2534Bridge.exe --doip-discover --listen true --listen-ipv6-ifindex 3
+  CamaroDiag.J2534Bridge.exe --doip-discover --multicast-ipv6-ifindex 3
+  CamaroDiag.J2534Bridge.exe --doip-discover --broadcast-ip 192.168.1.255
+  CamaroDiag.J2534Bridge.exe --doip-discover --host 192.0.2.10 --vin 1G1FA1RXXR0123456
+  CamaroDiag.J2534Bridge.exe --doip-status --host 192.0.2.10 --doip-version 3
+  CamaroDiag.J2534Bridge.exe --doip-exchange --host 192.0.2.10 --tester 0E80 --ecu 1234 --payload 22F190 --uds-p2-ms 100 --uds-p2-star-ms 2000
+
+Exemples :
+  --self-test                 Tests logiciels simulés, sans adaptateur ni calculateur.
+  --probe-drivers             Liste des pilotes J2534 Windows, sans accès calculateur.
+  --discover-connector COM5   Découverte série CD/1 d'une carte prototype isolée.
+  --inspect-write-journal attempt.jsonl
+                              Analyse d'un journal hors ligne, sans reprise ou effacement.
+  --port 35001                Démarre le pont J2534 local avec appairage TLS.
+                              Une vérification de mise à jour peut avoir lieu.
+                              Ne jamais exposer ce port sur Internet.
+  --allow-obd-clear           Autorise localement la suppression des défauts OBD.
+                              Android demande aussi OK, puis Oui séparément.
+  --doip-discover             Identification UDP ISO 13400, pas une authentification ECU.
+                              --host unicast IPv4/IPv6, --broadcast-ip en IPv4,
+                              --listen true passif ; multicast IPv6 ff02::1 avec
+                              --listen-ipv6-ifindex (passif) ou --multicast-ipv6-ifindex
+                              (une requête ACTIVE UDP d'identification).
+                              Remplacer l'index fictif 3 par l'interface du lien
+                              véhicule explicitement vérifiée, sans le deviner.
+                              Filtrage --vin ou --eid, jamais les deux.
+                              La sortie donne version=0x02/0x03/0x04 observée ;
+                              vérifier la passerelle avant --doip-version.
+  --doip-status               État passerelle ou --power-mode true par UDP.
+                              --doip-version 2, 3 ou 4 ; 255 réservé à la découverte.
+  --doip-exchange             Diagnostic UDS par TCP/TLS : --host, --tester, --ecu,
+                              --payload hexadécimal ; --tls true vérifie le serveur
+                              et refuse le repli en clair ; --uds-p2-ms et
+                              --uds-p2-star-ms fixent les délais.
+                              Peut modifier l'ECU : identité et consentement
+                              explicite obligatoires ; ni contournement OEM ni
+                              flash ou récupération qualifiés sur véhicule.
+
+Chaque commande nécessite ses paramètres exacts. Utiliser --help seul :
+une invocation mélangeant aide et programmation est refusée sans accès matériel.
+L'aide n'active ni flash, ni EEPROM, ni écriture UDS brute.
+Les simulations ne valident pas les calculateurs physiques.
+Pont Linux x64/ARM64 avec CLI identique prévu dans l'issue #115.</value></data>
+</root>

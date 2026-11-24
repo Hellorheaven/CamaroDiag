@@ -9,15 +9,138 @@ internal static class BridgeSelfTests
 {
     public static int Run()
     {
+        BridgeCommandLineHelpSelfTests.Run();
+        BridgeLaunchArgumentsSelfTests.Run();
         ConnectorTlsReferenceSelfTests.Run();
         if (ConnectorDiscoverySelfTests.Run() != 0) return 1;
         ConnectorCheckpointSelfTests.Run();
-        var checks = 0;
+        UserExportStorageSelfTests.Run();
+        var checks = DoIpDiagnosticSessionSelfTests.Run();
+        checks += DoIpUdpDiscoverySelfTests.Run();
+        checks += DoIpConsolePresentationSelfTests.Run();
         void Assert(bool condition, string name)
         {
             checks++;
             if (!condition) throw new InvalidOperationException("Bridge self-test failed: " + name);
         }
+
+        Assert(J2534Device.IsWellFormedReadOnlyDiagnosticPayload(
+            [0x22, 0xF1, 0x90]), "J2534 UDS single DID shape");
+        Assert(!J2534Device.IsWellFormedReadOnlyDiagnosticPayload(
+            [0x22, 0xF1, 0x90, 0xF1, 0x91]), "J2534 multi-DID denied until correlation is supported");
+        Assert(!J2534Device.IsWellFormedReadOnlyDiagnosticPayload(
+            [0x22]), "J2534 UDS missing DID rejected");
+        Assert(!J2534Device.IsWellFormedReadOnlyDiagnosticPayload(
+            [0x22, 0xF1]), "J2534 UDS truncated DID rejected");
+        Assert(!J2534Device.IsWellFormedReadOnlyDiagnosticPayload(
+            [0x22, 0xF1, 0x90, 0xF1]), "J2534 UDS incomplete second DID rejected");
+        Assert(J2534Device.IsWellFormedReadOnlyDiagnosticPayload(
+            [0x19, 0x01, 0xFF]), "J2534 UDS report number by status mask");
+        Assert(J2534Device.IsWellFormedReadOnlyDiagnosticPayload(
+            [0x19, 0x02, 0xFF]), "J2534 UDS report DTC by status mask");
+        Assert(J2534Device.IsWellFormedReadOnlyDiagnosticPayload(
+            [0x19, 0x0A]), "J2534 UDS report supported DTC");
+        Assert(!J2534Device.IsWellFormedReadOnlyDiagnosticPayload(
+            [0x19]), "J2534 UDS missing DTC subfunction rejected");
+        Assert(!J2534Device.IsWellFormedReadOnlyDiagnosticPayload(
+            [0x19, 0x01]), "J2534 UDS missing status mask for DTC count");
+        Assert(!J2534Device.IsWellFormedReadOnlyDiagnosticPayload(
+            [0x19, 0x02]), "J2534 UDS missing status mask for DTC list");
+        Assert(!J2534Device.IsWellFormedReadOnlyDiagnosticPayload(
+            [0x19, 0x0A, 0xFF]), "J2534 UDS unwanted mask on supported DTC list");
+        Assert(!J2534Device.IsWellFormedReadOnlyDiagnosticPayload(
+            [0x19, 0xFE, 0xFF]), "J2534 UDS unsupported DTC subfunction");
+        Assert(!J2534Device.IsWellFormedReadOnlyDiagnosticPayload(
+            [0x14, 0xFF, 0xFF, 0xFF]), "J2534 UDS clear DTC not a read-only query");
+
+        // A memory-scoped J2534 channel must purge stale RX before every
+        // request, including its first physical F190 VIN identification.
+        // Unscoped console/diagnostic channels retain their existing policy.
+        Assert(J2534Device.NeedsFreshReceiveQueue(false, true),
+            "Scoped ECU memory requires RX queue isolation before every request");
+        Assert(J2534Device.NeedsFreshReceiveQueue(true, false),
+            "Qualified native bench always requires isolated receive traffic");
+        Assert(!J2534Device.NeedsFreshReceiveQueue(false, false),
+            "Standard read-only J2534 console does not require the memory RX policy");
+
+        // The first OK never authorizes a write; a second independent OUI
+        // is mandatory for local programming. No, empty input and EOF cancel.
+        bool Consent(params string?[] answers)
+        {
+            var pending = new Queue<string?>(answers);
+            var messages = new List<string>();
+            return EcuWriteOperatorConsent.AskBeforeProgramming(
+                () => pending.Count > 0 ? pending.Dequeue() : null,
+                messages.Add, "ECU test");
+        }
+        Assert(!Consent(), "Missing warning acknowledgement cannot write");
+        Assert(!Consent("OUI", "OUI"), "Direct YES without initial OK cannot write");
+        Assert(!Consent("OK"), "OK without separate YES cannot write");
+        Assert(!Consent("OK", "NON"), "Explicit NO always cancels the ECU write");
+        Assert(!Consent("OK", null), "Closing the final confirmation cancels");
+        Assert(Consent("OK", "OUI"), "Warning OK followed by explicit YES approves one write");
+
+        Assert(NativeEcuWriteAvailability.PhysicalEcuProgrammingEnabled,
+            "Dedicated local E39 bench hardware test route is enabled");
+        NativeEcuWriteAvailability.RequirePhysicalEcuProgrammingEnabled();
+        var deniedBenchCli = NativeE39QualifiedBenchCli.RunAsync(new[] {
+            "--program-e39-bench", "0", "not-present.json",
+            "original.bin", "target.bin", "kernel.bin", "new-journal.jsonl"
+        }).GetAwaiter().GetResult();
+        Assert(deniedBenchCli == 8,
+            "Missing local bench profile is rejected before opening J2534 drivers");
+
+        const string memoryVin = "1G1FA1RXXR0123456";
+        Assert(J2534Device.IsUnsupportedUdsVinResponse([0x7F, 0x22, 0x11]) &&
+               J2534Device.IsUnsupportedUdsVinResponse([0x7F, 0x22, 0x12]) &&
+               J2534Device.IsUnsupportedUdsVinResponse([0x7F, 0x22, 0x31]) &&
+               !J2534Device.IsUnsupportedUdsVinResponse([0x7F, 0x22, 0x33]),
+            "Only unsupported UDS VIN replies permit a legacy GMLAN fallback");
+        var physicalGmlanVin = new byte[] { 0x5A, 0x90 }
+            .Concat(Encoding.ASCII.GetBytes(memoryVin)).ToArray();
+        Assert(J2534Device.MatchesScopedGmlanVin(physicalGmlanVin, memoryVin) &&
+               !J2534Device.MatchesScopedGmlanVin(physicalGmlanVin, "1G1FA1RXXR0123457") &&
+               !J2534Device.MatchesScopedGmlanVin(physicalGmlanVin[..^1], memoryVin),
+            "GMLAN 1A/90 must prove the exact full VIN before memory read");
+        var memoryVinReply = new byte[] { 0x62, 0xF1, 0x90 }
+            .Concat(Encoding.ASCII.GetBytes(memoryVin)).ToArray();
+        Assert(J2534Device.MatchesScopedMemoryVin(memoryVinReply, memoryVin),
+            "J2534 scoped memory read requires exact physical F190 VIN");
+        Assert(!J2534Device.MatchesScopedMemoryVin(
+            memoryVinReply.Concat(new byte[] { 0x00 }).ToArray(), memoryVin),
+            "J2534 rejects physical VIN responses with trailing bytes");
+        Assert(!J2534Device.MatchesScopedMemoryVin(
+            memoryVinReply[..^1], memoryVin),
+            "J2534 rejects truncated physical VIN replies");
+        Assert(!J2534Device.MatchesScopedMemoryVin(
+            memoryVinReply, "1G1FA1RXXR0123457"),
+            "J2534 rejects a different ECU VIN before any scoped memory reads");
+        Assert(!J2534Device.MatchesScopedMemoryVin(
+            new byte[] { 0x62, 0xF1, 0x91 }
+                .Concat(Encoding.ASCII.GetBytes(memoryVin)).ToArray(), memoryVin),
+            "J2534 rejects a VIN from a different DID");
+
+        Assert(BridgeConsoleDirection.Normalize("TX") == "TX", "CAN console TX direction");
+        Assert(BridgeConsoleDirection.Normalize("RX") == "RX", "CAN console RX direction");
+        Assert(BridgeConsoleDirection.Normalize("SYSTEM") == "SYSTEM", "CAN console SYSTEM direction");
+        Assert(BridgeConsoleDirection.Normalize("INFO") == "SYSTEM", "Legacy INFO classified SYSTEM");
+        Assert(BridgeConsoleDirection.Normalize(null) == "SYSTEM", "Unknown CAN console direction fails closed");
+        // Pending TX and driver queue acceptance are not evidence of bus
+        // delivery; only a correlated ECU reply may be marked as such.
+        foreach (var state in new[] { BridgeConsoleTxState.Requested,
+            BridgeConsoleTxState.DriverAccepted, BridgeConsoleTxState.Unconfirmed })
+        {
+            Assert(!BridgeConsoleTxEvidence.HasVerifiedEcuReply(state),
+                "Unverified Windows console TX must not claim ECU confirmation");
+        }
+        Assert(BridgeConsoleTxEvidence.HasVerifiedEcuReply(BridgeConsoleTxState.EcuReplied),
+            "Correlated J2534 ECU reply confirms a response");
+        Assert(BridgeConsoleTxEvidence.Label(BridgeConsoleTxState.Requested).Contains("non confirmée"),
+            "Windows TX request is visibly pending");
+        Assert(BridgeConsoleTxEvidence.Label(BridgeConsoleTxState.DriverAccepted).Contains("non vérifiée"),
+            "Windows no-response transmission does not claim bus delivery");
+        Assert(BridgeConsoleTxEvidence.Label(BridgeConsoleTxState.Unconfirmed).Contains("non confirmée"),
+            "Windows J2534 timeout marks TX as unconfirmed");
 
         Assert(BridgeServer.IsPrivateNetworkAddress(IPAddress.Parse("192.168.1.20")), "RFC1918 LAN");
         Assert(BridgeServer.IsPrivateNetworkAddress(IPAddress.Parse("10.1.2.3")), "10/8 LAN");
@@ -27,6 +150,115 @@ internal static class BridgeSelfTests
         Assert(!BridgeServer.IsPrivateNetworkAddress(IPAddress.Parse("8.8.8.8")), "Public IPv4 denied");
         Assert(!BridgeServer.IsPrivateNetworkAddress(IPAddress.Parse("100.64.0.10")), "Carrier-grade NAT denied");
         Assert(!BridgeServer.IsPrivateNetworkAddress(IPAddress.Parse("2001:4860:4860::8888")), "Public IPv6 denied");
+
+        const string samplePairingToken = "authenticated-bridge-token";
+        foreach (var valid in new[] {
+            "{\"token\":\"authenticated-bridge-token\",\"op\":\"open\"}",
+            "{\"op\":\"close\",\"token\":\"authenticated-bridge-token\"}"
+        })
+        {
+            using var json = JsonDocument.Parse(valid);
+            Assert(BridgeServer.HasValidRequestToken(json.RootElement, samplePairingToken),
+                "Correct bearer token is required on every J2534 operation");
+        }
+        foreach (var denied in new[] {
+            "{}", "null", "[]", "true",
+            "{\"token\":null}", "{\"token\":42}",
+            "{\"token\":[]}", "{\"token\":{}}",
+            "{\"token\":\"\"}",
+            "{\"token\":\"authenticated-bridge-TOKEN\"}",
+            "{\"token\":\"authenticated-bridge-token-extra\"}",
+            "{\"token\":\"bad\",\"token\":\"authenticated-bridge-token\",\"op\":\"open\"}",
+            "{\"token\":\"authenticated-bridge-token\",\"op\":\"close\",\"op\":\"open\"}",
+            "{\"token\":\"authenticated-bridge-token\"}",
+            "{\"token\":\"authenticated-bridge-token\",\"op\":42}"
+        })
+        {
+            using var json = JsonDocument.Parse(denied);
+            Assert(!BridgeServer.HasValidRequestToken(json.RootElement, samplePairingToken),
+                "Malformed or missing bearer token must end the bridge session");
+        }
+        using (var json = JsonDocument.Parse("{\"token\":\"authenticated-bridge-token\"}"))
+            Assert(!BridgeServer.HasValidRequestToken(json.RootElement, ""),
+                "A bridge with an empty expected token never authorizes operations");
+
+        // A correct bearer token must never make an ambiguously decoded
+        // operation safe. The full command schema is checked before J2534.
+        foreach (var validRequest in new[] {
+            "{\"token\":\"x\",\"op\":\"open\",\"requestCanId\":\"7E0\",\"responseCanId\":\"7E8\",\"can29Bit\":false,\"protocolNumber\":33}",
+            "{\"token\":\"x\",\"op\":\"identify\"}",
+            "{\"token\":\"x\",\"op\":\"identifyGmlan\"}",
+            "{\"token\":\"x\",\"op\":\"exchange\",\"payloadHex\":\"22F190\",\"timeoutMs\":3000}",
+            "{\"token\":\"x\",\"op\":\"sendOnly\",\"payloadHex\":\"3E80\"}",
+            "{\"token\":\"x\",\"op\":\"exchangeRaw\",\"payloadHex\":\"2EF19000\",\"timeoutMs\":3000,\"warningAcknowledged\":true,\"writeConfirmed\":true}",
+            "{\"token\":\"x\",\"op\":\"sendRaw\",\"payloadHex\":\"2701\",\"warningAcknowledged\":true,\"writeConfirmed\":true}",
+            "{\"token\":\"x\",\"op\":\"clearStandardObdDtcs\",\"confirmed\":true,\"warningAcknowledged\":true,\"writeConfirmed\":true}",
+            "{\"token\":\"x\",\"op\":\"close\"}"
+        }) {
+            using var json = JsonDocument.Parse(validRequest);
+            Assert(BridgeServer.HasCanonicalRequestShape(json.RootElement),
+                "Known J2534 operation has exactly its expected fields");
+        }
+        foreach (var rawConfirmation in new[] {
+            "{\"warningAcknowledged\":true,\"writeConfirmed\":true}",
+            "{\"warningAcknowledged\":true,\"writeConfirmed\":false}",
+            "{\"warningAcknowledged\":false,\"writeConfirmed\":true}",
+            "{\"warningAcknowledged\":true}",
+            "{\"writeConfirmed\":true}",
+            "{}"
+        })
+        {
+            using var json = JsonDocument.Parse(rawConfirmation);
+            var expected = rawConfirmation == "{\"warningAcknowledged\":true,\"writeConfirmed\":true}";
+            Assert(BridgeServer.HasExplicitEcuWriteConsent(json.RootElement) == expected,
+                "Only both explicit UI confirmations permit a raw ECU write");
+        }
+        foreach (var forged in new[] {
+            "{\"token\":\"x\",\"op\":\"exchange\",\"payloadHex\":\"22F190\",\"payloadHex\":\"27AA\"}",
+            "{\"token\":\"x\",\"op\":\"exchangeRaw\",\"payloadHex\":\"2EF190\",\"payloadHex\":\"27AA\"}",
+            "{\"token\":\"x\",\"op\":\"sendRaw\",\"payloadHex\":\"3601\",\"unexpectedFlag\":true}",
+            "{\"token\":\"x\",\"op\":\"exchangeRaw\",\"payloadHex\":\"2EF19000\"}",
+            "{\"token\":\"x\",\"op\":\"sendRaw\",\"payloadHex\":\"2701\",\"warningAcknowledged\":false,\"writeConfirmed\":true}",
+            "{\"token\":\"x\",\"op\":\"sendRaw\",\"payloadHex\":\"2701\",\"warningAcknowledged\":true,\"writeConfirmed\":false}",
+            "{\"token\":\"x\",\"op\":\"clearStandardObdDtcs\",\"confirmed\":true}",
+            "{\"token\":\"x\",\"op\":\"clearStandardObdDtcs\",\"confirmed\":true,\"warningAcknowledged\":true,\"writeConfirmed\":false}",
+            "{\"token\":\"x\",\"op\":\"open\",\"requestCanId\":\"7E0\",\"requestCanId\":\"7DF\",\"responseCanId\":\"7E8\"}",
+            "{\"token\":\"x\",\"op\":\"clearStandardObdDtcs\",\"confirmed\":true,\"confirmed\":false}",
+            "{\"token\":\"x\",\"op\":\"exchange\",\"payloadHex\":\"22F190\",\"timeoutMs\":1000,\"timeoutMs\":9999}",
+            "{\"token\":\"x\",\"op\":\"exchange\",\"payloadHex\":\"22F190\",\"confirmed\":true}",
+            "{\"token\":\"x\",\"op\":\"close\",\"payloadHex\":\"27AA\"}",
+            "{\"token\":\"x\",\"op\":\"open\",\"requestCanId\":\"7E0\"}",
+            "{\"token\":\"x\",\"op\":\"open\",\"requestCanId\":\"7E0\",\"responseCanId\":\"7E8\",\"can29Bit\":1}",
+            "{\"token\":\"x\",\"op\":\"exchange\",\"payloadHex\":\"22F190\",\"timeoutMs\":1.5}",
+            "{\"token\":\"x\",\"op\":\"unknown\"}",
+            "[]"
+        }) {
+            using var json = JsonDocument.Parse(forged);
+            Assert(!BridgeServer.HasCanonicalRequestShape(json.RootElement),
+                "Duplicate, unknown and mistyped CAN requests are denied before native I/O");
+        }
+
+        Assert(BridgeServer.RequiresSessionTermination(new UnauthorizedAccessException()),
+            "Denied ECU service revokes the current PC bridge session");
+        Assert(BridgeServer.RequiresSessionTermination(new IOException()),
+            "Uncertain native J2534 transport ends its owner session");
+        Assert(BridgeServer.RequiresSessionTermination(new InvalidDataException()),
+            "Malformed physical reply invalidates the session");
+        Assert(!BridgeServer.RequiresSessionTermination(new TimeoutException()),
+            "Ordinary ECU silence is not independently a disconnected adapter");
+        Assert(!BridgeServer.RequiresSessionTermination(new ArgumentException()),
+            "Bad local field syntax is rejected without reusing a privileged request");
+
+        // The peer is told when its authorized TLS session is revoked.
+        using (var fatal = JsonDocument.Parse(BridgeServer.SerializeErrorResponse(
+            "Unqualified ECU operation.", true)))
+            Assert(fatal.RootElement.GetProperty("sessionTerminated").GetBoolean() &&
+                !fatal.RootElement.GetProperty("ok").GetBoolean(),
+                "Fatal security errors explicitly revoke the client's bridge session");
+        using (var ordinary = JsonDocument.Parse(BridgeServer.SerializeErrorResponse(
+            "A recoverable ECU timeout.", false)))
+            Assert(!ordinary.RootElement.GetProperty("sessionTerminated").GetBoolean(),
+                "Recoverable errors do not falsely report a terminated session");
 
         // Request framing must reject oversized and truncated client data
         // before JSON parsing or J2534 device access.
@@ -38,7 +270,36 @@ internal static class BridgeSelfTests
                 .GetAwaiter().GetResult();
         }
         Assert(ReadWire("{\"op\":\"open\"}\r\n") == "{\"op\":\"open\"}", "CRLF bridge request");
+        foreach (var invalidFrame in new[] {
+            "{\"op\":\"cl\rose\"}\n",
+            "{\"op\":\"open\"}\r\r\n",
+            "{\"op\":\"open\"}\0\n",
+            "{\"op\":\"open\"}\t\n",
+            "{\"op\":\"identité\"}\n"
+        })
+        {
+            var refused = false;
+            try { ReadWire(invalidFrame); }
+            catch (InvalidDataException) { refused = true; }
+            Assert(refused, "A malformed bridge line must not be silently canonicalized");
+        }
         Assert(ReadWire("") is null, "Clean EOF on empty client");
+        // A malicious LAN peer can complete TLS before knowing the bearer
+        // token; malformed UTF-8 must never be silently replaced or parsed.
+        using (var malformed = new MemoryStream(new byte[] {
+            (byte)'{', (byte)'"', 0xC3, 0x28, (byte)'"', (byte)'}', (byte)'\n'
+        }))
+        using (var strictReader = new StreamReader(
+            malformed, new UTF8Encoding(false, true), detectEncodingFromByteOrderMarks: false))
+        {
+            var rejectedUtf8 = false;
+            try {
+                BridgeServer.ReadBoundedLineAsync(strictReader, CancellationToken.None)
+                    .GetAwaiter().GetResult();
+            }
+            catch (DecoderFallbackException) { rejectedUtf8 = true; }
+            Assert(rejectedUtf8, "Bridge must reject invalid UTF-8 before parsing credentials");
+        }
         Assert(ReadWire(new string('A', 64 * 1024) + "\n")?.Length == 64 * 1024,
             "Maximum request accepted");
         var tooLongRejected = false;
@@ -56,6 +317,16 @@ internal static class BridgeSelfTests
             var root = valid.RootElement;
             Assert(Convert.ToHexString(BridgeServer.ParseHexPayload(root)) == "22F190", "Hex payload");
             Assert(BridgeServer.ParseHexId(root, "requestCanId") == 0x7E0, "CAN identifier");
+        }
+        foreach (string malformedCanId in new[] { "70xE0", "0x0x7E0", "7E0-",
+            "0x", "0000000007E0", "7 E0", "0x-7E0" })
+        {
+            using var input = JsonDocument.Parse(
+                JsonSerializer.Serialize(new { requestCanId = malformedCanId }));
+            var rejected = false;
+            try { BridgeServer.ParseHexId(input.RootElement, "requestCanId"); }
+            catch (ArgumentException) { rejected = true; }
+            Assert(rejected, "CAN target ID is never repaired by stripping embedded markers");
         }
 
         using (var invalid = JsonDocument.Parse("{\"payloadHex\":\"22F1Z0\"}"))
@@ -178,6 +449,13 @@ internal static class BridgeSelfTests
         var map = new J2534MemoryReadScope(
             "1G1FA1RXXR0123456", 0x7E0, 0x7E8, 33,
             0x80001000u, 0x100u, 64, 0x03);
+        Assert(map.Region == "OTHER", "Old scoped read maps cannot claim a region type");
+        Assert(J2534MemoryReadScope.IsKnownRegion("CALIBRATION") &&
+               J2534MemoryReadScope.IsKnownRegion("PROGRAM_FLASH") &&
+               J2534MemoryReadScope.IsKnownRegion("DATA_FLASH") &&
+               J2534MemoryReadScope.IsKnownRegion("EXTERNAL_EEPROM") &&
+               !J2534MemoryReadScope.IsKnownRegion("COMPLETE_ECU"),
+               "Declared ECU memory regions never imply complete coverage");
         Assert(map.MatchesChannel(0x7E0, 0x7E8, 33), "Read map CAN channel");
         Assert(!map.MatchesChannel(0x7E1, 0x7E8, 33), "Wrong CAN ID rejected");
         Assert(map.AllowsReadMemory(new byte[] {
@@ -213,6 +491,24 @@ internal static class BridgeSelfTests
             File.WriteAllText(scopedFile, scopedJson);
             var loaded = J2534MemoryReadScope.Load(scopedFile);
             Assert(loaded.StartAddress == 0x80001000u, "Unsigned 32-bit memory region parsed");
+            Assert(loaded.Region == "OTHER", "Legacy read profile has unknown region type");
+            File.WriteAllText(scopedFile, scopedJson[..^1] + ",\"region\":\"CALIBRATION\"}");
+            var typed = J2534MemoryReadScope.Load(scopedFile);
+            Assert(typed.Region == "CALIBRATION", "Operator-declared calibration range is retained");
+            File.WriteAllText(scopedFile, scopedJson[..^1] + ",\"region\":\"COMPLETE_ECU\"}");
+            var invalidRegion = false;
+            try { J2534MemoryReadScope.Load(scopedFile); }
+            catch (ArgumentException) { invalidRegion = true; }
+            Assert(invalidRegion, "Invented full-ECU region type cannot be selected");
+            foreach (var badRegion in new[] { "null", "123", "true", "{}" })
+            {
+                File.WriteAllText(scopedFile,
+                    scopedJson[..^1] + ",\"region\":" + badRegion + "}");
+                var rejectedType = false;
+                try { J2534MemoryReadScope.Load(scopedFile); }
+                catch (ArgumentException) { rejectedType = true; }
+                Assert(rejectedType, "Non-string region is rejected as a profile error");
+            }
             Assert(loaded.AllowsReadMemory(new byte[] {
                 0x23, 0x14, 0x80, 0x00, 0x10, 0x00, 0x20 }), "Parsed read profile usable");
             File.WriteAllText(scopedFile, scopedJson[..^1] + ",\"allowWrite\":true}");
@@ -220,6 +516,16 @@ internal static class BridgeSelfTests
             try { J2534MemoryReadScope.Load(scopedFile); }
             catch (ArgumentException) { rejected = true; }
             Assert(rejected, "Unknown/dangerous profile permissions rejected");
+            File.WriteAllText(scopedFile, new string(' ', 16 * 1024 + 1));
+            rejected = false;
+            try { J2534MemoryReadScope.Load(scopedFile); }
+            catch (ArgumentException) { rejected = true; }
+            Assert(rejected, "Oversized memory read profile is rejected before parsing");
+            File.WriteAllText(scopedFile, "");
+            rejected = false;
+            try { J2534MemoryReadScope.Load(scopedFile); }
+            catch (ArgumentException) { rejected = true; }
+            Assert(rejected, "Empty memory read profile is rejected before parsing");
         }
         finally { File.Delete(scopedFile); }
 
@@ -247,6 +553,38 @@ internal static class BridgeSelfTests
 
         checks += BridgeTlsSelfTests.Run();
         checks += NativeUdsDownloadSelfTests.Run();
+        checks += NativeUdsUploadSelfTests.Run();
+        checks += StandardVehicleProtocolsSelfTests.Run();
+        checks += Kwp2000TransactionSelfTests.Run();
+        checks += ObdJ1979TransactionSelfTests.Run();
+        checks += ObdJ1979PidSupportSelfTests.Run();
+        checks += ObdJ1979VinSelfTests.Run();
+        checks += ObdJ1979DtcSelfTests.Run();
+        checks += ObdJ1979InterpretationSelfTests.Run();
+        checks += ObdJ1979PidDiscoverySelfTests.Run();
+        checks += ObdJ1979PidValuesSelfTests.Run();
+        checks += ObdJ1979FunctionalCanDiscoverySelfTests.Run();
+        checks += ObdJ1979VehicleInfoSelfTests.Run();
+        checks += ObdJ1979MonitorStatusSelfTests.Run();
+        checks += ObdJ1979Mode06SelfTests.Run();
+        checks += ObdCanProtocolDetectionSelfTests.Run();
+        checks += ObdOnUdsVehicleIdentificationSelfTests.Run();
+        checks += ObdOnUdsDtcCountSelfTests.Run();
+        checks += ObdOnUdsDtcStatusSelfTests.Run();
+        checks += IsoTpCanFdSelfTests.Run();
+        checks += IsoTpClassicCaptureAuditSelfTests.Run();
+        checks += IsoTpCanFdCaptureAuditSelfTests.Run();
+        checks += IsoTpDeadlineSelfTests.Run();
+        checks += J1939ClassicTpSelfTests.Run();
+        checks += J1939AddressClaimSessionSelfTests.Run();
+        checks += J1939FdMultiPgSelfTests.Run();
+        checks += J1939FdTransportFramesSelfTests.Run();
+        checks += J1939FdBamSelfTests.Run();
+        checks += J1939FdCmdtSelfTests.Run();
+        checks += UdsStandardServicesSelfTests.Run();
+        checks += UdsResponseDeadlineSelfTests.Run();
+        checks += ObdOnUdsCanDiscoverySelfTests.Run();
+        checks += EcuPostFlashAssessmentSelfTests.Run();
         checks += NativeEcuSectorSelfTests.Run();
         checks += NativeMpc5566FlashMapSelfTests.Run();
         checks += NativeE39RamLoaderSelfTests.Run();

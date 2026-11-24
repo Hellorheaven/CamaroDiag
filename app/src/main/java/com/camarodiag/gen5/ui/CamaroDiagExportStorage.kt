@@ -5,6 +5,7 @@ import android.content.Intent
 import android.net.Uri
 import android.provider.DocumentsContract
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
@@ -21,6 +22,23 @@ internal object CamaroDiagExportStorage {
     const val AUTHORITY = "com.android.externalstorage.documents"
     const val DOCUMENT_ID = "primary:CamaroDiag"
     const val DISPLAY_PATH = "/storage/emulated/0/CamaroDiag/"
+    internal enum class Category(val folder: String) {
+        ECU_BACKUPS("Backups/ECU"), DIAGNOSTIC_SESSIONS("Backups/Diagnostics"),
+        REPORTS("Reports"), CONSOLE("Logs/Console"), RECOVERY("Logs/Recovery"),
+        TELEMETRY("Telemetry"), CALIBRATIONS("Calibrations"), TESTS("Tests"),
+        EXPORTS("Exports"), APK("APK")
+    }
+
+    internal fun categoryDocumentId(category: Category): String = "$DOCUMENT_ID/${category.folder}"
+    internal fun displayPath(category: Category): String = "$DISPLAY_PATH${category.folder}/"
+    internal fun fileDisplayPath(category: Category, finalName: String): String {
+        require(finalName.matches(Regex("[A-Za-z0-9._-]+")) && !finalName.startsWith('.'))
+        return displayPath(category) + finalName
+    }
+    internal fun isCategoryFile(authority: String?, documentId: String?, category: Category, name: String): Boolean =
+        authority == AUTHORITY && name.matches(Regex("[A-Za-z0-9._-]+")) && name !in setOf(".", "..") &&
+            documentId == "${categoryDocumentId(category)}/$name"
+
     private const val FLAGS = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
 
     internal fun isExpectedDocument(authority: String?, documentId: String?): Boolean =
@@ -62,6 +80,28 @@ internal object CamaroDiagExportStorage {
             context.contentResolver.takePersistableUriPermission(uri, FLAGS)
             authorizedTree(context) != null
         }.getOrDefault(false)
+    }
+
+    /**
+     * ZIP reinspection occurs against the storage provider, not the J2534
+     * transport. Malformed or unreadable staged data is a storage/export
+     * failure and must never disconnect a healthy ECU communication session.
+     */
+    internal suspend fun verifyStagedArchive(
+        input: InputStream,
+        verify: suspend (InputStream) -> Unit
+    ) {
+        try {
+            input.use { verify(it) }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (storage: ExportStorageException) {
+            throw storage
+        } catch (error: Exception) {
+            throw ExportStorageException(
+                "Staged ECU backup ZIP failed offline verification.", error
+            )
+        }
     }
 
     // Preserve the extension and never overwrite an existing export, even on repeated actions.
@@ -159,25 +199,88 @@ internal object CamaroDiagExportStorage {
         return Fingerprint(length, digest.digest().hex())
     }
 
+    // The primary-storage provider uses root-relative document IDs. Only fixed
+    // category segments are used; never accept a path from an exported filename.
+    @Synchronized
+    internal fun categoryDirectory(context: Context, tree: Uri, category: Category): Uri {
+        val resolver = context.contentResolver
+        var parentId = DOCUMENT_ID
+        var parent = DocumentsContract.buildDocumentUriUsingTree(tree, parentId)
+        for (segment in category.folder.split('/')) {
+            val expectedId = "$parentId/$segment"
+            val children = DocumentsContract.buildChildDocumentsUriUsingTree(tree, parentId)
+            val existing = storageOperation {
+                resolver.query(children, arrayOf(
+                    DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+                    DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+                    DocumentsContract.Document.COLUMN_MIME_TYPE
+                ), null, null, null)?.use { cursor ->
+                    var found = false
+                    while (cursor.moveToNext()) {
+                        if (cursor.getString(1).equals(segment, ignoreCase = true)) {
+                            if (found || cursor.getString(0) != expectedId ||
+                                cursor.getString(2) != DocumentsContract.Document.MIME_TYPE_DIR)
+                                throw ExportStorageException("Invalid or conflicting export folder: $segment")
+                            found = true
+                        }
+                    }
+                    found
+                } ?: throw ExportStorageException("Could not list export folders.")
+            }
+            parent = if (existing) DocumentsContract.buildDocumentUriUsingTree(tree, expectedId)
+                else storageOperation {
+                    DocumentsContract.createDocument(resolver, parent,
+                        DocumentsContract.Document.MIME_TYPE_DIR, segment)
+                } ?: throw ExportStorageException("Could not create export folder: $segment")
+            if (parent.authority != AUTHORITY || DocumentsContract.getDocumentId(parent) != expectedId)
+                throw ExportStorageException("Unexpected export folder identity.")
+            parentId = expectedId
+        }
+        return parent
+    }
+
     /**
-     * Create a uniquely named temporary document inside the approved folder.
+     * Create a uniquely named temporary document inside the approved category folder.
      * Publish the final name only after successful completion; cancel or failure deletes the temp.
      * A sudden process or device crash may leave a .partial document, never a completed filename.
      */
     suspend fun write(context: Context, requested: String, mimeType: String,
-        beforePublish: () -> Unit = {}, writeBytes: suspend (OutputStream) -> Unit) =
+        category: Category, beforePublish: () -> Unit = {},
+        verifyStaged: (suspend (InputStream) -> Unit)? = null,
+        writeBytes: suspend (OutputStream) -> Unit): String =
+        writeNamed(context, uniqueFileName(requested), mimeType, category,
+            beforePublish, verifyStaged, writeBytes)
+
+    // Controlled name for a verified APK; all ordinary exports remain unique.
+    internal suspend fun writeArchivedApk(context: Context, name: String, file: java.io.File): String {
+        require(CamaroDiagApkRetention.parse(name) != null)
+        return writeNamed(context, name, "application/vnd.android.package-archive", Category.APK, {}) { output ->
+            file.inputStream().use { input -> input.copyTo(output) }
+        }
+    }
+
+    private suspend fun writeNamed(context: Context, finalName: String, mimeType: String,
+        category: Category, beforePublish: () -> Unit,
+        verifyStaged: (suspend (InputStream) -> Unit)? = null,
+        writeBytes: suspend (OutputStream) -> Unit): String =
         withContext(Dispatchers.IO) {
             require(mimeType.isNotBlank())
             val resolver = context.contentResolver
             val tree = availableTree(context) ?: throw ExportStorageException("CamaroDiag folder access is required.")
-            val root = DocumentsContract.buildDocumentUriUsingTree(tree, DOCUMENT_ID)
-            val finalName = uniqueFileName(requested)
+            val root = categoryDirectory(context, tree, category)
+            val stagedName = if (category == Category.APK) temporaryFileName(uniqueFileName(finalName))
+                else temporaryFileName(finalName)
             // Use a generic MIME until publication: Android's file provider
             // otherwise may append the target extension to the partial name.
             val temporary = storageOperation {
                 DocumentsContract.createDocument(resolver, root,
-                    "application/octet-stream", temporaryFileName(finalName))
+                    "application/octet-stream", stagedName)
             } ?: throw ExportStorageException("Could not create export document.")
+            if (!isCategoryFile(temporary.authority, DocumentsContract.getDocumentId(temporary),
+                    category, stagedName)) {
+                // Do not write to or delete an unexpected provider document.
+                throw ExportStorageException("Unexpected temporary export identity.")
+            }
             var published = false
             try {
                 val output = VerifiedOutput(storageOperation {
@@ -193,11 +296,24 @@ internal object CamaroDiagExportStorage {
                     ?: throw ExportStorageException("Could not read back export document.")
                 if (expected.length == 0L || expected != actual)
                     throw ExportStorageException("Export readback differs from written bytes.")
+                // A byte-identical ZIP can still contain incomplete or
+                // inconsistent ECU backup metadata. Reopen the ACTUAL staged
+                // document and validate its full format before publication.
+                verifyStaged?.let { verify ->
+                    val reopened = storageOperation {
+                        resolver.openInputStream(temporary)
+                    } ?: throw ExportStorageException("Could not reopen staged ECU backup.")
+                    verifyStagedArchive(reopened, verify)
+                }
                 currentCoroutineContext().ensureActive()
                 beforePublish()
-                storageOperation { DocumentsContract.renameDocument(resolver, temporary, finalName) }
+                val finalDocument = storageOperation { DocumentsContract.renameDocument(resolver, temporary, finalName) }
                     ?: throw ExportStorageException("Could not publish completed export.")
                 published = true
+                if (!isCategoryFile(finalDocument.authority, DocumentsContract.getDocumentId(finalDocument),
+                        category, finalName))
+                    throw ExportStorageException("Unexpected published export identity; inspect the folder.")
+                fileDisplayPath(category, finalName)
             } finally {
                 if (!published) runCatching { DocumentsContract.deleteDocument(resolver, temporary) }
             }

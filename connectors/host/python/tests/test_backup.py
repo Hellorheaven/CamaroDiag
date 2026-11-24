@@ -4,6 +4,7 @@ from dataclasses import replace
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from camarodiagconnectors.backup import backup_manifest, write_bundle, verify_bundle
 
@@ -56,6 +57,48 @@ class BackupTests(unittest.TestCase):
             with self.assertRaises(FileExistsError):
                 write_bundle(prefix, b"abcdefgh", m)
 
+    def test_backup_persists_and_reads_back_both_files_before_returning(self):
+        data = b"abcd" * 100
+        manifest = backup_manifest("offline-chip", len(data), 0, data, data)
+        with tempfile.TemporaryDirectory() as directory:
+            prefix = Path(directory) / "verified"
+            with patch("camarodiagconnectors.backup.os.fsync", wraps=os.fsync) as sync:
+                write_bundle(prefix, data, manifest)
+            self.assertGreaterEqual(sync.call_count, 2)
+            self.assertEqual(verify_bundle(prefix), manifest)
+
+    def test_large_backup_readback_is_chunked(self):
+        data = b"ECU" * 900_000  # crosses two 1 MiB readback boundaries
+        manifest = backup_manifest("offline-chip", len(data), 0, data)
+        with tempfile.TemporaryDirectory() as directory:
+            prefix = Path(directory) / "large"
+            write_bundle(prefix, data, manifest)
+            self.assertEqual(verify_bundle(prefix), manifest)
+
+    def test_file_sync_failure_leaves_no_authoritative_bundle(self):
+        data = b"original-image"
+        manifest = backup_manifest("offline-chip", len(data), 0, data)
+        with tempfile.TemporaryDirectory() as directory:
+            prefix = Path(directory) / "failed"
+            with patch("camarodiagconnectors.backup.os.fsync",
+                       side_effect=OSError("simulated disk sync error")):
+                with self.assertRaisesRegex(OSError, "simulated disk sync error"):
+                    write_bundle(prefix, data, manifest)
+            self.assertFalse(prefix.with_suffix(".bin").exists())
+            self.assertFalse(prefix.with_suffix(".json").exists())
+
+    def test_failed_post_write_verification_never_publishes_backup(self):
+        data = b"original-image"
+        manifest = backup_manifest("offline-chip", len(data), 0, data)
+        with tempfile.TemporaryDirectory() as directory:
+            prefix = Path(directory) / "failed"
+            with patch("camarodiagconnectors.backup.verify_bundle",
+                       side_effect=ValueError("simulated readback mismatch")):
+                with self.assertRaisesRegex(ValueError, "simulated readback mismatch"):
+                    write_bundle(prefix, data, manifest)
+            self.assertFalse(prefix.with_suffix(".bin").exists())
+            self.assertFalse(prefix.with_suffix(".json").exists())
+
     def test_dangling_symlink_components_rejected_without_side_effects(self):
         m = backup_manifest("chip", 4, 0, b"abcd")
         with tempfile.TemporaryDirectory() as directory:
@@ -105,6 +148,15 @@ class BackupTests(unittest.TestCase):
             ), encoding="utf-8")
             with self.assertRaises(ValueError):
                 verify_bundle(prefix)
+
+    def test_oversized_manifest_never_publishes_a_bundle(self):
+        image = b"abcd"
+        manifest = backup_manifest("é" * 12_000, len(image), 0, image)
+        with tempfile.TemporaryDirectory() as directory:
+            prefix = Path(directory) / "new-directory" / "backup"
+            with self.assertRaisesRegex(ValueError, "Manifest exceeds 64 KiB"):
+                write_bundle(prefix, image, manifest)
+            self.assertFalse(prefix.parent.exists())
 
     def test_oversized_manifest_rejected(self):
         m = backup_manifest("chip", 4, 0, b"abcd")

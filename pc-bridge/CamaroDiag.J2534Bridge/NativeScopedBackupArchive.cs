@@ -6,20 +6,29 @@ using System.Text;
 namespace CamaroDiag.J2534Bridge;
 
 /// <summary>
-/// Portable read-only ECU archive, compatible with CamaroDiag Android v2.
+/// Portable read-only ECU archive, compatible with CamaroDiag Android v3.
 /// The archive records reported hardware reads, not certified hardware
 /// provenance, an OEM checksum or permission to program the controller.
 /// Without a verified complete ECU map, coverage remains partial.
 /// </summary>
 internal static class NativeScopedBackupArchive
 {
-    internal const string Format = "CamaroDiag ECU offline archive v2";
+    internal const string LegacyFormat = "CamaroDiag ECU offline archive v2";
+    internal const string Format = "CamaroDiag ECU offline archive v3";
+
+    internal sealed record FirmwareIdentity(uint OperatingSystemId, byte OsDid)
+    {
+        internal bool IsValid => OperatingSystemId is > 0 and < uint.MaxValue &&
+            OsDid is 0xC1 or 0xC9;
+    }
 
     private static (byte[] First, byte[] Second, string Hash) Snapshot(
         J2534MemoryReadScope scope, NativeScopedMemoryReader.VerifiedCapture capture)
     {
         ArgumentNullException.ThrowIfNull(scope);
         ArgumentNullException.ThrowIfNull(capture);
+        if (capture.AcquiredScope != scope)
+            throw new InvalidDataException("Backup profile differs from the acquired ECU memory scope.");
         if (capture.SecondBytes is null || ReferenceEquals(capture.Bytes, capture.SecondBytes))
             throw new InvalidDataException("Two distinct ECU acquisitions are required.");
         var first = capture.Bytes.ToArray();
@@ -36,9 +45,35 @@ internal static class NativeScopedBackupArchive
         return (first, second, hash);
     }
 
-    internal static void SaveNew(string destination, J2534MemoryReadScope scope,
-        NativeScopedMemoryReader.VerifiedCapture capture, CancellationToken token)
+    /// <summary>
+    /// Check the publicly visible ZIP against the exact capture and optional
+    /// physical firmware observation, not merely against its own edited
+    /// manifest. A self-consistent forged archive is not capture evidence.
+    /// </summary>
+    internal static void RequirePublishedCaptureMatch(
+        string archivePath, J2534MemoryReadScope scope,
+        NativeScopedMemoryReader.VerifiedCapture capture, FirmwareIdentity? firmware)
     {
+        var readback = NativeScopedBackupImport.VerifyZip(archivePath, scope);
+        if (capture.AcquiredScope != scope || !readback.ChannelBound ||
+            readback.Vin != capture.ExpectedVin ||
+            readback.StartAddress != capture.StartAddress ||
+            readback.ByteCount != capture.Bytes.Length ||
+            readback.DeclaredRegion != scope.Region ||
+            readback.DeclaredOrigin != "REPORTED_HARDWARE_READ" ||
+            !string.Equals(readback.Sha256, capture.Sha256, StringComparison.OrdinalIgnoreCase) ||
+            readback.Firmware != firmware ||
+            readback.RequiredRegions.Count != 0)
+            throw new InvalidDataException(
+                "Published ZIP no longer matches the independently verified live ECU acquisition.");
+    }
+
+    internal static void SaveNew(string destination, J2534MemoryReadScope scope,
+        NativeScopedMemoryReader.VerifiedCapture capture, CancellationToken token,
+        FirmwareIdentity? firmware = null)
+    {
+        if (firmware is not null && !firmware.IsValid)
+            throw new InvalidDataException("Invalid observed GM firmware identity.");
         ArgumentException.ThrowIfNullOrWhiteSpace(destination);
         token.ThrowIfCancellationRequested();
         var data = Snapshot(scope, capture);
@@ -60,10 +95,17 @@ internal static class NativeScopedBackupArchive
                 "controller=\n" +
                 "created=" + DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString(CultureInfo.InvariantCulture) + "\n" +
                 "count=1\n" +
+                "channel.requestCanId=" + scope.RequestCanId.ToString(CultureInfo.InvariantCulture) + "\n" +
+                "channel.responseCanId=" + scope.ResponseCanId.ToString(CultureInfo.InvariantCulture) + "\n" +
+                "channel.protocolNumber=" + scope.ProtocolNumber.ToString(CultureInfo.InvariantCulture) + "\n" +
+                "channel.session=" + scope.Session.ToString(CultureInfo.InvariantCulture) + "\n" +
+                (firmware is null ? "" :
+                    "ecu.osId=" + firmware.OperatingSystemId.ToString(CultureInfo.InvariantCulture) + "\n" +
+                    "ecu.osDid=" + firmware.OsDid.ToString(CultureInfo.InvariantCulture) + "\n") +
                 // OTHER deliberately does not infer a region from a numeric address;
                 // an empty required map conservatively describes partial ECU coverage.
                 "required=\n" +
-                "capture.0.region=OTHER\n" +
+                "capture.0.region=" + scope.Region + "\n" +
                 "capture.0.start=" + scope.StartAddress.ToString(CultureInfo.InvariantCulture) + "\n" +
                 "capture.0.expected=" + scope.Length.ToString(CultureInfo.InvariantCulture) + "\n" +
                 "capture.0.origin=REPORTED_HARDWARE_READ\n" +
@@ -97,6 +139,12 @@ internal static class NativeScopedBackupArchive
                 }
                 else RequireBytes(input, data.First, token);
             }
+            token.ThrowIfCancellationRequested();
+            // Verify the COMPLETE ZIP schema, both independent acquisitions
+            // and VIN-bound scope before exposing a final backup filename.
+            // Entry readback above alone would not catch an invalid manifest.
+            if (zip)
+                NativeScopedBackupImport.VerifyZip(staged, scope, allowInternalStage: true);
             token.ThrowIfCancellationRequested();
             // Same-directory rename is the publication point. No half-written
             // .zip/.bin exists even after a process crash; no replacement allowed.

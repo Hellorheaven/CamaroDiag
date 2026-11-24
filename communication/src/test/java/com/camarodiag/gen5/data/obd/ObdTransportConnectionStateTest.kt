@@ -117,4 +117,17 @@ class ObdTransportConnectionStateTest {
             false, false, "J2534_BRIDGE"
         ))
     }
+    @Test
+    fun outdatedCanRestorationCannotInvalidateReplacementSession() {
+        val epoch = ObdTransportSessionEpoch()
+        val monitoringSession = epoch.capture()
+        epoch.invalidate()
+        val newSession = epoch.capture()
+        assertFalse(epoch.isCurrent(monitoringSession))
+        assertTrue(epoch.isCurrent(newSession))
+        val stale = ObdSupersededSessionException(CanAdapterRestorationException())
+        assertFalse(ObdTransportFailurePolicy.isConnectionLoss(stale))
+        epoch.requireCurrent(newSession)
+    }
+
 }

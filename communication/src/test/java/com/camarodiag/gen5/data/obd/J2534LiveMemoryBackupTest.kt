@@ -2,6 +2,7 @@ package com.camarodiag.gen5.data.obd
 
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -45,14 +46,19 @@ class J2534LiveMemoryBackupTest {
                 0x10 -> byteArrayOf(0x50, payload[1])
                 0x3E -> byteArrayOf(0x7E, 0x00)
                 0x23 -> {
-                    require(payload.size == 8 && payload[1] == 0x24.toByte())
+                    require((payload.size == 7 && payload[1] == 0x14.toByte()) ||
+                        (payload.size == 8 && payload[1] == 0x24.toByte()))
                     val address = ((payload[2].toLong() and 0xFF) shl 24) or
                         ((payload[3].toLong() and 0xFF) shl 16) or
                         ((payload[4].toLong() and 0xFF) shl 8) or
                         (payload[5].toLong() and 0xFF)
                     val offset = (address - 0x1000L).toInt()
-                    val length = ((payload[6].toInt() and 0xFF) shl 8) or
-                        (payload[7].toInt() and 0xFF)
+                    val length = if (payload.size == 7) {
+                        payload[6].toInt() and 0xFF
+                    } else {
+                        ((payload[6].toInt() and 0xFF) shl 8) or
+                            (payload[7].toInt() and 0xFF)
+                    }
                     require(offset >= 0 && offset + length <= memory.size)
                     val body = memory.copyOfRange(offset, offset + length)
                     if (alterSecondPass && reads >= 3) body[0] = (body[0] + 1).toByte()
@@ -64,6 +70,26 @@ class J2534LiveMemoryBackupTest {
         }
         override suspend fun sendOnly(payload: ByteArray, timeoutMs: Long) =
             error("Unexpected sendOnly")
+    }
+
+    @Test fun memoryReadLengthUsesTheShortestDocumentedUdsAlfiEncoding() = runBlocking {
+        for (size in listOf(1, 128, 255, 256)) {
+            val fake = ScriptedEcu(ByteArray(size) { it.toByte() }, vin)
+            val result = J2534LiveMemoryBackup.captureForTest(
+                fake, request(length = size).copy(chunkBytes = size)
+            )
+            assertEquals(size, result.capture.firstRead.size)
+            val payloads = fake.sent.filter { it[0] == 0x23.toByte() }
+            assertEquals(2, payloads.size)
+            for (requestBytes in payloads) {
+                val expected = if (size == 256) {
+                    byteArrayOf(0x23, 0x24, 0, 0, 0x10, 0, 0x01, 0)
+                } else {
+                    byteArrayOf(0x23, 0x14, 0, 0, 0x10, 0, size.toByte())
+                }
+                assertArrayEquals(expected, requestBytes)
+            }
+        }
     }
 
     @Test fun twoIndependentReadPassesBecomeAConsistentOfflineArchive() = runBlocking {
@@ -82,6 +108,64 @@ class J2534LiveMemoryBackupTest {
         assertTrue(imported.verification.consistent)
         assertEquals(vin, imported.manifest.vehicleVin)
         assertEquals(result.manifest, imported.manifest)
+    }
+
+    @Test fun firmwareEvidenceRequiresMatchingPhysicalGmlanVinOsidAndResponder() {
+        fun observed(v: String = vin, osId: Long = 0x123456L, did: Int = 0xC1,
+            responseId: String = "7E8") = GmlanIdentityEvidence.validate(
+            vin = v, osId = osId, osDid = did, responseId = responseId,
+            expectedResponseId = responseId, physicalRead = true,
+            readOnly = true, flashQualified = false
+        )
+        val first = observed()
+        val second = observed()
+        assertEquals(
+            EcuBackupManifest.FirmwareEvidence(0x123456, 0xC1),
+            J2534LiveMemoryBackup.verifiedStableFirmware(first, second, vin)
+        )
+        for (changed in listOf(
+            observed(v = "1G1FA1RXXR0123457"),
+            observed(osId = 0x123457L),
+            observed(did = 0xC9),
+            observed(responseId = "7E9")
+        )) assertTrue(runCatching {
+            J2534LiveMemoryBackup.verifiedStableFirmware(first, changed, vin)
+        }.isFailure)
+    }
+
+    @Test fun physicalOriginCannotExportAnArchiveWithoutItsJ2534Route() = runBlocking {
+        val acquired = J2534LiveMemoryBackup.captureForTest(
+            ScriptedEcu(baseline, vin), request()
+        )
+        val physical = acquired.capture.copy(
+            origin = EcuBackupManifest.Origin.REPORTED_HARDWARE_READ
+        )
+        val physicalManifest = EcuBackupManifest.inspect(
+            "Read-only test", 1L, listOf(physical), emptySet(), vin
+        )
+        val result = J2534LiveMemoryBackup.CaptureResult(
+            physicalManifest, physical,
+            EcuBackupIntegrity.verify(physicalManifest, listOf(physical), emptySet())
+        )
+        val refused = ByteArrayOutputStream()
+        assertTrue(runCatching { result.export(refused) }.isFailure)
+        assertEquals(0, refused.size())
+        val accepted = ByteArrayOutputStream()
+        result.export(accepted, EcuBackupManifest.Channel(0x7E0, 0x7E8, 33, 1))
+        val reopened = EcuBackupArchive.import(accepted.toByteArray().inputStream())
+        assertEquals(33, reopened.manifest.channel?.protocolNumber)
+        assertFalse(reopened.manifest.hardwareProvenanceVerified)
+    }
+
+    @Test fun simulatedCaptureCanRecordRouteWithoutPromotingHardwareProvenance() = runBlocking {
+        val result = J2534LiveMemoryBackup.captureForTest(ScriptedEcu(baseline, vin), request())
+        val channel = EcuBackupManifest.Channel(0x7E0, 0x7E8, 33, 1)
+        val archive = ByteArrayOutputStream()
+        result.export(archive, channel)
+        val restored = EcuBackupArchive.import(archive.toByteArray().inputStream())
+        assertEquals(channel, restored.manifest.channel)
+        assertEquals(EcuBackupManifest.Origin.SIMULATION, restored.captures.single().origin)
+        assertFalse(restored.manifest.hardwareProvenanceVerified)
     }
 
     @Test fun modifyingBothReadBuffersCannotReplaceTheVerifiedAcquisition() = runBlocking {
@@ -176,11 +260,63 @@ class J2534LiveMemoryBackupTest {
     @Test fun reportsMonotonicProgressAcrossTwoActualReadPasses() = runBlocking {
         val snapshots = mutableListOf<J2534LiveMemoryBackup.CaptureProgress>()
         val fake = ScriptedEcu(baseline, vin)
-        val result = J2534LiveMemoryBackup.captureForTest(fake, request()) { snapshots += it }
+        val result = J2534LiveMemoryBackup.captureForTest(fake, request(), progress = { snapshots += it })
         assertTrue(result.verification.consistent)
         assertEquals(listOf(1, 1, 2, 2), snapshots.map { it.pass })
         assertEquals(listOf(0L, 300L, 300L, 600L), snapshots.map { it.totalBytesRead })
         assertTrue(snapshots.all { it.requiredBytesRead == 600L })
+    }
+
+    @Test fun diagnosticSessionRepliesRequireExactUdsTimingShape() {
+        for (session in listOf(1, 3)) {
+            assertTrue(J2534LiveMemoryBackup.isValidSessionReply(
+                byteArrayOf(0x50, session.toByte()), session))
+            assertTrue(J2534LiveMemoryBackup.isValidSessionReply(
+                byteArrayOf(0x50, session.toByte(), 0x00, 0x32, 0x01, 0xF4.toByte()), session))
+            for (bad in listOf(
+                byteArrayOf(0x50, session.toByte(), 0x00),
+                byteArrayOf(0x50, session.toByte(), 0x00, 0x32),
+                byteArrayOf(0x50, session.toByte(), 0x00, 0x32, 0x01),
+                byteArrayOf(0x50, session.toByte(), 0x00, 0x32, 0x01, 0xF4.toByte(), 0x00),
+                byteArrayOf(0x7F, 0x10, 0x12),
+                byteArrayOf(0x50, (session xor 2).toByte())
+            )) {
+                assertFalse(J2534LiveMemoryBackup.isValidSessionReply(bad, session))
+            }
+        }
+    }
+
+    @Test fun malformedExtendedSessionTimingNeverStartsMemoryRead() = runBlocking {
+        val ecu = ScriptedEcu(baseline, vin)
+        val sessions = mutableListOf<Int>()
+        val transport = object : UdsPayloadTransport by ecu {
+            override suspend fun exchange(payload: ByteArray, timeoutMs: Long): ByteArray {
+                if (payload[0] == 0x10.toByte()) {
+                    sessions += payload[1].toInt() and 0xFF
+                    if (payload[1] == 0x03.toByte()) return byteArrayOf(0x50, 0x03, 0x00)
+                }
+                return ecu.exchange(payload, timeoutMs)
+            }
+        }
+        assertTrue(runCatching {
+            J2534LiveMemoryBackup.captureForTest(transport, request(session = 3))
+        }.isFailure)
+        assertEquals(0, ecu.reads)
+        assertEquals(listOf(3, 1), sessions)
+    }
+
+    @Test fun malformedDefaultSessionTimingRejectsCompletedCapture() = runBlocking {
+        val ecu = ScriptedEcu(baseline, vin)
+        val transport = object : UdsPayloadTransport by ecu {
+            override suspend fun exchange(payload: ByteArray, timeoutMs: Long): ByteArray =
+                if (payload.contentEquals(byteArrayOf(0x10, 0x01)))
+                    byteArrayOf(0x50, 0x01, 0x00)
+                else ecu.exchange(payload, timeoutMs)
+        }
+        assertTrue(runCatching {
+            J2534LiveMemoryBackup.captureForTest(transport, request(session = 3))
+        }.isFailure)
+        assertEquals(6, ecu.reads)
     }
 
     @Test fun extendedReadSessionIsClosedAfterDoubleCapture() = runBlocking {
@@ -208,14 +344,65 @@ class J2534LiveMemoryBackupTest {
     @Test fun cancellationClosesExtendedSessionOnTheOriginalEcu() = runBlocking {
         val ecu = ScriptedEcu(baseline, vin)
         val job = launch {
-            J2534LiveMemoryBackup.captureForTest(ecu, request(session = 3)) { progress ->
+            J2534LiveMemoryBackup.captureForTest(ecu, request(session = 3), progress = { progress ->
                 if (progress.pass == 1 && progress.completedBytes == 0) this@launch.cancel()
-            }
+            })
         }
         job.join()
         assertTrue(job.isCancelled)
         assertEquals(0, ecu.reads)
         assertEquals(listOf(3, 1), ecu.sent.filter { it[0] == 0x10.toByte() }.map { it[1].toInt() })
+    }
+
+    @Test fun cancellationInsideVinCheckSafelyRevalidatesBeforeResettingSession() = runBlocking {
+        val ecu = ScriptedEcu(baseline, vin)
+        var vinChecks = 0
+        val transport = object : UdsPayloadTransport by ecu {
+            override suspend fun exchange(payload: ByteArray, timeoutMs: Long): ByteArray {
+                if (payload.contentEquals(byteArrayOf(0x22, 0xF1.toByte(), 0x90.toByte()))) {
+                    vinChecks++
+                    if (vinChecks == 2)
+                        throw CancellationException("Cancelled during VIN polling")
+                }
+                return ecu.exchange(payload, timeoutMs)
+            }
+        }
+        assertTrue(runCatching {
+            J2534LiveMemoryBackup.captureForTest(transport, request(session = 3))
+        }.exceptionOrNull() is CancellationException)
+        assertEquals(3, ecu.reads)
+        assertEquals(3, vinChecks)
+        assertEquals(
+            listOf(3, 1),
+            ecu.sent.filter { it[0] == 0x10.toByte() }.map { it[1].toInt() }
+        )
+    }
+
+    @Test fun cancellationInsideVinCheckNeverResetsAnUnidentifiedReplacement() = runBlocking {
+        val ecu = ScriptedEcu(baseline, vin)
+        var vinChecks = 0
+        val transport = object : UdsPayloadTransport by ecu {
+            override suspend fun exchange(payload: ByteArray, timeoutMs: Long): ByteArray {
+                if (payload.contentEquals(byteArrayOf(0x22, 0xF1.toByte(), 0x90.toByte()))) {
+                    vinChecks++
+                    if (vinChecks == 2)
+                        throw CancellationException("Cancelled during VIN polling")
+                    if (vinChecks == 3)
+                        return byteArrayOf(0x62, 0xF1.toByte(), 0x90.toByte()) +
+                            "1G1FA1RXXR0123457".toByteArray(Charsets.US_ASCII)
+                }
+                return ecu.exchange(payload, timeoutMs)
+            }
+        }
+        assertTrue(runCatching {
+            J2534LiveMemoryBackup.captureForTest(transport, request(session = 3))
+        }.exceptionOrNull() is CancellationException)
+        assertEquals(3, ecu.reads)
+        assertEquals(3, vinChecks)
+        assertEquals(
+            listOf(3),
+            ecu.sent.filter { it[0] == 0x10.toByte() }.map { it[1].toInt() }
+        )
     }
 
     @Test fun extendedSessionIsNeverResetAfterLiveVinMismatch() = runBlocking {
@@ -278,4 +465,191 @@ class J2534LiveMemoryBackupTest {
         }.isFailure)
         assertEquals(32, ecu.reads)
     }
+    @Test fun truncatedMemoryReplyIsRejectedWithoutCompletingBackup() = runBlocking {
+        val ecu = ScriptedEcu(baseline, vin)
+        val transport = object : UdsPayloadTransport by ecu {
+            override suspend fun exchange(payload: ByteArray, timeoutMs: Long): ByteArray {
+                val reply = ecu.exchange(payload, timeoutMs)
+                return if (payload[0] == 0x23.toByte()) reply.copyOf(reply.size - 1) else reply
+            }
+        }
+        assertTrue(runCatching {
+            J2534LiveMemoryBackup.captureForTest(transport, request())
+        }.isFailure)
+        assertEquals(1, ecu.reads)
+    }
+
+    @Test fun wrongMemoryServiceReplyIsRejectedWithoutCompletingBackup() = runBlocking {
+        val ecu = ScriptedEcu(baseline, vin)
+        val transport = object : UdsPayloadTransport by ecu {
+            override suspend fun exchange(payload: ByteArray, timeoutMs: Long): ByteArray {
+                val reply = ecu.exchange(payload, timeoutMs)
+                if (payload[0] == 0x23.toByte()) reply[0] = 0x62
+                return reply
+            }
+        }
+        assertTrue(runCatching {
+            J2534LiveMemoryBackup.captureForTest(transport, request())
+        }.isFailure)
+        assertEquals(1, ecu.reads)
+    }
+
+    @Test fun corruptedReadReplyCannotBecomeAExportableBackup() = runBlocking {
+        val ecu = ScriptedEcu(baseline, vin)
+        val transport = object : UdsPayloadTransport by ecu {
+            override suspend fun exchange(payload: ByteArray, timeoutMs: Long): ByteArray {
+                val reply = ecu.exchange(payload, timeoutMs)
+                // All first-pass chunks are unchanged; corrupt the first reply of pass 2.
+                if (payload[0] == 0x23.toByte() && ecu.reads == 4) {
+                    reply[1] = (reply[1].toInt() xor 0x01).toByte()
+                }
+                return reply
+            }
+        }
+        assertTrue(runCatching {
+            J2534LiveMemoryBackup.captureForTest(transport, request())
+        }.isFailure)
+        assertEquals(6, ecu.reads)
+    }
+
+    @Test fun connectionLossDuringMemoryReadStopsBeforeNextHardwareCommand() = runBlocking {
+        val ecu = ScriptedEcu(baseline, vin)
+        val failure = runCatching {
+            J2534LiveMemoryBackup.captureForTest(
+                ecu, request(), liveLinkValid = { ecu.reads < 1 })
+        }
+        assertTrue(failure.isFailure)
+        assertEquals(1, ecu.reads)
+        assertFalse(ecu.sent.any { it[0] == 0x10.toByte() })
+    }
+
+    @Test fun disabledReadScopePreventsAnyMemoryOrVinRequest() = runBlocking {
+        val ecu = ScriptedEcu(baseline, vin)
+        assertTrue(runCatching {
+            J2534LiveMemoryBackup.captureForTest(
+                ecu, request(), liveLinkValid = { false })
+        }.isFailure)
+        assertTrue(ecu.sent.isEmpty())
+    }
+
+    @Test fun emptyOversizedAndOverflowingReadRangesNeverContactEcu() = runBlocking {
+        val ecu = ScriptedEcu(baseline, vin)
+        val invalidRequests = listOf(
+            request(length = 0),
+            request(length = 4 * 1024 * 1024 + 1),
+            request().copy(address = -1L),
+            request().copy(address = 0x1_0000_0000L),
+            request().copy(address = 0xFFFF_FFFFL),
+            request().copy(chunkBytes = 0),
+            request().copy(chunkBytes = 257),
+            request().copy(diagnosticSession = 0)
+        )
+        for (invalid in invalidRequests) {
+            assertTrue("Invalid memory scope must fail before contacting ECU",
+                runCatching { J2534LiveMemoryBackup.captureForTest(ecu, invalid) }.isFailure)
+        }
+        assertTrue(ecu.sent.isEmpty())
+    }
+
+    @Test fun invalidVinIsRejectedBeforeAnyMemoryOrIdentificationTraffic() = runBlocking {
+        val ecu = ScriptedEcu(baseline, vin)
+        for (invalid in listOf("", "INVALID", "2G1I0000000000001")) {
+            assertTrue(runCatching {
+                J2534LiveMemoryBackup.captureForTest(ecu, request(vinOverride = invalid))
+            }.isFailure)
+        }
+        assertTrue(ecu.sent.isEmpty())
+    }
+
+    @Test fun scopedReadRevocationAfterSecondPassStillRejectsCapture() = runBlocking {
+        val ecu = ScriptedEcu(baseline, vin)
+        assertTrue(runCatching {
+            J2534LiveMemoryBackup.captureForTest(
+                ecu, request(), liveLinkValid = { ecu.reads < 6 })
+        }.isFailure)
+        assertEquals(6, ecu.reads)
+    }
+
+    @Test fun lastTwoBytesOfFourGigabyteAddressSpaceEncodeWithoutWrap() = runBlocking {
+        val requests = mutableListOf<ByteArray>()
+        val transport = object : UdsPayloadTransport {
+            override suspend fun exchange(payload: ByteArray, timeoutMs: Long): ByteArray {
+                requests += payload.copyOf()
+                return when (payload[0].toInt() and 0xFF) {
+                    0x22 -> byteArrayOf(0x62, 0xF1.toByte(), 0x90.toByte()) +
+                        vin.toByteArray(Charsets.US_ASCII)
+                    0x23 -> byteArrayOf(0x63, 0x12, 0x34)
+                    else -> error("Unexpected physical read service")
+                }
+            }
+            override suspend fun sendOnly(payload: ByteArray, timeoutMs: Long) =
+                error("A backup never sends a write-only request")
+        }
+        val result = J2534LiveMemoryBackup.captureForTest(
+            transport, request(length = 2).copy(
+                address = 0xFFFF_FFFEL, chunkBytes = 2))
+        assertEquals(0xFFFF_FFFEL, result.capture.startAddress)
+        assertTrue(result.verification.consistent)
+        assertEquals(2, requests.count { it[0] == 0x23.toByte() })
+        val memoryRequests = requests.filter { it[0] == 0x23.toByte() }
+        for (payload in memoryRequests) {
+            assertArrayEquals(byteArrayOf(0x23, 0x14,
+                0xFF.toByte(), 0xFF.toByte(), 0xFF.toByte(), 0xFE.toByte(),
+                0x02), payload)
+        }
+    }
+
+    @Test fun memoryDeniedByEcuReportsExactAddressAndNeverEscalatesPrivileges() = runBlocking {
+        for (nrc in listOf(0x31, 0x33, 0x22)) {
+            val ecu = ScriptedEcu(baseline, vin)
+            val transport = object : UdsPayloadTransport by ecu {
+                override suspend fun exchange(payload: ByteArray, timeoutMs: Long): ByteArray =
+                    if (payload[0] == 0x23.toByte())
+                        byteArrayOf(0x7F, 0x23, nrc.toByte())
+                    else ecu.exchange(payload, timeoutMs)
+            }
+            val result = runCatching {
+                J2534LiveMemoryBackup.captureForTest(transport, request())
+            }
+            val refusal = result.exceptionOrNull() as? J2534LiveMemoryBackup.ReadRefused
+            assertTrue("A physical ECU denial needs a typed error", refusal != null)
+            assertEquals(0x1000L, refusal?.requestedAddress)
+            assertEquals(128, refusal?.requestedBytes)
+            assertEquals(nrc, refusal?.nrc)
+            assertTrue(ecu.sent.none { (it[0].toInt() and 0xFF) in
+                setOf(0x27, 0x2E, 0x31, 0x34, 0x36, 0x37) })
+        }
+    }
+
+    @Test fun udsSecurityAccessRefusalNeverProducesOrExportsAMemoryBackup() = runBlocking {
+        val ecu = ScriptedEcu(baseline, vin)
+        val transport = object : UdsPayloadTransport by ecu {
+            override suspend fun exchange(payload: ByteArray, timeoutMs: Long): ByteArray =
+                if (payload[0] == 0x23.toByte())
+                    byteArrayOf(0x7F, 0x23, 0x33)
+                else ecu.exchange(payload, timeoutMs)
+        }
+        assertTrue(runCatching {
+            J2534LiveMemoryBackup.captureForTest(transport, request())
+        }.isFailure)
+        assertTrue(ecu.sent.none { it[0] == 0x27.toByte() ||
+            it[0] == 0x34.toByte() || it[0] == 0x36.toByte() })
+    }
+
+    @Test fun exportedCaptureRejectsMutationOfEitherIndividualReadBuffer() = runBlocking {
+        for (changeFirst in listOf(true, false)) {
+            val result = J2534LiveMemoryBackup.captureForTest(
+                ScriptedEcu(baseline, vin), request())
+            if (changeFirst) result.capture.firstRead[0] =
+                (result.capture.firstRead[0].toInt() xor 1).toByte()
+            else {
+                val second = requireNotNull(result.capture.independentRead)
+                second[0] = (second[0].toInt() xor 1).toByte()
+            }
+            val output = ByteArrayOutputStream()
+            assertTrue(runCatching { result.export(output) }.isFailure)
+            assertEquals(0, output.size())
+        }
+    }
+
 }

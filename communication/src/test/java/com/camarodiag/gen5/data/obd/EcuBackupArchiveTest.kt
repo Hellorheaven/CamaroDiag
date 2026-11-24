@@ -2,6 +2,7 @@ package com.camarodiag.gen5.data.obd
 
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.ByteArrayInputStream
@@ -15,6 +16,231 @@ class EcuBackupArchiveTest {
         byteArrayOf(1, 2, 3, 4), byteArrayOf(1, 2, 3, 4),
         EcuBackupManifest.Origin.IMPORTED_FILE
     )
+
+    @Test fun androidImportLimitIncludesWindowsMaximumDoubleReadAndManifest() {
+        val maximumWindowsReadBytes = 16L * 1024 * 1024
+        val independentPassBytes = 2L * maximumWindowsReadBytes
+        assertTrue(EcuBackupArchive.MAX_J2534_IMPORT_UNCOMPRESSED_BYTES > independentPassBytes)
+        assertTrue(EcuBackupArchive.MAX_J2534_IMPORT_UNCOMPRESSED_BYTES >=
+            independentPassBytes + 64L * 1024)
+        assertTrue(EcuBackupArchive.MAX_J2534_IMPORT_UNCOMPRESSED_BYTES <=
+            256L * 1024 * 1024)
+    }
+
+    @Test fun hardwareReportedArchiveWithoutVinIsNeverExported() {
+        val reported = capture().copy(
+            origin = EcuBackupManifest.Origin.REPORTED_HARDWARE_READ
+        )
+        val output = ByteArrayOutputStream()
+        assertTrue(runCatching {
+            EcuBackupArchive.export(output, listOf(reported), emptySet())
+        }.isFailure)
+        assertEquals(0, output.size())
+        EcuBackupArchive.export(
+            output, listOf(reported), emptySet(), vehicleVin = "1G1FA1RXXR0123456"
+        )
+        val imported = EcuBackupArchive.import(output.toByteArray().inputStream())
+        assertEquals("1G1FA1RXXR0123456", imported.manifest.vehicleVin)
+        assertTrue(imported.verification.consistent)
+        assertTrue(!imported.manifest.hardwareProvenanceVerified)
+    }
+
+    @Test fun firmwareOsidEvidenceRequiresPhysicalRouteAndPreservesItsReadDid() {
+        val route = EcuBackupManifest.Channel(0x7E0, 0x7E8, 33, 1)
+        val observed = EcuBackupManifest.FirmwareEvidence(0x01234567, 0xC1)
+        val physical = capture().copy(origin = EcuBackupManifest.Origin.REPORTED_HARDWARE_READ)
+        val zip = ByteArrayOutputStream()
+        EcuBackupArchive.export(
+            zip, listOf(physical), emptySet(), vehicleVin = "1G1FA1RXXR0123456",
+            channel = route, firmwareEvidence = observed
+        )
+        val forged = ByteArrayOutputStream()
+        assertTrue(runCatching {
+            EcuBackupArchive.export(
+                forged, listOf(capture()), emptySet(),
+                vehicleVin = "1G1FA1RXXR0123456",
+                channel = route, firmwareEvidence = observed
+            )
+        }.isFailure)
+        assertEquals(0, forged.size())
+        val reopened = EcuBackupArchive.import(zip.toByteArray().inputStream())
+        assertEquals(observed, reopened.manifest.firmwareEvidence)
+        assertEquals(route, reopened.manifest.channel)
+        assertTrue(!reopened.manifest.hardwareProvenanceVerified)
+
+        val unsafe = ByteArrayOutputStream()
+        assertTrue(runCatching {
+            EcuBackupArchive.export(
+                unsafe, listOf(capture()), emptySet(),
+                vehicleVin = "1G1FA1RXXR0123456", firmwareEvidence = observed
+            )
+        }.isFailure)
+        assertEquals(0, unsafe.size())
+        for (invalid in listOf(
+            { EcuBackupManifest.FirmwareEvidence(0L, 0xC1) },
+            { EcuBackupManifest.FirmwareEvidence(0xFFFFFFFFL, 0xC9) },
+            { EcuBackupManifest.FirmwareEvidence(1234L, 0x90) }
+        )) assertTrue(runCatching { invalid() }.isFailure)
+    }
+
+    @Test fun windowsV3ArchiveWithObservedOsidImportsOnAndroidAndRejectsMalformedMetadata() {
+        val bytes = byteArrayOf(0x11, 0x22, 0x33, 0x44)
+        val hash = EcuBenchExpertPlan.sha256Hex(bytes).uppercase()
+        val metadata = """
+            format=CamaroDiag ECU offline archive v3
+            vin=1G1FA1RXXR0123456
+            controller=
+            created=1795320000000
+            count=1
+            channel.requestCanId=2016
+            channel.responseCanId=2024
+            channel.protocolNumber=33
+            channel.session=3
+            ecu.osId=19088743
+            ecu.osDid=193
+            required=
+            capture.0.region=OTHER
+            capture.0.start=4096
+            capture.0.expected=4
+            capture.0.origin=REPORTED_HARDWARE_READ
+            capture.0.sha256=$hash
+            capture.0.second=true
+        """.trimIndent() + "\n"
+        fun archiveWithManifest(manifest: String): ByteArray {
+            val output = ByteArrayOutputStream()
+            ZipOutputStream(output).use { zip ->
+                for ((name, data) in listOf(
+                    "manifest.properties" to manifest.toByteArray(Charsets.US_ASCII),
+                    "capture/0/first.bin" to bytes,
+                    "capture/0/second.bin" to bytes.copyOf()
+                )) {
+                    zip.putNextEntry(ZipEntry(name))
+                    zip.write(data)
+                    zip.closeEntry()
+                }
+            }
+            return output.toByteArray()
+        }
+        val imported = EcuBackupArchive.import(archiveWithManifest(metadata).inputStream())
+        assertEquals(
+            EcuBackupManifest.Channel(0x7E0, 0x7E8, 33, 3),
+            imported.manifest.channel
+        )
+        assertEquals(
+            EcuBackupManifest.FirmwareEvidence(19088743L, 0xC1),
+            imported.manifest.firmwareEvidence
+        )
+        assertEquals(EcuBackupCoverage.Status.PARTIAL, imported.manifest.coverage.status)
+        assertTrue(imported.verification.consistent)
+        assertTrue(!imported.manifest.hardwareProvenanceVerified)
+
+        val malformed = listOf(
+            metadata.replace("channel.requestCanId=2016", "channel.requestCanId=2048"),
+            metadata.replace("channel.session=3", "channel.session=2"),
+            metadata.replace("ecu.osId=19088743\n", ""),
+            metadata.replace("ecu.osDid=193", "ecu.osDid=144"),
+            metadata.replace("ecu.osId=19088743", "ecu.osId=0"),
+            metadata.replace("required=\n", "required=OTHER\n"),
+            metadata.replace("capture.0.expected=4", "capture.0.expected=5"),
+            metadata.replace("capture.0.expected=4", "capture.0.expected=04"),
+            metadata.replace("capture.0.start=4096", "capture.0.start=04096"),
+            metadata.replace("capture.0.start=4096", "capture.0.start=4294967296"),
+            metadata.replace("capture.0.start=4096", "capture.0.start=4294967295"),
+            metadata.replace("count=1", "count=01"),
+            metadata.replace("created=1795320000000", "created=01795320000000"),
+            metadata.replace("controller=\n", "controller=ECU\\u000Abad\n"),
+            metadata.replace("controller=\n", "controller=" + "X".repeat(129) + "\n"),
+            metadata.replace("offline archive v3", "offline archive v2")
+        )
+        for (bad in malformed) {
+            assertTrue("Forged or incomplete Windows v3 metadata must be rejected",
+                runCatching { EcuBackupArchive.import(archiveWithManifest(bad).inputStream()) }.isFailure)
+        }
+    }
+
+    @Test fun portableJ2534MemoryScopesStayInside32BitAddressAnd16MiBBudget() {
+        assertTrue(EcuBackupArchive.isPortableJ2534Range(0L, 16L * 1024 * 1024))
+        assertTrue(EcuBackupArchive.isPortableJ2534Range(0xFFFF_FFFFL, 1L))
+        assertFalse(EcuBackupArchive.isPortableJ2534Range(0xFFFF_FFFFL, 2L))
+        assertFalse(EcuBackupArchive.isPortableJ2534Range(0x1_0000_0000L, 1L))
+        assertFalse(EcuBackupArchive.isPortableJ2534Range(-1L, 1L))
+        assertFalse(EcuBackupArchive.isPortableJ2534Range(0L, 0L))
+        assertFalse(EcuBackupArchive.isPortableJ2534Range(0L, 16L * 1024 * 1024 + 1))
+    }
+
+    @Test fun routedPhysicalV3ArchivesCannotClaimIncompleteMemoryOrFullEcuMap() {
+        val channel = EcuBackupManifest.Channel(0x7E0, 0x7E8, 33, 1)
+        val vin = "1G1FA1RXXR0123456"
+        val illegal = listOf(
+            { EcuBackupArchive.export(ByteArrayOutputStream(), listOf(capture()),
+                setOf(EcuBackupCoverage.Region.CALIBRATION),
+                vehicleVin = vin, channel = channel) },
+            { EcuBackupArchive.export(ByteArrayOutputStream(),
+                listOf(capture().copy(expectedBytes = 5)), emptySet(),
+                vehicleVin = vin, channel = channel) },
+            { EcuBackupArchive.export(ByteArrayOutputStream(),
+                listOf(capture().copy(startAddress = 0x1_0000_0000L)), emptySet(),
+                vehicleVin = vin, channel = channel) },
+            { EcuBackupArchive.export(ByteArrayOutputStream(),
+                listOf(capture().copy(startAddress = 0xFFFF_FFFFL)), emptySet(),
+                vehicleVin = vin, channel = channel) },
+            { EcuBackupArchive.export(ByteArrayOutputStream(),
+                listOf(capture()), emptySet(), controllerLabel = "X".repeat(129),
+                vehicleVin = vin, channel = channel) },
+            { EcuBackupArchive.export(ByteArrayOutputStream(),
+                listOf(capture()), emptySet(), controllerLabel = "ECU\nBAD",
+                vehicleVin = vin, channel = channel) }
+        )
+        for (write in illegal) assertTrue(runCatching { write() }.isFailure)
+    }
+
+    @Test fun routeBoundArchiveRetainsExactCanIdsProtocolAndSession() {
+        val channel = EcuBackupManifest.Channel(0x7E0, 0x7E8, 33, 3)
+        val zip = ByteArrayOutputStream()
+        EcuBackupArchive.export(
+            zip, listOf(capture()), emptySet(), vehicleVin = "1G1FA1RXXR0123456",
+            channel = channel
+        )
+        val imported = EcuBackupArchive.import(zip.toByteArray().inputStream())
+        assertEquals(channel, imported.manifest.channel)
+        assertEquals("1G1FA1RXXR0123456", imported.manifest.vehicleVin)
+        assertTrue(imported.verification.consistent)
+        assertTrue(!imported.manifest.hardwareProvenanceVerified)
+    }
+
+    @Test fun routedV3ArchivePreserves29BitIsoTpIdsWithoutClaimingPhysicalProof() {
+        val longCanIds = EcuBackupManifest.Channel(
+            requestCanId = 0x18DA10F1, responseCanId = 0x18DAF110,
+            protocolNumber = 34, diagnosticSession = 3
+        )
+        val output = ByteArrayOutputStream()
+        EcuBackupArchive.export(
+            output, listOf(capture()), emptySet(),
+            vehicleVin = "1G1FA1RXXR0123456", channel = longCanIds
+        )
+        val reopened = EcuBackupArchive.import(output.toByteArray().inputStream())
+        assertEquals(longCanIds, reopened.manifest.channel)
+        assertEquals(EcuBackupCoverage.Status.PARTIAL, reopened.manifest.coverage.status)
+        assertTrue(reopened.verification.consistent)
+        assertTrue(!reopened.manifest.hardwareProvenanceVerified)
+    }
+
+    @Test fun invalidPhysicalRouteShapeIsRejectedBeforeZipWriting() {
+        for (illegal in listOf(
+            { EcuBackupManifest.Channel(0x7E0, 0x7E0, 33, 1) },
+            { EcuBackupManifest.Channel(0x800, 0x7E8, 33, 1) },
+            { EcuBackupManifest.Channel(0x18DAF110.toInt(), 0x18DA10F1.toInt(), 33, 1) },
+            { EcuBackupManifest.Channel(0x7E0, 0x7E8, 33, 2) }
+        )) assertTrue(runCatching { illegal() }.isFailure)
+        val zip = ByteArrayOutputStream()
+        assertTrue(runCatching {
+            EcuBackupArchive.export(
+                zip, listOf(capture()), emptySet(),
+                channel = EcuBackupManifest.Channel(0x7E0, 0x7E8, 33, 1)
+            )
+        }.isFailure)
+        assertEquals(0, zip.size())
+    }
 
     @Test fun exportAndImportPreserveBytesAndCoverage() {
         val archive = ByteArrayOutputStream()
@@ -219,6 +445,46 @@ class EcuBackupArchiveTest {
         }.isFailure)
     }
 
+    @Test fun duplicateRequiredRegionsAndNonpositiveTimestampsAreRejected() {
+        val output = ByteArrayOutputStream()
+        assertTrue(runCatching {
+            EcuBackupArchive.export(output, listOf(capture()),
+                setOf(EcuBackupCoverage.Region.CALIBRATION), createdAtUtcMillis = 0)
+        }.isFailure)
+        assertEquals(0, output.size())
+
+        val original = ByteArrayOutputStream()
+        EcuBackupArchive.export(original, listOf(capture()),
+            setOf(EcuBackupCoverage.Region.CALIBRATION))
+        fun repackage(change: (String) -> String): ByteArray {
+            val modified = ByteArrayOutputStream()
+            java.util.zip.ZipInputStream(original.toByteArray().inputStream()).use { source ->
+                ZipOutputStream(modified).use { target ->
+                    while (true) {
+                        val entry = source.nextEntry ?: break
+                        val data = source.readBytes()
+                        target.putNextEntry(ZipEntry(entry.name))
+                        if (entry.name == "manifest.properties") {
+                            target.write(change(String(data, Charsets.ISO_8859_1))
+                                .toByteArray(Charsets.ISO_8859_1))
+                        } else target.write(data)
+                        target.closeEntry()
+                        source.closeEntry()
+                    }
+                }
+            }
+            return modified.toByteArray()
+        }
+        val duplicated = repackage {
+            it.replace("required=CALIBRATION", "required=CALIBRATION,CALIBRATION")
+        }
+        assertTrue(runCatching { EcuBackupArchive.import(duplicated.inputStream()) }.isFailure)
+        val invalidTime = repackage {
+            it.replace(Regex("(?m)^created=[0-9]+$"), "created=0")
+        }
+        assertTrue(runCatching { EcuBackupArchive.import(invalidTime.inputStream()) }.isFailure)
+    }
+
     @Test fun exportUsesFrozenBytesWhenCallerMutatesBufferDuringZipWrite() {
         val initial = capture()
         val destination = ByteArrayOutputStream()
@@ -326,6 +592,118 @@ class EcuBackupArchiveTest {
         assertTrue(!EcuBackupArchive.fitsUncompressedLimit(-1L, 0L))
         assertTrue(!EcuBackupArchive.fitsUncompressedLimit(0L, -1L))
         assertTrue(!EcuBackupArchive.fitsUncompressedLimit(Long.MAX_VALUE, 1L))
+    }
+
+    @Test fun refusesAnInterruptedZipMissingItsCentralDirectoryOrFooter() {
+        val original = ByteArrayOutputStream()
+        EcuBackupArchive.export(original, listOf(capture()), setOf(capture().region))
+        val bytes = original.toByteArray()
+        val central = bytes.indices.firstOrNull { index ->
+            index + 3 < bytes.size && bytes[index] == 0x50.toByte() &&
+                bytes[index + 1] == 0x4B.toByte() &&
+                bytes[index + 2] == 0x01.toByte() &&
+                bytes[index + 3] == 0x02.toByte()
+        } ?: error("Expected ZIP central directory")
+        // ZipInputStream can decode local files even if this entire section
+        // is missing; a verified ECU backup must reject such a truncated ZIP.
+        for (truncated in listOf(bytes.copyOf(central), bytes.copyOf(bytes.size - 22),
+            bytes.copyOf(bytes.size - 1))) {
+            assertTrue(runCatching {
+                EcuBackupArchive.import(truncated.inputStream())
+            }.isFailure)
+        }
+        assertTrue(EcuBackupArchive.import(bytes.inputStream()).verification.consistent)
+    }
+
+    @Test fun refusesCentralDirectoryNameThatDisagreesWithLocalVerifiedFiles() {
+        val original = ByteArrayOutputStream()
+        EcuBackupArchive.export(original, listOf(capture()), setOf(capture().region))
+        val altered = original.toByteArray().copyOf()
+        val signature = byteArrayOf(0x50, 0x4B, 0x01, 0x02)
+        val index = altered.indices.firstOrNull { i ->
+            i + signature.size <= altered.size &&
+                altered.copyOfRange(i, i + signature.size).contentEquals(signature)
+        } ?: error("Missing central file header")
+        // Central name begins 46 bytes after its header.
+        altered[index + 46] = 'X'.code.toByte()
+        assertTrue(runCatching { EcuBackupArchive.import(altered.inputStream()) }.isFailure)
+    }
+
+    @Test fun acceptsCompleteZipWithAStandardEndOfCentralDirectoryComment() {
+        val original = ByteArrayOutputStream()
+        EcuBackupArchive.export(original, listOf(capture()), setOf(capture().region))
+        val commented = ByteArrayOutputStream()
+        java.util.zip.ZipInputStream(original.toByteArray().inputStream()).use { source ->
+            ZipOutputStream(commented).use { target ->
+                target.setComment("CamaroDiag complete ECU archive")
+                while (true) {
+                    val entry = source.nextEntry ?: break
+                    target.putNextEntry(ZipEntry(entry.name))
+                    target.write(source.readBytes())
+                    target.closeEntry()
+                    source.closeEntry()
+                }
+            }
+        }
+        val read = EcuBackupArchive.import(commented.toByteArray().inputStream())
+        assertTrue(read.verification.consistent)
+        assertEquals(EcuBackupCoverage.Status.COMPLETE, read.manifest.coverage.status)
+    }
+
+    @Test fun refusesCentralDirectoryWithForgedEntryCountOrOffset() {
+        val archive = ByteArrayOutputStream()
+        EcuBackupArchive.export(archive, listOf(capture()), setOf(capture().region))
+        val original = archive.toByteArray()
+        val end = original.size - 22
+        assertTrue(original[end] == 0x50.toByte() && original[end + 1] == 0x4B.toByte())
+        for (offset in listOf(10, 16)) {
+            val altered = original.copyOf()
+            altered[end + offset] = (altered[end + offset].toInt() xor 1).toByte()
+            assertTrue(runCatching {
+                EcuBackupArchive.import(altered.inputStream())
+            }.isFailure)
+        }
+    }
+
+    @Test fun rejectsBytesAppendedAfterTheCompletedZipFooter() {
+        val archive = ByteArrayOutputStream()
+        EcuBackupArchive.export(archive, listOf(capture()), setOf(capture().region))
+        val original = archive.toByteArray()
+        val extraneous = original + byteArrayOf(0x00, 0x50, 0x4B, 0x05, 0x06)
+        assertTrue(runCatching {
+            EcuBackupArchive.import(extraneous.inputStream())
+        }.isFailure)
+        assertTrue(EcuBackupArchive.import(original.inputStream()).verification.consistent)
+    }
+
+    @Test fun centralDirectoryCheckWorksWhenCompressedDataExceedsTailBuffer() {
+        val random = ByteArray(1024 * 1024)
+        java.util.Random(42L).nextBytes(random)
+        val archive = ByteArrayOutputStream()
+        ZipOutputStream(archive).use { zip ->
+            for (name in listOf("manifest.properties", "capture/0/first.bin")) {
+                zip.putNextEntry(ZipEntry(name))
+                zip.write(random)
+                zip.closeEntry()
+            }
+        }
+        val data = archive.toByteArray()
+        assertTrue(data.size > 512 * 1024)
+        fun isFinished(bytes: ByteArray): Boolean = runCatching {
+            val tracked = EcuZipCompletionGuard(bytes.inputStream(), 8L * 1024 * 1024)
+            val names = mutableListOf<String>()
+            java.util.zip.ZipInputStream(tracked).use { zip ->
+                while (true) {
+                    val entry = zip.nextEntry ?: break
+                    names += entry.name
+                    zip.readBytes()
+                    zip.closeEntry()
+                }
+                tracked.requireCompletedArchive(names)
+            }
+        }.isSuccess
+        assertTrue(isFinished(data))
+        assertTrue(!isFinished(data.copyOf(data.size - 22)))
     }
 
 }

@@ -12,7 +12,7 @@ Sous-projet logiciel de **[CamaroDiag](https://github.com/Hellorheaven/CamaroDia
 - **MCU internes** : méthodes BOOT/BDM/Nexus/JTAG distinctes des EEPROM externes ; ne pas supposer de compatibilité à partir du nom d'un ECU.
 
 ## État actuel
-Le firmware ESP32-S3 fournit uniquement `PING`, `CAPS` et `STATUS`, en variantes ASCII et binaire distinctes ; toutes les fonctions véhicule/écriture restent désactivées. Le prototype STM32G474 démarre avec signaux cibles inactifs et diagnostic ST-LINK. Le client Python propose découverte USB, sauvegardes et planification de patches hors ligne, transport TLS 1.3 de référence sur socket et journal de programmation de simulation. Le client Android USB Host CDC est un prototype de découverte autonome, à qualifier sur carte réelle. Aucun accès physique ECU, SPI interprocesseur ou CAN réel n'est activé.
+Les variantes de découverte ASCII et binaire du firmware ESP32-S3 fournissent uniquement `PING`, `CAPS` et `STATUS`. L'export matériel de checkpoints CDJ/USB/1 est différé au chantier Connectors C5 ; l'inspection hors ligne reste disponible. Toutes les fonctions véhicule et les commandes d’écriture restent désactivées. Le prototype STM32G474 démarre avec signaux cibles inactifs et diagnostic ST-LINK. Le client Python propose découverte USB, sauvegardes et planification de patches hors ligne, transport TLS 1.3 de référence sur socket et journal de programmation de simulation. Le client Android USB Host CDC est un prototype de découverte autonome, à qualifier sur carte réelle. Aucun accès physique ECU, SPI interprocesseur ou CAN réel n'est activé.
 
 | Dossier | Contenu |
 |---|---|
@@ -33,7 +33,7 @@ python -m unittest discover -s tests -v
 Voir [découverte USB binaire](docs/user/usb-binary-discovery.md) et [Android](host/android/README.md). Pour tenter la découverte USB sur une carte ESP32-S3 **isolée du véhicule** : flasher `firmware/esp32s3` avec PlatformIO (compilation et qualification physique distinctes), installer `pyserial`, puis `python -m camarodiagconnectors --port COM5 ping`.
 
 ## Gouvernance
-Code, tests et suivi logiciel centralisés dans CamaroDiag (#80, PR #70). Matériel, schémas, PCB et documents de validation également centralisés ici. [Ancien dépôt historique](https://github.com/Hellorheaven/CamaroDiagConnectors). Exécuter les commandes depuis `connectors/`.
+Code, tests et suivi logiciel centralisés dans CamaroDiag (#80, PR #95). Matériel, schémas, PCB et documents de validation également centralisés ici. Exécuter les commandes depuis `connectors/`.
 
 Aucune licence open source choisie pour le moment. Ne pas publier de dumps, clés ou images firmware GM ni des données véhicules privées.
 

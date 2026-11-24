@@ -27,12 +27,10 @@ import com.camarodiag.gen5.R
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.Source
+import com.google.firebase.functions.FirebaseFunctions
 import com.google.firebase.auth.EmailAuthProvider
 import com.google.firebase.auth.GoogleAuthProvider
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.delay
 import androidx.compose.ui.platform.LocalConfiguration
 
 /**
@@ -64,34 +62,23 @@ fun CamaroAuthGate(
     var validationError by remember { mutableStateOf<String?>(null) }
     var verificationRequired by remember { mutableStateOf(false) }
     var accessLevel by remember { mutableStateOf(LicenseLevel.FREE) }
+    var accountAdminAllowed by remember { mutableStateOf(false) }
+    var licenseChecked by remember { mutableStateOf<Boolean?>(null) }
+    var licenseSource by remember { mutableStateOf<String?>(null) }
     var retryValidation by remember { mutableIntStateOf(0) }
     var validationGeneration by remember { mutableIntStateOf(0) }
     val latestOnAccountChanged by rememberUpdatedState(onAccountChanged)
-    // Delay diagnostic UI until the old user's active connection and transient
-    // diagnostic results have been cleared by the ViewModel.
-    // Reconfirm authorization periodically, even when the app remains open.
-    // This also enforces the bounded offline grace without needing a restart.
-    LaunchedEffect(user?.uid) {
-        if (user == null) return@LaunchedEffect
-        while (true) {
-            delay(5L * 60L * 1000L)
-            retryValidation++
-        }
-    }
+    // Check Firebase only on app startup, account changes or manual retry.
     LaunchedEffect(user, retryValidation) {
         // A late callback from the previous FirebaseUser instance or retry may
         // never authenticate a different validation attempt with the same UID.
         val attempt = ++validationGeneration
-        // Refreshing the current user's token must not unmount the diagnostic
-        // screen every five minutes. Only an identity change hides old data.
         val identityChanged = readyAccountUid != user?.uid ||
             (validatedUser != null && validatedUser !== user)
-        // Preserve the current account's verified tier during a periodic token
-        // refresh: otherwise owner-only Debug tabs disappear every five minutes
-        // and ongoing diagnostic navigation is interrupted. Account changes
-        // still revoke all privileges immediately. A failed refresh below
-        // separately revokes owner privileges and applies offline-grace rules.
         if (identityChanged) {
+            accountAdminAllowed = false
+            licenseChecked = null
+            licenseSource = null
             accessLevel = LicenseLevel.FREE
             readyAccountUid = null
             validatedAccountUid = null
@@ -115,6 +102,9 @@ fun CamaroAuthGate(
                     if (verificationRequired) {
                         // Keep the signed-in Firebase session for verification only. Do not expose
                         // diagnostics, previous account state, owner access or offline grace.
+                        accountAdminAllowed = false
+                        licenseChecked = null
+                        licenseSource = null
                         accessLevel = LicenseLevel.FREE
                         validationPrefs.edit { remove("verified_$targetUid"); remove("verified_email_$targetUid") }
                         validatedAccountUid = targetUid
@@ -122,6 +112,7 @@ fun CamaroAuthGate(
                         latestOnAccountChanged(null)
                         return@addOnCompleteListener
                     }
+                    accountAdminAllowed = AccountAdminAccessPolicy.isAllowed(verifiedClaims)
                     // Owner claim is signed by Firebase Admin. Paying users
                     // require a SECOND proof from Firestore's SERVER, never cache.
                     accessLevel = if (!LicenseRolloutConfig.ENABLED) {
@@ -137,39 +128,29 @@ fun CamaroAuthGate(
                         signedClaims = verifiedClaims,
                         license = null
                     )
-                    if (LicenseRolloutConfig.ENABLED && accessLevel != LicenseLevel.OWNER &&
-                        verifiedClaims[LicenseAccessPolicy.PREMIUM_CLAIM] == true
-                    ) {
-                        FirebaseFirestore.getInstance().collection("licenses")
-                            .document(targetUid).get(Source.SERVER)
+                    if (accessLevel == LicenseLevel.OWNER) {
+                        licenseChecked = true
+                        licenseSource = "owner"
+                    } else if (LicenseRolloutConfig.ENABLED) {
+                        // One server entitlement read per startup, account change,
+                        // or explicit refresh. Never re-query just to show My Account.
+                        licenseChecked = null
+                        licenseSource = null
+                        FirebaseFunctions.getInstance("europe-west1")
+                            .getHttpsCallable("getMyLicenseStatus").call()
                             .addOnCompleteListener { licenseTask ->
                                 if (auth.currentUser?.uid != targetUid ||
                                     validationGeneration != attempt
                                 ) return@addOnCompleteListener
-                                // Task.result throws if the request failed. A network
-                                // error, permission denial or missing record must
-                                // simply leave the entitlement locked.
-                                val snapshot = if (licenseTask.isSuccessful) {
-                                    licenseTask.result?.takeIf { it.exists() }
-                                } else null
-                                val licenseRecord = snapshot?.let {
-                                    ServerLicenseRecord(
-                                        uid = it.getString("uid").orEmpty(),
-                                        emailLower = it.getString("emailLower").orEmpty(),
-                                        status = it.getString("status").orEmpty(),
-                                        kind = it.getString("kind").orEmpty(),
-                                        expiresAtEpochMillis = it.getTimestamp("expiresAt")?.toDate()?.time,
-                                        verifiedFromServer = !it.metadata.isFromCache
-                                    )
-                                }
-                                accessLevel = LicenseAccessPolicy.resolve(
-                                    uid = targetUid,
-                                    email = user.email,
-                                    emailVerified = verifiedEmail,
-                                    providerIds = providerIds,
-                                    signedClaims = verifiedClaims,
-                                    license = licenseRecord
-                                )
+                                val data = if (licenseTask.isSuccessful)
+                                    licenseTask.result?.data as? Map<*, *> else null
+                                val confirmed = data?.get("verified") == true &&
+                                    data["licensed"] is Boolean
+                                licenseChecked = confirmed
+                                licenseSource = if (confirmed)
+                                    data?.get("source") as? String else null
+                                accessLevel = if (confirmed && data?.get("licensed") == true)
+                                    LicenseLevel.PREMIUM else LicenseLevel.FREE
                             }
                     }
                     validationPrefs.edit {
@@ -181,7 +162,10 @@ fun CamaroAuthGate(
                     validatedUser = user
                     latestOnAccountChanged(targetUid)
                 } else {
-                    // An offline grace period can allow ordinary diagnostics, never owner tests.
+                    // Failed validation: never retain a previously granted Premium entitlement.
+                    accountAdminAllowed = false
+                    licenseChecked = false
+                    licenseSource = null
                     accessLevel = LicenseLevel.FREE
                     val lastValidated = validationPrefs.getLong("verified_$targetUid", 0L)
                     val previousEmail = validationPrefs.getString("verified_email_$targetUid", null)
@@ -253,11 +237,12 @@ fun CamaroAuthGate(
         }
     } else {
         var accountOpen by remember(user.uid) { mutableStateOf(false) }
+        var administrationOpen by remember(user.uid) { mutableStateOf(false) }
         var deleteConfirm by remember(user.uid) { mutableStateOf(false) }
         var deleting by remember(user.uid) { mutableStateOf(false) }
         var deleteError by remember(user.uid) { mutableStateOf(false) }
         var linking by remember(user.uid) { mutableStateOf(false) }
-        var linkPassword by remember(user.uid) { mutableStateOf("") }
+        var changePasswordOpen by remember(user.uid) { mutableStateOf(false) }
         var linkMessage by remember(user.uid) { mutableStateOf("") }
         var accountRevision by remember(user.uid) { mutableIntStateOf(0) }
         val context = LocalContext.current
@@ -283,13 +268,24 @@ fun CamaroAuthGate(
                 onDismissRequest = { accountOpen = false },
                 title = { Text(if (french) "Mon compte" else "My account") },
                 text = {
-                    Column {
+                    Column(Modifier.verticalScroll(rememberScrollState())) {
                         Text(user.email.orEmpty())
                         Spacer(Modifier.height(8.dp))
                         Text(
                             if (french) "Connexion : $provider" else "Signed in with: $provider",
                             style = MaterialTheme.typography.bodyMedium
                         )
+                        Spacer(Modifier.height(8.dp))
+                        AccountLicenseStatus(french, accessLevel, licenseChecked, licenseSource)
+                        if (accountAdminAllowed) {
+                            Spacer(Modifier.height(8.dp))
+                            TextButton(onClick = {
+                                accountOpen = false
+                                administrationOpen = true
+                            }) {
+                                Text(if (french) "Administration des comptes" else "Account administration")
+                            }
+                        }
                         Spacer(Modifier.height(12.dp))
                         if (passwordLinked && !googleLinked && user.isEmailVerified) {
                             TextButton(enabled = !linking, onClick = {
@@ -343,32 +339,15 @@ fun CamaroAuthGate(
                                 }
                             }) { Text(if (french) "Lier mon compte Google" else "Link my Google account") }
                         }
-                        if (googleLinked && !passwordLinked && !user.email.isNullOrBlank()) {
-                            OutlinedTextField(
-                                value = linkPassword,
-                                onValueChange = { linkPassword = it },
-                                singleLine = true,
-                                label = { Text(if (french) "Créer un mot de passe" else "Create a password") },
-                                visualTransformation = PasswordVisualTransformation()
-                            )
-                            TextButton(enabled = !linking && linkPassword.length >= 6, onClick = {
-                                linking = true
-                                linkMessage = ""
-                                val credential = EmailAuthProvider.getCredential(user.email!!, linkPassword)
-                                user.linkWithCredential(credential).addOnCompleteListener { result ->
-                                    linking = false
-                                    linkPassword = ""
-                                    if (result.isSuccessful) { accountRevision++; retryValidation++ }
-                                    linkMessage = if (result.isSuccessful) {
-                                        if (french) "Connexion e-mail ajoutée." else "Email sign-in added."
-                                    } else {
-                                        if (french) "Impossible d'ajouter ce mot de passe."
-                                        else "Unable to add email password sign-in."
-                                    }
-                                }
-                            }) { Text(if (french) "Ajouter la connexion e-mail" else "Add email sign-in") }
-                        }
                         if (linkMessage.isNotEmpty()) Text(linkMessage)
+                        if (PasswordAccountPolicy.isEmailPasswordAccount(user.providerData.map { it.providerId })) {
+                            TextButton(enabled = !deleting && !linking, onClick = {
+                                accountOpen = false
+                                changePasswordOpen = true
+                            }) {
+                                Text(if (french) "Changer mon mot de passe" else "Change my password")
+                            }
+                        }
                         Spacer(Modifier.height(12.dp))
                         TextButton(enabled = !deleting && !linking, onClick = {
                             accountOpen = false
@@ -393,6 +372,121 @@ fun CamaroAuthGate(
                     TextButton(onClick = { accountOpen = false }) {
                         Text(if (french) "Fermer" else "Close")
                     }
+                }
+            )
+        }
+        if (administrationOpen && accountAdminAllowed) {
+            AccountAdministrationDialog(french) { administrationOpen = false }
+        }
+        if (changePasswordOpen &&
+            PasswordAccountPolicy.isEmailPasswordAccount(user.providerData.map { it.providerId })
+        ) {
+            // Password entry exists only in the e-mail account flow. Google-backed
+            // accounts (including mixed providers) never expose password controls.
+            var oldPassword by remember(user.uid) { mutableStateOf("") }
+            var newPassword by remember(user.uid) { mutableStateOf("") }
+            var confirmPassword by remember(user.uid) { mutableStateOf("") }
+            var changing by remember(user.uid) { mutableStateOf(false) }
+            var changed by remember(user.uid) { mutableStateOf(false) }
+            var error by remember(user.uid) { mutableStateOf(false) }
+            val eligible = PasswordAccountPolicy.canChange(oldPassword, newPassword, confirmPassword)
+            AlertDialog(
+                onDismissRequest = { if (!changing) changePasswordOpen = false },
+                title = { Text(if (french) "Changer mon mot de passe" else "Change my password") },
+                text = {
+                    Column(
+                        modifier = Modifier.verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        if (changed) {
+                            Text(if (french) "Mot de passe modifié. Votre compte est conservé."
+                                else "Password updated. Your account has been preserved.")
+                        } else {
+                            OutlinedTextField(
+                                value = oldPassword, onValueChange = { oldPassword = it },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true, enabled = !changing,
+                                label = { Text(if (french) "Mot de passe actuel" else "Current password") },
+                                visualTransformation = PasswordVisualTransformation()
+                            )
+                            OutlinedTextField(
+                                value = newPassword, onValueChange = { newPassword = it },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true, enabled = !changing,
+                                label = { Text(if (french) "Nouveau mot de passe" else "New password") },
+                                visualTransformation = PasswordVisualTransformation()
+                            )
+                            OutlinedTextField(
+                                value = confirmPassword, onValueChange = { confirmPassword = it },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true, enabled = !changing,
+                                label = { Text(if (french) "Confirmer le nouveau mot de passe"
+                                    else "Confirm new password") },
+                                visualTransformation = PasswordVisualTransformation()
+                            )
+                            if (newPassword.isNotEmpty() && newPassword.length < 8) {
+                                Text(if (french) "Au moins 8 caractères requis."
+                                    else "At least 8 characters are required.")
+                            }
+                            if (confirmPassword.isNotEmpty() && newPassword != confirmPassword) {
+                                Text(if (french) "Les deux saisies sont différentes."
+                                    else "The new passwords do not match.",
+                                    color = MaterialTheme.colorScheme.error)
+                            }
+                            if (error) {
+                                Text(if (french) "Modification refusée. Vérifiez l'ancien mot de passe et la connexion."
+                                    else "Change failed. Check the current password and connection.",
+                                    color = MaterialTheme.colorScheme.error)
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    if (!changed) {
+                        TextButton(enabled = !changing && eligible, onClick = {
+                            val pendingUser = auth.currentUser
+                            val address = user.email
+                            if (pendingUser !== user || address.isNullOrBlank()) {
+                                error = true
+                                return@TextButton
+                            }
+                            changing = true
+                            error = false
+                            val current = oldPassword
+                            val replacement = newPassword
+                            // Firebase requires recent proof of the password before changing it.
+                            // No credential, password or security token is persisted locally.
+                            pendingUser.reauthenticate(
+                                EmailAuthProvider.getCredential(address, current)
+                            ).addOnCompleteListener { reauthenticated ->
+                                if (auth.currentUser !== pendingUser) {
+                                    changing = false
+                                    return@addOnCompleteListener
+                                }
+                                if (!reauthenticated.isSuccessful) {
+                                    changing = false
+                                    error = true
+                                    return@addOnCompleteListener
+                                }
+                                pendingUser.updatePassword(replacement).addOnCompleteListener { updated ->
+                                    changing = false
+                                    if (auth.currentUser !== pendingUser) return@addOnCompleteListener
+                                    if (updated.isSuccessful) {
+                                        oldPassword = ""
+                                        newPassword = ""
+                                        confirmPassword = ""
+                                        changed = true
+                                        retryValidation++
+                                    } else error = true
+                                }
+                            }
+                        }) { Text(if (french) "Enregistrer" else "Save") }
+                    }
+                },
+                dismissButton = {
+                    TextButton(enabled = !changing, onClick = {
+                        changePasswordOpen = false
+                    }) { Text(if (french) "Fermer" else "Close") }
                 }
             )
         }
@@ -453,6 +547,9 @@ private fun CamaroLoginScreen(auth: FirebaseAuth) {
     var busy by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf("") }
     var register by remember { mutableStateOf(false) }
+    // Google is the default sign-in route. Password fields require an explicit
+    // choice of the independent e-mail/password route.
+    var emailMode by remember { mutableStateOf(false) }
 
     fun finishError() {
         busy = false
@@ -469,75 +566,90 @@ private fun CamaroLoginScreen(auth: FirebaseAuth) {
         Spacer(Modifier.height(12.dp))
         Text(if (french) "Connectez-vous pour accéder au diagnostic" else "Sign in to access diagnostics")
         Spacer(Modifier.height(20.dp))
-        OutlinedTextField(value = email, onValueChange = { email = it }, singleLine = true,
-            label = { Text(if (french) "Adresse e-mail" else "Email address") },
-            modifier = Modifier.fillMaxWidth())
-        Spacer(Modifier.height(8.dp))
-        OutlinedTextField(value = password, onValueChange = { password = it }, singleLine = true,
-            visualTransformation = PasswordVisualTransformation(),
-            label = { Text(if (french) "Mot de passe" else "Password") },
-            modifier = Modifier.fillMaxWidth())
-        Spacer(Modifier.height(12.dp))
-        Button(
-            enabled = !busy && email.isNotBlank() && password.isNotBlank(),
-            onClick = {
-                busy = true
-                message = ""
-                val normalizedEmail = email.trim()
-                if (register) {
-                    auth.createUserWithEmailAndPassword(normalizedEmail, password)
-                        .addOnCompleteListener { task ->
-                            busy = false
-                            if (task.isSuccessful) {
-                                val registeredUser = auth.currentUser
-                                if (registeredUser == null) {
-                                    finishError()
-                                } else {
-                                    // Do not claim the verification email was sent before
-                                    // Firebase confirms the request actually succeeded.
-                                    auth.setLanguageCode(if (french) "fr" else "en")
-                                    registeredUser.sendEmailVerification().addOnCompleteListener { sent ->
-                                        if (auth.currentUser?.uid != registeredUser.uid) return@addOnCompleteListener
-                                        message = if (sent.isSuccessful) {
-                                            if (french) "Compte créé. Vérifiez votre boîte e-mail."
-                                            else "Account created. Check your email for verification."
-                                        } else {
-                                            if (french) "Compte créé, mais l'envoi de l'e-mail a échoué. Réessayez depuis l'écran de vérification."
-                                            else "Account created, but the verification email could not be sent. Retry from the verification screen."
+        TextButton(enabled = !busy, onClick = {
+            emailMode = !emailMode
+            email = ""
+            password = ""
+            register = false
+            message = ""
+        }) {
+            Text(if (emailMode) {
+                if (french) "Utiliser Google plutôt" else "Use Google instead"
+            } else {
+                if (french) "Connexion avec e-mail et mot de passe" else "Sign in with email and password"
+            })
+        }
+        if (emailMode) {
+            OutlinedTextField(value = email, onValueChange = { email = it }, singleLine = true,
+                label = { Text(if (french) "Adresse e-mail" else "Email address") },
+                modifier = Modifier.fillMaxWidth())
+            Spacer(Modifier.height(8.dp))
+            OutlinedTextField(value = password, onValueChange = { password = it }, singleLine = true,
+                visualTransformation = PasswordVisualTransformation(),
+                label = { Text(if (french) "Mot de passe" else "Password") },
+                modifier = Modifier.fillMaxWidth())
+            Spacer(Modifier.height(12.dp))
+            Button(
+                enabled = !busy && email.isNotBlank() && password.isNotBlank(),
+                onClick = {
+                    busy = true
+                    message = ""
+                    val normalizedEmail = email.trim()
+                    if (register) {
+                        auth.createUserWithEmailAndPassword(normalizedEmail, password)
+                            .addOnCompleteListener { task ->
+                                busy = false
+                                if (task.isSuccessful) {
+                                    val registeredUser = auth.currentUser
+                                    if (registeredUser == null) {
+                                        finishError()
+                                    } else {
+                                        // Do not claim the verification email was sent before
+                                        // Firebase confirms the request actually succeeded.
+                                        auth.setLanguageCode(if (french) "fr" else "en")
+                                        registeredUser.sendEmailVerification().addOnCompleteListener { sent ->
+                                            if (auth.currentUser?.uid != registeredUser.uid) return@addOnCompleteListener
+                                            message = if (sent.isSuccessful) {
+                                                if (french) "Compte créé. Vérifiez votre boîte e-mail."
+                                                else "Account created. Check your email for verification."
+                                            } else {
+                                                if (french) "Compte créé, mais l'envoi de l'e-mail a échoué. Réessayez depuis l'écran de vérification."
+                                                else "Account created, but the verification email could not be sent. Retry from the verification screen."
+                                            }
                                         }
                                     }
-                                }
-                            } else finishError()
-                        }
-                } else {
-                    auth.signInWithEmailAndPassword(normalizedEmail, password)
-                        .addOnCompleteListener { task ->
-                            busy = false
-                            if (!task.isSuccessful) finishError()
-                        }
-                }
-            },
-            modifier = Modifier.fillMaxWidth()
-        ) { Text(if (register) { if (french) "Créer mon compte" else "Create account" }
-                 else { if (french) "Se connecter" else "Sign in" }) }
-        TextButton(enabled = !busy, onClick = { register = !register; message = "" }) {
-            Text(if (register) { if (french) "J'ai déjà un compte" else "I already have an account" }
-                 else { if (french) "Créer un compte e-mail" else "Create an email account" })
-        }
-        TextButton(enabled = !busy && email.isNotBlank(), onClick = {
-            busy = true
-            auth.setLanguageCode(if (french) "fr" else "en")
-            auth.sendPasswordResetEmail(email.trim()).addOnCompleteListener { task ->
-                busy = false
-                message = if (task.isSuccessful) {
-                    if (french) "Si ce compte existe, un e-mail de réinitialisation a été envoyé."
-                    else "If this account exists, a reset email was sent."
-                } else {
-                    if (french) "Impossible d'envoyer l'e-mail pour le moment."
-                    else "Unable to send the email right now."
-                }
+                                } else finishError()
+                            }
+                    } else {
+                        auth.signInWithEmailAndPassword(normalizedEmail, password)
+                            .addOnCompleteListener { task ->
+                                busy = false
+                                if (!task.isSuccessful) finishError()
+                            }
+                    }
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) { Text(if (register) { if (french) "Créer mon compte" else "Create account" }
+                     else { if (french) "Se connecter" else "Sign in" }) }
+            TextButton(enabled = !busy, onClick = { register = !register; message = "" }) {
+                Text(if (register) { if (french) "J'ai déjà un compte" else "I already have an account" }
+                     else { if (french) "Créer un compte e-mail" else "Create an email account" })
             }
-        }) { Text(if (french) "Mot de passe oublié ?" else "Forgot password?") }
+            TextButton(enabled = !busy && email.isNotBlank(), onClick = {
+                busy = true
+                auth.setLanguageCode(if (french) "fr" else "en")
+                auth.sendPasswordResetEmail(email.trim()).addOnCompleteListener { task ->
+                    busy = false
+                    message = if (task.isSuccessful) {
+                        if (french) "Si ce compte existe, un e-mail de réinitialisation a été envoyé."
+                        else "If this account exists, a reset email was sent."
+                    } else {
+                        if (french) "Impossible d'envoyer l'e-mail pour le moment."
+                        else "Unable to send the email right now."
+                    }
+                }
+            }) { Text(if (french) "Mot de passe oublié ?" else "Forgot password?") }
+        }
         HorizontalDivider(Modifier.padding(vertical = 12.dp))
         OutlinedButton(
             enabled = !busy,

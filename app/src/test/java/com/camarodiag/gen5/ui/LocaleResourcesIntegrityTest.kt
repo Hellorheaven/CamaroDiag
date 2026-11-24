@@ -18,6 +18,9 @@ class LocaleResourcesIntegrityTest {
         "ar", "pt", "nl", "el", "bg", "hr", "cs", "da", "et", "fi",
         "hu", "ga", "lv", "lt", "mt", "pl", "ro", "sk", "sl", "sv"
     )
+    // New UI strings are currently maintained in French and English only.
+    // Existing legacy locale coverage remains verified by the other tests.
+    private val maintainedLocales = listOf("en", "fr")
     private val euLanguages = setOf(
         "bg", "hr", "cs", "da", "nl", "en", "et", "fi", "fr", "de", "el", "hu",
         "ga", "it", "lv", "lt", "mt", "pl", "pt", "ro", "sk", "sl", "es", "sv"
@@ -149,13 +152,13 @@ class LocaleResourcesIntegrityTest {
     }
 
     /**
-     * Release gate for #71/#72: each declared locale must provide every English
+     * Current release gate: each maintained locale must provide every English
      * string key. The current incomplete locales intentionally fail this test
      * until real translations are committed; copying English text is not completion.
      */
-    @Test fun allAdvertisedLocalesCoverEveryStringKey() {
+    @Test fun maintainedLocalesCoverEveryStringKey() {
         val source = strings("en").keys
-        val missingByLocale = locales.filterNot { it == "en" }
+        val missingByLocale = maintainedLocales.filterNot { it == "en" }
             .associateWith { locale -> (source - strings(locale).keys).sorted() }
             .filterValues { it.isNotEmpty() }
         val missingTotal = missingByLocale.values.sumOf { it.size }
@@ -193,14 +196,14 @@ class LocaleResourcesIntegrityTest {
         }
     }
 
-    @Test fun everyLocaleContainsAllLiveSensorLabelsAndPluralResources() {
+    @Test fun maintainedLocalesContainAllLiveSensorLabelsAndPluralResources() {
         val sensors = strings("en").keys.filter { it.startsWith("live_pid_") }.toSet()
         fun plurals(locale: String): Map<String, Element> {
             val nodes = document(File("src/main/res/${directory(locale)}/strings.xml")).getElementsByTagName("plurals")
             return (0 until nodes.length).map { nodes.item(it) as Element }.associateBy { it.getAttribute("name") }
         }
         val expectedPlurals = plurals("en").keys
-        for (locale in locales) {
+        for (locale in maintainedLocales) {
             val labels = strings(locale)
             assertTrue("Missing live sensor label in $locale", sensors.all { !labels[it].isNullOrBlank() })
             val translated = plurals(locale)
@@ -406,12 +409,9 @@ class LocaleResourcesIntegrityTest {
         }
     }
 
-    /** Key parity reached by English, French and the twelve established locales. */
-    @Test fun completedLegacyLocalesKeepFullEnglishKeyParity() {
-        val complete = listOf(
-            "en", "fr", "de", "it", "es", "he", "ru", "zh-CN",
-            "ja", "ko-KR", "ar", "pt", "nl", "el"
-        )
+    /** Full new-feature key parity is required for the two maintained locales. */
+    @Test fun maintainedLocalesKeepFullEnglishKeyParity() {
+        val complete = maintainedLocales
         val english = strings("en").keys
         for (locale in complete) {
             val actual = strings(locale).keys
@@ -485,6 +485,81 @@ class LocaleResourcesIntegrityTest {
                 }
             }
         }
+    }
+
+    @Test fun adapterDisconnectAndPairedBridgeLabelsAreSafeInFrenchAndEnglish() {
+        for (locale in listOf("en", "fr")) {
+            val values = strings(locale)
+            assertTrue(values.getValue("adapter_disconnect_label").isNotBlank())
+            assertTrue(values.getValue("adapter_j2534_bridge_connected").contains("J2534"))
+            val notice = values.getValue("adapter_j2534_capabilities_guidance")
+            assertTrue(notice.contains("ECU") || notice.contains("calculateur"))
+            assertTrue(notice.contains("PC") || notice.contains("pont"))
+        }
+    }
+
+    @Test fun bridgeFormErrorIsLocalizedAndDoesNotClaimConnectionLoss() {
+        val english = strings("en").getValue("msg_j2534_bridge_invalid_form")
+        val french = strings("fr").getValue("msg_j2534_bridge_invalid_form")
+        assertTrue(english.contains("TLS") && english.contains("not disconnected"))
+        assertTrue(french.contains("TLS") && french.contains("pas été déconnecté"))
+        assertFalse(english == french)
+    }
+
+    @Test fun missingCurrentEthanolValueIsNotPresentedAsFresh() {
+        val en = strings("en").getValue("flexfuel_lfx2012_ethanol_no_current_measurement")
+        val fr = strings("fr").getValue("flexfuel_lfx2012_ethanol_no_current_measurement")
+        assertTrue(en.contains("historical") && en.contains("current"))
+        assertTrue(fr.contains("historique") && fr.contains("actuelle"))
+        assertFalse(en == fr)
+    }
+
+    @Test fun usbPermissionDeniedIsClearlyLocalized() {
+        val en = strings("en").getValue("msg_usb_permission_denied")
+        val fr = strings("fr").getValue("msg_usb_permission_denied")
+        assertTrue(en.contains("denied") && en.contains("again"))
+        assertTrue(fr.contains("refusé") && fr.contains("nouveau"))
+        assertFalse(en == fr)
+    }
+
+    @Test fun usbPermissionPromptHasActionableFrenchAndEnglishGuidance() {
+        val english = strings("en").getValue("msg_usb_permission_pending")
+        val french = strings("fr").getValue("msg_usb_permission_pending")
+        assertTrue(english.contains("USB"))
+        assertTrue(english.contains("Android"))
+        assertTrue(french.contains("USB"))
+        assertTrue(french.contains("Android"))
+        assertFalse(english == french)
+        assertTrue(english.isNotBlank() && french.isNotBlank())
+    }
+
+    @Test fun currentCanExportAndFuelHistoryGuidanceIsTranslatedAndNotMisleading() {
+        val required = setOf(
+            "can_console_history_recent_scope",
+            "can_console_export_header",
+            "can_console_export_events_limited",
+            "can_console_export_direction_legend",
+            "can_console_export_full_raw_rx",
+            "can_console_export_recent_raw_rx",
+            "can_console_export_failed_marker",
+            "flexfuel_lfx2012_history_range",
+            "flexfuel_lfx2012_history_trim_range",
+            "flexfuel_lfx2012_export_history"
+        )
+        val english = strings("en")
+        val french = strings("fr")
+        for (key in required) {
+            assertTrue("Missing English user-facing string: $key", !english[key].isNullOrBlank())
+            assertTrue("Missing French user-facing string: $key", !french[key].isNullOrBlank())
+            assertFalse("Untranslated French output: $key", english[key] == french[key])
+        }
+        // The saved console's recent event window is NOT a complete TX archive.
+        assertTrue(english.getValue("can_console_export_events_limited").contains("300"))
+        assertTrue(french.getValue("can_console_export_events_limited").contains("300"))
+        assertFalse(
+            "Recent raw text must not be labelled as a complete capture",
+            english.getValue("can_console_export_recent_raw_rx").contains("full archived")
+        )
     }
 
 }

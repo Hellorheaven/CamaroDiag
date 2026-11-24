@@ -71,7 +71,10 @@ fun LicenseScreen(level: LicenseLevel, onRefresh: () -> Unit) {
                 }
             }
         }
-        if (level == LicenseLevel.FREE) {
+        if (level == LicenseLevel.FREE && !LicenseRolloutConfig.PAYMENTS_ENABLED) {
+            item { Text(stringResource(R.string.license_checkout_not_open), style = MaterialTheme.typography.bodyMedium) }
+        }
+        if (level == LicenseLevel.FREE && LicenseRolloutConfig.PAYMENTS_ENABLED) {
             item {
                 Button(
                     modifier = Modifier.fillMaxWidth(),
@@ -121,11 +124,13 @@ fun LicenseScreen(level: LicenseLevel, onRefresh: () -> Unit) {
             }
             error?.let { Text(stringResource(it), color = MaterialTheme.colorScheme.error) }
         }
-        item {
-            Text(
-                stringResource(R.string.license_activation_help),
-                style = MaterialTheme.typography.bodySmall
-            )
+        if (LicenseRolloutConfig.PAYMENTS_ENABLED) {
+            item {
+                Text(
+                    stringResource(R.string.license_activation_help),
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
         }
     }
 }

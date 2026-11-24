@@ -1,0 +1,169 @@
+package com.camarodiag.gen5.data.obd
+
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class CanConsoleDisplayFilterTest {
+    private val standard = ObservedCanId(0x7E8, false)
+    private val extendedSameNumber = ObservedCanId(0x7E8, true)
+    private val extended = ObservedCanId(0x18DAF110, true)
+    private val traffic = listOf(
+        ParsedCanConsoleRecord("RX", "CAN ID=7E8 DLC=3 DATA=41 0C 1A"),
+        ParsedCanConsoleRecord("RX", "CAN ID=7E9 DLC=3 DATA=41 0C 1B"),
+        ParsedCanConsoleRecord("RX", "CAN ID=000007E8 DLC=3 DATA=41 0C 1C"),
+        ParsedCanConsoleRecord("RX", "CAN ID=18DAF110 DLC=3 DATA=62 F1 90"),
+        ParsedCanConsoleRecord("SYSTEM", "CAN ERROR", succeeded = false),
+        ParsedCanConsoleRecord("TX", "7E0 02 01 0C")
+    )
+
+    @Test fun observedOptionsKeepCanWidthAndDoNotInventIdsFromTransmitOrErrors() {
+        assertEquals(
+            listOf(standard, extendedSameNumber, ObservedCanId(0x7E9, false), extended),
+            CanConsoleDisplayFilter.observedIds(traffic, listOf(0x18DAF110.toInt()))
+        )
+        assertEquals(emptyList<ObservedCanId>(), CanConsoleDisplayFilter.observedIds(
+            listOf(ParsedCanConsoleRecord("SYSTEM", "NO DATA")), emptyList()))
+        assertEquals("7E8", CanConsoleDisplayFilter.displayId(standard))
+        assertEquals("000007E8", CanConsoleDisplayFilter.displayId(extendedSameNumber))
+        assertEquals("18DAF110", CanConsoleDisplayFilter.displayId(extended))
+    }
+
+    @Test fun globalMonitorByDefaultPreservesAllCanRxTxAndSystem() {
+        assertEquals(traffic, traffic.filter { CanConsoleDisplayFilter.visible(it, null) })
+    }
+
+    @Test fun selectedIdDoesNotConfuseStandardAndExtendedWithSameNumericValue() {
+        assertEquals(
+            listOf(traffic[0], traffic[4], traffic[5]),
+            traffic.filter { CanConsoleDisplayFilter.visible(it, standard) }
+        )
+        assertEquals(
+            listOf(traffic[2], traffic[4]),
+            traffic.filter { CanConsoleDisplayFilter.visible(it, extendedSameNumber) }
+        )
+        assertTrue(CanConsoleDisplayFilter.visibleId(0x18DAF110L, null))
+        assertTrue(CanConsoleDisplayFilter.visibleId(0x18DAF110L, extended))
+        assertFalse(CanConsoleDisplayFilter.visibleId(0x7E8L, extendedSameNumber))
+        assertFalse(CanConsoleDisplayFilter.visibleId(0x18DAF110L, standard))
+    }
+
+    @Test fun untypedTraceDoesNotInventElevenBitEcuAddress() {
+        assertEquals(emptyList<ObservedCanId>(), CanConsoleDisplayFilter.observedIds(
+            emptyList(), listOf(0x7E8, 0x7E9)
+        ))
+    }
+
+    @Test fun physicalTxFramesFollowTheSelectedEcuWithoutClaimingBroadcastTraffic() {
+        val physical11 = ParsedCanConsoleRecord("TX", "7E0 02 01 0C")
+        val physical29 = ParsedCanConsoleRecord("TX", "18DA10F1 03 22 F1 90")
+        val broadcast = ParsedCanConsoleRecord("TX", "7DF 02 01 0C")
+        assertTrue(CanConsoleDisplayFilter.visible(physical11, standard))
+        assertFalse(CanConsoleDisplayFilter.visible(physical11, extendedSameNumber))
+        assertTrue(CanConsoleDisplayFilter.visible(physical29, extended))
+        assertFalse(CanConsoleDisplayFilter.visible(physical29, standard))
+        assertFalse(CanConsoleDisplayFilter.visible(broadcast, standard))
+        assertTrue(CanConsoleDisplayFilter.visible(broadcast, null))
+        assertTrue(CanConsoleDisplayFilter.visible(
+            ParsedCanConsoleRecord("SYSTEM", "CAN ERROR", succeeded = false), extended
+        ))
+    }
+
+    @Test fun selectionNeverChangesDiagnosticCorrelation() {
+        val request = requireNotNull(RawCanFrameParser.parse("7E0 02 01 0C"))
+        val other = requireNotNull(RawCanFrameParser.parse("7E9 03 41 0C 1A"))
+        val expected = requireNotNull(RawCanFrameParser.parse("7E8 03 41 0C 1A"))
+        assertFalse(CanConsoleEcuRouting.isSelectedResponder(request, other))
+        assertTrue(CanConsoleEcuRouting.isSelectedResponder(request, expected))
+        assertTrue(CanConsoleDisplayFilter.visible(traffic[1], null))
+        assertFalse(CanConsoleDisplayFilter.visible(traffic[1], standard))
+        assertTrue(CanConsoleEcuRouting.isSelectedResponder(request, expected))
+    }
+
+    @Test fun typedTraceFramesRetainExactIdentifierWidthInDropdownAndList() {
+        val frames = listOf(
+            CanTraceFrame(1, null, 0x7E8, CanTraceDirection.RX, listOf(0x03), false),
+            CanTraceFrame(2, null, 0x7E8, CanTraceDirection.RX, listOf(0x03), true),
+            CanTraceFrame(3, null, 0x7E8, CanTraceDirection.RX, listOf(0x03), null),
+            CanTraceFrame(4, null, 0x18DAF110, CanTraceDirection.RX, listOf(0x03), true)
+        )
+        assertEquals(listOf(standard, extendedSameNumber, extended),
+            CanConsoleDisplayFilter.observedFrameIds(emptyList(), frames))
+        assertEquals(listOf(frames[0]),
+            frames.filter { CanConsoleDisplayFilter.visibleTrace(it, standard) })
+        assertEquals(listOf(frames[1]),
+            frames.filter { CanConsoleDisplayFilter.visibleTrace(it, extendedSameNumber) })
+        assertEquals(frames, frames.filter { CanConsoleDisplayFilter.visibleTrace(it, null) })
+    }
+
+    @Test fun transmittedOnlyCanIdentifiersAreNotAdvertisedAsVehicleEcus() {
+        val sent = CanTraceFrame(1, null, 0x7E0, CanTraceDirection.TX, listOf(2, 1, 12), false)
+        val received = CanTraceFrame(2, null, 0x7E8, CanTraceDirection.RX, listOf(3, 65, 12, 26), false)
+        val passive = CanTraceFrame(3, null, 0x18DAF110, CanTraceDirection.UNKNOWN, listOf(3, 98, 241, 144), true)
+        val ambiguous = CanTraceFrame(4, null, 0x7E9, CanTraceDirection.UNKNOWN, listOf(3), null)
+        assertEquals(
+            listOf(ObservedCanId(0x7E8, false), extended),
+            CanConsoleDisplayFilter.observedFrameIds(emptyList(), listOf(sent, received, passive, ambiguous))
+        )
+        // Display filtering never mutates or drops the underlying transmitted frame.
+        assertTrue(CanConsoleDisplayFilter.visibleTrace(sent, null))
+        assertTrue(CanConsoleDisplayFilter.visibleTrace(sent, standard))
+    }
+
+    @Test fun filteredTraceKeepsPhysicalTransmitButNeverBroadcastOrAnotherEcu() {
+        val request11 = CanTraceFrame(1, null, 0x7E0, CanTraceDirection.TX, listOf(2, 1, 12), false)
+        val request29 = CanTraceFrame(2, null, 0x18DA10F1, CanTraceDirection.TX, listOf(3, 34, 241, 144), true)
+        val broadcast = CanTraceFrame(3, null, 0x7DF, CanTraceDirection.TX, listOf(2, 1, 12), false)
+        val other = CanTraceFrame(4, null, 0x7E9, CanTraceDirection.RX, listOf(3, 65, 12, 26), false)
+        assertTrue(CanConsoleDisplayFilter.visibleTrace(request11, standard))
+        assertTrue(CanConsoleDisplayFilter.visibleTrace(request29, extended))
+        assertFalse(CanConsoleDisplayFilter.visibleTrace(request29, standard))
+        assertFalse(CanConsoleDisplayFilter.visibleTrace(broadcast, standard))
+        assertFalse(CanConsoleDisplayFilter.visibleTrace(other, standard))
+        assertTrue(CanConsoleDisplayFilter.visibleTrace(broadcast, null))
+    }
+
+    @Test fun newCaptureUsesCurrentSessionIdsWithoutErasingHistoricalTraffic() {
+        val pastTraffic = listOf(
+            ParsedCanConsoleRecord("RX", "CAN ID=7E9 DLC=3 DATA=41 0C 1A")
+        )
+        val currentSession = setOf(ObservedCanId(0x7E8, false))
+        assertEquals(
+            listOf(ObservedCanId(0x7E8, false)),
+            CanConsoleDisplayFilter.observedFrameIds(
+                emptyList(), emptyList(), currentSession
+            )
+        )
+        assertEquals(1, pastTraffic.size) // Preserved global log is independent.
+        assertTrue(CanConsoleDisplayFilter.visible(pastTraffic[0], null))
+    }
+
+    @Test fun observedEcusRemainSelectableAfterRecentHistoryRollsOver() {
+        val initial = listOf(
+            ParsedCanConsoleRecord("RX", "CAN ID=7E8 DLC=3 DATA=41 0C 1A"),
+            ParsedCanConsoleRecord("RX", "CAN ID=000007E8 DLC=3 DATA=41 0C 1B")
+        )
+        val known = CanConsoleDisplayFilter.accumulateObserved(emptySet(), initial)
+        val last300 = listOf(
+            ParsedCanConsoleRecord("RX", "CAN ID=7E9 DLC=3 DATA=41 0C 1C")
+        )
+        val retained = CanConsoleDisplayFilter.accumulateObserved(known, last300)
+        assertEquals(
+            listOf(standard, extendedSameNumber, ObservedCanId(0x7E9, false)),
+            CanConsoleDisplayFilter.observedFrameIds(last300, emptyList(), retained)
+        )
+        assertEquals(3, retained.size)
+        assertEquals(emptySet<ObservedCanId>(),
+            CanConsoleDisplayFilter.accumulateObserved(emptySet(),
+                listOf(ParsedCanConsoleRecord("SYSTEM", "NO DATA"))))
+    }
+
+    @Test fun observedIdCatalogueIsBoundedAgainstUntrustedCanTraffic() {
+        val full = (0 until 4096).map { ObservedCanId(it.toLong(), true) }.toSet()
+        val ignored = CanConsoleDisplayFilter.accumulateObserved(
+            full, listOf(ParsedCanConsoleRecord("RX", "CAN ID=18DAF110 DLC=0 DATA=(empty)"))
+        )
+        assertEquals(full, ignored)
+    }
+}

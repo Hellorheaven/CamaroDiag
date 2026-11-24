@@ -1,0 +1,50 @@
+CamaroDiag C1 console unit-test campaign, requested once after C1 code freeze.
+Branch: chore/unified-ci
+C1 implementation baseline: d56e1363c853bcb19b48c498e6d6e3514846f3f4
+Scope: communication, diagnostic, Android app unit tests; Windows J2534 Debug compilation/self-tests.
+Full PR Debug validation stays reserved for C8. No vehicle write, no Release, no merge.
+
+C1 integrated console event journal follow-up: 45756aa779759d1abb29c59fa04fbe1f967df9ad
+Validation scope: complete TX/RX/SYSTEM journal, app/communication tests; once per finished lot only.
+
+Grouped completion checkpoint — C1 journal chronological TX/RX/SYSTEM and lifecycle correction
+Source before checkpoint: 6788763f95182bb853e8883d2be7c6d1f9ba40e3
+No physical ECU qualification, no merge.
+
+Grouped correction validation — C1 final journal-file integrity follow-up
+Source HEAD before grouped request: 1bd8819068385be797f5bc6f24b7bca9b25ae771
+No Release, merge or physical ECU validation.
+
+Grouped connector / J2534 bridge integration checkpoint (Android + communication + Windows self-test).
+Source HEAD before request: 0688222fbec8b72de84a6ff9f0abc6a9c869e517
+Scope: USB device routing, permission feedback, J2534 TLS form preflight and stale capability clearing.
+No physical connector / ECU tests, no code for ISO/SAE transports, no merge.
+
+Final grouped non-protocol connector/bridge/adapter validation checkpoint.
+Source SHA: ca4f48abe81b009240fcc585313fefce1cee4405
+Scope: Android UI + communication tests + Windows J2534 debug self-tests; USB routing, permissions, J2534 form/busy flags, Wi-Fi/Bluetooth preflight.
+No physical-ECU qualification; no standards protocol changes, merge, release or new PR.
+
+Consolidated USB permission failure classification regression checkpoint.
+Source SHA: b70a97783da729baee23d086b873a98aaee2ed70
+Tests: communication/diagnostic/app Android Debug, Windows bridge Debug self-test; no per-commit runs.
+No hardware ECU, ISO/SAE protocol change, merge or Release.
+
+Grouped C1/C2/C4/C6 connector and bridge integration regression checkpoint — 23 Nov 2026.
+Source HEAD before checkpoint: 13e5c5650a849c36eeaa945cb4604348a33b57c9
+Unit scope: Android communication/diagnostic/app including DTC consent VIN/session guard, C2 archive, USB and J2534 tests; Windows J2534 Debug self-test.
+This is not the final C8 gate, a vehicle qualification, a Release or a merge.
+
+Final grouped non-protocol C1/C2/C4/C6 connector and bridge checkpoint, 2026-11-23.
+Source HEAD before request: 72bab814d622871624e78db17970bfe891afb24a
+Check all Android communication/diagnostic/app unit tests and Windows J2534 Debug self-test. Includes DTC consent adapter/VIN, portable restore finalization, and J2534 UI credential redaction.
+No per-commit CI, no physical ECU qualification, no merge or Release.
+
+Group C1/C4/C6 + connector integration checkpoint — 2026-11-23 evening.
+Target HEAD before marker 1c23cb08e6498e83f403b0719ad486847d27cb9a
+Run Android communication/diagnostic/app unit tests including UsbPermissionReconnectPolicy, EcuWriteConsentFlow, SafeRawCanTransmitPolicy, Lfx2012FuelSessionHistory, CanConsoleEventJournalStore; Windows J2534 Debug self-test.
+This is an integration checkpoint only: no physical ECU validation, no release, no merge.
+
+Final non-protocol C1/C2/C4/C6 + adapter bridge integration checkpoint, 2026-11-23 evening.
+Source HEAD: eca192d302621680a0e8b628a17f45d5917f9fcb
+Run communication/diagnostic/app Debug unit tests + Windows J2534 Debug build/self-test on this marker SHA. Includes Android USB permission retry, connector discovery, exact restore map coverage, console SHA256 journal and stale fuel observations. No destructive ECU test, no release, no merge.

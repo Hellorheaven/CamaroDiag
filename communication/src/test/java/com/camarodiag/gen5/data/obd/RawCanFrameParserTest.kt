@@ -86,4 +86,42 @@ class RawCanFrameParserTest {
         assertEquals(0x7E8L, frames[1].canId)
         assertTrue(frames[1].data.isEmpty())
     }
+    @Test fun obdEthanolConsoleInputCannotBeMisclassifiedAsRawCanTransmission() {
+        for (input in listOf("0152", "01 52", "0902", "03", "07", "0A")) {
+            assertNull("OBD request must use the diagnostic read channel: $input",
+                RawCanFrameParser.parse(input))
+            assertNotNull("Read-only OBD command must be recognized: $input",
+                SafeObdRequestPolicy.parse(input))
+        }
+        val physicalFrame = "7E0 02 01 52"
+        assertNotNull(RawCanFrameParser.parse(physicalFrame))
+        assertNull(SafeObdRequestPolicy.parse(physicalFrame))
+    }
+
+    @Test fun explicitlyAddressedRawConsoleDoesNotImposeReadOnlyServiceAllowlist() {
+        for (input in listOf(
+            "7E0 02 01 0C", "7DF 02 01 52",
+            "7E0 02 27 01", "7E0 03 2E F1 90",
+            "7E0 02 34 00", "7E0 02 36 01", "7E0 02 11 01",
+            "7E0 10 14 34 00", "7E0 21 00 00",
+            "18DA10F1 03 2E F1 90", "18DAF110 03 22 F1 90",
+            "123 03 2E F1 90", "456 03 31 01 01",
+            "00000123 03 22 F1 90", "123 55 AA BB"
+        )) {
+            assertTrue(input, SafeRawCanTransmitPolicy.allows(
+                requireNotNull(RawCanFrameParser.parse(input))))
+        }
+    }
+
+    @Test fun rawConsoleStillEnforcesPhysicalClassicalCanFraming() {
+        assertFalse(SafeRawCanTransmitPolicy.allows(
+            RawCanFrame(0x800L, false, byteArrayOf(0x02, 0x01, 0x0C))))
+        assertFalse(SafeRawCanTransmitPolicy.allows(
+            RawCanFrame(0x20000000L, true, byteArrayOf(0x02, 0x01, 0x0C))))
+        assertFalse(SafeRawCanTransmitPolicy.allows(
+            RawCanFrame(0x123L, false, byteArrayOf())))
+        assertFalse(SafeRawCanTransmitPolicy.allows(
+            RawCanFrame(0x123L, false, ByteArray(9))))
+    }
+
 }

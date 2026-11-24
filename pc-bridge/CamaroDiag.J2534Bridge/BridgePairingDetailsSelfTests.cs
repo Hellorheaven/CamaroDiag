@@ -18,7 +18,9 @@ internal static class BridgePairingDetailsSelfTests
             throw new InvalidOperationException("Missing " + typeof(T).Name);
         }
 
-        var code = "temporarySessionToken." + new string('A', 64);
+        // Valid shape only: 32 random bytes encoded as 43 base64url chars
+        // followed by the pinned TLS certificate fingerprint.
+        var code = new string('T', 43) + "." + new string('A', 64);
         var text = BridgePairingDetails.FormatForAndroid("192.168.1.42", 35001, code);
         Assert(text.Contains("192.168.1.42", StringComparison.Ordinal) &&
                text.Contains("35001", StringComparison.Ordinal) &&
@@ -46,6 +48,34 @@ internal static class BridgePairingDetailsSelfTests
         MustReject<ArgumentException>(() =>
             BridgePairingDetails.FormatForAndroid("0.0.0.0", 35001, code));
         checks++;
+        // .NET accepts some noncanonical IPv4 shorthands that the Android
+        // pairing parser deliberately rejects. Never display such an address.
+        foreach (var invalidIp in new[]
+        {
+            "192.168.1", "192.168.001.42", "192.168.1.042",
+            " 192.168.1.42", "192.168.1.42 ", "0xC0A8012A",
+            "192.168.1.256", "192.168.1.42\n", "192.168.1.-1"
+        })
+        {
+            MustReject<ArgumentException>(() =>
+                BridgePairingDetails.FormatForAndroid(invalidIp, 35001, code));
+            checks++;
+        }
+        foreach (var invalid in new[]
+        {
+            "short." + new string('A', 64),
+            new string('T', 42) + "." + new string('A', 64),
+            new string('T', 44) + "." + new string('A', 64),
+            new string('T', 43) + "." + '\n' + new string('A', 64),
+            new string('T', 42) + '\n' + "." + new string('A', 64),
+            new string('T', 42) + "+." + new string('A', 64),
+            new string('T', 43) + "." + new string('A', 63)
+        })
+        {
+            MustReject<ArgumentException>(() =>
+                BridgePairingDetails.FormatForAndroid("192.168.1.42", 35001, invalid));
+            checks++;
+        }
 
         Console.WriteLine($"PASS: {checks} Android TLS pairing UI format tests.");
         return checks;

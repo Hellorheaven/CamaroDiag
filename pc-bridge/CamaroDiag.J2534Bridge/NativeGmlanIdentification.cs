@@ -14,6 +14,9 @@ internal static class NativeGmlanIdentification
     internal const byte OsModuleDid = 0xC1;
     internal const byte OsFallbackDid = 0xC9;
 
+    /** Unsupported legacy identity, distinct from an inconsistent or denied ECU response. */
+    internal sealed class IdentityUnavailableException(string reason) : IOException(reason) { }
+
     internal sealed record Identity(
         string Vin,
         uint OperatingSystemId,
@@ -71,7 +74,7 @@ internal static class NativeGmlanIdentification
         bool physicalRead)
     {
         var vin = DecodeVin(DecodeResponse(VinDid, vinReply) ??
-            throw new InvalidDataException("GMLAN ECU did not report a VIN."));
+            throw new IdentityUnavailableException("GMLAN ECU does not support the legacy VIN identifier."));
         uint osid = 0;
         byte did = 0;
         foreach (var (candidateDid, response) in new[]
@@ -88,7 +91,7 @@ internal static class NativeGmlanIdentification
             break;
         }
         if (osid == 0)
-            throw new InvalidDataException("GMLAN ECU did not report a usable OSID.");
+            throw new IdentityUnavailableException("GMLAN ECU does not expose a usable legacy OSID.");
         return new Identity(vin, osid, did, physicalRead,
             "Read-only VIN/OSID identity; E39/E39A firmware and recovery are not yet qualified.");
     }

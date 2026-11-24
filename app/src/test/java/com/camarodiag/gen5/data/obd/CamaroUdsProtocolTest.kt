@@ -25,12 +25,80 @@ class CamaroUdsProtocolTest {
     }
 
     @Test
+    fun lfxFuelSurveyRequiresRealSingleBytePidRepliesFromPrimaryEcu() {
+        for ((pid, raw) in listOf("52" to 0x00, "06" to 0x80, "07" to 0x40,
+            "08" to 0x00, "09" to 0xFF)) {
+            val headerless = "41$pid%02X".format(raw)
+            assertArrayEquals(intArrayOf(raw),
+                CamaroUdsProtocol.parsePidBytes(
+                    headerless, pid, primaryPowertrainResponderOnly = true
+                ))
+            assertArrayEquals(intArrayOf(raw),
+                CamaroUdsProtocol.parsePidBytes(
+                    "7E8 03 41 $pid %02X".format(raw),
+                    pid, primaryPowertrainResponderOnly = true
+                ))
+            for (bad in listOf(
+                "7E9 03 41 $pid %02X".format(raw),
+                "7E8 04 41 $pid %02X 00".format(raw),
+                "7E8 03 41 $pid",
+                "7E8 03 41 53 %02X".format(raw),
+                "NO DATA"
+            )) {
+                assertNull("Invalid physical LFX fuel response: $bad",
+                    CamaroUdsProtocol.parsePidBytes(
+                        bad, pid, primaryPowertrainResponderOnly = true
+                    ))
+            }
+        }
+    }
+
+    @Test
     fun parsesOdometerPidsWithTenthKilometreResolution() {
         val pidA6 = requireNotNull(CamaroUdsProtocol.parseOdometerPidA6("41 A6 00 12 D6 87"))
         val pidD3 = requireNotNull(CamaroUdsProtocol.parseOdometerPidD3("41 D3 00 12 D6 87"))
 
         assertEquals(123456.7, pidA6, 0.01)
         assertEquals(123456.7, pidD3, 0.01)
+    }
+
+    @Test
+    fun ignoresAdapterBannersAndOtherPidsBeforeValidSingleLineTelemetry() {
+        assertArrayEquals(intArrayOf(0x1A, 0xF8),
+            CamaroUdsProtocol.parsePidBytes(
+                "SEARCHING...\r\n010C\r\nNO DATA\r\n7E8 04 41 0C 1A F8", "0C"))
+        assertArrayEquals(intArrayOf(0x1A, 0xF8),
+            CamaroUdsProtocol.parsePidBytes("7E804410C1AF8", "0C"))
+        assertArrayEquals(intArrayOf(0x1A, 0xF8),
+            CamaroUdsProtocol.parsePidBytes("18DAF11004410C1AF8", "0C"))
+        for (invalid in listOf("410C", "41 0C", "7E8 03 41 0C 1A F8",
+                "SEARCH410C1AF8", "41 0D 1A F8", "7E8 41 0C GG F8",
+                "BAD 04 41 0C 1A F8", "7DF 04 41 0C 1A F8",
+                "18DB33F1 04 41 0C 1A F8",
+                "18DB33F104410C1AF8", "18DAF11004410C1A",
+                "18DAF11003410C1AF8")) {
+            assertNull("Invalid telemetry must not be interpreted: $invalid",
+                CamaroUdsProtocol.parsePidBytes(invalid, "0C"))
+        }
+    }
+
+    @Test
+    fun odometerNeverCombinesChatterOrIncompleteAndOverlongPidReplies() {
+        for (invalid in listOf(
+            "A641A60012D687",
+            "410C01234567",
+            "41 A6 00 12 D6",
+            "41 A6 00 12 D6 87 01",
+            "7E8 05 41 A6 00 12 D6 87",
+            "7E8 07 41 A6 00 12 D6 87",
+            "SEARCHING...\nNO DATA",
+            "410A410A410A",
+            "41 D3 00 12 D6 87"
+        )) assertNull("Never infer odometer from: $invalid",
+            CamaroUdsProtocol.parseOdometerPidA6(invalid))
+        val confirmed = requireNotNull(CamaroUdsProtocol.parseOdometerPidA6(
+            "SEARCHING...\r\n7E8 06 41 A6 00 12 D6 87"))
+        assertEquals(123456.7, confirmed, 0.01)
     }
 
     @Test
@@ -73,6 +141,44 @@ class CamaroUdsProtocolTest {
         )
 
         assertFalse(capabilities.supportsCanHeaders)
+    }
+
+    @Test
+    fun negativeAtRepliesDoNotGrantCanOrSwCanCapabilities() {
+        for (failure in listOf("NOT OK", "NOK", "OK?", "ERROR", "UNABLE TO CONNECT",
+                "OK\r\nERROR", "OK\r\nNO DATA", "OK\r\n?")) {
+            val capabilities = CamaroUdsProtocol.evaluateAdapterProbe(
+                deviceName = "OBDLink MX+",
+                macAddress = "00:00:00:00:00:01",
+                atzResp = "OBDLink",
+                stiResp = "STN2120 v5.6.5",
+                atalResp = failure,
+                stp61Resp = failure,
+                headersResp = failure,
+                protocolResp = failure
+            )
+            assertFalse("Must not trust $failure as ATAL", capabilities.supportsLongFrames)
+            assertFalse("Must not trust $failure as STP 61", capabilities.supportsSwCan)
+            assertFalse("Must not trust $failure as CAN headers", capabilities.supportsCanHeaders)
+        }
+    }
+
+    @Test
+    fun echoedAtCommandsWithSeparateOkAcknowledgementsRemainSupported() {
+        val capabilities = CamaroUdsProtocol.evaluateAdapterProbe(
+            deviceName = "OBDLink MX+",
+            macAddress = "00:00:00:00:00:01",
+            atzResp = "OBDLink",
+            stiResp = "STN2120 v5.6.5",
+            atalResp = "ATAL\r\nOK\r\n>",
+            stp61Resp = "STP 61\r\nOK\r\n>",
+            headersResp = "ATH1\r\nOK\r\n>",
+            protocolResp = "ATSP6\r\nOK\r\n>"
+        )
+        assertTrue(capabilities.supportsLongFrames)
+        assertTrue(capabilities.supportsSwCan)
+        assertTrue(capabilities.supportsCanHeaders)
+        assertFalse(capabilities.supportsCanTransmit)
     }
 
     @Test
@@ -120,7 +226,10 @@ class CamaroUdsProtocolTest {
             "7E8 05 41 00 BE 3E B8 13",
             "7E8 08 41 00 BE 3E B8 13",
             "18DAF110 07 41 00 BE 3E B8 13",
-            "NOPE4100BE3EB813"
+            "NOPE4100BE3EB813",
+            "BEE 06 41 00 BE 3E B8 13",
+            "7DF 06 41 00 BE 3E B8 13",
+            "18DB33F1 06 41 00 BE 3E B8 13"
         ).forEach { response ->
             val capabilities = CamaroUdsProtocol.evaluateAdapterProbe(
                 deviceName = "ELM327 Bluetooth",
@@ -143,7 +252,8 @@ class CamaroUdsProtocolTest {
             "41 00 BE 3E B8 13",
             "06 41 00 BE 3E B8 13",
             "7E8 06 41 00 BE 3E B8 13",
-            "18DAF110 06 41 00 BE 3E B8 13"
+            "18DAF110 06 41 00 BE 3E B8 13",
+            "7EF 06 41 00 BE 3E B8 13"
         ).forEach { response ->
             val capabilities = CamaroUdsProtocol.evaluateAdapterProbe(
                 deviceName = "ELM327 Bluetooth",
@@ -195,6 +305,27 @@ class CamaroUdsProtocolTest {
 
             assertEquals(name, AdapterTier.CLONE_ELM, capabilities.tier)
             assertFalse(name, capabilities.supportsSwCan)
+        }
+    }
+
+    @Test
+    fun stnSubstringWithoutRealFirmwareVersionCannotElevateAdapterCapabilities() {
+        for (banner in listOf("NOT STN2120", "unknown STN", "STN", "STN21201",
+            "STN2120BROKEN", "STN2120 bogus", "STN2120_v6.6", "STN2120 vX.Y")) {
+            val capabilities = CamaroUdsProtocol.evaluateAdapterProbe(
+                deviceName = "OBDLink MX+",
+                macAddress = "00:00:00:00:00:01",
+                atzResp = banner,
+                stiResp = banner,
+                atalResp = "OK",
+                stp61Resp = "OK",
+                headersResp = "OK",
+                protocolResp = "OK"
+            )
+            assertFalse("SW-CAN must require a versioned STN firmware banner: $banner",
+                capabilities.supportsSwCan)
+            assertTrue("Unverified STN banner must not set PRO_STN: $banner",
+                capabilities.tier != AdapterTier.PRO_STN)
         }
     }
 
@@ -290,4 +421,132 @@ class CamaroUdsProtocolTest {
         assertTrue(2020 in CamaroEngine.LGX.years)
         assertFalse(2020 in CamaroEngine.LFX.years)
     }
+    @Test
+    fun ethanolPidRequiresExactlyOneUnsignedDataByte() {
+        assertEquals(0.0, CamaroUdsProtocol.decodeEthanolPercent(intArrayOf(0))!!, 0.00001)
+        assertEquals(100.0, CamaroUdsProtocol.decodeEthanolPercent(intArrayOf(255))!!, 0.00001)
+        assertEquals(50.196078, CamaroUdsProtocol.decodeEthanolPercent(intArrayOf(128))!!, 0.00001)
+        assertNull(CamaroUdsProtocol.decodeEthanolPercent(null))
+        assertNull(CamaroUdsProtocol.decodeEthanolPercent(intArrayOf()))
+        assertNull(CamaroUdsProtocol.decodeEthanolPercent(intArrayOf(128, 0)))
+        assertNull(CamaroUdsProtocol.decodeEthanolPercent(intArrayOf(-1)))
+        assertNull(CamaroUdsProtocol.decodeEthanolPercent(intArrayOf(256)))
+    }
+
+    @Test
+    fun ethanolTelemetryDoesNotAcceptWrongOrConcatenatedPidResponses() {
+        assertNull(CamaroUdsProtocol.decodeEthanolPercent(
+            CamaroUdsProtocol.parsePidBytes("41 53 FF", "52")))
+        assertNull(CamaroUdsProtocol.decodeEthanolPercent(
+            CamaroUdsProtocol.parsePidBytes("41 52 FF 00", "52")))
+        assertNull(CamaroUdsProtocol.decodeEthanolPercent(
+            CamaroUdsProtocol.parsePidBytes("41 52", "52")))
+        assertEquals(100.0, CamaroUdsProtocol.decodeEthanolPercent(
+            CamaroUdsProtocol.parsePidBytes("41 52 FF", "52"))!!, 0.00001)
+    }
+
+    @Test
+    fun standardLiveTelemetryRejectsTruncatedAndPaddedSensorResponses() {
+        val samples = listOf(
+            Triple("0C", "41 0C 1A F8", "41 0C 1A"),
+            Triple("05", "41 05 5B", "41 05 5B 00"),
+            Triple("42", "41 42 36 B0", "41 42 36"),
+            Triple("52", "41 52 80", "41 52 80 00"),
+            Triple("24", "41 24 80 00 40 00", "41 24 80 00"),
+            Triple("01", "41 01 00 00 00 00", "41 01 00 00 00")
+        )
+        for ((pid, valid, invalid) in samples) {
+            assertNotNull("PID $pid complete bytes", CamaroUdsProtocol.parsePidBytes(valid, pid))
+            assertNull("PID $pid malformed bytes", CamaroUdsProtocol.parsePidBytes(invalid, pid))
+        }
+        // GM-specific mileage decoding retains its dedicated four-byte
+        // contract even though it is not part of the standard PID allowlist.
+        assertEquals(123456.7,
+            requireNotNull(CamaroUdsProtocol.parseOdometerPidA6("41 A6 00 12 D6 87")), 0.01)
+    }
+
+    @Test
+    fun primaryPowertrainTelemetryRejectsOtherPhysicalEcuResponses() {
+        for (valid in listOf("7E8 03 41 52 80", "18DAF110 03 41 52 80",
+            "7E803415280", "18DAF11003415280", "41 52 80")) {
+            assertArrayEquals(valid, intArrayOf(128),
+                CamaroUdsProtocol.parsePidBytes(valid, "52",
+                    primaryPowertrainResponderOnly = true))
+        }
+        for (foreign in listOf("7E9 03 41 52 80", "18DAF111 03 41 52 80",
+            "7E903415280", "18DAF11103415280")) {
+            assertNull(foreign, CamaroUdsProtocol.parsePidBytes(foreign, "52",
+                primaryPowertrainResponderOnly = true))
+        }
+    }
+
+    @Test
+    fun absoluteLoadPid43UsesTheSaeScalingAndCanExceedOneHundredPercent() {
+        assertEquals(0.0,
+            requireNotNull(CamaroUdsProtocol.decodeAbsoluteLoadPercent(intArrayOf(0, 0))), 0.001)
+        assertEquals(100.0,
+            requireNotNull(CamaroUdsProtocol.decodeAbsoluteLoadPercent(intArrayOf(0, 255))), 0.001)
+        assertEquals(200.0,
+            requireNotNull(CamaroUdsProtocol.decodeAbsoluteLoadPercent(intArrayOf(1, 254))), 0.001)
+        assertEquals(25700.0,
+            requireNotNull(CamaroUdsProtocol.decodeAbsoluteLoadPercent(intArrayOf(255, 255))), 0.001)
+        assertNull(CamaroUdsProtocol.decodeAbsoluteLoadPercent(intArrayOf(255)))
+        assertNull(CamaroUdsProtocol.decodeAbsoluteLoadPercent(intArrayOf(255, 0, 0)))
+        assertNull(CamaroUdsProtocol.decodeAbsoluteLoadPercent(intArrayOf(-1, 1)))
+        assertNull(CamaroUdsProtocol.decodeAbsoluteLoadPercent(intArrayOf(256, 1)))
+    }
+
+    @Test
+    fun commandedEquivalenceRatioPid44UsesExactSaeDivisor() {
+        assertEquals(1.0, requireNotNull(
+            CamaroUdsProtocol.decodeCommandedEquivalenceRatio(intArrayOf(0x80, 0))), 0.000001)
+        assertEquals(0.5, requireNotNull(
+            CamaroUdsProtocol.decodeCommandedEquivalenceRatio(intArrayOf(0x40, 0))), 0.000001)
+        assertEquals(65535.0 / 32768.0, requireNotNull(
+            CamaroUdsProtocol.decodeCommandedEquivalenceRatio(intArrayOf(255, 255))), 0.000001)
+        assertNull(CamaroUdsProtocol.decodeCommandedEquivalenceRatio(null))
+        assertNull(CamaroUdsProtocol.decodeCommandedEquivalenceRatio(intArrayOf(128)))
+        assertNull(CamaroUdsProtocol.decodeCommandedEquivalenceRatio(intArrayOf(128, 0, 0)))
+    }
+
+    @Test
+    fun widebandVoltageAndCurrentFamiliesUseDistinctSaeScaling() {
+        val sample = intArrayOf(0x80, 0x00, 0x80, 0x00)
+        assertEquals(32768 * 2.0 / 65535.0,
+            requireNotNull(CamaroUdsProtocol.decodeWidebandLambda(sample)), 0.000001)
+        assertEquals(32768 * 8.0 / 65535.0,
+            requireNotNull(CamaroUdsProtocol.decodeWidebandVoltage(sample)), 0.000001)
+        assertEquals(0.0,
+            requireNotNull(CamaroUdsProtocol.decodeWidebandCurrent(sample)), 0.000001)
+        assertEquals(-128.0,
+            requireNotNull(CamaroUdsProtocol.decodeWidebandCurrent(
+                intArrayOf(0, 0, 0, 0))), 0.000001)
+        assertEquals(127.99609375,
+            requireNotNull(CamaroUdsProtocol.decodeWidebandCurrent(
+                intArrayOf(0xFF, 0xFF, 0xFF, 0xFF))), 0.000001)
+        for (invalid in listOf(
+            intArrayOf(0, 0, 0), intArrayOf(0, 0, 0, 0, 0),
+            intArrayOf(0, 0, -1, 0), intArrayOf(0, 0, 256, 0)
+        )) {
+            assertNull(CamaroUdsProtocol.decodeWidebandLambda(invalid))
+            assertNull(CamaroUdsProtocol.decodeWidebandVoltage(invalid))
+            assertNull(CamaroUdsProtocol.decodeWidebandCurrent(invalid))
+        }
+    }
+
+    @Test
+    fun bankTwoWidebandSensorPidsHaveStrictFourByteFraming() {
+        for (pid in listOf("28", "29", "38", "39")) {
+            val request = requireNotNull(SafeObdRequestPolicy.parse("01$pid"))
+            assertEquals(true, SafeObdRequestPolicy.hasPositiveResponse(
+                request, "41 $pid 80 00 80 00"))
+            assertEquals(false, SafeObdRequestPolicy.hasPositiveResponse(
+                request, "41 $pid 80 00 80"))
+            assertEquals(false, SafeObdRequestPolicy.hasPositiveResponse(
+                request, "41 $pid 80 00 80 00 00"))
+            assertArrayEquals(intArrayOf(128, 0, 128, 0),
+                CamaroUdsProtocol.parsePidBytes("41 $pid 80 00 80 00", pid))
+        }
+    }
+
 }

@@ -1,0 +1,243 @@
+namespace CamaroDiag.J2534Bridge;
+
+/// <summary>
+/// Offline SAE J1939-22 FEFF Multi-PG checks. These tests do not exercise
+/// J1939 FD.TP, real arbitration, J2534 drivers, or an OEM ECU.
+/// </summary>
+internal static class J1939FdMultiPgSelfTests
+{
+    internal static int Run()
+    {
+        var checks = 0;
+        void Check(bool result, string name)
+        {
+            checks++;
+            if (!result) throw new InvalidOperationException(
+                "J1939-22 FEFF Multi-PG test failed: " + name);
+        }
+        void Reject<T>(Action action, string name) where T : Exception
+        {
+            var threw = false;
+            try { action(); }
+            catch (T) { threw = true; }
+            Check(threw, name);
+        }
+        static J1939FdMultiPg.ContainedGroup Group(int pgn, params byte[] data) =>
+            new(pgn, data);
+
+        var first = J1939FdMultiPg.Encode(0xF1, 0xFF, 6,
+            [Group(0xF004, 1, 2, 3, 4, 5)]);
+        Check(first.IsFd && first.Data.Length == 12 &&
+            first.Data[0] == 0x40 &&
+            first.Data[1] == 0xF0 && first.Data[2] == 0x04 &&
+            first.Data[3] == 5 &&
+            first.Data.AsSpan(4, 5).SequenceEqual(
+                new byte[] {1, 2, 3, 4, 5}) &&
+            first.Data[9] == 0 && first.Data[10] == 0 &&
+            first.Data[11] == 0,
+            "FEFF Multi-PG C-PG header uses 4 bytes and CAN FD 12-byte DLC.");
+        var decoded = J1939FdMultiPg.Decode(first);
+        Check(decoded.Groups.Count == 1 &&
+            decoded.Groups[0].Pgn == 0xF004 &&
+            decoded.Groups[0].Payload.SequenceEqual(
+                new byte[] {1, 2, 3, 4, 5}) &&
+            decoded.SourceAddress == 0xF1 && decoded.DestinationAddress == 0xFF,
+            "FEFF Multi-PG single group round-trip.");
+
+        var fbff = J1939FdMultiPg.EncodeFastBroadcast(0x80,
+            [Group(0xF004, 0x11, 0x22, 0x33),
+             Group(0xFECA, 0xC7, 0xFF)]);
+        var fbffRx = J1939FdMultiPg.Decode(fbff);
+        Check(fbff.IsFd && fbff.Id == 0x80 &&
+            fbffRx.FastBroadcast && fbffRx.Priority == 0 &&
+            fbffRx.SourceAddress == 0x80 &&
+            fbffRx.DestinationAddress == 0xFF &&
+            fbffRx.Groups.Count == 2 &&
+            fbffRx.Groups[1].Pgn == 0xFECA,
+            "FBFF uses 11-bit source-address CAN FD ID and global C-PGs.");
+        Reject<ArgumentException>(() =>
+            J1939FdMultiPg.EncodeFastBroadcast(0xFE,
+                [Group(0xF004, 0x11)]),
+            "FBFF cannot use Cannot Claim Address source for data.");
+        Reject<InvalidDataException>(() =>
+            J1939FdMultiPg.Decode(new(0x123, true, fbff.Data)),
+            "FBFF rejects source address outside 0x00-0xFD.");
+
+        var packed = J1939FdMultiPg.Encode(0xF1, 0xFF, 6,
+            [Group(0xF004, 1, 2, 3),
+             Group(0xFECA, 0xC7, 0xFF, 0x00, 0x00)]);
+        var groups = J1939FdMultiPg.Decode(packed);
+        Check(packed.Data.Length == 16 &&
+            groups.Groups.Count == 2 &&
+            groups.Groups[0].Pgn == 0xF004 &&
+            groups.Groups[1].Pgn == 0xFECA &&
+            groups.Groups[1].Payload.Length == 4 &&
+            groups.DestinationAddress == 0xFF,
+            "Two C-PGs with explicit payload sizes are preserved.");
+
+        var directed = J1939FdMultiPg.Encode(0xF1, 0x10, 6,
+            [Group(0xEF00, 0x11, 0x22)]);
+        Check(J1939FdMultiPg.Decode(directed).DestinationAddress == 0x10 &&
+            J1939FdMultiPg.Decode(directed).Groups[0].Pgn == 0xEF00,
+            "J1939-22 PDU1 contained group may use directed destination.");
+        Reject<ArgumentException>(() =>
+            J1939FdMultiPg.Encode(0xF1, 0x10, 6,
+                [Group(0xF004, 0x11)]),
+            "J1939-22 PDU2 group is broadcast, not unicast.");
+
+        var full = J1939FdMultiPg.Encode(0xF1, 0xFF, 6,
+            [Group(0xF004, Enumerable.Repeat((byte)0xAA, 60).ToArray())]);
+        Check(full.Data.Length == 64 &&
+            J1939FdMultiPg.Decode(full).Groups[0].Payload.Length == 60,
+            "Maximum 60-byte single C-PG fills a 64-byte CAN FD frame.");
+
+        Reject<ArgumentException>(() =>
+            J1939FdMultiPg.Encode(0xF1, 0xFF, 6,
+                [Group(0xF004, new byte[61])]),
+            "Multi-PG refuses payload larger than one 64-byte CAN FD frame.");
+        Reject<ArgumentException>(() =>
+            J1939FdMultiPg.Encode(0xF1, 0xFF, 6,
+                [Group(0xEF01, 0x22)]),
+            "Invalid PDU1 C-PG group extension refused.");
+
+        var badLength = packed.Data.ToArray();
+        badLength[3] = 63;
+        Reject<InvalidDataException>(() =>
+            J1939FdMultiPg.Decode(new(packed.Id, true, badLength)),
+            "Truncated C-PG payload must not overread FD data.");
+        var badTos = packed.Data.ToArray();
+        badTos[0] = 0x60;
+        Reject<NotSupportedException>(() =>
+            J1939FdMultiPg.Decode(new(packed.Id, true, badTos)),
+            "Unknown assurance service cannot be interpreted as plain J1939.");
+        Reject<InvalidDataException>(() =>
+            J1939FdMultiPg.Decode(new(packed.Id, false, packed.Data)),
+            "Classical CAN frame cannot masquerade as a J1939-22 FD Multi-PG.");
+        Reject<InvalidDataException>(() =>
+            J1939FdMultiPg.Decode(new(packed.Id, true,
+                packed.Data.AsSpan(0, 9).ToArray())),
+            "Noncanonical CAN FD DLC is rejected.");
+        var fbffCli = StandardProtocolCli.ParseJ1939Fd([
+            StandardProtocolCli.J1939FdCommand, "--adapter-index", "0",
+            "--baud", "500000", "--data-baud", "2000000",
+            "--source", "0x80", "--target", "0xFF",
+            "--mode", "send", "--fbff", "true",
+            "--pgn", "0xF004", "--payload", "112233"]);
+        Check(fbffCli.FastBroadcast && fbffCli.Priority == 0 &&
+            fbffCli.J2534ConnectFlags == 0 &&
+            fbffCli.Mode == "send" && fbffCli.Target == 0xFF,
+            "CLI requests FBFF using priority-0 standard CAN FD broadcast.");
+        var fbffReceive = StandardProtocolCli.ParseJ1939Fd([
+            StandardProtocolCli.J1939FdCommand, "--adapter-index", "0",
+            "--baud", "500000", "--source", "0xF1", "--target", "0x80",
+            "--mode", "receive", "--fbff", "true"]);
+        Check(fbffReceive.FastBroadcast && fbffReceive.Payload.Length == 0,
+            "FBFF CLI receives an 11-bit source without transmitting.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseJ1939Fd([
+            StandardProtocolCli.J1939FdCommand, "--adapter-index", "0",
+            "--baud", "500000", "--source", "0x80", "--target", "0x10",
+            "--mode", "send", "--fbff", "true", "--pgn", "0xF004",
+            "--payload", "11"]),
+            "FBFF cannot send directed data on standard 11-bit CAN.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseJ1939Fd([
+            StandardProtocolCli.J1939FdBamCommand, "--adapter-index", "0",
+            "--baud", "500000", "--source", "0x80", "--target", "0xFF",
+            "--mode", "send", "--fbff", "true", "--pgn", "0xF004",
+            "--payload", Convert.ToHexString(new byte[100])]),
+            "FBFF is not an alias for FD.TP BAM.");
+        var zeroLengthGroups = J1939FdMultiPgCliParser.Parse(
+            "0xEF00:;0xFECA:11");
+        Check(zeroLengthGroups.Count == 2 &&
+            zeroLengthGroups[0].Payload.Length == 0 &&
+            J1939FdMultiPg.Decode(J1939FdMultiPg.Encode(
+                0x80, 0xFF, 6, zeroLengthGroups))
+                .Groups[0].Payload.Length == 0,
+            "Multi-PG explicit empty C-PG remains representable without false data.");
+        var groupList = J1939FdMultiPgCliParser.Parse(
+            "0xF004:010203;0xFECA:C7FF");
+        Check(groupList.Count == 2 &&
+            groupList[0].Pgn == 0xF004 &&
+            groupList[0].Payload.SequenceEqual(new byte[] {1, 2, 3}) &&
+            J1939FdMultiPg.Decode(J1939FdMultiPg.Encode(
+                0x80, 0xFF, 6, groupList)).Groups.Count == 2,
+            "CLI grouped PGN list composes multiple real C-PGs in a CAN-FD frame.");
+        var groupsCli = StandardProtocolCli.ParseJ1939Fd([
+            StandardProtocolCli.J1939FdCommand, "--adapter-index", "0",
+            "--baud", "500000", "--source", "0x80", "--target", "0xFF",
+            "--mode", "send", "--groups", "0xF004:010203;0xFECA:C7FF"]);
+        Check(groupsCli.Groups?.Count == 2 && groupsCli.Pgn is null &&
+            groupsCli.Payload.Length == 0,
+            "Multi-PG CLI transmits the explicit group list, not an invented raw payload.");
+        var groupsFbff = StandardProtocolCli.ParseJ1939Fd([
+            StandardProtocolCli.J1939FdCommand, "--adapter-index", "0",
+            "--baud", "500000", "--source", "0x80", "--target", "0xFF",
+            "--mode", "send", "--fbff", "true",
+            "--groups", "0xF004:010203;0xFECA:C7FF"]);
+        Check(groupsFbff.FastBroadcast && groupsFbff.Groups?.Count == 2,
+            "FBFF can broadcast multiple standard C-PGs in one frame.");
+        Reject<ArgumentException>(() =>
+            J1939FdMultiPgCliParser.Parse("0xF004:11;0xFECA:ZZ"),
+            "Group list rejects invalid data bytes before any adapter access.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseJ1939Fd([
+            StandardProtocolCli.J1939FdCommand, "--adapter-index", "0",
+            "--baud", "500000", "--source", "0x80", "--target", "0xFF",
+            "--mode", "send", "--pgn", "0xF004", "--payload", "AA",
+            "--groups", "0xF004:0102;0xFECA:0304"]),
+            "Multi-PG cannot mix raw transmission with explicit group collection.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseJ1939Fd([
+            StandardProtocolCli.J1939FdCommand, "--adapter-index", "0",
+            "--baud", "500000", "--source", "0x80", "--target", "0xFF",
+            "--mode", "send", "--groups",
+            "0xF004:0102030405060708090A0B0C0D0E0F101112131415161718191A1B1C1D1E1F202122232425262728292A2B2C2D2E2F303132333435363738393A3B3C3D3E3F40;0xFECA:CC"]),
+            "Grouped PGNs are rejected when their combined wire size exceeds 64 bytes.");
+
+        var transmit = StandardProtocolCli.ParseJ1939Fd([
+            StandardProtocolCli.J1939FdCommand,
+            "--adapter-index", "0", "--baud", "500000",
+            "--data-baud", "2000000", "--brs", "true",
+            "--source", "0xF1", "--target", "0xFF",
+            "--priority", "6", "--pgn", "0xF004",
+            "--mode", "send", "--payload", "01020304"]);
+        Check(transmit.Mode == "send" && transmit.Brs &&
+            transmit.J2534ConnectFlags == 0x100u &&
+            transmit.DataBaud == 2000000 &&
+            transmit.Pgn == 0xF004 && transmit.Target == 0xFF &&
+            transmit.Payload.SequenceEqual(new byte[] {1, 2, 3, 4}),
+            "J1939-22 CLI negotiates raw FD_CAN plus data bit rate.");
+        var receive = StandardProtocolCli.ParseJ1939Fd([
+            StandardProtocolCli.J1939FdCommand,
+            "--adapter-index", "0", "--baud", "500000",
+            "--source", "0xF1", "--target", "0x10",
+            "--mode", "receive", "--pgn", "0xEF00"]);
+        Check(receive.Mode == "receive" &&
+            receive.Payload.Length == 0 && receive.Pgn == 0xEF00,
+            "J1939-22 CLI receive never injects a data payload.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseJ1939Fd([
+            StandardProtocolCli.J1939FdCommand,
+            "--adapter-index", "0", "--baud", "500000",
+            "--source", "0xF1", "--target", "0x10",
+            "--mode", "receive", "--payload", "22F190"]),
+            "J1939-22 passive receive cannot transmit unexpected payload.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseJ1939Fd([
+            StandardProtocolCli.J1939FdCommand,
+            "--adapter-index", "0", "--baud", "500000",
+            "--source", "0xF1", "--target", "0x10",
+            "--mode", "send", "--pgn", "0xF004", "--payload", "01"]),
+            "J1939-22 PDU2 send requires global destination.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseJ1939Fd([
+            StandardProtocolCli.J1939FdCommand,
+            "--adapter-index", "0", "--baud", "500000",
+            "--source", "0xF1", "--target", "0xFF",
+            "--brs", "true", "--mode", "send",
+            "--pgn", "0xF004", "--payload", "01"]),
+            "J1939-22 BRS cannot be advertised without negotiated data bitrate.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseJ1939Fd([
+            StandardProtocolCli.J1939FdCommand,
+            "--adapter-index", "0", "--baud", "500000",
+            "--source", "0xF1", "--target", "0xFF",
+            "--mode", "receive"]),
+            "J1939-22 receive cannot use broadcast target as peer address.");
+
+        return checks;
+    }
+}

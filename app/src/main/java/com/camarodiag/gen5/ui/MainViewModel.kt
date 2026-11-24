@@ -22,6 +22,13 @@ import com.camarodiag.gen5.data.obd.CalibrationFileFormat
 import com.camarodiag.gen5.data.obd.CalibrationFileInspection
 import com.camarodiag.gen5.data.obd.CalibrationBinaryComparer
 import com.camarodiag.gen5.data.obd.EcuBackupArchive
+import com.camarodiag.gen5.data.obd.EcuBackupCoverage
+import com.camarodiag.gen5.data.obd.EcuBackupManifest
+import com.camarodiag.gen5.data.obd.Lfx2012FuelReadOnly
+import com.camarodiag.gen5.data.obd.Lfx2012FuelSessionHistory
+import com.camarodiag.gen5.data.obd.Lfx2012FuelHistoryWindow
+import com.camarodiag.gen5.data.obd.Lfx2012FuelHistoryCsv
+import com.camarodiag.gen5.data.obd.Lfx2012FuelHistoryExportPolicy
 import com.camarodiag.gen5.data.obd.EcuExternalDumpPair
 import com.camarodiag.gen5.data.obd.EcuBenchExpertPlan
 import com.camarodiag.gen5.data.obd.EcuPartialWritePlanner
@@ -33,12 +40,32 @@ import com.camarodiag.gen5.data.obd.toDiagnosticDtc
 import com.camarodiag.gen5.data.obd.ObdDtc
 import com.camarodiag.gen5.data.obd.ObdScanReport
 import com.camarodiag.gen5.data.obd.ObdTransportFailurePolicy
+import com.camarodiag.gen5.data.obd.ObdTransportDisconnectedException
 import com.camarodiag.gen5.data.obd.ObdSupersededSessionException
 import com.camarodiag.gen5.data.obd.CanTraceAnalyzer
 import com.camarodiag.gen5.data.obd.CanTraceAnalysisReport
 import com.camarodiag.gen5.data.obd.SafeObdRequestPolicy
 import com.camarodiag.gen5.data.obd.RawCanFrameParser
+import com.camarodiag.gen5.data.obd.SafeRawCanTransmitPolicy
 import com.camarodiag.gen5.data.obd.CanConsoleRecordParser
+import com.camarodiag.gen5.data.obd.CanConsoleCapabilityPolicy
+import com.camarodiag.gen5.data.obd.EcuWriteConsentFlow
+import com.camarodiag.gen5.data.obd.CanConsoleDiagnosticStatus
+import com.camarodiag.gen5.data.obd.CanAdapterRestorationException
+import com.camarodiag.gen5.data.obd.CanConsoleDisplayFilter
+import com.camarodiag.gen5.data.obd.CanConsoleStreamFramer
+import com.camarodiag.gen5.data.obd.CanCaptureArchiveWriteException
+import com.camarodiag.gen5.data.obd.CanConsoleRawArchiveWriter
+import com.camarodiag.gen5.data.obd.J2534BridgeConnectionForm
+import com.camarodiag.gen5.data.obd.AdapterEndpointPreflight
+import com.camarodiag.gen5.data.obd.AdapterConnectionFailurePolicy
+import com.camarodiag.gen5.data.obd.UsbPermissionResultBus
+import com.camarodiag.gen5.data.obd.UsbPermissionReconnectPolicy
+import com.camarodiag.gen5.data.obd.CanConsolePhysicalExchangeException
+import com.camarodiag.gen5.data.obd.CanConsolePhysicalExchangeCancelled
+import com.camarodiag.gen5.data.obd.CanConsoleExportPolicy
+import com.camarodiag.gen5.data.obd.ObservedCanId
+import com.camarodiag.gen5.data.obd.ParsedCanConsoleRecord
 import com.camarodiag.gen5.mileageaudit.MileageAuditEngine
 import com.camarodiag.gen5.domain.model.*
 import kotlinx.coroutines.delay
@@ -88,6 +115,11 @@ data class LiveCanMonitorState(
     val report: CanTraceAnalysisReport? = null,
     val isSendingRequest: Boolean = false,
     val consoleHistory: List<CanConsoleHistoryEntry> = emptyList(),
+    val observedCanIds: Set<ObservedCanId> = emptySet(),
+    val rawArchiveFailed: Boolean = false,
+    val captureArchiveRequired: Boolean = false,
+    /** Invalidates any CAN TX confirmation opened under an older adapter or vehicle. */
+    val consoleContextGeneration: Long = 0L,
     val message: String? = null
 )
 
@@ -179,7 +211,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _functionalTestState.value = FunctionalTestState()
         // A connection started under another Firebase account must never
         // complete after the garage and session ownership have changed.
-        connectionAttemptGeneration++
+        nextConnectionGeneration()
+        invalidateFuelHistoryForConnectionChange()
         // Retain the cancelled job until the next connection can join its
         // transport cleanup; clearing it would allow overlapping handshakes.
         connectionAttemptJob?.cancel()
@@ -405,15 +438,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         // succeeds. Never tear down the replacement adapter for that old error.
         if (error is ObdSupersededSessionException) return
         if (!ObdTransportFailurePolicy.isConnectionLoss(error)) return
-        connectionAttemptGeneration++
+        nextConnectionGeneration()
+        invalidateFuelHistoryForConnectionChange()
         // Retain the cancelled job until the next connection can join its
         // transport cleanup; clearing it would allow overlapping handshakes.
         connectionAttemptJob?.cancel()
-        discardCanMonitor()
+        val interruptedCapture = canMonitorJob != null || _liveCanMonitorState.value.isCapturing
+        discardCanMonitor(deleteArchive = false)
         detachCanRequest()
         _liveCanMonitorState.value = _liveCanMonitorState.value.copy(
             isCapturing = false,
-            isSendingRequest = false
+            isSendingRequest = false,
+            rawArchiveFailed = CanConsoleExportPolicy.archiveFailedAfterDisconnect(
+                    _liveCanMonitorState.value.rawArchiveFailed, interruptedCapture
+                )
         )
         _isStreamingLive.value = false
         _livePids.value = emptyList()
@@ -427,9 +465,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             isUdsReading = false,
             isObdbSignalReading = false,
             isJ2534BridgeConnecting = false,
-            isJ2534BridgeConnected = false
+            isJ2534BridgeConnected = false,
+            isJ2534MemoryReadAvailable = false
         )
-        val messageId = when (obdManager.currentTransportKind) {
+        val restoration = when (error) {
+            is CanAdapterRestorationException -> error
+            is CanConsolePhysicalExchangeException -> error.cause as? CanAdapterRestorationException
+            else -> null
+        }
+        val failureTransport = restoration?.originalTransportKind ?: obdManager.currentTransportKind
+        val messageId = when (failureTransport) {
             "BLUETOOTH", "BLE" -> R.string.connection_lost_bluetooth
             "USB" -> R.string.connection_lost_usb
             "WIFI" -> R.string.connection_lost_wifi
@@ -504,6 +549,39 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     sessionDao.observeSessionsForOwner(uid).collect { rows ->
                         if (authenticatedAccountUid == uid) _savedSessions.value = rows
                     }
+                }
+            }
+        }
+        viewModelScope.launch {
+            UsbPermissionResultBus.results.collect { outcome ->
+                val pending = pendingUsbPermissionRetry ?: return@collect
+                if (pending.deviceId != outcome.deviceId) return@collect
+                // Wait for the original USB handshake to release its handle.
+                connectionAttemptJob?.join()
+                if (pendingUsbPermissionRetry != pending) return@collect
+                if (!outcome.granted) {
+                    pendingUsbPermissionRetry = null
+                    if (pending.generation == connectionAttemptGeneration) {
+                        _connectionMessage.value = localizedContext.getString(R.string.msg_usb_permission_denied)
+                    }
+                    return@collect
+                }
+                val devices = runCatching { obdManager.getUsbDevices() }.getOrDefault(emptyList())
+                _usbDevices.value = devices
+                val mayResume = UsbPermissionReconnectPolicy.mayResume(
+                    pending, outcome.deviceId, outcome.granted, connectionAttemptGeneration, devices
+                )
+                pendingUsbPermissionRetry = null
+                if (!mayResume) {
+                    if (pending.generation == connectionAttemptGeneration) {
+                        _connectionMessage.value = localizedContext.getString(R.string.msg_usb_identifier_unavailable)
+                    }
+                    return@collect
+                }
+                when (pending.transport) {
+                    "usb" -> connectUsb(pending.endpoint)
+                    "connector_usb" -> discoverCamaroDiagConnector(pending.endpoint)
+                    "connector_usb_binary" -> discoverCamaroDiagConnector(pending.endpoint, binary = true)
                 }
             }
         }
@@ -837,19 +915,52 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private var traceAnalysisJob: Job? = null
     private var calibrationIdentityGeneration = 0L
     private var gmlanIdentityGeneration = 0L
+    private var fuelSnapshotGeneration = 0L
+    private val fuelHistory = Lfx2012FuelHistoryWindow()
 
-    private fun clearVehicleEvidence() {
+    /** Drop observations immediately when the authenticated/transport context changes. */
+    private fun invalidateFuelHistoryForConnectionChange() {
+        fuelSnapshotGeneration++
+        fuelHistory.clear()
+        _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+            isFuelSnapshotReading = false,
+            fuelReadOnlySnapshot = null,
+            fuelHistoryCount = 0,
+            fuelHistorySummary = null,
+            fuelSnapshotError = ""
+        )
+    }
+
+
+    private fun clearVehicleEvidence(preserveCanConsole: Boolean = false) {
         calibrationIdentityGeneration++
         gmlanIdentityGeneration++
-        discardCanMonitor()
+        fuelSnapshotGeneration++
+        fuelHistory.clear()
+        val newCanContext = ++canConsoleContextGeneration
+        val interruptedCapture = canMonitorJob != null || _liveCanMonitorState.value.isCapturing
+        discardCanMonitor(deleteArchive = !preserveCanConsole)
         detachCanRequest()
-        _liveCanMonitorState.value = LiveCanMonitorState()
+        _liveCanMonitorState.value = if (preserveCanConsole) {
+            _liveCanMonitorState.value.copy(
+                consoleContextGeneration = newCanContext,
+                isCapturing = false,
+                isSendingRequest = false,
+                rawArchiveFailed = CanConsoleExportPolicy.archiveFailedAfterDisconnect(
+                    _liveCanMonitorState.value.rawArchiveFailed, interruptedCapture
+                )
+            )
+        } else {
+            resetConsoleEventJournal()
+            LiveCanMonitorState(consoleContextGeneration = newCanContext)
+        }
         obdManager.invalidateObdPidSupportCache()
         if (obdManager.isJ2534BridgeConnected()) {
             obdManager.disconnect()
             _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                 isJ2534BridgeConnecting = false,
                 isJ2534BridgeConnected = false,
+                isJ2534MemoryReadAvailable = false,
                 j2534BridgeMessage = localizedContext.getString(R.string.vm_bridge_disconnected_vehicle_changed)
             )
         }
@@ -862,6 +973,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
             isReading = false,
             isGmlanReading = false,
+            isFuelSnapshotReading = false,
+            fuelReadOnlySnapshot = null,
+            fuelHistoryCount = 0,
+            fuelHistorySummary = null,
+            fuelSnapshotError = "",
             gmlanIdentity = null,
             gmlanIdentityFailed = false,
             ecuVinResponse = "",
@@ -882,10 +998,28 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val calibrationWorkspace: StateFlow<CalibrationWorkspaceState> = _calibrationWorkspace.asStateFlow()
 
     private val _liveCanMonitorState = MutableStateFlow(LiveCanMonitorState())
+    private var canConsoleContextGeneration = 0L
     val liveCanMonitorState: StateFlow<LiveCanMonitorState> = _liveCanMonitorState.asStateFlow()
     private var canMonitorJob: Job? = null
     /** Complete raw recording on private storage; rawText is only a bounded UI preview. */
     @Volatile private var activeCanCaptureFile: File? = null
+    private val consoleEventJournal = CanConsoleEventJournalStore(application.cacheDir)
+    @Volatile private var consoleEventJournalFailed = false
+
+    /** Persistence failures affect export completeness, never adapter communications. */
+    private fun recordConsoleEvents(events: List<CanConsoleHistoryEntry>) {
+        if (events.isEmpty() || consoleEventJournalFailed) return
+        try {
+            consoleEventJournal.append(events)
+        } catch (_: Exception) {
+            consoleEventJournalFailed = true
+        }
+    }
+
+    private fun resetConsoleEventJournal() {
+        consoleEventJournal.reset()
+        consoleEventJournalFailed = false
+    }
     private var canRequestJob: Job? = null
 
     private fun loadNativeCamaroSignalCatalog() {
@@ -1051,16 +1185,114 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         protocolNumberText: String
     ) {
         if (!requirePremiumLicense()) return
-        val attempt = ++connectionAttemptGeneration
+        // Validate all form fields BEFORE invalidating an active OBD/J2534
+        // session; malformed input must not disconnect a working adapter.
+        val connectionForm = try {
+            J2534BridgeConnectionForm.parse(
+                host, portText, pairingToken,
+                requestCanIdHex, responseCanIdHex, protocolNumberText
+            )
+        } catch (_: IllegalArgumentException) {
+            _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+                j2534BridgeMessage = localizedContext.getString(
+                    R.string.msg_j2534_bridge_invalid_form
+                )
+            )
+            return
+        }
+        val attempt = nextConnectionGeneration()
+        invalidateFuelHistoryForConnectionChange()
         val previousAttempt = connectionAttemptJob
         previousAttempt?.cancel()
         connectionAttemptJob = viewModelScope.launch {
+            beginBusyOperation()
+            try {
+                try {
+                    previousAttempt?.join()
+                    if (attempt != connectionAttemptGeneration) return@launch
+                    val activeMonitor = canMonitorJob
+                    val activeRequest = detachCanRequest()
+                    markAdapterDisconnected()
+                    val detachedMonitor = detachedCanMonitorJob
+                    val detachedRequest = detachedCanRequestJob
+                    activeMonitor?.join()
+                    activeRequest?.join()
+                    detachedMonitor?.join()
+                    detachedRequest?.join()
+                    if (attempt != connectionAttemptGeneration) return@launch
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                }
+                _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+                    isJ2534BridgeConnecting = true,
+                    isJ2534BridgeConnected = false,
+                    isJ2534MemoryReadAvailable = false,
+                    j2534BridgeMessage = ""
+                )
+                try {
+                    val result = obdManager.connectJ2534Bridge(
+                        host = connectionForm.host,
+                        port = connectionForm.port,
+                        pairingToken = connectionForm.pairingCode,
+                        requestCanId = connectionForm.requestCanId,
+                        responseCanId = connectionForm.responseCanId,
+                        can29Bit = connectionForm.can29Bit,
+                        protocolNumber = connectionForm.protocolNumber
+                    ).getOrThrow()
+                    if (attempt != connectionAttemptGeneration) {
+                        obdManager.disconnect()
+                        return@launch
+                    }
+                    _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+                        isJ2534BridgeConnecting = false,
+                        isJ2534BridgeConnected = true,
+                        isJ2534MemoryReadAvailable = obdManager.isJ2534MemoryReadAvailable(),
+                        j2534BridgeMessage = localizedContext.getString(R.string.vm_j2534_connected, result)
+                    )
+                } catch (cancelled: CancellationException) {
+                    if (attempt == connectionAttemptGeneration) {
+                        _calibrationWorkspace.value = _calibrationWorkspace.value.copy(isJ2534BridgeConnecting = false)
+                    }
+                    throw cancelled
+                } catch (error: Exception) {
+                    if (attempt == connectionAttemptGeneration) {
+                        _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+                            isJ2534BridgeConnecting = false,
+                            isJ2534BridgeConnected = false,
+                            isJ2534MemoryReadAvailable = false,
+                            j2534BridgeMessage = localizedContext.getString(R.string.msg_j2534_bridge_connect_failed)
+                        )
+                    }
+                } finally {
+                    if (attempt == connectionAttemptGeneration) {
+                        connectionAttemptJob = null
+                    }
+                }
+            } finally {
+                endBusyOperation()
+            }
+        }
+    }
+
+    /** Disconnect any selected adapter (USB, BLE, Wi-Fi, J2534 or simulation).
+     * Obsolete connection attempts and console jobs must complete teardown
+     * before the manager socket/USB handle can be closed.
+     */
+    fun disconnectSelectedAdapter() {
+        val attempt = nextConnectionGeneration()
+        invalidateFuelHistoryForConnectionChange()
+        val previousAttempt = connectionAttemptJob
+        previousAttempt?.cancel()
+        // Register the disconnect itself as the active transition. A subsequent
+        // connection must cancel/join this cleanup before opening new hardware.
+        connectionAttemptJob = viewModelScope.launch {
+            beginBusyOperation()
             try {
                 previousAttempt?.join()
                 if (attempt != connectionAttemptGeneration) return@launch
                 val activeMonitor = canMonitorJob
                 val activeRequest = detachCanRequest()
-                markAdapterDisconnected()
+                stopCanMonitor()
                 val detachedMonitor = detachedCanMonitorJob
                 val detachedRequest = detachedCanRequestJob
                 activeMonitor?.join()
@@ -1068,107 +1300,26 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 detachedMonitor?.join()
                 detachedRequest?.join()
                 if (attempt != connectionAttemptGeneration) return@launch
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            }
-            _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
-                isJ2534BridgeConnecting = true,
-                isJ2534BridgeConnected = false,
-                isJ2534MemoryReadAvailable = false,
-                j2534BridgeMessage = ""
-            )
-            try {
-                fun parseCanId(value: String): Pair<Int, String> {
-                    val normalized = value.trim().removePrefix("0x").removePrefix("0X").uppercase()
-                    require(normalized.length in setOf(3, 8) &&
-                        normalized.all { it.digitToIntOrNull(16) != null }) {
-                        "CAN ID doit contenir 3 chiffres hexadécimaux (11 bits) ou 8 (29 bits)."
-                    }
-                    return normalized.toInt(16) to normalized
-                }
-                val (requestId, requestText) = parseCanId(requestCanIdHex)
-                val (responseId, responseText) = parseCanId(responseCanIdHex)
-                require(requestText.length == responseText.length) {
-                    "Les deux identifiants CAN doivent utiliser le même format 11 ou 29 bits."
-                }
-                require(requestId != responseId) { "Les CAN ID de requête et de réponse doivent être différents." }
-                val can29Bit = requestText.length == 8
-                val protocolNumber = protocolNumberText.toIntOrNull()
-                    ?: error("Profil CAN invalide.")
-                require(protocolNumber in setOf(33, 34, 35, 36, 63, 64)) { "Profil CAN non pris en charge." }
-                require(can29Bit == (protocolNumber in setOf(34, 36, 64))) {
-                    "Le profil CAN sélectionné ne correspond pas à la longueur des identifiants CAN."
-                }
-                val port = portText.toIntOrNull() ?: error("Port TCP invalide.")
-                val result = obdManager.connectJ2534Bridge(
-                    host = host.trim(),
-                    port = port,
-                    pairingToken = pairingToken.trim(),
-                    requestCanId = requestId,
-                    responseCanId = responseId,
-                    can29Bit = can29Bit,
-                    protocolNumber = protocolNumber
-                ).getOrThrow()
-                if (attempt != connectionAttemptGeneration) {
-                    obdManager.disconnect()
-                    return@launch
-                }
+                obdManager.disconnect()
+                markAdapterDisconnected()
+                _connectionMessage.value = null
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     isJ2534BridgeConnecting = false,
-                    isJ2534BridgeConnected = true,
-                    isJ2534MemoryReadAvailable = obdManager.isJ2534MemoryReadAvailable(),
-                    j2534BridgeMessage = localizedContext.getString(R.string.vm_j2534_connected, result)
+                    isJ2534BridgeConnected = false,
+                    isJ2534MemoryReadAvailable = false,
+                    j2534BridgeMessage = localizedContext.getString(R.string.vm_pc_bridge_disconnected)
                 )
             } catch (cancelled: CancellationException) {
-                if (attempt == connectionAttemptGeneration) {
-                    _calibrationWorkspace.value = _calibrationWorkspace.value.copy(isJ2534BridgeConnecting = false)
-                }
                 throw cancelled
-            } catch (error: Exception) {
-                if (attempt == connectionAttemptGeneration) {
-                    _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
-                        isJ2534BridgeConnecting = false,
-                        isJ2534BridgeConnected = false,
-                        isJ2534MemoryReadAvailable = false,
-                        j2534BridgeMessage = localizedContext.getString(R.string.msg_j2534_bridge_connect_failed)
-                    )
-                }
             } finally {
-                if (attempt == connectionAttemptGeneration) {
-                    connectionAttemptJob = null
-                }
+                if (attempt == connectionAttemptGeneration) connectionAttemptJob = null
+                endBusyOperation()
             }
         }
     }
 
-    fun disconnectJ2534Bridge() {
-        val attempt = ++connectionAttemptGeneration
-        val pendingConnection = connectionAttemptJob
-        pendingConnection?.cancel()
-        // Keep the cancelled handshake joinable by a subsequent connection.
-        viewModelScope.launch {
-            val activeMonitor = canMonitorJob
-            val activeRequest = detachCanRequest()
-            stopCanMonitor()
-            val detachedMonitor = detachedCanMonitorJob
-            val detachedRequest = detachedCanRequestJob
-            pendingConnection?.join()
-            activeMonitor?.join()
-            activeRequest?.join()
-            detachedMonitor?.join()
-            detachedRequest?.join()
-            // A replacement adapter may have been requested while we waited.
-            if (attempt != connectionAttemptGeneration) return@launch
-            obdManager.disconnect()
-            markAdapterDisconnected()
-            _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
-                isJ2534BridgeConnecting = false,
-                isJ2534BridgeConnected = false,
-                isJ2534MemoryReadAvailable = false,
-                j2534BridgeMessage = localizedContext.getString(R.string.vm_pc_bridge_disconnected)
-            )
-        }
-    }
+    /** The bridge uses the same serialized teardown as USB, BLE and Wi-Fi. */
+    fun disconnectJ2534Bridge() = disconnectSelectedAdapter()
 
     /**
      * Runs two REAL ECU memory reads through a connected J2534 PC bridge, then
@@ -1201,12 +1352,38 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 check(obdManager.isJ2534BridgeConnected()) {
                     "A real J2534 adapter must be connected."
                 }
-                CamaroDiagExportStorage.write(getApplication<Application>(), fileName, "application/zip",
-                    beforePublish = {
-                        check(current())
+                var acquired: J2534LiveMemoryBackup.CaptureResult? = null
+                val savedPath = CamaroDiagExportStorage.write(getApplication<Application>(), fileName, "application/zip",
+                    category = CamaroDiagExportStorage.Category.ECU_BACKUPS,
+                    beforePublish = { check(current()) },
+                    verifyStaged = { staged ->
+                        check(current()) { "ECU backup context changed before ZIP verification." }
+                        val capture = checkNotNull(acquired) {
+                            "No complete ECU acquisition was returned for this ZIP."
+                        }
+                        val restored = EcuBackupArchive.import(
+                            staged, EcuBackupArchive.MAX_J2534_IMPORT_UNCOMPRESSED_BYTES
+                        )
+                        val original = capture.manifest.entries.single()
+                        val entry = restored.manifest.entries.single()
+                        check(restored.verification.consistent &&
+                            restored.manifest.vehicleVin == request.expectedVin &&
+                            restored.manifest.channel == capture.manifest.channel &&
+                            restored.manifest.channel?.diagnosticSession == request.diagnosticSession &&
+                            restored.manifest.firmwareEvidence == capture.manifest.firmwareEvidence &&
+                            restored.manifest.createdAtUtcMillis == capture.manifest.createdAtUtcMillis &&
+                            restored.manifest.controllerLabel == capture.manifest.controllerLabel &&
+                            entry == original &&
+                            entry.origin == EcuBackupManifest.Origin.REPORTED_HARDWARE_READ &&
+                            entry.region == request.region &&
+                            entry.startAddress == request.address &&
+                            entry.expectedBytes == request.lengthBytes.toLong() &&
+                            restored.manifest.coverage.status == EcuBackupCoverage.Status.PARTIAL &&
+                            !restored.manifest.hardwareProvenanceVerified
+                        ) { "Staged ECU backup ZIP differs from the verified physical acquisition." }
                     }
                 ) { output ->
-                    obdManager.captureAndExportJ2534Memory(request, output) { progress ->
+                    acquired = obdManager.captureAndExportJ2534Memory(request, output) { progress ->
                         check(current()) { "Vehicle or account changed while ECU memory was being read." }
                         _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                             j2534MemoryCaptureBytesRead = progress.totalBytesRead,
@@ -1220,7 +1397,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     isJ2534MemoryCapturing = false,
                     j2534MemoryCaptureMessage =
-                        localizedContext.getString(R.string.cal_live_memory_saved)
+                        localizedContext.getString(R.string.cal_live_memory_saved) + "\n" +
+                            localizedContext.getString(R.string.cal_live_memory_partial_notice) + "\n" +
+                            savedPath
                 )
             } catch (cancelled: CancellationException) {
                 throw cancelled
@@ -1469,13 +1648,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     put("calibrationWritingPermitted", false)
                 }
                 if (!current()) return@launch
-                CamaroDiagExportStorage.write(getApplication<Application>(), fileName, "application/json",
-                    beforePublish = { check(current() && hasPremiumLicense()) }
+                val savedPath = CamaroDiagExportStorage.write(getApplication<Application>(), fileName, "application/json",
+                    category = CamaroDiagExportStorage.Category.REPORTS, beforePublish = { check(current() && hasPremiumLicense()) }
                 ) { it.write(report.toString(2).toByteArray(Charsets.UTF_8)) }
                 if (current()) {
                     _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                         message = getApplication<Application>()
-                            .getString(R.string.flexfuel_lfx2012_export_success)
+                            .getString(R.string.flexfuel_lfx2012_export_success) + "\n" + savedPath
                     )
                 }
             } catch (cancelled: CancellationException) {
@@ -1487,6 +1666,154 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             .getString(R.string.flexfuel_lfx2012_export_failed)
                     )
                 }
+            }
+        }
+    }
+
+    /**
+     * C4: one physical, read-only fuel composition/trim survey for the selected
+     * 2012 LFX. No changes to ECU calibration, adaptive fuel cells or VIN.
+     * The UI never promotes this reading to proof of an installed sensor.
+     */
+    fun readLfx2012FuelSnapshot() {
+        if (!requirePremiumLicense()) return
+        val vehicle = _vehicle.value
+        if (vehicle.modelYear != 2012 ||
+            !vehicle.engine.rpo.equals("LFX", ignoreCase = true)) return
+        if (_calibrationWorkspace.value.isFuelSnapshotReading) return
+        val account = accountSessionGeneration
+        val connection = connectionAttemptGeneration
+        val generation = ++fuelSnapshotGeneration
+        fun current() = isCurrentAccountGeneration(account) &&
+            generation == fuelSnapshotGeneration &&
+            connection == connectionAttemptGeneration &&
+            _vehicle.value == vehicle && hasPremiumLicense()
+        _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+            isFuelSnapshotReading = true, fuelReadOnlySnapshot = null,
+            fuelSnapshotError = ""
+        )
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                if (!current()) return@launch
+                check(!obdManager.isDemoMode && !obdManager.isSimulationActive &&
+                    obdManager.isStandardObdReadAvailable()) {
+                    "A connected physical, read-only OBD channel is required."
+                }
+                val survey = obdManager.readPhysicalFuelSurvey()
+                if (!current()) return@launch
+                val raw = Lfx2012FuelReadOnly.PIDS.associateWith { pid ->
+                    survey.responses[pid]?.let { response ->
+                        // Some adapters return NO DATA or malformed text while
+                        // still advertising the PID. Show 'no valid response',
+                        // never 0% or a simulated measurement in that case.
+                        runCatching {
+                            CamaroUdsProtocol.parsePidBytes(
+                                response, "%02X".format(java.util.Locale.ROOT, pid),
+                                primaryPowertrainResponderOnly = true
+                            )
+                        }.getOrNull()
+                    }
+                }
+                val captured = Lfx2012FuelReadOnly.inspect(
+                    survey, raw, System.currentTimeMillis()
+                )
+                // Serialize publishing a completed physical read with vehicle/
+                // connection changes on the UI dispatcher. Otherwise the VIN
+                // could change between the IO-thread guard and history append.
+                withContext(Dispatchers.Main) {
+                    if (current()) {
+                        val validVin = vehicle.vin.trim().uppercase(java.util.Locale.ROOT)
+                            .takeIf { it.matches(Regex("[A-HJ-NPR-Z0-9]{17}")) }
+                        val historySummary = if (validVin != null) {
+                            fuelHistory.append(
+                                Lfx2012FuelSessionHistory.SessionIdentity(
+                                    validVin, "account-$account-connection-$connection",
+                                    captured.source
+                                ), captured
+                            )
+                        } else null
+                        _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+                            isFuelSnapshotReading = false,
+                            fuelReadOnlySnapshot = captured,
+                            fuelHistoryCount = historySummary?.count ?: 0,
+                            fuelHistorySummary = historySummary,
+                            fuelSnapshotError = ""
+                        )
+                    }
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                if (current()) {
+                    reportConnectionLoss(error)
+                    if (current()) _calibrationWorkspace.value =
+                        _calibrationWorkspace.value.copy(
+                            isFuelSnapshotReading = false,
+                            fuelReadOnlySnapshot = null,
+                            fuelSnapshotError = error.message.orEmpty().take(180)
+                        )
+                }
+            } finally {
+                if (current() && _calibrationWorkspace.value.isFuelSnapshotReading) {
+                    _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+                        isFuelSnapshotReading = false
+                    )
+                }
+            }
+        }
+    }
+
+    /**
+     * Export only readings captured in the active vehicle/connection context.
+     * This uses the same private export store as ECU identity reports.
+     */
+    fun exportLfx2012FuelHistory(fileName: String) {
+        if (!requirePremiumLicense()) return
+        val vehicle = _vehicle.value
+        val account = accountSessionGeneration
+        val connection = connectionAttemptGeneration
+        val generation = fuelSnapshotGeneration
+        val observed = fuelHistory.copySamples()
+        fun current() = isCurrentAccountGeneration(account) &&
+            connectionAttemptGeneration == connection &&
+            fuelSnapshotGeneration == generation &&
+            _vehicle.value == vehicle && hasPremiumLicense() &&
+            Lfx2012FuelHistoryExportPolicy.canPublish(
+                observed, fuelHistory.copySamples(),
+                _calibrationWorkspace.value.isFuelSnapshotReading
+            )
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                if (!current()) return@launch
+                check(observed.isNotEmpty()) { "No fuel observations to export" }
+                val expectedVin = vehicle.vin.trim().uppercase(java.util.Locale.ROOT)
+                check(observed.all {
+                    it.identity.vin == expectedVin &&
+                        it.identity.sessionId == "account-$account-connection-$connection"
+                }) { "Fuel history session no longer matches the selected vehicle" }
+                val path = CamaroDiagExportStorage.write(
+                    getApplication<Application>(), fileName, "text/csv",
+                    category = CamaroDiagExportStorage.Category.REPORTS,
+                    beforePublish = { check(current()) }
+                ) { stream ->
+                    java.io.OutputStreamWriter(stream, Charsets.UTF_8).apply {
+                        Lfx2012FuelHistoryCsv.export(observed, this)
+                        flush()
+                    }
+                }
+                if (current()) _calibrationWorkspace.value =
+                    _calibrationWorkspace.value.copy(
+                        message = getApplication<Application>()
+                            .getString(R.string.flexfuel_lfx2012_history_saved) + "\n" + path
+                    )
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                if (current()) _calibrationWorkspace.value =
+                    _calibrationWorkspace.value.copy(
+                        message = getApplication<Application>()
+                            .getString(R.string.flexfuel_lfx2012_history_failed)
+                    )
             }
         }
     }
@@ -1692,6 +2019,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             content = message,
             succeeded = succeeded
         )
+        recordConsoleEvents(listOf(event))
         _liveCanMonitorState.value = current.copy(
             consoleHistory = (current.consoleHistory + event).takeLast(300)
         )
@@ -1713,8 +2041,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             )
         }
 
+    private fun retainObservedCanIds(
+        known: Set<ObservedCanId>,
+        events: List<CanConsoleHistoryEntry>
+    ): Set<ObservedCanId> = CanConsoleDisplayFilter.accumulateObserved(
+        known,
+        events.map { ParsedCanConsoleRecord(it.direction, it.content, it.succeeded) }
+    )
+
     /** Starts passive monitoring until Stop, disconnect, adapter exit or an explicit timeout. */
-    fun startCanMonitor(durationMs: Long = Long.MAX_VALUE) {
+    fun startCanMonitor(durationMs: Long = Long.MAX_VALUE, can29Bit: Boolean = false) {
         if (!requirePremiumLicense()) return
         if (canMonitorJob != null || detachedCanMonitorJob?.isCompleted == false ||
             canRequestJob?.isCompleted == false || detachedCanRequestJob?.isCompleted == false
@@ -1738,63 +2074,95 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             content = localizedContext.getString(R.string.can_sniffer_start)
         )
         _liveCanMonitorState.value = previousState.copy(
+            consoleContextGeneration = ++canConsoleContextGeneration,
             isCapturing = true,
+            rawArchiveFailed = false,
+            captureArchiveRequired = true,
             rawText = "",
+            observedCanIds = emptySet(),
             report = null,
             message = null,
             consoleHistory = (previousState.consoleHistory + startEvent).takeLast(300)
         )
+        recordConsoleEvents(listOf(startEvent))
         // Install the job reference before it can execute. A lazy start also lets the
         // finally block compare its identity, so an older cancelled capture cannot clear
         // or overwrite the state of a newer capture started immediately afterward.
         lateinit var monitorJob: Job
         monitorJob = viewModelScope.launch(Dispatchers.IO, start = CoroutineStart.LAZY) {
-            val pendingChunks = StringBuilder()
+            val framer = CanConsoleStreamFramer()
+            fun framedEvents(batch: CanConsoleStreamFramer.Batch): List<CanConsoleHistoryEntry> {
+                val frames = parseCanConsoleReceiveEvents(batch.completeLines)
+                if (batch.discardedLines == 0) return frames
+                return frames + CanConsoleHistoryEntry(
+                    id = System.nanoTime(),
+                    direction = "SYSTEM",
+                    timestampMillis = System.currentTimeMillis(),
+                    content = localizedContext.getString(
+                        R.string.can_console_oversized_line, batch.discardedLines
+                    ),
+                    succeeded = false
+                )
+            }
+            var captureArchive: CanConsoleRawArchiveWriter? = null
             try {
                 // A quickly cancelled or superseded session must not create or claim a new archive.
                 if (canMonitorJob !== monitorJob || !currentCoroutineContext().isActive) return@launch
-                val archive = File.createTempFile("camarodiag-can-", ".log", getApplication<Application>().cacheDir)
+                val archive = try {
+                    File.createTempFile("camarodiag-can-", ".log", getApplication<Application>().cacheDir)
+                } catch (error: java.io.IOException) {
+                    throw CanCaptureArchiveWriteException(error)
+                }
                 val previousArchive = activeCanCaptureFile
                 activeCanCaptureFile = archive
                 previousArchive?.delete()
-                val captured = archive.bufferedWriter(Charsets.US_ASCII).use { writer ->
-                    obdManager.captureCanMonitor(durationMs) { chunk ->
+                val archiveStream = try {
+                    CanConsoleRawArchiveWriter(archive.bufferedWriter(Charsets.US_ASCII))
+                } catch (error: java.io.IOException) {
+                    throw CanCaptureArchiveWriteException(error)
+                }
+                captureArchive = archiveStream
+                val captured = archiveStream.use { writer ->
+                    obdManager.captureCanMonitor(durationMs, can29Bit) { chunk ->
                     if (canMonitorJob === monitorJob) {
-                        writer.write(chunk)
+                        writer.append(chunk)
                         // Keep the raw stream unchanged, but decode only complete lines:
                         // Bluetooth/USB reads may split a CAN record at any character.
-                        pendingChunks.append(chunk)
-                        // Protect long-running sessions from a malformed stream without line breaks.
-                        if (pendingChunks.length > 4096) pendingChunks.delete(0, pendingChunks.length - 4096)
                         val current = _liveCanMonitorState.value
                         val raw = (current.rawText + chunk).takeLast(131_072)
-                        val pendingText = pendingChunks.toString()
-                        val lineEnd = maxOf(pendingText.lastIndexOf('\n'), pendingText.lastIndexOf('\r'))
-                        val completeBatch = if (lineEnd >= 0) {
-                            pendingText.substring(0, lineEnd + 1).also {
-                                pendingChunks.delete(0, lineEnd + 1)
-                            }
-                        } else ""
-                        val receiveEvents = parseCanConsoleReceiveEvents(completeBatch)
+                        // Parse complete lines before enforcing the incomplete-line limit.
+                        // The raw archive always receives the original unmodified chunk.
+                        val receiveEvents = framedEvents(framer.append(chunk))
+                        recordConsoleEvents(receiveEvents)
                         val history = (current.consoleHistory + receiveEvents).takeLast(300)
-                        _liveCanMonitorState.value = current.copy(rawText = raw, consoleHistory = history)
+                        _liveCanMonitorState.value = current.copy(
+                            rawText = raw, consoleHistory = history,
+                            observedCanIds = retainObservedCanIds(current.observedCanIds, receiveEvents)
+                        )
                     }
                     }
                 }
+                // Publication of a complete CAN capture requires successful
+                // final flush and close, not merely a returned transport string.
+                check(archiveStream.isComplete) {
+                    "CAN capture archive did not finish writing successfully"
+                }
                 if (canMonitorJob === monitorJob) {
                     val raw = captured.takeLast(131_072)
-                    val trailing = pendingChunks.toString()
                     val currentBeforeReport = _liveCanMonitorState.value
-                    val trailingEvents = parseCanConsoleReceiveEvents(trailing)
+                    val trailingEvents = framedEvents(framer.drainTrailing())
+                    recordConsoleEvents(trailingEvents)
                     val historyWithTrailing =
                         (currentBeforeReport.consoleHistory + trailingEvents).takeLast(300)
-                    pendingChunks.clear()
                     val report = CanTraceAnalyzer.analyze(
                         raw.replace("\r\n", "\n").replace('\r', '\n'),
                         "live-can-monitor.txt"
                     )
                     val current = _liveCanMonitorState.value.copy(
-                        consoleHistory = historyWithTrailing.takeLast(300)
+                        consoleHistory = historyWithTrailing.takeLast(300),
+                        observedCanIds = retainObservedCanIds(
+                            currentBeforeReport.observedCanIds, trailingEvents
+                        )
                     )
                     val completeEvent = CanConsoleHistoryEntry(
                         id = System.nanoTime(),
@@ -1802,6 +2170,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         timestampMillis = System.currentTimeMillis(),
                         content = localizedContext.getString(R.string.can_sniffer_capture_complete)
                     )
+                    recordConsoleEvents(listOf(completeEvent))
                     _liveCanMonitorState.value = current.copy(
                         isCapturing = false,
                         rawText = raw,
@@ -1813,16 +2182,25 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             } catch (cancelled: CancellationException) {
                 if (canMonitorJob === monitorJob) {
                     val current = _liveCanMonitorState.value
-                    // Every chunk is already appended to rawText in the receive callback.
-                    // pendingChunks is only a line-framing buffer; appending it again duplicates
-                    // the final unterminated record when capture is stopped or fails.
+                    // Raw chunks were archived before parsing. Drain only the
+                    // unframed final line; do not append it to rawText a second time.
                     val raw = current.rawText.takeLast(131_072)
+                    val trailingEvents = framedEvents(framer.drainTrailing())
+                    val archiveFailed = CanConsoleExportPolicy.archiveFailedAfterStop(
+                        current.rawArchiveFailed,
+                        captureArchive?.isComplete == true
+                    )
                     val stoppedEvent = CanConsoleHistoryEntry(
                         id = System.nanoTime(),
                         direction = "SYSTEM",
                         timestampMillis = System.currentTimeMillis(),
-                        content = localizedContext.getString(R.string.can_sniffer_stop)
+                        content = localizedContext.getString(
+                            if (archiveFailed) R.string.can_sniffer_capture_failed
+                            else R.string.can_sniffer_stop
+                        ),
+                        succeeded = !archiveFailed
                     )
+                    recordConsoleEvents(trailingEvents + stoppedEvent)
                     val report = runCatching {
                         CanTraceAnalyzer.analyze(
                             raw.replace("\r\n", "\n").replace('\r', '\n'),
@@ -1834,7 +2212,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         rawText = raw,
                         report = report,
                         message = stoppedEvent.content,
-                        consoleHistory = (current.consoleHistory + stoppedEvent).takeLast(300)
+                        rawArchiveFailed = archiveFailed,
+                        consoleHistory = (current.consoleHistory + trailingEvents + stoppedEvent).takeLast(300),
+                        observedCanIds = retainObservedCanIds(current.observedCanIds, trailingEvents)
                     )
                 }
                 throw cancelled
@@ -1842,23 +2222,29 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 reportConnectionLoss(error)
                 if (canMonitorJob === monitorJob) {
                     val current = _liveCanMonitorState.value
-                    // Every chunk is already appended to rawText in the receive callback.
-                    // pendingChunks is only a line-framing buffer; appending it again duplicates
-                    // the final unterminated record when capture is stopped or fails.
+                    // Raw chunks were archived before parsing. Drain only the
+                    // unframed final line; do not append it to rawText a second time.
                     val raw = current.rawText.takeLast(131_072)
+                    val trailingEvents = framedEvents(framer.drainTrailing())
                     val failureMessage = localizedContext.getString(R.string.can_sniffer_capture_failed)
                     val failureEvent = CanConsoleHistoryEntry(
                         id = System.nanoTime(),
                         direction = "SYSTEM",
                         timestampMillis = System.currentTimeMillis(),
-                        content = error.message ?: failureMessage,
+                        content = failureMessage,
                         succeeded = false
                     )
+                    recordConsoleEvents(trailingEvents + failureEvent)
                     _liveCanMonitorState.value = current.copy(
                         isCapturing = false,
                         rawText = raw,
                         message = failureMessage,
-                        consoleHistory = (current.consoleHistory + failureEvent).takeLast(300)
+                        // Any abnormal capture termination leaves the physical stream incomplete.
+                        // Keep partial RX visible for diagnostics, but never advertise
+                        // its archive as a completed physical CAN acquisition.
+                        rawArchiveFailed = true,
+                        consoleHistory = (current.consoleHistory + trailingEvents + failureEvent).takeLast(300),
+                        observedCanIds = retainObservedCanIds(current.observedCanIds, trailingEvents)
                     )
                 }
             } finally {
@@ -1879,10 +2265,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private var detachedCanMonitorJob: Job? = null
     private var detachedCanRequestJob: Job? = null
 
-    private fun discardCanMonitor() {
-        // A changed vehicle must never inherit the previous vehicle's raw archive.
-        activeCanCaptureFile?.delete()
-        activeCanCaptureFile = null
+    private fun discardCanMonitor(deleteArchive: Boolean = true) {
+        // Vehicle/VIN changes delete old evidence; link disconnects retain it.
+        if (deleteArchive) {
+            activeCanCaptureFile?.delete()
+            activeCanCaptureFile = null
+        }
         val activeJob = canMonitorJob ?: return
         canMonitorJob = null
         detachedCanMonitorJob = activeJob
@@ -1906,10 +2294,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (current.isSendingRequest || current.isCapturing) return
         activeCanCaptureFile?.delete()
         activeCanCaptureFile = null
+        resetConsoleEventJournal()
         _liveCanMonitorState.value = current.copy(
+            consoleContextGeneration = ++canConsoleContextGeneration,
             rawText = "",
             report = null,
-            consoleHistory = emptyList()
+            consoleHistory = emptyList(),
+            observedCanIds = emptySet(),
+            rawArchiveFailed = false,
+            captureArchiveRequired = false
         )
     }
 
@@ -1923,25 +2316,88 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             activeJob.join()
             if (canMonitorJob === activeJob) {
+                // A LAZY coroutine cancelled before its first instruction never
+                // executes its use/finally cleanup or appends a Stop event.
+                // Treat that case as an aborted capture, not a successful one.
                 canMonitorJob = null
-                _liveCanMonitorState.value = _liveCanMonitorState.value.copy(isCapturing = false)
+                val current = _liveCanMonitorState.value
+                val failureMessage = localizedContext.getString(R.string.can_sniffer_capture_failed)
+                val event = CanConsoleHistoryEntry(
+                    id = System.nanoTime(),
+                    direction = "SYSTEM",
+                    timestampMillis = System.currentTimeMillis(),
+                    content = failureMessage,
+                    succeeded = false
+                )
+                recordConsoleEvents(listOf(event))
+                _liveCanMonitorState.value = current.copy(
+                    isCapturing = false,
+                    rawArchiveFailed = CanConsoleExportPolicy.archiveFailedAfterStop(
+                        current.rawArchiveFailed, writerCompleted = false
+                    ),
+                    message = failureMessage,
+                    consoleHistory = (current.consoleHistory + event).takeLast(300)
+                )
             }
         }
         // Do not detach: a later request must not overtake the adapter cleanup.
     }
 
-    /** Dispatches raw CAN frames and whitelisted OBD requests through the same console input. */
+    /** Standard OBD read availability is distinct from raw CAN monitor/transmit support. */
+    fun canConsoleReadObd(): Boolean = obdManager.isStandardObdReadAvailable()
+
+    /**
+     * Public console input accepts read-only OBD directly. A raw CAN frame is
+     * never transmitted here: it must pass through the session-bound explicit
+     * confirmation entry point, even if another UI caller invokes this method.
+     */
     fun sendCanConsoleInput(input: String) {
         if (!requirePremiumLicense()) return
-        val frame = RawCanFrameParser.parse(input)
-        if (frame == null) {
-            sendSafeObdRequest(input)
+        if (RawCanFrameParser.parse(input) != null) {
+            val message = localizedContext.getString(R.string.can_console_raw_tx_confirm_title)
+            appendCanConsoleSystemEvent(message, succeeded = false)
+            _liveCanMonitorState.value = _liveCanMonitorState.value.copy(message = message)
             return
         }
-        sendRawCanConsoleFrame(input, frame)
+        sendSafeObdRequest(input)
     }
 
-    private fun sendRawCanConsoleFrame(input: String, frame: com.camarodiag.gen5.data.obd.RawCanFrame) {
+    /**
+     * A confirmation dialog must not authorize TX on a replacement adapter or
+     * another vehicle. Recheck the live generation when the user confirms.
+     */
+    fun confirmRawCanConsoleFrame(
+        input: String,
+        expectedContextGeneration: Long,
+        approval: EcuWriteConsentFlow.Approval
+    ) {
+        if (!requirePremiumLicense()) return
+        val state = _liveCanMonitorState.value
+        val frame = RawCanFrameParser.parse(input)
+        if (!CanConsoleCapabilityPolicy.canConfirmPhysicalTx(
+                frame = frame,
+                pendingContextGeneration = expectedContextGeneration,
+                currentContextGeneration = state.consoleContextGeneration,
+                monitorAvailable = obdManager.isObdCommandChannelAvailable &&
+                    _adapter.value.supportsCanHeaders,
+                canTransmit = _adapter.value.supportsCanTransmit,
+                busy = state.isCapturing || state.isSendingRequest
+            )) return
+        sendRawCanConsoleFrame(input, requireNotNull(frame), expectedContextGeneration, approval)
+    }
+
+    private fun sendRawCanConsoleFrame(
+        input: String,
+        frame: com.camarodiag.gen5.data.obd.RawCanFrame,
+        confirmedConsoleGeneration: Long,
+        approval: EcuWriteConsentFlow.Approval
+    ) {
+        if (!SafeRawCanTransmitPolicy.allows(frame)) {
+            val message = localizedContext.getString(R.string.can_console_unsafe_can_payload)
+            appendCanConsoleSystemEvent(message, succeeded = false)
+            _liveCanMonitorState.value = _liveCanMonitorState.value.copy(message = message)
+            return
+        }
         val currentState = _liveCanMonitorState.value
         if (currentState.isSendingRequest || canRequestJob?.isActive == true ||
             detachedCanRequestJob?.isActive == true
@@ -1957,6 +2413,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _liveCanMonitorState.value = _liveCanMonitorState.value.copy(message = message)
             return
         }
+        val confirmedAccountGeneration = accountSessionGeneration
+        val confirmedAdapterGeneration = connectionAttemptGeneration
+        val confirmedVehicle = _vehicle.value
         val txEvent = CanConsoleHistoryEntry(
             id = System.nanoTime(),
             direction = "TX",
@@ -1969,54 +2428,179 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             message = null,
             consoleHistory = (currentState.consoleHistory + txEvent).takeLast(300)
         )
+        recordConsoleEvents(listOf(txEvent))
         lateinit var requestJob: Job
         requestJob = viewModelScope.launch(Dispatchers.IO, start = CoroutineStart.LAZY) {
+            val rawRxStream = CanConsoleRawRxStream()
+            var rxStreamFinished = false
+            fun persistResponseBatch(batch: CanConsoleRawRxStream.Batch) {
+                if (canRequestJob !== requestJob ||
+                    confirmedConsoleGeneration != _liveCanMonitorState.value.consoleContextGeneration ||
+                    !isCurrentAccountGeneration(confirmedAccountGeneration) ||
+                    confirmedAdapterGeneration != connectionAttemptGeneration ||
+                    confirmedVehicle != _vehicle.value
+                ) return
+                val records = batch.records.map { received ->
+                    CanConsoleHistoryEntry(
+                        id = System.nanoTime(),
+                        direction = received.direction,
+                        timestampMillis = batch.receivedAtMillis,
+                        content = received.content,
+                        succeeded = received.succeeded
+                    )
+                }
+                val discarded = if (batch.discardedOversizedLines > 0) {
+                    listOf(CanConsoleHistoryEntry(
+                        id = System.nanoTime(),
+                        direction = "SYSTEM",
+                        timestampMillis = batch.receivedAtMillis,
+                        content = localizedContext.getString(
+                            R.string.can_console_oversized_line, batch.discardedOversizedLines
+                        ),
+                        succeeded = false
+                    ))
+                } else emptyList()
+                // Persist each physical RX batch, not just the diagnostic
+                // matcher’s recent 300-record UI window. The callback runs
+                // on IO and keeps constant memory during long ECU replies.
+                recordConsoleEvents(records + discarded)
+            }
+            fun drainResponseStream() {
+                if (!rxStreamFinished) {
+                    rxStreamFinished = true
+                    persistResponseBatch(rawRxStream.finish())
+                }
+            }
             try {
-                val response = obdManager.sendRawCanFrame(frame)
+                val transmission = obdManager.sendRawCanFrameWithStatus(
+                    frame, approval,
+                    onPhysicalResponseChunk = { chunk, receivedAtMillis ->
+                        persistResponseBatch(rawRxStream.append(chunk, receivedAtMillis))
+                    }
+                ) {
+                    isCurrentAccountGeneration(confirmedAccountGeneration) &&
+                        confirmedAdapterGeneration == connectionAttemptGeneration &&
+                        confirmedVehicle == _vehicle.value &&
+                        confirmedConsoleGeneration == _liveCanMonitorState.value.consoleContextGeneration
+                }
+                drainResponseStream()
+                val response = transmission.adapterOutput
                 if (canRequestJob === requestJob) {
                     val current = _liveCanMonitorState.value
-                    val receivedEvents = parseCanConsoleReceiveEvents(response).ifEmpty {
-                        listOf(
-                            CanConsoleHistoryEntry(
-                                id = System.nanoTime(),
-                                direction = "SYSTEM",
-                                timestampMillis = System.currentTimeMillis(),
-                                content = localizedContext.getString(
-                                    R.string.can_console_adapter_ack,
-                                    response.ifBlank { "No adapter text returned" }
-                                )
-                            )
+                    val diagnosticStatus = transmission.diagnosticStatus
+                    val streamedRecords = transmission.receivedRecords
+                    // Only frames observed through the physical receive callback
+                    // have a trustworthy RX provenance and reception timestamp.
+                    // Adapter output alone can contain echoes, prompts or truncated
+                    // text; never reconstruct ECU RX from that fallback string.
+                    val receivedEvents = streamedRecords.map { timed ->
+                        CanConsoleHistoryEntry(
+                            id = System.nanoTime(),
+                            direction = timed.record.direction,
+                            timestampMillis = timed.timestampMillis,
+                            content = timed.record.content,
+                            succeeded = timed.record.succeeded
                         )
                     }
+                    val displayedReceivedEvents = receivedEvents.ifEmpty {
+                        listOf(CanConsoleHistoryEntry(
+                            id = System.nanoTime(),
+                            direction = "SYSTEM",
+                            timestampMillis = System.currentTimeMillis(),
+                            content = localizedContext.getString(
+                                R.string.can_console_adapter_ack,
+                                response.ifBlank {
+                                    localizedContext.getString(R.string.can_console_no_adapter_text)
+                                }
+                            )
+                        ))
+                    }
+                    // Live RX was already written in full through the
+                    // transport callback; only a fallback acknowledgement
+                    // needs to be appended when no physical record arrived.
+                    if (rawRxStream.recordCount == 0L)
+                        recordConsoleEvents(displayedReceivedEvents)
                     _liveCanMonitorState.value = current.copy(
                         isSendingRequest = false,
                         consoleHistory = (
                             current.consoleHistory.map { if (it.id == txEvent.id) it.copy(succeeded = true) else it } +
-                                receivedEvents
+                                displayedReceivedEvents
                         ).takeLast(300),
-                        message = localizedContext.getString(R.string.can_sniffer_request_complete)
+                        observedCanIds = retainObservedCanIds(current.observedCanIds, displayedReceivedEvents),
+                        message = localizedContext.getString(when (diagnosticStatus) {
+                            CanConsoleDiagnosticStatus.POSITIVE -> R.string.can_sniffer_request_complete
+                            CanConsoleDiagnosticStatus.NEGATIVE -> R.string.can_console_negative_ecu_response
+                            CanConsoleDiagnosticStatus.NONE -> R.string.can_console_tx_ack_only
+                        })
                     )
                 }
             } catch (cancelled: CancellationException) {
+                drainResponseStream()
                 if (canRequestJob === requestJob) {
-                    _liveCanMonitorState.value = _liveCanMonitorState.value.copy(isSendingRequest = false)
+                    val current = _liveCanMonitorState.value
+                    val receivedEvents = (cancelled as? CanConsolePhysicalExchangeCancelled)
+                        ?.receivedRecords.orEmpty().map { timed ->
+                            CanConsoleHistoryEntry(
+                                id = System.nanoTime(),
+                                direction = timed.record.direction,
+                                timestampMillis = timed.timestampMillis,
+                                content = timed.record.content,
+                                succeeded = timed.record.succeeded
+                            )
+                        }
+                    if (rawRxStream.recordCount == 0L) recordConsoleEvents(receivedEvents)
+                    // A cancelled TX stays pending/unsuccessful. Old vehicle jobs
+                    // cannot reach this branch after detachCanRequest().
+                    _liveCanMonitorState.value = current.copy(
+                        isSendingRequest = false,
+                        consoleHistory = (current.consoleHistory + receivedEvents).takeLast(300),
+                        observedCanIds = retainObservedCanIds(current.observedCanIds, receivedEvents)
+                    )
                 }
                 throw cancelled
             } catch (error: Exception) {
+                drainResponseStream()
                 if (canRequestJob === requestJob) {
                     reportConnectionLoss(error)
                     val current = _liveCanMonitorState.value
+                    val receivedEvents = (error as? CanConsolePhysicalExchangeException)
+                        ?.receivedRecords.orEmpty().map { timed ->
+                            CanConsoleHistoryEntry(
+                                id = System.nanoTime(),
+                                direction = timed.record.direction,
+                                timestampMillis = timed.timestampMillis,
+                                content = timed.record.content,
+                                succeeded = timed.record.succeeded
+                            )
+                        }
+                    val errorMessage = localizedContext.getString(
+                        if ((error as? CanConsolePhysicalExchangeException)?.isResponseTimeout() == true ||
+                            error is java.net.SocketTimeoutException
+                        ) R.string.can_console_response_timeout
+                        else R.string.can_sniffer_request_failed
+                    )
                     val errorEvent = CanConsoleHistoryEntry(
                         id = System.nanoTime(),
                         direction = "SYSTEM",
                         timestampMillis = System.currentTimeMillis(),
-                        content = error.message ?: localizedContext.getString(R.string.can_sniffer_request_failed),
+                        content = errorMessage,
                         succeeded = false
+                    )
+                    // Only the error outcome is new: physical RX was
+                    // already persisted before this late transport failure.
+                    recordConsoleEvents(
+                        (if (rawRxStream.recordCount == 0L) receivedEvents else emptyList()) +
+                            errorEvent
                     )
                     _liveCanMonitorState.value = current.copy(
                         isSendingRequest = false,
-                        consoleHistory = (current.consoleHistory.map { if (it.id == txEvent.id) it.copy(succeeded = false) else it } + errorEvent).takeLast(300),
-                        message = localizedContext.getString(R.string.can_sniffer_request_failed)
+                        consoleHistory = (
+                            current.consoleHistory.map {
+                                if (it.id == txEvent.id) it.copy(succeeded = false) else it
+                            } + receivedEvents + errorEvent
+                        ).takeLast(300),
+                        observedCanIds = retainObservedCanIds(current.observedCanIds, receivedEvents),
+                        message = errorMessage
                     )
                 }
             } finally {
@@ -2042,7 +2626,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (currentState.isSendingRequest || canRequestJob?.isActive == true ||
             detachedCanRequestJob?.isActive == true
         ) return
-        if (!obdManager.isObdCommandChannelAvailable ||
+        if (!obdManager.isStandardObdReadAvailable() ||
             currentState.isCapturing ||
             canMonitorJob?.isActive == true ||
             detachedCanMonitorJob?.isActive == true
@@ -2067,37 +2651,43 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             message = null,
             consoleHistory = (currentState.consoleHistory + txEvent).takeLast(300)
         )
+        recordConsoleEvents(listOf(txEvent))
         lateinit var requestJob: Job
         requestJob = viewModelScope.launch(Dispatchers.IO, start = CoroutineStart.LAZY) {
             try {
-                val response = obdManager.sendAtCommand(request.elmCommand, 4_000L)
+                val response = obdManager.sendReadOnlyConsoleCommand(request)
                 if (canRequestJob === requestJob) {
                     val current = _liveCanMonitorState.value
-                    val hasEcuResponse =
-                        Regex("(?i)(?:^|\\s)(?:41|43|47|49|4A|7F)(?:\\s|$)")
-                            .containsMatchIn(response) ||
-                            RawCanFrameParser.parseReceivedFrames(response).isNotEmpty()
+                    val kind = SafeObdRequestPolicy.classifyResponse(request, response)
+                    val hasEcuResponse = kind == SafeObdRequestPolicy.ReadResponseKind.POSITIVE_ECU
+                    // An ECU negative response proves the TX was delivered,
+                    // although the requested diagnostic read was refused.
+                    val isEcuTraffic = kind != SafeObdRequestPolicy.ReadResponseKind.UNMATCHED_OR_ADAPTER
                     val responseEvent = CanConsoleHistoryEntry(
                         id = System.nanoTime(),
-                        direction = if (hasEcuResponse) "RX" else "SYSTEM",
+                        direction = if (isEcuTraffic) "RX" else "SYSTEM",
                         timestampMillis = System.currentTimeMillis(),
-                        content = if (hasEcuResponse) {
+                        content = if (isEcuTraffic) {
                             response
                         } else {
                             localizedContext.getString(
                                 R.string.can_console_adapter_ack,
-                                response.ifBlank { "No adapter text returned" }
+                                response.ifBlank { localizedContext.getString(R.string.can_console_no_adapter_text) }
                             )
                         },
                         succeeded = hasEcuResponse
                     )
+                    recordConsoleEvents(listOf(responseEvent))
                     _liveCanMonitorState.value = current.copy(
                         isSendingRequest = false,
                         consoleHistory = (
-                            current.consoleHistory.map { if (it.id == txEvent.id) it.copy(succeeded = true) else it } +
+                            current.consoleHistory.map { if (it.id == txEvent.id) it.copy(succeeded = isEcuTraffic) else it } +
                                 responseEvent
                         ).takeLast(300),
-                        message = localizedContext.getString(R.string.can_sniffer_request_complete)
+                        message = localizedContext.getString(
+                            if (hasEcuResponse) R.string.can_sniffer_request_complete
+                            else R.string.can_sniffer_request_failed
+                        )
                     )
                 }
             } catch (cancelled: CancellationException) {
@@ -2116,6 +2706,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         content = localizedContext.getString(R.string.can_sniffer_request_failed),
                         succeeded = false
                     )
+                    recordConsoleEvents(listOf(errorEvent))
                     _liveCanMonitorState.value = current.copy(
                         isSendingRequest = false,
                         consoleHistory = (current.consoleHistory.map { if (it.id == txEvent.id) it.copy(succeeded = false) else it } + errorEvent).takeLast(300),
@@ -2130,49 +2721,109 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         requestJob.start()
     }
 
+    /** The console button and the export worker must enforce identical archive rules. */
+    fun canExportCanCapture(): Boolean {
+        val state = _liveCanMonitorState.value
+        val archive = activeCanCaptureFile?.takeIf { it.isFile }
+        return !consoleEventJournalFailed && !consoleEventJournal.hasFailed() &&
+            (state.consoleHistory.isEmpty() || consoleEventJournal.isAvailable()) &&
+            CanConsoleExportPolicy.canExport(
+            isCapturing = state.isCapturing,
+            archiveFailed = state.rawArchiveFailed,
+            hasHistory = state.consoleHistory.isNotEmpty(),
+            hasRawData = state.rawText.isNotBlank() || (archive?.length() ?: 0L) > 0L,
+            isSendingRequest = state.isSendingRequest,
+            requiresRawArchive = state.captureArchiveRequired,
+            hasRawArchive = archive != null
+        )
+    }
+
     /** Export the latest raw CAN capture without transforming adapter output. */
     fun exportCanCapture(fileName: String) {
         if (!requirePremiumLicense()) return
         val owner = authenticatedAccountUid ?: return
         val exportGeneration = accountSessionGeneration
         val profile = _vehicle.value
-        fun current() = canResumeExport(exportGeneration, owner) &&
-            _vehicle.value == profile && hasPremiumLicense()
         val snapshot = _liveCanMonitorState.value
         val history = snapshot.consoleHistory.toList()
         val selectedArchive = activeCanCaptureFile
+        // The UI must never flush and SHA-256 hash a multi-hour event archive.
+        // Capture only a cheap journal revision; the worker reads and hashes
+        // the actual bytes on Dispatchers.IO before publishing the export.
+        val journalRevisionAtClick = consoleEventJournal.revision()
+        var expectedJournalSnapshot: CanConsoleEventJournalStore.Snapshot? = null
+        var expectedRawArchiveSnapshot: CanConsoleRawArchiveIntegrity.Snapshot? = null
+        // Do not publish an old snapshot after Clear, a new recording, or a
+        // new physical TX has changed the active console since export started.
+        fun sameConsoleContext() = canResumeExport(exportGeneration, owner) &&
+            _vehicle.value == profile && hasPremiumLicense() &&
+            activeCanCaptureFile == selectedArchive &&
+            _liveCanMonitorState.value.consoleContextGeneration == snapshot.consoleContextGeneration
+        fun current() = sameConsoleContext() &&
+            (expectedRawArchiveSnapshot?.let { CanConsoleRawArchiveIntegrity.isCurrent(it) } != false) &&
+            !consoleEventJournalFailed && !consoleEventJournal.hasFailed() &&
+            consoleEventJournal.revision() == journalRevisionAtClick &&
+            (expectedJournalSnapshot?.let { consoleEventJournal.isCurrent(it) } != false) &&
+            !_liveCanMonitorState.value.isCapturing &&
+            !_liveCanMonitorState.value.isSendingRequest &&
+            !_liveCanMonitorState.value.rawArchiveFailed &&
+            _liveCanMonitorState.value.captureArchiveRequired == snapshot.captureArchiveRequired &&
+            _liveCanMonitorState.value.consoleContextGeneration == snapshot.consoleContextGeneration &&
+            _liveCanMonitorState.value.consoleHistory == history &&
+            _liveCanMonitorState.value.rawText == snapshot.rawText
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 if (!current()) return@launch
+                val journalSnapshot = consoleEventJournal.snapshot()
+                expectedJournalSnapshot = journalSnapshot
+                check(current()) { "Console event journal changed before export" }
                 val archive = selectedArchive?.takeIf { it.isFile }
-                require(history.isNotEmpty() || snapshot.rawText.isNotBlank() ||
-                    (archive?.length() ?: 0L) > 0L) {
-                    "No CAN console history is available to export."
+                check(selectedArchive == null || archive != null) {
+                    "The selected complete CAN raw archive disappeared before export"
                 }
+                check(history.isEmpty() || journalSnapshot != null) {
+                    "Complete console event journal is unavailable"
+                }
+                check(CanConsoleExportPolicy.canExport(
+                    isCapturing = snapshot.isCapturing,
+                    archiveFailed = snapshot.rawArchiveFailed,
+                    hasHistory = history.isNotEmpty(),
+                    hasRawData = snapshot.rawText.isNotBlank() || (archive?.length() ?: 0L) > 0L,
+                    isSendingRequest = snapshot.isSendingRequest,
+                    requiresRawArchive = snapshot.captureArchiveRequired,
+                    hasRawArchive = archive != null
+                )) {
+                    "CAN capture export is not available."
+                }
+                // The raw capture must have the same exact bytes at export
+                // completion as it had at the start. This hashes on IO only;
+                // no entire CAN archive is loaded into RAM.
+                expectedRawArchiveSnapshot = archive?.let {
+                    CanConsoleRawArchiveIntegrity.capture(it)
+                }
+                check(current()) { "CAN raw archive changed before export" }
                 val outputText = buildString {
-                    appendLine("# CamaroDiag unified CAN console")
-                    appendLine("# TX = transmitted • RX = received • SYSTEM = application event")
-                    history.sortedBy { it.timestampMillis }.forEach { entry ->
-                        val timestamp = java.text.SimpleDateFormat(
-                            "yyyy-MM-dd HH:mm:ss.SSS",
-                            java.util.Locale.ROOT
-                        ).format(java.util.Date(entry.timestampMillis))
-                        append(timestamp)
-                        append(" [")
-                        append(entry.direction)
-                        if (!entry.succeeded) append(" FAILED")
-                        append("] ")
-                        appendLine(entry.content)
-                    }
-                    if (archive != null || snapshot.rawText.isNotBlank()) {
-                        appendLine()
-                        appendLine("# RX RAW — received adapter stream (unmodified)")
-                    }
+                    appendLine(localizedContext.getString(R.string.can_console_export_header))
+                    appendLine(localizedContext.getString(
+                        if (journalSnapshot != null) R.string.can_console_export_events_full
+                        else R.string.can_console_export_events_limited
+                    ))
+                    appendLine(localizedContext.getString(R.string.can_console_export_direction_legend))
                 }
-                CamaroDiagExportStorage.write(getApplication<Application>(), fileName, "text/plain",
-                    beforePublish = { check(current()) }
+                val savedPath = CamaroDiagExportStorage.write(getApplication<Application>(), fileName, "text/plain",
+                    category = CamaroDiagExportStorage.Category.CONSOLE, beforePublish = { check(current()) }
                 ) { sink ->
                     sink.write(outputText.toByteArray(Charsets.UTF_8))
+                    if (journalSnapshot != null) {
+                        journalSnapshot.file.inputStream().use { source -> source.copyTo(sink) }
+                    }
+                    if (archive != null || snapshot.rawText.isNotBlank()) {
+                        val rawHeader = "\n" + localizedContext.getString(
+                            if (archive != null) R.string.can_console_export_full_raw_rx
+                            else R.string.can_console_export_recent_raw_rx
+                        ) + "\n"
+                        sink.write(rawHeader.toByteArray(Charsets.UTF_8))
+                    }
                     if (archive != null) {
                         archive.inputStream().use { source -> source.copyTo(sink) }
                     } else if (snapshot.rawText.isNotBlank()) {
@@ -2180,12 +2831,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     }
                 }
                 if (current()) _liveCanMonitorState.update {
-                    it.copy(message = localizedContext.getString(R.string.can_sniffer_capture_complete))
+                    it.copy(message = localizedContext.getString(R.string.can_sniffer_capture_complete) + "\n" + savedPath)
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
-                if (current()) _liveCanMonitorState.update {
+                // A corrupted journal or changed raw archive intentionally
+                // makes current() false. Still tell the user that this export
+                // failed, but never overwrite a new account/vehicle/session.
+                if (sameConsoleContext() &&
+                    !_liveCanMonitorState.value.isCapturing &&
+                    !_liveCanMonitorState.value.isSendingRequest
+                ) _liveCanMonitorState.update {
                     it.copy(message = localizedContext.getString(R.string.can_sniffer_capture_failed))
                 }
             }
@@ -2308,7 +2965,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     val resolver = getApplication<Application>().contentResolver
                     val stream = requireNotNull(resolver.openInputStream(uri))
                     // The mobile importer keeps both reads in memory. The limit includes the manifest.
-                    val manifest = stream.use { EcuBackupArchive.import(it, 32L * 1024 * 1024).manifest }
+                    val manifest = stream.use {
+                        EcuBackupArchive.import(
+                            it, EcuBackupArchive.MAX_J2534_IMPORT_UNCOMPRESSED_BYTES
+                        ).manifest
+                    }
                     ArchiveVerification.Verified(manifest)
                 }
             } catch (cancelled: CancellationException) {
@@ -2611,11 +3272,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val exportGeneration = accountSessionGeneration
         viewModelScope.launch {
             try {
-                CamaroDiagExportStorage.write(getApplication<Application>(), fileName, "text/tab-separated-values",
-                    beforePublish = { check(isCurrentAccountGeneration(exportGeneration) && hasPremiumLicense()) }
+                val savedPath = CamaroDiagExportStorage.write(getApplication<Application>(), fileName, "text/tab-separated-values",
+                    category = CamaroDiagExportStorage.Category.CALIBRATIONS, beforePublish = { check(isCurrentAccountGeneration(exportGeneration) && hasPremiumLicense()) }
                 ) { it.write(CalibrationTableCodec.template.toByteArray(Charsets.UTF_8)) }
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
-                    message = localizedContext.getString(R.string.msg_cal_template_exported)
+                    message = localizedContext.getString(R.string.msg_cal_template_exported) + "\n" + savedPath
                 )
             } catch (cancelled: CancellationException) {
                 throw cancelled
@@ -2884,9 +3545,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val length = original.length()
                 require(length in 1L..EcuExternalDumpPair.MAX_DUMP_BYTES.toLong() &&
                     repeated.length() == length)
-                CamaroDiagExportStorage.write(getApplication<Application>(),
+                val savedPath = CamaroDiagExportStorage.write(getApplication<Application>(),
                     "CamaroDiag_ECU_import_${method.name}_${System.currentTimeMillis()}.zip",
-                    "application/zip", beforePublish = { check(current()) }
+                    "application/zip", category = CamaroDiagExportStorage.Category.ECU_BACKUPS, beforePublish = { check(current()) }
                 ) { output ->
                     original.inputStream().use { first ->
                         repeated.inputStream().use { second ->
@@ -2897,7 +3558,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     }
                 }
                 if (current()) _calibrationWorkspace.update {
-                    it.copy(message = localizedContext.getString(R.string.export_folder_success))
+                    it.copy(message = localizedContext.getString(R.string.export_folder_success) + "\n" + savedPath)
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
@@ -2924,11 +3585,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val sourcePath = selectedPath ?: error("Aucun fichier de calibration n'est chargé.")
                 val source = File(sourcePath)
                 check(source.isFile && source.exists()) { "Le fichier local de calibration est introuvable." }
-                CamaroDiagExportStorage.write(getApplication<Application>(), fileName, "application/octet-stream",
-                    beforePublish = { check(current()) }
+                val savedPath = CamaroDiagExportStorage.write(getApplication<Application>(), fileName, "application/octet-stream",
+                    category = CamaroDiagExportStorage.Category.CALIBRATIONS, beforePublish = { check(current()) }
                 ) { target -> source.inputStream().use { it.copyTo(target) } }
                 if (current()) _calibrationWorkspace.update {
-                    it.copy(message = localizedContext.getString(R.string.msg_cal_file_exported))
+                    it.copy(message = localizedContext.getString(R.string.msg_cal_file_exported) + "\n" + savedPath)
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
@@ -2941,24 +3602,44 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun markAdapterDisconnected() {
+        // Capture the active state *before* Stop can complete asynchronously.
+        // Otherwise a partially archived monitor session could be exported as complete.
+        val wasCapturing = canMonitorJob != null || _liveCanMonitorState.value.isCapturing
         stopCanMonitor()
-        // Keep RX/TX history and already captured text across a disconnect or
-        // adapter switch. Only explicit "clear history" may erase the console.
+        // Keep RX/TX history and the raw archive across adapter disconnects;
+        // explicit vehicle/VIN changes still clear both to prevent data mixing.
         _liveCanMonitorState.value = _liveCanMonitorState.value.copy(
             isCapturing = false,
-            isSendingRequest = false
+            isSendingRequest = false,
+            rawArchiveFailed = CanConsoleExportPolicy.archiveFailedAfterDisconnect(
+                _liveCanMonitorState.value.rawArchiveFailed, wasCapturing
+            )
         )
         _adapter.value = AdapterCapabilities()
         _modules.value = CamaroUdsProtocol.buildTopology(_vehicle.value, _adapter.value)
         _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
             isJ2534BridgeConnecting = false,
-            isJ2534BridgeConnected = false
+            isJ2534BridgeConnected = false,
+            isJ2534MemoryReadAvailable = false
         )
-        clearVehicleEvidence()
+        clearVehicleEvidence(preserveCanConsole = true)
         _isObdScanning.value = false
     }
 
     @Volatile private var connectionAttemptGeneration: Long = 0L
+    private val _connectionGeneration = MutableStateFlow(0L)
+    private var pendingUsbPermissionRetry: UsbPermissionReconnectPolicy.Pending? = null
+    val connectionGeneration: StateFlow<Long> = _connectionGeneration.asStateFlow()
+
+    /** Shared revision for all physical/simulated adapter transitions.
+     * A consent dialog from an older revision can never authorize a write.
+     */
+    private fun nextConnectionGeneration(): Long {
+        val next = ++connectionAttemptGeneration
+        pendingUsbPermissionRetry = null
+        _connectionGeneration.value = next
+        return next
+    }
     private var connectionAttemptJob: Job? = null
 
     private fun connectWithResult(
@@ -2968,7 +3649,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         endpoint: String,
         discoveryOnly: Boolean = false
     ) {
-        val attempt = ++connectionAttemptGeneration
+        val attempt = nextConnectionGeneration()
+        pendingUsbPermissionRetry = UsbPermissionReconnectPolicy.forSelection(
+            transport, endpoint, attempt
+        )
+        invalidateFuelHistoryForConnectionChange()
         val previousAttempt = connectionAttemptJob
         previousAttempt?.cancel()
         connectionAttemptJob = viewModelScope.launch {
@@ -2992,6 +3677,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 connect()
                     .onSuccess { capabilities ->
                         if (attempt == connectionAttemptGeneration) {
+                            pendingUsbPermissionRetry = null
                             _adapter.value = capabilities
                             if (!discoveryOnly) {
                                 rememberConnectionProfile(transport, capabilities, endpoint)
@@ -2999,15 +3685,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             }
                         }
                     }
-                    .onFailure {
+                    .onFailure { error ->
                         if (attempt == connectionAttemptGeneration) {
-                            _connectionMessage.value = fallbackMessage
+                            val permissionRequired = AdapterConnectionFailurePolicy.classify(error) ==
+                                AdapterConnectionFailurePolicy.Kind.USB_PERMISSION_REQUIRED
+                            if (!permissionRequired) pendingUsbPermissionRetry = null
+                            _connectionMessage.value = if (permissionRequired) {
+                                localizedContext.getString(R.string.msg_usb_permission_pending)
+                            } else fallbackMessage
                         }
                     }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
                 if (attempt == connectionAttemptGeneration) {
+                    pendingUsbPermissionRetry = null
                     _connectionMessage.value = fallbackMessage
                 }
             } finally {
@@ -3054,30 +3746,52 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun connectWifi(host: String, port: Int) {
+        val endpoint = try {
+            AdapterEndpointPreflight.wifi(host, port)
+        } catch (_: IllegalArgumentException) {
+            _connectionMessage.value = localizedContext.getString(R.string.msg_wifi_connection_failed)
+            return
+        }
         connectWithResult(
-            connect = { obdManager.connectWifi(host.trim(), port) },
+            connect = { obdManager.connectWifi(endpoint.host, endpoint.port) },
             fallbackMessage = localizedContext.getString(R.string.msg_wifi_connection_failed),
             transport = "wifi",
-            endpoint = "${host.trim()}:$port"
+            endpoint = "${endpoint.host}:${endpoint.port}"
         )
     }
 
     fun discoverCamaroDiagConnector(deviceLabel: String, binary: Boolean = false) {
-        val id = Regex("#(\\d+)").find(deviceLabel)?.groupValues?.get(1)?.toIntOrNull()
-        if (id == null) {
+        val id = com.camarodiag.gen5.data.obd.CamaroDiagConnectorDiscovery.deviceIdFromLabel(deviceLabel)
+        if (id == null || !com.camarodiag.gen5.data.obd.CamaroDiagConnectorDiscovery
+                .allowsDedicatedUsbDiscovery(id, _usbDevices.value)) {
+            // Reject a mismatched/stale UI entry without switching away from
+            // an active OBD/J2534 adapter. Manager rechecks the live USB list.
             _connectionMessage.value = localizedContext.getString(R.string.msg_usb_identifier_unavailable)
             return
         }
         connectWithResult(
             connect = { obdManager.discoverCamaroDiagConnector(id, binary) },
             fallbackMessage = localizedContext.getString(R.string.msg_usb_connection_failed),
-            transport = "connector_usb",
+            transport = if (binary) "connector_usb_binary" else "connector_usb",
             endpoint = deviceLabel,
             discoveryOnly = true
         )
     }
 
+    /** CDJ/1 physical acquisition is not implemented in the connector
+     * firmware. Do not switch transports or produce a placeholder backup.
+     */
+    @Suppress("UNUSED_PARAMETER")
+    fun captureConnectorCheckpoint(deviceLabel: String) {
+        _connectionMessage.value = localizedContext.getString(R.string.status_not_verified)
+    }
+
     fun connectUsb(deviceLabel: String) {
+        val enumerated = _usbDevices.value
+        if (deviceLabel !in enumerated) {
+            _connectionMessage.value = localizedContext.getString(R.string.msg_usb_identifier_unavailable)
+            return
+        }
         if (com.camarodiag.gen5.data.obd.CamaroDiagConnectorDiscovery.isLegacyKklUsbLabel(deviceLabel)) {
             _connectionMessage.value = localizedContext.getString(R.string.status_not_verified)
             return
@@ -3086,7 +3800,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             discoverCamaroDiagConnector(deviceLabel)
             return
         }
-        val id = Regex("#(\\d+)").find(deviceLabel)?.groupValues?.get(1)?.toIntOrNull()
+        val id = com.camarodiag.gen5.data.obd.CamaroDiagConnectorDiscovery.deviceIdFromLabel(deviceLabel)
         if (id == null) {
             _connectionMessage.value = localizedContext.getString(R.string.msg_usb_identifier_unavailable)
             return
@@ -3101,7 +3815,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun selectSimulatedAdapter(preset: String) {
-        val attempt = ++connectionAttemptGeneration
+        val attempt = nextConnectionGeneration()
+        invalidateFuelHistoryForConnectionChange()
         val previousAttempt = connectionAttemptJob
         previousAttempt?.cancel()
         connectionAttemptJob = viewModelScope.launch {
@@ -3148,16 +3863,23 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun connectRealBluetooth(macAddress: String) {
-        val selectedName = _pairedDevices.value.firstOrNull { it.second == macAddress }?.first.orEmpty()
-        if (selectedName.contains("OBDLink CX", ignoreCase = true)) {
-            _connectionMessage.value = localizedContext.getString(R.string.msg_obdlink_cx_not_gm_compatible)
+        val selectedAddress = try {
+            AdapterEndpointPreflight.bluetoothMac(macAddress)
+        } catch (_: IllegalArgumentException) {
+            _connectionMessage.value = localizedContext.getString(R.string.msg_bluetooth_connection_failed)
             return
         }
+        val selectedName = _pairedDevices.value.firstOrNull {
+            it.second.equals(selectedAddress, ignoreCase = true)
+        }?.first.orEmpty()
+        // An OBDLink CX may support standard OBD over its BLE UART even when
+        // GM enhanced services are unavailable. Let the physical BLE probe
+        // determine capabilities instead of refusing the adapter by product name.
         connectWithResult(
-            connect = { obdManager.connectAndProbe(macAddress) },
+            connect = { obdManager.connectAndProbe(selectedAddress) },
             fallbackMessage = localizedContext.getString(R.string.msg_bluetooth_connection_failed),
             transport = "bluetooth",
-            endpoint = "$selectedName ($macAddress)"
+            endpoint = "$selectedName ($selectedAddress)"
         )
     }
 
@@ -3217,11 +3939,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     vin = v.vin,
                     vehicleLabel = "${v.modelYear} Camaro ${v.engine.rpo} • ${v.generation.label} • ${v.transmission.name}"
                 )
-                CamaroDiagExportStorage.write(getApplication<Application>(), fileName, "text/csv",
-                    beforePublish = { check(current()) }
+                val savedPath = CamaroDiagExportStorage.write(getApplication<Application>(), fileName, "text/csv",
+                    category = CamaroDiagExportStorage.Category.TELEMETRY, beforePublish = { check(current()) }
                 ) { it.write(csv.toByteArray(Charsets.UTF_8)) }
                 if (current()) _liveRecordingState.update {
-                    it.copy(message = localizedContext.getString(R.string.msg_live_csv_exported, snapshot.size))
+                    it.copy(message = localizedContext.getString(R.string.msg_live_csv_exported, snapshot.size) + "\n" + savedPath)
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
@@ -3359,10 +4081,23 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         return if (isFr) entry.second else entry.first
     }
 
-    fun clearDtcs() {
+    fun clearDtcs(
+        approval: EcuWriteConsentFlow.Approval,
+        confirmedConnection: Long,
+        confirmedVehicle: VehicleProfile
+    ) {
+        require(approval.warningAcknowledged && approval.confirmedYes) {
+            "The ECU write warning OK and subsequent YES are required."
+        }
+        // The warning, YES and eventual command must refer to exactly the
+        // same connection and vehicle identity, including VIN/profile changes.
+        if (confirmedConnection != connectionAttemptGeneration ||
+            confirmedVehicle != _vehicle.value) return
         val account = accountSessionGeneration
-        val connection = connectionAttemptGeneration
-        fun current() = isCurrentAccountGeneration(account) && connection == connectionAttemptGeneration
+        val connection = confirmedConnection
+        fun current() = isCurrentAccountGeneration(account) &&
+            connection == connectionAttemptGeneration &&
+            confirmedVehicle == _vehicle.value
         viewModelScope.launch {
             if (!current()) return@launch
             beginBusyOperation()
@@ -3371,7 +4106,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     _dtcs.value = emptyList()
                     _connectionMessage.value = localizedContext.getString(R.string.msg_dtc_demo_cleared)
                 } else if (obdManager.isJ2534StandardObdClearAvailable()) {
-                    obdManager.clearJ2534StandardDtcs()
+                    obdManager.clearJ2534StandardDtcs(approval) {
+                        EcuWriteConsentFlow.requireCurrentForTransmit(approval) { current() }
+                    }
                     if (!current()) return@launch
                     // Mode 04 does not erase permanent emissions DTCs. Preserve
                     // all other module records and require a new scan to refresh.
@@ -3389,7 +4126,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         else -> localizedContext.getString(R.string.msg_dtc_clear_adapter_required)
                     }
                 } else {
-                    val response = obdManager.sendAtCommand("04", 2500L)
+                    val response = obdManager.sendAtCommand("04", 2500L) {
+                        EcuWriteConsentFlow.requireCurrentForTransmit(approval) { current() }
+                    }
                     if (!current()) return@launch
                     if (com.camarodiag.gen5.data.obd.StandardObdClearEvidence.acknowledged(response)) {
                         // SAE Mode 04 clears standardized emissions DTCs only.
@@ -3762,12 +4501,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
             json.put("checks", checks)
             try {
-                CamaroDiagExportStorage.write(getApplication<Application>(), fileName, "application/json",
-                    beforePublish = { check(isCurrentAccountGeneration(sessionGeneration) &&
+                val savedPath = CamaroDiagExportStorage.write(getApplication<Application>(), fileName, "application/json",
+                    category = CamaroDiagExportStorage.Category.TESTS, beforePublish = { check(isCurrentAccountGeneration(sessionGeneration) &&
                         authenticatedAccountUid == accountUid && currentLicenseLevel == LicenseLevel.OWNER) }
                 ) { it.write(json.toString(2).toByteArray(Charsets.UTF_8)) }
                 if (isCurrentAccountGeneration(sessionGeneration)) {
-                    _connectionMessage.value = localizedContext.getString(R.string.export_folder_success)
+                    _connectionMessage.value = localizedContext.getString(R.string.export_folder_success) + "\n" + savedPath
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
@@ -3850,6 +4589,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun saveCurrentSession() {
+        if (!requirePremiumLicense()) return
         // Capture the identity and evidence at the user's action, never after
         // a queued coroutine may have crossed a Firebase account switch.
         val ownerUid = authenticatedAccountUid ?: return
@@ -3875,7 +4615,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     maxDeltaKm = report?.maxDeltaKm ?: 0.0
                 )
                 if (authenticatedAccountUid != ownerUid ||
-                    !isCurrentAccountGeneration(exportGeneration)) return@launch
+                    !isCurrentAccountGeneration(exportGeneration) || !hasPremiumLicense()) return@launch
                 val backup = JSONObject()
                     .put("schema", "camarodiag-diagnostic-session-v1")
                     .put("timestamp", entity.timestamp)
@@ -3887,17 +4627,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     .put("mileageSummary", entity.mileageSummary)
                     .put("hasMileageDiscrepancy", entity.hasMileageDiscrepancy)
                     .put("maxDeltaKm", entity.maxDeltaKm)
-                CamaroDiagExportStorage.write(getApplication<Application>(),
+                val savedPath = CamaroDiagExportStorage.write(getApplication<Application>(),
                     "CamaroDiag_session_${entity.timestamp}.json", "application/json",
-                    beforePublish = { check(authenticatedAccountUid == ownerUid &&
-                        isCurrentAccountGeneration(exportGeneration)) }
+                    category = CamaroDiagExportStorage.Category.DIAGNOSTIC_SESSIONS, beforePublish = { check(authenticatedAccountUid == ownerUid &&
+                        isCurrentAccountGeneration(exportGeneration) && hasPremiumLicense()) }
                 ) { it.write(backup.toString(2).toByteArray(Charsets.UTF_8)) }
                 if (authenticatedAccountUid != ownerUid ||
-                    !isCurrentAccountGeneration(exportGeneration)) return@launch
+                    !isCurrentAccountGeneration(exportGeneration) || !hasPremiumLicense()) return@launch
                 sessionDao.insertSession(entity)
                 if (isCurrentAccountGeneration(exportGeneration)) {
                     _connectionMessage.value = localizedContext.getString(R.string.msg_session_saved) +
-                        "\n" + CamaroDiagExportStorage.DISPLAY_PATH
+                        "\n" + savedPath
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
@@ -4007,9 +4747,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val response = obdManager.readMode01PidIfSupported(pidValue) ?: return null
                 if (response.equals("NO_SOCKET", ignoreCase = true) ||
                     response.contains("UNABLE TO CONNECT", ignoreCase = true)) {
-                    throw IllegalStateException("La connexion OBD a été interrompue.")
+                    throw ObdTransportDisconnectedException("Live OBD transport is disconnected")
                 }
-                return CamaroUdsProtocol.parsePidBytes(response, pid)
+                return CamaroUdsProtocol.parsePidBytes(
+                    response, pid, primaryPowertrainResponderOnly = true
+                )
             }
 
             while (currentCoroutineContext().isActive) {
@@ -4095,8 +4837,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                                 }
                                 // SAE J1979 Mode 01 PID 0x52: ethanol fuel percentage (A * 100 / 255).
                                 // This is reported only when the ECU advertises/supports the PID; trims are not an ethanol sensor.
-                                read("52")?.firstOrNull()?.let { a ->
-                                    val ethanolPercent = a * 100.0 / 255.0
+                                CamaroUdsProtocol.decodeEthanolPercent(read("52"))?.let { ethanolPercent ->
                                     values += LivePidValue(
                                         "ETHANOL",
                                         "Ethanol content (SAE PID 0x52)",
@@ -4134,28 +4875,34 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                                     val v = b[0] / 200.0
                                     values += LivePidValue("O2_B1S4", "Oxygen Sensor B1S4 Voltage", "Sonde lambda B1S4 - tension", v, "V", v, "V", 0.0, 1.275, push("O2_B1S4", v))
                                 }
-                                read("24")?.takeIf { it.size >= 4 }?.let { b ->
-                                    val v = ((b[0] * 256 + b[1]) * 2.0) / 65536.0
-                                    values += LivePidValue("WBO2_B1S1", "Wideband Lambda B1S1", "Sonde large bande B1S1 - lambda", v, "λ", v, "λ", 0.0, 2.0, push("WBO2_B1S1", v))
+                                // Two-bank SAE J1979 wideband voltage family:
+                                // 24/25 = B1S1/B1S2, 28/29 = B2S1/B2S2.
+                                for ((pid, id) in listOf(
+                                    "24" to "WBO2_B1S1", "25" to "WBO2_B1S2",
+                                    "28" to "WBO2_B2S1", "29" to "WBO2_B2S2"
+                                )) {
+                                    CamaroUdsProtocol.decodeWidebandLambda(read(pid))?.let { v ->
+                                        values += LivePidValue(id, id, id, v, "λ", v, "λ",
+                                            0.0, 2.0, push(id, v))
+                                    }
                                 }
-                                read("25")?.takeIf { it.size >= 4 }?.let { b ->
-                                    val v = ((b[0] * 256 + b[1]) * 2.0) / 65536.0
-                                    values += LivePidValue("WBO2_B1S2", "Wideband Lambda B1S2", "Sonde large bande B1S2 - lambda", v, "λ", v, "λ", 0.0, 2.0, push("WBO2_B1S2", v))
+                                // The current family is distinct: 34/35 = B1, 38/39 = B2.
+                                // Do not pass these amperage readings off as voltage data.
+                                for ((pid, id) in listOf(
+                                    "34" to "WBO2_I_B1S1", "35" to "WBO2_I_B1S2",
+                                    "38" to "WBO2_I_B2S1", "39" to "WBO2_I_B2S2"
+                                )) {
+                                    CamaroUdsProtocol.decodeWidebandCurrent(read(pid))?.let { v ->
+                                        values += LivePidValue(id, id, id, v, "mA", v, "mA",
+                                            -128.0, 128.0, push(id, v))
+                                    }
                                 }
-                                read("34")?.takeIf { it.size >= 4 }?.let { b ->
-                                    val v = ((b[0] * 256 + b[1]) * 2.0) / 65536.0
-                                    values += LivePidValue("WBO2_B2S1", "Wideband Lambda B2S1", "Sonde large bande B2S1 - lambda", v, "λ", v, "λ", 0.0, 2.0, push("WBO2_B2S1", v))
+                                CamaroUdsProtocol.decodeAbsoluteLoadPercent(read("43"))?.let { v ->
+                                    // Graph-scale ceiling is not the SAE encoded maximum (25700%). 
+                                    // Keep normal engine-load changes visible without clipping measured values.
+                                    values += LivePidValue("ABS_LOAD", "Absolute Engine Load", "Charge moteur absolue", v, "%", v, "%", 0.0, maxOf(300.0, v * 1.2), push("ABS_LOAD", v))
                                 }
-                                read("35")?.takeIf { it.size >= 4 }?.let { b ->
-                                    val v = ((b[0] * 256 + b[1]) * 2.0) / 65536.0
-                                    values += LivePidValue("WBO2_B2S2", "Wideband Lambda B2S2", "Sonde large bande B2S2 - lambda", v, "λ", v, "λ", 0.0, 2.0, push("WBO2_B2S2", v))
-                                }
-                                read("43")?.takeIf { it.size >= 2 }?.let { b ->
-                                    val v = ((b[0] * 256 + b[1]) * 100.0) / 65535.0
-                                    values += LivePidValue("ABS_LOAD", "Absolute Engine Load", "Charge moteur absolue", v, "%", v, "%", 0.0, 100.0, push("ABS_LOAD", v))
-                                }
-                                read("44")?.takeIf { it.size >= 2 }?.let { b ->
-                                    val v = ((b[0] * 256 + b[1]) * 2.0) / 65535.0
+                                CamaroUdsProtocol.decodeCommandedEquivalenceRatio(read("44"))?.let { v ->
                                     values += LivePidValue("EQ_RATIO", "Commanded Equivalence Ratio", "Rapport d'équivalence demandé", v, "λ", v, "λ", 0.0, 2.0, push("EQ_RATIO", v))
                                 }
                                 read("45")?.firstOrNull()?.let { b ->
@@ -4246,7 +4993,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     override fun onCleared() {
-        connectionAttemptGeneration++
+        nextConnectionGeneration()
         val activeJobs = listOfNotNull(
             canMonitorJob, canRequestJob, detachedCanMonitorJob,
             detachedCanRequestJob, connectionAttemptJob
@@ -4258,6 +5005,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         detachedCanRequestJob = null
         connectionAttemptJob = null
         activeJobs.forEach(Job::cancel)
+        consoleEventJournal.dispose()
+        consoleEventJournalFailed = true
         if (activeJobs.isEmpty()) {
             obdManager.disconnect()
         } else {

@@ -7,7 +7,7 @@ import org.junit.Test
 
 class SensorSelectionScopeTest {
     @Test fun isolatesAccountsEvenWithSameVin() {
-        val vehicle = "vin_2G1FF3D36C9104199"
+        val vehicle = "vin_2G1TEST00C0000001"
         assertNotEquals(
             SensorSelectionScope.key("alice", vehicle),
             SensorSelectionScope.key("bob", vehicle)

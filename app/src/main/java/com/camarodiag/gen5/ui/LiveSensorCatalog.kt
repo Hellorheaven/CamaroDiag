@@ -47,7 +47,11 @@ internal object LiveSensorCatalog {
         LiveSensorDefinition("WBO2_B1S1", "Wideband lambda B1S1", "Lambda large bande B1S1"),
         LiveSensorDefinition("WBO2_B1S2", "Wideband lambda B1S2", "Lambda large bande B1S2"),
         LiveSensorDefinition("WBO2_B2S1", "Wideband lambda B2S1", "Lambda large bande B2S1"),
-        LiveSensorDefinition("WBO2_B2S2", "Wideband lambda B2S2", "Lambda large bande B2S2")
+        LiveSensorDefinition("WBO2_B2S2", "Wideband lambda B2S2", "Lambda large bande B2S2"),
+        LiveSensorDefinition("WBO2_I_B1S1", "WBO2_I_B1S1", "WBO2_I_B1S1"),
+        LiveSensorDefinition("WBO2_I_B1S2", "WBO2_I_B1S2", "WBO2_I_B1S2"),
+        LiveSensorDefinition("WBO2_I_B2S1", "WBO2_I_B2S1", "WBO2_I_B2S1"),
+        LiveSensorDefinition("WBO2_I_B2S2", "WBO2_I_B2S2", "WBO2_I_B2S2")
     )
 
     /** Includes newly discovered signals without silently treating them as known hardware. */

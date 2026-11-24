@@ -20,13 +20,14 @@ BootDisposition inspectCheckpoint(Record& out){
   if(writer.locked())return BootDisposition::Corrupt;
   nvs_handle_t handle;
   const esp_err_t e=nvs_open("cd-journal",NVS_READONLY,&handle);
-  if(e==ESP_ERR_NVS_NOT_FOUND)return BootDisposition::NoRecord;
+  if(e==ESP_ERR_NVS_NOT_FOUND)return writer.observe(StoredState::Missing,out)?BootDisposition::NoRecord:BootDisposition::Corrupt;
   if(e!=ESP_OK){writer.uncertain();return BootDisposition::Corrupt;}
   const Read status=readRecord(handle,out);
   nvs_close(handle);
-  if(status==Read::Missing)return BootDisposition::NoRecord;
-  if(status==Read::Error)writer.uncertain();
-  return status==Read::Valid?classify(out):BootDisposition::Corrupt;
+  const StoredState state=status==Read::Missing?StoredState::Missing:
+      status==Read::Valid?StoredState::Valid:StoredState::Error;
+  if(!writer.observe(state,out)){out=Record{};return BootDisposition::Corrupt;}
+  return status==Read::Missing?BootDisposition::NoRecord:classify(out);
 }
 bool persistCheckpoint(const Record& next){
   uint8_t bytes[RecordSize]{},check[RecordSize]{};

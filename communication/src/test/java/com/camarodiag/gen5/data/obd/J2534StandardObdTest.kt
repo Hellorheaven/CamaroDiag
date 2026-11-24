@@ -89,4 +89,190 @@ class J2534StandardObdTest {
         assertFalse(J2534StandardObd.supportsChannel(0x7DF,0x7E8,33))
         assertFalse(J2534StandardObd.supportsChannel(0x7E0,0x7E8,63))
     }
+    @Test fun j2534EthanolSupportBitIsDiscoveredOnPid40Page() {
+        val (pids, continuation) = J2534StandardObd.supportPage(
+            0x40, bytes(0x41, 0x40, 0x00, 0x00, 0x40, 0x00)
+        )
+        assertEquals(setOf(0x52), pids)
+        assertFalse(continuation)
+        assertArrayEquals(bytes(0x80), J2534StandardObd.pidData(
+            0x52, bytes(0x41, 0x52, 0x80)))
+        assertThrows(IllegalArgumentException::class.java) {
+            J2534StandardObd.pidData(0x52, bytes(0x41, 0x53, 0x80))
+        }
+    }
+
+    @Test fun j2534ConsoleReadOnlyResponsesMustMatchRequestedServiceAndPid() {
+        val ethanol = requireNotNull(SafeObdRequestPolicy.parse("0152"))
+        J2534BridgeTransport.validateReadOnlyConsoleReply(ethanol,
+            bytes(0x41, 0x52, 0x80))
+        for (invalid in listOf(
+            bytes(0x7F, 0x01, 0x11),
+            bytes(0x41, 0x53, 0x80),
+            bytes(0x41, 0x52),
+            bytes(0x41, 0x52, 0x80, 0x00)
+        )) {
+            assertThrows(IllegalArgumentException::class.java) {
+                J2534BridgeTransport.validateReadOnlyConsoleReply(ethanol, invalid)
+            }
+        }
+        val vehicleInfo = requireNotNull(SafeObdRequestPolicy.parse("0902"))
+        J2534BridgeTransport.validateReadOnlyConsoleReply(vehicleInfo,
+            bytes(0x49, 0x02, 0x01) + "1G1FA1RXXR0123456".toByteArray(Charsets.US_ASCII))
+        assertThrows(IllegalArgumentException::class.java) {
+            J2534BridgeTransport.validateReadOnlyConsoleReply(vehicleInfo,
+                bytes(0x49, 0x02, 0x01, 0x31))
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            J2534BridgeTransport.validateReadOnlyConsoleReply(vehicleInfo,
+                bytes(0x49, 0x04, 0x01, 0x31))
+        }
+        val pending = requireNotNull(SafeObdRequestPolicy.parse("07"))
+        J2534BridgeTransport.validateReadOnlyConsoleReply(pending, bytes(0x47, 0))
+        assertThrows(IllegalArgumentException::class.java) {
+            J2534BridgeTransport.validateReadOnlyConsoleReply(pending,
+                bytes(0x7F, 0x07, 0x22))
+        }
+    }
+
+    @Test fun fabricatedReadOnlyCommandObjectCannotAuthorizeBridgeTraffic() {
+        val fake = SafeObdRequest(0x34, 0x00, "0152")
+        assertThrows(IllegalArgumentException::class.java) {
+            J2534BridgeTransport.validateReadOnlyConsoleReply(fake,
+                bytes(0x41, 0x52, 0x80))
+        }
+    }
+
+    @Test fun j2534ConsoleValidatesEveryReadOnlyDtcModeIndependently() {
+        for ((command, positive, negative) in listOf(
+            Triple("03", bytes(0x43, 0), bytes(0x43, 1, 3)),
+            Triple("07", bytes(0x47, 0), bytes(0x7F, 7, 0x11)),
+            Triple("0A", bytes(0x4A, 0), bytes(0x7F, 0x0A, 0x22))
+        )) {
+            val request = requireNotNull(SafeObdRequestPolicy.parse(command))
+            J2534BridgeTransport.validateReadOnlyConsoleReply(request, positive)
+            assertThrows(IllegalArgumentException::class.java) {
+                J2534BridgeTransport.validateReadOnlyConsoleReply(request, negative)
+            }
+        }
+    }
+
+    @Test fun j2534ConsoleSupportBitmapCannotBeAcceptedWhenTruncated() {
+        val request = requireNotNull(SafeObdRequestPolicy.parse("0100"))
+        J2534BridgeTransport.validateReadOnlyConsoleReply(request,
+            bytes(0x41, 0x00, 0, 0, 0, 0))
+        assertThrows(IllegalArgumentException::class.java) {
+            J2534BridgeTransport.validateReadOnlyConsoleReply(request,
+                bytes(0x41, 0x00, 0, 0, 0))
+        }
+    }
+
+    @Test fun j2534NegativeReadIsPreservedAsFailedEcuRxOnlyWhenExact() {
+        val ethanol = requireNotNull(SafeObdRequestPolicy.parse("0152"))
+        assertTrue(J2534BridgeTransport.isMatchingNegativeConsoleReply(
+            ethanol, bytes(0x7F, 0x01, 0x11)))
+        for (bad in listOf(
+            bytes(0x7F, 0x09, 0x11),
+            bytes(0x7F, 0x01),
+            bytes(0x7F, 0x01, 0x11, 0),
+            bytes(0x7F, 0x01, 0),
+            bytes(0x7F, 0x01, 0x78),
+            bytes(0x41, 0x52, 0x80)
+        )) {
+            assertFalse(J2534BridgeTransport.isMatchingNegativeConsoleReply(ethanol, bad))
+        }
+        val forged = SafeObdRequest(0x34, 0, "0152")
+        assertFalse(J2534BridgeTransport.isMatchingNegativeConsoleReply(
+            forged, bytes(0x7F, 0x34, 0x11)))
+    }
+
+    @Test fun j2534NegativeVehicleIdentificationIsReportedWithoutFakeVin() {
+        val readVin = requireNotNull(SafeObdRequestPolicy.parse("0902"))
+        assertTrue(J2534BridgeTransport.isMatchingNegativeConsoleReply(
+            readVin, bytes(0x7F, 0x09, 0x12)))
+        assertFalse(J2534BridgeTransport.isMatchingNegativeConsoleReply(
+            readVin, bytes(0x7F, 0x01, 0x12)))
+        assertThrows(IllegalArgumentException::class.java) {
+            J2534BridgeTransport.validateReadOnlyConsoleReply(
+                readVin, bytes(0x7F, 0x09, 0x12))
+        }
+    }
+
+    @Test fun physicalBridgeRejectsShortOrPaddedObdPidsAllowedByConsole() {
+        val lengths = mapOf(
+            0x00 to 4, 0x01 to 4, 0x0C to 2, 0x10 to 2,
+            0x1F to 2, 0x42 to 2, 0x43 to 2, 0x44 to 2,
+            0x45 to 1, 0x46 to 1, 0x4C to 1, 0x52 to 1,
+            0x20 to 4, 0x40 to 4, 0x60 to 4
+        )
+        for ((pid, expectedSize) in lengths) {
+            val valid = bytes(0x41, pid) + ByteArray(expectedSize)
+            assertEquals(expectedSize, J2534StandardObd.pidData(pid, valid).size)
+            for (wrong in listOf(expectedSize - 1, expectedSize + 1)) {
+                assertThrows(IllegalArgumentException::class.java) {
+                    J2534StandardObd.pidData(pid, bytes(0x41, pid) + ByteArray(wrong))
+                }
+            }
+        }
+    }
+
+    @Test fun j2534ConsoleCanReadEcuNameViaStandardMode09Pid0A() {
+        val request = requireNotNull(SafeObdRequestPolicy.parse("090A"))
+        J2534BridgeTransport.validateReadOnlyConsoleReply(request,
+            bytes(0x49, 0x0A, 0x01) +
+                "ECM".padEnd(20, ' ').toByteArray(Charsets.US_ASCII))
+        assertThrows(IllegalArgumentException::class.java) {
+            J2534BridgeTransport.validateReadOnlyConsoleReply(request,
+                bytes(0x49, 0x0A, 0x01, 0x45, 0x43, 0x4D))
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            J2534BridgeTransport.validateReadOnlyConsoleReply(request,
+                bytes(0x49, 0x04, 0x01, 0x45))
+        }
+        assertEquals("090A", request.elmCommand)
+    }
+
+    @Test fun j2534ConsoleCalibrationAndCvnRequireCompleteMode09Records() {
+        val cal = requireNotNull(SafeObdRequestPolicy.parse("0904"))
+        val cvn = requireNotNull(SafeObdRequestPolicy.parse("0906"))
+        J2534BridgeTransport.validateReadOnlyConsoleReply(cal,
+            bytes(0x49, 0x04, 0x01) +
+                "12612345".padEnd(16, ' ').toByteArray(Charsets.US_ASCII))
+        J2534BridgeTransport.validateReadOnlyConsoleReply(cvn,
+            bytes(0x49, 0x06, 0x01, 0x12, 0x34, 0xAB, 0xCD))
+        for ((request, data) in listOf(
+            cal to bytes(0x49, 0x04, 0x01, 0x31),
+            cvn to bytes(0x49, 0x06, 0x01, 0x12, 0x34),
+            cvn to bytes(0x49, 0x06, 0x00),
+            cvn to bytes(0x49, 0x06, 0x02, 0x12, 0x34, 0xAB, 0xCD)
+        )) {
+            assertThrows(IllegalArgumentException::class.java) {
+                J2534BridgeTransport.validateReadOnlyConsoleReply(request, data)
+            }
+        }
+    }
+
+    @Test fun consolePhysicalPayloadIsExactlyTheWhitelistedRequest() {
+        val examples = mapOf(
+            "010C" to bytes(0x01, 0x0C),
+            "0152" to bytes(0x01, 0x52),
+            "0902" to bytes(0x09, 0x02),
+            "090A" to bytes(0x09, 0x0A),
+            "03" to bytes(0x03),
+            "07" to bytes(0x07),
+            "0A" to bytes(0x0A)
+        )
+        for ((input, expected) in examples) {
+            val parsed = requireNotNull(SafeObdRequestPolicy.parse(input))
+            assertArrayEquals(expected, J2534BridgeTransport.readOnlyConsolePayload(parsed))
+        }
+        for (command in listOf("04", "2E F190", "27 01", "34 00", "36 00")) {
+            assertNull(SafeObdRequestPolicy.parse(command))
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            J2534BridgeTransport.readOnlyConsolePayload(
+                SafeObdRequest(0x34, 0x00, "0152"))
+        }
+    }
+
 }

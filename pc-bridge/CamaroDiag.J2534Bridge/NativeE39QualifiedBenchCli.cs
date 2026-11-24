@@ -10,10 +10,10 @@ internal static class NativeE39QualifiedBenchCli
 
     internal static async Task<int> RunAsync(string[] args)
     {
-        if (args.Length != 8 || !args[0].Equals(Command, StringComparison.OrdinalIgnoreCase) ||
+        if (args.Length != 7 || !args[0].Equals(Command, StringComparison.OrdinalIgnoreCase) ||
             !int.TryParse(args[1], out int index) || index < 0)
         {
-            Console.Error.WriteLine("Usage: --program-e39-bench <adapter-index> <profile.json> <profile.sig> <original.bin> <target.bin> <kernel.bin> <NEW-journal.jsonl>");
+            Console.Error.WriteLine("Usage: --program-e39-bench <adapter-index> <profile.json> <original.bin> <target.bin> <kernel.bin> <NEW-journal.jsonl>");
             return 6;
         }
         using var cancel = new CancellationTokenSource();
@@ -21,13 +21,14 @@ internal static class NativeE39QualifiedBenchCli
         Console.CancelKeyPress += Cancel;
         try
         {
-            // Verify trusted qualification BEFORE discovering adapters or
-            // processing operator input. There is no self-qualification switch.
-            var qualified = NativeE39QualifiedBenchProfile.Load(args[2], args[3]);
-            var original = NativeE39QualifiedBenchProfile.ReadBounded(args[4], NativeE39ImageInspector.ImageBytes);
-            var target = NativeE39QualifiedBenchProfile.ReadBounded(args[5], NativeE39ImageInspector.ImageBytes);
-            var kernel = NativeE39QualifiedBenchProfile.ReadBounded(args[6], NativeE39RamLoader.MaximumKernelBytes);
-            var journalPath = Path.GetFullPath(args[7]);
+            // No CamaroDiag-signing certificate or owner-created authorization
+            // key is required. Real ECU SecurityAccess remains protocol-driven.
+            NativeEcuWriteAvailability.RequirePhysicalEcuProgrammingEnabled();
+            var qualified = NativeE39QualifiedBenchProfile.Load(args[2]);
+            var original = NativeE39QualifiedBenchProfile.ReadBounded(args[3], NativeE39ImageInspector.ImageBytes);
+            var target = NativeE39QualifiedBenchProfile.ReadBounded(args[4], NativeE39ImageInspector.ImageBytes);
+            var kernel = NativeE39QualifiedBenchProfile.ReadBounded(args[5], NativeE39RamLoader.MaximumKernelBytes);
+            var journalPath = Path.GetFullPath(args[6]);
             if (File.Exists(journalPath) || File.Exists(journalPath + ".meta.json"))
                 throw new IOException("Choose a new journal path; previous recovery evidence is retained.");
             var originalHash = Hash(original);
@@ -43,18 +44,30 @@ internal static class NativeE39QualifiedBenchCli
             var adapter = adapters[index];
             using var lease = NativeE39PhysicalAdmission.OpenVerifiedDriverLease(
                 adapter, qualified.Scope, qualified.Channel);
-            if (Console.IsInputRedirected)
-                throw new UnauthorizedAccessException("Interactive local bench confirmation is required.");
-            Console.WriteLine("Qualified isolated bench ONLY. Not for a vehicle in service.");
+            var actualDriverSha256 = Convert.ToHexString(SHA256.HashData(lease));
+            lease.Position = 0;
+            // Invoking the explicit local --program-e39-bench command with
+            // its target and original images is already an operator request.
+            // Do not require an extra CamaroDiag challenge string or forbid
+            // noninteractive CLI usage; the ECU and physical preflights still
+            // determine if the transport/programming operation is possible.
+            Console.WriteLine("Local E39/E39A bench: physical identity, image, supply and readback remain checked.");
             Console.WriteLine($"ECU: {qualified.Family}; VIN: {q.ExpectedVin}; OS: {q.ExpectedOsId}");
             Console.WriteLine("Adapter: " + adapter.DisplayName);
             Console.WriteLine("Target SHA-256: " + targetHash);
             Console.WriteLine("Journal: " + journalPath);
             Console.WriteLine("No automatic retry, ECU reset or power cycle is performed.");
-            var confirmation = "BENCH " + q.ExpectedVin + " " + targetHash;
-            Console.WriteLine("Confirm the isolated qualified bench by typing: " + confirmation);
-            if (Console.ReadLine() != confirmation)
-                throw new OperationCanceledException("Operator did not confirm the exact target.");
+            // Explicit two-step operator consent before creating a write journal,
+            // opening a device or sending any programming command.
+            // Redirected stdin cannot acknowledge a real local warning.
+            if (Console.IsInputRedirected ||
+                !EcuWriteOperatorConsent.AskBeforeProgramming(
+                    Console.ReadLine, Console.WriteLine,
+                    qualified.Family + " / VIN " + q.ExpectedVin + " / cible " + targetHash))
+            {
+                Console.WriteLine("NON ou absence de confirmation : aucune écriture ECU.");
+                return 7;
+            }
             cancel.Token.ThrowIfCancellationRequested();
             // Separate immutable metadata and crash-resilient phase journal.
             // Both must be created and flushed before any ECU is opened.
@@ -65,8 +78,7 @@ internal static class NativeE39QualifiedBenchCli
                 {
                     Schema = 1, Utc = DateTimeOffset.UtcNow, qualified.Family,
                     q.ExpectedVin, q.ExpectedOsId, qualified.ProfileSha256,
-                    qualified.BoardEvidenceSha256, qualified.RecoveryEvidenceSha256,
-                    qualified.Channel.DriverSha256, qualified.Channel.RegistryView,
+                    DriverSha256 = actualDriverSha256, qualified.Channel.RegistryView,
                     OriginalSha256 = originalHash, TargetSha256 = targetHash,
                     KernelSha256 = Hash(kernel)
                 });

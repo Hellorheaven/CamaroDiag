@@ -14,8 +14,14 @@ internal static class NativeScopedMemoryReaderSelfTests
         internal int VinCalls;
         internal int? ChangeVinAfterMemoryCalls;
         internal bool MalformedVin;
+        internal bool UdsVinUnsupported;
+        internal bool UdsVinTimeout;
+        internal bool GmlanVinMalformed;
+        internal int GmlanVinCalls;
         internal bool RejectDefaultSession;
         internal bool MalformedExtendedReply;
+        internal bool ExtendedReplyWithTrailingByte;
+        internal bool ExtendedReplyWithTimings;
         internal Action? AfterRead;
         internal readonly List<byte> Sessions = [];
 
@@ -31,10 +37,21 @@ internal static class NativeScopedMemoryReaderSelfTests
             if (request.SequenceEqual(new byte[] { 0x22, 0xF1, 0x90 }))
             {
                 VinCalls++;
+                if (UdsVinTimeout) throw new TimeoutException("No UDS F190 reply from legacy GMLAN ECU.");
+                if (UdsVinUnsupported) return Task.FromResult(new byte[] { 0x7F, 0x22, 0x11 });
                 if (MalformedVin) return Task.FromResult(new byte[] { 0x62, 0xF1, 0x90 });
                 var vin = ChangeVinAfterMemoryCalls is int after && Calls >= after
                     ? "1G1FA1RXXR0123457" : "1G1FA1RXXR0123456";
                 return Task.FromResult(new byte[] { 0x62, 0xF1, 0x90 }
+                    .Concat(System.Text.Encoding.ASCII.GetBytes(vin)).ToArray());
+            }
+            if (request.SequenceEqual(new byte[] { 0x1A, 0x90 }))
+            {
+                GmlanVinCalls++;
+                if (GmlanVinMalformed) return Task.FromResult(new byte[] { 0x5A, 0x90, 0x41 });
+                var vin = ChangeVinAfterMemoryCalls is int after && Calls >= after
+                    ? "1G1FA1RXXR0123457" : "1G1FA1RXXR0123456";
+                return Task.FromResult(new byte[] { 0x5A, 0x90 }
                     .Concat(System.Text.Encoding.ASCII.GetBytes(vin)).ToArray());
             }
             if (request.Length == 2 && request[0] == 0x10)
@@ -42,6 +59,10 @@ internal static class NativeScopedMemoryReaderSelfTests
                 Sessions.Add(request[1]);
                 if (request[1] == 0x03 && MalformedExtendedReply)
                     return Task.FromResult(new byte[] { 0x50 });
+                if (request[1] == 0x03 && ExtendedReplyWithTrailingByte)
+                    return Task.FromResult(new byte[] { 0x50, 0x03, 0x12 });
+                if (request[1] == 0x03 && ExtendedReplyWithTimings)
+                    return Task.FromResult(new byte[] { 0x50, 0x03, 0x00, 0x32, 0x01, 0xF4 });
                 if (request[1] == 0x01 && RejectDefaultSession)
                     return Task.FromResult(new byte[] { 0x50, 0x03 });
                 return Task.FromResult(new byte[] { 0x50, request[1] });
@@ -105,13 +126,42 @@ internal static class NativeScopedMemoryReaderSelfTests
                verified.StartAddress == 0x80001000 &&
                verified.ExpectedVin == "1G1FA1RXXR0123456",
             "Verified memory captures retain scoped VIN, address and SHA256");
-        Assert(progress.Reports.Count == 6 &&
-               progress.Reports[0] == (1, 128, 300) &&
+        Assert(progress.Reports.Count == 2 &&
+               progress.Reports[0] == (1, 300, 300) &&
                progress.Reports[^1] == (2, 300, 300),
-            "Independent passes emit monotonic progress");
+            "Short independent passes always report their final progress");
+        Assert(!NativeScopedMemoryReader.ShouldReportProgress(1, 64, 5000) &&
+               !NativeScopedMemoryReader.ShouldReportProgress(31, 1984, 5000) &&
+               NativeScopedMemoryReader.ShouldReportProgress(32, 2048, 5000) &&
+               NativeScopedMemoryReader.ShouldReportProgress(79, 5000, 5000),
+            "Progress is throttled to every 32 blocks and the end of each pass");
+        var larger = new J2534MemoryReadScope(
+            "1G1FA1RXXR0123456", 0x7E0, 0x7E8, 33,
+            0x80001000, 5000, 64, 1);
+        var largeEcu = new FakeEcu(larger.StartAddress,
+            Enumerable.Range(0, 5000).Select(i => (byte)i).ToArray());
+        var largeProgress = new ProgressCount();
+        var largerRead = NativeScopedMemoryReader.ReadTwiceAsync(
+            largeEcu, larger, largeProgress, CancellationToken.None).GetAwaiter().GetResult();
+        Assert(largerRead.BlocksPerPass == 79 && largeEcu.Calls == 158 &&
+               largeProgress.Reports.Count == 6 &&
+               largeProgress.Reports[0] == (1, 2048, 5000) &&
+               largeProgress.Reports[1] == (1, 4096, 5000) &&
+               largeProgress.Reports[2] == (1, 5000, 5000) &&
+               largeProgress.Reports[^1] == (2, 5000, 5000),
+            "Two long passes preserve all reads without flooding the Windows UI");
         Assert(Convert.ToHexString(NativeScopedMemoryReader.BuildReadRequest(
                scope, 0x80001080, 128)) == "23148000108080",
             "UDS 23 ALFI address and one-byte size framing");
+        Reject<ArgumentOutOfRangeException>(() => NativeScopedMemoryReader.ParseReadResponse(
+            new byte[] { 0x63 }, 0));
+        checks++;
+        Reject<ArgumentOutOfRangeException>(() => NativeScopedMemoryReader.ParseReadResponse(
+            new byte[258], 257));
+        checks++;
+        Assert(NativeScopedMemoryReader.ParseReadResponse(
+            new byte[] { 0x63, 0x5A }, 1).SequenceEqual(new byte[] { 0x5A }),
+            "Exactly sized UDS memory response is accepted");
         var allowed256 = new J2534MemoryReadScope(
             "1G1FA1RXXR0123456", 0x7E0, 0x7E8, 33, 0x80001000, 300, 256, 3);
         Assert(Convert.ToHexString(NativeScopedMemoryReader.BuildReadRequest(
@@ -140,6 +190,34 @@ internal static class NativeScopedMemoryReaderSelfTests
                 finalSwap, scope, null, CancellationToken.None).GetAwaiter().GetResult());
         Assert(finalSwap.Calls == 6 && finalSwap.VinCalls == 3,
             "Final VIN mismatch rejects even identical data");
+        var gmlan = new FakeEcu(scope.StartAddress, memory) { UdsVinUnsupported = true };
+        var gmlanRead = NativeScopedMemoryReader.ReadTwiceAsync(
+            gmlan, scope, null, CancellationToken.None).GetAwaiter().GetResult();
+        Assert(gmlanRead.Bytes.SequenceEqual(memory) && gmlan.GmlanVinCalls == 3 &&
+               gmlan.VinCalls == 1,
+            "UDS-to-GMLAN discovery is cached per transport; each checkpoint still reads exact VIN");
+        var silentUds = new FakeEcu(scope.StartAddress, memory) { UdsVinTimeout = true };
+        var silentRead = NativeScopedMemoryReader.ReadTwiceAsync(
+            silentUds, scope, null, CancellationToken.None).GetAwaiter().GetResult();
+        Assert(silentRead.Bytes.SequenceEqual(memory) && silentUds.GmlanVinCalls == 3 &&
+               silentUds.VinCalls == 1,
+            "Silent F190 incurs only one timeout per physical link while GM VIN is rechecked");
+        var wrongGmlan = new FakeEcu(scope.StartAddress, memory) {
+            UdsVinUnsupported = true, ChangeVinAfterMemoryCalls = 0
+        };
+        Reject<UnauthorizedAccessException>(() =>
+            NativeScopedMemoryReader.ReadTwiceAsync(
+                wrongGmlan, scope, null, CancellationToken.None).GetAwaiter().GetResult());
+        Assert(wrongGmlan.Calls == 0,
+            "Wrong GMLAN VIN rejects memory capture before the first byte");
+        var brokenGmlan = new FakeEcu(scope.StartAddress, memory) {
+            UdsVinUnsupported = true, GmlanVinMalformed = true
+        };
+        Reject<UnauthorizedAccessException>(() =>
+            NativeScopedMemoryReader.ReadTwiceAsync(
+                brokenGmlan, scope, null, CancellationToken.None).GetAwaiter().GetResult());
+        Assert(brokenGmlan.Calls == 0,
+            "Truncated GM VIN cannot authorize memory reads");
         var malformedVin = new FakeEcu(scope.StartAddress, memory) { MalformedVin = true };
         Reject<UnauthorizedAccessException>(() =>
             NativeScopedMemoryReader.ReadTwiceAsync(
@@ -167,6 +245,18 @@ internal static class NativeScopedMemoryReaderSelfTests
                 denied, scope, null, CancellationToken.None).GetAwaiter().GetResult());
         checks++;
         Assert(denied.Calls == 1, "A negative ECU response halts before a second attempt");
+        var explicitDenied = new FakeEcu(scope.StartAddress, memory) { Deny = true };
+        NativeScopedMemoryReader.MemoryReadRefusedException? deniedReason = null;
+        try
+        {
+            NativeScopedMemoryReader.ReadTwiceAsync(
+                explicitDenied, scope, null, CancellationToken.None).GetAwaiter().GetResult();
+        }
+        catch (NativeScopedMemoryReader.MemoryReadRefusedException error) { deniedReason = error; }
+        Assert(deniedReason is not null && deniedReason.Address == scope.StartAddress &&
+               deniedReason.RequestedBytes == 128 && deniedReason.Nrc == 0x31 &&
+               explicitDenied.Calls == 1,
+               "Refused physical address, requested block size and ECU NRC are retained without retry");
         var truncated = new FakeEcu(scope.StartAddress, memory) { Truncate = true };
         Reject<InvalidDataException>(() =>
             NativeScopedMemoryReader.ReadTwiceAsync(
@@ -203,12 +293,38 @@ internal static class NativeScopedMemoryReaderSelfTests
         Assert(failedReset.Calls == 6 && failedReset.Sessions.SequenceEqual(new byte[] { 3, 1 }),
             "Failed default-session confirmation prevents successful capture");
 
+        var deniedWithinExtended = new FakeEcu(scope.StartAddress, memory) { Deny = true };
+        Reject<IOException>(() => NativeScopedMemoryReader.ReadWithSessionAsync(
+            deniedWithinExtended, scope, null, CancellationToken.None).GetAwaiter().GetResult());
+        Assert(deniedWithinExtended.Sessions.SequenceEqual(new byte[] { 3, 1 }) &&
+               deniedWithinExtended.Calls == 1,
+               "ECU memory refusal after session entry still restores the default session");
+
+        var blockedByScope = new FakeEcu(scope.StartAddress, memory) {
+            AfterRead = () => throw new UnauthorizedAccessException("Scoped memory operation blocked")
+        };
+        Reject<UnauthorizedAccessException>(() => NativeScopedMemoryReader.ReadWithSessionAsync(
+            blockedByScope, scope, null, CancellationToken.None).GetAwaiter().GetResult());
+        Assert(blockedByScope.Sessions.SequenceEqual(new byte[] { 3, 1 }),
+               "Non-VIN authorization failures still trigger safe default-session cleanup");
+
         var failedEnter = new FakeEcu(scope.StartAddress, memory) { MalformedExtendedReply = true };
         Reject<InvalidDataException>(() => NativeScopedMemoryReader.ReadWithSessionAsync(
             failedEnter, scope, null, CancellationToken.None).GetAwaiter().GetResult());
         Assert(failedEnter.Calls == 0 && failedEnter.Sessions.SequenceEqual(new byte[] { 3, 1 }),
             "Ambiguous extended-session response still triggers cleanup");
 
+        var badTiming = new FakeEcu(scope.StartAddress, memory) { ExtendedReplyWithTrailingByte = true };
+        Reject<InvalidDataException>(() => NativeScopedMemoryReader.ReadWithSessionAsync(
+            badTiming, scope, null, CancellationToken.None).GetAwaiter().GetResult());
+        Assert(badTiming.Calls == 0 && badTiming.Sessions.SequenceEqual(new byte[] { 3, 1 }),
+            "Malformed session timing response cannot permit memory access");
+        var timedSession = new FakeEcu(scope.StartAddress, memory) { ExtendedReplyWithTimings = true };
+        var timedCapture = NativeScopedMemoryReader.ReadWithSessionAsync(
+            timedSession, scope, null, CancellationToken.None).GetAwaiter().GetResult();
+        Assert(timedCapture.Bytes.SequenceEqual(memory) &&
+            timedSession.Sessions.SequenceEqual(new byte[] { 3, 1 }),
+            "Complete positive UDS session timings remain supported");
         var replacement = new FakeEcu(scope.StartAddress, memory) { ChangeVinAfterMemoryCalls = 3 };
         Reject<UnauthorizedAccessException>(() => NativeScopedMemoryReader.ReadWithSessionAsync(
             replacement, scope, null, CancellationToken.None).GetAwaiter().GetResult());

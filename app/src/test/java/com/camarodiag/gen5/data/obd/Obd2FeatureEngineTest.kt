@@ -1,6 +1,7 @@
 package com.camarodiag.gen5.data.obd
 
 import kotlinx.coroutines.runBlocking
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Assert.assertNull
@@ -479,6 +480,228 @@ class Obd2FeatureEngineTest {
         assertEquals(listOf("ABCDEFGH12345678"), identity.calibrationIds)
         assertEquals(listOf("9F3E61C2"), identity.calibrationVerificationNumbers)
         assertTrue(identity.ecuNames.isEmpty())
+    }
+
+    @Test
+    fun discoversAndReadsEthanolPidOnlyWhenEcuAdvertisesIt() = runBlocking {
+        val commands = mutableListOf<String>()
+        val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+            commands += command
+            when (command) {
+                "0100" -> "410000000001"
+                "0120" -> "412000000001"
+                "0140" -> "414000004000"
+                "0152" -> "415280"
+                else -> "NO DATA"
+            }
+        })
+        val supported = engine.discoverSupportedPids()
+        assertTrue(0x52 in supported)
+        val response = engine.readMode01PidIfSupported(0x52, supported)
+        assertEquals("415280", response)
+        assertEquals(listOf("0100", "0120", "0140", "0152"), commands)
+    }
+
+    @Test
+    fun absentEthanolBitmapBitNeverSendsPid52() = runBlocking {
+        val commands = mutableListOf<String>()
+        val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+            commands += command
+            when (command) {
+                "0100" -> "410000000001"
+                "0120" -> "412000000001"
+                "0140" -> "414000000000"
+                else -> "NO DATA"
+            }
+        })
+        val supported = engine.discoverSupportedPids()
+        assertTrue(0x52 !in supported)
+        assertNull(engine.readMode01PidIfSupported(0x52, supported))
+        assertTrue("0152" !in commands)
+    }
+
+    @Test
+    fun fullScanEthanolValueRequiresExactlyOneRealPayloadByte() = runBlocking {
+        val valid = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+            if (command == "0152") "415280" else "NO DATA"
+        })
+        val actual = valid.readLiveData(setOf(0x52))
+        assertEquals(1, actual.size)
+        assertEquals(0x52, actual.single().pid)
+        assertEquals("50.20", actual.single().value)
+
+        val malformed = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+            if (command == "0152") "41528000" else "NO DATA"
+        })
+        assertTrue(malformed.readLiveData(setOf(0x52)).isEmpty())
+    }
+
+    @Test
+    fun mode09IdentityCountCannotIgnoreTrailingOrMissingCalibrationBytes() = runBlocking {
+        suspend fun calibrations(reply: String): List<String> =
+            Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+                if (command == "0904") reply else "NO DATA"
+            }).readCalibrationIds()
+        val bytes = "ABCDEFGH12345678".toByteArray(Charsets.US_ASCII)
+            .joinToString("") { "%02X".format(java.util.Locale.ROOT, it.toInt() and 0xFF) }
+        assertEquals(listOf("ABCDEFGH12345678"), calibrations("490401" + bytes))
+        assertTrue(calibrations("490401" + bytes + "00").isEmpty())
+        assertTrue(calibrations("490401" + bytes.dropLast(2)).isEmpty())
+        // Even when the overall byte length looks like two records, a
+        // declared count of one must not fall through to count-less parsing.
+        assertTrue(calibrations("490401" + bytes + "00".repeat(15)).isEmpty())
+    }
+
+    @Test
+    fun physicalVinReaderRejectsForbiddenLettersAndNonPrintableIdentityBytes() = runBlocking {
+        suspend fun vin(response: String) =
+            Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+                if (command == "0902") response else "NO DATA"
+            }).readVin()
+        fun encode(text: String) = "490201" + text.toByteArray(Charsets.US_ASCII)
+            .joinToString("") { "%02X".format(java.util.Locale.ROOT, it.toInt() and 0xFF) }
+        assertEquals("1G1FA1RXXR0123456", vin(encode("1G1FA1RXXR0123456")))
+        for (invalid in listOf("1G1IA1RXXR0123456", "1G1OA1RXXR0123456",
+            "1G1QA1RXXR0123456", "1G1FA1RXXR012345" + '\u0001')) {
+            assertNull(vin(encode(invalid)))
+        }
+    }
+
+    @Test
+    fun mode09AsciiDecoderRejectsEmbeddedControlBytesRatherThanRemovingThem() = runBlocking {
+        val corruptId = "AB" + '\u0001' + "DEFGH12345678"
+        val reply = "490401" + corruptId.toByteArray(Charsets.US_ASCII).joinToString("") {
+            "%02X".format(java.util.Locale.ROOT, it.toInt() and 0xFF)
+        }
+        val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+            if (command == "0904") reply else "NO DATA"
+        })
+        assertTrue(engine.readCalibrationIds().isEmpty())
+    }
+
+    @Test
+    fun acceptsCountedAndLegacyPaddedDtcRepliesWithoutInventingCodes() = runBlocking {
+        suspend fun result(raw: String) =
+            Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+                if (command == "03") raw else "NO DATA"
+            }).readDtcsWithPositiveResponseProof()
+        val counted = result("43010300")
+        assertEquals("P0300", counted.first.first.single().code)
+        assertTrue(counted.second)
+        val legacy = result("4301710000")
+        assertEquals("P0171", legacy.first.first.single().code)
+        assertTrue(legacy.second)
+        val clean = result("4300")
+        assertTrue(clean.first.first.isEmpty())
+        assertTrue(clean.second)
+        for (invalid in listOf("43", "4301", "430103", "NO DATA", "7F0311")) {
+            val parsed = result(invalid)
+            assertTrue(invalid, parsed.first.first.isEmpty())
+            assertFalse(invalid, parsed.second)
+        }
+    }
+
+    @Test
+    fun physicalObdScanAndLiveDisplayAgreeOnAbsoluteLoadPid43Scaling() = runBlocking {
+        val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+            if (command == "0143") "414301FE" else "NO DATA"
+        })
+        val values = engine.readLiveData(setOf(0x43))
+        assertEquals("200.00", values.single().value)
+        assertEquals(200.0, requireNotNull(CamaroUdsProtocol.decodeAbsoluteLoadPercent(
+            intArrayOf(1, 254))), 0.001)
+        assertEquals("%", values.single().unit)
+    }
+
+    @Test
+    fun physicalDtcRepliesAreDecodedSeparatelyForMultipleCanResponders() = runBlocking {
+        val commands = mutableListOf<String>()
+        val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+            commands += command
+            when (command) {
+                "03" -> "7E8 04 43 01 03 00\r7E9 04 43 01 01 71"
+                "07" -> "18DAF110 04 47 01 01 33\r18DAF111 02 47 00"
+                "0A" -> "NO DATA"
+                else -> "NO DATA"
+            }
+        })
+        val (codes, proved) = engine.readDtcsWithPositiveResponseProof()
+        assertTrue(proved)
+        assertEquals(setOf("P0300", "P0171"), codes.first.map { it.code }.toSet())
+        assertEquals(listOf("P0133"), codes.second.map { it.code })
+        assertTrue(codes.third.isEmpty())
+        assertEquals(listOf("03", "07", "0A"), commands)
+    }
+
+    @Test
+    fun malformedInterleavedDtcFramesCannotInventAdditionalCodes() = runBlocking {
+        val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+            if (command == "03") {
+                "7E8 04 43 01 03 00\n7E9 03 43 02 01\nSEARCHING..."
+            } else "NO DATA"
+        })
+        val (codes, proved) = engine.readDtcsWithPositiveResponseProof()
+        assertTrue(proved)
+        assertEquals(listOf("P0300"), codes.first.map { it.code })
+    }
+
+    @Test
+    fun compactCanResponderHeadersCannotBeDecodedAsFaultData() = runBlocking {
+        val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+            when (command) {
+                "03" -> "7E80443010300\r18DAF1100443010171"
+                else -> "NO DATA"
+            }
+        })
+        val (confirmed, _, _) = engine.readDtcs()
+        assertEquals(setOf("P0300", "P0171"), confirmed.map { it.code }.toSet())
+    }
+
+    @Test
+    fun singleDigitCanDlcStillDecodesExactDtcPayloadAndRejectsMismatch() = runBlocking {
+        suspend fun confirmed(response: String): List<ObdDtc> =
+            Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+                if (command == "03") response else "NO DATA"
+            }).readDtcs().first
+        assertEquals(listOf("P0300"), confirmed("7E8 4 43 01 03 00").map { it.code })
+        assertEquals(listOf("P0171"), confirmed("18DAF110 4 43 01 01 71").map { it.code })
+        assertTrue(confirmed("7E8 3 43 01 03 00").isEmpty())
+        assertTrue(confirmed("18DAF110 5 43 01 01 71").isEmpty())
+    }
+
+    @Test
+    fun physicalScannerKeepsWidebandVoltageAndCurrentBanksDistinct() = runBlocking {
+        val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+            when (command) {
+                "0128" -> "412880008000"
+                "0134" -> "413480008000"
+                "0138" -> "413880008000"
+                else -> "NO DATA"
+            }
+        })
+        val values = engine.readLiveData(setOf(0x28, 0x34, 0x38))
+        val bankTwoVoltage = values.filter { it.pid == 0x28 }
+        assertEquals(setOf("lambda", "V"), bankTwoVoltage.map { it.unit }.toSet())
+        assertTrue(bankTwoVoltage.all { it.name.contains("Bank 2 sensor 1") })
+        val bankOneCurrent = values.filter { it.pid == 0x34 }
+        assertEquals(setOf("lambda", "mA"), bankOneCurrent.map { it.unit }.toSet())
+        assertTrue(bankOneCurrent.all { it.name.contains("Bank 1 sensor 1") })
+        val bankTwoCurrent = values.filter { it.pid == 0x38 }
+        assertEquals(setOf("lambda", "mA"), bankTwoCurrent.map { it.unit }.toSet())
+        assertTrue(bankTwoCurrent.all { it.name.contains("Bank 2 sensor 1") })
+        assertEquals("0.00", bankTwoCurrent.single { it.unit == "mA" }.value)
+    }
+
+    @Test
+    fun physicalScannerNeverAcceptsExtraWidebandSensorBytes() = runBlocking {
+        val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+            when (command) {
+                "0128" -> "41288000800000"
+                "0138" -> "4138800080"
+                else -> "NO DATA"
+            }
+        })
+        assertTrue(engine.readLiveData(setOf(0x28, 0x38)).isEmpty())
     }
 
 }

@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using System.Runtime.CompilerServices;
 
 namespace CamaroDiag.J2534Bridge;
 
@@ -11,6 +12,37 @@ internal static class NativeScopedMemoryReader
 {
     internal const int MaximumUiCaptureBytes = 16 * 1024 * 1024;
 
+    // Cache only the ECU's supported, READ-ONLY VIN dialect on this specific
+    // live transport. Long captures still re-read the exact VIN before every
+    // pass and every 32 memory blocks, but do not wait for repeated silent
+    // F190 timeouts once the physical GM 1A/90 route has succeeded.
+    // Weak keys prevent retaining a disconnected adapter/session.
+    private sealed class VinDialect { internal volatile bool PreferGmlan; }
+    private static readonly ConditionalWeakTable<ITransport, VinDialect> VinDialects = new();
+
+    // A 16 MiB capture with small read blocks can issue hundreds of thousands
+    // of successful requests. Posting one WinForms Progress<T> callback per
+    // request exhausts the UI message queue without changing any ECU data.
+    internal static bool ShouldReportProgress(int blocks, int completed, int total) =>
+        blocks > 0 && completed > 0 && completed <= total &&
+            (blocks % 32 == 0 || completed == total);
+
+    internal sealed class LiveVinMismatchException :
+        UnauthorizedAccessException
+    {
+        internal LiveVinMismatchException() :
+            base("Live ECU VIN no longer matches the approved memory scope.") { }
+    }
+
+    internal sealed class MemoryReadRefusedException(uint address, int size, byte nrc) :
+        IOException($"ECU denied memory read at 0x{address:X8} ({size} bytes, NRC 0x{nrc:X2}). " +
+            "No SecurityAccess, flash write or privileged retry was attempted.")
+    {
+        internal uint Address { get; } = address;
+        internal int RequestedBytes { get; } = size;
+        internal byte Nrc { get; } = nrc;
+    }
+
     internal interface ITransport
     {
         Task<byte[]> ExchangeAsync(byte[] request, CancellationToken cancellationToken);
@@ -18,7 +50,7 @@ internal static class NativeScopedMemoryReader
 
     internal sealed record VerifiedCapture(
         byte[] Bytes, uint StartAddress, string ExpectedVin, string Sha256,
-        int BlocksPerPass, byte[]? SecondBytes = null);
+        int BlocksPerPass, byte[]? SecondBytes, J2534MemoryReadScope AcquiredScope);
 
     internal static byte[] BuildReadRequest(
         J2534MemoryReadScope scope, uint address, int bytes)
@@ -50,6 +82,8 @@ internal static class NativeScopedMemoryReader
     internal static byte[] ParseReadResponse(byte[] reply, int requestedBytes)
     {
         ArgumentNullException.ThrowIfNull(reply);
+        if (requestedBytes is < 1 or > 256)
+            throw new ArgumentOutOfRangeException(nameof(requestedBytes));
         if (reply.Length == 3 && reply[0] == 0x7F && reply[1] == 0x23)
             throw new IOException($"The ECU refused memory read: NRC 0x{reply[2]:X2}.");
         if (reply.Length != requestedBytes + 1 || reply[0] != 0x63)
@@ -61,14 +95,43 @@ internal static class NativeScopedMemoryReader
         ITransport link, J2534MemoryReadScope scope, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
-        var reply = await link.ExchangeAsync([0x22, 0xF1, 0x90], token);
-        token.ThrowIfCancellationRequested();
-        if (reply.Length != 20 || reply[0] != 0x62 ||
-            reply[1] != 0xF1 || reply[2] != 0x90 ||
-            !string.Equals(System.Text.Encoding.ASCII.GetString(reply, 3, 17),
-                scope.ExpectedVin, StringComparison.Ordinal))
-            throw new UnauthorizedAccessException(
-                "Live ECU VIN no longer matches the approved memory scope.");
+        var dialect = VinDialects.GetValue(link, static _ => new VinDialect());
+        if (dialect.PreferGmlan)
+        {
+            var gmReply = await link.ExchangeAsync([0x1A, 0x90], token);
+            token.ThrowIfCancellationRequested();
+            if (!J2534Device.MatchesScopedGmlanVin(gmReply, scope.ExpectedVin))
+                throw new LiveVinMismatchException();
+            return;
+        }
+        bool gmlanFallback;
+        try
+        {
+            var reply = await link.ExchangeAsync([0x22, 0xF1, 0x90], token);
+            token.ThrowIfCancellationRequested();
+            if (J2534Device.MatchesScopedMemoryVin(reply, scope.ExpectedVin))
+                return;
+            if (!J2534Device.IsUnsupportedUdsVinResponse(reply))
+                throw new LiveVinMismatchException();
+            gmlanFallback = true;
+        }
+        catch (TimeoutException)
+        {
+            // F190 silence on a GM GMLAN ECU is not proof of wrong hardware.
+            // Attempt the read-only legacy VIN DID instead.
+            gmlanFallback = true;
+        }
+        if (gmlanFallback)
+        {
+            var reply = await link.ExchangeAsync([0x1A, 0x90], token);
+            token.ThrowIfCancellationRequested();
+            if (J2534Device.MatchesScopedGmlanVin(reply, scope.ExpectedVin))
+            {
+                dialect.PreferGmlan = true;
+                return;
+            }
+        }
+        throw new LiveVinMismatchException();
     }
 
     /// <summary>
@@ -105,9 +168,11 @@ internal static class NativeScopedMemoryReader
             cancellationToken.ThrowIfCancellationRequested();
             captureCompleted = true;
         }
-        catch (UnauthorizedAccessException)
+        catch (LiveVinMismatchException)
         {
-            // A VIN or scope failure is not a reason to send another command.
+            // A changed VIN is unsafe to address again. In contrast, a
+            // scoped request denial on the SAME ECU must still attempt a
+            // bounded return to the default session after verifying VIN.
             identityUncertain = true;
             throw;
         }
@@ -137,7 +202,9 @@ internal static class NativeScopedMemoryReader
 
     private static void RequireSessionReply(byte[] reply, byte expected)
     {
-        if (reply.Length < 2 || reply[0] != 0x50 || reply[1] != expected)
+        // Accept an echoed session response with either no timing fields or
+        // the complete four-byte ISO 14229 timing pair. Reject trailing data.
+        if (reply.Length is not (2 or 6) || reply[0] != 0x50 || reply[1] != expected)
             throw new InvalidDataException("ECU did not confirm the requested read session.");
     }
 
@@ -177,11 +244,14 @@ internal static class NativeScopedMemoryReader
                 var request = BuildReadRequest(scope, address, length);
                 var reply = await link.ExchangeAsync(request, cancellationToken);
                 cancellationToken.ThrowIfCancellationRequested();
+                if (reply.Length == 3 && reply[0] == 0x7F && reply[1] == 0x23)
+                    throw new MemoryReadRefusedException(address, length, reply[2]);
                 var data = ParseReadResponse(reply, length);
                 data.CopyTo(output, offset);
                 offset += length;
                 blocks++;
-                progress?.Report((pass, offset, size));
+                if (ShouldReportProgress(blocks, offset, size))
+                    progress?.Report((pass, offset, size));
             }
             if (pass == 1)
             {
@@ -205,6 +275,6 @@ internal static class NativeScopedMemoryReader
             throw new InvalidDataException("No independent physical bytes received.");
         return new VerifiedCapture(
             first, scope.StartAddress, scope.ExpectedVin,
-            Convert.ToHexString(SHA256.HashData(first)), blocksPerPass, second);
+            Convert.ToHexString(SHA256.HashData(first)), blocksPerPass, second, scope);
     }
 }

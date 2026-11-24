@@ -80,6 +80,9 @@
     <string name="common_refresh">Actualiser</string>
     <string name="adapter_none_detected">Aucun adaptateur détecté. Les OBDLink MX+, MX, LX et autres Bluetooth classiques doivent être appairés ; le CX est recherché en BLE à proximité.</string>
     <string name="common_connect">Connecter</string>
+    <string name="adapter_j2534_capabilities_guidance">Les fonctions du pont dépendent du pilote J2534 et du canal ECU choisi. L’appairage du PC ne confirme pas à lui seul l’accès au calculateur.</string>
+    <string name="adapter_j2534_bridge_connected">Pont Windows J2534 appairé (connexion PC)</string>
+    <string name="adapter_disconnect_label">Déconnecter l’adaptateur</string>
     <string name="usb_connection_title">Connexion USB (OBDLink EX / SX, ELM327 et interfaces série)</string>
     <string name="usb_devices_detected">Périphériques USB détectés</string>
     <string name="usb_none_detected">Aucun adaptateur série USB détecté.</string>
@@ -440,6 +443,8 @@
     <string name="msg_live_recording_stopped">Enregistrement arrêté : la communication OBD a échoué. Les derniers échantillons restent exportables.</string>
     <string name="msg_live_recording_started">Enregistrement en cours. Nombre d’échantillons : %1$d.</string>
     <string name="msg_wifi_connection_failed">Échec de la connexion OBD Wi-Fi</string>
+    <string name="msg_usb_permission_denied">Accès USB refusé. Sélectionnez à nouveau l’adaptateur pour redemander l’autorisation.</string>
+    <string name="msg_usb_permission_pending">Autorisation USB demandée. Acceptez la fenêtre Android, puis appuyez à nouveau sur Connexion.</string>
     <string name="msg_usb_connection_failed">Échec de la connexion OBD USB</string>
     <string name="msg_bluetooth_connection_failed">Échec de la connexion Bluetooth SPP</string>
     <string name="mileage_audit_not_run">Audit non exécuté</string>
@@ -505,6 +510,7 @@
     <string name="msg_native_catalog_load_failed">Impossible de charger le catalogue natif des signaux Camaro.</string>
     <string name="msg_obdb_catalog_load_failed">Impossible de charger le catalogue OBDb Camaro.</string>
     <string name="msg_obdb_signal_read_failed">Échec de la lecture du signal OBDb.</string>
+    <string name="msg_j2534_bridge_invalid_form">Vérifiez l’adresse IPv4 locale du PC, le port TCP, le code d’appairage TLS et le profil/les identifiants CAN. L’adaptateur actif n’a pas été déconnecté.</string>
     <string name="msg_j2534_bridge_connect_failed">Impossible de se connecter au pont J2534.</string>
     <string name="live_pid_fuel_system_status">État du système d’alimentation</string>
     <string name="live_pid_ltft">Correction de carburant à long terme B1</string>
@@ -656,11 +662,11 @@
     <string name="vin_photo_success">VIN détecté et copié dans le profil véhicule. Vérifiez chaque caractère.</string>
     <string name="vin_photo_not_found">Aucun VIN valide de 17 caractères détecté. Saisissez-le manuellement ou reprenez la photo.</string>
     <string name="vin_photo_error">Impossible de lire la photo du VIN. Réessayez avec plus de lumière et une meilleure mise au point.</string>
-    <string name="tab_can_sniffer">Analyseur CAN</string>
+    <string name="tab_can_sniffer">Console CAN / OBD</string>
     <string name="can_sniffer_raw_heading">Flux brut reçu de l’interface CAN</string>
     <string name="can_sniffer_export_raw">Exporter le journal brut</string>
     <string name="can_sniffer_title">Moniteur CAN en direct</string>
-    <string name="can_sniffer_description">Capture des trames CAN avec un adaptateur ELM ou STN réel et compatible. Chaque capture s’arrête automatiquement après une courte session.</string>
+    <string name="can_sniffer_description">Lecture des données OBD standard avec une interface ELM ou J2534 connectée, ou capture CAN avec un adaptateur ELM/STN compatible. Les captures CAN s’arrêtent automatiquement.</string>
     <string name="can_sniffer_safety">Seules les requêtes OBD-II en lecture seule sont acceptées. Les trames CAN arbitraires et les écritures UDS sont bloquées.</string>
     <string name="can_sniffer_start">Démarrer la capture</string>
     <string name="can_sniffer_stop">Arrêter la capture</string>
@@ -668,6 +674,10 @@
     <string name="can_sniffer_request_examples">Exemples : 01 0C (régime), 09 02 (VIN), 03 / 07 / 0A (lecture des défauts). L’effacement est interdit.</string>
     <string name="can_sniffer_send">Envoyer</string>
     <string name="can_sniffer_empty">Aucune trame CAN capturée pour le moment.</string>
+    <string name="can_console_no_adapter_text">Aucun texte de réponse reçu de l’interface</string>
+    <string name="can_console_unsafe_can_payload">Trame CAN refusée : commande de diagnostic dangereuse ou adresse de réponse ECU réservée.</string>
+    <string name="can_console_obd_unavailable">La surveillance CAN est disponible, mais l’interface n’a pas de canal de lecture OBD standard actif.</string>
+    <string name="can_console_read_only_available">Les commandes OBD en lecture seule restent accessibles avec l’interface connectée. La surveillance CAN passive n’est pas disponible sur cet adaptateur.</string>
     <string name="can_sniffer_unavailable">Connectez un adaptateur réel prenant en charge les en-têtes CAN. La simulation et les ponts non compatibles ne permettent pas la capture en direct.</string>
     <string name="can_sniffer_capture_complete">Capture CAN terminée.</string>
     <string name="can_sniffer_capture_failed">Échec de la capture CAN ou absence de réponse de l’adaptateur.</string>
@@ -758,7 +768,7 @@
     <string name="can_console_rx">RX • REÇU</string>
     <string name="can_console_system">SYSTÈME</string>
     <string name="can_console_input_label">Trame ou commande OBD</string>
-    <string name="can_console_input_hint">Trame CAN : 7E0 02 01 0C • Requête OBD : 01 0C</string>
+    <string name="can_console_input_hint">CAN brut : 7E0 02 01 0C • Lecture OBD : 010C, 0152 (si pris en charge), 0902</string>
     <string name="can_console_sending">Envoi en cours…</string>
 
     <string name="can_console_adapter_ack">Réponse de l’interface (pas une trame RX ECU) : %1$s</string>
@@ -783,10 +793,28 @@
     <string name="obd_sensor_not_measured">Non mesuré lors de ce diagnostic</string>
     <string name="live_selected_sensors">Capteurs affichés (%1$d/%2$d)</string>
     <string name="flexfuel_lfx2012_title">FlexFuel LFX 2012 : identification du calculateur (lecture seule)</string>
+    <string name="flexfuel_lfx2012_read_fuel">Lire l’éthanol ECU et les corrections carburant (lecture seule)</string>
+    <string name="flexfuel_lfx2012_reading_fuel">Lecture physique des PID SAE Mode 01…</string>
+    <string name="flexfuel_lfx2012_source_j2534">J2534 Windows</string>
+    <string name="flexfuel_lfx2012_source_elm">OBD physique ELM/STN</string>
+    <string name="flexfuel_lfx2012_observed_source">Relevé ECU via %1$s · %2$s</string>
+    <string name="flexfuel_lfx2012_pid_ethanol">Éthanol déclaré par l’ECU (PID 52)</string>
+    <string name="flexfuel_lfx2012_pid_stft_b1">Correction courte carburant B1 (PID 06)</string>
+    <string name="flexfuel_lfx2012_pid_ltft_b1">Correction longue carburant B1 (PID 07)</string>
+    <string name="flexfuel_lfx2012_pid_stft_b2">Correction courte carburant B2 (PID 08)</string>
+    <string name="flexfuel_lfx2012_pid_ltft_b2">Correction longue carburant B2 (PID 09)</string>
+    <string name="flexfuel_lfx2012_reported_percent">%1$.1f%% (déclaré par l’ECU)</string>
+    <string name="flexfuel_lfx2012_pid_unsupported">PID non annoncé par l’ECU</string>
+    <string name="flexfuel_lfx2012_pid_no_response">Aucune réponse valide pour ce PID</string>
+    <string name="flexfuel_lfx2012_observation_warning">Une teneur en éthanol déclarée ne prouve ni la présence d’un capteur, ni l’activation FlexFuel, ni la compatibilité E85. Les corrections carburant ne mesurent pas l’éthanol. Cet écran ne modifie aucun paramètre ECU.</string>
+    <string name="flexfuel_lfx2012_fuel_failed">Relevé carburant en lecture seule indisponible :</string>
+    <string name="flexfuel_lfx2012_vin_unverified">Le VIN sélectionné n’a pas été comparé à une identité ECU physique récente et vérifiée pour ce relevé carburant.</string>
+    <string name="flexfuel_lfx2012_continuous_telemetry">Ceci est un relevé ponctuel. Ouvrez Télémétrie Live pour le suivi répété du PID ECU 52 lorsque le calculateur le propose.</string>
     <string name="flexfuel_lfx2012_parts">Catalogue de pièces : calculateur %1$s, référence %2$s (remplace %3$s).</string>
     <string name="flexfuel_lfx2012_parts_warning">Ces références ne prouvent pas quel calculateur équipe ce VIN et ne permettent pas de modifier sa calibration.</string>
     <string name="flexfuel_lfx2012_calid_label">Identifiant de calibration communiqué par le calculateur : %1$s</string>
     <string name="flexfuel_lfx2012_boot">Référence de fichier de démarrage du catalogue : %1$s (non vérifiée sur ce véhicule).</string>
+    <string name="flexfuel_lfx2012_readonly_testing_notice">La lecture et l’identification du calculateur sur véhicule réel restent utilisables pour les essais individuels, indépendamment de la qualification de l’écriture ECU.</string>
     <string name="flexfuel_lfx2012_checks">Conditions empêchant encore toute modification de calibration</string>
     <string name="flexfuel_preflight_vehicle_missing">Aucun profil véhicule sélectionné</string>
     <string name="flexfuel_preflight_wrong_vehicle">Véhicule différent de la Camaro LFX 2012</string>
@@ -876,6 +904,10 @@
     <string name="live_pid_wbo2_b1s2">Lambda large bande B1S2</string>
     <string name="live_pid_wbo2_b2s1">Lambda large bande B2S1</string>
     <string name="live_pid_wbo2_b2s2">Lambda large bande B2S2</string>
+    <string name="live_pid_wbo2_i_b1s1">Courant de sonde lambda large bande B1S1</string>
+    <string name="live_pid_wbo2_i_b1s2">Courant de sonde lambda large bande B1S2</string>
+    <string name="live_pid_wbo2_i_b2s1">Courant de sonde lambda large bande B2S1</string>
+    <string name="live_pid_wbo2_i_b2s2">Courant de sonde lambda large bande B2S2</string>
     <string name="system_language_follow_phone">Suivre la langue du téléphone</string>
 
     <!-- Live physical J2534 ECU memory capture -->
@@ -883,14 +915,22 @@
     <string name="cal_live_memory_notice">La passerelle Windows doit disposer d’une carte mémoire approuvée et liée au VIN. Lecture seule, sans écriture ECU.</string>
     <string name="cal_live_memory_length">Octets à lire (4 Mio maximum)</string>
     <string name="cal_live_memory_region_calibration">Calibration</string>
+    <string name="cal_live_memory_region_other">Non qualifiée / inconnue</string>
+    <string name="cal_live_memory_region_profile_match">La région, la plage d’adresses et la session doivent correspondre au profil J2534 Windows. Les blocs sont automatiquement limités à la taille autorisée. Une région inconnue ne constitue pas une sauvegarde ECU complète.</string>
     <string name="cal_live_memory_extended">Session de diagnostic étendue (0x03)</string>
     <string name="cal_live_memory_save">Lire deux fois et sauvegarder la mémoire ECU en ZIP</string>
+    <string name="cal_live_memory_partial_notice">Plage mémoire partielle uniquement. Cette archive ne constitue ni une sauvegarde complète de l’ECU ni une image dont la restauration est démontrée.</string>
     <string name="cal_live_memory_saved">Mémoire ECU sauvegardée après deux lectures identiques.</string>
     <string name="cal_live_memory_failed">Échec de lecture mémoire ECU. Aucune sauvegarde vérifiée créée.</string>
     <string name="cal_archive_verify">Vérifier le ZIP de sauvegarde du calculateur</string>
     <string name="cal_archive_verified">Les deux lectures concordent et les empreintes SHA-256 sont valides pour les plages archivées.</string>
     <string name="cal_archive_partial">La sauvegarde ne couvre qu’une partie de la mémoire demandée.</string>
-    <string name="cal_archive_failed">Impossible de vérifier ce ZIP. La limite est de 32 Mio après décompression.</string>
+    <string name="cal_archive_failed">Impossible de vérifier ce ZIP. La limite est de 32 Mio de données et 64 Kio de métadonnées.</string>
+    <string name="cal_archive_channel">Canal J2534 déclaré : TX %1$s / RX %2$s, protocole %3$d, session de diagnostic %4$d.</string>
+    <string name="cal_archive_legacy_route">Archive ancienne : les identifiants CAN et la session ne sont pas enregistrés.</string>
+    <string name="cal_archive_unattested">Intégrité hors ligne uniquement : l’origine physique et la couverture complète du firmware ne sont pas certifiées.</string>
+    <string name="cal_archive_osid">Identifiant OS GM enregistré : %1$d (DID 0x%2$s). Cela ne qualifie pas une variante de firmware ECU.</string>
+    <string name="cal_archive_osid_missing">Aucun identifiant OS GM enregistré dans cette archive.</string>
     <!-- Owner-only Debug downloads and staged license labels -->
     <string name="tab_debug_builds">Versions Debug</string>
     <string name="tab_license">Licence</string>
@@ -920,4 +960,37 @@
     <string name="export_folder_instruction">Créez ou sélectionnez le dossier CamaroDiag dans le stockage interne, puis autorisez son accès. Les exports sont visibles dans le stockage partagé.</string>
     <string name="export_folder_success">Export enregistré dans /CamaroDiag/.</string>
     <string name="export_folder_failed">Impossible d’enregistrer l’export dans /CamaroDiag/.</string>
+    <string name="can_console_filter_all_ecus">Tous les identifiants CAN observés (surveillance globale)</string>
+    <string name="can_console_filter_observed_id">Identifiant CAN observé 0x%1$s</string>
+    <string name="can_console_filter_observed_note">Seuls les identifiants CAN réellement observés sur le bus connecté sont proposés. Un identifiant ne suffit pas à identifier un calculateur. Ce filtre agit uniquement sur l’affichage.</string>
+    <string name="can_console_filter_verified_ecu">Calculateur identifié : %1$s (CAN 0x%2$s)</string>
+    <string name="can_monitor_format_11">Capture CAN 11 bits</string>
+    <string name="can_monitor_format_29">Capture CAN 29 bits</string>
+    <string name="can_monitor_format_notice">L’interface physique surveille un seul format CAN à la fois ; les autres bus et formats non pris en charge ne sont pas visibles pendant cette session.</string>
+    <string name="can_console_tx_ack_only">Trame envoyée à l’interface ; aucune réponse diagnostique correspondante du calculateur n’a été confirmée.</string>
+    <string name="can_console_negative_ecu_response">Le calculateur sélectionné a renvoyé une réponse diagnostique négative ; aucune lecture réussie n’a été confirmée.</string>
+    <string name="can_console_oversized_line">Lignes de surveillance CAN malformées ignorées : %1$d. La capture brute d’origine est conservée.</string>
+    <string name="can_console_response_timeout">Délai dépassé pour la réponse diagnostique CAN ; les trames déjà reçues restent dans la console.</string>
+    <string name="ecu_write_warning_title">Avertissement avant écriture ECU</string>
+    <string name="ecu_write_warning_message">Une commande va être transmise à un calculateur ou à un élément connecté. Elle peut provoquer une écriture, une modification ou un effacement, et endommager ou rendre cet élément inutilisable. CamaroDiag décline toute responsabilité pour les conséquences de cette opération, dans les limites prévues par la loi. Appuyez sur OK pour accéder à la confirmation.</string>
+    <string name="ecu_write_confirm_title">Confirmer l’écriture sur l’élément</string>
+    <string name="ecu_write_confirm_message">Confirmez-vous l’envoi de cette commande pouvant écrire sur l’élément ciblé, en connaissance des risques ? Si vous choisissez Non, aucune commande ne sera envoyée.</string>
+    <string name="ecu_write_ok">OK</string>
+    <string name="ecu_write_yes">Oui</string>
+    <string name="ecu_write_no">Non</string>
+    <string name="ecu_write_cancel">Annuler</string>
+    <string name="flexfuel_lfx2012_export_history">Exporter %1$d relevés carburant (CSV)</string>
+    <string name="flexfuel_lfx2012_history_saved">Historique carburant exporté en lecture seule.</string>
+    <string name="flexfuel_lfx2012_history_failed">Impossible d’exporter l’historique carburant.</string>
+    <string name="flexfuel_lfx2012_ethanol_no_current_measurement">Aucune mesure actuelle d’éthanol : la plage affichée correspond uniquement à l’historique.</string>
+    <string name="flexfuel_lfx2012_history_range">Éthanol : %1$d relevés valides, min. %2$.2f %% / max. %3$.2f %%</string>
+    <string name="flexfuel_lfx2012_history_trim_range">%1$s : %2$d relevés valides, min. %3$.2f %% / max. %4$.2f %%</string>
+    <string name="can_console_export_header"># Export console CAN CamaroDiag</string>
+    <string name="can_console_export_events_full"># Historique intégral des événements TX/RX/SYSTEM dans l’ordre chronologique ; le flux RX brut suit lorsqu’il est disponible.</string>
+    <string name="can_console_export_events_limited"># Historique : 300 derniers événements TX/RX/SYSTEM au maximum. Les émissions TX plus anciennes ne sont pas conservées ; le flux RX brut complet est archivé séparément lorsqu’il existe.</string>
+    <string name="can_console_export_direction_legend"># TX = envoyé, RX = reçu, SYSTEM = événement applicatif</string>
+    <string name="can_console_export_full_raw_rx"># RX BRUT - flux complet archivé de l’adaptateur (texte non modifié)</string>
+    <string name="can_console_export_recent_raw_rx"># RX BRUT - extrait mémoire récent uniquement, capture non exhaustive</string>
+    <string name="can_console_export_failed_marker">ÉCHEC</string>
+    <string name="can_console_history_recent_scope">Historique à l’écran : 300 événements récents au maximum. Le flux RX brut peut être archivé séparément ; les anciens TX ne sont pas conservés.</string>
 </resources>

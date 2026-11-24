@@ -9,12 +9,14 @@ interface EcuProgrammingDriverContract {
         ELM_DIAGNOSTICS, J2534, BENCH, BOOT_BAM, NEXUS_JTAG, CHIP_OFF,
         CAN_DIRECT, BDM, EEPROM_ISP, SWD;
 
-        /** Connection type is not evidence of an implemented hardware protocol. */
+        /** No transport is disabled just by its marketing label.
+         *  Actual memory write support must be provided by its registered driver.
+         *  Unsupported ELM/STN adapters still have no such driver.
+         */
         fun permitsMemoryProgramming(region: EcuBackupCoverage.Region): Boolean =
             when (this) {
-                ELM_DIAGNOSTICS -> false
                 CHIP_OFF, EEPROM_ISP -> region == EcuBackupCoverage.Region.EXTERNAL_EEPROM
-                J2534, BENCH, BOOT_BAM, NEXUS_JTAG, CAN_DIRECT, BDM, SWD ->
+                ELM_DIAGNOSTICS, J2534, BENCH, BOOT_BAM, NEXUS_JTAG, CAN_DIRECT, BDM, SWD ->
                     region in setOf(EcuBackupCoverage.Region.CALIBRATION,
                         EcuBackupCoverage.Region.PROGRAM_FLASH, EcuBackupCoverage.Region.DATA_FLASH)
             }
@@ -64,7 +66,7 @@ interface EcuProgrammingDriverContract {
          * One protocol driver may support many firmware versions on that family.
          */
         fun supportsWrite(target: FirmwareTarget, requestedTransport: Transport): Boolean =
-            physicalHardwareValidated && transport != Transport.ELM_DIAGNOSTICS &&
+            physicalHardwareValidated &&
                 supportsFamilyProtocol(target.controllerFamily, requestedTransport) &&
                 target in writeTargets &&
                 capabilities.containsAll(requiredWriteCapabilities) &&

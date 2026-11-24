@@ -1,0 +1,11 @@
+C4 read-only fuel observations, session-bound history and CSV export: grouped Android Debug checkpoint.
+Source revision before request: de4ea6c84188643d832921a803307766f3ffc02e
+Includes communication history/CSV unit regressions and Android calibration screen/export integration.
+Run communication, diagnostic and app unit suites once; fail on warnings.
+No physical ECU, installed ethanol sensor or calibration qualification is implied.
+
+C4 completed follow-up: stable history snapshot export rejects in-progress reads and stale samples.
+Source before grouped checkpoint: 5e74486a4764baa4ddefbc54e7b737ee90374708
+Run targeted Android suites once after this C4 correction; no physical FlexFuel validation.
+
+24/11/2026 — #52 : annonces de PID du répondant moteur, page silencieuse, correction d’affichage et régressions de relevés ELM. Campagne C4 Debug.

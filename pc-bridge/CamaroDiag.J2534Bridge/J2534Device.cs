@@ -165,15 +165,33 @@ internal sealed partial class J2534Device : IDisposable
             _opened = true;
             if (_memoryReadScope != null)
             {
-                // Read live VIN via an already allowed, non-destructive DID before
-                // exposing any memory command. No identity -> no 0x23 permission.
-                var vinResponse = Exchange(new byte[] { 0x22, 0xF1, 0x90 }, 6000);
-                if (vinResponse.Length < 20 || vinResponse[0] != 0x62 ||
-                    vinResponse[1] != 0xF1 || vinResponse[2] != 0x90 ||
-                    !string.Equals(Encoding.ASCII.GetString(vinResponse, 3, 17),
-                        _memoryReadScope.ExpectedVin, StringComparison.OrdinalIgnoreCase))
-                    throw new UnauthorizedAccessException(
-                        "The live ECU VIN does not match the approved memory read profile.");
+                // Some stock GM GMLAN ECUs use service 1A/90, not UDS F190.
+                // An unsupported/silent F190 may fall back to an EXACT live
+                // GMLAN VIN. Never fall back after a malformed or wrong VIN.
+                bool gmVinFallback;
+                try
+                {
+                    var vinReply = Exchange([0x22, 0xF1, 0x90], 6000);
+                    if (MatchesScopedMemoryVin(vinReply, _memoryReadScope.ExpectedVin))
+                        gmVinFallback = false;
+                    else if (IsUnsupportedUdsVinResponse(vinReply))
+                        gmVinFallback = true;
+                    else throw new UnauthorizedAccessException(
+                        "ECU UDS VIN differs from the operator-selected memory target.");
+                }
+                catch (TimeoutException)
+                {
+                    // No positive reply. A GMLAN-only ECU may still identify
+                    // itself using 1A/90; no write or unlock request is sent.
+                    gmVinFallback = true;
+                }
+                if (gmVinFallback)
+                {
+                    var gmReply = Exchange([0x1A, 0x90], 6000);
+                    if (!MatchesScopedGmlanVin(gmReply, _memoryReadScope.ExpectedVin))
+                        throw new UnauthorizedAccessException(
+                            "ECU GMLAN VIN differs from the operator-selected memory target.");
+                }
                 _memoryReadVinVerified = true;
             }
         }
@@ -184,6 +202,25 @@ internal sealed partial class J2534Device : IDisposable
         }
     }
 
+    /// <summary>
+    /// An ECU must return exactly one 17-character VIN in DID F190.
+    /// Extra bytes, truncated responses or case-changed bytes are not proof
+    /// of the exact ECU identity in the operator's memory read scope.
+    /// </summary>
+    internal static bool MatchesScopedMemoryVin(byte[] response, string expectedVin) =>
+        response.Length == 20 && expectedVin.Length == 17 &&
+        response[0] == 0x62 && response[1] == 0xF1 && response[2] == 0x90 &&
+        response.AsSpan(3, 17).SequenceEqual(Encoding.ASCII.GetBytes(expectedVin));
+
+    internal static bool IsUnsupportedUdsVinResponse(byte[] reply) =>
+        reply.Length == 3 && reply[0] == 0x7F && reply[1] == 0x22 &&
+        reply[2] is 0x11 or 0x12 or 0x31;
+
+    internal static bool MatchesScopedGmlanVin(byte[] reply, string expectedVin) =>
+        reply.Length == 19 && expectedVin.Length == 17 &&
+        reply[0] == 0x5A && reply[1] == 0x90 &&
+        reply.AsSpan(2, 17).SequenceEqual(Encoding.ASCII.GetBytes(expectedVin));
+
     public byte[] Exchange(byte[] payload, int timeoutMs)
     {
         EnsureOpen();
@@ -193,12 +230,44 @@ internal sealed partial class J2534Device : IDisposable
         return ExchangeCore(payload, timeoutMs, nativeBenchReply: false);
     }
 
+    /// <summary>
+    /// Explicit local J2534 console exchange. Do not apply an artificial
+    /// service-level read-only list to operator-entered ECU protocol requests.
+    /// Actual vendor transport, ECU SecurityAccess and OEM acknowledgements
+    /// are still handled by the physical adapter and the controller.
+    /// The Android network bridge continues to use the restricted Exchange().
+    /// </summary>
+    internal byte[] ExchangeConsole(byte[] payload, int timeoutMs)
+    {
+        EnsureOpen();
+        if (payload.Length is < 1 or > 4091)
+            throw new ArgumentOutOfRangeException(nameof(payload));
+        return ExchangeCore(payload, timeoutMs, nativeBenchReply: false);
+    }
+
+    internal void SendConsoleOnly(byte[] payload)
+    {
+        EnsureOpen();
+        if (payload.Length is < 1 or > 4091)
+            throw new ArgumentOutOfRangeException(nameof(payload));
+        SendCore(payload);
+    }
+
+    // Memory 0x63 replies contain no address echo: a previously queued reply
+    // from the same ECU CAN ID could otherwise be assigned to a later block.
+    // Also clear before VIN identity reads on the scoped channel so a stale
+    // F190 response cannot authenticate an ECU that was since replaced.
+    // A driver without the standard CLEAR_RX_BUFFER ioctl fails closed.
+    internal static bool NeedsFreshReceiveQueue(bool nativeBenchReply, bool hasMemoryReadProfile) =>
+        nativeBenchReply || hasMemoryReadProfile;
+
     // The future isolated bench caller uses a separate reply dialect.
     // The public network exchange above always remains read-only.
     private byte[] ExchangeCore(byte[] payload, int timeoutMs, bool nativeBenchReply)
     {
         EnsureOpen();
-        if (nativeBenchReply) ClearNativeReceiveQueue();
+        if (NeedsFreshReceiveQueue(nativeBenchReply, _memoryReadScope is not null))
+            ClearNativeReceiveQueue();
         var tx = CreatePayloadMessage(_requestCanId, payload);
         var messages = new[] { tx };
         uint count = 1;
@@ -409,6 +478,25 @@ internal sealed partial class J2534Device : IDisposable
         if (count != 1) throw new IOException("J2534 driver did not queue the UDS message.");
     }
 
+    // Check diagnostic wire shape before an untrusted console payload reaches
+    // the physical J2534 driver. 0x22 is deliberately limited to one DID:
+    // response matching presently validates only that DID. 0x19 must contain
+    // at least its read-DTC subfunction.
+    internal static bool IsWellFormedReadOnlyDiagnosticPayload(byte[] payload) =>
+        payload.Length >= 2 && (payload[0] switch
+        {
+            0x22 => payload.Length == 3,
+            // ReadDTCInformation 01/02 require a status mask; 0A does not.
+            // Reject unknown or truncated subfunctions in the C1 console.
+            0x19 => payload[1] switch
+            {
+                0x01 or 0x02 => payload.Length == 3,
+                0x0A => payload.Length == 2,
+                _ => false
+            },
+            _ => false
+        });
+
     private void ValidateReadOnlyService(byte[] payload, bool allowNoResponse)
     {
         var service = payload[0];
@@ -417,7 +505,7 @@ internal sealed partial class J2534Device : IDisposable
             payload[1] is 0x02 or 0x04 or 0x06 or 0x0A) return;
         if (!allowNoResponse && payload.Length == 2 && service == 0x1A &&
             payload[1] is 0x90 or 0xC1 or 0xC9) return;
-        if (service == 0x22 || service == 0x19) return;
+        if (IsWellFormedReadOnlyDiagnosticPayload(payload)) return;
         if (service == 0x3E && payload.Length == 2 && payload[1] is 0x00 or 0x80) return;
         if (!allowNoResponse && _memoryReadVinVerified && _memoryReadScope != null)
         {

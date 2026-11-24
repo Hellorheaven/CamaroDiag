@@ -8,6 +8,19 @@ namespace CamaroDiag.J2534Bridge;
 internal sealed partial class BridgeDesktopForm
 {
     private J2534Device? consoleDevice;
+    private CancellationTokenSource? doIpConsoleDiscoveryCancellation;
+    private readonly TextBox doIpConsoleHost = new() { Dock = DockStyle.Fill };
+    private readonly Button doIpConsoleDiscover = Button(DoIpConsolePresentation.Text("Discover"));
+    private readonly Button doIpConsoleCancel = Button(DoIpConsolePresentation.Text("Cancel"));
+    private readonly Button doIpConsoleStatus = Button(DoIpConsolePresentation.Text("Status"));
+    private readonly Button doIpConsolePower = Button(DoIpConsolePresentation.Text("Power"));
+    private DoIpVehicleDiscovery.Identity? doIpObservedGateway;
+    private readonly TextBox doIpTesterAddress = new() { Dock = DockStyle.Fill };
+    private readonly TextBox doIpEcuAddress = new() { Dock = DockStyle.Fill };
+    private readonly CheckBox doIpUseTls = new()
+        { Text = DoIpConsolePresentation.Text("UseTls"), Checked = true, AutoSize = true };
+    private readonly TextBox doIpClientCertificate = new() { Dock = DockStyle.Fill };
+    private readonly Button doIpReadVin = Button(DoIpConsolePresentation.Text("ReadVin"));
     private readonly TextBox consoleRequestId = new()
         { Text = "7E0", Dock = DockStyle.Fill };
     private readonly TextBox consoleResponseId = new()
@@ -66,18 +79,262 @@ internal sealed partial class BridgeDesktopForm
         consoleBattery.Click += async (_, _) => await ConsoleBatteryAsync();
         consoleSave.Click += (_, _) => SaveConsoleHistory();
         WideRow(fields, identityButtons, 48);
+        Row(fields, DoIpConsolePresentation.Text("Host"), doIpConsoleHost, doIpConsoleDiscover);
+        doIpConsoleCancel.Enabled = false;
+        doIpConsoleDiscover.Click += async (_, _) => await DiscoverDoIpFromConsoleAsync();
+        doIpConsoleCancel.Click += (_, _) => doIpConsoleDiscoveryCancellation?.Cancel();
+        var doIpOperations = new FlowLayoutPanel { Dock = DockStyle.Fill };
+        doIpOperations.Controls.Add(doIpConsoleStatus);
+        doIpOperations.Controls.Add(doIpConsolePower);
+        doIpOperations.Controls.Add(doIpConsoleCancel);
+        doIpConsoleStatus.Enabled = doIpConsolePower.Enabled = doIpReadVin.Enabled = false;
+        doIpConsoleStatus.Click += async (_, _) => await RunDoIpConsoleOperationAsync(false);
+        doIpConsolePower.Click += async (_, _) => await RunDoIpConsoleOperationAsync(true);
+        doIpConsoleHost.TextChanged += (_, _) =>
+        {
+            doIpObservedGateway = null;
+            doIpConsoleStatus.Enabled = doIpConsolePower.Enabled = doIpReadVin.Enabled = false;
+            doIpConsoleDiscoveryCancellation?.Cancel();
+        };
+        WideRow(fields, doIpOperations, 48);
+        Row(fields, DoIpConsolePresentation.Text("TesterAddress"), doIpTesterAddress);
+        Row(fields, DoIpConsolePresentation.Text("EcuAddress"), doIpEcuAddress, doIpReadVin);
+        WideRow(fields, doIpUseTls, 38);
+        Row(fields, DoIpConsolePresentation.Text("CertThumbprint"), doIpClientCertificate);
+        doIpReadVin.Enabled = false;
+        doIpReadVin.Click += async (_, _) => await ReadDoIpVinFromConsoleAsync();
+        // A logical endpoint or security-mode change invalidates the
+        // previously selected diagnostic context, even with the same IP.
+        // Require new discovery rather than retaining stale gateway evidence.
+        void InvalidateDoIpContext(object? sender, EventArgs args)
+        {
+            doIpObservedGateway = null;
+            doIpConsoleStatus.Enabled = doIpConsolePower.Enabled = doIpReadVin.Enabled = false;
+            doIpConsoleDiscoveryCancellation?.Cancel();
+        }
+        doIpTesterAddress.TextChanged += InvalidateDoIpContext;
+        doIpEcuAddress.TextChanged += InvalidateDoIpContext;
+        doIpUseTls.CheckedChanged += InvalidateDoIpContext;
+        doIpClientCertificate.TextChanged += InvalidateDoIpContext;
         WideRow(fields, new Label
         {
-            Text = "Console complète en lecture/diagnostic : TX et RX affichés séparément. " +
-                "Le pont refuse toute commande de programmation, effacement, déverrouillage ou actionneur. " +
+            Text = "Console J2534 locale : TX et RX séparés ; commandes ECU transmises selon " +
+                "le protocole et le pilote réellement sélectionnés, sans liste blanche CamaroDiag. " +
+                "Les écritures et déverrouillages restent soumis aux réponses du calculateur. " +
                 "Fermez ce canal avant de démarrer le pont Android.",
             Dock = DockStyle.Fill, AutoSize = true, ForeColor = Color.DarkSlateGray
         }, 78);
         outer.Controls.Add(fields, 0, 0);
         outer.Controls.Add(consoleHistory, 0, 1);
         tab.Controls.Add(outer);
-        ConsoleLine("INFO", "Console prête. Sélectionnez l'interface dans Connexion Android et ouvrez un canal.", Color.DarkSlateGray);
+        ConsoleLine("SYSTEM", "Console prête. Sélectionnez l'interface dans Connexion Android et ouvrez un canal.", Color.DarkSlateGray);
         return tab;
+    }
+
+    private Task DiscoverDoIpFromConsoleAsync() => RunDoIpConsoleOperationAsync(null);
+
+    // null = identification; false = entity status; true = power mode.
+    private async Task RunDoIpConsoleOperationAsync(bool? powerMode)
+    {
+        if (busy || doIpConsoleDiscoveryCancellation is not null) return;
+        if (consoleDevice is not null || bridgeTask is { IsCompleted: false })
+        {
+            ShowError(DoIpConsolePresentation.Text("Busy"));
+            return;
+        }
+        var host = doIpConsoleHost.Text.Trim();
+        if (!System.Net.IPAddress.TryParse(host, out var address) ||
+            address.Equals(System.Net.IPAddress.Any) ||
+            address.Equals(System.Net.IPAddress.IPv6Any) ||
+            address.Equals(System.Net.IPAddress.Broadcast) ||
+            address.IsIPv6Multicast)
+        {
+            ShowError(DoIpConsolePresentation.Text("InvalidHost"));
+            return;
+        }
+        var observed = doIpObservedGateway;
+        if (powerMode.HasValue &&
+            (observed is null || !observed.Source.Equals(address)))
+        {
+            ShowError(DoIpConsolePresentation.Text("IdentifyFirst"));
+            return;
+        }
+        if (!powerMode.HasValue) doIpObservedGateway = null;
+        var timeout = TimeSpan.FromMilliseconds((int)consoleTimeout.Value);
+        using var stop = new CancellationTokenSource();
+        doIpConsoleDiscoveryCancellation = stop;
+        doIpConsoleDiscover.Enabled = doIpConsoleStatus.Enabled = doIpConsolePower.Enabled = doIpReadVin.Enabled = false;
+        doIpConsoleHost.Enabled = false;
+        doIpConsoleCancel.Enabled = true;
+        try
+        {
+            await RunBusyAsync(async () =>
+            {
+                try
+                {
+                    if (powerMode.HasValue)
+                    {
+                        var version = observed!.ProtocolVersion;
+                        ConsoleLine("SYSTEM", string.Format(
+                            DoIpConsolePresentation.Text("StatusStarted"), address, version),
+                            Color.DarkSlateGray);
+                        var response = await DoIpVehicleDiscovery.QueryStatusAsync(
+                            address.ToString(), powerMode.Value, timeout, stop.Token,
+                            protocolVersion: version);
+                        stop.Token.ThrowIfCancellationRequested();
+                        if (IsDisposed || Disposing) return;
+                        ConsoleLine("SYSTEM", DoIpConsolePresentation.FormatStatus(
+                            response, powerMode.Value), Color.DarkGreen);
+                        ConsoleLine("SYSTEM", DoIpConsolePresentation.Text("StatusNotice"),
+                            Color.DarkSlateGray);
+                    }
+                    else
+                    {
+                        ConsoleLine("SYSTEM", string.Format(
+                            DoIpConsolePresentation.Text("Started"), address), Color.DarkSlateGray);
+                        var identity = await DoIpVehicleDiscovery.DiscoverAsync(
+                            address.ToString(), timeout, stop.Token);
+                        stop.Token.ThrowIfCancellationRequested();
+                        if (IsDisposed || Disposing) return;
+                        doIpObservedGateway = identity;
+                        ConsoleLine("SYSTEM", DoIpConsolePresentation.FormatIdentity(identity),
+                            Color.DarkGreen);
+                        ConsoleLine("SYSTEM", DoIpConsolePresentation.Text("Notice"),
+                            Color.DarkSlateGray);
+                    }
+                }
+                catch (OperationCanceledException) when (stop.IsCancellationRequested)
+                {
+                    doIpObservedGateway = null;
+                    if (!IsDisposed && !Disposing)
+                        ConsoleLine("SYSTEM", DoIpConsolePresentation.Text("Canceled"),
+                            Color.DarkSlateGray);
+                }
+                catch
+                {
+                    doIpObservedGateway = null;
+                    throw;
+                }
+            });
+        }
+        finally
+        {
+            doIpConsoleDiscoveryCancellation = null;
+            if (!IsDisposed && !Disposing)
+            {
+                doIpConsoleHost.Enabled = true;
+                doIpConsoleDiscover.Enabled = true;
+                doIpConsoleStatus.Enabled = doIpConsolePower.Enabled = doIpReadVin.Enabled = doIpObservedGateway is not null;
+                doIpConsoleCancel.Enabled = false;
+            }
+        }
+    }
+
+    private async Task ReadDoIpVinFromConsoleAsync()
+    {
+        if (busy || doIpConsoleDiscoveryCancellation is not null) return;
+        if (consoleDevice is not null || bridgeTask is { IsCompleted: false })
+        {
+            ShowError(DoIpConsolePresentation.Text("Busy"));
+            return;
+        }
+        var observed = doIpObservedGateway;
+        if (observed is null ||
+            !System.Net.IPAddress.TryParse(doIpConsoleHost.Text.Trim(), out var address) ||
+            !observed.Source.Equals(address))
+        {
+            ShowError(DoIpConsolePresentation.Text("IdentifyFirst"));
+            return;
+        }
+        ushort tester;
+        ushort ecu;
+        try
+        {
+            tester = DoIpVinReader.ParseLogicalAddress(doIpTesterAddress.Text.Trim());
+            ecu = DoIpVinReader.ParseLogicalAddress(doIpEcuAddress.Text.Trim());
+            if (tester == ecu) throw new ArgumentException();
+        }
+        catch (ArgumentException)
+        {
+            ShowError(DoIpConsolePresentation.Text("InvalidLogical"));
+            return;
+        }
+        var useTls = doIpUseTls.Checked;
+        var thumbprint = string.Concat(doIpClientCertificate.Text.Where(c => !char.IsWhiteSpace(c)));
+        if (thumbprint.Length != 0 &&
+            (!useTls || thumbprint.Length != 40 || !thumbprint.All(Uri.IsHexDigit)))
+        {
+            ShowError(DoIpConsolePresentation.Text("InvalidCertificate"));
+            return;
+        }
+        var timeout = TimeSpan.FromMilliseconds((int)consoleTimeout.Value);
+        using var stop = new CancellationTokenSource();
+        doIpConsoleDiscoveryCancellation = stop;
+        doIpConsoleDiscover.Enabled = doIpConsoleStatus.Enabled =
+            doIpConsolePower.Enabled = doIpReadVin.Enabled = false;
+        doIpConsoleHost.Enabled = doIpTesterAddress.Enabled =
+            doIpEcuAddress.Enabled = doIpUseTls.Enabled = doIpClientCertificate.Enabled = false;
+        doIpConsoleCancel.Enabled = true;
+        try
+        {
+            await RunBusyAsync(async () =>
+            {
+                try
+                {
+                    ConsoleLine("SYSTEM", string.Format(
+                        DoIpConsolePresentation.Text("VinStarted"), useTls ? "TLS" : "TCP",
+                        address, ecu, tester, observed.ProtocolVersion), Color.DarkSlateGray);
+                    var vin = await DoIpVinReader.ReadObservedGatewayAsync(
+                        observed, address, tester, ecu, useTls, timeout, stop.Token,
+                        requested: data =>
+                        {
+                            if (!IsDisposed && !Disposing)
+                                ConsoleLine("TX", Convert.ToHexString(data) + " [" +
+                                    BridgeConsoleTxEvidence.Label(BridgeConsoleTxState.Requested) + "]",
+                                    Color.DarkOrange);
+                        },
+                        received: data =>
+                        {
+                            if (!IsDisposed && !Disposing)
+                                {
+                                ConsoleLine("SYSTEM", BridgeConsoleTxEvidence.Label(
+                                    BridgeConsoleTxState.EcuReplied), Color.DarkSlateGray);
+                                ConsoleLine("RX", Convert.ToHexString(data), Color.DarkGreen);
+                            }
+                        },
+                        clientCertificateThumbprint: thumbprint.Length == 0 ? null : thumbprint);
+                    stop.Token.ThrowIfCancellationRequested();
+                    if (IsDisposed || Disposing) return;
+                    ConsoleLine("SYSTEM", string.Format(
+                        DoIpConsolePresentation.Text("VinResult"), vin), Color.DarkGreen);
+                    ConsoleLine("SYSTEM", DoIpConsolePresentation.Text("VinNotice"), Color.DarkSlateGray);
+                }
+                catch (OperationCanceledException) when (stop.IsCancellationRequested)
+                {
+                    doIpObservedGateway = null;
+                    if (!IsDisposed && !Disposing)
+                        ConsoleLine("SYSTEM", DoIpConsolePresentation.Text("Canceled"), Color.DarkSlateGray);
+                }
+                catch
+                {
+                    doIpObservedGateway = null;
+                    throw;
+                }
+            });
+        }
+        finally
+        {
+            doIpConsoleDiscoveryCancellation = null;
+            if (!IsDisposed && !Disposing)
+            {
+                doIpConsoleHost.Enabled = doIpTesterAddress.Enabled =
+                    doIpEcuAddress.Enabled = doIpUseTls.Enabled = doIpClientCertificate.Enabled = true;
+                doIpConsoleDiscover.Enabled = true;
+                doIpConsoleStatus.Enabled = doIpConsolePower.Enabled =
+                    doIpReadVin.Enabled = doIpObservedGateway is not null;
+                doIpConsoleCancel.Enabled = false;
+            }
+        }
     }
 
     private async Task OpenConsoleChannelAsync()
@@ -115,7 +372,7 @@ internal sealed partial class BridgeDesktopForm
                 consoleDevice = device;
                 consoleOpen.Enabled = false;
                 consoleClose.Enabled = true;
-                ConsoleLine("INFO", $"Canal ouvert : {selected.Adapter.DisplayName}, " +
+                ConsoleLine("SYSTEM", $"Canal ouvert : {selected.Adapter.DisplayName}, " +
                     $"TX 0x{chosen.RequestCanId:X}, RX 0x{chosen.ResponseCanId:X}, " +
                     $"profil {chosen.ProtocolNumber}.", Color.DarkSlateGray);
             }
@@ -134,8 +391,40 @@ internal sealed partial class BridgeDesktopForm
             consoleDevice = null;
             consoleOpen.Enabled = true;
             consoleClose.Enabled = false;
-            ConsoleLine("INFO", "Canal J2534 fermé.", Color.DarkSlateGray);
+            ConsoleLine("SYSTEM", "Canal J2534 fermé.", Color.DarkSlateGray);
         });
+    }
+
+    /// <summary>
+    /// Two distinct user actions before an arbitrary CAN/UDS transmission that
+    /// could modify an ECU. The warning OK does NOT transmit. No/cancel/close
+    /// returns before any J2534 driver call. A changed device invalidates it.
+    /// </summary>
+    private bool ConfirmPotentialEcuWrite(J2534Device device, string payloadHex)
+    {
+        var warning = MessageBox.Show(this,
+            "Une commande va être transmise à un calculateur ou à un élément connecté. " +
+            "Elle peut entraîner une écriture, une modification ou un effacement, " +
+            "et rendre cet élément inutilisable.\n\n" +
+            "CamaroDiag décline toute responsabilité pour les conséquences de " +
+            "cette opération, dans les limites prévues par la loi.\n\n" +
+            "Cliquez sur OK pour accéder à la confirmation.\nCommande : " + payloadHex,
+            "Avertissement avant écriture ECU",
+            MessageBoxButtons.OKCancel, MessageBoxIcon.Warning,
+            MessageBoxDefaultButton.Button2);
+        if (warning != DialogResult.OK || !ReferenceEquals(consoleDevice, device))
+            return false;
+
+        var confirmation = MessageBox.Show(this,
+            "Confirmez-vous l'envoi de cette commande pouvant écrire sur " +
+            "l'élément ciblé, en connaissance des risques ?\n\n" +
+            "Commande : " + payloadHex + "\n\n" +
+            "Non = aucune commande ne sera envoyée.",
+            "Confirmer l'écriture ECU",
+            MessageBoxButtons.YesNo, MessageBoxIcon.Question,
+            MessageBoxDefaultButton.Button2);
+        return confirmation == DialogResult.Yes &&
+            ReferenceEquals(consoleDevice, device);
     }
 
     private async Task ExchangeConsoleAsync(bool noResponse)
@@ -154,19 +443,53 @@ internal sealed partial class BridgeDesktopForm
         }
         catch (ArgumentException ex) { ShowError(ex.Message); return; }
 
+        // This console deliberately accepts OEM-specific services. Because
+        // an unknown payload can mutate an ECU, obtain two-step consent
+        // before ANY raw emission rather than guessing a safe SID list.
+        var confirmedPayload = Convert.ToHexString(payload);
+        if (!ConfirmPotentialEcuWrite(device, confirmedPayload))
+        {
+            ConsoleLine("SYSTEM", "Envoi annulé : aucune commande transmise.",
+                Color.DarkSlateGray);
+            return;
+        }
+
         await RunBusyAsync(async () =>
         {
-            ConsoleLine("TX", Convert.ToHexString(payload) +
-                (noResponse ? " [sans réponse]" : ""), Color.DarkOrange);
-            if (noResponse)
+            var frameHex = Convert.ToHexString(payload);
+            // A TX row records the operator's attempted send, never an
+            // unconditional claim that the J2534 device queued it on the bus.
+            ConsoleLine("TX", frameHex + " [" +
+                BridgeConsoleTxEvidence.Label(BridgeConsoleTxState.Requested) + "]",
+                Color.DarkOrange);
+            try
             {
-                await Task.Run(() => device.SendOnly(payload));
-                ConsoleLine("INFO", "Trame envoyée ; aucune réponse attendue.", Color.DarkSlateGray);
+                if (noResponse)
+                {
+                    await Task.Run(() => device.SendConsoleOnly(payload));
+                    // PassThruWriteMsgs only proves acceptance by the driver:
+                    // without an ECU reply, physical bus delivery is unknown.
+                    ConsoleLine("SYSTEM", frameHex + " [" +
+                        BridgeConsoleTxEvidence.Label(BridgeConsoleTxState.DriverAccepted) + "]",
+                        Color.DarkSlateGray);
+                }
+                else
+                {
+                    var reply = await Task.Run(() => device.ExchangeConsole(payload, (int)consoleTimeout.Value));
+                    ConsoleLine("SYSTEM", frameHex + " [" +
+                        BridgeConsoleTxEvidence.Label(BridgeConsoleTxState.EcuReplied) + "]",
+                        Color.DarkGreen);
+                    ConsoleLine("RX", Convert.ToHexString(reply), Color.DarkGreen);
+                }
             }
-            else
+            catch (Exception)
             {
-                var reply = await Task.Run(() => device.Exchange(payload, (int)consoleTimeout.Value));
-                ConsoleLine("RX", Convert.ToHexString(reply), Color.DarkGreen);
+                // A timeout does not prove whether a frame was transmitted;
+                // retain the attempted TX and append its explicit final status.
+                ConsoleLine("SYSTEM", frameHex + " [" +
+                    BridgeConsoleTxEvidence.Label(BridgeConsoleTxState.Unconfirmed) + "]",
+                    Color.DarkRed);
+                throw;
             }
         });
     }
@@ -181,16 +504,19 @@ internal sealed partial class BridgeDesktopForm
             object value;
             if (gmlan)
             {
-                ConsoleLine("TX", "1A 90 / 1A C1 / 1A C9 (GM GMLAN)", Color.DarkOrange);
+                ConsoleLine("SYSTEM", "Demande de lecture d'identité GM GMLAN en cours (1A 90 / 1A C1 / 1A C9).", Color.DarkSlateGray);
                 value = await Task.Run(() => device.ReadGmlanIdentification());
             }
             else
             {
-                ConsoleLine("TX", "09 02 / 09 04 / 09 06 / 09 0A (OBD Mode 09)", Color.DarkOrange);
+                ConsoleLine("SYSTEM", "Demande de lecture d'identité OBD Mode 09 en cours (09 02 / 09 04 / 09 06 / 09 0A).", Color.DarkSlateGray);
                 value = await Task.Run(() => device.ReadCalibrationIdentification());
             }
-            ConsoleLine("RX", JsonSerializer.Serialize(value,
-                new JsonSerializerOptions { WriteIndented = true }), Color.DarkGreen);
+            // The returned identity is a decoded aggregate of several ECU
+            // responses, not one byte-for-byte physical RX frame.
+            ConsoleLine("SYSTEM", "Identité ECU lue et décodée : " +
+                JsonSerializer.Serialize(value,
+                    new JsonSerializerOptions { WriteIndented = true }), Color.DarkGreen);
         });
     }
 
@@ -202,7 +528,7 @@ internal sealed partial class BridgeDesktopForm
         await RunBusyAsync(async () =>
         {
             var mv = await Task.Run(() => device.ReadBatteryMillivolts());
-            ConsoleLine("INFO", mv.HasValue
+            ConsoleLine("SYSTEM", mv.HasValue
                 ? $"Tension rapportée par le pilote J2534 : {mv.Value / 1000.0:F2} V."
                 : "Le pilote J2534 ne fournit pas la tension.", Color.DarkSlateGray);
         });
@@ -216,6 +542,7 @@ internal sealed partial class BridgeDesktopForm
             Filter = "Texte (*.txt)|*.txt", AddExtension = true,
             FileName = "CamaroDiag-Console.txt"
         };
+        if (!PrepareExportDialog(picker, UserExportStorage.Category.Console, "CamaroDiag-Console.txt")) return;
         if (picker.ShowDialog(this) != DialogResult.OK) return;
         try
         {
@@ -224,7 +551,7 @@ internal sealed partial class BridgeDesktopForm
             var bytes = Encoding.UTF8.GetBytes(consoleHistory.Text);
             stream.Write(bytes);
             stream.Flush(flushToDisk: true);
-            ConsoleLine("INFO", "Historique enregistré : " + picker.FileName, Color.DarkSlateGray);
+            ConsoleLine("SYSTEM", "Historique enregistré : " + picker.FileName, Color.DarkSlateGray);
         }
         catch (IOException ex)
         {
@@ -238,7 +565,7 @@ internal sealed partial class BridgeDesktopForm
         consoleHistory.SelectionStart = consoleHistory.TextLength;
         consoleHistory.SelectionLength = 0;
         consoleHistory.SelectionColor = color;
-        consoleHistory.AppendText($"{DateTime.Now:HH:mm:ss} [{direction}] {message}{Environment.NewLine}");
+        consoleHistory.AppendText($"{DateTime.Now:HH:mm:ss} [{BridgeConsoleDirection.Normalize(direction)}] {message}{Environment.NewLine}");
         consoleHistory.SelectionColor = consoleHistory.ForeColor;
         consoleHistory.ScrollToCaret();
     }

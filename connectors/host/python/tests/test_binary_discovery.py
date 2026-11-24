@@ -83,6 +83,70 @@ class BinaryDiscoveryTests(unittest.TestCase):
         with self.assertRaises(IOError):
             client.execute(Op.PING)
 
+    def test_bounded_binary_serial_timeout_restored_after_three_exchanges(self):
+        class TimedSerial(SimulatedSerial):
+            def __init__(self):
+                super().__init__()
+                self.timeout = None
+                self.write_timeout = None
+                self.read_limits = []
+                self.write_limits = []
+            def write(self, data):
+                self.write_limits.append(self.write_timeout)
+                return super().write(data)
+            def read(self, count):
+                self.read_limits.append(self.timeout)
+                return super().read(count)
+        serial = TimedSerial()
+        client = BinaryDiscoveryClient(serial)
+        self.assertEqual(client.verify_read_only(), tuple(v.decode() for v in REPLIES.values()))
+        self.assertTrue(all(limit == 0.2 for limit in serial.read_limits))
+        self.assertEqual([0.2, 0.2, 0.2], serial.write_limits)
+        self.assertIsNone(serial.timeout)
+        self.assertIsNone(serial.write_timeout)
+
+    def test_binary_serial_recovers_from_transient_empty_reads(self):
+        class GappedSerial(SimulatedSerial):
+            timeout = None
+            write_timeout = None
+            gaps = 3
+            def read(self, count):
+                if self.gaps > 0:
+                    self.gaps -= 1
+                    return b""
+                return super().read(count)
+        serial = GappedSerial()
+        self.assertEqual(BinaryDiscoveryClient(serial).verify_read_only(),
+                         tuple(v.decode() for v in REPLIES.values()))
+        self.assertEqual([0, 1, 2], [frame.sequence for frame in serial.sent])
+        self.assertIsNone(serial.timeout)
+        self.assertIsNone(serial.write_timeout)
+
+    def test_binary_empty_read_timeout_never_resets_global_deadline(self):
+        class StalledSerial(SimulatedSerial):
+            timeout = None
+            write_timeout = None
+            def read(self, count):
+                return b""
+        clock = iter(i * 0.5 for i in range(20))
+        serial = StalledSerial()
+        client = BinaryDiscoveryClient(serial, clock=lambda: next(clock))
+        with self.assertRaises(TimeoutError):
+            client.execute(Op.PING)
+        self.assertTrue(client.closed)
+        self.assertIsNone(serial.timeout)
+        self.assertIsNone(serial.write_timeout)
+    def test_bounded_binary_timeout_restored_on_corruption(self):
+        class TimedSerial(SimulatedSerial):
+            timeout = None
+            write_timeout = None
+        serial = TimedSerial(lambda frame: frame[:-1] + bytes([frame[-1] ^ 1]))
+        client = BinaryDiscoveryClient(serial)
+        with self.assertRaises(ValueError):
+            client.execute(Op.PING)
+        self.assertTrue(client.closed)
+        self.assertIsNone(serial.timeout)
+        self.assertIsNone(serial.write_timeout)
     def test_write_short(self):
         class Short(SimulatedSerial):
             def write(self,data): return len(data)-1

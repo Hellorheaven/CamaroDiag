@@ -13,7 +13,7 @@ Le pont relie CamaroDiag sur Android à un fournisseur SAE J2534 Pass-Thru insta
 | **Connexion Android** | Choisir et actualiser les pilotes J2534 installés, adresse IP locale du PC, port TLS, profil mémoire facultatif, autorisation facultative d’effacement des défauts antipollution, démarrer/arrêter le pont, copier séparément l'IP, le port et le code d'appairage TLS complet, ou copier les trois valeurs ensemble |
 | **Outils ECU E39/E39A** | Lire deux fois l'identification GM VIN/OSID (CAN IDs/profil explicites), inspecter une image brute de 3 Mio, recalculer les checksums GM SUM/CVN des calibrations et enregistrer un nouveau fichier sans écraser les originaux |
 | **Console CAN / OBD** | Ouvrir/fermer le canal J2534, envoyer des trames **autorisées en lecture**, afficher distinctement les trames TX et RX, envoyer les trames sans réponse autorisées, identification OBD Mode 09/GM GMLAN, tension du pilote, sauvegarder l'historique |
-| **Lecture mémoire ECU** | Créer/charger un profil de lecture avec VIN, plage mémoire, tailles de blocs, session et CAN IDs ; effectuer une lecture UDS 0x23, relire toute la plage, refuser les divergences, annuler, et exporter un nouveau fichier binaire à couverture déclarée |
+| **Lecture mémoire ECU** | Créer/charger un profil de lecture avec VIN, plage mémoire, tailles de blocs, session et CAN IDs ; effectuer une lecture UDS 0x23, comparer deux acquisitions, exporter un ZIP et vérifier hors ligne un ZIP existant sans connexion au calculateur |
 | **Pilotes et diagnostics** | Tester un ou tous les pilotes (ABI, connexion USB, version firmware/DLL/API), lancer les autotests du pont et copier le diagnostic |
 | **Mises à jour / À propos** | Voir la version du pont, rechercher les releases officielles, télécharger/installateur x86/x64 sans commande terminal, consulter le compte rendu d'installation |
 | **Aide et utilisation** | Instructions intégrées pas à pas pour toutes les fonctions, sécurité TLS et résolution des pannes courantes |
@@ -106,6 +106,22 @@ Utilisez la même version du pont et de l’application Android. Sélectionnez l
 Pour autoriser l'effacement, arrêtez le pont et cochez **Autoriser l’effacement OBD des défauts antipollution (moteur arrêté)** avant de le redémarrer. Reconnectez Android avec le nouveau code TLS. Immobilisez le véhicule, coupez le moteur en laissant le contact nécessaire au diagnostic, puis confirmez l'effacement dans l'écran DTC. Le calculateur doit confirmer une vitesse et un régime nuls. Relisez les défauts après l'opération. Les données de préparation antipollution et les données de contexte des défauts seront réinitialisées, mais les codes permanents ne sont pas effacés par cette commande. Elle ne répare pas le défaut à l'origine du code. Aucun effacement UDS des autres modules n'est autorisé.
 
 La fonction est en cours de validation sur la PR de développement ; la compatibilité avec votre interface et votre véhicule doit être contrôlée en conditions réelles.
+
+### Utiliser la console Android avec le pont J2534
+
+Après avoir ouvert sur le PC un canal OBD physique compatible, puis appairé Android au pont sécurisé, ouvrez **Console CAN / OBD** dans l'application. Le champ de commande peut envoyer des **lectures OBD standard**, même si l'interface ne sait pas capturer ou transmettre des trames CAN brutes depuis Android. La capture CAN et la lecture OBD sont deux capacités distinctes.
+
+Exemples de requêtes en lecture : `010C` (régime moteur), `0152` (teneur en éthanol, **uniquement si le calculateur prend ce PID en charge**), `0902` (informations VIN), `03` (défauts confirmés), `07` (défauts en attente), `0A` (défauts permanents). Une réponse absente, négative ou non conforme n'est pas indiquée comme une lecture réussie. L'historique distingue la commande envoyée (TX) et les données retournées par le calculateur (RX).
+
+Le PID `0152` retourne une teneur déclarée par le calculateur ; son absence ne signifie pas que le carburant est dépourvu d'éthanol, et sa présence ne prouve pas à elle seule qu'une stratégie FlexFuel est active. Les commandes d'effacement, de reprogrammation, d'actionneurs et de sécurité ECU ne sont pas accessibles par ce champ de lecture.
+
+Cette fonction logicielle peut être testée individuellement sur véhicule réel pendant le développement ; **elle n'est pas encore déclarée validée physiquement**. Le cahier de tests exhaustif du projet restera le dernier lot.
+
+### Vérifier une sauvegarde ECU depuis Windows
+
+Dans l'onglet **Lecture mémoire ECU**, ouvrez le profil JSON utilisé pour la sauvegarde, puis cliquez sur **Vérifier une sauvegarde ZIP**. Le contrôle fonctionne sans boîtier connecté et refuse les fichiers altérés, les lectures différentes ou un VIN et une plage mémoire incompatibles avec ce profil.
+
+Pour vérifier sans interface graphique : `CamaroDiag.J2534Bridge.exe --verify-ecu-archive sauvegarde.zip profil.json`. Cette opération n'écrit rien sur le calculateur et **ne démontre pas que la sauvegarde est complète ou restaurable**. La vérification retourne uniquement un rapport (VIN, région, taille, origine déclarée, empreinte) : elle ne fournit aucune image prête à programmer un ECU. Les archives Android v2 à région unique peuvent aussi être contrôlées avec le profil correspondant ; l'origine indiquée dans leur manifeste reste une déclaration non certifiée. Le fichier BIN brut n'inclut pas les deux acquisitions et ne peut pas être vérifié de la même manière.
 
 ### Sauvegarde d’une plage mémoire
 
@@ -253,3 +269,7 @@ Le pont inclut désormais un mode local explicite : `CamaroDiag.J2534Bridge.exe 
 L'onglet **CamaroDiagConnectors** du pont propose aussi cette découverte sans terminal : actualiser les ports COM, sélectionner uniquement la carte CD/1 isolée, confirmer l'absence de cible et lancer le test. Aucun port n'est sélectionné ou interrogé automatiquement. L'opération exige l'arrêt du pont et de la console ; le résultat n'autorise aucun accès véhicule.
 
 Pour examiner un checkpoint CDJ/1 local de 64 octets : onglet Récupération ECU, bouton « Ouvrir un checkpoint CDJ/1 », ou `CamaroDiag.J2534Bridge.exe --inspect-connector-checkpoint checkpoint.bin`. Le fichier exporté doit être fourni par l'utilisateur ; le firmware public ne propose pas encore de commande d'export. Analyse hors ligne, non authentifiée, aucune reprise automatique.
+
+
+### Journal du boîtier en USB (prototype isolé)
+Dans l'onglet CamaroDiagConnectors, sélectionner explicitement un port COM et le firmware de service `esp32s3-journal-export`, sans ECU ni véhicule connecté, puis exporter un fichier `.cdj` inédit. En ligne de commande : `CamaroDiag.J2534Bridge.exe --capture-connector-checkpoint COM5 checkpoint.cdj --isolated`. Les fichiers existants ne sont jamais écrasés. Le journal 64 octets est compatible avec le lecteur hors ligne Android/Windows. Absence de journal, corruption et état de récupération ne donnent aucune autorisation de programmation. Ne jamais reflasher un boîtier en opération ni effacer NVS. Qualification réelle sur carte encore requise.

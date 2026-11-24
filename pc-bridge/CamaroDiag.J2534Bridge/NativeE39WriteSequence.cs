@@ -30,6 +30,11 @@ internal static class NativeE39WriteSequence
         /// storage. Implementation must flush before returning to the caller.
         /// </summary>
         Task AppendAsync(Event evidence, CancellationToken cancellationToken);
+        // Physically re-acquired ORIGINAL bytes must be durably preserved
+        // before ANY erase command. A filename/hash alone is insufficient.
+        Task PreserveOriginalBlockAsync(
+            uint address, byte[] liveBytes, string expectedSha256,
+            CancellationToken cancellationToken);
     }
 
     internal interface IKernelLink
@@ -126,6 +131,10 @@ internal static class NativeE39WriteSequence
             _ = eraseRequest;
             var dry = BuildWrites(sector, options, dryRun: true).ToArray();
             var write = BuildWrites(sector, options, dryRun: false).ToArray();
+            // Compare every assembled wire packet with the target sector NOW,
+            // before any ECU operation, and check again immediately pre-TX.
+            NativeE39WriteBlockVerifier.RequireCompleteBatch(sector, dry, dryRun: true);
+            NativeE39WriteBlockVerifier.RequireCompleteBatch(sector, write, dryRun: false);
             sectors.Add((sector, dry, write));
         }
 
@@ -159,19 +168,27 @@ internal static class NativeE39WriteSequence
                     new(Phase.OriginalCrcVerified, s.Address, expected.ToString("X8")),
                     cancellationToken);
 
-                await RequireFreshBytesAsync(s.Address, s.Original,
+                var physicalOriginal = await RequireFreshBytesAsync(s.Address, s.Original,
                     "Original ECU bytes differ from backup; refusing erase.");
+                await journal.PreserveOriginalBlockAsync(
+                    s.Address, physicalOriginal, s.OriginalSha256, cancellationToken);
                 await journal.AppendAsync(
                     new(Phase.OriginalBytesVerified, s.Address, s.OriginalSha256),
                     cancellationToken);
 
+                var dryOffset = 0;
                 foreach (var frame in item.Dry)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
+                    dryOffset = checked(dryOffset +
+                        NativeE39WriteBlockVerifier.RequireExactFrame(
+                            s, frame, dryOffset, dryRun: true));
                     await RequireSupplyAsync();
                     NativeE39FlashCommands.RequireWriteSuccess(
                         await link.ExchangeAsync(frame, cancellationToken));
                 }
+                if (dryOffset != s.Length)
+                    throw new InvalidDataException("Dry-run frames do not match the full intended sector.");
                 await journal.AppendAsync(
                     new(Phase.TestWriteAccepted, s.Address, item.Dry.Length.ToString()),
                     cancellationToken);
@@ -207,13 +224,20 @@ internal static class NativeE39WriteSequence
                 await journal.AppendAsync(
                     new(Phase.WriteStarted, s.Address, s.UpdatedSha256),
                     cancellationToken);
+                var nextOffset = 0;
                 foreach (var frame in item.Write)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
+                    // Last-mile check of the ACTUAL frame about to be sent.
+                    nextOffset = checked(nextOffset +
+                        NativeE39WriteBlockVerifier.RequireExactFrame(
+                            s, frame, nextOffset, dryRun: false));
                     await RequireSupplyAsync();
                     NativeE39FlashCommands.RequireWriteSuccess(
                         await link.ExchangeAsync(frame, cancellationToken));
                 }
+                if (nextOffset != s.Length)
+                    throw new InvalidDataException("Outgoing write frames did not cover target sector exactly.");
 
                 await RequireSupplyAsync();
                 var verify = NativeE39FlashCommands.BuildFlashCrcQuery(
@@ -276,7 +300,7 @@ internal static class NativeE39WriteSequence
             throw;
         }
 
-        async Task RequireFreshBytesAsync(uint address, byte[] expected, string error)
+        async Task<byte[]> RequireFreshBytesAsync(uint address, byte[] expected, string error)
         {
             await RequireSupplyAsync();
             var observed = await link.ReadFlashBytesAsync(address, expected.Length,
@@ -286,6 +310,7 @@ internal static class NativeE39WriteSequence
                 !System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(
                     observed, expected))
                 throw new InvalidDataException(error);
+            return observed;
         }
 
         async Task RequireSupplyAsync()

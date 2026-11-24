@@ -1,6 +1,8 @@
 package com.camarodiag.gen5.data.obd
 
 import android.annotation.SuppressLint
+import java.net.InetAddress
+import java.net.InetSocketAddress
 import java.net.Socket
 import java.security.MessageDigest
 import java.security.SecureRandom
@@ -27,7 +29,8 @@ import javax.net.ssl.X509TrustManager
 object J2534BridgePairingCodeFormat {
     private val pattern = Regex("^[A-Za-z0-9_-]{43}\\.[0-9a-fA-F]{64}$")
 
-    fun isValid(code: String): Boolean = pattern.matches(code.trim())
+    fun isValid(code: String): Boolean =
+        code.none(Char::isISOControl) && pattern.matches(code.trim())
 }
 
 internal class J2534BridgeTlsPairing private constructor(
@@ -38,11 +41,10 @@ internal class J2534BridgeTlsPairing private constructor(
     val certificateSha256: ByteArray get() = pinnedDigest.copyOf()
     companion object {
         fun parse(pairingCode: String): J2534BridgeTlsPairing {
-            val normalized = pairingCode.trim()
-            require(J2534BridgePairingCodeFormat.isValid(normalized)) {
+            require(J2534BridgePairingCodeFormat.isValid(pairingCode)) {
                 "Appairage non sécurisé : recopier le code complet (jeton.empreinte TLS) affiché par le nouveau pont Windows."
             }
-            val parts = normalized.split('.')
+            val parts = pairingCode.trim().split('.')
             val pin = ByteArray(32) { index ->
                 parts[1].substring(index * 2, index * 2 + 2).toInt(16).toByte()
             }
@@ -86,14 +88,45 @@ internal class J2534BridgeTlsPairing private constructor(
                 verifyCertificate(chain)
             }
         }
+    /** The Windows bridge binds the pairing code to a LAN IPv4 address.
+     * Parse it locally; no hostname lookup, public IP or DNS rebinding is
+     * allowed to redirect an ECU session to an unexpected remote network.
+     * This does not substitute for the mandatory out-of-band TLS pin.
+     */
+    internal fun localBridgeIpv4(host: String): InetAddress {
+        require(host.matches(Regex("(?:[0-9]{1,3}\\.){3}[0-9]{1,3}"))) {
+            "The Windows J2534 bridge requires the numeric private IPv4 shown on the PC."
+        }
+        val parts = host.split('.').map { part ->
+            val octet = part.toIntOrNull()
+                ?: throw IllegalArgumentException("Noncanonical local bridge IPv4 address.")
+            require((part.length == 1 || part[0] != '0') && octet in 0..255) {
+                "Noncanonical local bridge IPv4 address."
+            }
+            octet
+        }
+        val allowed = parts[0] == 10 ||
+            (parts[0] == 172 && parts[1] in 16..31) ||
+            (parts[0] == 192 && parts[1] == 168) ||
+            (parts[0] == 169 && parts[1] == 254)
+        // Never guess the network mask from the last octet: .0 and .255
+        // may be legitimate host addresses on non-/24 private subnets.
+        require(allowed) {
+            "The J2534 bridge must use a private LAN address, not a public or loopback target."
+        }
+        return InetAddress.getByAddress(parts.map(Int::toByte).toByteArray())
+    }
+
     fun openSocket(host: String, port: Int): SSLSocket {
+        require(port in 1024..65535) { "Invalid private J2534 bridge port." }
+        val target = localBridgeIpv4(host)
         val context = SSLContext.getInstance("TLS")
         context.init(null, arrayOf<TrustManager>(pinnedTrustManager()), SecureRandom())
 
         val plain = Socket()
         try {
             plain.tcpNoDelay = true
-            plain.connect(java.net.InetSocketAddress(host, port), 5000)
+            plain.connect(InetSocketAddress(target, port), 5000)
             plain.soTimeout = 12_000
 
             // The plain socket transports only encrypted TLS handshake records:

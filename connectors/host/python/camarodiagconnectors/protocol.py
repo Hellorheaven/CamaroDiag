@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from typing import Protocol
 
 _ALLOWED_COMMANDS = frozenset({"PING", "CAPS", "STATUS"})
+_EXPECTED_CAPS = ("CAPS hs_can=disabled sw_can=disabled eeprom_read=disabled "
+                  "eeprom_write=disabled ecu_flash=disabled j2534=disabled")
 
 
 class SerialLike(Protocol):
@@ -73,9 +75,26 @@ class DiscoveryClient:
         if command not in _ALLOWED_COMMANDS:
             raise ValueError("Command forbidden in read-only prototype")
         outgoing = (command + "\n").encode("ascii")
-        if self._transport.write(outgoing) != len(outgoing):
-            raise IOError("Short command write")
-        reply = self._transport.readline()
+        # The caller may supply an unconfigured pyserial port with no
+        # timeout. Discovery must never hang indefinitely on USB I/O.
+        serial = self._transport
+        has_timeout = hasattr(serial, "timeout")
+        has_write_timeout = hasattr(serial, "write_timeout")
+        original_timeout = getattr(serial, "timeout", None)
+        original_write_timeout = getattr(serial, "write_timeout", None)
+        try:
+            if has_timeout:
+                serial.timeout = 2
+            if has_write_timeout:
+                serial.write_timeout = 2
+            if serial.write(outgoing) != len(outgoing):
+                raise IOError("Short command write")
+            reply = serial.readline()
+        finally:
+            if has_timeout:
+                serial.timeout = original_timeout
+            if has_write_timeout:
+                serial.write_timeout = original_write_timeout
         if not reply or len(reply) > 256:
             raise IOError("Missing or oversize reply")
         # A reply must be one complete line; reject partial frames and injected replies.
@@ -96,6 +115,10 @@ class DiscoveryClient:
             raise IOError("Unexpected device reply")
         if command == "PING" and response != "PONG CamaroDiagConnectors 0.1.0":
             raise IOError("Unsupported device identity or firmware version")
+        if command == "CAPS" and response != _EXPECTED_CAPS:
+            raise IOError("Noncanonical discovery capabilities")
+        if command == "STATUS" and response != "STATUS mode=prototype write=disabled":
+            raise IOError("Unsupported device mode or write state")
         return response
 
     def capabilities(self) -> Capabilities:

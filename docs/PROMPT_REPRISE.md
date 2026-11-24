@@ -1,6 +1,323 @@
+## Décision propriétaire — scission PR95 et continuité immédiate (24/11/2026)
+
+Le propriétaire autorise la scission, la validation puis la fusion de PR95 et la création immédiate de sa PR de continuation. Cette autorisation ne dispense pas du checkpoint Debug complet sur le HEAD exact ni du contrôle de fusionnabilité. Ne pas fusionner en cas d'échec, ne pas publier de Release intermédiaire volontairement. Conserver tous les commits et les issues ouvertes.
+
+### Périmètre transféré, sans perte d'exigences
+- C1 console CAN/OBD, C2 sauvegardes ECU (#63), C4 FlexFuel lecture seule : conserver les acquis et transférer toute exigence non satisfaite des issues et de l'audit PR95.
+- C6 et DoIP restent le chantier et le protocole actifs. Dernier code au SHA a7ffed89063fafba41bd29ff2e5e245213562733 : lecture DTC UDS 19/02 via passerelle DoIP observée ; raccordement GUI, tests loopback et présentation FR/EN non terminés.
+- #110 : toutes les couches et services ISO/SAE encore incomplets, intégration Android/Windows/Connectors par triplet connecteur + ECU + opération, distinction CAN brut/diagnostic, preuves RX/TX, revalidation contexte et erreurs.
+- C8 demeure exclusivement la validation finale du périmètre global ; la validation de PR95 est intermédiaire. #106 audit, #108 chantiers ultérieurs et #48 recette Release restent dus, sans suppression d'engagement.
+- Après succès des jobs sur le HEAD de clôture, vérifier le contrôle review, fusionner sans perdre les commits, puis supprimer l'ancienne branche si possible et ouvrir immédiatement une unique PR Draft de continuation depuis main. Si la suppression automatique dépend d'une Release, réutiliser la branche existante une fois synchronisée avec main plutôt que créer une troisième branche. Reporter le numéro réel de la nouvelle PR dans les consignes et le suivi.
+- Aucun statut terminé pour un travail non achevé, aucun test matériel revendiqué, aucune fermeture des issues de reliquat.
+
+---
+
+## Reprise C6/DoIP — annulation et changement de contexte (24/11/2026)
+
+- `fcfbc672544a12ad5c1ca4ee577534bcd636b9c9` : réutilisation de ReadDid F190 et contrôle d'annulation après callback RX et avant publication du VIN corrélé.
+- `acea1693eee0287ab0f3111767348db714f75c57` : test loopback d'annulation pendant callback RX, écrit mais non exécuté.
+- `b3c3819085a91a488afbd3df89f4ea3fb7f5e6f1` : invalidation de la découverte et annulation lors du changement d'adresse logique testeur/ECU, TLS ou certificat client. Nouvelle découverte requise. Aucun nouveau chemin d'écriture.
+- C6/DoIP restent actifs ; intégration transversale incomplète, C8 non commencé. Aucun résultat CI PR visible au HEAD initial e3766b0 ; ne pas assimiler cette absence à un résultat de CI push. Aucun merge ou Release.
+
+---
+
+## Reprise C6/DoIP — lecture VIN ECU UDS Windows (24/11/2026)
+
+- `7201e38` : contrôle facultatif de l'adresse logique annoncée par la passerelle lors du routage TCP/TLS. `47ddb6a` : service UDS F190 lecture seule, VIN ASCII 17 caractères valides, concordance avec le VIN UDP disponible, adresses explicites, copie indépendante TX/RX. `613bac4`, `6ba26de`, `d3b25a5` : ressources EN/FR et raccordement console Windows, TLS par défaut, certificat client facultatif, annulation et invalidation après erreur. `49a84bb` : historique TX demandé/RX corrélé distinct.
+- `7239385`, `c6155fd` : tests loopback du service VIN et refus de routage vers une passerelle logique différente avant toute émission UDS ; 17 assertions supplémentaires écrites, non exécutées. Le checkpoint précédent `d5842eb` n'est pas observable avec la vue GitHub limitée aux événements PR. Ne pas dupliquer sans contrôle ; aucune compilation locale disponible (pas de dotnet, accès git réseau indisponible).
+- Intégration limitée à lecture VIN, pas à une authentification, ni à l'écriture, ni à un sélecteur global. C6 et DoIP restent actifs ; C8 non commencé. Aucun test physique, merge, Release ou nouvelle branche.
+
+---
+
+## Reprise C6/DoIP — état passerelle dans la console (24/11/2026)
+
+- `859401d`, `ad8c010`, `52dc2fc` : présentation commune FR/EN des réponses EntityStatus et PowerMode. `981bead` : raccordement graphique aux requêtes UDP réelles, version reprise de l'identification observée pour l'adresse exacte, invalidation au changement de contexte, annulation ou échec. `7435f65` : même décodage pour CLI. `d21ca1f` : 22 assertions supplémentaires dans les autotests existants (taille présente/absente, trois modes, type incorrect, ressources FR/EN).
+- Aucun résultat de compilation ou de test nouveau constaté. C6 et DoIP restent actifs, C8 non démarré. État passerelle informatif, aucune autorisation ECU, aucun nouveau chemin d'écriture. Sélection transversale et intégration aux autres fonctions restent incomplètes.
+- Un checkpoint groupé de la tranche console et des correctifs précédents est demandé après ce lot ; ne pas assimiler le déclenchement à une réussite. Aucun merge, Release ou essai matériel.
+
+---
+
+## Reprise C6/DoIP — intégration console Windows (24/11/2026)
+
+- `15ad57b`, `8720d40`, `337cb86` : présentation commune de l'identité de passerelle et ressources FR/EN. `a62a69b` : découverte UDP unicast DoIP depuis la console graphique, avec adresse explicite, timeout, annulation et historique. `b181f75` : annulation à la fermeture et protection UI disposée. `ba9ad23` : CLI réutilise la présentation. `3c04f3f` et `e9a3c70` : vingt assertions de présentation et ressources enregistrées dans la suite d'autotests Windows.
+- Intégration limitée à l'identification UDP de passerelle, pas à l'authentification ECU, à la console UDS, au diagnostic live ni aux écritures. Pas de faux support, ni d'assimilation au CAN brut. Sélection automatique par fonction et autres parcours encore à réaliser.
+- Tests non exécutés à ce stade. C6/DoIP actifs, C8 strictement final, aucun merge/Release/essai physique. Demander un checkpoint groupé de cette tranche et des correctifs UDP/TCP précédents ; ne pas confondre le SHA de la demande avec un résultat.
+
+---
+
+## Reprise DoIP/C6 — correctifs supplémentaires du 24/11/2026
+
+- `54e0486317c5290d19fa5331ea56775a4c68c40a` : les quatre collectes UDP propagent l'annulation externe avant de publier les résultats.
+- `4007d981f5a574a406f7611b26b73b5d307584b6` : copie des octets OEM d'activation avant connexion et annulation préalable ; test TCP `383759a675fa68fb7f514b96309ee0e1f692326b`.
+- `e8cd617ab6a2ef3b8596d55e8ba0e92d93fcd151` : EID figé avant émission, corrélation sur ce même EID pour unicast, broadcast et multicast ; deux assertions loopback `d678b4bb1e1e0cca49ec313ff4d4166746344e60`.
+- Tests ajoutés, non exécutés. Aucun nouveau protocole, aucun C8, aucune qualification physique ni modification du consentement. Intégration par fonction toujours à réaliser, C6 et DoIP restent actifs. Le connecteur GitHub ne liste que les runs déclenchés par PR, pas les runs push du checkpoint ; ne pas confondre absence de résultat et absence de CI.
+
+---
+
+## Reprise DoIP/C6 — 24/11/2026
+
+- `9fb924bfde58073e8938ac48a86369752a50b5f1` : validation du socket UDP déjà lié, durée et port source bornés, annulation préalable explicite.
+- `6dc73472c3cfd0f28994f05c4bd6afa93b6f44c3` : six contrôles de régression ajoutés ; **non exécutés**. Aucun changement de capacité matérielle ni de consentement.
+- Les consultations du checkpoint `266279ef` et de l'ancien HEAD `1b4864f7` ne renvoient aucun run via la vue limitée aux événements PR ; cela ne prouve pas l'absence de runs push. Ne pas dupliquer une campagne sans vérification. DoIP et C6 restent actifs. Sélection automatique par connecteur + ECU + opération et intégration applicative de tous les protocoles toujours à réaliser avant C8.
+
+---
+
+## Décision propriétaire — sélection par fonction (prioritaire)
+
+- Résoudre automatiquement la pile de communication par **connecteur + ECU + fonction/opération** ; le même couple peut utiliser CAN brut en console et ISO-TP/UDS ou SAE J1979 en diagnostic selon capacités réelles. Distinguer transport, segmentation et service. Ne pas imposer un protocole unique à tout le couple.
+- Revalider à chaque changement de contexte, afficher la pile réellement utilisée, conserver les sessions cohérentes et le double consentement lié à l'opération. Aucun repli automatique après émission mutante incertaine. Tester plusieurs fonctions sur un même couple, incompatibilités et changement de contexte. Cette décision précise et prévaut sur la règle précédente à deux critères. C6 et DoIP actifs ; C8 strictement final. Implémentation et tests non réalisés par ce commit documentaire.
+
+---
+
+## Décision propriétaire — sélection automatique des protocoles
+
+- Le protocole est automatiquement sélectionné à partir du **couple connecteur effectivement utilisé + ECU cible**, en fonction des capacités négociées du connecteur/pilote, du profil ECU et de réponses de découverte non mutantes. Pas de sélecteur manuel obligatoire pour le parcours normal, pas de choix fondé sur le seul véhicule ou le seul connecteur.
+- Invalider la sélection au changement de connecteur, ECU ou session ; afficher le transport/service réellement utilisé ; signaler explicitement les incompatibilités et ambiguïtés sans inventer de capacité. La détection n'autorise aucune écriture : conserver le consentement et les contrôles techniques existants.
+- Intégrer et tester cette sélection dans chaque fonction applicable avant clôture du protocole. DoIP et C6 restent actifs ; C8 exclusivement après tous les autres chantiers et protocoles intégrés et validés. Règle AGENTS.md : 0b1990c1. Exigence enregistrée, implémentation et tests à réaliser.
+
+---
+
+## Décision propriétaire prioritaire — intégration des protocoles et C8 final (24/11/2026)
+
+- C8 est strictement le dernier chantier, après C1/C2/C4/C6 ET la clôture logicielle de tous les protocoles du périmètre PR95, y compris leur intégration aux fonctions applicables Android, Windows GUI/CLI, Connectors, console, diagnostic, sauvegardes, calibration/programmation et récupération selon les capacités réelles. Les tests d'intégration font partie de chaque protocole, pas d'un reliquat à reporter à C8.
+- Un seul chat, un chantier et un protocole actifs au maximum. Matrice de couverture par fonction/protocole/transport, parcours de bout en bout positifs et négatifs, consentement OK puis Oui/Non, sauvegardes et contrôles d'intégrité conservés. Cas non applicables justifiés, aucune capacité matérielle fictive.
+- Checkpoint C6/DoIP demandé au SHA `266279ef79327541519ffcaec2789102d9a3a479` : aucun run retourné par la consultation actuelle ; résultat non établi, ne pas dupliquer le déclenchement ni passer à SAE J1979/C8 prématurément. Règle durable AGENTS.md commit `2b6db9ae`. Aucun essai physique avant Release #48, aucune fusion sans accord.
+
+---
+
+## Reprise unifiée — 24/11/2026, C6 + correction DoIP
+
+- Décision propriétaire : ce chat unique pilote désormais les chantiers et protocoles. Les réservations historiques de fichiers à un autre chat sont obsolètes. Un chantier et un protocole actifs au maximum, validation avant passage au suivant. C6 actif ; DoIP rouvert pour corriger la régression Windows avant reprise SAE J1979.
+- Run #45365181139, SHA c8660bdde1978fa5794c09d49b207c6bca104a82 : 11 jobs réussis, Windows échoué, review ignorée (draft). Logs Windows : build Debug 0 erreur/avertissement, SocketException 10013 au bind UDP passif.
+- Correctifs 306094ae et b273b18c : réception passive commune sur socket UDP déjà lié ; autotest utilise un vrai port UDP éphémère attribué par OS au lieu d'un port réservé en TCP. Filtrage des sources conservé ; port production 13400 inchangé. Tests à exécuter au checkpoint groupé ; aucune réussite revendiquée sur ces nouveaux commits.
+- AGENTS.md actualisé (abfd1656). Aucun essai physique avant Release #48, aucun merge/Release sans consentement. C8 final reste en attente de clôture C6.
+
+---
+
+## Reprise C6 — 24/11/2026, appairage et CI
+
+- C4 validé logiciel : run #45363634459 SUCCESS, SHA c508902f43fa397554fcb8618fa605ab41ae4880, 12 jobs techniques réussis.
+- C6 actif : commits 5e30f6bd, bf10d7a1 (code d'appairage TLS refusant les caractères de contrôle avant trim), d557f8ec et 99ab3761 (tests). Aucun fichier protocole modifié.
+- Checkpoint C6 #45365181139 au SHA c8660bdde1978fa5794c09d49b207c6bca104a82 : Windows compile Debug avec zéro erreur et avertissement puis self-test DoIP FAIL SocketException 10013 sur Socket.Bind dans DoIpVehicleDiscovery.ListenAsync ligne 218, test DoIpUdpDiscoverySelfTests ligne 248. Session protocole propriétaire avertie via issue #110 commentaire 7127450558 ; ne pas modifier ces fichiers depuis C6. **Android SUCCESS** : `testDebugUnitTest lintDebug app:assembleDebug --warning-mode=fail`, BUILD SUCCESSFUL en 4m19 (tests communication/app exécutés). Natif et tous jobs Connectors SUCCESS ; **Windows FAILURE DoIP UDP seulement**, compilation 0 avertissement/erreur. Run complet FAILURE, aucune validation globale C6 ; attendre un correctif protocole puis revalider groupé.
+- Pas d'essai matériel pendant PR95. Consentement OK puis Oui/Non et vérification physique pré-écriture impératifs. C8 qualité finale uniquement après clôture C6 ; aucun merge/Release sans autorisation.
+
+---
+
+## Reprise coordonnée — 24/11/2026, C4 export CSV (session de 10 h 14)
+
+- **Chantier unique C4 (#52), protocole SAE J1979 classique réservé à l'autre session (#110)**. Relecture de `AGENTS.md`, de cette reprise, du suivi PR95 et de l'issue sauvegardes #63 ; aucune intervention sur ISO/SAE, aucune branche/PR nouvelle.
+- `4f9b98b44a58ac10f7eada178f3ab886ec08a735` : `Lfx2012FuelHistoryCsv.export` fige la liste et les listes internes des lectures avant contrôle et écriture. Empêche l'utilisateur d'exporter une collection validée puis modifiée pendant le `Writer` CSV.
+- `25b9feb7961e92a869c5cf48c413a78ac5ae6f3c` : régression avec `StringWriter` modifiant liste et octets éthanol après l'en-tête. Les tests supplémentaires `3be145c5` couvrent valeurs changées à horodatage identique et session mixte.
+- Checkpoint **C4 regroupé, NON C8 final**, demandé via `c508902f43fa397554fcb8618fa605ab41ae4880` : [GitHub Actions #45363634459](https://github.com/Hellorheaven/CamaroDiag/actions/runs/45363634459). Au dernier contrôle : `verify-revision`, Windows Debug (1 848 autotests hardware-free PASS), noyau natif et **tous** les jobs Connectors (ESP32, STM32, USB, parser, découverte Windows, Python 3.11–3.13) SUCCESS ; revue SKIPPED car PR draft ; Android `unit-tests` **SUCCESS**, `testDebugUnitTest lintDebug app:assembleDebug --warning-mode=fail` **BUILD SUCCESSFUL** (5m36). Campagne **SUCCESS, 12 jobs techniques réussis** au SHA exact `c508902f43fa397554fcb8618fa605ab41ae4880` ; review-gate SKIPPED car PR draft. **C4 clos côté logiciel dans son périmètre lecture seule**, sans qualification matérielle. Le commit de reprise `5df5a104` est postérieur au SHA testé et ne modifie pas le code exécuté. **C6 devient le chantier suivant autorisé**, puis C8 qualité finale.
+- Aucun test physique en PR95 ; aucune qualification capteur FlexFuel, activation E85, sauvegarde/restauration OEM complète ; recette sur Release propriétaire #48 uniquement. Pas de merge, de Release ni de fermeture de PR sans accord.
+
+---
+
+## Point de reprise coordonnée — 24/11/2026 (C4 uniquement, pas de bascule de chantier)
+
+- PR #95 toujours en draft, branche unique `chore/unified-ci`. Les instructions AGENTS.md, la priorité C1 → C2 → C4 → C6 → C8, l'issue #110 et #63 ont été relues.
+- C1 et C2 : clôtures logicielles et campagnes antérieures consignées ci-dessous ; C2 gate #45351021895 : 2 jobs success. Ne pas convertir cette preuve en qualification véhicule.
+- **C4 actif** : commit `3be145c5b4c3a177fb7e16c5b19dbb8630f7f66e` ajoute deux tests de non-régression de `Lfx2012FuelHistoryExportPolicy` : export rejeté si un échantillon conserve le même horodatage mais change sa valeur éthanol, et rejet d'un historique mixant deux sessions pourtant identique à son instantané. Aucun moteur protocoles ISO/SAE touché ; l'autre session garde SAE J1979 (#110).
+- **Validation du nouveau commit** : tests ajoutés mais **non exécutés à ce stade**. Attendre la fin du développement C4 avant la campagne ciblée groupée, conformément à AGENTS.md. Ne pas déclarer ce HEAD vert sur la base d'une campagne antérieure. Contrôler également les jobs du HEAD final avant C6.
+- Les jobs de la campagne DoIP #45334468537 sont success (review skipped car draft) au SHA historique documenté dans #110, **pas** sur le commit C4 ci-dessus. Consentement OK puis Oui/Non, contrôle octets/blocs et préservation des originaux restent non négociables pour toute voie mutante. Aucun merge/Release ni essai physique pendant PR #95.
+
+---
+
+# Reprise PR #95 — 24 novembre 2026, C4 et SAE J1979 classique
+
+- C1 console clôturé côté logiciel (#59, campagne #45332946454).
+- C2 : le périmètre logiciel de PR95 est terminé sur `cb5241a35635d80f0b9803e615ad77b4868d6ff6`. Les deux jobs de la [campagne C2 dédiée](https://github.com/Hellorheaven/CamaroDiag/actions/runs/45351021895) ont réussi : Android communication/app et Windows Debug/autotests. Les correctifs `aba34286`, `ef009f03` et `5d1e1186` protègent les octets d’origine et leur couverture, le canal J2534, le firmware observé et le profil de lecture à l’export. Le rapport reste partiel pour une plage isolée. La couverture de toute la mémoire constructeur et la restauration physique relèvent des essais Release #48 et du suivi #63.
+- Chantier actif suivant : C4 (#52), relevés éthanol/corrections carburant en lecture sur LFX 2012. C6 puis C8 qualité finale suivent dans cet ordre.
+- DoIP : acceptation logicielle du correctif VIN ASCII `574d6de5` confirmée au SHA `5b9f8c00c3cdff01d77d70db92107ab9f9eacb7c` par la [campagne Debug](https://github.com/Hellorheaven/CamaroDiag/actions/runs/45350268159). Le protocole actif devient SAE J1979 classique (#110). `60c1b123` décode le nom de calculateur Mode 09 sur CAN. Le Mode 02 PID 02 identifie le code ayant déclenché une image figée et signale aussi l’absence d’image.
+
+# Reprise C6/Connectors hors protocoles — 24 novembre 2026
+
+- **Décision propriétaire définitive** : PR #95 reste en draft sur `chore/unified-ci`, **aucun test réel sur voiture ou ECU pendant cette PR**. Seule la **Release après fermeture de PR** sera testée physiquement par le propriétaire via le **Lot 8, issue #48**. Une CI verte prouve le logiciel, pas la compatibilité physique ; ne plus présenter les essais véhicule comme un bloqueur de fusion. Règles reprises dans `AGENTS.md`, `docs/VALIDATION_LOGICIELLE.md`, `docs/AUDIT_PR95_C1_C2_C4_C6_C8.md` et issue #48. Toujours aucun merge, Release, branche ou PR nouvelle sans autorisation.
+- **Périmètre séparé** : autre chat responsable exclusivement des piles **ISO/SAE**. Dans cette tranche, travail **C6, C1, USB/BLE/Wi-Fi/J2534 et clients Connectors**. C2 sauvegardes et C4 éthanol lecture seule ne deviennent pas « qualifiés matériellement ».
+- **C6 Android Wi-Fi** : sockets remplacés/annulés isolés par identité de session ; anciennes connexions et lectures/écritures tardives ne peuvent fermer ou contaminer la nouvelle. Échecs E/S marqués sous verrou du socket courant, input invalide ou création de socket en échec laisse l'adaptateur actif ; faux sockets et tests concurrents (`dc903ee`, `12f9792`, `9dd4306`, `3af8db3`).
+- **BLE / Bluetooth** : notifications bornées (128 paquets / 514 octets maximum), copie défensive, arrêt de session si file saturée, fermeture GATT avant callbacks et connexions GATT sérialisées ; publication Classic SPP/BLE liée à la génération de l'adaptateur (`6e58137`, `c783228`, `b2d9251`, `1c7709e`, `80c2074`).
+- **USB Android** : `ObdConnectionSlot` atomique empêche publication/fermeture d'une session obsolète, tests de concurrence (8 ouvreurs) ; l'état perte E/S appartient au **port original**. La librairie `UsbSerialPort.write` retourne **Unit**, pas le nombre d'octets : correctif `8321ae4` et garde de commande non vide. Ne prétendre ni compter des octets acceptés par le driver ni prouver leur livraison bus. Prévalidation deviceId/baud avant déconnexion (`d33632f`, `af5d8a2`, `64357c1`, `58d69ba`, `4cfc701`, `6060cf0`).
+- **J2534** : rejet du TLS PIN/hôte privé/port/profil CAN incohérents **avant** déconnexion de l'adaptateur ; publication d'une session TLS uniquement si génération encore courante. Pour l'effacement DTC et la console UDS brute, callbacks de contexte obligatoires au TX. **C1 console CAN brute** : ancien chemin TX sans approbation supprimé, signature exige un `EcuWriteConsentFlow.Approval` issu des deux écrans et revalidation live au payload physique. Mode simulation périmé ne remplace pas une connexion réelle (`1a11b78`, `efc66a0`, `67cca1b`, `0c6a4f1`, `6d5a0b6`, `2ab1895`, `0320514`).
+- **CLI/connecteurs sans ECU** : Windows `--list-ports` avant tout dispatch protocole, option mélangée rejetée ; Python `--list-ports` liste descripteurs en lignes JSON échappées sans ouvrir les ports. Découverte de firmware prototype reste **non authentifiée, sans RX/TX ECU activé** ; pont Linux x64/ARM64 GUI/.deb reste **issue future #115** (`aca416e`, `370bc27`, `5cedb4e`, `627ca85`, `21f2e6c`).
+- **C8** : [run #45311771440](https://github.com/Hellorheaven/CamaroDiag/actions/runs/45311771440) sur `0bf30352` **totalement vert** (Android, Windows, natif, Connectors) ; [run #45312756165](https://github.com/Hellorheaven/CamaroDiag/actions/runs/45312756165) sur `31077a5e` teste la dernière série C1/C6/USB au SHA exact, **vérifier le verdict avant affirmation**. L'échec Windows DoIP précédent (CS1929, run #45310320249) a été corrigé dans le chantier protocoles et Windows a réussi dans le checkpoint #45311771440. Le diff PR demeure parfois `mergeable_state=dirty` face au commit protocole présent dans `main` ; ne pas toucher aux fichiers de conflit ISO/SAE ni merger sans accord.
+- **Recette future** : cas détaillés C6-CON-01 à C6-CON-13 ajoutés à [issue #48](https://github.com/Hellorheaven/CamaroDiag/issues/48#issuecomment-7120165373) pour le classeur Excel de la Release. Ce ne sont **pas** des résultats de tests physiques.
+
+---
+
+# Hors protocoles — connecteurs, C2, C6 et C8 (23 novembre 2026, dernière tranche)
+
+- **Branche/PR** : `chore/unified-ci`, PR #95 unique en draft. La couche ISO/SAE est traitée dans l'autre chat ; les changements ci-dessous portent sur les connexions et sauvegardes hors protocole.
+- **Connecteur Android USB** : `CamaroDiagConnectorBinaryDiscovery` utilise une limite globale de 3 s depuis **avant l'écriture USB**, contrôles d'annulation après write, tests de port bloqué / session remplacée (`6560598`, `5dfed01`). Cela reste uniquement la découverte du firmware prototype, **sans RX/TX ECU authentifié**.
+- **Pont Windows / connecteur COM** : refus d'une sélection COM absente ou dupliquée à l'instant de la tentative (pas une preuve d'identité de périphérique), tests simulés (`8abec52`, `504ca9d`).
+- **C6 / pont Windows J2534** : la copie du code d'appairage TLS valide exactement le format Android actuel (token base64url 43 caractères + empreinte SHA-256 64 hex), rejette les retours à la ligne et valeurs malformées (`e646551`, `a0852e9`, `e855158`). Sans authentification physique du boîtier Connectors.
+- **C2 / client Python Connectors** : écriture exclusive d'une image et d'un manifeste **hors ligne**, synchronisation de fichiers/dossier POSIX quand disponible, relecture indépendante, publication du manifeste en dernier, nettoyage après échec et test de défaut (`bab2225`, `13888dc`). Réduction mémoire par comparaison incrémentale en blocs de 1 Mio avec test image multi-Mio (`32202fd`, `cb4c321`). Vérification d'un fichier ≠ preuve de source ECU physique ou de récupération.
+- **C8 / CI** : campagne complète demandée au SHA `9d9a723` (run #45277412678) **annulée**, remplacée par la campagne lancée par l'autre chat au SHA `8524168` (run [#45277509716](https://github.com/Hellorheaven/CamaroDiag/actions/runs/45277509716)). A cette étape : Windows/natif/connecteurs y sont réussis, Android encore en cours. Les deux commits C2 `32202fd` et `cb4c321` sont postérieurs à ce checkpoint et nécessitent un contrôle à leur HEAD. N'annoncer aucun résultat final global sans vérification.
+- **Non résolu / blocage** : PR #95 régulièrement marquée `mergeable_state=dirty` ; ne pas merger automatiquement, ne pas toucher aux sources ISO-TP concurrentes. C2/C6 restent **ouverts** sur sauvegarde/restauration réelle, pilotes firmware, vrai RX/TX, alimentation et banc ECU ; C4 lecture seule. Le pont Linux CLI/GUI/.deb est l'évolution future issue #115, **pas** une seconde PR active.
+
+---
+
+## ISO-TP CAN classique — tests end-to-end J2534 simulés (23/11/2026)
+
+- Périmètre exclusif : ISO 15765-2 sur CAN classique uniquement. Ne pas poursuivre avec un nouveau protocole tant que la qualification VCI/ECU du CAN classique manque. PR #95 unique (Draft), issue #110 ouverte, aucun merge/Release.
+- Nouveaux autotests sans matériel `5b910cf8` : chemin complet ISO-TP FF/FC/CF par `IsoTpJ2534RawCanLink` simulé sur 11 bits, fenêtres BS=1, filtrage des ID parasites, réponses FC et arrêt sur OVERFLOW. `c592e2a4` : CAN classique 29 bits, flag CAN_29BIT_ID et absence de FD_CAN_FORMAT/BRS à l'émission, réception SF.
+- Corrections précédentes `07621a4e` et `a0e14673` : échos/statuts et réponses après annulation écartés, filtres CAN 29 bits corrects. L'adaptateur reste dépendant d'un vrai pilote SAE J2534 dont le fonctionnement physique n'a pas été prouvé.
+- Checkpoint groupé **#45275140467 sur `69018081` : Windows/J2534 et Android réussis**. Il est antérieur aux nouveaux tests ; ne pas leur attribuer ce résultat. Vérifier le prochain checkpoint complet sur un SHA exact avant de conclure.
+- **Non terminé** : horodatages de bus STmin, qualification 11/29 bits sur équipement autorisé, erreurs VCI/bus-off, évaluation en lecture et écriture ECU selon identité/sauvegardes et consentement. Procédure : `docs/QUALIFICATION_ISOTP_CAN_CLASSIQUE.md`. Aucune preuve ECU/flash/rollback et aucun protocole suivant engagé.
+
+---
+
+# ISO-TP CAN classique — correctifs J2534 et checkpoint Windows (23/11/2026)
+
+- **Protocole exclusif actif** : ISO 15765-2 / ISO-TP CAN classique, sur PR #95 Draft et branche unique `chore/unified-ci`. Aucun passage au protocole suivant ni fusion/Release.
+- **Corrections committées** : `07621a4` protège la réception RAW J2534 contre les échos/status, les ProtocolID non corrélés et les réponses arrivant après annulation ; tests d'interface hors matériel. `a0e1467` passe le TxFlags CAN_29BIT_ID (0x100) aux filtres J2534 à identifiant 29 bits, contrairement à 11 bits (0), avec régressions. La spécification SAE J2534-1 §7.3.14 confirme ce bit sur le masque ET le modèle du filtre.
+- **Checkpoint groupé** : `743fdd3b7b01d2efd7c2e7ec33d836bf04c3698e`, [Actions #45276201139](https://github.com/Hellorheaven/CamaroDiag/actions/runs/45276201139) : **Windows Debug PASS, 0 erreur, 0 avertissement, 1621 autotests J2534 software/hardware-free PASS** ; noyau natif et connecteurs terminés PASS. Consulter le run pour le dernier statut Android/global : ne pas inférer le verdict d'un job encore actif.
+- **Blocages de clôture ISO-TP** : pilotes/VCI J2534 réels, capture indépendante CAN 11 et 29 bits avec STmin entre CF, pertes et bus-off sur banc isolé, relevés N_Bs/N_Cr et preuve sur ECU autorisé. Aucune habilitation de flash, restauration ou confirmation constructeur déduite de ces autotests. Critères et commande sans mutation dans `docs/QUALIFICATION_ISOTP_CAN_CLASSIQUE.md`. Couverture indicative historique code hôte 75 %, pas conformité normative. Issue #110.
+
+---
+
+# Résultat de la campagne C6 regroupée — 23/11/2026
+
+- **HEAD de code testé :** `690180812c38e7f324df7715a9427132a5c5fb60`, [GitHub Actions #45275140467](https://github.com/Hellorheaven/CamaroDiag/actions/runs/45275140467), **success** sur les 2 jobs.
+- **Windows/J2534 :** Debug `-warnaserror`, garde C6 anti-verrou artificiel et autotests du pont **réussis**, **1 618 self-tests hardware-free** recensés dans le journal.
+- **Android :** `:communication:testDebugUnitTest :diagnostic:testDebugUnitTest :app:testDebugUnitTest --warning-mode=fail` **réussi**. Les deux défauts révélés dans le run précédent sont corrigés : compteur de contexte C6 et libération du writer d'archive CAN après `flush` échoué C1.
+- **Écriture et console :** double consentement OK puis Oui/Non, revalidation utilisateur/compte/adaptateur/véhicule juste avant émission DTC et CAN brute, y compris pont TLS J2534. Aucune restriction OEM artificielle.
+- **Limites :** pas de preuve d'essai physique de trame CAN, d'écriture sur ECU réel, de sauvegarde/restauration intégralement qualifiée ni de programmation d'un boîtier prototype. C2/C6 restent ouverts côté matériel et récupération, C4 lecture seule, C8 global/merge encore ouvert. Ce checkpoint **n'est pas une qualification complète Release ni un merge**.
+- Cette mise à jour documentaire ultérieure à `6901808` ne change aucun code exécuté dans la campagne. Garder la **PR #95** unique et la branche `chore/unified-ci`; l'autre chat traite les protocoles. Pont Linux : future issue #115.
+
+---
+
+# Correctifs C1/C6 après le premier checkpoint C6 du 23/11/2026
+
+- Premier checkpoint [#45274227208](https://github.com/Hellorheaven/CamaroDiag/actions/runs/45274227208), SHA `d2ac70f` : **Windows/J2534 success**, Android compilé mais `:communication:testDebugUnitTest` a échoué **2/574 tests**, sur `EcuWriteConsentFlowTest.operatorAuthorizationIsRecheckedWhenQueuedWriteActuallyStarts` et `CanConsoleRawArchiveWriterTest.failedFlushMakesArchivePermanentlyIncomplete`. **Aucun statut vert global** sur cette campagne.
+- C6 test corrigé : le contrôle de contexte est appelé cinq fois, pas quatre (`ed26b75`).
+- C1 archive CAN : après un `flush` déjà en erreur, `close()` ne retente plus ce `flush` mais libère toujours le writer, en conservant `hasFailed=true` et `isComplete=false` (`85d031d`), test renforcé (`ae5b9b6`).
+- C6 console CAN brute : l'objet de consentement issu des deux écrans de l'UI est désormais passé jusqu'au ViewModel (`8b475e0`). Le ViewModel compare compte, véhicule, génération d'adaptateur et génération console ; la fonction de validation est exécutée par le transport ELM **immédiatement avant l'émission du payload CAN** et non à la simple mise en file (`78e5530`, `20365b5`). Les commandes de configuration du transceiver ne sont pas des preuves d'émission ECU.
+- Règle : aucun protocole ISO/SAE modifié, aucune capacité ECU/VCI simulée. C6 **ouvert** pour qualification physique et récupération. Regrouper la prochaine campagne C6 au nouveau HEAD ; ne pas merger, publier de Release ni annoncer des tests passés avant résultats.
+
+---
+
+# 23/11/2026 — ISO-TP CAN CLASSIQUE : point de reprise de fin de tranche
+
+- Chantier de protocole **exclusivement ISO 15765-2 ISO-TP CAN classique**. Aucun nouveau protocole démarré, aucune autre branche/PR, aucune fusion. PR #95 Draft `chore/unified-ci`, issue #110.
+- Logiciel : FF/CF/FC, DLC/longueurs, N_Bs/N_Cr et limite globale, STmin entre CF successives et **repli 127 ms verrouillé pour le transfert entier si un FC annonce un STmin réservé**, prise en charge des blocages FC/WAIT/OVFLW.
+- Frontière pilote J2534 couverte par simulation ; nouvel enregistrement facultatif `--trace-file <chemin-neuf.csv>` autour de `--isotp-exchange` : `TX_REQUEST/TX_QUEUED/RX` et timestamp **hôte uniquement**, fichier CreateNew (ne pas écraser), données ECU/VIN à garder privées. `TX_QUEUED` n'est PAS un acquittement ou un timestamp sur bus.
+- **Preuve vérifiée : commit `bf7953fcb66b3397da05106d1bbdc6efc5fdba67`, Actions #45274333738 : Windows Debug succès, 0 erreur, 0 warning, 1618 autotests hardware-free exécutés et réussis.** Native ECU et la majorité des connecteurs réussis ; Android et ESP32 étaient encore en cours lors de cette vérification. Ne pas conclure CI globale verte sans contrôler le rapport final. Les changements ultérieurs éventuels sur la branche ne sont pas couverts par ce SHA.
+- Le protocole reste **non terminé physiquement** : qualification réelle VCI J2534/ECU, CAN 11/29, timing de bus (STmin), réponse aux pertes/bus-off, preuves de lecture/écriture OEM avec sauvegardes physiques. Critères de tests dans `docs/QUALIFICATION_ISOTP_CAN_CLASSIQUE.md`. Valeur indicative historique de couverture globale ISO-TP CAN classique : 75 % ; pas une mesure normative.
+- Les autres protocoles restent en attente. Ne pas modifier leurs moteurs pendant cette tranche ; respecter les fichiers de C6/C2/Android possédés par les autres sessions. **Ne pas merger / Release.**
+
+# Session hors protocoles — reprise C6 / ponts / C2 / C4 (23/11/2026)
+
+**PR unique** : #95 sur `chore/unified-ci`. L'autre chat reste responsable des standards/protocoles ISO/SAE. **C6 reste OUVERT**, en particulier les essais matériels, l'intégrité physique, la sauvegarde/restauration prouvées et la qualification OEM. N'ajouter ni signature/clé de programmation CamaroDiag, ni blocage universel de services d'écriture. Ne pas fusionner.
+
+## C6 — suppression DTC et contexte actuel à l'instant TX
+- Le consentement opérateur a toujours deux écrans (OK puis Oui/Non) ; ajout de `EcuWriteConsentFlow.requireCurrentForTransmit` (commit `51ac6fe`) et tests pour refus après changement de génération d'adaptateur, véhicule ou compte (`cca08b3`).
+- L'effacement standard sur **ELM/USB/BLE/Wi-Fi** repasse désormais une fonction de vérification de contexte sous les mutex de commande, **juste avant émission physique** (`BluetoothObdManager.sendAtCommandInternal`, `c34bf9e`).
+- Même vérification pour le **pont Windows J2534** avant l'appel réseau `clearStandardObdDtcs`, après acquisition du mutex transport (`d99e18b`) ; le ViewModel lie les deux voies à la session opérateur en cours (`fd18159`, `a78a145`).
+- Ces vérifications protègent des confirmations devenues obsolètes lors de commandes en file d'attente ; elles n'attestent pas la programmation ECU, le bench ou un éventuel rollback.
+
+## Réparations de compilation C2/C4
+- Runs antérieurs #45272690164 et #45273390209 : Windows, natif, connecteurs réussis, mais compilation Android en échec sur `EcuRestorePortableBundleTest.kt:136` (ByteArray au lieu d'InputStream) et `CalibrationWorkspaceScreen.kt:400-401` (smart cast multi-module). Correctifs `bfd5dba` et `7144db3`.
+- Les nouveaux commits de cette tranche **ne sont pas encore validés** par CI à la rédaction ; ne pas annoncer build vert sur le HEAD. Une campagne groupée est nécessaire à la fin du lot, sans exécution par commit.
+
+## Linux
+- Pont Linux natif x64/ARM64, GUI, CLI, aide hiérarchique avec exemples et paquets .deb : issue [#115](https://github.com/Hellorheaven/CamaroDiag/issues/115), **future PR après #95**, pas de deuxième branche.
+
+---
+
+# Tranche hors protocoles — connexions et C6, 23/11/2026 (soir)
+
+- **PR #95** sur l'unique branche `chore/unified-ci`. **C6 reste actif**, sans aucun verrou logiciel artificiel d'écriture. Les vrais prérequis ECU/OEM, la sauvegarde physique, le contrôle des blocs et le double consentement restent obligatoires. Aucune programmation/restauration de véhicule démontrée.
+- **USB Android** : `UsbPermissionReconnectPolicy` rattache maintenant la reprise à la famille USB explicitement choisie (ELM/OBDLink ordinaire, KKL isolé, CamaroDiagConnectors découverte dédiée) et refuse les collisions d'identifiant dans l'énumération ; tests unitaires ajoutés. Commits `8d06118`, `136856c`.
+- **Bluetooth BLE** : l'OBDLink CX n'est plus refusé par son seul nom dans `MainViewModel`; le pilote BLE existant détermine les capacités réellement accessibles. Une annulation de tentative BLE est propagée tandis que son timeout local est signalé comme échec. Commits `394a43b`, `eef9066`, `930c56d`. Pas de qualification matérielle CX ni de service GM prétendu.
+- **C4 / CI** : dans le run [#45270916895](https://github.com/Hellorheaven/CamaroDiag/actions/runs/45270916895), Windows/natif/connecteurs réussis mais Android a échoué à compiler `Lfx2012FuelHistoryCsv.kt` (7 appels `Writer.write(Char)` invalides). Correction Kotlin `Writer.write(','.code)` dans `1837bbe`. **Aucune CI après cette correction n'a été lancée par cette tranche ; ne pas annoncer que le HEAD passe.**
+- Développement logiciel hors normes ISO/SAE seulement ; l'autre chat traite les protocoles. Ne pas toucher à ses fichiers. Pas de nouvelle branche/PR, merge, Release ou workflow déclenché à chaque commit ; tests groupés après achèvement du chantier. C1/C2/C4/C6/C8 restent soumis aux preuves manquantes de l'audit.
+
+---
+
+# 23/11/2026 — ISO-TP CAN classique : seule famille de protocole active
+
+- PR #95, branche unique `chore/unified-ci`, issue #110. **Ne commencer aucun autre protocole avant de clôturer ISO-TP classique** ; correction transversale des tests C# ne constitue pas un nouveau chantier protocole.
+- Travaux logiciels : FC/OVFLW sur FF >1 MiB, tests limites 7/8 et 4095/4096, FC avec adressage logique, N_Bs/N_Cr indépendants et bornés par le budget global, STmin réservé reçu traité à 127 ms sans publicité locale réservée. Commits d'implémentation : `2371a0c`, `3551e42`, `1aa147e`.
+- **Checkpoint testé : `23bbbe6474f7f82d4c48598c24ab578bc3e5adb4`, run #45268234408. Windows Debug BUILD avec 0 erreur, 0 avertissement ; 1593 autotests logiciel/pont J2534 réussis, dont ISO-TP et deadlines ; natif et connecteurs réussis. Android encore en cours lors de l'enregistrement de cette note ; ne pas annoncer globalement « CI verte » avant résultat.**
+- Ce n'est **pas un protocole terminé physiquement** : qualification J2534/ECU CAN classique, 11/29 bits, N_Bs/N_Cr/STmin sur vrais adaptateurs, erreurs bus-off, lecture/écriture et scénarios d'interruption, attestation de capacité VCI restent exigés. Aucun flash/rollback constructeur physiquement prouvé. Statut ouvert, progrès logiciel indicatif historique 75 %, aucun 100 % inventé.
+- Issue #110 mise à jour par commentaire avec les résultats. Aucun merge/Release, aucune autre PR, aucun test automatique par commit.
+
+## C2 / C4 — fin de tranche indépendante des protocoles (23/11/2026, soir)
+
+- **C2, toujours incomplet physiquement :** `EcuRestoreCoveragePreview` produit un inventaire exact des plages d'adresses absentes ou non issues de deux lectures déclarées physiques et concordantes ; les captures hors carte sont distinguées. La création du dossier de restauration hors ligne réclame désormais la couverture de la **carte fournie** avant publication. Ceci ne démontre PAS que cette carte est la carte mémoire OEM exhaustive, que l'origine physique a été authentifiée ou que le calculateur est récupérable. Tests dédiés ajoutés.
+- **C4, lecture uniquement :** `currentSnapshotPercent` distingue une mesure réellement reçue dans la dernière enquête d'une mesure historique ; en cas d'absence de réponse éthanol, l'écran affiche le statut « historique seulement » en FR/EN. Aucun E85 activé et aucun profil moteur supposé.
+- **C6 reste ouvert et NON BLOQUANT ARTIFICIELLEMENT :** la couche CAN valide seulement le format des trames ; test de non-régression sur charges utiles constructeur sécurité/écriture. Le double consentement utilisateur et les vérifications physiques exactes restent requis.
+- **C8 :** GitHub ne renvoyait aucune exécution de workflows pour la demande groupée de la précédente tranche au moment de la consultation. Ne pas conclure tests verts. Nouvelle demande après stabilisation du lot ; aucun merge/Release.
+
+## REPRISE DU CHANTIER HORS PROTOCOLES — C6 ACTIF (23/11/2026, soir)
+
+- Ne pas perdre le chantier **C6** : il traite l'authentification constructeur réelle, le consentement utilisateur OK puis Oui/Non, l'intégrité des opérations et la sauvegarde/récupération ECU, **jamais** un verrou logiciel de programmation CamaroDiag. Les trames CAN valides restent admises quelle que soit leur commande OEM (test `SafeRawCanTransmitPolicyTest`), dans les limites du transport physique et de la confirmation utilisateur.
+- Nouveau raccordement USB Android : retour de permission reçu par `UsbPermissionReceiver`, vérification effective de la permission, reprise uniquement de l'adaptateur et de la session sélectionnés grâce à `UsbPermissionReconnectPolicy` ; le choix CD/1 ASCII/binaire est conservé, le refus est localisé FR/EN. Aucun accès ECU certifié par la permission USB.
+- Déconnexion J2534/USB/BLE/Wi-Fi unifiée et sérialisée au niveau du ViewModel. Annulation de la sonde ELM propagée au lieu d'être transformée en erreur.
+- C1 : SHA-256 de l'instantané CSV pour déceler une modification à taille constante ; C4 : mesure PID actuelle distinguée d'une valeur historique non actualisée.
+- C2 conserve la demande d'**image ECU entière physiquement restaurable**, pas de prétention de clôture. C8 : campagne Debug regroupée seulement après stabilisation de ce lot et du HEAD visé ; tests ajoutés ne valent pas tests exécutés.
+- Développement standard ISO/SAE/UDS dans l'autre chat sur la même PR #95. Ne pas éditer ses fichiers de protocole ni publier un verdict de validation de ses changements. Une seule branche `chore/unified-ci` ; pas de fusion ni Release.
+
+# Tranche ISO14230 KWP2000 — 23/11/2026
+
+Corrélation facultative des premiers paramètres réémis après SID sur une réponse positive KWP (`--kwp-echo-bytes`), refus des réponses appartenant à un autre identifiant, statut NRC/0x78 préservé, tests offline ajoutés. PR #95 inchangée, aucune CI compil ni essai VCI/ECU pendant ce lot.
+
+# Tranche J1979-2 / OBDonUDS DTC — 23/11/2026
+
+Ajout d'une validation de corrélation sur réponse ISO 14229 19/02 avec masque de statut effectivement demandé, filtrage des entrées incohérentes et doublons, branchement CLI CAN/DoIP et tests offline `ObdOnUdsDtcStatusSelfTests` (non lancés). Même branche PR #95, aucune CI ni essai ECU, aucun merge. Garder distinctions pile logicielle / VCI / flash physique.
+
+# Tranche protocoles SAE J1979 classique — 23/11/2026
+
+PR #95 / branche `chore/unified-ci` / chantier #110 : extension offline du décodeur PID Mode 01/02 avec 35 nouvelles formules standard (pressions, évaporation signée, EGR, charge, catalyseurs, ratio, couple et temporisations), tests négatifs de taille et de freeze-frame. Aucune CI, compilation, essai véhicule ou validation matérielle sur cette tranche ; ne pas confondre décodeur et ECU pris en charge. Le chantier reste ouvert, matrice et protocole suivant à établir après revue. Ne pas merger/créer d'autre branche ou PR.
+
+# Reprise — suivi développement 20h du 23/11/2026, protocoles par lots
+Sur `Hellorheaven/CamaroDiag` PR #95 `chore/unified-ci`, chantier #110, dernière tranche (code hôte) : SAE J1979-2 0x19/01 DTC count (ISO-TP et DoIP, option `--obd-dtc-count-mask`), ISO-TP CAN/CAN-FD délai de transfert global et filtrage de trafic jusqu'au deadline (sans limite arbitraire de 64 trames), budget d'échange TX+RX Windows, UDS rejet réponses tardives après NRC 0x78, et ISO 14230 KWP2000 validation optionnelle des réponses positives/négatives/attente avec adresses RX (sans whitelist arbitraire SID). Nouveaux autotests offline ajoutés à `BridgeSelfTests`, non exécutés. La matrice des **15 familles de protocoles** et leurs pourcentages logiciels indicatifs (NON certifiés) est actualisée dans `docs/PROTOCOLES_STANDARDS_ET_RECUPERATION.md`. Pas de build, CI, tests physiques ni qualification flash/rollback dans cette tranche ; PR ouverte en draft, ne pas merger/créer de branche, regrouper les tests à la clôture du chantier. Garder les exigences de sauvegardes réellement relues et de double confirmation avant écriture.
+
+# Suivi protocoles — lot J1979/J1979-2 et matrice (23/11/2026)
+PR #95 `chore/unified-ci` et issue #110 : ajout J1979 classique de dix PID normalisés et des données Mode 06 CAN (bitmap MID, enregistrements TID/UASID avec valeurs brutes et sans verdict inventé) ; puis J1979-2 OBDonUDS : détection CAN fonctionnelle prioritaire `22 F8 10` avant fallback classique `01 00`, rejet des réponses F810 contradictoires, VIN `22 F8 02` décodé séparément du Mode 09 classique. Cmds nouvelles `--obd-auto-detect-can` et prise en charge `--obd-did F802` dans l'affichage ISO-TP/DoIP. Tests offline ajoutés aux autotests, **pas encore exécutés**, zéro workflow confirmé sur HEAD vérifié avant cette note. Matrice indicative des pourcentages détaillée dans `docs/PROTOCOLES_STANDARDS_ET_RECUPERATION.md` : J1979 classique 60 %, J1979-2 40 %, autres estimations inchangées. Aucune capacité physique universelle ni restauration ECU revendiquée. Maintenir seule PR #95 ; ne pas lancer CI par commit, merger ou supprimer de branche.
+
+# Actualisation chantier protocoles SAE J1979 — 23/11/2026
+PR95 `chore/unified-ci`, issue #110 : traitement protocole par protocole, J1979 actif. Les modes 03/07/0A sur CAN utilisent un count DTC avant les paires ; InfoTypes/CALID/CVN du mode 09 et statut MIL/DTC du PID 01 décodés ; séparation explicite entre J1979 classique et OBDonUDS. Dernier HEAD de référence lors de cette note : `4c472a60a5cfd4eecc69b739e91e1477fa228672`. Tests ajoutés **non exécutés**, aucune qualification véhicule ni CI finale ; la matrice d'estimation par standard est dans le commentaire de l'issue #110 du 23/11/2026. Respecter la règle d'un seul chantier actif, une seule PR, tests groupés et aucun merge sans accord.
+
+# Addendum prioritaire 23/11/2026 — normes ECU et recette post-flash (issue #110)
+La PR #95 sur chore/unified-ci couvre maintenant une première tranche ISO/SAE et contrôle offline de sauvegardes physiques ; état détaillé docs/PROTOCOLES_STANDARDS_ET_RECUPERATION.md. Exiger pile standard ISO 14229/13400/15765-2 (CAN-FD compris), 9141-2/14230 K-Line, SAE J1850/J2534/J1979/J1939 ; niveau réel transport/matériel/flash distingué. Après écriture, test ECU + véhicule, comparatif DTC et VIN, statut PASS/FAIL/INCONCLUSIF ; toute restauration est une nouvelle écriture avec backup original physique vérifié et double consentement OK puis Oui/Non, jamais automatique ; ECU muet nécessite récupération qualifiée sur banc. Respecter AGENTS.md. Ne pas créer nouvelle branche/PR, ne pas lancer CI par commit.
+
 # PROMPT DE REPRISE — CamaroDiag
 
 > Fichier de continuité du projet. À lire en premier dans tout nouveau chat consacré à CamaroDiag. Mettre ce fichier à jour dès qu'une décision durable, un changement de périmètre, une modification GitHub/PR, un résultat CI ou un état technique important est confirmé. Tenir le changelog propre à chaque PR (`docs/CHANGELOG_PR<number>.md`) à jour sur la branche de cette PR.
+
+## CLARIFICATION PRIORITAIRE DU PROPRIÉTAIRE — C6 NE DOIT PAS BLOQUER L'ÉCRITURE (23/11/2026)
+
+**C6 est un chantier de fiabilisation, PAS un chantier de remise en lecture seule.** Interdiction de réintroduire un verrou général `read-only`, une whitelist de pilotes ou d'ECU, un certificat/signature ou une permission CamaroDiag de programmation inventée, un interrupteur d'écriture désactivé par défaut, ou de transformer une fonction d'écriture réellement implémentée en fonction indisponible par prudence générique. Ne pas réinterpréter les anciennes notes « toute écriture interdite », « pilotes enregistrés uniquement » ou « read-only PR95 » comme une consigne actuelle : elles sont remplacées par cette décision.
+
+**Conserver** le consentement explicite de l'utilisateur en deux étapes (avertissement OK, puis Oui/Non), les contrôles réels imposés par le matériel/constructeur/ECU, la vérification de l'identité, des secteurs et octets envoyés, la sauvegarde préalable réellement restaurable, les checksums, la relecture et le rollback prévus. Ce sont des conditions de cohérence d'une opération physique, **pas des licences ou freins artificiels à la programmation**.
+
+Si un véritable pilote ou une capacité n'existe pas, le signaler précisément et développer la capacité manquante ; ne pas prétendre qu'une opération est opérationnelle et ne pas ajouter de verrou technique générique pour remplacer le développement. Ne pas modifier les protocoles actuellement confiés à l'autre chat. Respecter ce principe dans C6, C2, l'interface Android, le pont Windows, les tests et la documentation.
+
+## ÉTAT DE REPRISE — C6 ET CONNECTEURS (23/11/2026, PR #95)
+
+- **C6 n'est pas disparu et ne doit pas être clôturé.** Il couvre le consentement OK puis Oui/Non, l'identité de l'ECU, le bloc d'écriture exact, le pont TLS J2534, le pré-flash et la récupération après écriture. L'audit `docs/AUDIT_PR95_C1_C2_C4_C6_C8.md` et le contrôle `docs/C8_PARALLEL_NON_PROTOCOL_REVIEW.md` le suivent explicitement.
+- Une correction C6 vient de lier le consentement d'effacement DTC à la génération de connexion au moment de l'avertissement ; toute reconnexion/déconnexion/expiration de compte invalide le « Oui » précédent. Tests unitaires ajoutés. La même exigence vaut pour toute future écriture physique, sans clé ni licence artificielle.
+- C2 conserve les régions et les octets exacts des images hors ligne. Si la vérification finale d'un paquet de restauration échoue, supprimer l'index plutôt que laisser une image apparemment complète. **Toujours pas de preuve d'une image complète et physiquement restaurable sur ECU.**
+- L'UI Adaptateur possède une commande générale de déconnexion pour USB, Wi-Fi, Bluetooth/BLE, J2534 et simulation. Les périphériques USB sont vérifiés par numéro Android final, puis par énumération ; les annulations USB/Wi-Fi propagent correctement leur `CancellationException`.
+- Les développements protocoles SAE/ISO, l'écriture et les transports physiques du firmware connecteurs relèvent de l'autre chat. Pour cette intervention : connexions, sécurité de session, C1/C2/C4/C6/C8 et leurs tests ; pas de création de branche/PR, pas de merge, CI groupée en fin de chantier. Ne pas présenter l'ajout des tests comme une réussite CI.
+
+## DERNIER LOT HORS PROTOCOLES — C6 ET PONT WINDOWS (23/11/2026)
+
+- C6 : double validation DTC désormais liée au même adaptateur **et** à l'identité du véhicule/VIN depuis l'avertissement jusqu'au ViewModel. Même une reconnection rapide, un changement de profil véhicule ou un changement de compte invalide l'autorisation. Tests `EcuWriteConsentFlowTest` étendus.
+- J2534 : le pont TLS appairé est visible distinctement de l'adaptateur ELM, sans affichage trompeur des capacités ELM ni prétention d'accès ECU. Le formulaire de connexion masque son jeton + empreinte TLS dans `toString()` et possède un test de confidentialité.
+- C1 : la console brute revérifie déjà son contexte avant TX, ne pas supprimer cette protection. C2 : l'index d'un paquet de sauvegarde hors ligne est supprimé en cas d'échec de finalisation ; toujours pas de preuve de restauration physique.
+- CI : une validation groupée Android/communication/Windows a été demandée via `.github/c1-console-gate-request.txt` au commit `671bbbe`. **Son résultat n'est pas confirmé** ; aucune validation C8 complète au HEAD final ni essai physique n'est revendiqué.
+- C6 **reste actif** en lien avec C2 et le chantier des pilotes physiques. Ne pas annoncer programmation, sauvegarde complète, rollback ou prise en charge complète des connecteurs à la seule vue d'une UI ou d'une suite de tests.
+
+## DÉCISIONS LES PLUS RÉCENTES — À APPLIQUER DANS TOUT NOUVEAU CHAT (23/11/2026)
+
+**Lire impérativement [AGENTS.md](../AGENTS.md) et [l'audit de PR #95](AUDIT_PR95_C1_C2_C4_C6_C8.md).** Ces règles priment sur les anciennes indications de PR #35, branche `feat/live-can-monitor`, CI à chaque ~50 commits, verrouillage ECU globalement lecture seule et anciens blocages d'écriture décrits plus bas. Sur GitHub au 23/11/2026 : PR **#95** et branche **`chore/unified-ci`**, non fusionnée ; toujours rafraîchir ce statut en temps réel.
+
+**Demande définitive du propriétaire :** aucun verrou ou licence d'écriture inventé par CamaroDiag. Conserver seulement les licences commerciales, les vraies exigences constructeur/ECU et les vérifications techniques de cohérence/integrité. Pour chaque opération pouvant écrire, afficher **avertissement de risque + responsabilité CamaroDiag (dans les limites légales) + OK**, puis une **deuxième confirmation Oui/Non** : Non, fermer ou perdre la session = zéro transmission. **Avant le premier effacement, faire une vraie lecture physique des octets d'origine de TOUS les secteurs à modifier, une double comparaison indépendante à l'image d'origine, une sauvegarde durable propre à chaque bloc avec adresse/longueur/région/ECU et une relecture du fichier de sauvegarde. Ne jamais se contenter d'un fichier BIN fourni par l'utilisateur ou d'un hash comme sauvegarde du bloc réel.** Vérifier avant la transmission que **l'adresse ECU, la région, le secteur d'effacement, la taille, les données et le checksum du bloc réellement envoyé** correspondent exactement au changement demandé ; contrôle pré-effacement et pré-trame ; lecture de vérification après écriture. Si sauvegarde / identité / géométrie / octets ne concordent pas, aucune commande d'effacement ou écriture. Ceci concerne tout ECU, tout protocole et tout adaptateur dès lors qu'un pilote réel existe ; pas de fausse compatibilité. Les commandes RAW sans définition mémoire cible ne peuvent pas être déclarées vérifiées bloc-à-bloc.
+
+**Processus** : une seule branche+PR active ; ne pas fusionner sans accord ; une campagne de tests après un chantier terminé, correctifs groupés puis revalidation ; C1/C2/C4/C6/C8 à reprendre/auditer. Les validations logicielles ne prouvent pas la capacité de programmation physique.
+
 
 ## Conservation obligatoire de ce fichier
 
@@ -36,6 +353,16 @@ Cette règle est prioritaire et s'applique en continu :
 - Ne jamais inscrire un test/build comme réussi sans résultat observable ; noter explicitement `en attente`, `skipped`, `échoué` ou `non exécuté` le cas échéant.
 - Si une modification du prompt ou du backlog sur `main` est nécessaire pendant une PR, effectuer ce commit documentaire séparément sur `main` et ne pas mélanger le contenu de la PR dans ces fichiers.
 
+## Décision impérative du propriétaire — jamais de sécurité ECU artificielle (23/11/2026)
+
+Ne JAMAIS ajouter ni réintroduire, sans demande et accord explicites de l'utilisateur, des clés de confiance, signatures de profils, certificats de programmation, listes figées de pilotes ou interrupteurs bloqués par défaut qui ne sont pas exigés par le protocole réel ECU/transport. C'est une perte de temps et empêche les essais réels. Cette interdiction s'applique aussi aux tests, à la CI et aux futures PR. Toujours expliquer toute restriction nouvelle et obtenir une validation avant de l'implémenter.
+
+Séparer les licences Firebase de CamaroDiag (droits d'utilisation), le jeton et le TLS du pont (sécurité réseau) et le seed/key GM `0x27` (véritable échange ECU). Aucun ne justifie une clé de signature CamaroDiag pour programmer un E39. En revanche, conserver les vérifications techniques qui évitent un ECU inutilisable : identité exacte, sauvegarde complète et réellement restaurable, mémoire/firmware compatible, alimentation stable, checksums OEM, vérification après écriture, récupération réelle. La disponibilité du code ne prouve pas sa validation sur matériel.
+
+Une seule PR et une seule branche actives ; pas de fusion sans autorisation. C2 reste INCOMPLET jusqu'à preuve d'une image entière restaurable. Respecter cette décision sur toute reprise du développement.
+
+**Nouvelle exigence UI confirmée le 23/11/2026 : avant chaque opération utilisateur susceptible d'écrire sur un ECU ou un élément connecté**, afficher deux écrans successifs : (1) avertissement sur les risques de dommage et mention que CamaroDiag décline toute responsabilité dans les limites de la loi, à acquitter avec **OK** ; (2) confirmation explicite **Oui / Non**, avec **Non** ou fermeture entraînant immédiatement l'annulation **sans envoyer la commande**. L'OK initial ne vaut jamais autorisation d'écriture. Réafficher pour toute nouvelle opération (pas à chaque paquet interne d'une écriture continue). Appliquer à tous les futurs pilotes, écrans, protocoles et adaptateurs, y compris consoles brutes et voies J2534 ; vérifier que le contexte de connexion n'a pas changé au moment de l'envoi. **Cette double confirmation est expressément souhaitée par l'utilisateur et ne doit pas servir de prétexte pour réintroduire d'autres clés ou blocages artificiels.**
+
 ## Règles de collaboration non négociables
 
 - Répondre en français, de façon directe, avec un état concret et honnête.
@@ -48,7 +375,7 @@ Cette règle est prioritaire et s'applique en continu :
 - Ne jamais fusionner une PR sans autorisation explicite de l'utilisateur.
 - Ne pas fermer/supprimer des branches ou modifier des noms/structures sans raison et vérification.
 - Le fichier `docs/PROMPT_REPRISE.md` est essentiel à la continuité du projet : **ne jamais le supprimer, le déplacer ou le renommer sans demande explicite de l'utilisateur**. Le maintenir à jour sur `main` conformément à la synchronisation documentaire.
-- Conserver exactement deux branches (`main` et `feat/live-can-monitor`) et une seule PR ouverte (#35), sauf autorisation explicite contraire. Ne jamais créer une nouvelle branche ou PR de sa propre initiative.
+- Conserver `main` et au plus une branche de travail associée à l'unique PR active ; vérifier les noms dans GitHub. Au 23/11/2026 : `chore/unified-ci`, PR #95. Ne jamais créer une nouvelle branche/PR de sa propre initiative.
 - Tous les documents destinés aux utilisateurs doivent expliquer les fonctions, les véhicules, le matériel compatible, l'utilisation et les limites, sans exposer les détails internes de développement. Seuls le backlog et les documents d'évolutions futures sont exemptés et peuvent rester techniques.
 - Respecter le périmètre validé. Pas de dérive fonctionnelle dans une PR en cours.
 - L'utilisateur travaille souvent depuis Android et GitHub Actions ; privilégier les opérations directes dans le dépôt plutôt que de lui demander de téléverser des fichiers quand le dépôt suffit.
@@ -607,7 +934,7 @@ Auditer à nouveau la PR #35 et la CI sur son **head SHA actuel**, comparer le c
 
 
 ### 22/11/2026 — périmètre matériel séparé, PR70 / Connectors #7
-- Décision utilisateur : CamaroDiagConnectors devient la couche commune de communication et programmation matérielle Android/Windows, développée à part. Issue chapeau https://github.com/Hellorheaven/CamaroDiagConnectors/issues/7 créée, couvre OBD, CAN direct, BENCH, BOOT/BAM, BDM, JTAG/Nexus, SWD, EEPROM/NOR ISP et chip-off, et fédère les issues 1 à 5. Aucun fichier du dépôt Connectors modifié.
+- Décision utilisateur : CamaroDiagConnectors devient la couche commune de communication et programmation matérielle Android/Windows, développée à part. Issue chapeau https://github.com/Hellorheaven/CamaroDiag/issues/86 créée, couvre OBD, CAN direct, BENCH, BOOT/BAM, BDM, JTAG/Nexus, SWD, EEPROM/NOR ISP et chip-off, et fédère les issues 1 à 5. Aucun fichier du dépôt Connectors modifié.
 - CamaroDiag #79 et PR70 : contrat de pilotes distincts, qualification par cible/firmware/région/route exacte, sélecteur Expert huit modes, sauvegarde ZIP des deux BIN d'origine identiques importés depuis un programmateur externe (15 Mio par lecture max, /CamaroDiag/, provenance importée, couverture partielle). EEPROM externe exclue de l'effacement flash par secteurs. Tests de non-interchangeabilité et d'intégrité ajoutés. Import des deux BIN protégé contre changements de compte/véhicule et annulation. CI Android renforcée pour ces fichiers.
 - Le socle J2534 et noyau E39/E39A existant reste conservé ; aucune connexion physique universelle ni écriture validée n'est revendiquée. L'intégration du futur module Connectors et sa qualification matérielle seront traitées séparément. Activation FlexFuel réelle toujours tributaire des définitions de cartographie exactes et de la qualification du pilote.
 - Au checkpoint 115fc7b : 1539 commits, 30 locales complètes. Ancien HEAD 926933b : tests unitaires, noyau natif et Windows réussis ; build Android réussi mais instrumentation annulée. Ne pas annoncer dernière CI verte sans vérifier tous les jobs attendus au nouveau HEAD. Ne pas fusionner en cas d'erreur, warning ou validation requise incomplète.
@@ -622,7 +949,7 @@ Auditer à nouveau la PR #35 et la CI sur son **head SHA actuel**, comparer le c
 
 
 ### 22/11/2026 — PR70, intégration des exigences Connectors P0 sécurité / anti-brick
-- Sources : https://github.com/Hellorheaven/CamaroDiagConnectors/issues/7, https://github.com/Hellorheaven/CamaroDiagConnectors/issues/8 et https://github.com/Hellorheaven/CamaroDiagConnectors/issues/9. Aucun développement firmware Connectors effectué dans CamaroDiag.
+- Sources : https://github.com/Hellorheaven/CamaroDiag/issues/86, https://github.com/Hellorheaven/CamaroDiag/issues/87 et https://github.com/Hellorheaven/CamaroDiag/issues/88. Aucun développement firmware Connectors effectué dans CamaroDiag.
 - Le rapport ASCII 0.1.0 est explicitement non authentifié et ne donne aucune capacité de trafic ECU. Le gestionnaire USB refuse de sonder un connecteur nommé comme ELM, y compris en appel direct (nom USB = indice de routage, jamais preuve cryptographique). Tests ajoutés en 15d18e7.
 - Séquenceur ECU : comparaison indépendante des secteurs non modifiés de la région qualifiée avant le premier effacement et après les écritures ; divergence = arrêt sans succès, sans retry ni reset automatique. Trois nouveaux tests simulés en 1574a0f. Aucune qualification sur banc revendiquée.
 - Futur transport natif : appairage hors ligne et authentification mutuelle PC/Android ↔ boîtier, session anti-rejeu, isolation de la découverte, qualification et autorisation exacte par route/cible/firmware/région. Android sans PC. USB en priorité ; Wi-Fi/BLE non destructifs jusqu'à qualification. Ne pas traiter le nom USB, une capacité déclarée ou un checksum comme preuve d'authentification ou de restaurabilité.
@@ -632,7 +959,7 @@ Auditer à nouveau la PR #35 et la CI sur son **head SHA actuel**, comparer le c
 
 
 ### 22/11/2026 — PR70, raccordements et SWD (Connectors #10)
-- Nouvelle exigence : https://github.com/Hellorheaven/CamaroDiagConnectors/issues/10. Documentation du dépôt Connectors consultée à 04883775d7f97de4cd89da0de75c46bf076f3332 ; fiches LFX 2012 E39 candidat, E38 LS3/L99 2012 et E39A indépendante, toutes non qualifiées. Ne pas réutiliser les pins E39 pour E39A, ni inventer une séquence d'alimentation. USB 5 V logique, 12 V externe protégé dédié cible, VCC mémoire selon composant ; continuité de l'alimentation logique indépendante des données exigée pour opérations critiques.
+- Nouvelle exigence : https://github.com/Hellorheaven/CamaroDiag/issues/89. Documentation du dépôt Connectors consultée à 04883775d7f97de4cd89da0de75c46bf076f3332 ; fiches LFX 2012 E39 candidat, E38 LS3/L99 2012 et E39A indépendante, toutes non qualifiées. Ne pas réutiliser les pins E39 pour E39A, ni inventer une séquence d'alimentation. USB 5 V logique, 12 V externe protégé dédié cible, VCC mémoire selon composant ; continuité de l'alimentation logique indépendante des données exigée pour opérations critiques.
 - dd8a1cb : SWD ajouté au modèle, au sélecteur Expert et aux contraintes de routes/régions ; tests d'étanchéité entre SWD, BDM, JTAG/Nexus, CAN et mémoires externes. Aucun support matériel déclaré.
 - cd6f181 : accès au guide et fiches documentaires dans Expert, sélection stricte année/RPO/famille saisie, repli catalogue sans rapprochement approximatif. Trois tests du catalogue. Liens figés sur la révision Connectors examinée, non autorisants.
 - 8a60674 : indication non vérifiée, gestion de l'échec d'ouverture, CI Android complète requise pour tout changement de ce catalogue. Aucun nouveau texte non traduit (réutilisation des ressources).
@@ -697,10 +1024,95 @@ Auditer à nouveau la PR #35 et la CI sur son **head SHA actuel**, comparer le c
 
 
 ### 22/11/2026 — Décision finale utilisateur (remplace les règles de répartition précédentes)
-- Un seul dépôt actif : CamaroDiag. Intégrer intégralement les deux main et développements PR70/PR6, logiciel ET matériel, schémas/PCB/BOM/documentation et futurs développements dans `connectors/`. Aucun dépôt matériel indépendant à maintenir désormais. Ancien dépôt conservé comme archive historique, ne pas effacer son historique. Les 13 issues migrées #81–#93 sont canoniques, #80 pilote la migration.
+- Un seul dépôt actif : CamaroDiag. Intégrer intégralement les deux main et développements PR70/PR6, logiciel ET matériel, schémas/PCB/BOM/documentation et futurs développements dans `connectors/`. Aucun dépôt matériel indépendant à maintenir désormais. Toutes les sources utiles et les exigences sont suivies directement dans CamaroDiag (issues #80 à #93). Les 13 issues migrées #81–#93 sont canoniques, #80 pilote la migration.
 - Les neuf références matérielles de la première importation sont remplacées par les fichiers complets d'origine. Les 84 chemins de l'instantané source sont présents ; quatre workflows relocalisés. Demande explicite de fusion de la consolidation dans main maintenant même si la qualification fonctionnelle/physique reste incomplète. Ne pas confondre consolidation Git et livraison/validation fonctionnelle ; inscrire les blocages restants dans les issues et maintenir les écritures non qualifiées bloquées. Aucune nouvelle branche de développement parallèle.
 
 - Liens de câblage de l'application repointés vers l'instantané complet CamaroDiag 84c21a5, toujours non qualifié. Les références matérielles et PCB futurs sont maintenus dans le même dépôt.
 
 
+### 22/11/2026 — Rationalisation CI post-consolidation (#94)
+- Toutes les évolutions sont dans CamaroDiag, logiciel ET matériel sous connectors/. PR70 et ancienne PR6 fusionnées. Ne pas reprendre anciens refs/PR70/PR6 ni ouvrir deux PR de développement.
+- 12 workflows identifiés, cible 8 : Android CI, PC J2534 Bridge CI, PR unit tests (y compris Firebase/licences), Native ECU kernel tests, Connectors CI (ESP32/STM32, C++, Java USB, Python 3.11/3.12/3.13, Windows), Release validation sans publication, Release CamaroDiag, nettoyage des branches fusionnées. Supprimer kickoff PR35/70 et remplacer quatre anciennes CI Connectors par une seule. Aucune perte volontaire de tests ; préserver cadence draft 50 commits et build complet ready-for-review.
+- Android et Windows : lancement manuel sur main ou ref explicite avec SHA résolu pour artefacts ; supprimer référence à l'ancienne branche. Préflight signé sans publication uniquement main ; publication automatique conservée pour changements produit, pas les seuls documents/PCB. Nettoyage uniquement sur PR fusionnée, branche locale et SHA inchangé, aucune PR ouverte réutilisant le nom. Contrôle de CI avant fusion.
+- Catalogue Android Debug existant #76 reste lié à ancienne PR70 ; adapter explicitement dans un lot avec tests de provenance GitHub, ne jamais ouvrir aux artefacts de forks ou prétendre que télécharger est anonyme.
+
+
+### Règle impérative de gestion Git — issue #96
+- Un seul dépôt actif : CamaroDiag. Une seule PR ouverte à la fois (brouillon inclus), ciblant main depuis sa branche locale unique. Il ne peut exister que main et cette branche. Sans PR, main seule.
+- Avant toute création, interroger GitHub pour les PR ouvertes et toutes les branches. Si une PR existe, reprendre exclusivement celle-ci. Ne pas créer de branche ni de PR en parallèle, même pour un autre composant. En l'absence de PR, vérifier que seule main subsiste avant de créer la prochaine branche et sa PR.
+- Après acceptation et CI obligatoires réussies sur le HEAD exact, fusionner la PR vers main ; vérifier sa fermeture et la suppression de sa branche. Ne travailler sur le prochain lot qu'après contrôle de main seule et zéro PR ouverte. Ne jamais supprimer main, une branche ayant avancé ou du travail non fusionné. Une CI signale les violations mais ne bloque pas atomiquement les créations GitHub : ces préconditions restent obligatoires pour chaque session et agent. En cas de violation, arrêter toute nouvelle création, examiner le travail existant et corriger sans perte.
+
+
+### Reprise des développements PR6/PR70 après consolidation
+- Continuer sur l'unique PR ouverte #95. CDJ/USB/1 : variante firmware de service isolée, lecture réelle du checkpoint NVS, export borné en hex ASCII, un ordre exact par boot, aucune écriture, aucun clear, aucune activation de route. Client Python `--port COM5 checkpoint --isolated --output checkpoint.cdj` refuse corruption, suffixes, troncatures, CRC/états invalides et écrasement. Fichier 64 octets compatible lecteurs Android/Windows existants. Ne pas effacer NVS, ne pas reflasher un boîtier en transaction ou récupération ; variante pour validation isolée uniquement, pas une procédure de restauration validée. Vérifier compilation/CI et tester sur vrai boîtier avant qualification. Durcissement de l'inspection NVS si le record possédé disparaît/change.
+
+- PR95 : 1ccd8eb ajoute la capture USB CDJ/1 dans l'onglet Connectors Windows et CLI, tests hors ligne et conservation exclusive de preuve. Le contrôle Android des secteurs inchangés vérifie identité et alimentation entre acquisitions et après lecture ; test de coupure supplémentaire. Qualifier sur matériel réel, les protections restent actives. Une seule PR ouverte ; pas de fusion sans CI requises.
+
+- Reprise PR95 : capture CDJ/USB/1 directement depuis Android, port CDC unique explicite, confirmation carte isolée, propriétaire/licence et profil contrôlés, réutilise l'arbitrage USB de découverte (pas d'ELM ni de session ECU), export via stockage vérifié `/CamaroDiag/`. Tests parseur/lecture fragmentée et refus données supplémentaires ; aucune autorisation d'écriture, aucune qualification physique.
+
+- Organisation utilisateur (#78) : classification Android sous `/CamaroDiag/` (Backups/ECU, Backups/Diagnostics, Calibrations, Reports, Logs/Console, Logs/Recovery, Telemetry, Tests, Exports). Parité Windows dans Documents/CamaroDiag avec les mêmes catégories et Profiles ; dialogues de sauvegarde prépositionnés, noms uniques, chemin alternatif uniquement au choix explicite, refus des conflits/répertoires redirigés. Préserver fichiers existants et stockage privé. Tests Windows ajoutés ; vérifier CI.
+
+- Stockage Android : catégorie obligatoire à chaque appel d'export (10 appels existants), vérification d'identité des documents temporaires et publiés ; le chemin complet est renvoyé dans chaque message de succès. Tests supplémentaires (#78). Les applications d'installation utilisent toujours DownloadManager et vérification de signature, hors du classement des exports.
+
+- Demande #97 : sous-répertoire `/CamaroDiag/APK/`, téléchargement updater en transit privé puis signature/package/version et copie SAF vérifiée avant lancement installateur. Rétention cinq fichiers archivés gérés (versionCode puis ID), nettoyage après publication et démarrage, indépendamment de la suppression du transit après installation. Aucun fichier hors APK, aucun APK navigateur externe ni ancienne sauvegarde supprimés. Autorisation SAF explicite ; retenter si accès perdu. Tests et CI nécessaires.
+
+- Complément utilisateur #97 : afficher le chemin exact `/storage/emulated/0/CamaroDiag/APK/` dans la modale de téléchargement et la notification, conserver la progression jusqu'à publication vérifiée, possibilité de masquer/réouvrir la modale sans annuler le transfert. Les libellés existants sont réutilisés pour les langues ; rétention cinq APK complets gérés. Continuer sur PR95, ne pas créer une autre branche.
+
+
 - Hotfix #98 (main et PR95, demande explicite) : logo Google 18dp, vérification fondée sur le claim Firebase signé email_verified après renouvellement, relecture au retour du navigateur, feedback erreurs, actualisation après ajout d'un fournisseur, grâce hors ligne seulement sur même adresse précédemment confirmée, sans privilèges propriétaire offline. L'objet des mails nécessite la configuration Firebase Authentication (nom public CamaroDiag et modèle de vérification). Ne pas modifier l'ID projet/OAuth ni annoncer une modification serveur sans confirmation.
+
+
+### UX Auth #99 — compte Google et mots de passe
+- Google devient la connexion par défaut ; aucun champ e-mail/mot de passe n'est affiché tant que l'utilisateur n'a pas explicitement choisi « Connexion avec e-mail et mot de passe ». Lors du changement de mode, nettoyer les saisies.
+- Aucun champ « ajouter/créer mot de passe » sur compte lié Google, même si `password` est présent parmi les fournisseurs ; aucun changement de mot de passe sur compte Google. Seuls les comptes e-mail purs (`password` et non `google.com`) ont dans « Mon compte » une action Changer mon mot de passe, avec ancien mot de passe + double saisie du nouveau. Vérifier ≥8 caractères, égalité, différence de l'ancien ; appeler `reauthenticate` puis `updatePassword` Firebase ; ne pas toucher aux UID, e-mails ou claims. Tests de la politique.
+
+## Suivi protocole PR95 — session du 23 novembre 2026 (complément, non validé)
+
+Travaux ajoutés sur `chore/unified-ci` sans nouvelle branche/PR : ISO-TP mixte 11/29 bits avec N_AE et tests SF/FF/CF/FC ; J1939-81 décodage passif Address Claimed NAME ; J1939-21 requêtes PGN EA00, réponses ACKM E800 et tests négatifs ; DoIP sécurisé TLS TCP 3496 sans contournement de certificat, écoute UDP passive, états entité/alimentation, ACK et activation stricts ; J2534 mode réception réellement passif (initialisation K-Line exclue). État détaillé : `docs/PROTOCOLES_STANDARDS_ET_RECUPERATION.md` et `docs/CHANGELOG_PR95.md`.
+
+**Ne pas annoncer d'implémentation complète ni de compatibilité véhicule** : J1939-22 FD.TP, revendication d'adresse active J1939-81, authentification client/certificats OEM DoIP, J1979-2 complet, pilotes physiques/firmware et flash/rollback ECU restent incomplets ; les nouveaux tests sont écrits mais **aucune CI sur le HEAD de cette session n'a été constatée**. Dernier HEAD observé avant ce complément : `357c962b3f750a5b3b470dc8bf72a8468c69d0f1` ; PR #95 ouverte, draft, non fusionnable au moment de cette lecture (contrôler à nouveau). Tests à exécuter par lot selon AGENTS.md, sans déclenchement par commit. Ne jamais fusionner sans accord utilisateur.
+
+
+## Reprise protocoles — SAE J1939-22 CAN-FD, complément du 23/11/2026
+
+Le chantier SAE J1939-22 a progressé directement sur la branche PR95 `chore/unified-ci`. Fichiers ajoutés : `pc-bridge/CamaroDiag.J2534Bridge/J1939FdMultiPg.cs`, `J1939FdTransportFrames.cs`, `J1939FdBamSession.cs`, `J1939FdCmdtSession.cs` et suites de tests `*SelfTests.cs`. La CLI Windows `StandardProtocolCli.cs` et son dispatch dans `Program.cs` exposent les commandes `--j1939-fd-multipg`, `--j1939-fd-bam` et `--j1939-fd-cmdt`, en send/receive, avec J2534 FD_CAN brut et double confirmation des émissions. Tests enregistrés dans `BridgeSelfTests`. Une partie OBDonUDS SAE J1979-2, la corrélation UDS DoIP, et les corrections J1939 classique / ISO-TP ont également progressé ; détails dans `docs/PROTOCOLES_STANDARDS_ET_RECUPERATION.md` et `docs/CHANGELOG_PR95.md`.
+
+**Validation obligatoire avant clôture du chantier** : compiler Windows Debug avec warnings as errors puis lancer `--self-test` une seule fois au checkpoint de chantier ; corriger groupément les échecs. Sur l'état observé, les tests sont seulement écrits, **pas exécutés** sur le dernier HEAD. Ne pas présumer que la nouvelle couche FD.TP satisfait intégralement SAE J1939-22, les variantes d'assurance, les sessions multiples ou les timings hardware : vérifier les références SAE et tester un vrai adaptateur compatible FD_CAN. Le support physique J1939-81 (NAME revendiqué et conflits), certificats OEM, SAE J1979-2 complet et les sauvegardes/restaurations ECU éprouvées restent des chantiers. PR95 doit rester ouverte/brouillon, aucune fusion sans instruction du propriétaire. Re-vérifier l'état GitHub avant chaque écriture car plusieurs chats interviennent.
+
+
+## Reprise des protocoles — session longue du 23 novembre 2026 (complément)
+
+Tous les travaux ci-dessous sont enregistrés sur `chore/unified-ci` dans PR #95 **sans nouvelle branche ni fusion**. Suite à la tranche J1939-22 CAN-FD, les corrections incluent : délais FD.TP globaux/par phase, abort CMDT corrélé sur numéros de segments et EOM incohérent, claim NAME J1939-81 explicite avec arbitrage initial et réponse à PGN EE00, parser et constructeur KWP ISO14230 en adressage physique/fonctionnel, correction checksum J2534 (automatique par défaut, manuel `--flags 0x200`), SW_ISO15765_PS `0x8007` vs SW_CAN_PS `0x8008` et configuration optionnelle `SW_CAN_HS_DATA_RATE`, services applicatifs UDS 0x24/0x28/0x2A/0x2F/0x85, réponses NRC 0x78 validées jusqu'à la réponse finale, DoIP v0x02/0x03/v0x04, versions routage attente confirmation 0x11, generic NACK, certificat client du magasin Windows, et découverte OBDonUDS fonctionnelle F810 CAN 11 bits à plusieurs ECU (source fixe 0x7DF, réponses 0x7E8..0x7EF). Les nouveaux fichiers et tests sont cités dans `docs/PROTOCOLES_STANDARDS_ET_RECUPERATION.md` et `docs/CHANGELOG_PR95.md`.
+
+**Ne pas déclarer le développement terminé.** Compilation Windows Debug, auto-tests intégrés `BridgeSelfTests`, pilote J2534 réel, pile connecteurs, matériel CAN-FD/SW-CAN/K-Line, ECU OEM et récupération post-écriture restent à qualifier. Pas de preuve de CI sur HEAD de cette session. L'identification F810 CAN 11 bits ne couvre pas automatiquement les variantes 29 bits ni toutes les éditions J1979-2 ; J1939-22 avec assurance data et concurrence multi-nœuds, revendication NAME persistante et tous les services applicatifs SAE/ISO restent inachevés. Préserver la double confirmation pour toute émission potentiellement mutante et tous les contrôles de vrais blocs/secteurs avant écriture. Pas de flash ni de rollback OEM revendiqué sans matériel/validation. **Ne lancer la campagne CI complète qu'au checkpoint d'un chantier fini**, jamais à chaque commit. Une autre conversation développe en parallèle sur la même branche : toujours refetch la version de fichier et le HEAD et ne jamais forcer ou fusionner la PR.
+
+
+## Reprise protocoles — session de développement 23 novembre 2026 (13h57–14h20)
+
+Chantier continué **uniquement dans la PR #95 / `chore/unified-ci`**. Ajouts SAE J1939-22 : support Multi-PG **FBFF 11-bit CAN-FD** en complément FEFF 29-bit, option `--fbff true` avec canal J2534 ouvert réellement en 11-bit, codec et CLI multi-C-PG `--groups '0xF004:010203;0xFECA:C7FF'` avec vérification de taille avant émission et SHA-256 des vrais octets de trame ; prise en charge des C-PG vides explicitement, tests sur modes, DLC, drapeaux et contradictions. Protection FD.TP BAM/CMDT : contrôle du padding FF après la longueur de dernier segment et Abort CMDT si incorrect.
+
+SAE J1979-2 et ISO 14229 : groupes DID F4/F5, F6 surveillance historique, F7, F8 informations véhicule dont F810 ; requêtes et parseurs WWH DTC `19 42` (statut/sévérité), `19 55` (permanent), `19 56` (readiness group), `19 04` (snapshot DTC), `19 06` (données DTC étendues). CLI ISO-TP et DoIP : `--obd-did`, `--obd-wwh-status`, `--obd-wwh-severity`, `--obd-wwh-permanent`, `--obd-readiness-group`, `--obd-snapshot`, `--obd-snapshot-record`, `--obd-extended-dtc`, `--obd-extended-record`. Décodage brut sans supposer les longueurs et unités des données OEM. Corrélation supplémentaire des groupes WWH 0x33, groupes de readiness, DTC 24 bits et identifiants précis de records (sauf demande all-record FE/FF). Tests ajoutés dans les `*SelfTests.cs` existants, **non exécutés**. Aucun build/CI de cette tranche, aucun matériel J2534/ECU/DoIP disponible dans la session.
+
+Respecter le point d'arrêt : une seule PR, pas de création de branche, pas de fusion, pas de CI à chaque commit. **La réalisation logicielle n'est pas égale à la conformité physique**. Relecture finale Windows avec warnings-as-errors, tests regroupés, diagnostics sur adaptateurs réels et qualification ECU restent nécessaires. État de détail : `docs/PROTOCOLES_STANDARDS_ET_RECUPERATION.md`, `docs/CHANGELOG_PR95.md`.
+
+
+### Reprise protocoles — correctifs complémentaires après tests de trames
+
+- Nouveau chemin OBDonUDS pour DTC WWH : `19 42` (masques de statut/sévérité, groupe émission 33), `19 55` (permanents), `19 56` (readiness), `19 04` (snapshot) et `19 06` (données étendues). Sélecteurs CLI documentés dans `docs/PROTOCOLES_STANDARDS_ET_RECUPERATION.md`.
+- Les réponses `19 04`/`19 06` contrôlent désormais le DTC 24 bits et le numéro de record lorsqu'une seule valeur est demandée ; les demandes `FF` ou `FE` multi-record sont préservées. Valeurs brutes non interprétées sans schéma ECU/OEM.
+- J1939-22 : FEFF CAN-FD 29 bits / FBFF 11 bits négociés comme tels dans le pilote J2534, C-PG explicitement vide accepté, vérification du padding FD.TP, gestion d'une expiration intermédiaire de 30 secondes J2534 pendant une attente BAM/RTS à délai global plus long, sans modifier les délais courts des phases CTS/DT/EOM.
+- Suites de tests ajoutées dans `UdsStandardServicesSelfTests`, `StandardVehicleProtocolsSelfTests`, `IsoTpCanFdSelfTests`, `J1939FdBamSelfTests`, `J1939FdCmdtSelfTests`, `J1939FdMultiPgSelfTests`. **Aucune compilation locale ni CI vérifiée sur cette session ; ne pas prétendre les avoir exécutées.** Aucun flash ni test physique.
+
+
+## Complément chantiers standards du 23/11/2026 — UDS/J1850/J2534
+
+Ce créneau est resté sur la PR #95 `chore/unified-ci` : aucune nouvelle branche, aucun merge et aucune publication. Les travaux concernent les transports ISO/SAE **et leurs tests hors matériel**, pas la certification d'un ECU. Actualiser le HEAD GitHub avant toute reprise : d'autres sessions écrivent sur cette branche.
+
+- **ISO 14229 / UDS** : `UdsStandardServices.ReadDids/DecodeDids` pour plusieurs DID dans une même requête, avec longueurs explicites issues des définitions ECU et contrôle d'ordre, de longueur et de trames supplémentaires ; CLI ISO-TP/DoIP `--uds-dids` et autotests.
+- **Download/Upload UDS** : `DecodeTransferParameters` traite le LFI et maxNumberOfBlockLength des réponses `0x74/0x75`, y compris les champs jusqu'à huit octets. `NativeUdsDownloadProtocol` réutilise le parseur commun en gardant sa limite native. Les constructeurs `RequestDownload/Upload` ont un ALFI explicite adresse/taille sur 1–8 octets ; les anciennes signatures 32 bits conservent le contrôle anti-dépassement de l'espace 32 bits.
+- **Lecture UDS 0x35/0x36/0x37** : `NativeUdsUploadProtocol` reconstruit la longueur exacte, valide chaque compteur y compris `0xFF -> 0x00`, refuse les NRC et trames trop longues, et expose `UploadTwiceAsync` : deux lectures physiques indépendantes, égalité octet à octet et SHA-256 uniquement si cohérentes. `NativeUdsUploadSelfTests` est enregistré dans `BridgeSelfTests`. **Ce moteur générique n'est PAS encore raccordé à une cartographie/identité ECU complète ni à un stockage/restauration physique qualifiés.** Les tests sont simulés, pas des lectures de voiture.
+- **J1850 VPW/PWM** : `J1850Crc` calcule CRC-8 SAE (vecteur `123456789 = 4B`) et peut valider une frame brute. L'option J2534 `--j1850-wire-crc true` s'applique uniquement aux DLL qui conservent le CRC physique dans RX ; pas de deuxième CRC injecté à l'émission, ignorer les événements de statut et ne pas confondre codec avec transceiver J1850 réel.
+- **J2534 CAN brut** : `IsoTpJ2534RawCanLink.Unpack` vérifie l'indicateur de réception `CAN_29BIT_ID` cohérent avec le canal 11/29 bits et la présence de format FD. Autotests ajoutés.
+- **CLI et catalogue** : erreurs numériques invalides attrapées proprement dans les principales commandes, matrice protocolaire synchronisée avec l'état réellement codé, test du nombre d'entrées du catalogue passé de 13 à 14.
+
+**Point bloquant** : aucune campagne Windows Debug (warnings as errors), aucun `--self-test` réellement lancé au dernier HEAD de cette tranche, aucun pilote J2534 ou calculateur physique vérifié. Ne déclarer ni « 100 % standard » ni « sauvegarde intégralement restaurable ». Restent la qualification physique, J1979-2 intégral, OEM seed/key/routines/checksums/bootloader par ECU, J2411 et les différents adaptateurs, plus les chantiers C1/C2/C4/C6/C8 détaillés dans l'audit. Exécuter une campagne regroupée au checkpoint de chantier et corriger sans lancer une CI par commit.

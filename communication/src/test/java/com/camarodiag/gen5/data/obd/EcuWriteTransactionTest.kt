@@ -35,12 +35,14 @@ class EcuWriteTransactionTest {
 
     private class FakeDriver(
         initial: ByteArray,
-        private val identity: EcuProgrammingDriverContract.Identity,
+        var identity: EcuProgrammingDriverContract.Identity,
         validated: Boolean = true
     ) : EcuProgrammingDriverContract {
         val memory = initial.copyOf()
         var eraseCalls = 0
         var identityAfterErases: Pair<Int, EcuProgrammingDriverContract.Identity>? = null
+        var identityAfterWrites: Pair<Int, EcuProgrammingDriverContract.Identity>? = null
+        var identityAfterReads: Pair<Int, EcuProgrammingDriverContract.Identity>? = null
         val writes = mutableListOf<EcuProgrammingDriverContract.RegionRequest>()
         val writeCalls: Int get() = writes.size
         var failWriteAt: Long? = null
@@ -77,7 +79,9 @@ class EcuWriteTransactionTest {
         }
 
         override suspend fun identify(): EcuProgrammingDriverContract.Identity =
-            identityAfterErases?.takeIf { eraseCalls >= it.first }?.second ?: identity
+            identityAfterReads?.takeIf { reads >= it.first }?.second
+                ?: identityAfterWrites?.takeIf { writeCalls >= it.first }?.second
+                ?: identityAfterErases?.takeIf { eraseCalls >= it.first }?.second ?: identity
         override suspend fun read(request: EcuProgrammingDriverContract.RegionRequest): ByteArray {
             val start = start(request)
             reads++
@@ -143,14 +147,14 @@ class EcuWriteTransactionTest {
         }
     }
 
-    @Test fun preparationRejectsElmMissingChecksAndUnverifiedMap() {
+    @Test fun transportLabelDoesNotInventWriteBanButMissingPhysicalEvidenceStillStopsFlash() {
         val invalid = request(evidence = EcuWriteTransaction.SafetyEvidence()).copy(
             transport = EcuProgrammingDriverContract.Transport.ELM_DIAGNOSTICS,
             layout = originalLayout.copy(mapVerifiedForTargetEcu = false)
         )
         val result = EcuWriteTransaction.prepare(invalid)
         assertFalse(result.canAttemptWithValidatedHardware)
-        assertTrue(EcuWriteTransaction.Blocker.DIAGNOSTIC_ONLY_TRANSPORT in result.blockers)
+        assertFalse(EcuWriteTransaction.Blocker.DIAGNOSTIC_ONLY_TRANSPORT in result.blockers)
         assertTrue(EcuWriteTransaction.Blocker.UNVERIFIED_MEMORY_MAP in result.blockers)
         assertTrue(EcuWriteTransaction.Blocker.UNVERIFIED_OEM_CHECKSUM in result.blockers)
         assertTrue(EcuWriteTransaction.Blocker.UNVERIFIED_HARDWARE_BACKUP in result.blockers)
@@ -248,10 +252,14 @@ class EcuWriteTransactionTest {
     @Test fun controllerIdentityChangedAfterFirstSectorStopsBeforeNextErase() = runBlocking {
         val updated = original.copyOf().also { it[2] = 100; it[10] = 110 }
         val device = FakeDriver(original, expectedIdentity)
-        device.identityAfterErases = 1 to expectedIdentity.copy(vin = "2G1TEST0000000002")
         val records = mutableListOf<EcuWriteTransaction.Record>()
         val outcome = EcuWriteExecutionEngine(
-            device, journal(records), EcuWriteTransaction.PowerMonitor { true }
+            device, EcuWriteTransaction.Journal { record ->
+                records += record
+                if (record.stage == EcuWriteTransaction.Stage.VERIFIED_AFTER_WRITE) {
+                    device.identity = expectedIdentity.copy(vin = "2G1TEST0000000002")
+                }
+            }, EcuWriteTransaction.PowerMonitor { true }
         ).run(request(updated))
         assertEquals(EcuWriteTransaction.Status.STOPPED_REQUIRES_ASSESSMENT, outcome.status)
         assertEquals(1, outcome.verifiedSectors)
@@ -259,6 +267,36 @@ class EcuWriteTransactionTest {
         assertEquals(1, device.eraseCalls)
         assertEquals(4, device.writeCalls)
         assertEquals(1, records.count { it.stage == EcuWriteTransaction.Stage.BEFORE_ERASE })
+    }
+
+    @Test fun controllerSwitchDuringSectorProgrammingStopsBeforeNextUnit() = runBlocking {
+        val device = FakeDriver(original, expectedIdentity)
+        device.identityAfterWrites = 1 to expectedIdentity.copy(vin = "2G1TEST0000000002")
+        val records = mutableListOf<EcuWriteTransaction.Record>()
+        val outcome = EcuWriteExecutionEngine(
+            device, journal(records), EcuWriteTransaction.PowerMonitor { true }
+        ).run(request())
+        assertEquals(EcuWriteTransaction.Status.STOPPED_REQUIRES_ASSESSMENT, outcome.status)
+        assertEquals(1, device.eraseCalls)
+        assertEquals(1, device.writeCalls)
+        assertEquals(0x1002L, outcome.failedAddress)
+        assertFalse(records.any { it.stage == EcuWriteTransaction.Stage.VERIFIED_AFTER_WRITE })
+        assertEquals(0, device.resetCalls)
+    }
+
+    @Test fun controllerSwitchAfterLastUnitPreventsSectorVerification() = runBlocking {
+        val device = FakeDriver(original, expectedIdentity)
+        device.identityAfterWrites = 4 to expectedIdentity.copy(vin = "2G1TEST0000000002")
+        val records = mutableListOf<EcuWriteTransaction.Record>()
+        val outcome = EcuWriteExecutionEngine(
+            device, journal(records), EcuWriteTransaction.PowerMonitor { true }
+        ).run(request())
+        assertEquals(EcuWriteTransaction.Status.STOPPED_REQUIRES_ASSESSMENT, outcome.status)
+        assertEquals(1, device.eraseCalls)
+        assertEquals(4, device.writeCalls)
+        assertEquals(0x1000L, outcome.failedAddress)
+        assertFalse(records.any { it.stage == EcuWriteTransaction.Stage.VERIFIED_AFTER_WRITE })
+        assertEquals(0, device.resetCalls)
     }
 
     @Test fun lossOfPowerDuringBaselineReadNeverStartsSecondAcquisitionOrErase() = runBlocking {
@@ -274,6 +312,36 @@ class EcuWriteTransactionTest {
         assertEquals(0, device.eraseCalls)
     }
 
+    @Test fun lossOfPowerDuringUntouchedBaselineReadPreventsSecondAcquisitionAndErase() = runBlocking {
+        val device = FakeDriver(original, expectedIdentity)
+        var stable = true
+        device.afterRead = { stable = false }
+        val outcome = EcuWriteExecutionEngine(
+            device, EcuWriteTransaction.Journal {}, EcuWriteTransaction.PowerMonitor { stable }
+        ).run(request())
+        assertEquals(EcuWriteTransaction.Status.STOPPED_REQUIRES_ASSESSMENT, outcome.status)
+        assertEquals(0x1008L, outcome.failedAddress)
+        assertEquals(1, device.reads)
+        assertEquals(0, device.eraseCalls)
+    }
+
+    @Test fun lossOfPowerDuringSecondBaselineAcquisitionStopsBeforeJournalAndErase() = runBlocking {
+        val device = FakeDriver(original, expectedIdentity)
+        var stable = true
+        device.afterRead = {
+            if (device.reads == 4) stable = false
+        }
+        val records = mutableListOf<EcuWriteTransaction.Record>()
+        val outcome = EcuWriteExecutionEngine(
+            device, journal(records), EcuWriteTransaction.PowerMonitor { stable }
+        ).run(request())
+        assertEquals(EcuWriteTransaction.Status.STOPPED_REQUIRES_ASSESSMENT, outcome.status)
+        assertEquals(4, device.reads)
+        assertEquals(0, device.eraseCalls)
+        assertEquals(0, device.writeCalls)
+        assertTrue(records.isEmpty())
+    }
+
     @Test fun mutatingCallerImageDuringReadDoesNotChangeFrozenProgrammingPlan() = runBlocking {
         val req = request()
         val expected = req.updatedImage.copyOf()
@@ -284,6 +352,38 @@ class EcuWriteTransactionTest {
         ).run(req)
         assertEquals(EcuWriteTransaction.Status.COMPLETED, result.status)
         assertArrayEquals(expected, device.memory)
+    }
+
+    @Test fun liveEcuSectorBytesAreCapturedBeforeAnyErase() = runBlocking {
+        val device = FakeDriver(original, expectedIdentity)
+        val snapshots = InMemoryEcuPhysicalBlockBackup()
+        val outcome = EcuWriteExecutionEngine(
+            device, EcuWriteTransaction.Journal {}, EcuWriteTransaction.PowerMonitor { true },
+            snapshots
+        ).run(request())
+        assertEquals(EcuWriteTransaction.Status.COMPLETED, outcome.status)
+        assertEquals(1, snapshots.blocks.size)
+        assertArrayEquals(
+            original.copyOfRange(0, 8),
+            snapshots.blocks[EcuBackupCoverage.Region.CALIBRATION to 0x1000L]
+        )
+        assertEquals(1, device.eraseCalls)
+    }
+
+    @Test fun diskBackupFailureCannotEraseOrWriteEcu() = runBlocking {
+        val device = FakeDriver(original, expectedIdentity)
+        val refusingBackup = EcuPhysicalBlockBackup { _, _, _ ->
+            throw java.io.IOException("Physical block backup cannot be persisted.")
+        }
+        val records = mutableListOf<EcuWriteTransaction.Record>()
+        val outcome = EcuWriteExecutionEngine(
+            device, journal(records), EcuWriteTransaction.PowerMonitor { true },
+            refusingBackup
+        ).run(request())
+        assertEquals(EcuWriteTransaction.Status.STOPPED_REQUIRES_ASSESSMENT, outcome.status)
+        assertEquals(0, device.eraseCalls)
+        assertEquals(0, device.writeCalls)
+        assertFalse(records.any { it.stage == EcuWriteTransaction.Stage.BEFORE_ERASE })
     }
 
     @Test fun baselineMismatchStopsBeforeAnyErase() = runBlocking {
@@ -482,7 +582,42 @@ class EcuWriteTransactionTest {
         assertEquals(0, device.resetCalls)
     }
 
-    @Test fun finalIdentityMismatchAfterSingleSectorDoesNotReportCompletion() = runBlocking {
+    @Test fun powerLossDuringFinalIndependentReadbackCannotBeJournaledAsVerified() = runBlocking {
+        val device = FakeDriver(original, expectedIdentity)
+        var stable = true
+        // Two reads of untouched baseline, two reads of the changed baseline,
+        // one pre-erase read, one post-write read, then the final readback.
+        device.afterRead = {
+            if (device.reads == 7) stable = false
+        }
+        val records = mutableListOf<EcuWriteTransaction.Record>()
+        val outcome = EcuWriteExecutionEngine(
+            device, journal(records), EcuWriteTransaction.PowerMonitor { stable }
+        ).run(request())
+        assertEquals(EcuWriteTransaction.Status.STOPPED_REQUIRES_ASSESSMENT, outcome.status)
+        assertEquals(1, device.eraseCalls)
+        assertEquals(4, device.writeCalls)
+        assertEquals(0x1000L, outcome.failedAddress)
+        assertFalse(records.any { it.stage == EcuWriteTransaction.Stage.FINAL_READBACK_VERIFIED })
+        assertFalse(records.any { it.stage == EcuWriteTransaction.Stage.TRANSACTION_COMPLETED })
+    }
+
+    @Test fun controllerSwitchDuringFinalIndependentReadbackCannotMarkCompletion() = runBlocking {
+        val device = FakeDriver(original, expectedIdentity)
+        device.identityAfterReads = 7 to expectedIdentity.copy(vin = "2G1TEST0000000002")
+        val records = mutableListOf<EcuWriteTransaction.Record>()
+        val outcome = EcuWriteExecutionEngine(
+            device, journal(records), EcuWriteTransaction.PowerMonitor { true }
+        ).run(request())
+        assertEquals(EcuWriteTransaction.Status.STOPPED_REQUIRES_ASSESSMENT, outcome.status)
+        assertEquals(1, device.eraseCalls)
+        assertEquals(4, device.writeCalls)
+        assertEquals(0x1000L, outcome.failedAddress)
+        assertFalse(records.any { it.stage == EcuWriteTransaction.Stage.FINAL_READBACK_VERIFIED })
+        assertFalse(records.any { it.stage == EcuWriteTransaction.Stage.TRANSACTION_COMPLETED })
+    }
+
+    @Test fun controllerSwitchJustAfterEraseStopsBeforeFirstWrite() = runBlocking {
         val device = FakeDriver(original, expectedIdentity)
         device.identityAfterErases = 1 to expectedIdentity.copy(vin = "2G1TEST0000000002")
         val outcome = EcuWriteExecutionEngine(
@@ -490,7 +625,8 @@ class EcuWriteTransactionTest {
         ).run(request())
         assertEquals(EcuWriteTransaction.Status.STOPPED_REQUIRES_ASSESSMENT, outcome.status)
         assertEquals(1, device.eraseCalls)
-        assertEquals(4, device.writeCalls)
+        assertEquals(0, device.writeCalls)
+        assertEquals(0, outcome.verifiedSectors)
         assertEquals(0, device.resetCalls)
     }
 
@@ -509,4 +645,34 @@ class EcuWriteTransactionTest {
         assertEquals(1, device.eraseCalls)
         assertEquals(0, device.resetCalls)
     }
+    @Test fun placeholderEcuAndFirmwareCannotSatisfyWritePreparation() {
+        val invalid = listOf("unknown", "demo", "simulation", "mock", "pending",
+            "00000000", "FFFFFFFF", "0x000000", "N/A",
+            "unknown-ecu", "ECU-DEMO", "sample-firmware", "fake-controller")
+        for (value in invalid) {
+            for (target in listOf(
+                request().copy(controllerFamily = value),
+                request().copy(expectedIdentity = expectedIdentity.copy(controllerId = value)),
+                request().copy(expectedIdentity = expectedIdentity.copy(firmwareId = value))
+            )) {
+                val result = EcuWriteTransaction.prepare(target)
+                assertTrue("Unsafe identity must be refused: $value",
+                    EcuWriteTransaction.Blocker.UNKNOWN_TARGET in result.blockers)
+                assertFalse(result.canAttemptWithValidatedHardware)
+            }
+        }
+    }
+
+    @Test fun unchangedImageDoesNotBypassUnsafeTargetPreflight() = runBlocking {
+        val unsafe = request(updated = original.copyOf()).copy(
+            expectedIdentity = expectedIdentity.copy(controllerId = "unknown-ecu"))
+        val result = EcuWriteTransaction.execute(
+            unsafe,
+            EcuWriteTransaction.Journal {},
+            EcuWriteTransaction.PowerMonitor { true }
+        )
+        assertEquals(EcuWriteTransaction.Status.BLOCKED, result.status)
+        assertTrue(EcuWriteTransaction.Blocker.UNKNOWN_TARGET in result.blockers)
+    }
+
 }

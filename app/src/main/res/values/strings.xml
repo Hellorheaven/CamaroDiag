@@ -80,6 +80,9 @@
     <string name="common_refresh">Refresh</string>
     <string name="adapter_none_detected">No adapter detected. Pair OBDLink MX+, MX, LX and other Classic Bluetooth adapters; CX is discovered nearby over BLE.</string>
     <string name="common_connect">Connect</string>
+    <string name="adapter_j2534_capabilities_guidance">Bridge features depend on the paired J2534 driver and selected ECU channel. PC pairing alone does not confirm ECU access.</string>
+    <string name="adapter_j2534_bridge_connected">Windows J2534 bridge paired (PC connection)</string>
+    <string name="adapter_disconnect_label">Disconnect adapter</string>
     <string name="usb_connection_title">USB connection (OBDLink EX / SX, ELM327 and serial adapters)</string>
     <string name="usb_devices_detected">Detected USB devices</string>
     <string name="usb_none_detected">No USB serial adapter detected.</string>
@@ -440,6 +443,8 @@
     <string name="msg_live_recording_stopped">Recording stopped because OBD communication failed. Recent samples remain exportable.</string>
     <string name="msg_live_recording_started">Recording in progress. Sample count: %1$d.</string>
     <string name="msg_wifi_connection_failed">Wi-Fi OBD connection failed</string>
+    <string name="msg_usb_permission_denied">USB access was denied. Select the adapter again to request permission.</string>
+    <string name="msg_usb_permission_pending">USB access requested. Allow permission in the Android dialog, then tap Connect again.</string>
     <string name="msg_usb_connection_failed">USB OBD connection failed</string>
     <string name="msg_bluetooth_connection_failed">Bluetooth SPP connection failed</string>
     <string name="mileage_audit_not_run">Audit not run</string>
@@ -502,6 +507,7 @@
     <string name="msg_native_catalog_load_failed">Native Camaro signal catalogue could not be loaded.</string>
     <string name="msg_obdb_catalog_load_failed">OBDb Camaro catalog could not be loaded.</string>
     <string name="msg_obdb_signal_read_failed">OBDb signal read failed.</string>
+    <string name="msg_j2534_bridge_invalid_form">Check the PC bridge LAN IPv4 address, TCP port, TLS pairing code and selected CAN IDs/profile. The current adapter was not disconnected.</string>
     <string name="msg_j2534_bridge_connect_failed">Unable to connect to the J2534 bridge.</string>
     <string name="live_pid_fuel_system_status">Fuel system status</string>
     <string name="live_pid_ltft">Long-term fuel trim B1</string>
@@ -653,11 +659,11 @@
     <string name="vin_photo_success">VIN detected and copied to the vehicle profile. Verify every character.</string>
     <string name="vin_photo_not_found">No valid 17-character VIN detected. Enter it manually or take another photo.</string>
     <string name="vin_photo_error">Could not read the VIN photo. Try again with better lighting and focus.</string>
-    <string name="tab_can_sniffer">CAN Sniffer</string>
+    <string name="tab_can_sniffer">CAN / OBD Console</string>
     <string name="can_sniffer_raw_heading">Raw CAN adapter output</string>
     <string name="can_sniffer_export_raw">Export raw log</string>
     <string name="can_sniffer_title">Live CAN Monitor</string>
-    <string name="can_sniffer_description">Capture CAN frames on a real compatible ELM or STN adapter. Each capture stops automatically after a short session.</string>
+    <string name="can_sniffer_description">Read standard OBD data from a connected ELM or J2534 adapter, or capture CAN frames with a compatible ELM/STN device. CAN capture sessions stop automatically.</string>
     <string name="can_sniffer_safety">Only read-only OBD-II requests are accepted. Arbitrary CAN frames and UDS write services are blocked.</string>
     <string name="can_sniffer_start">Start capture</string>
     <string name="can_sniffer_stop">Stop capture</string>
@@ -665,6 +671,10 @@
     <string name="can_sniffer_request_examples">Examples: 01 0C (RPM), 09 02 (VIN), 03 / 07 / 0A (read DTCs). Clear codes is not allowed.</string>
     <string name="can_sniffer_send">Send</string>
     <string name="can_sniffer_empty">No CAN frames captured yet.</string>
+    <string name="can_console_no_adapter_text">No adapter response text received</string>
+    <string name="can_console_unsafe_can_payload">Raw CAN request refused: the diagnostic payload is unsafe or the ECU responder address is reserved.</string>
+    <string name="can_console_obd_unavailable">CAN monitoring is available, but the adapter has no active standard OBD read channel.</string>
+    <string name="can_console_read_only_available">Read-only OBD commands remain available with the connected adapter. Passive CAN monitoring is unavailable on this interface.</string>
     <string name="can_sniffer_unavailable">Connect a real adapter with CAN header support. Simulation and unsupported bridges cannot monitor live CAN.</string>
     <string name="can_sniffer_capture_complete">CAN capture complete.</string>
     <string name="can_sniffer_capture_failed">CAN capture failed or the adapter stopped responding.</string>
@@ -755,7 +765,7 @@
     <string name="can_console_rx">RX • RECEIVED</string>
     <string name="can_console_system">SYSTEM</string>
     <string name="can_console_input_label">Frame or OBD command</string>
-    <string name="can_console_input_hint">CAN frame: 7E0 02 01 0C • OBD request: 01 0C</string>
+    <string name="can_console_input_hint">Raw CAN: 7E0 02 01 0C • OBD read: 010C, 0152 (if supported), 0902</string>
     <string name="can_console_sending">Sending…</string>
 
     <string name="can_console_adapter_ack">Adapter response (not an ECU RX frame): %1$s</string>
@@ -780,10 +790,28 @@
     <string name="obd_sensor_not_measured">Not measured in this scan</string>
     <string name="live_selected_sensors">Displayed sensors (%1$d/%2$d)</string>
     <string name="flexfuel_lfx2012_title">2012 LFX FlexFuel: ECU identification (read-only)</string>
+    <string name="flexfuel_lfx2012_read_fuel">Read ECU ethanol and fuel trims (read-only)</string>
+    <string name="flexfuel_lfx2012_reading_fuel">Reading physical SAE Mode 01 PIDs…</string>
+    <string name="flexfuel_lfx2012_source_j2534">Windows J2534</string>
+    <string name="flexfuel_lfx2012_source_elm">physical ELM/STN OBD</string>
+    <string name="flexfuel_lfx2012_observed_source">ECU read via %1$s · %2$s</string>
+    <string name="flexfuel_lfx2012_pid_ethanol">Ethanol reported by ECU (PID 52)</string>
+    <string name="flexfuel_lfx2012_pid_stft_b1">Short-term fuel trim B1 (PID 06)</string>
+    <string name="flexfuel_lfx2012_pid_ltft_b1">Long-term fuel trim B1 (PID 07)</string>
+    <string name="flexfuel_lfx2012_pid_stft_b2">Short-term fuel trim B2 (PID 08)</string>
+    <string name="flexfuel_lfx2012_pid_ltft_b2">Long-term fuel trim B2 (PID 09)</string>
+    <string name="flexfuel_lfx2012_reported_percent">%1$.1f%% (ECU-reported)</string>
+    <string name="flexfuel_lfx2012_pid_unsupported">PID not advertised by ECU</string>
+    <string name="flexfuel_lfx2012_pid_no_response">No valid response for this PID</string>
+    <string name="flexfuel_lfx2012_observation_warning">A reported ethanol percentage does not establish a fitted ethanol sensor, an active FlexFuel calibration or E85 compatibility. Fuel trims are not ethanol measurements. This screen never changes ECU parameters.</string>
+    <string name="flexfuel_lfx2012_fuel_failed">Read-only fuel inspection unavailable:</string>
+    <string name="flexfuel_lfx2012_vin_unverified">The selected VIN was not independently matched to a fresh physical ECU identity for this fuel observation.</string>
+    <string name="flexfuel_lfx2012_continuous_telemetry">This is a one-time read. Open Live Telemetry for repeated ECU PID 52 readings when the ECU supports them.</string>
     <string name="flexfuel_lfx2012_parts">Parts catalog: %1$s controller, service part %2$s (replaces %3$s).</string>
     <string name="flexfuel_lfx2012_parts_warning">These part numbers are references only, not proof of the ECU fitted to this VIN or permission to change its calibration.</string>
     <string name="flexfuel_lfx2012_calid_label">ECU-reported calibration ID: %1$s</string>
     <string name="flexfuel_lfx2012_boot">Catalog boot-file reference: %1$s (not verified on this vehicle).</string>
+    <string name="flexfuel_lfx2012_readonly_testing_notice">Live ECU reading and identification remain available for individual vehicle testing, independently of ECU writing qualification.</string>
     <string name="flexfuel_lfx2012_checks">Conditions still preventing calibration changes</string>
     <string name="flexfuel_preflight_vehicle_missing">No vehicle profile selected</string>
     <string name="flexfuel_preflight_wrong_vehicle">Vehicle is not a 2012 Camaro LFX</string>
@@ -873,6 +901,10 @@
     <string name="live_pid_wbo2_b1s2">Wideband lambda B1S2</string>
     <string name="live_pid_wbo2_b2s1">Wideband lambda B2S1</string>
     <string name="live_pid_wbo2_b2s2">Wideband lambda B2S2</string>
+    <string name="live_pid_wbo2_i_b1s1">Wideband oxygen current B1S1</string>
+    <string name="live_pid_wbo2_i_b1s2">Wideband oxygen current B1S2</string>
+    <string name="live_pid_wbo2_i_b2s1">Wideband oxygen current B2S1</string>
+    <string name="live_pid_wbo2_i_b2s2">Wideband oxygen current B2S2</string>
     <string name="system_language_follow_phone">Follow the phone language</string>
 
     <!-- Live physical J2534 ECU memory capture -->
@@ -880,14 +912,22 @@
     <string name="cal_live_memory_notice">The Windows bridge needs an approved VIN-bound memory map. Read-only access; ECU writing stays disabled.</string>
     <string name="cal_live_memory_length">Bytes to read (max 4 MiB)</string>
     <string name="cal_live_memory_region_calibration">Calibration</string>
+    <string name="cal_live_memory_region_other">Unknown / not qualified</string>
+    <string name="cal_live_memory_region_profile_match">The region, address range and session must match the Windows J2534 profile. Read blocks are automatically limited to its maximum. Unknown does not imply a complete ECU backup.</string>
     <string name="cal_live_memory_extended">Extended diagnostic session (0x03)</string>
     <string name="cal_live_memory_save">Read twice and save ECU memory ZIP</string>
+    <string name="cal_live_memory_partial_notice">Partial memory region only. This archive is not a verified full ECU backup or a proven restorable image.</string>
     <string name="cal_live_memory_saved">ECU memory saved after two matching reads.</string>
     <string name="cal_live_memory_failed">ECU memory reading failed. No verified backup was created.</string>
     <string name="cal_archive_verify">Verify ECU backup ZIP</string>
     <string name="cal_archive_verified">Both reads match and the SHA-256 hashes are valid for the archived ranges.</string>
     <string name="cal_archive_partial">The backup covers only part of the requested memory.</string>
-    <string name="cal_archive_failed">Could not verify this ZIP. The limit is 32 MiB uncompressed.</string>
+    <string name="cal_archive_failed">Could not verify this ZIP. The maximum imported data is 32 MiB plus 64 KiB of metadata.</string>
+    <string name="cal_archive_channel">Declared J2534 route: TX %1$s / RX %2$s, protocol %3$d, diagnostic session %4$d.</string>
+    <string name="cal_archive_legacy_route">Legacy archive: CAN route and session were not recorded.</string>
+    <string name="cal_archive_unattested">Offline integrity only: physical ECU provenance and full firmware coverage are not certified.</string>
+    <string name="cal_archive_osid">Recorded GM operating-system ID: %1$d (DID 0x%2$s). This does not identify a verified ECU firmware variant.</string>
+    <string name="cal_archive_osid_missing">No GM operating-system ID recorded in this archive.</string>
     <!-- Owner-only Debug downloads and staged license labels -->
     <string name="tab_debug_builds">Debug builds</string>
     <string name="tab_license">License</string>
@@ -917,4 +957,37 @@
     <string name="export_folder_instruction">Create or select the CamaroDiag folder in internal storage, then allow access. Exports are visible in shared storage.</string>
     <string name="export_folder_success">Export saved in /CamaroDiag/.</string>
     <string name="export_folder_failed">Unable to save the export in /CamaroDiag/.</string>
+    <string name="can_console_filter_all_ecus">All observed CAN IDs (global monitor)</string>
+    <string name="can_console_filter_observed_id">Observed CAN ID 0x%1$s</string>
+    <string name="can_console_filter_observed_note">Only CAN IDs actually observed on the connected bus are listed. An ID alone does not confirm an ECU identity. This filter changes display only.</string>
+    <string name="can_console_filter_verified_ecu">Verified ECU: %1$s (CAN 0x%2$s)</string>
+    <string name="can_monitor_format_11">CAN 11-bit capture</string>
+    <string name="can_monitor_format_29">CAN 29-bit capture</string>
+    <string name="can_monitor_format_notice">The physical adapter monitors one CAN ID format at a time; other buses and unsupported formats cannot be displayed by this session.</string>
+    <string name="can_console_tx_ack_only">Frame sent to the adapter; no matching ECU diagnostic response was confirmed.</string>
+    <string name="can_console_negative_ecu_response">The selected ECU returned a negative diagnostic response; no successful read was confirmed.</string>
+    <string name="can_console_oversized_line">Malformed CAN monitor lines discarded: %1$d. The original raw capture is retained.</string>
+    <string name="can_console_response_timeout">The CAN diagnostic response timed out; the frames already received remain in the console.</string>
+    <string name="ecu_write_warning_title">ECU write warning</string>
+    <string name="ecu_write_warning_message">A command is about to be sent to an ECU or connected device. It may write, modify or erase data, potentially damaging or disabling the device. CamaroDiag disclaims responsibility for the consequences of this operation to the extent permitted by law. Select OK to proceed to the separate confirmation.</string>
+    <string name="ecu_write_confirm_title">Confirm ECU/device write</string>
+    <string name="ecu_write_confirm_message">Do you confirm sending this command, knowing it may write to the selected device and carries risks? Choosing No sends nothing.</string>
+    <string name="ecu_write_ok">OK</string>
+    <string name="ecu_write_yes">Yes</string>
+    <string name="ecu_write_no">No</string>
+    <string name="ecu_write_cancel">Cancel</string>
+    <string name="flexfuel_lfx2012_export_history">Export %1$d fuel readings (CSV)</string>
+    <string name="flexfuel_lfx2012_history_saved">Read-only fuel history exported.</string>
+    <string name="flexfuel_lfx2012_history_failed">Could not export fuel history.</string>
+    <string name="flexfuel_lfx2012_ethanol_no_current_measurement">No current ethanol reading: the displayed range is historical only.</string>
+    <string name="flexfuel_lfx2012_history_range">Ethanol: %1$d valid readings, min %2$.2f %% / max %3$.2f %%</string>
+    <string name="flexfuel_lfx2012_history_trim_range">%1$s: %2$d valid readings, min %3$.2f %% / max %4$.2f %%</string>
+    <string name="can_console_export_header"># CamaroDiag CAN console export</string>
+    <string name="can_console_export_events_full"># Complete event timeline: TX/RX/SYSTEM recorded in chronological order; raw RX archive follows when available.</string>
+    <string name="can_console_export_events_limited"># Event timeline: up to the 300 latest TX/RX/SYSTEM entries. Earlier TX events are not retained; the full captured raw RX stream is archived separately when available.</string>
+    <string name="can_console_export_direction_legend"># TX = sent, RX = received, SYSTEM = application event</string>
+    <string name="can_console_export_full_raw_rx"># RX RAW - full archived adapter output (unaltered text)</string>
+    <string name="can_console_export_recent_raw_rx"># RX RAW - recent in-memory excerpt only, not a complete capture</string>
+    <string name="can_console_export_failed_marker">FAILED</string>
+    <string name="can_console_history_recent_scope">On-screen history: up to 300 recent events. The complete raw RX stream may be archived separately; older TX entries are not retained.</string>
 </resources>

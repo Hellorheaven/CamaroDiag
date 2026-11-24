@@ -11,7 +11,7 @@ object CamaroDiagConnectorDiscovery {
     const val BAUD_RATE = 115200
     private const val MAX_REPLY_BYTES = 256
     private const val TIMEOUT_NANOS = 3_000_000_000L
-    private val keys = setOf("hs_can", "sw_can", "eeprom_read", "eeprom_write", "ecu_flash", "j2534")
+    private const val EXPECTED_CAPS = "CAPS hs_can=disabled sw_can=disabled eeprom_read=disabled eeprom_write=disabled ecu_flash=disabled j2534=disabled"
 
     interface Channel {
         fun write(bytes: ByteArray)
@@ -38,32 +38,68 @@ object CamaroDiagConnectorDiscovery {
     fun isConnectorUsbLabel(label: String): Boolean =
         label.contains("CamaroDiagConnectors", ignoreCase = true)
 
+    /**
+     * Recheck the *current* USB descriptor at the physical-open boundary.
+     * UI labels and Android permission grants are routing hints only: a
+     * hot-plugged connector must not become an ELM channel (or vice versa).
+     * This is not cryptographic device authentication.
+     */
+    fun allowsUsbDriverFamily(productName: String?, discoveryOnly: Boolean): Boolean {
+        val name = productName.orEmpty()
+        val connector = isConnectorUsbLabel(name)
+        val kkl = isLegacyKklUsbLabel(name)
+        return if (discoveryOnly) connector && !kkl else !connector && !kkl
+    }
+
     /** Explicit product-name hints only: FTDI is also used by real ELM devices. */
     fun isLegacyKklUsbLabel(label: String): Boolean =
         Regex("(?i)(?<![a-z0-9])(?:KKL|K[- ]?LINE)(?![a-z0-9])").containsMatchIn(label)
 
+    /** Android's actual USB device ID is the final enumeration suffix,
+     * never the first '#' in an arbitrary product name. */
+    fun deviceIdFromLabel(label: String): Int? {
+        val suffix = Regex("(?:\\(#([0-9]+)\\)| #([0-9]+))$").find(label.trim())
+            ?: return null
+        return suffix.groupValues[1].ifEmpty { suffix.groupValues[2] }.toIntOrNull()
+    }
+
     fun requiresLegacyKklIsolation(deviceId: Int, deviceLabels: List<String>): Boolean =
         deviceLabels.any { label ->
-            isLegacyKklUsbLabel(label) &&
-                Regex("#(\\d+)").find(label)?.groupValues?.get(1)?.toIntOrNull() == deviceId
+            isLegacyKklUsbLabel(label) && deviceIdFromLabel(label) == deviceId
         }
 
     fun requiresDedicatedUsbDiscovery(deviceId: Int, deviceLabels: List<String>): Boolean =
         deviceLabels.any { label ->
-            isConnectorUsbLabel(label) &&
-                Regex("#(\\d+)").find(label)?.groupValues?.get(1)?.toIntOrNull() == deviceId
+            isConnectorUsbLabel(label) && deviceIdFromLabel(label) == deviceId
         }
 
-    fun inspect(channel: Channel, ensureActive: () -> Unit = {}): Report {
+    /** USB routing gate: a product-name match is necessary for discovery,
+     * but never grants a diagnostic session or proves device authentication.
+     * KKL isolation wins even if a label also contains CamaroDiagConnectors. */
+    fun allowsDedicatedUsbDiscovery(deviceId: Int, deviceLabels: List<String>): Boolean =
+        !requiresLegacyKklIsolation(deviceId, deviceLabels) &&
+            requiresDedicatedUsbDiscovery(deviceId, deviceLabels)
+
+    fun inspect(channel: Channel, ensureActive: () -> Unit = {}): Report =
+        inspectWithClock(channel, ensureActive, System::nanoTime)
+
+    /** Fixed-clock injection for deadline regression tests; never exposes ECU access. */
+    internal fun inspectWithClock(
+        channel: Channel,
+        ensureActive: () -> Unit = {},
+        clock: () -> Long
+    ): Report {
         fun exchange(command: String): String {
             ensureActive()
+            // Include USB write time in the deadline, not just response reads.
+            val deadline = clock() + TIMEOUT_NANOS
             channel.write((command + "\n").toByteArray(Charsets.US_ASCII))
-            val deadline = System.nanoTime() + TIMEOUT_NANOS
+            ensureActive()
             val reply = StringBuilder()
             // CDC bulk USB may deliver the complete CAPS reply in one packet.
             // Do not truncate it to the 64-byte chunk used by older serial devices.
             val buffer = ByteArray(512)
-            while (System.nanoTime() - deadline < 0) {
+            while (clock() - deadline < 0) {
                 ensureActive()
                 val count = channel.read(buffer, 100)
                 if (count < 0 || count > buffer.size) throw IOException("Invalid USB read")
@@ -72,7 +108,7 @@ object CamaroDiagConnectorDiscovery {
                     if (value == 10) {
                         if (i != count - 1) throw IOException("Unexpected trailing USB data")
                         ensureActive()
-                        if (System.nanoTime() - deadline >= 0) throw IOException("Connector discovery timed out")
+                        if (clock() - deadline >= 0) throw IOException("Connector discovery timed out")
                         val line = reply.toString().removeSuffix("\r")
                         if (line.isEmpty() || line.contains('\r')) throw IOException("Invalid connector reply")
                         return line
@@ -99,15 +135,8 @@ object CamaroDiagConnectorDiscovery {
         val ping = exchange(1)
         if (ping != "PONG CamaroDiagConnectors 0.1.0") throw IOException("Unsupported connector identity/version")
         val caps = exchange(2)
-        val tokens = caps.split(' ')
-        if (tokens.firstOrNull() != "CAPS" || tokens.size != keys.size + 1)
-            throw IOException("Invalid capability response")
-        val seen = mutableSetOf<String>()
-        for (token in tokens.drop(1)) {
-            val pair = token.split('=')
-            if (pair.size != 2 || pair[0] !in keys || !seen.add(pair[0]) || pair[1] != "disabled")
-                throw IOException("Prototype capability not supported or malformed")
-        }
+        if (caps != EXPECTED_CAPS)
+            throw IOException("Prototype capability response differs from the published read-only firmware")
         val status = exchange(3)
         if (status != "STATUS mode=prototype write=disabled")
             throw IOException("Unsupported connector status")

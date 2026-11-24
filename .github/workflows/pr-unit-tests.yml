@@ -1,12 +1,32 @@
 name: PR unit tests
-# Lightweight regression gate on PR changes. Full Android/Windows checkpoint
-# remains explicitly launched through the existing manual CI workflows.
+# Heavy tests are never triggered by pull_request synchronize.
+# Run manually at ~50-commit checkpoints and before merging; ready_for_review is a final gate.
+# Single Debug-only PR checkpoint. Manual during large commit batches (~50),
+# automatically once when the finished PR is marked ready_for_review.
+# Never build Release or publish artifacts from a PR.
 on:
+  # Explicit checkpoint from the existing PR branch; no per-commit builds.
+  # Update .github/ci-checkpoint-request.txt to request a full Debug run.
+  push:
+    branches: [chore/unified-ci]
+    paths:
+      - '.github/ci-checkpoint-request.txt'
+  workflow_dispatch:
+    inputs:
+      expected_sha:
+        description: "Exact branch head for the full checkpoint (optional)"
+        type: string
   pull_request:
     branches: [main]
-    types: [opened, synchronize, reopened, ready_for_review]
+    types: [ready_for_review]
     paths:
       - 'app/**'
+      - 'pc-bridge/**'
+      - 'ecu-native/**'
+      - 'connectors/**'
+      - '.github/workflows/connectors-ci.yml'
+      - '.github/workflows/android-ci.yml'
+      - '.github/workflows/pc-bridge-ci.yml'
       - 'tools/admin/**'
       - 'functions/**'
       - 'firebase.json'
@@ -23,16 +43,39 @@ on:
 
 permissions:
   contents: read
+  actions: read
+  pull-requests: read
 
 concurrency:
-  group: pr-unit-tests-${{ github.event.pull_request.number }}
+  group: pr-unit-tests-${{ github.event.pull_request.number || github.ref_name }}
   cancel-in-progress: true
 
 jobs:
+  verify-revision:
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require the requested immutable revision
+        env:
+          EXPECTED_SHA: ${{ inputs.expected_sha }}
+        run: |
+          if [[ -n "$EXPECTED_SHA" && "$EXPECTED_SHA" != "$GITHUB_SHA" ]]; then
+            echo "::error::Requested SHA differs from the workflow dispatch revision."
+            exit 1
+          fi
+
   unit-tests:
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
+    needs: verify-revision
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
       - uses: actions/setup-java@v6
         with:
           distribution: temurin
@@ -48,17 +91,96 @@ jobs:
         run: gradle wrapper --gradle-version 8.11.1
       - name: Verify private two-account Firebase owner provisioning (offline)
         run: node --test tools/admin/enroll-functional-test-owner.test.mjs
-      - name: Verify staged licensing backend policies without Firebase deployment
-        run: node --test functions/licensing-policy.test.js
+      - name: Verify Firebase account and license backend
+        run: |
+          node --check functions/index.js
+          node --check functions/account-admin.js
+          node --check functions/license-status.js
+          node --check functions/entitlement-policy.js
+          node --test functions/entitlement-policy.test.js functions/account-policy.test.js
       - name: Execute Android unit tests (warnings fail)
-        run: ./gradlew testDebugUnitTest --stacktrace --warning-mode=fail
+        run: ./gradlew testDebugUnitTest lintDebug app:assembleDebug --stacktrace --warning-mode=fail
       - name: Collect unit test reports
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: android-unit-tests-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+          name: android-unit-tests-${{ github.event.pull_request.number || 'manual' }}-${{ github.event.pull_request.head.sha || github.sha }}
           path: |
             **/build/reports/tests/testDebugUnitTest/**
             **/build/test-results/testDebugUnitTest/**
           if-no-files-found: ignore
           retention-days: 14
+
+  windows-debug:
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
+    needs: verify-revision
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '8.0.x'
+      - name: Enforce PR95 read-only ECU boundary
+        shell: pwsh
+        run: ./.github/scripts/verify-pr95-readonly.ps1
+      - name: Build and self-test Windows bridge (Debug only)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          dotnet build .\\pc-bridge\\CamaroDiag.J2534Bridge\\CamaroDiag.J2534Bridge.csproj --configuration Debug -warnaserror
+          if ($LASTEXITCODE -ne 0) { throw 'Debug bridge compilation failed' }
+          dotnet run --project .\\pc-bridge\\CamaroDiag.J2534Bridge\\CamaroDiag.J2534Bridge.csproj --configuration Debug --no-build -- --self-test
+          if ($LASTEXITCODE -ne 0) { throw 'Debug bridge self-tests failed' }
+
+  native-ecu-debug:
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
+    needs: verify-revision
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Verify native ECU components (no vehicle writes)
+        run: bash ecu-native/mpc5566/verify.sh
+
+  connectors:
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
+    needs: verify-revision
+    uses: ./.github/workflows/connectors-ci.yml
+
+  review-gate:
+    name: Review only after successful full Debug checkpoint at exact SHA
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify completed manual Debug checkpoint
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const {owner, repo} = context.repo;
+            const pr = context.payload.pull_request;
+            if (!pr || pr.draft) {
+              core.setFailed('PR must be ready for review.');
+              return;
+            }
+            const runs = await github.paginate(github.rest.actions.listWorkflowRuns, {
+              owner, repo, workflow_id: 'pr-unit-tests.yml',
+              branch: pr.head.ref, status: 'completed', per_page: 100
+            });
+            // A marker-only push is a deliberate operator checkpoint, not
+            // automatic CI on every commit. Both authorized triggers must
+            // validate the exact current HEAD before the PR review gate opens.
+            const approved = runs.find(run =>
+              run.head_sha === pr.head.sha && run.conclusion === 'success' &&
+              ['workflow_dispatch', 'push'].includes(run.event)
+            );
+            if (!approved) {
+              core.setFailed('Full Debug checkpoint has not succeeded on PR head ' + pr.head.sha +
+                '. Return PR to Draft, complete development, run the manual checkpoint and retry review.');
+              return;
+            }
+            core.info('Full Debug checkpoint validated for exact PR head: ' + pr.head.sha);

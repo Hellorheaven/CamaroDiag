@@ -1,6 +1,8 @@
 package com.camarodiag.gen5.data.obd
 
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -11,6 +13,13 @@ import java.io.InputStreamReader
 import java.io.OutputStreamWriter
 import java.net.Socket
 import java.util.Locale
+
+/** Explicitly unsupported legacy GM 0x1A identity, never a malformed/denied response. */
+internal class GmlanIdentityUnavailableException :
+    IllegalStateException("The ECU does not expose a supported legacy GM VIN/OSID.")
+
+/** The authenticated Windows J2534 bridge revoked its physical session. */
+internal class J2534SessionRevokedException(message: String) : java.io.IOException(message)
 
 /**
  * Certificate-pinned TLS (JSON lines) client for the Windows J2534 bridge.
@@ -30,8 +39,14 @@ class J2534BridgeTransport(
     private var connectedResponseCanId: String? = null
     private var standardObdAdapterInfo: Map<String, String> = emptyMap()
     @Volatile private var scopedMemoryReadEnabled = false
+    @Volatile private var approvedMemoryReadScope: J2534ApprovedMemoryScope? = null
     @Volatile private var standardObdPhysicalReadEnabled = false
     @Volatile private var standardObdClearEnabled = false
+    @Volatile private var rawUdsConsoleAvailable = false
+
+    /** Explicit raw ECU requests on the paired J2534 ISO-TP channel. */
+    val isRawUdsConsoleAvailable: Boolean
+        get() = isConnected && rawUdsConsoleAvailable
     val isStandardObdClearEnabled: Boolean
         get() = isStandardObdPhysicalReadEnabled && standardObdClearEnabled
     val isStandardObdPhysicalReadEnabled: Boolean
@@ -42,6 +57,9 @@ class J2534BridgeTransport(
         get() = isConnected && scopedMemoryReadEnabled
     /** Close requested by the app, not a spontaneous I/O failure of the bridge. */
     @Volatile private var externallyClosed = false
+    // A Boolean alone can lose a Close arriving between a blocked TLS
+    // handshake and the next connection's initial state reset.
+    private val explicitCloseEpoch = java.util.concurrent.atomic.AtomicLong(0L)
 
     /** Reflects a live TCP session rather than just an allocated transport object. */
     val isConnected: Boolean
@@ -56,8 +74,9 @@ class J2534BridgeTransport(
         protocolNumber: Int = 33
     ): String = withContext(Dispatchers.IO) {
         mutex.withLock {
-            closeInternal()
-            externallyClosed = false
+            // Validate before disconnecting an existing usable bridge.
+            // Invalid profile, unpinned token or non-LAN target cannot tear
+            // down an established diagnostic connection.
             require(host.isNotBlank()) { "Adresse IP du PC manquante." }
             require(port in 1024..65535) { "Port du pont PC invalide." }
             // Parse before network I/O: legacy token-only pairing must fail closed.
@@ -70,11 +89,22 @@ class J2534BridgeTransport(
             require(can29Bit == (protocolNumber in setOf(34, 36, 64))) {
                 "La largeur des identifiants CAN ne correspond pas au profil sélectionné."
             }
+            pairing.localBridgeIpv4(host) // no DNS or public network target
+            val closeEpoch = explicitCloseEpoch.get()
+            closeInternal()
+            externallyClosed = false
             try {
                 // TLS handshake (including SHA-256 certificate pin verification)
                 // completes BEFORE the first pairing token or UDS command is sent.
                 val connected = pairing.openSocket(host, port)
                 socket = connected
+                // TLS handshake is synchronous: cancellation or app Close can
+                // race it. No pairing bearer token or CAN "open" request may
+                // be sent after the operator switched away from this bridge.
+                J2534BridgeHandshakeAdmission.requireCurrent(
+                    currentCoroutineContext().isActive, externallyClosed,
+                    closeEpoch, explicitCloseEpoch.get()
+                )
                 connected.soTimeout = 12_000
                 reader = BufferedReader(InputStreamReader(connected.getInputStream(), Charsets.UTF_8))
                 writer = BufferedWriter(OutputStreamWriter(connected.getOutputStream(), Charsets.UTF_8))
@@ -88,6 +118,12 @@ class J2534BridgeTransport(
                         .put("protocolNumber", protocolNumber),
                     10_000
                 )
+                // Even a valid reply can arrive after cancellation: do not
+                // publish capabilities for a closed/superseded TLS session.
+                J2534BridgeHandshakeAdmission.requireCurrent(
+                    currentCoroutineContext().isActive, externallyClosed,
+                    closeEpoch, explicitCloseEpoch.get()
+                )
                 val requestLabel = requestCanId.toString(16).uppercase().padStart(if (can29Bit) 8 else 3, '0')
                 val responseLabel = responseCanId.toString(16).uppercase().padStart(if (can29Bit) 8 else 3, '0')
                 check(response.opt("readOnly") == true &&
@@ -96,7 +132,41 @@ class J2534BridgeTransport(
                     response.optInt("protocolNumber", -1) == protocolNumber
                 ) { "The PC bridge did not confirm the selected read-only CAN channel." }
                 connectedResponseCanId = responseLabel
-                scopedMemoryReadEnabled = response.optBoolean("scopedPhysicalMemoryRead", false)
+                rawUdsConsoleAvailable = response.opt("rawUdsConsoleAvailable") == true
+                val memoryAllowed = response.opt("scopedPhysicalMemoryRead") == true
+                approvedMemoryReadScope = if (memoryAllowed) runCatching {
+                    // Older or malformed PC bridges may not supply physical
+                    // profile evidence. Refuse memory privileges rather than
+                    // trusting a boolean and re-labelling an unrelated span.
+                    fun exactNumber(key: String): Long {
+                        val value = response.opt(key)
+                        require(value is Number &&
+                            value.toDouble() == value.toLong().toDouble()) {
+                            "PC bridge supplied an invalid J2534 memory profile: $key."
+                        }
+                        return value.toLong()
+                    }
+                    fun exactSmallNumber(key: String): Int {
+                        val value = exactNumber(key)
+                        require(value in Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong()) {
+                            "PC bridge supplied an out-of-range memory profile: $key."
+                        }
+                        return value.toInt()
+                    }
+                    val vin = response.opt("memoryReadVin") as? String
+                        ?: error("The PC bridge must advertise its approved VIN-bound memory profile.")
+                    val region = response.opt("memoryReadRegion") as? String
+                        ?: error("The PC bridge did not advertise its approved ECU memory region.")
+                    J2534ApprovedMemoryScope(
+                        vin = vin,
+                        region = EcuBackupCoverage.Region.valueOf(region),
+                        startAddress = exactNumber("memoryReadStartAddress"),
+                        lengthBytes = exactNumber("memoryReadLengthBytes"),
+                        maxReadBytes = exactSmallNumber("memoryReadMaxReadBytes"),
+                        diagnosticSession = exactSmallNumber("memoryReadSession")
+                    )
+                }.getOrNull() else null
+                scopedMemoryReadEnabled = approvedMemoryReadScope != null
                 standardObdPhysicalReadEnabled = response.opt("standardObdPhysicalRead") == true &&
                     J2534StandardObd.supportsChannel(requestCanId, responseCanId, protocolNumber)
                 standardObdClearEnabled = standardObdPhysicalReadEnabled && response.opt("standardObdClear") == true
@@ -111,12 +181,29 @@ class J2534BridgeTransport(
                 val voltageLabel = if (voltage >= 0) {
                     String.format(Locale.getDefault(), " • %.2f V", voltage / 1000.0)
                 } else ""
-                "$adapter • ${response.optString("protocol", "ISO15765")} • ${response.optInt("baudRate")} bit/s$voltageLabel"
+                val backupWarning = if (memoryAllowed && approvedMemoryReadScope == null)
+                    " • Sauvegarde ECU désactivée : profil de lecture non confirmé par ce pont PC."
+                    else ""
+                "$adapter • ${response.optString("protocol", "ISO15765")} • ${response.optInt("baudRate")} bit/s$voltageLabel$backupWarning"
             } catch (error: Exception) {
                 closeInternal()
                 throw error
             }
         }
+    }
+
+    /** Refuse an unapproved ECU span before issuing VIN, OSID or memory commands. */
+    internal fun requireApprovedMemoryReadScope(
+        request: J2534LiveMemoryBackup.Request
+    ): J2534LiveMemoryBackup.Request {
+        val scope = approvedMemoryReadScope
+        check(isScopedMemoryReadEnabled && scope != null) {
+            "A current Windows J2534 bridge with an approved memory read profile is required."
+        }
+        require(scope.permits(request)) {
+            "ECU VIN, memory range, region or session differs from the PC read profile."
+        }
+        return scope.constrain(request)
     }
 
     suspend fun readCalibrationIdentification(): ObdEcuIdentification = withContext(Dispatchers.IO) {
@@ -147,6 +234,14 @@ class J2534BridgeTransport(
                 JSONObject().put("op", "identifyGmlan").put("token", tlsPairing.token),
                 15_000
             )
+            if (response.opt("identityAvailable") == false) {
+                check(response.opt("readOnly") == true &&
+                    response.opt("flashQualified") == false &&
+                    response.optString("responseCanId") == expected) {
+                    "The PC bridge returned an untrusted optional GMLAN identity response."
+                }
+                throw GmlanIdentityUnavailableException()
+            }
             val data = response.getJSONObject("identity")
             fun integer(name: String): Long {
                 val value = data.opt(name)
@@ -190,6 +285,77 @@ class J2534BridgeTransport(
         // the existing telemetry decoder. No fabricated adapter text.
         J2534StandardObd.pidData(pid, reply)
         return reply.toHex()
+    }
+
+    /**
+     * One operator-requested, non-destructive SAE OBD command on the currently
+     * selected physical J2534 responder. No ELM commands, write services, or
+     * fallback to demonstration data are accepted on this path.
+     */
+    suspend fun readOnlyConsoleRequest(command: SafeObdRequest): String {
+        check(isStandardObdPhysicalReadEnabled) {
+            "J2534 physical standard OBD reading is not enabled."
+        }
+        val payload = readOnlyConsolePayload(command)
+        val reply = exchange(payload, 4_000L)
+        // An exact negative ECU acknowledgement belongs in RX history as a
+        // failed request. All unrelated, corrupted, and truncated replies fail.
+        if (!isMatchingNegativeConsoleReply(command, reply)) {
+            validateReadOnlyConsoleReply(command, reply)
+        }
+        check(isStandardObdPhysicalReadEnabled) {
+            "J2534 disconnected before the physical console response was accepted."
+        }
+        return reply.toHex()
+    }
+
+    internal companion object {
+        fun readOnlyConsolePayload(command: SafeObdRequest): ByteArray {
+            require(SafeObdRequestPolicy.parse(command.elmCommand) == command) {
+                "Unrecognized or modified read-only console command."
+            }
+            // SafeObdRequest belongs to another Gradle module: Kotlin cannot
+            // smart-cast its public nullable property across module boundaries.
+            val parameter = command.parameter
+            return if (parameter == null) {
+                byteArrayOf(command.service.toByte())
+            } else {
+                byteArrayOf(command.service.toByte(), parameter.toByte())
+            }
+        }
+
+        fun isMatchingNegativeConsoleReply(command: SafeObdRequest, reply: ByteArray): Boolean =
+            SafeObdRequestPolicy.parse(command.elmCommand) == command &&
+                reply.size == 3 &&
+                (reply[0].toInt() and 0xFF) == 0x7F &&
+                (reply[1].toInt() and 0xFF) == command.service &&
+                (reply[2].toInt() and 0xFF) !in setOf(0, 0x78)
+
+        /** A negative, mismatched, or truncated reply is never a successful read. */
+        fun validateReadOnlyConsoleReply(command: SafeObdRequest, reply: ByteArray) {
+            require(SafeObdRequestPolicy.parse(command.elmCommand) == command) {
+                "Unsupported console read request."
+            }
+            when (command.service) {
+                0x01 -> {
+                    val pid = requireNotNull(command.parameter)
+                    if (pid % 0x20 == 0) J2534StandardObd.supportPage(pid, reply)
+                    else J2534StandardObd.pidData(pid, reply)
+                }
+                0x03, 0x07, 0x0A -> {
+                    requireNotNull(J2534StandardObd.optionalDtcs(command.service, reply)) {
+                        "The ECU does not support this DTC read mode."
+                    }
+                }
+                0x09 -> {
+                    require(SafeObdRequestPolicy.hasUnambiguousPositiveResponse(
+                        command,
+                        reply.joinToString("") { "%02X".format(Locale.ROOT, it.toInt() and 0xFF) }
+                    )) { "Physical Mode 09 identification is incomplete or invalid." }
+                }
+                else -> throw IllegalArgumentException("Not a read-only OBD console service.")
+            }
+        }
     }
 
     suspend fun readStandardObdDtcs(): PhysicalObdDtcSnapshot {
@@ -239,12 +405,24 @@ class J2534BridgeTransport(
         }
     }
 
-    suspend fun clearStandardObdDtcs() = withContext(Dispatchers.IO) {
+    suspend fun clearStandardObdDtcs(
+        approval: EcuWriteConsentFlow.Approval,
+        beforeTransmit: () -> Unit
+    ) = withContext(Dispatchers.IO) {
         mutex.withLock {
+            require(approval.warningAcknowledged && approval.confirmedYes) {
+                "Risk notice OK and subsequent YES required before ECU clear."
+            }
             check(isStandardObdClearEnabled) { "Local Windows operator has not enabled OBD clear." }
+            // A queued bridge request must not reuse operator consent after
+            // logout, vehicle selection changes or an adapter transition.
+            beforeTransmit()
+            ensureOpen()
             val response = request(JSONObject()
                 .put("op", "clearStandardObdDtcs")
                 .put("token", tlsPairing.token)
+                .put("warningAcknowledged", approval.warningAcknowledged)
+                .put("writeConfirmed", approval.confirmedYes)
                 .put("confirmed", true), 12_000)
             check(response.optString("payloadHex") == "44" &&
                 response.optString("responseCanId") == connectedResponseCanId &&
@@ -296,6 +474,75 @@ class J2534BridgeTransport(
         }
     }
 
+    /** An explicitly requested ECU service, without a CamaroDiag-specific
+     * service allowlist. The existing TLS pairing and J2534 channel still apply.
+     */
+    suspend fun exchangeOperatorUds(
+        payload: ByteArray, timeoutMs: Long, approval: EcuWriteConsentFlow.Approval,
+        beforeTransmit: () -> Unit
+    ): ByteArray =
+        withContext(Dispatchers.IO) {
+            mutex.withLock {
+                ensureOpen()
+                check(rawUdsConsoleAvailable) {
+                    "The connected PC bridge does not implement raw UDS exchange."
+                }
+                require(approval.warningAcknowledged && approval.confirmedYes) {
+                    "ECU risk warning OK and separate YES confirmation required."
+                }
+                require(payload.size in 1..J2534BridgeProtocol.MAX_PAYLOAD_BYTES)
+                // Authorization must be current AFTER transport queue admission,
+                // immediately before the paired TLS bridge request is sent.
+                beforeTransmit()
+                ensureOpen()
+                val boundedTimeout = J2534BridgeProtocol.boundedTimeoutMs(timeoutMs)
+                val response = request(
+                    JSONObject().put("op", "exchangeRaw")
+                        .put("token", tlsPairing.token)
+                        .put("warningAcknowledged", approval.warningAcknowledged)
+                        .put("writeConfirmed", approval.confirmedYes)
+                        .put("payloadHex", payload.toHex())
+                        .put("timeoutMs", boundedTimeout),
+                    boundedTimeout + 3000
+                )
+                val hex = response.optString("payloadHex")
+                if (hex.isBlank() || hex.length % 2 != 0 ||
+                    hex.length > J2534BridgeProtocol.MAX_PAYLOAD_BYTES * 2 ||
+                    !hex.all { it in '0'..'9' || it in 'A'..'F' || it in 'a'..'f' }) {
+                    closeInternal()
+                    throw IllegalStateException("Invalid physical ECU response from J2534.")
+                }
+                hex.hexToBytes()
+            }
+        }
+
+    suspend fun sendOperatorUdsOnly(
+        payload: ByteArray, approval: EcuWriteConsentFlow.Approval,
+        beforeTransmit: () -> Unit
+    ) = withContext(Dispatchers.IO) {
+        mutex.withLock {
+            ensureOpen()
+            check(rawUdsConsoleAvailable) {
+                "The connected PC bridge does not implement raw UDS send."
+            }
+            require(approval.warningAcknowledged && approval.confirmedYes) {
+                "ECU risk warning OK and separate YES confirmation required."
+            }
+            require(payload.size in 1..J2534BridgeProtocol.MAX_PAYLOAD_BYTES)
+            beforeTransmit()
+            ensureOpen()
+            request(
+                JSONObject().put("op", "sendRaw")
+                    .put("token", tlsPairing.token)
+                    .put("warningAcknowledged", approval.warningAcknowledged)
+                    .put("writeConfirmed", approval.confirmedYes)
+                    .put("payloadHex", payload.toHex()),
+                13_000
+            )
+            Unit
+        }
+    }
+
     private fun request(json: JSONObject, timeoutMs: Int): JSONObject {
         val activeSocket = socket ?: error("Pont PC J2534 non connecté.")
         activeSocket.soTimeout = timeoutMs.coerceIn(1000, 15_000)
@@ -322,7 +569,12 @@ class J2534BridgeTransport(
             throw IllegalStateException("Le pont J2534 a retourné une réponse JSON invalide.", error)
         }
         if (!response.optBoolean("ok", false)) {
-            throw IllegalStateException(response.optString("error", "Erreur inconnue du pont J2534."))
+            val reason = response.optString("error", "Erreur inconnue du pont J2534.")
+            if (J2534BridgeProtocol.isTerminalFailureFlag(response.opt("sessionTerminated"))) {
+                closeInternal()
+                throw J2534SessionRevokedException(reason)
+            }
+            throw IllegalStateException(reason)
         }
         return response
     }
@@ -334,6 +586,9 @@ class J2534BridgeTransport(
     }
 
     fun close() {
+        // Publish closure before tearing down sockets. A late TLS handshake
+        // cannot reset the Boolean and resurrect this explicitly closed link.
+        explicitCloseEpoch.incrementAndGet()
         externallyClosed = true
         closeInternal()
     }
@@ -351,8 +606,10 @@ class J2534BridgeTransport(
         standardObdAdapterInfo = emptyMap()
         opened = false
         scopedMemoryReadEnabled = false
+        approvedMemoryReadScope = null
         standardObdPhysicalReadEnabled = false
         standardObdClearEnabled = false
+        rawUdsConsoleAvailable = false
     }
 
     private fun ByteArray.toHex(): String =
@@ -362,9 +619,28 @@ class J2534BridgeTransport(
         chunked(2).map { it.toInt(16).toByte() }.toByteArray()
 }
 
+/** Pure fail-closed admission used after blocking TLS I/O and before publication. */
+internal object J2534BridgeHandshakeAdmission {
+    fun requireCurrent(
+        coroutineActive: Boolean, closedByApp: Boolean,
+        capturedCloseEpoch: Long, currentCloseEpoch: Long
+    ) {
+        if (!coroutineActive) {
+            throw kotlinx.coroutines.CancellationException(
+                "J2534 TLS connection was cancelled before admission"
+            )
+        }
+        check(!closedByApp && currentCloseEpoch == capturedCloseEpoch) {
+            "J2534 bridge connection was closed during the TLS handshake"
+        }
+    }
+}
+
 /** Bounded framing helpers for the untrusted JSON-lines PC bridge stream. */
 internal object J2534BridgeProtocol {
     const val MAX_PAYLOAD_BYTES = 4091
+
+    fun isTerminalFailureFlag(value: Any?): Boolean = value is Boolean && value
     private const val MAX_RESPONSE_LINE_CHARS = 32 * 1024
 
     fun boundedTimeoutMs(timeoutMs: Long): Int = timeoutMs.coerceIn(100L, 10_000L).toInt()
@@ -382,6 +658,12 @@ internal object J2534BridgeProtocol {
                 if (input.read() != '\n'.code)
                     throw java.io.IOException("Invalid J2534 response frame terminator.")
                 break
+            }
+            // JSON control bytes must be escaped inside strings. The Windows
+            // bridge emits one compact UTF-8 JSON object per line; accepting
+            // raw NUL/ESC/TAB would make its authenticated framing ambiguous.
+            if (next < 0x20) {
+                throw java.io.IOException("Invalid control character in J2534 bridge response.")
             }
             check(line.length < MAX_RESPONSE_LINE_CHARS) {
                 "The J2534 bridge response exceeds the maximum allowed line size."

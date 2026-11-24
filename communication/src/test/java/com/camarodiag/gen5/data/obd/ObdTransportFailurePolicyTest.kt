@@ -61,4 +61,67 @@ class ObdTransportFailurePolicyTest {
     fun genericIoFailureIsTreatedAsTransportLoss() {
         assertTrue(ObdTransportFailurePolicy.isConnectionLoss(IOException("socket closed")))
     }
+    @Test
+    fun canAdapterRestorationFailureMustCloseTheVisibleSession() {
+        assertTrue(ObdTransportFailurePolicy.isConnectionLoss(CanAdapterRestorationException()))
+        assertTrue(ObdTransportFailurePolicy.isConnectionLoss(
+            IllegalStateException("wrapped recovery failure", CanAdapterRestorationException())
+        ))
+    }
+
+    @Test
+    fun supersededSessionStillCannotCloseReplacementAdapter() {
+        val stale = ObdSupersededSessionException(CanAdapterRestorationException())
+        assertFalse(ObdTransportFailurePolicy.isConnectionLoss(stale))
+        assertFalse(ObdTransportFailurePolicy.isConnectionLoss(
+            IllegalStateException("old session", stale)
+        ))
+    }
+
+    @Test
+    fun localCanArchiveFailureDoesNotMasqueradeAsVehicleDisconnect() {
+        val storage = CanCaptureArchiveWriteException(IOException("device storage full"))
+        assertFalse(ObdTransportFailurePolicy.isConnectionLoss(storage))
+        assertFalse(ObdTransportFailurePolicy.isConnectionLoss(
+            IllegalStateException("failed to capture CAN", storage)
+        ))
+        assertTrue(ObdTransportFailurePolicy.isConnectionLoss(
+            IOException("actual USB transport failure")
+        ))
+    }
+
+    @Test
+    fun failedCanExchangePreservesCauseClassificationAndSessionIsolation() {
+        val noFrames = emptyList<CanConsoleTimedRecord>()
+        assertFalse(ObdTransportFailurePolicy.isConnectionLoss(
+            CanConsolePhysicalExchangeException(
+                noFrames, SocketTimeoutException("prompt timeout")
+            )
+        ))
+        assertTrue(ObdTransportFailurePolicy.isConnectionLoss(
+            CanConsolePhysicalExchangeException(
+                noFrames, EOFException("USB adapter disconnected")
+            )
+        ))
+        assertTrue(ObdTransportFailurePolicy.isConnectionLoss(
+            CanConsolePhysicalExchangeException(
+                noFrames, CanAdapterRestorationException("WIFI")
+            )
+        ))
+        assertFalse(ObdTransportFailurePolicy.isConnectionLoss(
+            CanConsolePhysicalExchangeException(
+                noFrames, ObdSupersededSessionException(EOFException("old adapter"))
+            )
+        ))
+    }
+
+    @Test
+    fun adapterRestoreErrorPreservesTheOriginalPhysicalTransportForTheUi() {
+        for (kind in listOf("USB", "WIFI", "BLE", "BLUETOOTH")) {
+            val error = CanAdapterRestorationException(kind)
+            assertTrue(ObdTransportFailurePolicy.isConnectionLoss(error))
+            assertTrue(error.originalTransportKind == kind)
+        }
+    }
+
 }

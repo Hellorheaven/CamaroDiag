@@ -18,6 +18,7 @@ class SafeObdRequestPolicyTest {
         assertEquals("0902", SafeObdRequestPolicy.parse("0x09 0x02")?.elmCommand)
         assertEquals("0904", SafeObdRequestPolicy.parse("0904")?.elmCommand)
         assertEquals("0906", SafeObdRequestPolicy.parse("09 06")?.elmCommand)
+        assertEquals("090A", SafeObdRequestPolicy.parse("09 0A")?.elmCommand)
     }
 
     @Test
@@ -84,5 +85,248 @@ class SafeObdRequestPolicyTest {
     fun acceptsOnlyOnePairRegardlessOfWhitespace() {
         assertEquals("010C", SafeObdRequestPolicy.parse("  01   0c  ")?.elmCommand)
         assertNull(SafeObdRequestPolicy.parse("01\t0C extra"))
+    }
+    @Test
+    fun acceptsReadOnlyPidsExposedByLiveVehicleTelemetryIncludingEthanol() {
+        val livePids = listOf(
+            0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B,
+            0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x11,
+            0x14, 0x15, 0x16, 0x17, 0x24, 0x25, 0x34, 0x35,
+            0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49,
+            0x4A, 0x4B, 0x4C, 0x52
+        )
+        for (pid in livePids) {
+            val command = "01%02X".format(java.util.Locale.ROOT, pid)
+            assertEquals(command, SafeObdRequestPolicy.parse(command)?.elmCommand)
+            assertEquals(pid, SafeObdRequestPolicy.parse(command)?.parameter)
+        }
+    }
+
+    @Test
+    fun allowingEthanolReadingDoesNotPermitDestructiveServices() {
+        assertEquals("0152", SafeObdRequestPolicy.parse("01 52")?.elmCommand)
+        for (command in listOf("04", "14", "2E", "27", "31", "34", "36", "3D", "85", "10 03")) {
+            assertNull(SafeObdRequestPolicy.parse(command))
+        }
+    }
+
+    @Test
+    fun positiveResponsesAcceptCompactSpacedAndPhysicalHeaderFormats() {
+        val request = requireNotNull(SafeObdRequestPolicy.parse("0152"))
+        for (response in listOf("41 52 80", "415280", "7E8 41 52 80",
+            "7E8 03 41 52 80", "7E8 03 41 52 80 00 00", "18DAF110 41 52 80")) {
+            assertEquals(response, true, SafeObdRequestPolicy.hasPositiveResponse(request, response))
+        }
+        val dtc = requireNotNull(SafeObdRequestPolicy.parse("03"))
+        assertEquals(true, SafeObdRequestPolicy.hasPositiveResponse(dtc, "43 00"))
+        assertEquals(true, SafeObdRequestPolicy.hasPositiveResponse(dtc, "4300"))
+        assertEquals(true, SafeObdRequestPolicy.hasPositiveResponse(dtc, "43 01 03 00"))
+        assertEquals(true, SafeObdRequestPolicy.hasPositiveResponse(dtc, "43 01 71 00 00"))
+        assertEquals(false, SafeObdRequestPolicy.hasPositiveResponse(dtc, "43 01 71"))
+        for (invalid in listOf("43 FF", "43 01 03", "43 01 00 00", "43 00 03 00")) {
+            assertEquals(invalid, false, SafeObdRequestPolicy.hasPositiveResponse(dtc, invalid))
+        }
+        val vin = requireNotNull(SafeObdRequestPolicy.parse("0902"))
+        val completeVin = "49 02 01 " +
+            "1G1FA1RXXR0123456".toByteArray(Charsets.US_ASCII).joinToString(" ") {
+                "%02X".format(java.util.Locale.ROOT, it.toInt() and 0xFF)
+            }
+        assertEquals(true, SafeObdRequestPolicy.hasPositiveResponse(vin, completeVin))
+        assertEquals(false, SafeObdRequestPolicy.hasPositiveResponse(vin, "49 02 01 31"))
+    }
+
+    @Test
+    fun commandEchoAdapterAcknowledgementAndNegativeReplyNeverCountAsSuccess() {
+        val request = requireNotNull(SafeObdRequestPolicy.parse("0152"))
+        for (response in listOf("0152", "OK", "NO DATA", "7F 01 11",
+            "41 53 80", "41 52", "41 52 80 00",
+            "7E8 05 41 52 80", "7E8 02 41 52 80",
+            "SEARCHING...", "7E0 41 52 80",
+            "41 52 80 0", "")) {
+            assertEquals(response, false, SafeObdRequestPolicy.hasPositiveResponse(request, response))
+        }
+    }
+
+    @Test
+    fun aMatchingNegativeEcuReplyRemainsReceivedTrafficButNotSuccess() {
+        val request = requireNotNull(SafeObdRequestPolicy.parse("0152"))
+        for (reply in listOf("7F 01 11", "7F0111", "7E8 7F 01 11",
+            "7E8 03 7F 01 11", "7E8 03 7F 01 11 00 00", "18DAF110 7F0111")) {
+            assertEquals(reply, true, SafeObdRequestPolicy.hasNegativeResponse(request, reply))
+            assertEquals(reply, false, SafeObdRequestPolicy.hasPositiveResponse(request, reply))
+        }
+    }
+
+    @Test
+    fun unrelatedNegativeAndAdapterErrorsAreNotAttributedToEcu() {
+        val request = requireNotNull(SafeObdRequestPolicy.parse("0152"))
+        for (reply in listOf("7F 09 11", "7F 01", "7F 01 00", "7F 01 78", "7F 01 11 00",
+            "7E0 7F 01 11", "7E8 03 7F 01 11 FF", "NO DATA", "OK", "41 52 80")) {
+            assertEquals(reply, false, SafeObdRequestPolicy.hasNegativeResponse(request, reply))
+        }
+    }
+
+    @Test
+    fun conflictingPositiveAndNegativeLinesCannotConfirmConsoleSuccess() {
+        val request = requireNotNull(SafeObdRequestPolicy.parse("0152"))
+        val mixed = "41 52 80\n7F 01 11"
+        assertEquals(true, SafeObdRequestPolicy.hasPositiveResponse(request, mixed))
+        assertEquals(true, SafeObdRequestPolicy.hasNegativeResponse(request, mixed))
+        assertEquals(false, SafeObdRequestPolicy.hasUnambiguousPositiveResponse(request, mixed))
+        assertEquals(true, SafeObdRequestPolicy.hasUnambiguousPositiveResponse(request, "41 52 80"))
+    }
+
+    @Test
+    fun liveMode01ReadRequiresTheExactSaePayloadLength() {
+        val cases = listOf(
+            Triple("010C", "41 0C 1A F8", "41 0C 1A"),
+            Triple("0110", "41 10 00 64", "41 10 64"),
+            Triple("0105", "41 05 5B", "41 05 5B 00"),
+            Triple("0152", "41 52 80", "41 52 80 00"),
+            Triple("0140", "41 40 00 00 40 00", "41 40 00 00 40"),
+            Triple("0124", "41 24 00 01 02 03", "41 24 00 01"),
+            Triple("0144", "41 44 80 00", "41 44 80"),
+            Triple("0114", "41 14 80 80", "41 14 80")
+        )
+        for ((command, valid, invalid) in cases) {
+            val request = requireNotNull(SafeObdRequestPolicy.parse(command))
+            assertEquals(command, true, SafeObdRequestPolicy.hasPositiveResponse(request, valid))
+            assertEquals(command, false, SafeObdRequestPolicy.hasPositiveResponse(request, invalid))
+        }
+    }
+
+    @Test
+    fun allWhitelistedMode01PidsHaveAnExplicitPayloadLength() {
+        for (pid in 0..255) {
+            val command = "01%02X".format(java.util.Locale.ROOT, pid)
+            val request = SafeObdRequestPolicy.parse(command) ?: continue
+            assertEquals(command, 0x01, request.service)
+            assertEquals(command, true, SafeObdRequestPolicy.expectedMode01DataBytes(pid) != null)
+        }
+    }
+
+    @Test
+    fun physicalEcuNameReadRequiresMatchingMode09Pid() {
+        val name = requireNotNull(SafeObdRequestPolicy.parse("090A"))
+        val encodedName = "ECM".padEnd(20, ' ').toByteArray(Charsets.US_ASCII)
+            .joinToString(" ") { "%02X".format(java.util.Locale.ROOT, it.toInt() and 0xFF) }
+        assertEquals(true, SafeObdRequestPolicy.hasPositiveResponse(
+            name, "49 0A 01 $encodedName"))
+        assertEquals(false, SafeObdRequestPolicy.hasPositiveResponse(name, "49 0A 01 45 43 4D"))
+        assertEquals(false, SafeObdRequestPolicy.hasPositiveResponse(name, "49 04 01 45 43 4D"))
+        assertEquals(false, SafeObdRequestPolicy.hasPositiveResponse(name, "7F 09 12"))
+        assertEquals(true, SafeObdRequestPolicy.hasNegativeResponse(name, "7F 09 12"))
+    }
+
+    @Test
+    fun mode09CalibrationAndCvnRequireFullDeclaredRecords() {
+        val calibration = requireNotNull(SafeObdRequestPolicy.parse("0904"))
+        val cvn = requireNotNull(SafeObdRequestPolicy.parse("0906"))
+        val calText = "12612345".padEnd(16, ' ').toByteArray(Charsets.US_ASCII)
+            .joinToString(" ") { "%02X".format(java.util.Locale.ROOT, it.toInt() and 0xFF) }
+        assertEquals(true, SafeObdRequestPolicy.hasPositiveResponse(
+            calibration, "49 04 01 $calText"))
+        assertEquals(false, SafeObdRequestPolicy.hasPositiveResponse(
+            calibration, "49 04 01 31 32"))
+        assertEquals(true, SafeObdRequestPolicy.hasPositiveResponse(
+            cvn, "49 06 01 01 02 03 04"))
+        assertEquals(true, SafeObdRequestPolicy.hasPositiveResponse(
+            cvn, "49 06 02 01 02 03 04 05 06 07 08"))
+        for (invalid in listOf("49 06 01 01 02 03", "49 06 00",
+            "49 06 02 01 02 03 04", "49 06 01 01 02 03 04 00")) {
+            assertEquals(invalid, false, SafeObdRequestPolicy.hasPositiveResponse(cvn, invalid))
+        }
+    }
+
+    @Test
+    fun mode09VinRejectsForbiddenCharactersAndWrongRecordCount() {
+        val request = requireNotNull(SafeObdRequestPolicy.parse("0902"))
+        fun response(vin: String, count: Int = 1): String =
+            "49 02 %02X ".format(java.util.Locale.ROOT, count) +
+                vin.toByteArray(Charsets.US_ASCII).joinToString(" ") {
+                    "%02X".format(java.util.Locale.ROOT, it.toInt() and 0xFF)
+                }
+        assertEquals(true, SafeObdRequestPolicy.hasPositiveResponse(
+            request, response("1G1FA1RXXR0123456")))
+        for (invalid in listOf("1G1IA1RXXR0123456", "1G1OA1RXXR0123456",
+            "1G1QA1RXXR0123456", "1G1FA1RXXR012345", "1G1FA1RXXR01234567")) {
+            assertEquals(invalid, false, SafeObdRequestPolicy.hasPositiveResponse(
+                request, response(invalid)))
+        }
+        assertEquals(false, SafeObdRequestPolicy.hasPositiveResponse(
+            request, response("1G1FA1RXXR0123456", count = 2)))
+    }
+
+    @Test
+    fun readResponseClassificationPreservesSentVsAcceptedMeaning() {
+        val request = requireNotNull(SafeObdRequestPolicy.parse("0152"))
+        assertEquals(SafeObdRequestPolicy.ReadResponseKind.POSITIVE_ECU,
+            SafeObdRequestPolicy.classifyResponse(request, "41 52 80"))
+        assertEquals(SafeObdRequestPolicy.ReadResponseKind.NEGATIVE_ECU,
+            SafeObdRequestPolicy.classifyResponse(request, "7F 01 11"))
+        assertEquals(SafeObdRequestPolicy.ReadResponseKind.NEGATIVE_ECU,
+            SafeObdRequestPolicy.classifyResponse(request, "41 52 80\n7F 01 11"))
+        for (invalid in listOf("OK", "NO DATA", "41 52", "41 53 80", "")) {
+            assertEquals(invalid, SafeObdRequestPolicy.ReadResponseKind.UNMATCHED_OR_ADAPTER,
+                SafeObdRequestPolicy.classifyResponse(request, invalid))
+        }
+    }
+
+    @Test
+    fun unrelatedTwentyNineBitResponderMustNotConfirmPhysicalIdentityOrEthanol() {
+        val ethanol = requireNotNull(SafeObdRequestPolicy.parse("0152"))
+        val vin = requireNotNull(SafeObdRequestPolicy.parse("0902"))
+        val payload = "49 02 01 " + "1G1FA1RXXR0123456"
+            .toByteArray(Charsets.US_ASCII).joinToString(" ") {
+                "%02X".format(java.util.Locale.ROOT, it.toInt() and 0xFF)
+            }
+        assertEquals(true, SafeObdRequestPolicy.hasPositiveResponse(
+            ethanol, "18DAF110 41 52 80"))
+        assertEquals(false, SafeObdRequestPolicy.hasPositiveResponse(
+            ethanol, "18DAF111 41 52 80"))
+        assertEquals(false, SafeObdRequestPolicy.hasNegativeResponse(
+            ethanol, "18DAF111 7F 01 11"))
+        assertEquals(false, SafeObdRequestPolicy.hasPositiveResponse(
+            vin, "18DAF111 $payload"))
+        assertEquals(true, SafeObdRequestPolicy.hasPositiveResponse(
+            vin, "18DAF110 $payload"))
+    }
+
+    @Test
+    fun consoleAcceptsOnlyCompleteNumberedElmVinFrames() {
+        val request = requireNotNull(SafeObdRequestPolicy.parse("0902"))
+        val complete = "014\r0: 490201314731\r1: 46413152585852\r2: 30313233343536"
+        assertEquals(true, SafeObdRequestPolicy.hasPositiveResponse(request, complete))
+        assertEquals(false, SafeObdRequestPolicy.hasPositiveResponse(request,
+            complete.replace("1:", "2:")))
+        assertEquals(false, SafeObdRequestPolicy.hasPositiveResponse(request,
+            complete.dropLast(2)))
+        assertEquals(false, SafeObdRequestPolicy.hasPositiveResponse(request,
+            complete.replace("014", "013")))
+        assertEquals(false, SafeObdRequestPolicy.hasPositiveResponse(request,
+            complete.replace("490201", "490401")))
+    }
+
+
+    @Test
+    fun adapterFaultOverridesApparentlyValidObdEcuResponse() {
+        val ethanol = requireNotNull(SafeObdRequestPolicy.parse("0152"))
+        for (fault in listOf("CAN ERROR", "BUS ERROR", "BUFFER FULL",
+            "NO DATA", "UNABLE TO CONNECT", "STOPPED", "ERROR", "?")) {
+            val positiveAndFault = "41 52 80\r\n" + fault
+            val negativeAndFault = "7F 01 11\r\n" + fault
+            assertEquals(fault, false,
+                SafeObdRequestPolicy.hasPositiveResponse(ethanol, positiveAndFault))
+            assertEquals(fault, false,
+                SafeObdRequestPolicy.hasNegativeResponse(ethanol, negativeAndFault))
+            assertEquals(fault, false,
+                SafeObdRequestPolicy.hasUnambiguousPositiveResponse(ethanol, positiveAndFault))
+            assertEquals(fault, SafeObdRequestPolicy.ReadResponseKind.UNMATCHED_OR_ADAPTER,
+                SafeObdRequestPolicy.classifyResponse(ethanol, positiveAndFault))
+            assertEquals(fault, SafeObdRequestPolicy.ReadResponseKind.UNMATCHED_OR_ADAPTER,
+                SafeObdRequestPolicy.classifyResponse(ethanol, negativeAndFault))
+        }
+        assertEquals(SafeObdRequestPolicy.ReadResponseKind.POSITIVE_ECU,
+            SafeObdRequestPolicy.classifyResponse(ethanol, "41 52 80\r\nOK"))
     }
 }

@@ -24,6 +24,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Install App Check before the first authenticated Cloud Function call.
+        AppCheckProvider.install()
         // Recover missed MY_PACKAGE_REPLACED broadcasts after process death:
         // delete downloaded update APKs only if the installed versionCode advanced.
         lifecycleScope.launch(Dispatchers.IO) {

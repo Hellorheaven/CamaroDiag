@@ -2,6 +2,7 @@ package com.camarodiag.gen5.data.obd
 
 import java.io.OutputStream
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
@@ -20,6 +21,39 @@ import kotlinx.coroutines.withTimeout
 object J2534LiveMemoryBackup {
     private const val MAX_CAPTURE_BYTES = 4 * 1024 * 1024
     private const val TIMEOUT_MS = 6000L
+
+    /** Exact, non-destructive reason the ECU refused a documented memory span. */
+    internal class ReadRefused(
+        val requestedAddress: Long,
+        val requestedBytes: Int,
+        val nrc: Int
+    ) : IllegalStateException(
+        "ECU refused memory read at 0x${requestedAddress.toString(16).uppercase()} " +
+            "($requestedBytes bytes, NRC 0x${nrc.toString(16).uppercase().padStart(2, '0')}). " +
+            "No security access, retries with new privileges or writes were attempted."
+    )
+
+    /**
+     * UDS DiagnosticSessionControl has either a minimal echoed subfunction
+     * or the full P2/P2* timing parameters. A three-, four- or five-byte
+     * reply cannot establish a valid session transition.
+     */
+    internal fun isValidSessionReply(reply: ByteArray, expectedSubfunction: Int): Boolean =
+        (reply.size == 2 || reply.size == 6) &&
+            reply[0] == 0x50.toByte() &&
+            (reply[1].toInt() and 0xFF) == expectedSubfunction
+
+    /** Two independently observed GM identities, never an assumed firmware family. */
+    internal fun verifiedStableFirmware(
+        before: GmlanIdentityEvidence,
+        after: GmlanIdentityEvidence,
+        expectedVin: String
+    ): EcuBackupManifest.FirmwareEvidence {
+        require(before.vin == expectedVin && after == before) {
+            "GM VIN/OSID changed during memory acquisition; refuse to archive firmware evidence."
+        }
+        return EcuBackupManifest.FirmwareEvidence(before.operatingSystemId, before.osDid)
+    }
 
     data class Request(
         val expectedVin: String,
@@ -50,7 +84,25 @@ object J2534LiveMemoryBackup {
         val capture: EcuBackupManifest.Capture,
         val verification: EcuBackupIntegrity.Result
     ) {
-        internal fun export(output: OutputStream) {
+        internal fun export(
+            output: OutputStream,
+            channel: EcuBackupManifest.Channel? = null,
+            firmwareEvidence: EcuBackupManifest.FirmwareEvidence? = null
+        ) {
+            require(manifest.channel == null || channel == null || channel == manifest.channel) {
+                "Export route differs from the acquired ECU channel."
+            }
+            require(manifest.firmwareEvidence == null || firmwareEvidence == null ||
+                firmwareEvidence == manifest.firmwareEvidence) {
+                "Export firmware evidence differs from the acquired ECU identity."
+            }
+            val exportChannel = manifest.channel ?: channel
+            val exportFirmware = manifest.firmwareEvidence ?: firmwareEvidence
+            if (capture.origin == EcuBackupManifest.Origin.REPORTED_HARDWARE_READ) {
+                requireNotNull(exportChannel) {
+                    "A physically acquired backup must retain its J2534 CAN route."
+                }
+            }
             // Bind the archive to the acquisition's original digest, not a newly
             // computed digest of potentially mutated public capture buffers.
             check(capture.independentRead != null && capture.firstRead !== capture.independentRead) {
@@ -66,7 +118,7 @@ object J2534LiveMemoryBackup {
             ) { "Capture no longer matches the verified acquisition." }
             EcuBackupArchive.export(
                 output, listOf(snapshot), required, manifest.controllerLabel,
-                manifest.createdAtUtcMillis, manifest.vehicleVin
+                manifest.createdAtUtcMillis, manifest.vehicleVin, exportChannel, exportFirmware
             )
         }
     }
@@ -83,34 +135,27 @@ object J2534LiveMemoryBackup {
         check(bridge.isConnected && bridge.isScopedMemoryReadEnabled) {
             "A real J2534 bridge with an approved ECU memory read scope must be connected."
         }
-        return acquire(bridge, request, EcuBackupManifest.Origin.REPORTED_HARDWARE_READ, progress)
-    }
-
-    suspend fun captureAndExport(
-        bridge: J2534BridgeTransport,
-        request: Request,
-        output: OutputStream,
-        progress: (CaptureProgress) -> Unit = {}
-    ): CaptureResult {
-        val read = capture(bridge, request, progress)
-        currentCoroutineContext().ensureActive()
-        read.export(output)
-        return read
+        val boundedRequest = bridge.requireApprovedMemoryReadScope(request)
+        return acquire(bridge, boundedRequest, EcuBackupManifest.Origin.REPORTED_HARDWARE_READ, progress) {
+            bridge.isConnected && bridge.isScopedMemoryReadEnabled
+        }
     }
 
     /** Only fake transport may enter unit tests; fake data is never marked as hardware. */
     internal suspend fun captureForTest(
         transport: UdsPayloadTransport,
         request: Request,
-        progress: (CaptureProgress) -> Unit = {}
+        progress: (CaptureProgress) -> Unit = {},
+        liveLinkValid: () -> Boolean = { true }
     ): CaptureResult =
-        acquire(transport, request, EcuBackupManifest.Origin.SIMULATION, progress)
+        acquire(transport, request, EcuBackupManifest.Origin.SIMULATION, progress, liveLinkValid)
 
     private suspend fun acquire(
         transport: UdsPayloadTransport,
         request: Request,
         origin: EcuBackupManifest.Origin,
-        progress: (CaptureProgress) -> Unit
+        progress: (CaptureProgress) -> Unit,
+        liveLinkValid: () -> Boolean = { true }
     ): CaptureResult {
         require(request.expectedVin.matches(Regex("[A-HJ-NPR-Z0-9]{17}"))) { "Invalid target VIN." }
         require(request.address in 0L..0xFFFFFFFFL &&
@@ -124,6 +169,7 @@ object J2534LiveMemoryBackup {
 
         var identityLost = false
         suspend fun liveVin(): String = try {
+            check(liveLinkValid()) { "Physical bridge or scoped read permission was lost." }
             val response = transport.exchange(byteArrayOf(0x22, 0xF1.toByte(), 0x90.toByte()), TIMEOUT_MS)
             require(response.size == 20 &&
                 response[0] == 0x62.toByte() &&
@@ -132,19 +178,32 @@ object J2534LiveMemoryBackup {
             val vin = response.copyOfRange(3, 20).toString(Charsets.US_ASCII)
             require(vin == request.expectedVin) { "Live ECU VIN differs from selected vehicle." }
             vin
+        } catch (cancelled: CancellationException) {
+            // Cancellation alone does not prove a different ECU. The
+            // NonCancellable session cleanup independently rechecks the
+            // original link's VIN before it can send a session reset.
+            throw cancelled
         } catch (failure: Exception) {
-            // Never send a session change to a target whose identity is uncertain.
+            // Malformed, missing or mismatched identity is uncertain;
+            // never send a session change to that target.
             identityLost = true
             throw failure
         }
 
-        fun memoryRequest(address: Long, bytes: Int): ByteArray =
-            byteArrayOf(0x23, 0x24) +
-                byteArrayOf(
-                    (address ushr 24).toByte(), (address ushr 16).toByte(),
-                    (address ushr 8).toByte(), address.toByte(),
-                    (bytes ushr 8).toByte(), bytes.toByte()
-                )
+        fun memoryRequest(address: Long, bytes: Int): ByteArray {
+            // ISO 14229 ALFI: 4-byte address; use a 1-byte size for 1..255
+            // and a 2-byte size only for 256. Match the Windows native reader.
+            val addressBytes = byteArrayOf(
+                (address ushr 24).toByte(), (address ushr 16).toByte(),
+                (address ushr 8).toByte(), address.toByte()
+            )
+            return if (bytes > 255) {
+                byteArrayOf(0x23, 0x24) + addressBytes +
+                    byteArrayOf((bytes ushr 8).toByte(), bytes.toByte())
+            } else {
+                byteArrayOf(0x23, 0x14) + addressBytes + byteArrayOf(bytes.toByte())
+            }
+        }
 
         suspend fun pass(passNumber: Int): ByteArray {
             val image = ByteArray(request.lengthBytes)
@@ -153,6 +212,7 @@ object J2534LiveMemoryBackup {
             var blocks = 0
             while (offset < image.size) {
                 currentCoroutineContext().ensureActive()
+                check(liveLinkValid()) { "Physical bridge or scoped read permission was lost." }
                 if (blocks > 0 && blocks % 32 == 0) {
                     val ping = transport.exchange(byteArrayOf(0x3E, 0x00), TIMEOUT_MS)
                     require(ping.size == 2 && ping[0] == 0x7E.toByte() && ping[1] == 0x00.toByte()) {
@@ -164,9 +224,15 @@ object J2534LiveMemoryBackup {
                     liveVin()
                 }
                 val length = minOf(request.chunkBytes, image.size - offset)
+                val requestedAddress = request.address + offset
                 val response = transport.exchange(
-                    memoryRequest(request.address + offset, length), TIMEOUT_MS
+                    memoryRequest(requestedAddress, length), TIMEOUT_MS
                 )
+                if (response.size == 3 &&
+                    response[0] == 0x7F.toByte() && response[1] == 0x23.toByte()
+                ) {
+                    throw ReadRefused(requestedAddress, length, response[2].toInt() and 0xFF)
+                }
                 require(response.size == length + 1 && response[0] == 0x63.toByte()) {
                     "ECU memory response is not a complete ReadMemoryByAddress result."
                 }
@@ -189,9 +255,8 @@ object J2534LiveMemoryBackup {
                 // A lost or malformed positive response can still mean the ECU changed session.
                 extendedRequested = true
                 val response = transport.exchange(byteArrayOf(0x10, 0x03), TIMEOUT_MS)
-                require(response.size >= 2 && response[0] == 0x50.toByte() &&
-                    response[1] == 0x03.toByte()) {
-                    "ECU did not accept the extended read session."
+                require(isValidSessionReply(response, 0x03)) {
+                    "ECU did not accept a well-formed extended read session."
                 }
             }
             val first = pass(1)
@@ -202,6 +267,7 @@ object J2534LiveMemoryBackup {
             val second = pass(2)
             // VIN could change after a session replacement or reconnect.
             val observedVin = liveVin()
+            check(liveLinkValid()) { "Physical bridge or scoped read permission was lost." }
             require(first.contentEquals(second)) {
                 "Two physical memory acquisitions disagree; do not export this backup."
             }
@@ -233,9 +299,8 @@ object J2534LiveMemoryBackup {
                         withTimeout(2 * (TIMEOUT_MS + 3000L) + 1000L) {
                             liveVin()
                             val response = transport.exchange(byteArrayOf(0x10, 0x01), TIMEOUT_MS)
-                            require(response.size >= 2 && response[0] == 0x50.toByte() &&
-                                response[1] == 0x01.toByte()) {
-                                "ECU did not confirm return to the default diagnostic session."
+                            require(isValidSessionReply(response, 0x01)) {
+                                "ECU did not confirm a well-formed return to the default diagnostic session."
                             }
                         }
                     }

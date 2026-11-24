@@ -47,16 +47,56 @@ internal static class NativeGmlanIdentificationSelfTests
             [0x5A, 0xC9, 0, 0xC1, 0x3D, 0x3D], false);
         Assert(empty.OsDid == 0xC9, "Zero SWMI slot does not mask valid fallback");
 
-        Reject<InvalidDataException>(() =>
+        Reject<NativeGmlanIdentification.IdentityUnavailableException>(() =>
             NativeGmlanIdentification.Compose(vinReply, unused, unused, false));
+        checks++;
+        Reject<NativeGmlanIdentification.IdentityUnavailableException>(() =>
+            NativeGmlanIdentification.Compose(unused, osReply, unused, false));
         checks++;
         Reject<IOException>(() =>
             NativeGmlanIdentification.Compose(vinReply,
                 [0x7F, 0x1A, 0x33], unused, false));
         checks++;
+        bool accessDeniedIsNotOptional = false;
+        try
+        {
+            NativeGmlanIdentification.Compose(vinReply,
+                [0x7F, 0x1A, 0x33], unused, false);
+        }
+        catch (NativeGmlanIdentification.IdentityUnavailableException) { }
+        catch (IOException) { accessDeniedIsNotOptional = true; }
+        Assert(accessDeniedIsNotOptional,
+            "A denied GMLAN OSID read must not be treated as unsupported identity");
+
+        bool malformedOsIdIsNotOptional = false;
+        try
+        {
+            NativeGmlanIdentification.Compose(vinReply,
+                [0x5A, 0xC1, 0x00, 0x01], unused, false);
+        }
+        catch (NativeGmlanIdentification.IdentityUnavailableException) { }
+        catch (InvalidDataException) { malformedOsIdIsNotOptional = true; }
+        Assert(malformedOsIdIsNotOptional,
+            "A truncated GM OSID reply must fail, not downgrade to optional absence");
         Reject<InvalidDataException>(() =>
             NativeGmlanIdentification.Compose([0x5A, 0x90, 0x00], osReply, unused, false));
         checks++;
+        var malformedWasNotUnsupported = false;
+        try
+        {
+            NativeGmlanIdentification.Compose(
+                [0x5A, 0x90, 0x00], osReply, unused, false);
+        }
+        catch (NativeGmlanIdentification.IdentityUnavailableException)
+        {
+            malformedWasNotUnsupported = false;
+        }
+        catch (InvalidDataException)
+        {
+            malformedWasNotUnsupported = true;
+        }
+        Assert(malformedWasNotUnsupported,
+            "Malformed GMLAN VIN is not classified as an unsupported legacy identity");
         Reject<InvalidDataException>(() =>
             NativeGmlanIdentification.Compose(
                 [0x5A, 0x90, .. Encoding.ASCII.GetBytes("1G1FA1RXXR012345I")],

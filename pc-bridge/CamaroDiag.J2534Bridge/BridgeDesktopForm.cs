@@ -104,6 +104,7 @@ internal sealed partial class BridgeDesktopForm : Form
         {
             bridgeCancellation?.Cancel();
             functionalCancellation?.Cancel();
+            doIpConsoleDiscoveryCancellation?.Cancel();
             consoleDevice?.Dispose();
             consoleDevice = null;
         };
@@ -532,6 +533,7 @@ pas le port du pont sur Internet.",
                 Filter = filter, OverwritePrompt = true, AddExtension = true,
                 DefaultExt = "bin", Title = "Choisir un NOUVEAU fichier de sortie"
             };
+            if (!PrepareExportDialog(dialog, UserExportStorage.Category.Calibrations, "CamaroDiag-calibration.bin")) return;
             if (dialog.ShowDialog(this) == DialogResult.OK)
                 target.Text = dialog.FileName;
         }
@@ -700,13 +702,17 @@ pas le port du pont sur Internet.",
         try { await work(); }
         catch (Exception error)
         {
-            AppendLog("ERREUR : " + error.Message);
-            ShowError(error.Message);
+            if (!IsDisposed && !Disposing)
+            {
+                AppendLog("ERREUR : " + error.Message);
+                ShowError(error.Message);
+            }
         }
         finally
         {
             busy = false;
-            inspect.Enabled = repair.Enabled = probe.Enabled = true;
+            if (!IsDisposed && !Disposing)
+                inspect.Enabled = repair.Enabled = probe.Enabled = true;
         }
     }
 
