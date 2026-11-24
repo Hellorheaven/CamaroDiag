@@ -140,4 +140,32 @@ class DoIpGatewayControlTraceTest {
         }
     }
 
+    @Test fun routeResolutionUsesDiscoveredGatewayAndKeepsExplicitLogicalAddresses() = runBlocking {
+        val selected = DoIpDirectRead.resolveTargetWithDiscovery("", "0E80", "1001",
+            vin, true, 0x1000) { requested ->
+            assertEquals(vin, requested)
+            DoIpDirectRead.GatewayResult(DoIpDirectRead.Gateway(vin, 0x1000, 2), host = "127.0.0.1")
+        }
+        assertEquals("127.0.0.1", selected.address.hostAddress)
+        assertEquals(0x0E80, selected.tester)
+        assertEquals(0x1001, selected.ecu)
+        assertEquals(0x1000, selected.expectedGateway)
+        assertTrue(selected.tls)
+        val mismatch = runCatching {
+            DoIpDirectRead.resolveTargetWithDiscovery("", "0E80", "1001", vin, true, 0x1002) {
+                DoIpDirectRead.GatewayResult(DoIpDirectRead.Gateway(vin, 0x1000, 2), host = "127.0.0.1")
+            }
+        }
+        assertTrue(mismatch.isFailure)
+        val manual = DoIpDirectRead.resolveTargetWithDiscovery("127.0.0.1", "0E80", "1001",
+            vin, false, 0x1000) { error("Manual endpoint must not invoke broadcast discovery") }
+        assertEquals(0x1000, manual.expectedGateway)
+        assertFalse(manual.tls)
+        assertTrue(runCatching {
+            DoIpDirectRead.resolveTargetWithDiscovery("", "0E80", "0E80", vin, true, null) {
+                error("Invalid logical addresses must be rejected before discovery")
+            }
+        }.exceptionOrNull() is IllegalArgumentException)
+    }
+
 }
