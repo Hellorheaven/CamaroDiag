@@ -1,3 +1,11 @@
+## Décision propriétaire — sélection automatique des protocoles
+
+- Le protocole est automatiquement sélectionné à partir du **couple connecteur effectivement utilisé + ECU cible**, en fonction des capacités négociées du connecteur/pilote, du profil ECU et de réponses de découverte non mutantes. Pas de sélecteur manuel obligatoire pour le parcours normal, pas de choix fondé sur le seul véhicule ou le seul connecteur.
+- Invalider la sélection au changement de connecteur, ECU ou session ; afficher le transport/service réellement utilisé ; signaler explicitement les incompatibilités et ambiguïtés sans inventer de capacité. La détection n'autorise aucune écriture : conserver le consentement et les contrôles techniques existants.
+- Intégrer et tester cette sélection dans chaque fonction applicable avant clôture du protocole. DoIP et C6 restent actifs ; C8 exclusivement après tous les autres chantiers et protocoles intégrés et validés. Règle AGENTS.md : 0b1990c1. Exigence enregistrée, implémentation et tests à réaliser.
+
+---
+
 ## Décision propriétaire prioritaire — intégration des protocoles et C8 final (24/11/2026)
 
 - C8 est strictement le dernier chantier, après C1/C2/C4/C6 ET la clôture logicielle de tous les protocoles du périmètre PR95, y compris leur intégration aux fonctions applicables Android, Windows GUI/CLI, Connectors, console, diagnostic, sauvegardes, calibration/programmation et récupération selon les capacités réelles. Les tests d'intégration font partie de chaque protocole, pas d'un reliquat à reporter à C8.
