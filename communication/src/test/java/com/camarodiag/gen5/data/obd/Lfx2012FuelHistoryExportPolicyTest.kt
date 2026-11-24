@@ -48,4 +48,26 @@ class Lfx2012FuelHistoryExportPolicyTest {
             duplicateTimes, duplicateTimes, false
         ))
     }
+    @Test fun sameLengthAndTimestampWithChangedFuelValueCannotBeExported() {
+        val original = sample(100L)
+        val alteredReadings = original.snapshot.readings.map { reading ->
+            if (reading.pid == Lfx2012FuelReadOnly.ETHANOL)
+                Lfx2012FuelReadOnly.Reading(
+                    reading.pid, Lfx2012FuelReadOnly.Availability.REPORTED, 0.0, 0
+                )
+            else reading
+        }
+        val changed = original.copy(snapshot = original.snapshot.copy(readings = alteredReadings))
+        assertFalse(Lfx2012FuelHistoryExportPolicy.canPublish(
+            listOf(original), listOf(changed), false
+        ))
+    }
+
+    @Test fun mixedSessionWindowIsRefusedEvenWhenBothSnapshotsMatch() {
+        val mixed = listOf(
+            sample(100L),
+            sample(200L, identity.copy(sessionId = "session-2"))
+        )
+        assertFalse(Lfx2012FuelHistoryExportPolicy.canPublish(mixed, mixed.toList(), false))
+    }
 }
