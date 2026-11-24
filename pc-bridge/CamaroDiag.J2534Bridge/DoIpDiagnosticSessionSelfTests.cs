@@ -211,6 +211,37 @@ internal static class DoIpDiagnosticSessionSelfTests
             await Expect<ArgumentException>(() => Task.Run(() =>
                 DoIpVinReader.ParseLogicalAddress(badAddress)), "Reject invalid logical address.");
 
+        // UDP and TCP identity correlation: no diagnostic PDU may be sent
+        // if routing activation reports a different logical gateway.
+        var mismatchListener = new TcpListener(IPAddress.Loopback, 0);
+        mismatchListener.Start();
+        var mismatchPort = ((IPEndPoint)mismatchListener.LocalEndpoint).Port;
+        var mismatchServer = Task.Run(async () =>
+        {
+            using var peer = await mismatchListener.AcceptTcpClientAsync();
+            await using var wire = peer.GetStream();
+            var activation = await ReadAsync(wire);
+            Check(activation.Type == DoIpCodec.RoutingActivationRequest,
+                "Expected routing request before gateway identity comparison.");
+            await SendAsync(wire, DoIpCodec.RoutingActivationResponse,
+                [0x0E, 0x80, 0x12, 0x35, 0x10, 0, 0, 0, 0]);
+            var extra = new byte[1];
+            Check(await wire.ReadAsync(extra).AsTask().WaitAsync(TimeSpan.FromSeconds(3)) == 0,
+                "Mismatched gateway is disconnected before any UDS transmission.");
+        });
+        try
+        {
+            await Expect<InvalidDataException>(async () =>
+            {
+                await using var ignored = await DoIpDiagnosticTransport.ConnectAsync(
+                    "127.0.0.1", Tester, Ecu, TimeSpan.FromSeconds(2),
+                    CancellationToken.None, portOverride: mismatchPort,
+                    expectedGatewayAddress: Ecu);
+            }, "Reject routing response from a different observed gateway.");
+            await mismatchServer.WaitAsync(TimeSpan.FromSeconds(4));
+        }
+        finally { mismatchListener.Stop(); }
+
         // Full happy path: routing 0x11 pending then 0x10, gateway ACK,
         // AliveCheck and UDS NRC 0x78 followed by final correlated response.
         await RunCaseAsync(async stream =>
