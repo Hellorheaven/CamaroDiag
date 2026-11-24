@@ -300,6 +300,69 @@ internal static class DoIpVehicleDiscovery
         remote.Address.AddressFamily == AddressFamily.InterNetworkV6 &&
         remote.Address.IsIPv6LinkLocal && remote.Port == sourcePort;
 
+    /// <summary>
+    /// Active IPv6 link-local DoIP vehicle identification. Send exactly one
+    /// standard 0x0001/0x0002/0x0003 UDP request to ff02::1 on the
+    /// explicitly selected interface; no UDS/ECU mutation is emitted.
+    /// Only identities returned by that interface's DoIP UDP port are shown.
+    /// </summary>
+    internal static async Task<IReadOnlyList<Identity>> DiscoverIpv6MulticastAsync(
+        int interfaceIndex, TimeSpan timeout, CancellationToken cancellationToken,
+        string? vin = null, byte[]? eid = null, int? portOverride = null)
+    {
+        ValidateIpv6MulticastOptions(interfaceIndex, timeout, null, portOverride);
+        if (vin is not null && eid is not null)
+            throw new ArgumentException("Choose VIN or EID identification, not both.");
+        var request = vin is not null ? BuildVinRequest(vin) :
+            eid is not null ? BuildEidRequest(eid) : BuildRequest();
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        deadline.CancelAfter(timeout);
+        using var socket = new UdpClient(AddressFamily.InterNetworkV6);
+        // The scoped multicast destination chooses the vehicle Ethernet
+        // interface without guessing a default IPv6 route.
+        var address = Ipv6MulticastDestination(interfaceIndex);
+        var port = portOverride ?? 13400;
+        await socket.SendAsync(request.AsMemory(),
+            new IPEndPoint(address, port), deadline.Token);
+        var identified = new Dictionary<string, Identity>(StringComparer.Ordinal);
+        while (identified.Count < 32)
+        {
+            UdpReceiveResult received;
+            try
+            {
+                received = await socket.ReceiveAsync(deadline.Token);
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                break;
+            }
+            if (!IsIpv6MulticastAnnouncementSource(received.RemoteEndPoint, port))
+                continue;
+            try
+            {
+                var found = ParseAnnouncement(received.Buffer,
+                    received.RemoteEndPoint.Address);
+                if (!MatchesRequestedIdentity(found, vin, eid))
+                    continue;
+                var key = found.Source + ":" + found.LogicalAddress.ToString("X4");
+                identified[key] = found;
+            }
+            catch (InvalidDataException)
+            {
+                // Ignore unrelated IPv6 UDP payloads and malformed messages.
+            }
+        }
+        return identified.Values.ToArray();
+    }
+
+    internal static IPAddress Ipv6MulticastDestination(int interfaceIndex)
+    {
+        if (interfaceIndex <= 0)
+            throw new ArgumentOutOfRangeException(nameof(interfaceIndex));
+        return new IPAddress(IPAddress.Parse("ff02::1").GetAddressBytes(),
+            interfaceIndex);
+    }
+
     internal static async Task<Identity> DiscoverAsync(string host,
         TimeSpan timeout, CancellationToken cancellationToken,
         string? vin = null, byte[]? eid = null, int? portOverride = null)
