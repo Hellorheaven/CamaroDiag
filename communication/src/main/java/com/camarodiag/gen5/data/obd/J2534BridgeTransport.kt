@@ -643,6 +643,12 @@ internal object J2534BridgeProtocol {
                     throw java.io.IOException("Invalid J2534 response frame terminator.")
                 break
             }
+            // JSON control bytes must be escaped inside strings. The Windows
+            // bridge emits one compact UTF-8 JSON object per line; accepting
+            // raw NUL/ESC/TAB would make its authenticated framing ambiguous.
+            if (next < 0x20) {
+                throw java.io.IOException("Invalid control character in J2534 bridge response.")
+            }
             check(line.length < MAX_RESPONSE_LINE_CHARS) {
                 "The J2534 bridge response exceeds the maximum allowed line size."
             }
