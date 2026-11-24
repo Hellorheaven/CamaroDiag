@@ -1,3 +1,17 @@
+## Décision propriétaire — scission PR95 et continuité immédiate (24/11/2026)
+
+Le propriétaire autorise la scission, la validation puis la fusion de PR95 et la création immédiate de sa PR de continuation. Cette autorisation ne dispense pas du checkpoint Debug complet sur le HEAD exact ni du contrôle de fusionnabilité. Ne pas fusionner en cas d'échec, ne pas publier de Release intermédiaire volontairement. Conserver tous les commits et les issues ouvertes.
+
+### Périmètre transféré, sans perte d'exigences
+- C1 console CAN/OBD, C2 sauvegardes ECU (#63), C4 FlexFuel lecture seule : conserver les acquis et transférer toute exigence non satisfaite des issues et de l'audit PR95.
+- C6 et DoIP restent le chantier et le protocole actifs. Dernier code au SHA a7ffed89063fafba41bd29ff2e5e245213562733 : lecture DTC UDS 19/02 via passerelle DoIP observée ; raccordement GUI, tests loopback et présentation FR/EN non terminés.
+- #110 : toutes les couches et services ISO/SAE encore incomplets, intégration Android/Windows/Connectors par triplet connecteur + ECU + opération, distinction CAN brut/diagnostic, preuves RX/TX, revalidation contexte et erreurs.
+- C8 demeure exclusivement la validation finale du périmètre global ; la validation de PR95 est intermédiaire. #106 audit, #108 chantiers ultérieurs et #48 recette Release restent dus, sans suppression d'engagement.
+- Après succès des jobs sur le HEAD de clôture, vérifier le contrôle review, fusionner sans perdre les commits, puis supprimer l'ancienne branche si possible et ouvrir immédiatement une unique PR Draft de continuation depuis main. Si la suppression automatique dépend d'une Release, réutiliser la branche existante une fois synchronisée avec main plutôt que créer une troisième branche. Reporter le numéro réel de la nouvelle PR dans les consignes et le suivi.
+- Aucun statut terminé pour un travail non achevé, aucun test matériel revendiqué, aucune fermeture des issues de reliquat.
+
+---
+
 ## Reprise C6/DoIP — annulation et changement de contexte (24/11/2026)
 
 - `fcfbc672544a12ad5c1ca4ee577534bcd636b9c9` : réutilisation de ReadDid F190 et contrôle d'annulation après callback RX et avant publication du VIN corrélé.
