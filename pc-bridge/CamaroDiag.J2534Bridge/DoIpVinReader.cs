@@ -4,7 +4,7 @@ using System.Text;
 
 namespace CamaroDiag.J2534Bridge;
 
-/// <summary>One read-only UDS identification operation over a discovered DoIP gateway.</summary>
+/// <summary>Read-only UDS application services over a discovered DoIP gateway.</summary>
 internal static class DoIpVinReader
 {
     internal static ushort ParseLogicalAddress(string text)
@@ -29,19 +29,27 @@ internal static class DoIpVinReader
         return vin;
     }
 
-    internal static async Task<string> ReadAsync(
-        DoIpDiagnosticTransport transport, TimeSpan timeout, CancellationToken token,
-        Action<byte[]>? requested = null, Action<byte[]>? received = null)
+    private static async Task<byte[]> ExchangeReadAsync(
+        DoIpDiagnosticTransport transport, byte[] request, TimeSpan timeout,
+        CancellationToken token, Action<byte[]>? requested, Action<byte[]>? received)
     {
         ArgumentNullException.ThrowIfNull(transport);
         token.ThrowIfCancellationRequested();
-        var request = UdsStandardServices.ReadDid(0xF190);
         requested?.Invoke(request.ToArray());
         token.ThrowIfCancellationRequested();
         var reply = await transport.ExchangeUdsAsync(request, timeout, token);
         token.ThrowIfCancellationRequested();
         received?.Invoke(reply.ToArray());
         token.ThrowIfCancellationRequested();
+        return reply;
+    }
+
+    internal static async Task<string> ReadAsync(
+        DoIpDiagnosticTransport transport, TimeSpan timeout, CancellationToken token,
+        Action<byte[]>? requested = null, Action<byte[]>? received = null)
+    {
+        var reply = await ExchangeReadAsync(transport, UdsStandardServices.ReadDid(0xF190),
+            timeout, token, requested, received);
         return ParseVin(reply);
     }
 
@@ -50,16 +58,48 @@ internal static class DoIpVinReader
         CancellationToken token, Action<byte[]>? requested = null,
         Action<byte[]>? received = null)
     {
-        ArgumentNullException.ThrowIfNull(transport);
-        token.ThrowIfCancellationRequested();
-        var request = ObdOnUdsServices.ReadDtcByStatusMask(statusMask);
-        requested?.Invoke(request.ToArray());
-        token.ThrowIfCancellationRequested();
-        var reply = await transport.ExchangeUdsAsync(request, timeout, token);
-        token.ThrowIfCancellationRequested();
-        received?.Invoke(reply.ToArray());
-        token.ThrowIfCancellationRequested();
+        var reply = await ExchangeReadAsync(transport,
+            ObdOnUdsServices.ReadDtcByStatusMask(statusMask), timeout, token, requested, received);
         return ObdOnUdsServices.DecodeDtcByStatusMask(statusMask, reply);
+    }
+
+    internal static async Task<byte[]> ReadDidAsync(
+        DoIpDiagnosticTransport transport, ushort did, TimeSpan timeout,
+        CancellationToken token, Action<byte[]>? requested = null,
+        Action<byte[]>? received = null)
+    {
+        var reply = await ExchangeReadAsync(transport, UdsStandardServices.ReadDid(did),
+            timeout, token, requested, received);
+        return ObdOnUdsServices.DecodeReadDid(did, reply);
+    }
+
+    private static Task<DoIpDiagnosticTransport> ConnectObservedAsync(
+        DoIpVehicleDiscovery.Identity gateway, IPAddress address, ushort tester,
+        ushort ecu, bool useTls, TimeSpan timeout, CancellationToken token,
+        string? clientCertificateThumbprint)
+    {
+        ArgumentNullException.ThrowIfNull(gateway);
+        ArgumentNullException.ThrowIfNull(address);
+        if (!gateway.Source.Equals(address) || tester == ecu ||
+            gateway.ProtocolVersion is not (0x02 or 0x03 or 0x04))
+            throw new ArgumentException("The DoIP target must match a discovered gateway and explicit logical addresses.");
+        token.ThrowIfCancellationRequested();
+        return DoIpDiagnosticTransport.ConnectAsync(
+            address.ToString(), tester, ecu, timeout, token,
+            useTls: useTls, protocolVersion: gateway.ProtocolVersion,
+            clientCertificateThumbprint: clientCertificateThumbprint,
+            expectedGatewayAddress: gateway.LogicalAddress);
+    }
+
+    internal static async Task<byte[]> ReadObservedGatewayDidAsync(
+        DoIpVehicleDiscovery.Identity gateway, IPAddress address, ushort tester,
+        ushort ecu, bool useTls, ushort did, TimeSpan timeout,
+        CancellationToken token, Action<byte[]>? requested = null,
+        Action<byte[]>? received = null, string? clientCertificateThumbprint = null)
+    {
+        await using var transport = await ConnectObservedAsync(gateway, address, tester,
+            ecu, useTls, timeout, token, clientCertificateThumbprint);
+        return await ReadDidAsync(transport, did, timeout, token, requested, received);
     }
 
     internal static async Task<ObdOnUdsServices.DtcStatusReport> ReadObservedGatewayDtcsAsync(
@@ -68,17 +108,8 @@ internal static class DoIpVinReader
         CancellationToken token, Action<byte[]>? requested = null,
         Action<byte[]>? received = null, string? clientCertificateThumbprint = null)
     {
-        ArgumentNullException.ThrowIfNull(gateway);
-        ArgumentNullException.ThrowIfNull(address);
-        if (!gateway.Source.Equals(address) || tester == ecu ||
-            gateway.ProtocolVersion is not (0x02 or 0x03 or 0x04))
-            throw new ArgumentException("The DoIP target must match a discovered gateway and explicit logical addresses.");
-        token.ThrowIfCancellationRequested();
-        await using var transport = await DoIpDiagnosticTransport.ConnectAsync(
-            address.ToString(), tester, ecu, timeout, token,
-            useTls: useTls, protocolVersion: gateway.ProtocolVersion,
-            clientCertificateThumbprint: clientCertificateThumbprint,
-            expectedGatewayAddress: gateway.LogicalAddress);
+        await using var transport = await ConnectObservedAsync(gateway, address, tester,
+            ecu, useTls, timeout, token, clientCertificateThumbprint);
         return await ReadDtcsAsync(transport, statusMask, timeout, token, requested, received);
     }
 
@@ -88,17 +119,8 @@ internal static class DoIpVinReader
         Action<byte[]>? requested = null, Action<byte[]>? received = null,
         string? clientCertificateThumbprint = null)
     {
-        ArgumentNullException.ThrowIfNull(gateway);
-        ArgumentNullException.ThrowIfNull(address);
-        if (!gateway.Source.Equals(address) || tester == ecu ||
-            gateway.ProtocolVersion is not (0x02 or 0x03 or 0x04))
-            throw new ArgumentException("The DoIP target must match a discovered gateway and explicit logical addresses.");
-        token.ThrowIfCancellationRequested();
-        await using var transport = await DoIpDiagnosticTransport.ConnectAsync(
-            address.ToString(), tester, ecu, timeout, token,
-            useTls: useTls, protocolVersion: gateway.ProtocolVersion,
-            clientCertificateThumbprint: clientCertificateThumbprint,
-            expectedGatewayAddress: gateway.LogicalAddress);
+        await using var transport = await ConnectObservedAsync(gateway, address, tester,
+            ecu, useTls, timeout, token, clientCertificateThumbprint);
         var vin = await ReadAsync(transport, timeout, token, requested, received);
         if (gateway.Vin is not null && !string.Equals(gateway.Vin, vin, StringComparison.Ordinal))
             throw new InvalidDataException("UDS VIN differs from the observed DoIP vehicle identity.");
