@@ -65,4 +65,5 @@
   <data name="ExpectedVin" xml:space="preserve"><value>Expected VIN (leave IP blank to discover)</value></data>
   <data name="InvalidExpectedVin" xml:space="preserve"><value>Enter a valid 17-character VIN.</value></data>
   <data name="VinDiscoveryStarted" xml:space="preserve"><value>Discovering DoIP gateway for VIN {0}</value></data>
+  <data name="TraceIncomplete" xml:space="preserve"><value>DoIP history incomplete: receive buffer limit exceeded.</value></data>
 </root>
