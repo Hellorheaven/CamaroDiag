@@ -476,8 +476,8 @@ internal static class StandardVehicleProtocolsSelfTests
             "--routing-activation-type", "0xE0",
             "--routing-oem-data", "01020304"]);
         Check(customRouting.RoutingActivationType == 0xE0 &&
-            customRouting.RoutingOemData is { Length: 4 } &&
-            customRouting.RoutingOemData.SequenceEqual(new byte[] {1, 2, 3, 4}),
+            customRouting.RoutingOemData is { Length: 4 } routingOem &&
+            routingOem.SequenceEqual(new byte[] {1, 2, 3, 4}),
             "DoIP custom activation type and explicit 4-byte OEM field parsed.");
         var routeWithOem = DoIpCodec.Decode(
             DoIpCodec.RoutingActivation(0x0E80, activationType: 0xE0,
