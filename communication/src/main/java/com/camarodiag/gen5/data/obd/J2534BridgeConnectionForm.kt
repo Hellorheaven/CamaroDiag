@@ -51,10 +51,11 @@ object J2534BridgeConnectionForm {
 
         val port = portText.trim().toIntOrNull()
         require(port != null && port in 1024..65535) { "Bridge port is invalid" }
-        val pairing = pairingCodeText.trim()
-        require(J2534BridgePairingCodeFormat.isValid(pairing)) {
+        require(J2534BridgePairingCodeFormat.isValid(pairingCodeText)) {
             "A certificate-pinned bridge pairing code is required"
         }
+
+        val pairing = pairingCodeText.trim()
 
         fun canId(raw: String): Pair<Int, Int> {
             val normalized = raw.trim().removePrefix("0x").removePrefix("0X")
