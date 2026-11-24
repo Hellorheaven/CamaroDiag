@@ -1,3 +1,12 @@
+## Reprise DoIP/C6 — correctifs supplémentaires du 24/11/2026
+
+- `54e0486317c5290d19fa5331ea56775a4c68c40a` : les quatre collectes UDP propagent l'annulation externe avant de publier les résultats.
+- `4007d981f5a574a406f7611b26b73b5d307584b6` : copie des octets OEM d'activation avant connexion et annulation préalable ; test TCP `383759a675fa68fb7f514b96309ee0e1f692326b`.
+- `e8cd617ab6a2ef3b8596d55e8ba0e92d93fcd151` : EID figé avant émission, corrélation sur ce même EID pour unicast, broadcast et multicast ; deux assertions loopback `d678b4bb1e1e0cca49ec313ff4d4166746344e60`.
+- Tests ajoutés, non exécutés. Aucun nouveau protocole, aucun C8, aucune qualification physique ni modification du consentement. Intégration par fonction toujours à réaliser, C6 et DoIP restent actifs. Le connecteur GitHub ne liste que les runs déclenchés par PR, pas les runs push du checkpoint ; ne pas confondre absence de résultat et absence de CI.
+
+---
+
 ## Reprise DoIP/C6 — 24/11/2026
 
 - `9fb924bfde58073e8938ac48a86369752a50b5f1` : validation du socket UDP déjà lié, durée et port source bornés, annulation préalable explicite.
