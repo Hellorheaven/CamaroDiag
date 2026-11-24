@@ -264,6 +264,49 @@ internal static class DoIpDiagnosticSessionSelfTests
             finally { ipv6Listener.Stop(); }
         }
 
+        // Read/write parity: the transport is bidirectional. This fake
+        // gateway never touches an ECU, and the higher-level operator flow
+        // remains responsible for double consent before any real mutation.
+        byte[] simulatedWrite = [0x2E, 0xF1, 0x90, 0x01];
+        await RunCaseAsync(async stream =>
+        {
+            var write = await ReadAsync(stream);
+            Check(write.Type == DoIpCodec.DiagnosticMessage &&
+                write.Payload.AsSpan(4).SequenceEqual(simulatedWrite),
+                "DoIP TCP accepts a simulated UDS WriteDataByIdentifier request.");
+            await SendAsync(stream, DoIpCodec.DiagnosticPositiveAck,
+                [0x12, 0x34, 0x0E, 0x80, 0, .. simulatedWrite]);
+            await SendAsync(stream, DoIpCodec.DiagnosticMessage,
+                FromEcu([0x6E, 0xF1, 0x90]));
+        }, async client =>
+        {
+            var final = await client.ExchangeUdsAsync(simulatedWrite,
+                TimeSpan.FromSeconds(2), CancellationToken.None);
+            Check(final.SequenceEqual(new byte[] { 0x6E, 0xF1, 0x90 }),
+                "DoIP transports a mutating SID without a protocol blacklist.");
+        });
+
+        // A negative UDS write response is not success and cannot leave
+        // the socket reusable for an unrelated subsequent request.
+        await RunCaseAsync(async stream =>
+        {
+            var write = await ReadAsync(stream);
+            Check(write.Payload.AsSpan(4).SequenceEqual(simulatedWrite),
+                "Simulated write NRC test receives the intended UDS service.");
+            await SendAsync(stream, DoIpCodec.DiagnosticMessage,
+                FromEcu([0x7F, 0x2E, 0x33]));
+        }, async client =>
+        {
+            await Expect<IOException>(() =>
+                client.ExchangeUdsAsync(simulatedWrite,
+                    TimeSpan.FromSeconds(2), CancellationToken.None),
+                "UDS negative response to simulated write is never accepted.");
+            await Expect<InvalidOperationException>(() =>
+                client.ExchangeUdsAsync(Request, TimeSpan.FromSeconds(1),
+                    CancellationToken.None),
+                "Negative write NRC retires the ambiguous TCP socket.");
+        });
+
         // The caller owns the original byte[] and might reuse it as soon
         // as an async exchange is initiated. All transmission, ACK matching
         // and UDS SID validation must use the same immutable snapshot.
