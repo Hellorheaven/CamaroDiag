@@ -1187,10 +1187,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun inspectDirectDoIpGateway(host: String, operation: DoIpDirectRead.GatewayOperation, eid: String?) {
         if (!requirePremiumLicense()) return
         launchEnhancedUdsRead(journalDoIp = true) { current ->
+            val snapshot = _calibrationWorkspace.value
+            val selected = snapshot.doIpGatewayIdentity?.takeIf {
+                operation != DoIpDirectRead.GatewayOperation.DISCOVER &&
+                    runCatching { DoIpDirectRead.sameHost(host, snapshot.doIpGatewayHost) }.getOrDefault(false)
+            }
             _calibrationWorkspace.update { it.copy(doIpReading = true, doIpGatewayReading = true,
-                doIpGatewayResult = "", doIpDiscoveredVin = "", doIpGatewayHost = host, doIpGatewayIdentity = null) }
+                doIpGatewayResult = "", doIpDiscoveredVin = "", doIpGatewayHost = host, doIpGatewayIdentity = selected) }
             try {
                 val result = DoIpDirectRead.inspectGateway(host, _vehicle.value.vin, operation, eid = eid,
+                    selectedGateway = selected,
                     onControlTrace = { trace -> journalDoIpControlTrace(trace, current) })
                 if (!current()) return@launchEnhancedUdsRead
                 val unavailable = localizedContext.getString(R.string.cal_status_unresolved)

@@ -297,14 +297,14 @@ object DoIpDirectRead {
                     if (frame.type == 0) throw IOException("DoIP gateway rejected identification.")
                     if (frame.type != 0x0004) continue
                     require(frame.data.size in setOf(32, 33)) { "Invalid DoIP identity announcement." }
+                    val observedEid = hex(frame.data.copyOfRange(19, 25))
+                    if (requestedEid != null && requestedEid != observedEid) continue
                     val raw = frame.data.copyOfRange(0, 17)
                     val vin = if (raw.all { it == 0.toByte() } || raw.all { it.u8() == 255 }) null
                         else raw.toString(Charsets.US_ASCII).also { require(validVin(it)) }
                     if (vin != null && expectedVin.isNotEmpty()) require(vin == expectedVin) {
                         "Discovered DoIP vehicle differs from the selected VIN."
                     }
-                    val observedEid = hex(frame.data.copyOfRange(19, 25))
-                    if (requestedEid != null && requestedEid != observedEid) continue
                     found = Gateway(vin, u16(frame.data, 17), frame.version,
                         observedEid, hex(frame.data.copyOfRange(25, 31)), frame.data[31].u8(),
                         frame.data.getOrNull(32)?.u8())
@@ -373,11 +373,12 @@ object DoIpDirectRead {
 
     /** Discovery and control messages never activate a diagnostic TCP route. */
     suspend fun inspectGateway(host: String, vin: String, operation: GatewayOperation,
-        timeoutMs: Int = 5000, eid: String? = null, onControlTrace: (ControlTrace) -> Unit = {}): GatewayResult {
+        timeoutMs: Int = 5000, eid: String? = null, selectedGateway: Gateway? = null,
+        onControlTrace: (ControlTrace) -> Unit = {}): GatewayResult {
         require(eid == null || (host.isNotBlank() && operation == GatewayOperation.DISCOVER))
         return if (host.isBlank() && operation == GatewayOperation.DISCOVER)
             discoverSelectedVehicle(vin, timeoutMs, onControlTrace)
-        else inspectGatewayAt(host, vin, operation, timeoutMs, DOIP_UDP_PORT, onControlTrace, eid)
+        else inspectGatewayAt(host, vin, operation, timeoutMs, DOIP_UDP_PORT, onControlTrace, eid, selectedGateway)
     }
 
     /** The public operation always uses the standardized port; this seam also
@@ -388,7 +389,7 @@ object DoIpDirectRead {
 
     internal suspend fun inspectGatewayAt(host: String, vin: String, operation: GatewayOperation,
         timeoutMs: Int, port: Int, onControlTrace: (ControlTrace) -> Unit,
-        eid: String?): GatewayResult {
+        eid: String?, selectedGateway: Gateway? = null): GatewayResult {
         require(timeoutMs in 100..30_000 && port in 1..65535)
         require(eid == null || operation == GatewayOperation.DISCOVER)
         val address = parseHost(host)
@@ -396,6 +397,9 @@ object DoIpDirectRead {
         require(expected.isEmpty() || validVin(expected))
         val gateway = discover(address, expected, timeoutMs, onControlTrace, port, eid)
         if (operation == GatewayOperation.DISCOVER) return GatewayResult(gateway)
+        require(selectedGateway == null || selectedGateway.matchesIdentity(gateway)) {
+            "DoIP gateway changed before the control query."
+        }
         val socket = DatagramSocket()
         try {
             return io(timeoutMs.toLong(), socket::close) {

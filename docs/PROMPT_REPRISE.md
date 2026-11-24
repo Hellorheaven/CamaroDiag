@@ -1,3 +1,7 @@
+## PR117 — contrôle d’identité avant status/power Android (24/11/2026)
+
+- Les requêtes de contrôle conservent et revérifient l’identité de passerelle déjà sélectionnée avant d’émettre le statut/alimentation. Refus de substitution, ancienne sélection conservée en cas d’échec ; une nouvelle découverte explicite permet de choisir une nouvelle passerelle. EID filtré avant lecture VIN d’une réponse non demandée. Tests négatifs UDP ajoutés. Validation à venir avec le lot Android EID.
+
 ## PR117 — identification EID Android et portée IPv6 (24/11/2026)
 
 - Découverte unicast ciblée par EID (champ optionnel FR/EN) et contrôle de la réponse avant sélection ; affiche aussi les octets d’action supplémentaire et de synchronisation VIN/GID sans interprétation OEM. Les changements d’état d’annonce ne sont pas confondus avec une substitution d’identité. IPv6 link-local : scope obligatoire, comparaison des hôtes avec scope et nom IP TLS sans scope, contrôle d’identité même si VIN UDP indisponible. Tests UDP loopback et scope ajoutés. Postérieur au checkpoint en cours 45456278234 ; nouvelle validation nécessaire. C6/DoIP actifs.

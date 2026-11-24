@@ -64,7 +64,8 @@ class DoIpGatewayControlTraceTest {
                 val request = DatagramPacket(ByteArray(1024), 1024)
                 server.receive(request)
                 assertArrayEquals(expected, request.data.copyOf(request.length))
-                val other = identity()
+                val other = pdu(2, 4, "1G1FA1RX0J0100002".toByteArray(Charsets.US_ASCII) +
+                    byteArrayOf(0x10, 0) + ByteArray(13))
                 server.send(DatagramPacket(other, other.size, request.address, request.port))
                 val announcement = pdu(2, 4, vin.toByteArray(Charsets.US_ASCII) +
                     byteArrayOf(0x10, 0) + eid + ByteArray(6) + byteArrayOf(0x10, 0x10))
@@ -75,7 +76,32 @@ class DoIpGatewayControlTraceTest {
                     DoIpDirectRead.GatewayOperation.DISCOVER, 2000, server.localPort, {}, "010203040506")
                 assertEquals("010203040506", found.gateway.eid)
                 assertEquals(0x10, found.gateway.furtherAction)
-                assertEquals(0x10, found.gateway.syncStatus)
+                assertEquals(0x10, found.gateway.syncStatus ?: -1)
+                future.get(3, TimeUnit.SECONDS)
+            } finally { executor.shutdownNow() }
+        }
+    }
+
+    @Test fun controlQueryRefusesSubstitutedGatewayBeforeSendingStatus() = runBlocking {
+        val loopback = InetAddress.getByName("127.0.0.1")
+        DatagramSocket(0, loopback).use { server ->
+            server.soTimeout = 2000
+            val executor = Executors.newSingleThreadExecutor()
+            val future = executor.submit {
+                respond(server, pdu(255, 1), identity())
+                server.soTimeout = 300
+                try {
+                    server.receive(DatagramPacket(ByteArray(1024), 1024))
+                    fail("Status must not be sent to a changed gateway")
+                } catch (_: java.net.SocketTimeoutException) { /* expected */ }
+            }
+            try {
+                val selected = DoIpDirectRead.Gateway(vin, 0x1000, 2, "010203040506", "000000000000")
+                val result = runCatching {
+                    DoIpDirectRead.inspectGatewayAt("127.0.0.1", vin,
+                        DoIpDirectRead.GatewayOperation.STATUS, 1500, server.localPort, {}, null, selected)
+                }
+                assertTrue(result.isFailure)
                 future.get(3, TimeUnit.SECONDS)
             } finally { executor.shutdownNow() }
         }
