@@ -33,7 +33,17 @@ internal static class BridgePairingDetails
 
     internal static string FormatForAndroid(string host, int port, string pairingCode)
     {
-        if (!IPAddress.TryParse(host, out var ip) ||
+        // IPAddress.TryParse also accepts legacy numeric shorthands
+        // (such as 192.168.1), while Android demands four canonical decimal
+        // octets. Do not copy a pairing address Android will reinterpret or reject.
+        var octets = host?.Split('.');
+        if (octets is not { Length: 4 } ||
+            octets.Any(o => o.Length is < 1 or > 3 ||
+                (o.Length > 1 && o[0] == '0') ||
+                o.Any(c => c is < '0' or > '9') ||
+                !byte.TryParse(o, System.Globalization.NumberStyles.None,
+                    System.Globalization.CultureInfo.InvariantCulture, out _)) ||
+            !IPAddress.TryParse(host, out var ip) ||
             ip.AddressFamily != AddressFamily.InterNetwork ||
             IPAddress.IsLoopback(ip) ||
             !BridgeServer.IsPrivateNetworkAddress(ip))
