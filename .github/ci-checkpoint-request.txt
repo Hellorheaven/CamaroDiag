@@ -1,3 +1,7 @@
+C6 / DOIP CONSOLE INTEGRATION CHECKPOINT — 2026-11-24
+Implementation HEAD: 61c263944b2f068d743ad41b783ec9f1a091fe11
+Grouped Debug validation of Windows console DoIP identity, EntityStatus and PowerMode, observed-version routing, cancellation and FR/EN presentation; earlier UDP/TCP regression fixes included. Windows warnings-as-errors and self-tests, Android, native and Connectors. Intermediate validation, NOT C8; no physical tests, merge or Release. DoIP and C6 remain active.
+
 C6 + DOIP REGRESSION GROUPED CHECKPOINT — 2026-11-24
 Implementation HEAD: 7cc90d232c4384bf5f0dc755f5472005ed5eed6d
 Fix passive UDP offline test using actual OS-assigned bound UDP socket,
