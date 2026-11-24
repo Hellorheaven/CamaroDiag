@@ -333,11 +333,20 @@ internal static class DoIpCodec
     }
 
     internal static byte[] RoutingActivation(ushort testerAddress,
-        byte activationType = 0x00, byte version = Version)
+        byte activationType = 0x00, byte version = Version,
+        byte[]? oemSpecificData = null)
     {
-        var payload = new byte[7];
+        // The ISO-reserved four-byte area remains zero; the optional
+        // additional four OEM bytes must be explicitly provided by the
+        // operator's actual gateway profile. Never invent an OEM token.
+        if (oemSpecificData is not null && oemSpecificData.Length != 4)
+            throw new ArgumentException(
+                "DoIP routing activation OEM field must contain exactly four bytes.");
+        var payload = new byte[oemSpecificData is null ? 7 : 11];
         BinaryPrimitives.WriteUInt16BigEndian(payload, testerAddress);
         payload[2] = activationType;
+        if (oemSpecificData is not null)
+            oemSpecificData.CopyTo(payload, 7);
         return Encode(RoutingActivationRequest, payload, version);
     }
 
