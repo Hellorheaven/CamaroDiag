@@ -41,7 +41,9 @@ internal class OBDLinkBleTransport(private val context: Context) {
     val isConnected: Boolean
         get() = gatt != null && connectionFailure == null
 
-    private val incoming = Channel<ByteArray>(Channel.UNLIMITED)
+    // Fixed upper bound: an unexpectedly chatty adapter must never exhaust
+    // the Android process heap while the UI pauses consumption.
+    private val incoming = BleNotificationBuffer()
     private var pending = ByteArray(0)
     @Volatile private var connectionFailure: Throwable? = null
 
@@ -157,7 +159,7 @@ internal class OBDLinkBleTransport(private val context: Context) {
         override fun onCharacteristicChanged(g: BluetoothGatt, characteristic: BluetoothGattCharacteristic) {
             if (g !== gatt) return
             if (characteristic.uuid == notifyUuid) {
-                readLegacyNotificationValue(characteristic)?.let { incoming.trySend(it) }
+                readLegacyNotificationValue(characteristic)?.let { enqueueNotification(g, it) }
             }
         }
 
@@ -167,7 +169,18 @@ internal class OBDLinkBleTransport(private val context: Context) {
             value: ByteArray
         ) {
             if (g !== gatt) return
-            if (characteristic.uuid == notifyUuid) incoming.trySend(value.copyOf())
+            if (characteristic.uuid == notifyUuid) enqueueNotification(g, value)
+        }
+    }
+
+    private fun enqueueNotification(session: BluetoothGatt, bytes: ByteArray) {
+        if (gatt !== session) return
+        if (!incoming.offer(bytes)) {
+            // Dropping a byte from an ELM serial response changes its meaning.
+            // Retire the transport instead of silently truncating the stream.
+            invalidateSession(session, ObdTransportDisconnectedException(
+                "OBDLink BLE receive buffer full or invalid notification"
+            ))
         }
     }
 
@@ -316,7 +329,7 @@ internal class OBDLinkBleTransport(private val context: Context) {
                                 cause
                             )
                         }
-                        incoming.onReceive { it }
+                        incoming.packets.onReceive { it }
                     }
                 } ?: run {
                     if (gatt !== readSession) {
@@ -372,7 +385,7 @@ internal class OBDLinkBleTransport(private val context: Context) {
         // A new GATT session starts at the default ATT MTU until negotiation succeeds.
         mtuPayload = 20
         pending = ByteArray(0)
-        while (incoming.tryReceive().isSuccess) { }
+        incoming.clear()
         connectResult = null
         writeResult = null
         connectionFailure = null
@@ -380,6 +393,27 @@ internal class OBDLinkBleTransport(private val context: Context) {
     }
 }
 
+
+/**
+ * Bounded loss-intolerant BLE serial receive buffer.
+ * 128 packets * at most 514 bytes (maximum ATT payload at MTU 517) keeps
+ * pending notifications under 65 KiB. Full queues fail closed: dropping bytes
+ * and continuing would silently corrupt diagnostics or a command response.
+ */
+internal class BleNotificationBuffer(
+    capacity: Int = 128
+) {
+    init { require(capacity in 1..1024) }
+    val packets = Channel<ByteArray>(capacity)
+
+    fun offer(bytes: ByteArray): Boolean =
+        bytes.isNotEmpty() && bytes.size <= 514 &&
+            packets.trySend(bytes.copyOf()).isSuccess
+
+    fun clear() {
+        while (packets.tryReceive().isSuccess) { }
+    }
+}
 
 /** One-shot wakeup for the single active BLE reader; signals are never queued across sessions. */
 internal class ObdReadWakeup {
