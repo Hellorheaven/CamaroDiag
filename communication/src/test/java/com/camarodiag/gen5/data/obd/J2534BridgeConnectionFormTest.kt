@@ -70,4 +70,11 @@ class J2534BridgeConnectionFormTest {
         assertTrue(runCatching { parse(profile = "34") }.isFailure)
         assertTrue(runCatching { parse(profile = "999") }.isFailure)
     }
+    @Test fun pastedLineBreaksAndTabsCannotBypassBridgePairingPreflight() {
+        for (input in listOf("\n$pairing", "$pairing\r", "$pairing\n", "\t$pairing")) {
+            assertTrue(runCatching { parse(token = input) }.isFailure)
+        }
+        assertEquals(pairing, parse(token = "  $pairing  ").pairingCode)
+    }
+
 }
