@@ -15,7 +15,7 @@ internal static class DoIpVehicleDiscovery
 {
     internal sealed record Identity(string? Vin, ushort LogicalAddress,
         byte[] Eid, byte[] Gid, byte FurtherAction, byte? VinGidStatus,
-        IPAddress Source);
+        IPAddress Source, byte ProtocolVersion);
 
     internal static byte[] BuildRequest() =>
         DoIpCodec.Encode(DoIpCodec.VehicleIdentificationRequest, [],
@@ -61,7 +61,8 @@ internal static class DoIpVehicleDiscovery
             BinaryPrimitives.ReadUInt16BigEndian(payload.AsSpan(17, 2)),
             payload.AsSpan(19, 6).ToArray(),
             payload.AsSpan(25, 6).ToArray(),
-            payload[31], payload.Length == 33 ? payload[32] : null, source);
+            payload[31], payload.Length == 33 ? payload[32] : null,
+            source, decoded.Version);
     }
 
     internal static bool MatchesRequestedIdentity(Identity found,
