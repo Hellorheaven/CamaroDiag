@@ -82,6 +82,29 @@ class DoIpTests(unittest.TestCase):
             self.assertEqual(confirm_commands(commands, GATEWAY, 0xE80, 0x1234, True,
                 lambda: next(values), lambda _: None, french), expected)
 
+    def test_obd_did_requires_legislated_vin_and_identification(self):
+        for protocol_value in (1, 2):
+            class Fake:
+                closed = False
+                requests = []
+                def verify_vin(self, expected, did):
+                    self.requests.append(did)
+                    return expected
+                def read_did(self, did):
+                    self.requests.append(did)
+                    return bytes((protocol_value,)) if did == 0xF810 else b"\xab"
+                def close(self):
+                    self.closed = True
+            fake = Fake()
+            if protocol_value == 1:
+                self.assertEqual(Session.read_obd(fake, VIN, 0xF40C)["data"], "AB")
+                self.assertEqual(fake.requests, [0xF802, 0xF810, 0xF40C])
+            else:
+                with self.assertRaises(DoIpError):
+                    Session.read_obd(fake, VIN, 0xF40C)
+                self.assertEqual(fake.requests, [0xF802, 0xF810])
+                self.assertTrue(fake.closed)
+
     def test_session_trace_pending_ack_alive_and_count(self):
         with socket.socket() as listener:
             listener.bind(("127.0.0.1", 0))

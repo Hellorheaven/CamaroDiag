@@ -410,12 +410,33 @@ class Session:
             self.close()
             raise
 
-    def verify_vin(self, expected: str) -> str:
+    def read_obd(self, expected: str, did: int | None = None) -> dict:
+        if did is not None and not 0xF400 <= did <= 0xF8FF:
+            raise DoIpError("Expected legislated OBDonUDS DID F400..F8FF")
+        try:
+            vin = self.verify_vin(expected, 0xF802)
+            protocol = self.read_did(0xF810)
+            if len(protocol) != 1:
+                raise DoIpError("Invalid F810 protocol identification")
+            result = {"vin": vin, "protocol_value": protocol[0], "obd_on_uds": protocol[0] == 1}
+            if did is not None:
+                if not result["obd_on_uds"]:
+                    raise DoIpError("Selected ECU did not identify as OBDonUDS")
+                data = vin.encode("ascii") if did == 0xF802 else protocol if did == 0xF810 else self.read_did(did)
+                result.update(did=did, data=data.hex().upper())
+            return result
+        except BaseException:
+            self.close()
+            raise
+
+    def verify_vin(self, expected: str, vin_did: int = 0xF190) -> str:
         if not valid_vin(expected) or self.gateway.vin != expected:
             self.close()
             raise DoIpError("Expected VIN differs from the observed gateway")
         try:
-            reply = self.exchange(b"\x22\xf1\x90")
+            if vin_did not in (0xF190, 0xF802):
+                raise DoIpError("Invalid VIN DID")
+            reply = self.exchange(b"\x22" + logical(vin_did))
             vin = reply[3:].decode("ascii")
             if vin != expected:
                 raise DoIpError("ECU VIN mismatch")

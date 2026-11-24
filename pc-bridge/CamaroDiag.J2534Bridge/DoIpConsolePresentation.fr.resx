@@ -86,4 +86,9 @@
   <data name="DetailResult" xml:space="preserve"><value>DTC 0x{0:X6} ; statut 0x{1:X2} ; enregistrements bruts : {2}</value></data>
   <data name="SequenceReply" xml:space="preserve"><value>Commande n°{0} : réponse ECU {1}</value></data>
   <data name="SequenceComplete" xml:space="preserve"><value>Séquence terminée : {0} réponses.</value></data>
+  <data name="ObdIdentify" xml:space="preserve"><value>Identifier OBDonUDS</value></data>
+  <data name="ObdRead" xml:space="preserve"><value>Lire DID OBDonUDS</value></data>
+  <data name="ObdInvalidDid" xml:space="preserve"><value>Sélectionnez un DID réglementaire de F400 à F8FF.</value></data>
+  <data name="ObdVerified" xml:space="preserve"><value>OBDonUDS confirmé (F810={0:X2}) ; VIN {1}.</value></data>
+  <data name="ObdUnknown" xml:space="preserve"><value>OBDonUDS non confirmé (F810={0:X2}) ; VIN {1}.</value></data>
 </root>

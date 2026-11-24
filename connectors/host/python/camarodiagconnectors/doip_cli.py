@@ -45,10 +45,12 @@ def run(argv: Sequence[str] | None = None) -> dict:
     parser.add_argument("--timeout", type=float, default=3)
     parser.add_argument("--trace", action="store_true", help=tr("Write observed PDUs to stderr", "Journal PDU vers stderr"))
     sub = parser.add_subparsers(dest="action", required=True)
-    for action in ("discover", "status", "power", "vin"):
+    for action in ("discover", "status", "power", "vin", "obd-identify"):
         sub.add_parser(action)
     did = sub.add_parser("did")
     did.add_argument("--did", required=True, type=lambda x: hex_value(x, 4))
+    obd_did = sub.add_parser("obd-did", help=tr("Read legislated DID after ECU identification", "Lire un DID réglementaire après identification ECU"))
+    obd_did.add_argument("--did", required=True, type=lambda x: hex_value(x, 4))
     monitor = sub.add_parser("monitor")
     monitor.add_argument("--did", required=True, type=lambda x: hex_value(x, 4))
     monitor.add_argument("--samples", type=int, default=10)
@@ -83,6 +85,8 @@ def run(argv: Sequence[str] | None = None) -> dict:
     network_only = o.action in ("discover", "status", "power")
     if not network_only and (o.vin is None or not valid_vin(o.vin) or o.tester is None or o.ecu is None or o.tester == o.ecu):
         parser.error(tr("Expected VIN and distinct tester/ECU addresses required", "VIN attendu et adresses testeur/ECU distinctes requis"))
+    if o.action == "obd-did" and not 0xF400 <= o.did <= 0xF8FF:
+        parser.error(tr("Legislated DID F400..F8FF required", "DID réglementaire F400..F8FF requis"))
     if o.action == "monitor" and not (1 <= o.samples <= 3600 and 0.25 <= o.interval <= 60):
         parser.error(tr("Invalid sample count or interval", "Nombre de mesures ou intervalle invalide"))
     if o.action in ("snapshot", "extended") and o.record == 0:
@@ -118,6 +122,9 @@ def run(argv: Sequence[str] | None = None) -> dict:
         return result | {"cancelled": True, "commands_sent": 0}
     with Session(gateway, o.tester, o.ecu, tls=not o.tcp, timeout=o.timeout,
                  trace=trace, context=context) as session:
+        if o.action in ("obd-identify", "obd-did"):
+            return result | {"ecu": o.ecu, "tester": o.tester, "tls": not o.tcp} | session.read_obd(
+                o.vin, o.did if o.action == "obd-did" else None)
         vin = session.verify_vin(o.vin)
         result |= {"vin": vin, "ecu": o.ecu, "tester": o.tester, "tls": not o.tcp}
         if commands is not None:

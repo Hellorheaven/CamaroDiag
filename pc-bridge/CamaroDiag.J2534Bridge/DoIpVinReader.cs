@@ -102,6 +102,46 @@ internal static class DoIpVinReader
         return vin;
     }
 
+    internal sealed record ObdRead(string Vin, byte ProtocolValue, byte[]? Data);
+
+    internal static async Task<ObdRead> ReadObservedObdAsync(
+        DoIpVehicleDiscovery.Identity gateway, IPAddress address, ushort tester,
+        ushort ecu, bool tls, string expectedVin, ushort? did, TimeSpan timeout,
+        CancellationToken token, string? certificate = null,
+        Action<DoIpDiagnosticTransport.PduTrace>? trace = null)
+    {
+        if (!DoIpVehicleDiscovery.IsVehicleVin(expectedVin) || gateway.Vin != expectedVin ||
+            (did.HasValue && ObdOnUdsServices.ClassifyDid(did.Value) == ObdOnUdsServices.DataGroup.NotLegislated))
+            throw new ArgumentException("Explicit matching VIN and legislated DID required.");
+        await using var link = await ConnectObservedAsync(gateway, address, tester, ecu,
+            tls, timeout, token, certificate, trace);
+        return await ReadVerifiedObdAsync(link, expectedVin, did, timeout, token);
+    }
+
+    internal static async Task<ObdRead> ReadVerifiedObdAsync(DoIpDiagnosticTransport link,
+        string expectedVin, ushort? did, TimeSpan timeout, CancellationToken token)
+    {
+        if (!DoIpVehicleDiscovery.IsVehicleVin(expectedVin) ||
+            (did.HasValue && ObdOnUdsServices.ClassifyDid(did.Value) == ObdOnUdsServices.DataGroup.NotLegislated))
+            throw new ArgumentException("Invalid OBDonUDS target.");
+        var vin = ObdOnUdsVehicleIdentification.DecodeVin(await link.ExchangeUdsAsync(
+            ObdOnUdsVehicleIdentification.ReadVin(), timeout, token));
+        if (vin != expectedVin) throw new InvalidDataException("Legislated VIN differs from selected vehicle.");
+        var identification = ObdOnUdsServices.DecodeProtocolIdentification(await link.ExchangeUdsAsync(
+            ObdOnUdsServices.ReadProtocolIdentification(), timeout, token));
+        if (!did.HasValue) return new(vin, identification.Value, null);
+        if (!identification.IsObdOnUds)
+            throw new InvalidDataException("Selected ECU did not identify as OBDonUDS.");
+        var data = did.Value switch
+        {
+            0xF802 => Encoding.ASCII.GetBytes(vin),
+            0xF810 => new byte[] { identification.Value },
+            _ => ObdOnUdsServices.DecodeReadDid(did.Value, await link.ExchangeUdsAsync(
+                ObdOnUdsServices.ReadObdDid(did.Value), timeout, token))
+        };
+        return new(vin, identification.Value, data);
+    }
+
     internal static async Task<byte[]> ReadObservedGatewayDidAsync(
         DoIpVehicleDiscovery.Identity gateway, IPAddress address, ushort tester,
         ushort ecu, bool useTls, ushort did, TimeSpan timeout,

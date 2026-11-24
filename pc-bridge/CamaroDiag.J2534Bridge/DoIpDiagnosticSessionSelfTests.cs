@@ -411,6 +411,44 @@ internal static class DoIpDiagnosticSessionSelfTests
             Check(replies.Count == (failFirst ? 0 : 2), "Sequence stopped or completed as expected.");
         }
 
+        // A legislated OBD route uses F802 and F810, not generic F190.
+        foreach (var protocolValue in new byte[] { 1, 2 })
+        {
+            await RunCaseAsync(async stream =>
+            {
+                var vinRequest = await ReadAsync(stream);
+                Check(vinRequest.Payload.SequenceEqual(new byte[] {0x0E,0x80,0x12,0x34,0x22,0xF8,0x02}),
+                    "OBDonUDS reads legislated VIN.");
+                await SendAsync(stream, DoIpCodec.DiagnosticMessage,
+                    FromEcu([0x62,0xF8,0x02, .. System.Text.Encoding.ASCII.GetBytes(selectedVehicleVin)]));
+                var protocol = await ReadAsync(stream);
+                Check(protocol.Payload.SequenceEqual(new byte[] {0x0E,0x80,0x12,0x34,0x22,0xF8,0x10}),
+                    "OBDonUDS route asks the ECU for its protocol.");
+                await SendAsync(stream, DoIpCodec.DiagnosticMessage, FromEcu([0x62,0xF8,0x10,protocolValue]));
+                if (protocolValue == 1)
+                {
+                    var data = await ReadAsync(stream);
+                    Check(data.Payload.SequenceEqual(new byte[] {0x0E,0x80,0x12,0x34,0x22,0xF4,0x0C}),
+                        "Legislated DID sent after identification.");
+                    await SendAsync(stream, DoIpCodec.DiagnosticMessage, FromEcu([0x62,0xF4,0x0C,0xAB]));
+                }
+            }, async client =>
+            {
+                if (protocolValue == 1)
+                {
+                    var obd = await DoIpVinReader.ReadVerifiedObdAsync(client, selectedVehicleVin,
+                        0xF40C, TimeSpan.FromSeconds(2), CancellationToken.None);
+                    Check(obd.ProtocolValue == 1 && obd.Data is { Length: 1 } && obd.Data[0] == 0xAB,
+                        "OBDonUDS DID data is preserved.");
+                }
+                else await Expect<InvalidDataException>(async () =>
+                {
+                    _ = await DoIpVinReader.ReadVerifiedObdAsync(client, selectedVehicleVin,
+                        0xF40C, TimeSpan.FromSeconds(2), CancellationToken.None);
+                }, "Unknown protocol value cannot authorize the legislated DID.");
+            });
+        }
+
         // One routed session serves sequential monitored DID requests.
         await RunCaseAsync(async stream =>
         {

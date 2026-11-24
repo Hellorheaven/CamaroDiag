@@ -1,3 +1,9 @@
+## PR117 — sélection de route DoIP et identification OBDonUDS (24/11/2026)
+
+- `4ea1eaf` : Android conserve EID/GID, version, VIN et adresse logique de la passerelle choisie (y compris découverte VIN automatique) ; vérification à la nouvelle découverte avant ouverture TCP/TLS. Affichage EID/GID, invalidation à changement de contexte, tests de substitution. Ce contrôle corrèle les annonces UDP, ne les authentifie pas.
+- `4ffc898` : Android distingue explicitement le parcours OBDonUDS de l'UDS générique. Lecture F802 (VIN réglementaire) et F810 (identification de protocole) sur le même ECU ; sélection de route ETHERNET/DOIP/OBD par le sélecteur commun uniquement avec VIN correspondant et F810=01 ; DID réglementaires F400–F8FF accessibles après contrôle, données brutes. Le parcours UDS F190 reste distinct.
+- Parité console Windows et CLI Python Connectors : F802/F810, contrôle du VIN explicite et de la valeur de protocole, lecture DID réglementaire après identification. Pas d'inférence de disponibilité de tous les DIDs ni de décodage/scaling constructeur. Tests ciblés ajoutés. C6/DoIP restent actifs, C8 non commencé ; validation groupée demandée. Pas de fusion, déploiement, publication ou qualification physique.
+
 ## PR117 — authentification mutuelle TLS Android / KeyChain (24/11/2026)
 
 - `1dcc903` : sélection de certificat client par le gestionnaire Android KeyChain, installation des identités PKCS#12 (.p12/.pfx) par l'interface système, alias + empreinte SHA-256 liés au compte sélectionné (état UI), VIN et IP de passerelle. Choisir la passerelle avant le certificat. Clé privée utilisée via KeyChain, ni export, ni stockage du mot de passe dans CamaroDiag. Relecture de l'identité à chaque opération ; validation de la période, usage TLS client et empreinte. Aucune sélection de remplacement automatique.

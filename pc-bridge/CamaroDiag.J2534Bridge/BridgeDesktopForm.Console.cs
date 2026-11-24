@@ -23,7 +23,7 @@ internal sealed partial class BridgeDesktopForm
     private readonly CheckBox doIpUseTls = new()
         { Text = DoIpConsolePresentation.Text("UseTls"), Checked = true, AutoSize = true };
     private readonly TextBox doIpClientCertificate = new() { Dock = DockStyle.Fill };
-    private enum DoIpReadOperation { Vin, Dtcs, DtcCount, DtcSnapshot, DtcExtended, Did, MonitorDid, Backup, Exchange }
+    private enum DoIpReadOperation { Vin, Dtcs, DtcCount, DtcSnapshot, DtcExtended, Did, MonitorDid, Backup, Exchange, ObdIdentify, ObdDid }
     private readonly Button doIpCountDtcs = Button(DoIpConsolePresentation.Text("CountDtcs"));
     private readonly Button doIpSnapshot = Button(DoIpConsolePresentation.Text("Snapshot"));
     private readonly Button doIpExtended = Button(DoIpConsolePresentation.Text("Extended"));
@@ -39,6 +39,8 @@ internal sealed partial class BridgeDesktopForm
     private readonly NumericUpDown doIpMonitorCount = new()
         { Minimum = 1, Maximum = 3600, Value = 60, Dock = DockStyle.Fill };
     private readonly Button doIpReadDid = Button(DoIpConsolePresentation.Text("ReadDid"));
+    private readonly Button doIpObdIdentify = Button(DoIpConsolePresentation.Text("ObdIdentify"));
+    private readonly Button doIpObdDid = Button(DoIpConsolePresentation.Text("ObdRead"));
     private readonly TextBox doIpDid = new() { Dock = DockStyle.Fill };
     private readonly Button doIpReadVin = Button(DoIpConsolePresentation.Text("ReadVin"));
     private readonly Button doIpReadDtcs = Button(DoIpConsolePresentation.Text("ReadDtcs"));
@@ -110,14 +112,14 @@ internal sealed partial class BridgeDesktopForm
         doIpOperations.Controls.Add(doIpConsoleStatus);
         doIpOperations.Controls.Add(doIpConsolePower);
         doIpOperations.Controls.Add(doIpConsoleCancel);
-        doIpConsoleStatus.Enabled = doIpConsolePower.Enabled = doIpReadDtcs.Enabled = doIpCountDtcs.Enabled = doIpSnapshot.Enabled = doIpExtended.Enabled = doIpBackup.Enabled = doIpMonitorDid.Enabled = doIpReadDid.Enabled = doIpExchange.Enabled = doIpReadVin.Enabled = false;
+        doIpConsoleStatus.Enabled = doIpConsolePower.Enabled = doIpReadDtcs.Enabled = doIpCountDtcs.Enabled = doIpSnapshot.Enabled = doIpExtended.Enabled = doIpBackup.Enabled = doIpMonitorDid.Enabled = doIpReadDid.Enabled = doIpObdIdentify.Enabled = doIpObdDid.Enabled = doIpExchange.Enabled = doIpReadVin.Enabled = false;
         doIpConsoleStatus.Click += async (_, _) => await RunDoIpConsoleOperationAsync(false);
         doIpConsolePower.Click += async (_, _) => await RunDoIpConsoleOperationAsync(true);
         doIpConsoleHost.TextChanged += (_, _) =>
         {
             if (doIpPublishingHost) return;
             doIpObservedGateway = null;
-            doIpConsoleStatus.Enabled = doIpConsolePower.Enabled = doIpReadDtcs.Enabled = doIpCountDtcs.Enabled = doIpSnapshot.Enabled = doIpExtended.Enabled = doIpBackup.Enabled = doIpMonitorDid.Enabled = doIpReadDid.Enabled = doIpExchange.Enabled = doIpReadVin.Enabled = false;
+            doIpConsoleStatus.Enabled = doIpConsolePower.Enabled = doIpReadDtcs.Enabled = doIpCountDtcs.Enabled = doIpSnapshot.Enabled = doIpExtended.Enabled = doIpBackup.Enabled = doIpMonitorDid.Enabled = doIpReadDid.Enabled = doIpObdIdentify.Enabled = doIpObdDid.Enabled = doIpExchange.Enabled = doIpReadVin.Enabled = false;
             doIpConsoleDiscoveryCancellation?.Cancel();
         };
         WideRow(fields, doIpOperations, 48);
@@ -125,7 +127,7 @@ internal sealed partial class BridgeDesktopForm
         Row(fields, DoIpConsolePresentation.Text("EcuAddress"), doIpEcuAddress, doIpReadVin);
         WideRow(fields, doIpUseTls, 38);
         Row(fields, DoIpConsolePresentation.Text("CertThumbprint"), doIpClientCertificate);
-        doIpReadDtcs.Enabled = doIpCountDtcs.Enabled = doIpSnapshot.Enabled = doIpExtended.Enabled = doIpBackup.Enabled = doIpMonitorDid.Enabled = doIpReadDid.Enabled = doIpExchange.Enabled = doIpReadVin.Enabled = false;
+        doIpReadDtcs.Enabled = doIpCountDtcs.Enabled = doIpSnapshot.Enabled = doIpExtended.Enabled = doIpBackup.Enabled = doIpMonitorDid.Enabled = doIpReadDid.Enabled = doIpObdIdentify.Enabled = doIpObdDid.Enabled = doIpExchange.Enabled = doIpReadVin.Enabled = false;
         doIpReadVin.Click += async (_, _) => await ReadDoIpDiagnosticFromConsoleAsync(DoIpReadOperation.Vin);
         Row(fields, DoIpConsolePresentation.Text("DtcMask"), doIpDtcMask, doIpReadDtcs);
         doIpReadDtcs.Click += async (_, _) => await ReadDoIpDiagnosticFromConsoleAsync(DoIpReadOperation.Dtcs);
@@ -139,6 +141,10 @@ internal sealed partial class BridgeDesktopForm
         doIpExchange.Click += async (_, _) => await ReadDoIpDiagnosticFromConsoleAsync(DoIpReadOperation.Exchange);
         Row(fields, DoIpConsolePresentation.Text("DidLabel"), doIpDid, doIpReadDid);
         doIpReadDid.Click += async (_, _) => await ReadDoIpDiagnosticFromConsoleAsync(DoIpReadOperation.Did);
+        WideRow(fields, doIpObdIdentify, 38);
+        WideRow(fields, doIpObdDid, 38);
+        doIpObdIdentify.Click += async (_, _) => await ReadDoIpDiagnosticFromConsoleAsync(DoIpReadOperation.ObdIdentify);
+        doIpObdDid.Click += async (_, _) => await ReadDoIpDiagnosticFromConsoleAsync(DoIpReadOperation.ObdDid);
         Row(fields, DoIpConsolePresentation.Text("MonitorInterval"), doIpMonitorInterval, doIpMonitorDid);
         Row(fields, DoIpConsolePresentation.Text("MonitorCount"), doIpMonitorCount);
         doIpMonitorDid.Click += async (_, _) => await ReadDoIpDiagnosticFromConsoleAsync(DoIpReadOperation.MonitorDid);
@@ -154,7 +160,7 @@ internal sealed partial class BridgeDesktopForm
         void InvalidateDoIpContext(object? sender, EventArgs args)
         {
             doIpObservedGateway = null;
-            doIpConsoleStatus.Enabled = doIpConsolePower.Enabled = doIpReadDtcs.Enabled = doIpCountDtcs.Enabled = doIpSnapshot.Enabled = doIpExtended.Enabled = doIpBackup.Enabled = doIpMonitorDid.Enabled = doIpReadDid.Enabled = doIpExchange.Enabled = doIpReadVin.Enabled = false;
+            doIpConsoleStatus.Enabled = doIpConsolePower.Enabled = doIpReadDtcs.Enabled = doIpCountDtcs.Enabled = doIpSnapshot.Enabled = doIpExtended.Enabled = doIpBackup.Enabled = doIpMonitorDid.Enabled = doIpReadDid.Enabled = doIpObdIdentify.Enabled = doIpObdDid.Enabled = doIpExchange.Enabled = doIpReadVin.Enabled = false;
             doIpConsoleDiscoveryCancellation?.Cancel();
         }
         doIpExpectedVin.TextChanged += InvalidateDoIpContext;
@@ -224,7 +230,7 @@ internal sealed partial class BridgeDesktopForm
         var timeout = TimeSpan.FromMilliseconds((int)consoleTimeout.Value);
         using var stop = new CancellationTokenSource();
         doIpConsoleDiscoveryCancellation = stop;
-        doIpConsoleDiscover.Enabled = doIpConsoleStatus.Enabled = doIpConsolePower.Enabled = doIpReadDtcs.Enabled = doIpCountDtcs.Enabled = doIpSnapshot.Enabled = doIpExtended.Enabled = doIpBackup.Enabled = doIpMonitorDid.Enabled = doIpReadDid.Enabled = doIpExchange.Enabled = doIpReadVin.Enabled = false;
+        doIpConsoleDiscover.Enabled = doIpConsoleStatus.Enabled = doIpConsolePower.Enabled = doIpReadDtcs.Enabled = doIpCountDtcs.Enabled = doIpSnapshot.Enabled = doIpExtended.Enabled = doIpBackup.Enabled = doIpMonitorDid.Enabled = doIpReadDid.Enabled = doIpObdIdentify.Enabled = doIpObdDid.Enabled = doIpExchange.Enabled = doIpReadVin.Enabled = false;
         doIpConsoleHost.Enabled = doIpExpectedVin.Enabled = false;
         doIpConsoleCancel.Enabled = true;
         try
@@ -296,7 +302,7 @@ internal sealed partial class BridgeDesktopForm
             {
                 doIpConsoleHost.Enabled = doIpExpectedVin.Enabled = true;
                 doIpConsoleDiscover.Enabled = true;
-                doIpConsoleStatus.Enabled = doIpConsolePower.Enabled = doIpReadDtcs.Enabled = doIpCountDtcs.Enabled = doIpSnapshot.Enabled = doIpExtended.Enabled = doIpBackup.Enabled = doIpMonitorDid.Enabled = doIpReadDid.Enabled = doIpExchange.Enabled = doIpReadVin.Enabled = doIpObservedGateway is not null;
+                doIpConsoleStatus.Enabled = doIpConsolePower.Enabled = doIpReadDtcs.Enabled = doIpCountDtcs.Enabled = doIpSnapshot.Enabled = doIpExtended.Enabled = doIpBackup.Enabled = doIpMonitorDid.Enabled = doIpReadDid.Enabled = doIpObdIdentify.Enabled = doIpObdDid.Enabled = doIpExchange.Enabled = doIpReadVin.Enabled = doIpObservedGateway is not null;
                 doIpConsoleCancel.Enabled = false;
             }
         }
@@ -342,7 +348,7 @@ internal sealed partial class BridgeDesktopForm
             }
         }
         ushort did = 0;
-        if (operation is DoIpReadOperation.Did or DoIpReadOperation.MonitorDid)
+        if (operation is DoIpReadOperation.Did or DoIpReadOperation.MonitorDid or DoIpReadOperation.ObdDid)
         {
             try { did = DoIpVinReader.ParseLogicalAddress(doIpDid.Text.Trim()); }
             catch (ArgumentException)
@@ -350,6 +356,19 @@ internal sealed partial class BridgeDesktopForm
                 ShowError(DoIpConsolePresentation.Text("InvalidDid"));
                 return;
             }
+        }
+        if (operation == DoIpReadOperation.ObdDid &&
+            ObdOnUdsServices.ClassifyDid(did) == ObdOnUdsServices.DataGroup.NotLegislated)
+        {
+            ShowError(DoIpConsolePresentation.Text("ObdInvalidDid"));
+            return;
+        }
+        var expectedObdVin = doIpExpectedVin.Text.Trim();
+        if ((operation is DoIpReadOperation.ObdIdentify or DoIpReadOperation.ObdDid) &&
+            (!DoIpVehicleDiscovery.IsVehicleVin(expectedObdVin) || observed.Vin != expectedObdVin))
+        {
+            ShowError(DoIpConsolePresentation.Text("ExpectedVinRequired"));
+            return;
         }
         var interval = TimeSpan.FromMilliseconds((int)doIpMonitorInterval.Value);
         var sampleCount = (int)doIpMonitorCount.Value;
@@ -451,7 +470,7 @@ internal sealed partial class BridgeDesktopForm
         using var stop = new CancellationTokenSource();
         doIpConsoleDiscoveryCancellation = stop;
         doIpConsoleDiscover.Enabled = doIpConsoleStatus.Enabled =
-            doIpConsolePower.Enabled = doIpReadDtcs.Enabled = doIpCountDtcs.Enabled = doIpSnapshot.Enabled = doIpExtended.Enabled = doIpBackup.Enabled = doIpMonitorDid.Enabled = doIpReadDid.Enabled = doIpExchange.Enabled = doIpReadVin.Enabled = false;
+            doIpConsolePower.Enabled = doIpReadDtcs.Enabled = doIpCountDtcs.Enabled = doIpSnapshot.Enabled = doIpExtended.Enabled = doIpBackup.Enabled = doIpMonitorDid.Enabled = doIpReadDid.Enabled = doIpObdIdentify.Enabled = doIpObdDid.Enabled = doIpExchange.Enabled = doIpReadVin.Enabled = false;
         doIpConsoleHost.Enabled = doIpExpectedVin.Enabled = doIpTesterAddress.Enabled =
             doIpEcuAddress.Enabled = doIpPayload.Enabled = doIpDetailDtc.Enabled = doIpDetailRecord.Enabled = doIpDtcMask.Enabled = doIpDid.Enabled = doIpMonitorInterval.Enabled = doIpMonitorCount.Enabled = doIpUseTls.Enabled = doIpClientCertificate.Enabled = false;
         doIpConsoleCancel.Enabled = true;
@@ -589,6 +608,21 @@ internal sealed partial class BridgeDesktopForm
                                 DoIpConsolePresentation.Text("MonitorComplete"), sampleCount),
                                 Color.DarkGreen);
                     }
+                    else if (operation is DoIpReadOperation.ObdIdentify or DoIpReadOperation.ObdDid)
+                    {
+                        var obd = await DoIpVinReader.ReadObservedObdAsync(observed, address, tester, ecu,
+                            useTls, expectedObdVin, operation == DoIpReadOperation.ObdDid ? did : null,
+                            timeout, stop.Token, certificate, Trace);
+                        RequireCompleteTrace();
+                        stop.Token.ThrowIfCancellationRequested();
+                        if (IsDisposed || Disposing) return;
+                        ConsoleLine("SYSTEM", string.Format(DoIpConsolePresentation.Text(
+                            obd.ProtocolValue == 1 ? "ObdVerified" : "ObdUnknown"),
+                            obd.ProtocolValue, obd.Vin), obd.ProtocolValue == 1 ? Color.DarkGreen : Color.DarkOrange);
+                        if (obd.Data is not null)
+                            ConsoleLine("SYSTEM", string.Format(DoIpConsolePresentation.Text("DidResult"),
+                                did, Convert.ToHexString(obd.Data)), Color.DarkGreen);
+                    }
                     else if (operation == DoIpReadOperation.Did)
                     {
                         var data = await DoIpVinReader.ReadObservedGatewayDidAsync(
@@ -642,7 +676,7 @@ internal sealed partial class BridgeDesktopForm
                     doIpEcuAddress.Enabled = doIpPayload.Enabled = doIpDetailDtc.Enabled = doIpDetailRecord.Enabled = doIpDtcMask.Enabled = doIpDid.Enabled = doIpMonitorInterval.Enabled = doIpMonitorCount.Enabled = doIpUseTls.Enabled = doIpClientCertificate.Enabled = true;
                 doIpConsoleDiscover.Enabled = true;
                 doIpConsoleStatus.Enabled = doIpConsolePower.Enabled =
-                    doIpReadDtcs.Enabled = doIpCountDtcs.Enabled = doIpSnapshot.Enabled = doIpExtended.Enabled = doIpBackup.Enabled = doIpMonitorDid.Enabled = doIpReadDid.Enabled = doIpExchange.Enabled = doIpReadVin.Enabled = doIpObservedGateway is not null;
+                    doIpReadDtcs.Enabled = doIpCountDtcs.Enabled = doIpSnapshot.Enabled = doIpExtended.Enabled = doIpBackup.Enabled = doIpMonitorDid.Enabled = doIpReadDid.Enabled = doIpObdIdentify.Enabled = doIpObdDid.Enabled = doIpExchange.Enabled = doIpReadVin.Enabled = doIpObservedGateway is not null;
                 doIpConsoleCancel.Enabled = false;
             }
         }

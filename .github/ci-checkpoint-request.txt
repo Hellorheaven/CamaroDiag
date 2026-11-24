@@ -1,3 +1,7 @@
+PR117 — grouped DoIP selected gateway correlation and OBDonUDS route validation
+Implementation parent: 4ffc898af22dfa560934f953f277a0656ece3cd0
+Validate Android EID/GID identity binding, selected route and F802/F810 correlation; Windows and Python legislated DID paths, FR/EN and regression suite. Intermediate C6. No merge, deployment, release or physical qualification.
+
 PR117 — grouped Android DoIP mutual TLS checkpoint
 Parent implementation HEAD: 1dcc903704432fd4e59402af3fcfaa346631a715
 Validate KeyChain certificate selection and target binding, TLS key manager, localhost mutual TLS certificate presentation, server identity/trust, all Android DoIP paths and resources FR/EN; existing cross-platform Debug checks. No merge/release/deployment/physical qualification.
