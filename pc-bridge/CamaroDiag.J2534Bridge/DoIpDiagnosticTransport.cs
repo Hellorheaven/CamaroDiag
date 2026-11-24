@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using System.Net.Security;
 using System.Net.Sockets;
 using System.Security.Authentication;
@@ -89,6 +90,7 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
             // registered diagnostic routing state. Keep waiting within
             // the original connection deadline for code 0x10.
             var pendingConfirmation = false;
+            ushort? routingEntityAddress = null;
             while (true)
             {
                 var routing = await session.ReceiveAsync(deadline.Token);
@@ -103,6 +105,13 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
                     continue;
                 }
                 var status = DoIpCodec.ReadRoutingActivationCode(routing, tester);
+                var entityAddress = BinaryPrimitives.ReadUInt16BigEndian(
+                    routing.Payload.AsSpan(2, 2));
+                if (routingEntityAddress.HasValue &&
+                    routingEntityAddress.Value != entityAddress)
+                    throw new InvalidDataException(
+                        "DoIP routing activation response changed gateway logical address.");
+                routingEntityAddress = entityAddress;
                 if (status == 0x11)
                 {
                     pendingConfirmation = true;
