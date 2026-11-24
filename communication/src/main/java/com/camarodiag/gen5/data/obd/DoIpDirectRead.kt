@@ -23,7 +23,7 @@ import kotlin.coroutines.resumeWithException
  * A socket is owned by one operation and is never retained after failure.
  */
 object DoIpDirectRead {
-    enum class Operation { VIN, DID, DTC, MONITOR, BACKUP }
+    enum class Operation { VIN, DID, DTC, DTC_COUNT, MONITOR, BACKUP }
     data class Target private constructor(val address: InetAddress, val tester: Int, val ecu: Int,
         val expectedVin: String, val tls: Boolean, val expectedGateway: Int? = null) {
         companion object {
@@ -97,7 +97,8 @@ object DoIpDirectRead {
         val payloadHex: String, val observedAtUtcMillis: Long = System.currentTimeMillis())
     data class Outcome(val gateway: Gateway, val ecu: Int, val vin: String?,
         val data: ByteArray?, val dtcs: UdsDtcReport?, val trace: List<Trace>,
-        val samples: List<Sample> = emptyList(), val capture: DoIpMemoryBackup.Capture? = null)
+        val samples: List<Sample> = emptyList(), val capture: DoIpMemoryBackup.Capture? = null,
+        val dtcCount: UdsDtcCountReport? = null)
     data class Sample(val index: Int, val elapsedMs: Long, val data: ByteArray)
 
     private const val MAX_PAYLOAD = 1024 * 1024
@@ -524,6 +525,10 @@ object DoIpDirectRead {
                         } else if (operation == Operation.DID) {
                             val reply = session.exchange(byteArrayOf(0x22, (did shr 8).toByte(), did.toByte()), timeoutMs)
                             Outcome(gateway, target.ecu, vin, reply.copyOfRange(3, reply.size), null, trace.toList())
+                        } else if (operation == Operation.DTC_COUNT) {
+                            val reply = session.exchange(byteArrayOf(0x19,0x01,mask.toByte()), timeoutMs)
+                            val count = UdsDtcDecoder.decodeCountByStatusMask(reply)
+                            Outcome(gateway, target.ecu, vin, null, null, trace.toList(), dtcCount = count)
                         } else {
                             val reply = session.exchange(byteArrayOf(0x19,0x02,mask.toByte()), timeoutMs)
                             val report = UdsDtcDecoder.decodeStatusMaskReport(reply.copyOfRange(2, reply.size), mask)

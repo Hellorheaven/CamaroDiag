@@ -308,6 +308,7 @@ fun CalibrationWorkspaceScreen(
         }
     }
     var doIpDid by remember(vehicle) { mutableStateOf("F190") }
+    var doIpDtcMask by remember(vehicle) { mutableStateOf("FF") }
     var doIpTls by remember(vehicle) { mutableStateOf(true) }
     var doIpSampleCount by remember(vehicle) { mutableStateOf("10") }
     var doIpInterval by remember(vehicle) { mutableStateOf("1000") }
@@ -425,9 +426,18 @@ fun CalibrationWorkspaceScreen(
                         enabled = targetReady && vinReady && doIpDid.length == 4, modifier = Modifier.fillMaxWidth()) {
                         Text(stringResource(R.string.cal_read_uds_did))
                     }
-                    OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu, doIpDid, doIpTls, DoIpDirectRead.Operation.DTC) },
-                        enabled = targetReady && vinReady, modifier = Modifier.fillMaxWidth()) {
-                        Text(stringResource(R.string.cal_read_uds_dtcs))
+                    OutlinedTextField(doIpDtcMask, { doIpDtcMask = it.uppercase().filter { c -> c in "0123456789ABCDEF" }.take(2) },
+                        enabled = idle, singleLine = true, modifier = Modifier.fillMaxWidth(),
+                        label = { Text(stringResource(R.string.cal_doip_dtc_mask)) })
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu, doIpDtcMask, doIpTls, DoIpDirectRead.Operation.DTC) },
+                            enabled = targetReady && vinReady && doIpDtcMask.length == 2, modifier = Modifier.weight(1f)) {
+                            Text(stringResource(R.string.cal_read_uds_dtcs))
+                        }
+                        OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu, doIpDtcMask, doIpTls, DoIpDirectRead.Operation.DTC_COUNT) },
+                            enabled = targetReady && vinReady && doIpDtcMask.length == 2, modifier = Modifier.weight(1f)) {
+                            Text(stringResource(R.string.cal_doip_count_button))
+                        }
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedTextField(doIpSampleCount, { doIpSampleCount = it.filter(Char::isDigit).take(2) },

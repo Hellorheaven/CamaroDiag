@@ -1038,4 +1038,8 @@
     <string name="cal_doip_power_unsupported">Diagnostic power: unsupported</string>
     <string name="cal_doip_console_complete">DoIP operation complete</string>
     <string name="cal_doip_console_active">DoIP acquisition in progress</string>
+    <string name="cal_doip_dtc_mask">DTC status mask (hex)</string>
+    <string name="cal_doip_count_button">Count DTCs</string>
+    <string name="cal_doip_count_result">DTC count: %1$d; requested mask 0x%2$02X, available 0x%3$02X, format 0x%4$02X</string>
+    <string name="cal_doip_filtered_dtc_result">DTCs: %1$d; requested mask 0x%2$02X, available 0x%3$02X</string>
 </resources>

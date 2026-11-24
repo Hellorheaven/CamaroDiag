@@ -1416,7 +1416,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     require(didHex.matches(Regex("[0-9A-Fa-f]{4}")))
                     didHex.toInt(16)
                 } else 0xF190
-                val result = DoIpDirectRead.read(target, operation, did, sampleCount = sampleCount, intervalMs = intervalMs,
+                val mask = if (operation in setOf(DoIpDirectRead.Operation.DTC, DoIpDirectRead.Operation.DTC_COUNT)) {
+                    require(didHex.matches(Regex("[0-9A-Fa-f]{2}")))
+                    didHex.toInt(16)
+                } else 255
+                val result = DoIpDirectRead.read(target, operation, did, mask = mask, sampleCount = sampleCount, intervalMs = intervalMs,
                     onTrace = { trace ->
                         journalDoIpTrace(target, trace, current)
                         check(current())
@@ -1433,13 +1437,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 if (!current()) return@launchEnhancedUdsRead
                 val module = "DoIP 0x" + ecu.uppercase()
                 val report = result.dtcs
-                if (report != null) {
+                // A filtered report is not a complete replacement of the ECU's DTC list.
+                if (report != null && mask == 255) {
                     val mapped = report.records.map { it.toDiagnosticDtc(module) }
                     _dtcs.value = _dtcs.value.filterNot { it.module == module } + mapped
                 }
+                val count = result.dtcCount
                 val rendered = when {
+                    count != null -> localizedContext.getString(R.string.cal_doip_count_result,
+                        count.count, mask, count.availabilityMask, count.formatIdentifier)
                     result.samples.isNotEmpty() -> localizedContext.getString(R.string.cal_doip_monitor_complete, result.samples.size)
-                    report != null -> localizedContext.getString(R.string.cal_doip_dtc_count, report.records.size) +
+                    report != null -> localizedContext.getString(R.string.cal_doip_filtered_dtc_result,
+                        report.records.size, mask, report.statusAvailabilityMask) +
                         report.records.joinToString(separator = "\n", prefix = "\n") {
                             "0x" + it.rawDtc.toString(16).uppercase().padStart(6, '0')
                         }

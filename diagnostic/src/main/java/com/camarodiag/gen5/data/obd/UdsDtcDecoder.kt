@@ -80,7 +80,17 @@ data class UdsDtcReport(
     val records: List<DecodedUdsDtcRecord>
 )
 
+data class UdsDtcCountReport(val availabilityMask: Int, val formatIdentifier: Int, val count: Int)
+
 object UdsDtcDecoder {
+    /** ISO 14229 19/01: 59 01 availability format countHi countLo. */
+    fun decodeCountByStatusMask(reply: ByteArray): UdsDtcCountReport {
+        require(reply.size == 6 && reply[0] == 0x59.toByte() && reply[1] == 0x01.toByte()) {
+            "Invalid UDS 19/01 count response."
+        }
+        return UdsDtcCountReport(reply[2].toInt() and 255, reply[3].toInt() and 255,
+            ((reply[4].toInt() and 255) shl 8) or (reply[5].toInt() and 255))
+    }
     /**
      * Historical/offline format-tagged input, NOT a standard 19/02 wire response:
      * DTCStatusAvailabilityMask, DTCFormatIdentifier, then 4-byte records

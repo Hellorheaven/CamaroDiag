@@ -1041,4 +1041,8 @@
     <string name="cal_doip_power_unsupported">Alimentation diagnostic : non prise en charge</string>
     <string name="cal_doip_console_complete">Opération DoIP terminée</string>
     <string name="cal_doip_console_active">Acquisition DoIP en cours</string>
+    <string name="cal_doip_dtc_mask">Masque de statut DTC (hex)</string>
+    <string name="cal_doip_count_button">Compter les DTC</string>
+    <string name="cal_doip_count_result">Nombre de DTC : %1$d ; masque demandé 0x%2$02X, disponible 0x%3$02X, format 0x%4$02X</string>
+    <string name="cal_doip_filtered_dtc_result">DTC : %1$d ; masque demandé 0x%2$02X, disponible 0x%3$02X</string>
 </resources>

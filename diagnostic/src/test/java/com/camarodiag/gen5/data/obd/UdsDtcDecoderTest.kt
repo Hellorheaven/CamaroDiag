@@ -175,4 +175,14 @@ class UdsDtcDecoderTest {
         assertFalse(record.status.confirmed)
         assertFalse(record.status.warningIndicatorRequested)
     }
+    @Test
+    fun countReportPreservesMaskFormatAndUnsignedCount() {
+        val report = UdsDtcDecoder.decodeCountByStatusMask(byteArrayOf(0x59, 1, 0xFF.toByte(), 4, 0xFE.toByte(), 0xDC.toByte()))
+        assertEquals(255, report.availabilityMask)
+        assertEquals(4, report.formatIdentifier)
+        assertEquals(0xFEDC, report.count)
+        assertTrue(runCatching { UdsDtcDecoder.decodeCountByStatusMask(byteArrayOf(0x59, 2, 0, 0, 0, 0)) }.isFailure)
+        assertTrue(runCatching { UdsDtcDecoder.decodeCountByStatusMask(byteArrayOf(0x59, 1, 0, 0, 0)) }.isFailure)
+    }
+
 }
