@@ -191,6 +191,10 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
             throw new ArgumentOutOfRangeException(nameof(p2Timeout),
                 "UDS P2/P2* must be positive and bounded.");
         cancellationToken.ThrowIfCancellationRequested();
+        // Capture the user-approved bytes BEFORE the first asynchronous I/O.
+        // A caller must not be able to mutate a pending diagnostic request
+        // or its ACK/UDS correlation on a shared array.
+        var fixedRequest = request.ToArray();
         var previous = Interlocked.CompareExchange(ref exchangeState, 1, 0);
         if (previous != 0)
             throw new InvalidOperationException(previous == 1 ?
@@ -203,14 +207,14 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         deadline.CancelAfter(timeout);
         await SendAsync(DoIpCodec.Diagnostic(
-            testerAddress, ecuAddress, request, protocolVersion), deadline.Token);
+            testerAddress, ecuAddress, fixedRequest, protocolVersion), deadline.Token);
         var remaining = timeout - overall.Elapsed;
         if (remaining <= TimeSpan.Zero)
             throw new TimeoutException("DoIP diagnostic TX exhausted exchange budget.");
 
         // ACKs and gateway AliveCheck messages are not ECU UDS responses.
         // They cannot reset the P2/P2* timer or the overall deadline.
-        var response = await UdsResponseSequence.AwaitFinalAsync(request,
+        var response = await UdsResponseSequence.AwaitFinalAsync(fixedRequest,
             async (budget, token) =>
             {
                 using var stage = CancellationTokenSource.CreateLinkedTokenSource(token);
@@ -235,7 +239,7 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
                         continue;
                     }
                     if (DoIpCodec.IsCorrelatedDiagnosticAck(
-                        message, testerAddress, ecuAddress, request))
+                        message, testerAddress, ecuAddress, fixedRequest))
                         continue;
                     return DoIpCodec.RequireDiagnosticResponse(
                         message, testerAddress, ecuAddress);
