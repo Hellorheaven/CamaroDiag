@@ -218,6 +218,9 @@ internal static class StandardVehicleProtocols
 internal static class DoIpCodec
 {
     internal const byte Version = 0x02;
+    // ISO 13400 permits 0xFF only for a tester's vehicle identification
+    // request when the target entity's version is not yet known.
+    internal const byte VehicleIdentificationDefaultVersion = 0xFF;
     internal const ushort GenericNegativeAck = 0x0000;
     internal const ushort VehicleIdentificationRequest = 0x0001;
     internal const ushort VehicleIdentificationRequestEid = 0x0002;
@@ -240,9 +243,15 @@ internal static class DoIpCodec
 
     internal sealed record Message(byte Version, ushort Type, byte[] Payload);
 
+    private static bool ValidVersion(byte version, ushort type) =>
+        version is 0x02 or 0x03 or 0x04 ||
+        (version == VehicleIdentificationDefaultVersion &&
+         type is VehicleIdentificationRequest or
+             VehicleIdentificationRequestEid or VehicleIdentificationRequestVin);
+
     internal static byte[] Encode(ushort type, ReadOnlySpan<byte> payload, byte version = Version)
     {
-        if (version is not (0x02 or 0x03 or 0x04) || payload.Length > MaxPayload)
+        if (!ValidVersion(version, type) || payload.Length > MaxPayload)
             throw new ArgumentOutOfRangeException(nameof(payload));
         var frame = new byte[8 + payload.Length];
         frame[0] = version;
@@ -278,8 +287,10 @@ internal static class DoIpCodec
 
     internal static int ReadPayloadLength(ReadOnlySpan<byte> header)
     {
-        if (header.Length != 8 || header[0] is not (0x02 or 0x03 or 0x04) ||
-            header[1] != (byte)~header[0])
+        if (header.Length != 8 ||
+            header[1] != (byte)~header[0] ||
+            !ValidVersion(header[0],
+                BinaryPrimitives.ReadUInt16BigEndian(header.Slice(2, 2))))
             throw new InvalidDataException("DoIP protocol header version/inverse mismatch.");
         var size = BinaryPrimitives.ReadUInt32BigEndian(header.Slice(4, 4));
         if (size > MaxPayload)
