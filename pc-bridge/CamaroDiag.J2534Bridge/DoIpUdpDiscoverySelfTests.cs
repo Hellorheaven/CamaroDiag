@@ -213,6 +213,60 @@ internal static class DoIpUdpDiscoverySelfTests
                 ipv6Entity.CurrentSockets == 1,
                 "IPv6 UDP DoIP status response is correlated and decoded.");
         }
+
+        // Passive IPv6 announcements belong to the ff02::1 link-local
+        // scope and must come from the selected DoIP UDP source port.
+        // Test the filtering without requiring Windows CI runners to join
+        // a real IPv6 multicast interface (hardware/Release test later).
+        var invalidInterface = false;
+        try
+        {
+            DoIpVehicleDiscovery.ValidateIpv6MulticastOptions(0,
+                TimeSpan.FromSeconds(1), null, null);
+        }
+        catch (ArgumentOutOfRangeException) { invalidInterface = true; }
+        Check(invalidInterface,
+            "IPv6 multicast listener requires explicit nonzero interface.");
+
+        var invalidMulticastPort = false;
+        try
+        {
+            DoIpVehicleDiscovery.ValidateIpv6MulticastOptions(2,
+                TimeSpan.FromMilliseconds(500), null, 0);
+        }
+        catch (ArgumentOutOfRangeException) { invalidMulticastPort = true; }
+        Check(invalidMulticastPort,
+            "IPv6 DoIP passive listener refuses source port zero.");
+
+        var invalidMulticastDuration = false;
+        try
+        {
+            DoIpVehicleDiscovery.ValidateIpv6MulticastOptions(2,
+                TimeSpan.FromSeconds(31), null, null);
+        }
+        catch (ArgumentOutOfRangeException) { invalidMulticastDuration = true; }
+        Check(invalidMulticastDuration,
+            "IPv6 multicast listener remains bounded to thirty seconds.");
+
+        DoIpVehicleDiscovery.ValidateIpv6MulticastOptions(2,
+            TimeSpan.FromSeconds(1), 13400, 13400);
+        Check(true, "Valid IPv6 multicast listen profile accepted offline.");
+
+        var expectedIpv6Source = new IPEndPoint(
+            IPAddress.Parse("fe80::1234"), 13400);
+        Check(DoIpVehicleDiscovery.IsIpv6MulticastAnnouncementSource(
+            expectedIpv6Source, 13400),
+            "IPv6 link-local DoIP gateway and standard source port accepted.");
+        Check(!DoIpVehicleDiscovery.IsIpv6MulticastAnnouncementSource(
+            new IPEndPoint(IPAddress.IPv6Loopback, 13400), 13400),
+            "IPv6 loopback does not masquerade as link-local announcement.");
+        Check(!DoIpVehicleDiscovery.IsIpv6MulticastAnnouncementSource(
+            new IPEndPoint(IPAddress.Parse("2001:db8::1"), 13400), 13400),
+            "Unrelated global IPv6 sender cannot claim link-local announcement.");
+        Check(!DoIpVehicleDiscovery.IsIpv6MulticastAnnouncementSource(
+            new IPEndPoint(IPAddress.Parse("fe80::1234"), 15300), 13400),
+            "Wrong UDP source port cannot claim IPv6 DoIP announcement.");
+
         return checks;
     }
 }
