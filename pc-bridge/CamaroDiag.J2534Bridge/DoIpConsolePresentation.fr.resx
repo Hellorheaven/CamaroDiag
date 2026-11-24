@@ -65,4 +65,5 @@
   <data name="ExpectedVin" xml:space="preserve"><value>VIN attendu (laisser IP vide pour rechercher)</value></data>
   <data name="InvalidExpectedVin" xml:space="preserve"><value>Saisissez un VIN valide de 17 caractères.</value></data>
   <data name="VinDiscoveryStarted" xml:space="preserve"><value>Recherche de la passerelle DoIP du VIN {0}</value></data>
+  <data name="TraceIncomplete" xml:space="preserve"><value>Historique DoIP incomplet : limite du tampon de réception dépassée.</value></data>
 </root>
