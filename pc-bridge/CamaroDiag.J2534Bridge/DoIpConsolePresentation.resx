@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms</value></resheader>
+  <data name="Host" xml:space="preserve"><value>DoIP gateway IP</value></data>
+  <data name="Discover" xml:space="preserve"><value>Identify DoIP</value></data>
+  <data name="Cancel" xml:space="preserve"><value>Cancel discovery</value></data>
+  <data name="Unavailable" xml:space="preserve"><value>unavailable</value></data>
+  <data name="Identity" xml:space="preserve"><value>DoIP gateway={0} version=0x{1:X2} logical=0x{2:X4} VIN={3} EID={4} GID={5} further=0x{6:X2} sync={7}</value></data>
+  <data name="Notice" xml:space="preserve"><value>UDP identity is not ECU authentication or programming qualification.</value></data>
+  <data name="Started" xml:space="preserve"><value>DoIP / ISO 13400 UDP identification request to {0}.</value></data>
+  <data name="Canceled" xml:space="preserve"><value>DoIP discovery canceled.</value></data>
+  <data name="Busy" xml:space="preserve"><value>Close the local J2534 channel and stop the Android bridge before DoIP discovery.</value></data>
+  <data name="InvalidHost" xml:space="preserve"><value>Enter an explicit unicast IPv4 or IPv6 gateway address.</value></data>
+</root>
