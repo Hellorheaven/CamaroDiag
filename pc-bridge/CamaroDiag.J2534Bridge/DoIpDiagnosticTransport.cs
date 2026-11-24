@@ -156,6 +156,16 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
                 "UDS request must fit the DoIP diagnostic PDU.", nameof(request));
         if (timeout <= TimeSpan.Zero || timeout > TimeSpan.FromSeconds(30))
             throw new ArgumentOutOfRangeException(nameof(timeout));
+        // Reject malformed stage settings *before* sending any potentially
+        // modifying UDS request to the ECU, even through non-CLI callers.
+        if ((p2Timeout.HasValue &&
+                (p2Timeout.Value <= TimeSpan.Zero ||
+                 p2Timeout.Value > TimeSpan.FromMinutes(10))) ||
+            (p2StarTimeout.HasValue &&
+                (p2StarTimeout.Value <= TimeSpan.Zero ||
+                 p2StarTimeout.Value > TimeSpan.FromMinutes(10))))
+            throw new ArgumentOutOfRangeException(nameof(p2Timeout),
+                "UDS P2/P2* must be positive and bounded.");
         // Keep the complete request/reply transaction budget, including TX.
         var overall = System.Diagnostics.Stopwatch.StartNew();
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
