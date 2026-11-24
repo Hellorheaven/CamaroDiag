@@ -47,9 +47,10 @@ internal static class DoIpUdpDiscoverySelfTests
             "127.0.0.1", TimeSpan.FromSeconds(2), CancellationToken.None,
             portOverride: port);
         var request = await gateway.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(2));
-        Check(DoIpCodec.Decode(request.Buffer).Type ==
-            DoIpCodec.VehicleIdentificationRequest,
-            "Unicast discovery uses standard ISO 13400 identification request.");
+        var discoveryRequest = DoIpCodec.Decode(request.Buffer);
+        Check(discoveryRequest.Type == DoIpCodec.VehicleIdentificationRequest &&
+            discoveryRequest.Version == 0xFF,
+            "Unicast DoIP discovery sends 0xFF default version before ECU negotiation.");
         await rogue.SendAsync(Identity(rogueVin),
             request.RemoteEndPoint);
         await Task.Delay(20); // Ensure spoof reaches the client first.
