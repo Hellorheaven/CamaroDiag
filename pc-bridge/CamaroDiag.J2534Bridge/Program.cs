@@ -37,6 +37,16 @@ internal static class Program
         if (BridgeCommandLineHelp.IsHelpRequest(args))
             return BridgeCommandLineHelp.Run(args);
 
+        // Offline COM enumeration must win over every active diagnostic or
+        // programming flag. The handler rejects mixed invocations, rather
+        // than allowing any protocol handler to open a driver accidentally.
+        if (args.Contains(ConnectorDiscoveryCli.ListCommand, StringComparer.OrdinalIgnoreCase))
+            return ConnectorDiscoveryCli.ListPorts(args);
+
+        // Explicit public CD/1 prototype discovery rejects any extra flags.
+        if (args.Contains(ConnectorDiscoveryCli.Command, StringComparer.OrdinalIgnoreCase))
+            return ConnectorDiscoveryCli.Run(args);
+
         // Explicit bidirectional ISO/SAE exchanges. No default startup
         // programming and no network-listener fallback on malformed CLI.
         if (args.Contains(StandardProtocolCli.J1939FdCmdtCommand,
@@ -84,16 +94,6 @@ internal static class Program
         if (args.Contains(StandardProtocolCli.PassThruCommand,
             StringComparer.OrdinalIgnoreCase))
             return StandardProtocolCli.RunJ2534(args);
-
-        // Local COM port enumeration is deliberately routed before the
-        // updater, J2534 drivers, network listener and all ECU operations.
-        if (args.Contains(ConnectorDiscoveryCli.ListCommand, StringComparer.OrdinalIgnoreCase))
-            return ConnectorDiscoveryCli.ListPorts(args);
-
-        // Explicit public CD/1 discovery. Never falls through to a vendor
-        // driver, network listener, updater or ECU operation.
-        if (args.Contains(ConnectorDiscoveryCli.Command, StringComparer.OrdinalIgnoreCase))
-            return ConnectorDiscoveryCli.Run(args);
 
         // Offline verification must never load a vendor DLL, contact an ECU,
         // start the network bridge or launch the updater.
