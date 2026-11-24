@@ -18,7 +18,8 @@ internal static class DoIpVehicleDiscovery
         IPAddress Source);
 
     internal static byte[] BuildRequest() =>
-        DoIpCodec.Encode(DoIpCodec.VehicleIdentificationRequest, []);
+        DoIpCodec.Encode(DoIpCodec.VehicleIdentificationRequest, [],
+            DoIpCodec.VehicleIdentificationDefaultVersion);
 
     internal static byte[] BuildVinRequest(string vin)
     {
@@ -26,14 +27,16 @@ internal static class DoIpVehicleDiscovery
             vin.Any(c => c < 0x20 || c > 0x7E))
             throw new ArgumentException("DoIP VIN request requires 17 printable ASCII characters.");
         return DoIpCodec.Encode(DoIpCodec.VehicleIdentificationRequestVin,
-            Encoding.ASCII.GetBytes(vin));
+            Encoding.ASCII.GetBytes(vin),
+            DoIpCodec.VehicleIdentificationDefaultVersion);
     }
 
     internal static byte[] BuildEidRequest(byte[] eid)
     {
         if (eid is null || eid.Length != 6)
             throw new ArgumentException("DoIP EID request requires exactly 6 bytes.");
-        return DoIpCodec.Encode(DoIpCodec.VehicleIdentificationRequestEid, eid);
+        return DoIpCodec.Encode(DoIpCodec.VehicleIdentificationRequestEid, eid,
+            DoIpCodec.VehicleIdentificationDefaultVersion);
     }
 
     internal static Identity ParseAnnouncement(byte[] packet, IPAddress source)
