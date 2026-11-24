@@ -1007,4 +1007,7 @@
     <string name="cal_doip_cancel">Annuler</string>
     <string name="cal_doip_dtc_count">DTC : %1$d</string>
     <string name="cal_doip_failed">Lecture DoIP impossible. Vérifiez la passerelle, les adresses, le VIN et la confiance TLS.</string>
+    <string name="cal_doip_samples">Échantillons (1–30)</string>
+    <string name="cal_doip_interval">Intervalle (ms)</string>
+    <string name="cal_doip_monitor">Monitorer le DID</string>
 </resources>

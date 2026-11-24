@@ -1004,4 +1004,7 @@
     <string name="cal_doip_cancel">Cancel</string>
     <string name="cal_doip_dtc_count">DTCs: %1$d</string>
     <string name="cal_doip_failed">DoIP read failed. Check gateway, addresses, VIN and TLS trust.</string>
+    <string name="cal_doip_samples">Samples (1–30)</string>
+    <string name="cal_doip_interval">Interval (ms)</string>
+    <string name="cal_doip_monitor">Monitor DID</string>
 </resources>

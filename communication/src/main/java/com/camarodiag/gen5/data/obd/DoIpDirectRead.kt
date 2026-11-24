@@ -23,7 +23,7 @@ import kotlin.coroutines.resumeWithException
  * A socket is owned by one operation and is never retained after failure.
  */
 object DoIpDirectRead {
-    enum class Operation { VIN, DID, DTC }
+    enum class Operation { VIN, DID, DTC, MONITOR }
     data class Target private constructor(val address: InetAddress, val tester: Int, val ecu: Int,
         val expectedVin: String, val tls: Boolean) {
         companion object {
@@ -56,7 +56,9 @@ object DoIpDirectRead {
     data class Gateway(val vin: String?, val logicalAddress: Int, val version: Int)
     data class Trace(val direction: String, val payloadHex: String)
     data class Outcome(val gateway: Gateway, val ecu: Int, val vin: String?,
-        val data: ByteArray?, val dtcs: UdsDtcReport?, val trace: List<Trace>)
+        val data: ByteArray?, val dtcs: UdsDtcReport?, val trace: List<Trace>,
+        val samples: List<Sample> = emptyList())
+    data class Sample(val index: Int, val elapsedMs: Long, val data: ByteArray)
 
     private const val MAX_PAYLOAD = 1024 * 1024
     private data class Frame(val version: Int, val type: Int, val data: ByteArray)
@@ -179,6 +181,23 @@ object DoIpDirectRead {
                 }
             }
         }
+        /** Maintain routing while idle. A timeout is normal only before the
+         * first header byte; partial or unsolicited diagnostic data is fatal. */
+        fun waitBetweenSamples(intervalMs: Int, frameTimeoutMs: Int) {
+            val end = deadline(intervalMs)
+            while (System.nanoTime() < end) {
+                socket.soTimeout = remaining(end)
+                val first = try { socket.getInputStream().read() }
+                    catch (_: SocketTimeoutException) { return }
+                if (first < 0) throw EOFException("DoIP socket closed between samples.")
+                val frameEnd = deadline(frameTimeoutMs)
+                val header = byteArrayOf(first.toByte()) + readExact(7, frameEnd)
+                val frame = parseFrame(header, readExact(length(header), frameEnd))
+                require(frame.version == gateway.version && alive(frame, frameEnd)) {
+                    "Unsolicited DoIP message between samples."
+                }
+            }
+        }
         fun exchange(request: ByteArray, timeout: Int): ByteArray {
             val end = deadline(timeout)
             check(trace.size < 128) { "Too many DoIP diagnostic messages." }
@@ -220,15 +239,19 @@ object DoIpDirectRead {
      * A missing gateway VIN is checked with F190 on the same logical ECU.
      */
     suspend fun read(target: Target, operation: Operation, did: Int = 0xF190,
-        mask: Int = 255, timeoutMs: Int = 5000): Outcome {
+        mask: Int = 255, timeoutMs: Int = 5000, sampleCount: Int = 10,
+        intervalMs: Int = 1000): Outcome {
         require(timeoutMs in 100..30_000 && did in 0..65535 && mask in 0..255)
         require(operation == Operation.VIN || target.expectedVin.isNotEmpty())
+        require(sampleCount in 1..30 && intervalMs in 250..5000)
+        val budget = if (operation == Operation.MONITOR)
+            timeoutMs * (sampleCount + 5L) + intervalMs * (sampleCount - 1L) else timeoutMs * 5L
         val gateway = discover(target, timeoutMs)
         require(target.tester != gateway.logicalAddress)
         val trace = mutableListOf<Trace>()
         val base = Socket()
         try {
-            return io(timeoutMs * 4L, { base.close() }) {
+            return io(budget, { base.close() }) {
                 base.connect(InetSocketAddress(target.address, if (target.tls) 3496 else 13400), timeoutMs)
                 base.soTimeout = timeoutMs
                 val wire = if (target.tls) {
@@ -252,7 +275,7 @@ object DoIpDirectRead {
                         }
                         return vin
                     }
-                    var vin: String
+                    val vin: String
                     if (operation == Operation.VIN || (operation == Operation.DID && did == 0xF190)) {
                         vin = readVin()
                         Outcome(gateway, target.ecu, vin, vin.toByteArray(Charsets.US_ASCII), null, trace.toList())
@@ -260,7 +283,19 @@ object DoIpDirectRead {
                         // The gateway's announcement is not proof of the selected ECU identity.
                         vin = readVin()
                         require(vin == target.expectedVin)
-                        if (operation == Operation.DID) {
+                        if (operation == Operation.MONITOR) {
+                            val samples = mutableListOf<Sample>()
+                            val start = System.nanoTime()
+                            for (index in 1..sampleCount) {
+                                val reply = session.exchange(byteArrayOf(0x22, (did shr 8).toByte(), did.toByte()), timeoutMs)
+                                require(reply.size <= 4099) { "DID monitoring sample exceeds limit." }
+                                samples += Sample(index, (System.nanoTime() - start) / 1_000_000,
+                                    reply.copyOfRange(3, reply.size))
+                                if (index < sampleCount) session.waitBetweenSamples(intervalMs, timeoutMs)
+                            }
+                            require(readVin() == vin)
+                            Outcome(gateway, target.ecu, vin, null, null, trace.toList(), samples.toList())
+                        } else if (operation == Operation.DID) {
                             val reply = session.exchange(byteArrayOf(0x22, (did shr 8).toByte(), did.toByte()), timeoutMs)
                             Outcome(gateway, target.ecu, vin, reply.copyOfRange(3, reply.size), null, trace.toList())
                         } else {

@@ -1140,17 +1140,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun readDirectDoIp(host: String, tester: String, ecu: String, didHex: String,
-        tls: Boolean, operation: DoIpDirectRead.Operation) {
+        tls: Boolean, operation: DoIpDirectRead.Operation, sampleCount: Int = 10, intervalMs: Int = 1000) {
         if (!requirePremiumLicense()) return
         launchEnhancedUdsRead { current ->
             _calibrationWorkspace.update { it.copy(doIpReading = true, doIpResult = "", doIpTrace = emptyList()) }
             try {
                 val target = DoIpDirectRead.Target.parse(host, tester, ecu, _vehicle.value.vin, tls)
-                val did = if (operation == DoIpDirectRead.Operation.DID) {
+                val did = if (operation in setOf(DoIpDirectRead.Operation.DID, DoIpDirectRead.Operation.MONITOR)) {
                     require(didHex.matches(Regex("[0-9A-Fa-f]{4}")))
                     didHex.toInt(16)
                 } else 0xF190
-                val result = DoIpDirectRead.read(target, operation, did)
+                val result = DoIpDirectRead.read(target, operation, did, sampleCount = sampleCount, intervalMs = intervalMs)
                 if (!current()) return@launchEnhancedUdsRead
                 val module = "DoIP 0x" + ecu.uppercase()
                 val report = result.dtcs
@@ -1159,6 +1159,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     _dtcs.value = _dtcs.value.filterNot { it.module == module } + mapped
                 }
                 val rendered = when {
+                    result.samples.isNotEmpty() -> result.samples.joinToString("\n") { sample ->
+                        "#${sample.index}  ${sample.elapsedMs} ms  " + sample.data.joinToString(" ") { "%02X".format(it.toInt() and 255) }
+                    }
                     report != null -> localizedContext.getString(R.string.cal_doip_dtc_count, report.records.size) +
                         report.records.joinToString(separator = "\n", prefix = "\n") {
                             "0x" + it.rawDtc.toString(16).uppercase().padStart(6, '0')

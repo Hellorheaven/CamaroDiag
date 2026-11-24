@@ -254,6 +254,7 @@ fun CalibrationWorkspaceScreen(
     onReadUdsDtcs: (String, String, String) -> Unit,
     onReadDirectDoIp: (String, String, String, String, Boolean, DoIpDirectRead.Operation) -> Unit,
     onCancelDirectDoIp: () -> Unit,
+    onMonitorDirectDoIp: (String, String, String, String, Boolean, Int, Int) -> Unit,
     onConnectJ2534Bridge: (String, String, String, String, String, String) -> Unit,
     onDisconnectJ2534Bridge: () -> Unit,
     onCaptureJ2534Memory: (String, String, Int, EcuBackupCoverage.Region) -> Unit,
@@ -279,6 +280,8 @@ fun CalibrationWorkspaceScreen(
     var doIpEcu by remember(vehicle) { mutableStateOf("") }
     var doIpDid by remember(vehicle) { mutableStateOf("F190") }
     var doIpTls by remember(vehicle) { mutableStateOf(true) }
+    var doIpSampleCount by remember(vehicle) { mutableStateOf("10") }
+    var doIpInterval by remember(vehicle) { mutableStateOf("1000") }
     var udsRequestCanId by remember(vehicle) { mutableStateOf("") }
     var udsResponseCanId by remember(vehicle) { mutableStateOf("") }
     var udsDid by remember { mutableStateOf("F190") }
@@ -378,6 +381,26 @@ fun CalibrationWorkspaceScreen(
                     OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu, doIpDid, doIpTls, DoIpDirectRead.Operation.DTC) },
                         enabled = targetReady && vinReady, modifier = Modifier.fillMaxWidth()) {
                         Text(stringResource(R.string.cal_read_uds_dtcs))
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(doIpSampleCount, { doIpSampleCount = it.filter(Char::isDigit).take(2) },
+                            enabled = idle, singleLine = true, modifier = Modifier.weight(1f),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            label = { Text(stringResource(R.string.cal_doip_samples)) })
+                        OutlinedTextField(doIpInterval, { doIpInterval = it.filter(Char::isDigit).take(4) },
+                            enabled = idle, singleLine = true, modifier = Modifier.weight(1f),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            label = { Text(stringResource(R.string.cal_doip_interval)) })
+                    }
+                    val samples = doIpSampleCount.toIntOrNull()
+                    val interval = doIpInterval.toIntOrNull()
+                    OutlinedButton(onClick = {
+                        if (samples != null && interval != null)
+                            onMonitorDirectDoIp(doIpHost, doIpTester, doIpEcu, doIpDid, doIpTls, samples, interval)
+                    }, enabled = targetReady && vinReady && doIpDid.length == 4 &&
+                        samples != null && samples in 1..30 && interval != null && interval in 250..5000,
+                        modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(R.string.cal_doip_monitor))
                     }
                     if (state.doIpReading) {
                         LinearProgressIndicator(Modifier.fillMaxWidth())
