@@ -6,7 +6,7 @@ Le pont Windows CamaroDiag utilise le transport standard **Diagnostics over IP (
 
 ### Fonctions disponibles dans le code
 
-- Identification UDP ISO 13400 : demandes de découverte **avec version générique 0xFF uniquement pour les types 0x0001/0x0002/0x0003**, avant de connaître la version ECU ; demande unicast vers une adresse IPv4 explicite, demande vers une adresse de diffusion explicitement sélectionnée, écoute passive, recherche ciblée VIN ou EID, parsing VIN / adresse logique / EID / GID. Les réponses aux requêtes unicast sont corrélées à l'adresse IP **et au port UDP** du destinataire ; l'écoute d'une annonce n'authentifie pas un ECU.
+- Identification UDP ISO 13400 : demandes de découverte **avec version générique 0xFF uniquement pour les types 0x0001/0x0002/0x0003**, avant de connaître la version ECU ; demande unicast vers une adresse IPv4 **ou IPv6** explicite, demande de diffusion IPv4 explicitement sélectionnée, écoute passive IPv4, recherche ciblée VIN ou EID, parsing VIN / adresse logique / EID / GID. Le multicast IPv6 n'est pas encore intégré. Les réponses aux requêtes unicast sont corrélées à l'adresse IP **et au port UDP** du destinataire ; l'écoute d'une annonce n'authentifie pas un ECU.
 - Informations de passerelle : état de l'entité, nombre de sockets et mode d'alimentation diagnostique.
 - Session TCP : ouverture vers le port DoIP normalisé, activation du routage et confirmation du véhicule, réponses aux demandes AliveCheck. Les requêtes d'activation de routage peuvent porter un type explicite (`--routing-activation-type`, 1 octet) et un champ OEM facultatif (`--routing-oem-data`, exactement 4 octets) : la demande reste de longueur **7 ou 11 octets**, les 4 octets réservés ISO restent à zéro. Gestion des versions DoIP 0x02/0x03/0x04 selon la passerelle.
 - TLS : port sécurisé 3496, authentification du serveur par le système d'exploitation, refus de revenir silencieusement au TCP clair ; certificat client du magasin de certificats Windows si requis et présent.
@@ -19,6 +19,7 @@ Les adresses suivantes sont documentaires ; remplacer chacune par la passerelle 
 
 ```powershell
 CamaroDiag.J2534Bridge.exe --doip-discover --host 192.0.2.10 --timeout-ms 1500
+CamaroDiag.J2534Bridge.exe --doip-discover --host ::1 --timeout-ms 1500
 CamaroDiag.J2534Bridge.exe --doip-discover --broadcast-ip 192.168.1.255 --timeout-ms 2000
 CamaroDiag.J2534Bridge.exe --doip-status --host 192.0.2.10
 CamaroDiag.J2534Bridge.exe --doip-status --host 192.0.2.10 --power-mode true
@@ -45,7 +46,7 @@ DoIP ne fournit pas de numéro de transaction UDS universel : deux réponses tar
 
 CamaroDiag Windows Bridge uses **ISO 13400 Diagnostics over IP** to exchange UDS traffic with an explicitly selected gateway. Transport support does not imply vehicle programming support, authorized OEM security access or recovery capability.
 
-Implemented software includes UDP vehicle identification using the standard **0xFF default protocol version solely for discovery request types**, entity/power status, TCP routing activation and vehicle confirmation, AliveCheck, TLS with operating-system server trust, optional client certificates from the Windows store, diagnostic positive/negative acknowledgements, generic header NACKs, source and target logical-address correlation and configurable P2/P2* deadlines within a separate overall timeout.
+Implemented software includes UDP IPv4/IPv6 unicast vehicle identification using the standard **0xFF default protocol version solely for discovery request types**, IPv4 broadcast/passive discovery (IPv6 multicast not yet implemented), entity/power status, TCP routing activation and vehicle confirmation, AliveCheck, TLS with operating-system server trust, optional client certificates from the Windows store, diagnostic positive/negative acknowledgements, generic header NACKs, source and target logical-address correlation and configurable P2/P2* deadlines within a separate overall timeout.
 
 Only **one diagnostic request per TCP connection can be active at a time**. A successful final UDS response permits another sequential exchange; cancellation, timeout or an uncertain transmission permanently retires the existing connection. No automatic re-send of a potentially mutating ECU operation occurs. Active UDP unicast replies must match both the selected IP address and UDP source port.
 
