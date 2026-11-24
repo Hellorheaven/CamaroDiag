@@ -765,15 +765,16 @@ class BluetoothObdManager(context: Context) {
      * adapter. Receive/header support is checked separately from simulation state; this
      * path never routes through the demo adapter or the ISO-TP-only J2534 bridge.
      */
-    suspend fun sendRawCanFrame(frame: RawCanFrame): String =
-        sendRawCanFrameWithStatus(frame).adapterOutput
-
     suspend fun sendRawCanFrameWithStatus(
         frame: RawCanFrame,
-        beforePayloadTransmit: () -> Unit = {}
+        approval: EcuWriteConsentFlow.Approval,
+        isOperatorContextCurrent: () -> Boolean
     ): CanConsoleRawTransmissionResult =
         withContext(Dispatchers.IO) {
         val requestedEpoch = transportSessionEpoch.capture()
+        // The raw payload may be a mutating ECU command. No public no-approval
+        // convenience entrypoint may bypass the two independent UI actions.
+        EcuWriteConsentFlow.requireCurrentForTransmit(approval, isOperatorContextCurrent)
         check(isObdCommandChannelAvailable && !isDemoMode && !isSimulationActive) {
             "Raw CAN transmission requires a connected physical adapter."
         }
@@ -859,7 +860,12 @@ class BluetoothObdManager(context: Context) {
                             chunk, System.nanoTime() / 1_000_000L, System.currentTimeMillis()
                         )
                     },
-                    beforeTransmit = beforePayloadTransmit
+                    beforeTransmit = {
+                        transportSessionEpoch.requireQueuedCurrent(requestedEpoch)
+                        EcuWriteConsentFlow.requireCurrentForTransmit(
+                            approval, isOperatorContextCurrent
+                        )
+                    }
                 )
                 val diagnosticStatus = timedCorrelation.complete(
                     System.nanoTime() / 1_000_000L, System.currentTimeMillis()
