@@ -85,6 +85,11 @@ internal static class Program
             StringComparer.OrdinalIgnoreCase))
             return StandardProtocolCli.RunJ2534(args);
 
+        // Local COM port enumeration is deliberately routed before the
+        // updater, J2534 drivers, network listener and all ECU operations.
+        if (args.Contains(ConnectorDiscoveryCli.ListCommand, StringComparer.OrdinalIgnoreCase))
+            return ConnectorDiscoveryCli.ListPorts(args);
+
         // Explicit public CD/1 discovery. Never falls through to a vendor
         // driver, network listener, updater or ECU operation.
         if (args.Contains(ConnectorDiscoveryCli.Command, StringComparer.OrdinalIgnoreCase))
