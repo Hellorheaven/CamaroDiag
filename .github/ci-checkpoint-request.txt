@@ -1,3 +1,7 @@
+PR117 — grouped Debug validation of WWH OBDonUDS over DoIP on Android Windows Connectors
+Implementation parent: 81013db5c12775018c1c8b397f959e76cdce8275
+Previous full Debug run 45498873150 succeeded. Validate WWH 19/42 19/55 19/56, same-socket VIN/protocol revalidation, Android and Windows localized UI. No physical qualification, merge or Release.
+
 PR117 — revalidate Android JUnit signatures and Kotlin warnings after 11/12 checkpoint
 Implementation parent: b618d3477a3e42a8a4f5d0526abe5febb6a113dc
 Run 45459305032: all non-Android technical jobs passed, Android JUnit initialization failed. Full Debug gate, no merge or release.

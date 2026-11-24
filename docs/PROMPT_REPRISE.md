@@ -1,3 +1,7 @@
+## PR117 — checkpoint WWH multi-plateforme (24/11/2026)
+
+- Run 45498873150 sur 876015f : réussi. Nouveau checkpoint demandé sur 81013db5c12775018c1c8b397f959e76cdce8275 incluant WWH Python, Android et Windows. Aucune qualification matérielle ni fusion.
+
 ## PR117 — WWH-OBD sur DoIP Windows GUI (24/11/2026)
 
 - Console Windows : accès 19/42, 19/55, 19/56 avec masques et groupe explicites ; lecteur vérifié F802/F810 avant et après sur le même socket, réutilisation des codecs Windows, journal, annulation et réglages TLS/routage existants ; rendu FR/EN. À valider avec le lot Android/Python.
