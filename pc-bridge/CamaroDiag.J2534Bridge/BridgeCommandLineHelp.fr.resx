@@ -46,6 +46,8 @@ Exemples :
                               Remplacer l'index fictif 3 par l'interface du lien
                               véhicule explicitement vérifiée, sans le deviner.
                               Filtrage --vin ou --eid, jamais les deux.
+                              La sortie donne version=0x02/0x03/0x04 observée ;
+                              vérifier la passerelle avant --doip-version.
   --doip-status               État passerelle ou --power-mode true par UDP.
                               --doip-version 2, 3 ou 4 ; 255 réservé à la découverte.
   --doip-exchange             Diagnostic UDS par TCP/TLS : --host, --tester, --ecu,
