@@ -712,7 +712,7 @@
     <string name="can_sniffer_response_heading">Last OBD-II response</string>
     <string name="can_sniffer_request_complete">Read-only request completed.</string>
     <string name="can_sniffer_request_failed">Read-only request failed.</string>
-    <string name="can_sniffer_bus_limit">This capture path uses the active 11-bit, 500 kbit/s HS-CAN profile. SW-CAN and other buses require a different interface.</string>
+    <string name="can_sniffer_bus_limit">Select the physical network bitrate. This console does not yet cover SW-CAN.</string>
     <string name="can_sniffer_stn_filter_notice">On STN adapters, temporary filters are cleared for raw capture and automatic OBD filtering is re-enabled afterward. Custom filters set by other software are not restored.</string>
     <string name="connection_lost_bluetooth" tools:ignore="MissingTranslation">Bluetooth connection lost. Reconnect the adapter and restart the operation.</string>
     <string name="connection_lost_vehicle" tools:ignore="MissingTranslation">Vehicle connection lost. Reconnect to the vehicle and restart the operation.</string>
@@ -990,4 +990,6 @@
     <string name="can_console_export_recent_raw_rx"># RX RAW - recent in-memory excerpt only, not a complete capture</string>
     <string name="can_console_export_failed_marker">FAILED</string>
     <string name="can_console_history_recent_scope">On-screen history: up to 300 recent events. The complete raw RX stream may be archived separately; older TX entries are not retained.</string>
+    <string name="can_console_bitrate_changed">CAN %1$d kbit/s</string>
+    <string name="can_console_capture_profile">CAN capture %1$d kbit/s, %2$d-bit</string>
 </resources>

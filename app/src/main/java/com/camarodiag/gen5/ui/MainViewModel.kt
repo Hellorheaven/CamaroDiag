@@ -111,6 +111,7 @@ data class CanConsoleHistoryEntry(
 
 data class LiveCanMonitorState(
     val isCapturing: Boolean = false,
+    val bitrate: Int = 500_000,
     val rawText: String = "",
     val report: CanTraceAnalysisReport? = null,
     val isSendingRequest: Boolean = false,
@@ -2062,6 +2063,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         events.map { ParsedCanConsoleRecord(it.direction, it.content, it.succeeded) }
     )
 
+    /** Changing the physical network invalidates outstanding raw TX consent and
+     * observed-ID attribution, while preserving the global event history.
+     */
+    fun setCanConsoleBitrate(bitrate: Int) {
+        if (bitrate !in setOf(250_000, 500_000)) return
+        val state = _liveCanMonitorState.value
+        if (state.isCapturing || state.isSendingRequest || state.bitrate == bitrate ||
+            canMonitorJob?.isActive == true || canRequestJob?.isActive == true ||
+            detachedCanMonitorJob?.isCompleted == false || detachedCanRequestJob?.isCompleted == false) return
+        _liveCanMonitorState.value = state.copy(bitrate = bitrate,
+            consoleContextGeneration = ++canConsoleContextGeneration,
+            observedCanIds = emptySet(), report = null)
+        appendCanConsoleSystemEvent(localizedContext.getString(R.string.can_console_bitrate_changed, bitrate / 1000))
+    }
+
     /** Starts passive monitoring until Stop, disconnect, adapter exit or an explicit timeout. */
     fun startCanMonitor(durationMs: Long = Long.MAX_VALUE, can29Bit: Boolean = false) {
         if (!requirePremiumLicense()) return
@@ -2084,7 +2100,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             id = System.nanoTime(),
             direction = "SYSTEM",
             timestampMillis = System.currentTimeMillis(),
-            content = localizedContext.getString(R.string.can_sniffer_start)
+            content = localizedContext.getString(R.string.can_console_capture_profile, previousState.bitrate / 1000, if (can29Bit) 29 else 11)
         )
         _liveCanMonitorState.value = previousState.copy(
             consoleContextGeneration = ++canConsoleContextGeneration,
@@ -2136,7 +2152,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 captureArchive = archiveStream
                 val captured = archiveStream.use { writer ->
-                    obdManager.captureCanMonitor(durationMs, can29Bit) { chunk ->
+                    obdManager.captureCanMonitor(durationMs, can29Bit, previousState.bitrate) { chunk ->
                     if (canMonitorJob === monitorJob) {
                         writer.append(chunk)
                         // Keep the raw stream unchanged, but decode only complete lines:
@@ -2487,6 +2503,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 val transmission = obdManager.sendRawCanFrameWithStatus(
                     frame, approval,
+                    bitrate = currentState.bitrate,
                     onPhysicalResponseChunk = { chunk, receivedAtMillis ->
                         persistResponseBatch(rawRxStream.append(chunk, receivedAtMillis))
                     }
@@ -2494,7 +2511,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     isCurrentAccountGeneration(confirmedAccountGeneration) &&
                         confirmedAdapterGeneration == connectionAttemptGeneration &&
                         confirmedVehicle == _vehicle.value &&
-                        confirmedConsoleGeneration == _liveCanMonitorState.value.consoleContextGeneration
+                        confirmedConsoleGeneration == _liveCanMonitorState.value.consoleContextGeneration &&
+                        currentState.bitrate == _liveCanMonitorState.value.bitrate
                 }
                 drainResponseStream()
                 val response = transmission.adapterOutput

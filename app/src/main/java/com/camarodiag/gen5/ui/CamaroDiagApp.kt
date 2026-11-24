@@ -707,6 +707,7 @@ fun CamaroDiagApp(
                     canExportAvailable = viewModel.canExportCanCapture(),
                     knownModules = modules,
                     onStart = { can29Bit -> viewModel.startCanMonitor(can29Bit = can29Bit) },
+                    onBitrateChange = viewModel::setCanConsoleBitrate,
                     onStop = { viewModel.stopCanMonitor() },
                     onSendRequest = { viewModel.sendCanConsoleInput(it) },
                     onConfirmRawFrame = { frame, epoch, approval ->
@@ -1692,6 +1693,7 @@ fun CanSnifferScreen(
     canExportAvailable: Boolean,
     knownModules: List<EcuModule>,
     onStart: (Boolean) -> Unit,
+    onBitrateChange: (Int) -> Unit,
     onStop: () -> Unit,
     onSendRequest: (String) -> Unit,
     onConfirmRawFrame: (String, Long, EcuWriteConsentFlow.Approval) -> Unit,
@@ -1701,6 +1703,7 @@ fun CanSnifferScreen(
     var requestInput by remember { mutableStateOf("01 0C") }
     var monitorCan29Bit by remember { mutableStateOf(false) }
     var monitorFormatMenuExpanded by remember { mutableStateOf(false) }
+    var bitrateMenuExpanded by remember { mutableStateOf(false) }
     var pendingRawFrameInput by remember { mutableStateOf<Pair<String, Long>?>(null) }
     var writeConsentStep by remember { mutableStateOf(EcuWriteConsentFlow.Step.WARNING) }
     var frameSearch by remember { mutableStateOf("") }
@@ -1812,6 +1815,24 @@ fun CanSnifferScreen(
                                     monitorFormatMenuExpanded = false
                                 }
                             )
+                        }
+                    }
+                    Box {
+                        OutlinedButton(onClick = { bitrateMenuExpanded = true },
+                            enabled = !state.isCapturing && !state.isSendingRequest,
+                            modifier = Modifier.fillMaxWidth()) {
+                            Text(stringResource(R.string.can_console_bitrate_changed, state.bitrate / 1000))
+                        }
+                        DropdownMenu(expanded = bitrateMenuExpanded,
+                            onDismissRequest = { bitrateMenuExpanded = false }) {
+                            listOf(500_000, 250_000).forEach { bitrate ->
+                                DropdownMenuItem(text = {
+                                    Text(stringResource(R.string.can_console_bitrate_changed, bitrate / 1000))
+                                }, onClick = {
+                                    bitrateMenuExpanded = false
+                                    onBitrateChange(bitrate)
+                                })
+                            }
                         }
                     }
                     Text(stringResource(R.string.can_monitor_format_notice),

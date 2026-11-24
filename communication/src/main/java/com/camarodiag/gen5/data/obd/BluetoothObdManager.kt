@@ -705,6 +705,7 @@ class BluetoothObdManager(context: Context) {
     suspend fun captureCanMonitor(
         durationMs: Long = Long.MAX_VALUE,
         can29Bit: Boolean = false,
+        bitrate: Int = 500_000,
         onChunk: (String) -> Unit
     ): String = withContext(Dispatchers.IO) {
         val requestedEpoch = transportSessionEpoch.capture()
@@ -735,7 +736,7 @@ class BluetoothObdManager(context: Context) {
             try {
                 // Configure one physical CAN format and clear STN receive filters.
                 // All steps require explicit adapter acknowledgement before streaming.
-                for (command in CanMonitorProtocolPolicy.setupCommands(can29Bit, isStnAdapter)) {
+                for (command in CanMonitorProtocolPolicy.setupCommands(can29Bit, isStnAdapter, bitrate)) {
                     val timeout = if (command.startsWith("ATSP")) 1_500L else 1_000L
                     val answer = boundCommand(command, timeout)
                     if (!CanConsoleAdapterRestorationPolicy.accepted(answer))
@@ -790,6 +791,7 @@ class BluetoothObdManager(context: Context) {
         // The console stores all physical RX chunks before the matcher drops
         // older events from its deliberately bounded recent-record window.
         onPhysicalResponseChunk: (String, Long) -> Unit = { _, _ -> },
+        bitrate: Int = 500_000,
         isOperatorContextCurrent: () -> Boolean
     ): CanConsoleRawTransmissionResult =
         withContext(Dispatchers.IO) {
@@ -831,7 +833,7 @@ class BluetoothObdManager(context: Context) {
                 command, timeoutMs, expectedEpoch = requestedEpoch,
                 onChunk = onChunk, beforeTransmit = beforeTransmit
             )
-            val protocol = DiagnosticRouteSelector.elmCanProtocol(frame.isExtended, 500_000).toString()
+            val protocol = DiagnosticRouteSelector.elmCanProtocol(frame.isExtended, bitrate).toString()
             val header = if (frame.isExtended) {
                 frame.canId.toString(16).uppercase().padStart(8, '0')
             } else {

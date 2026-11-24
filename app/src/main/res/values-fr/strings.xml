@@ -715,7 +715,7 @@
     <string name="can_sniffer_response_heading">Dernière réponse OBD-II</string>
     <string name="can_sniffer_request_complete">Requête en lecture seule terminée.</string>
     <string name="can_sniffer_request_failed">Échec de la requête en lecture seule.</string>
-    <string name="can_sniffer_bus_limit">Cette capture utilise le profil HS-CAN actif en 11 bits à 500 kbit/s. Le SW-CAN et les autres bus nécessitent une interface différente.</string>
+    <string name="can_sniffer_bus_limit">Sélectionnez le débit du réseau physique. Cette console ne couvre pas encore le SW-CAN.</string>
     <string name="can_sniffer_stn_filter_notice">Sur les adaptateurs STN, les filtres temporaires sont effacés pour la capture brute puis le filtrage OBD automatique est réactivé. Les filtres personnalisés définis par un autre logiciel ne sont pas restaurés.</string>
     <string name="connection_lost_bluetooth">Connexion Bluetooth perdue. Veuillez reconnecter l’adaptateur et relancer l’opération.</string>
     <string name="connection_lost_vehicle">Connexion avec le véhicule perdue. Veuillez vous reconnecter et relancer l’opération.</string>
@@ -993,4 +993,6 @@
     <string name="can_console_export_recent_raw_rx"># RX BRUT - extrait mémoire récent uniquement, capture non exhaustive</string>
     <string name="can_console_export_failed_marker">ÉCHEC</string>
     <string name="can_console_history_recent_scope">Historique à l’écran : 300 événements récents au maximum. Le flux RX brut peut être archivé séparément ; les anciens TX ne sont pas conservés.</string>
+    <string name="can_console_bitrate_changed">CAN %1$d kbit/s</string>
+    <string name="can_console_capture_profile">Capture CAN %1$d kbit/s, %2$d bits</string>
 </resources>
