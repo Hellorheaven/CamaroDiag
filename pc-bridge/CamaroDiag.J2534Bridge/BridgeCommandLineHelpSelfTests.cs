@@ -38,6 +38,27 @@ internal static class BridgeCommandLineHelpSelfTests
             Require(english.Contains(option, StringComparison.Ordinal), "English " + option);
             Require(french.Contains(option, StringComparison.Ordinal), "French " + option);
         }
+        foreach (var option in new[] {
+            "--doip-discover", "--doip-status", "--doip-exchange",
+            "--listen-ipv6-ifindex", "--multicast-ipv6-ifindex",
+            "--doip-version", "--uds-p2-ms", "--uds-p2-star-ms",
+            "--power-mode true", "--broadcast-ip", "--vin", "--eid",
+            "--tls true", "--tester", "--ecu", "--payload"
+        })
+        {
+            Require(english.Contains(option, StringComparison.Ordinal) &&
+                    french.Contains(option, StringComparison.Ordinal),
+                "DoIP CLI help options present in both languages: " + option);
+        }
+        Require(english.Contains("ACTIVE", StringComparison.Ordinal) &&
+                french.Contains("ACTIVE", StringComparison.Ordinal),
+            "DoIP multicast active discovery is distinguished from passive listening.");
+        Require(english.Contains("consent", StringComparison.OrdinalIgnoreCase) &&
+                french.Contains("consentement", StringComparison.OrdinalIgnoreCase),
+            "Both CLI help resources warn that DoIP exchanges require consent.");
+        Require(BridgeCommandLineHelp.Run(["--doip-exchange", "--help"]) == 2,
+            "Help with DoIP UDS exchange cannot reach any socket or ECU.");
+
         Require(english.Contains("issue #115", StringComparison.Ordinal) &&
                 french.Contains("issue #115", StringComparison.Ordinal),
             "Windows/Linux CLI parity roadmap stays explicit");
