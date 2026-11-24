@@ -64,7 +64,8 @@ internal static class DoIpDiagnosticSessionSelfTests
     private static async Task RunCaseAsync(Func<Stream, Task> gateway,
         Func<DoIpDiagnosticTransport, Task> client, bool pendingRoute = false,
         byte activationType = 0x00, byte[]? activationOemData = null,
-        byte protocolVersion = DoIpCodec.Version)
+        byte protocolVersion = DoIpCodec.Version,
+        Action<DoIpDiagnosticTransport.PduTrace>? trace = null)
     {
         var listener = new TcpListener(IPAddress.Loopback, 0);
         listener.Start();
@@ -83,7 +84,7 @@ internal static class DoIpDiagnosticSessionSelfTests
                 CancellationToken.None, portOverride: port,
                 protocolVersion: protocolVersion,
                 activationType: activationType,
-                activationOemData: activationOemData);
+                activationOemData: activationOemData, trace: trace);
             await client(transport);
             await server.WaitAsync(TimeSpan.FromSeconds(3));
         }
@@ -479,6 +480,7 @@ internal static class DoIpDiagnosticSessionSelfTests
 
         // Full happy path: routing 0x11 pending then 0x10, gateway ACK,
         // AliveCheck and UDS NRC 0x78 followed by final correlated response.
+        var pduTrace = new System.Collections.Concurrent.ConcurrentQueue<(string Direction, byte[] Frame)>();
         await RunCaseAsync(async stream =>
         {
             await RequireRequestAsync(stream);
@@ -507,7 +509,31 @@ internal static class DoIpDiagnosticSessionSelfTests
                 TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
             Check(response.SequenceEqual(Positive),
                 "DoIP routing/ACK/AliveCheck/NRC/positive PDU.");
-        }, pendingRoute: true);
+        }, pendingRoute: true, trace: entry =>
+        {
+            pduTrace.Enqueue((entry.Direction, entry.Bytes.ToArray()));
+            // A trace subscriber cannot modify the live protocol message.
+            Array.Fill(entry.Bytes, (byte)0);
+        });
+        var traceMessages = pduTrace.Select(x => (x.Direction, Message: DoIpCodec.Decode(x.Frame))).ToArray();
+        Check(traceMessages.Length == 9, "DoIP trace retains every complete routing/control/diagnostic PDU.");
+        foreach (var pair in new[]
+        {
+            ("TX", DoIpCodec.RoutingActivationRequest),
+            ("RX", DoIpCodec.RoutingActivationResponse),
+            ("TX", DoIpCodec.DiagnosticMessage),
+            ("RX", DoIpCodec.DiagnosticPositiveAck),
+            ("RX", DoIpCodec.AliveCheckRequest),
+            ("TX", DoIpCodec.AliveCheckResponse),
+            ("RX", DoIpCodec.DiagnosticMessage)
+        })
+            Check(traceMessages.Any(x => x.Direction == pair.Item1 && x.Message.Type == pair.Item2),
+                "DoIP transport trace includes " + pair.Item1 + " 0x" + pair.Item2.ToString("X4"));
+        Check(traceMessages.Count(x => x.Direction == "RX" &&
+            x.Message.Type == DoIpCodec.RoutingActivationResponse) == 2 &&
+            traceMessages.Count(x => x.Direction == "RX" &&
+            x.Message.Type == DoIpCodec.DiagnosticMessage) == 2,
+            "Pending and final routing/UDS messages are kept separately.");
 
         // An OEM-specific activation must be an operator-provided field,
         // not an invented token or a modified ISO-reserved area.
