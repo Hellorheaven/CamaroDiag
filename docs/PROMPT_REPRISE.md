@@ -1,3 +1,7 @@
+## PR117 — correction de concurrence du transport DoIP Windows (24/11/2026)
+
+- Run 45453585549 : compilation Windows 0 erreur / 0 avertissement mais échec du test de monitoring (session fermée entre deux requêtes). Cause probable identifiée : le producteur vérifiait l'état de l'échange après publication de la réponse, alors que le consommateur pouvait légitimement avoir terminé. Sérialisation de la publication, admission, vérification des doublons et transition à l'état inactif ; maintien du refus des données non sollicitées et de la retraite de connexion après incertitude. Test 128 requêtes successives ajouté. Nouvelle validation indispensable. Les réponses tardives identiques sur un socket réutilisé restent intrinsèquement ambiguës.
+
 ## PR117 — monitoring DoIP OBDonUDS Windows (24/11/2026)
 
 - Bouton de monitoring réglementaire dans la console Windows, contrôle VIN F802/F810 avant et après mesures sur une seule connexion TCP/TLS, échantillons identifiés OBDonUDS, ressources FR/EN, annulation et trace existantes. Refus de terminer en succès si identification finale différente. Test réseau loopback ajouté. La campagne 45453585549 vise le HEAD précédent ; ce complément attend la prochaine validation groupée, sans interrompre la CI en cours.

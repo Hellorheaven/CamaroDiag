@@ -487,6 +487,29 @@ internal static class DoIpDiagnosticSessionSelfTests
             });
         }
 
+        // Regression: an immediately consumed final response must not
+        // be mistaken for a response crossing the exchange boundary.
+        await RunCaseAsync(async stream =>
+        {
+            for (var index = 0; index < 128; index++)
+            {
+                var request = await ReadAsync(stream);
+                Check(request.Payload.SequenceEqual((byte[])[0x0E,0x80,0x12,0x34,0x22,0x12,0x34]),
+                    "Sequential diagnostic requests stay correlated.");
+                await SendAsync(stream, DoIpCodec.DiagnosticMessage,
+                    FromEcu([0x62,0x12,0x34,(byte)index]));
+            }
+        }, async client =>
+        {
+            for (var index = 0; index < 128; index++)
+            {
+                var reply = await client.ExchangeUdsAsync([0x22,0x12,0x34],
+                    TimeSpan.FromSeconds(2), CancellationToken.None);
+                Check(reply.SequenceEqual((byte[])[0x62,0x12,0x34,(byte)index]),
+                    "A valid final reply leaves the session available for the next request.");
+            }
+        });
+
         // One routed session serves sequential monitored DID requests.
         await RunCaseAsync(async stream =>
         {

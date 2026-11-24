@@ -39,6 +39,7 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
     // DoIP carries no per-request transaction ID. A late reply after a
     // failed exchange could otherwise be mistaken for a fresh request.
     private int exchangeState;
+    private readonly object exchangeBoundary = new();
     private int disposed;
     // One owner reads from the TCP stream for the entire activated session.
     // Gateway AliveChecks must be answered even while no UDS exchange runs.
@@ -237,7 +238,12 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
         // A caller must not be able to mutate a pending diagnostic request
         // or its ACK/UDS correlation on a shared array.
         var fixedRequest = request.ToArray();
-        var previous = Interlocked.CompareExchange(ref exchangeState, 1, 0);
+        int previous;
+        lock (exchangeBoundary)
+        {
+            previous = exchangeState;
+            if (previous == 0) exchangeState = 1;
+        }
         if (previous != 0)
             throw new InvalidOperationException(previous == 1 ?
                 "DoIP socket already has an active UDS exchange." :
@@ -294,18 +300,20 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
                 }
             },
             remaining, deadline.Token, p2Timeout, p2StarTimeout);
-        if (Interlocked.CompareExchange(ref exchangeState, 0, 1) != 1)
-            throw new ObjectDisposedException(nameof(DoIpDiagnosticTransport));
-        // A duplicate positive UDS PDU may have arrived before this
-        // exchange ended. It has no transaction token and MUST NOT become
-        // the response to a later command with the same SID. Fail closed.
-        if (inbound.Reader.TryPeek(out _))
-            throw new InvalidDataException(
-                "DoIP stale queued diagnostic response after final UDS reply; reconnect.");
-        // An EOF received just after a valid final reply retires the
-        // connection, but does not retroactively invalidate that reply.
-        if (Volatile.Read(ref receiveFailure) is not null)
-            Interlocked.Exchange(ref exchangeState, 2);
+        lock (exchangeBoundary)
+        {
+            if (exchangeState != 1)
+                throw new ObjectDisposedException(nameof(DoIpDiagnosticTransport));
+            // Check for queued duplicates and transition to idle atomically
+            // with the pump's publish. Consuming a legitimate final reply
+            // may resume this continuation before TryWrite itself returns.
+            if (inbound.Reader.TryPeek(out _))
+                throw new InvalidDataException(
+                    "DoIP stale queued diagnostic response after final UDS reply; reconnect.");
+            // EOF after a valid final reply retires the connection without
+            // retroactively invalidating that reply.
+            exchangeState = receiveFailure is null ? 0 : 2;
+        }
         return response;
         }
         catch
@@ -313,7 +321,7 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
             // Even a cancelled/timed-out write may already be on the TCP
             // wire. Never silently retry it or allow a late reply to be
             // interpreted as belonging to another operation.
-            Interlocked.Exchange(ref exchangeState, 2);
+            lock (exchangeBoundary) exchangeState = 2;
             try { lifetime.Cancel(); }
             catch (ObjectDisposedException) { /* Concurrent DisposeAsync retired session. */ }
             stream.Dispose();
@@ -361,18 +369,20 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
                 // There is no universal UDS transaction identifier. A
                 // duplicate or unsolicited response between exchanges
                 // cannot be safely assigned to the NEXT request.
-                if (Volatile.Read(ref exchangeState) != 1)
-                    throw new InvalidDataException(
-                        "Unsolicited DoIP diagnostic data outside an exchange; reconnect.");
-                if (!inbound.Writer.TryWrite(message))
-                    throw new InvalidDataException(
-                        "DoIP diagnostic receive buffer overflow; reconnect.");
-                // The exchange may have finished just while TryWrite
-                // published the frame; a late write after transition to
-                // idle must retire the socket, never feed a next exchange.
-                if (Volatile.Read(ref exchangeState) != 1)
-                    throw new InvalidDataException(
-                        "DoIP response crossed diagnostic exchange boundary; reconnect.");
+                lock (exchangeBoundary)
+                {
+                    if (exchangeState != 1)
+                    {
+                        // Retire before releasing the boundary lock so a new
+                        // request cannot start after this unsolicited frame.
+                        exchangeState = 2;
+                        throw new InvalidDataException(
+                            "Unsolicited DoIP diagnostic data outside an exchange; reconnect.");
+                    }
+                    if (!inbound.Writer.TryWrite(message))
+                        throw new InvalidDataException(
+                            "DoIP diagnostic receive buffer overflow; reconnect.");
+                }
             }
         }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested)
@@ -381,11 +391,17 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
         }
         catch (Exception error)
         {
-            Volatile.Write(ref receiveFailure, error);
-            inbound.Writer.TryComplete(error);
-            // If a valid final response was already queued for an active
-            // exchange, allow it to finish before retiring the session.
-            if (Interlocked.CompareExchange(ref exchangeState, 2, 0) == 0)
+            bool close;
+            lock (exchangeBoundary)
+            {
+                receiveFailure = error;
+                inbound.Writer.TryComplete(error);
+                // A valid final reply already queued for an active exchange
+                // may complete; no new exchange may start after failure.
+                close = exchangeState != 1;
+                if (close) exchangeState = 2;
+            }
+            if (close)
             {
                 stream.Dispose();
                 socket.Dispose();
@@ -421,7 +437,7 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
         // transport; closing a TCP session must be idempotent.
         if (Interlocked.Exchange(ref disposed, 1) != 0)
             return;
-        Interlocked.Exchange(ref exchangeState, 2);
+        lock (exchangeBoundary) exchangeState = 2;
         lifetime.Cancel();
         stream.Dispose();
         socket.Dispose();
