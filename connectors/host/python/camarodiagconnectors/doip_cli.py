@@ -80,6 +80,12 @@ def run(argv: Sequence[str] | None = None) -> dict:
     for action in ("dtcs", "count"):
         p = sub.add_parser(action)
         p.add_argument("--mask", type=lambda x: hex_value(x, 2), default=255)
+    wwh = sub.add_parser("obd-wwh-dtcs", help=tr("Verified WWH emissions DTCs", "DTC émissions WWH vérifiés"))
+    wwh.add_argument("--mask", type=lambda x: hex_value(x, 2), default=255)
+    wwh.add_argument("--severity-mask", type=lambda x: hex_value(x, 2), default=255)
+    sub.add_parser("obd-wwh-permanent", help=tr("Verified permanent emissions DTCs", "DTC émissions permanents vérifiés"))
+    readiness = sub.add_parser("obd-wwh-readiness", help=tr("Verified readiness group DTCs", "DTC du groupe de readiness vérifié"))
+    readiness.add_argument("--group", required=True, type=lambda x: hex_value(x, 2))
     for action in ("snapshot", "extended"):
         p = sub.add_parser(action)
         p.add_argument("--dtc", required=True, type=lambda x: hex_value(x, 6))
@@ -186,6 +192,12 @@ def run(argv: Sequence[str] | None = None) -> dict:
         if o.action in ("obd-identify", "obd-did"):
             return result | {"ecu": o.ecu, "tester": o.tester, "tls": not o.tcp} | session.read_obd(
                 o.vin, o.did if o.action == "obd-did" else None)
+        if o.action in ("obd-wwh-dtcs", "obd-wwh-permanent", "obd-wwh-readiness"):
+            subfunction = {"obd-wwh-dtcs": 0x42, "obd-wwh-permanent": 0x55,
+                           "obd-wwh-readiness": 0x56}[o.action]
+            return result | {"ecu": o.ecu, "tester": o.tester, "tls": not o.tcp} | session.wwh_dtcs(
+                o.vin, subfunction, status_mask=getattr(o, "mask", 255),
+                severity_mask=getattr(o, "severity_mask", 255), readiness_group=getattr(o, "group", None))
         if o.action in ("monitor", "obd-monitor"):
             def on_sample(row):
                 print(json.dumps({"partial_sample": row}), file=sys.stderr)

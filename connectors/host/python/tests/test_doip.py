@@ -230,6 +230,39 @@ class DoIpTests(unittest.TestCase):
                 self.assertEqual(fake.requests, [0xF802, 0xF810])
                 self.assertTrue(fake.closed)
 
+    def test_verified_wwh_dtc_requests_and_correlation(self):
+        cases = [
+            (0x42, None, "194233FF08", "594233FFFC04A012345608", 0xA0),
+            (0x55, None, "195533", "595533FF0412345608", None),
+            (0x56, 0x12, "19563312", "595633FF041212345608", None),
+        ]
+        for subfunction, group, request, reply, severity in cases:
+            with self.subTest(subfunction=subfunction):
+                fake = Session.__new__(Session)
+                fake.read_obd = unittest.mock.Mock(return_value={"obd_on_uds": True})
+                fake.exchange = unittest.mock.Mock(return_value=bytes.fromhex(reply))
+                fake.close = unittest.mock.Mock()
+                result = fake.wwh_dtcs(VIN, subfunction, status_mask=8, readiness_group=group)
+                fake.exchange.assert_called_once_with(bytes.fromhex(request))
+                self.assertEqual(fake.read_obd.call_count, 2)
+                self.assertEqual(result["records"], [{"dtc": "123456", "status": 8, "severity": severity}])
+                fake.close.assert_not_called()
+        for reply in ("595633FF041312345608", "595633FF0412123456", "595634FF0412"):
+            fake = Session.__new__(Session)
+            fake.read_obd = unittest.mock.Mock(return_value={"obd_on_uds": True})
+            fake.exchange = unittest.mock.Mock(return_value=bytes.fromhex(reply))
+            fake.close = unittest.mock.Mock()
+            with self.assertRaises(DoIpError):
+                fake.wwh_dtcs(VIN, 0x56, readiness_group=0x12)
+            fake.close.assert_called_once()
+        fake = Session.__new__(Session)
+        fake.read_obd = unittest.mock.Mock(return_value={"obd_on_uds": False})
+        fake.exchange = unittest.mock.Mock()
+        fake.close = unittest.mock.Mock()
+        with self.assertRaises(DoIpError):
+            fake.wwh_dtcs(VIN, 0x55)
+        fake.exchange.assert_not_called()
+
     def test_deadlines_extend_only_on_pending_and_never_beyond_overall(self):
         req = bytes.fromhex("221234")
         pending = (0x8001, ECU + TESTER + bytes.fromhex("7F2278"))

@@ -1,3 +1,7 @@
+## PR117 — services WWH-OBD Connectors sur DoIP (24/11/2026)
+
+- CLI Python : `obd-wwh-dtcs`, `obd-wwh-permanent`, `obd-wwh-readiness` ; services 19/42, 19/55, 19/56 groupe émissions 33, selon les codecs existants Windows. Contrôle F802/F810 avant et après, même ECU/même socket, validation groupe et longueurs, décodage DTC/statut/sévérité sans inventer de signification OEM. Tests d’échanges et refus ajoutés ; nouveau lot postérieur au checkpoint 876015f, non validé matériellement.
+
 ## PR117 — checkpoint de correction Android (24/11/2026)
 
 - Validation groupée demandée sur le lot corrigé b618d3477a3e42a8a4f5d0526abe5febb6a113dc. Aucun essai matériel ni Release.

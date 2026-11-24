@@ -631,6 +631,52 @@ class Session:
             raise DoIpError("Uncorrelated DTC status")
         return {"requested_mask": mask, "availability_mask": available, "records": records}
 
+    def wwh_dtcs(self, expected: str, subfunction: int, *, status_mask: int = 255,
+                 severity_mask: int = 255, readiness_group: int | None = None) -> dict:
+        """Verified OBDonUDS route, ISO 14229 WWH emissions group 0x33."""
+        if subfunction not in (0x42, 0x55, 0x56):
+            raise DoIpError("Unsupported WWH DTC subfunction")
+        if any(type(value) is not int or not 0 <= value <= 255
+               for value in (status_mask, severity_mask)):
+            raise DoIpError("Invalid WWH mask")
+        if subfunction == 0x56:
+            if type(readiness_group) is not int or not 0 <= readiness_group <= 255:
+                raise DoIpError("Explicit readiness group required")
+        elif readiness_group is not None:
+            raise DoIpError("Readiness group only applies to 0x56")
+        request = bytes((0x19, subfunction, 0x33))
+        if subfunction == 0x42:
+            request += bytes((severity_mask, status_mask))
+        elif subfunction == 0x56:
+            request += bytes((readiness_group,))
+        try:
+            if not self.read_obd(expected)["obd_on_uds"]:
+                raise DoIpError("Selected ECU did not identify as OBDonUDS")
+            reply = self.exchange(request)
+            width = 5 if subfunction == 0x42 else 4
+            start = 5 if subfunction == 0x55 else 6
+            if len(reply) < start or reply[:3] != bytes((0x59, subfunction, 0x33)) or (len(reply) - start) % width:
+                raise DoIpError("Malformed WWH emissions DTC response")
+            if subfunction == 0x56 and reply[5] != readiness_group:
+                raise DoIpError("WWH readiness group mismatch")
+            report = {"vin": expected, "service_protocol": "OBDonUDS", "subfunction": subfunction,
+                      "functional_group": reply[2], "status_availability_mask": reply[3],
+                      "severity_availability_mask": reply[4] if subfunction == 0x42 else None,
+                      "dtc_format_identifier": reply[5] if subfunction == 0x42 else reply[4],
+                      "records": []}
+            if subfunction == 0x56:
+                report["readiness_group"] = readiness_group
+            for offset in range(start, len(reply), width):
+                index = offset + (1 if subfunction == 0x42 else 0)
+                report["records"].append({"dtc": reply[index:index+3].hex().upper(),
+                    "status": reply[index+3], "severity": reply[offset] if width == 5 else None})
+            if not self.read_obd(expected)["obd_on_uds"]:
+                raise DoIpError("OBDonUDS identification changed during DTC read")
+            return report
+        except BaseException:
+            self.close()
+            raise
+
     def dtc_detail(self, dtc: int, record: int, extended: bool) -> dict:
         if not 0 <= dtc <= 0xFFFFFF or not 1 <= record <= 255:
             raise DoIpError("Invalid DTC or record")
