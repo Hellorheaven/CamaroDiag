@@ -299,6 +299,14 @@ fun CalibrationWorkspaceScreen(
     }
     var doIpTester by remember(vehicle) { mutableStateOf("") }
     var doIpEcu by remember(vehicle) { mutableStateOf("") }
+    LaunchedEffect(state.doIpBackupScope, vehicle.vin) {
+        val scope = state.doIpBackupScope
+        if (scope != null && scope.vin == vehicle.vin.uppercase()) {
+            // Import explicitly selects the logical addresses in this ECU profile.
+            doIpTester = "%04X".format(scope.tester)
+            doIpEcu = "%04X".format(scope.ecu)
+        }
+    }
     var doIpDid by remember(vehicle) { mutableStateOf("F190") }
     var doIpTls by remember(vehicle) { mutableStateOf(true) }
     var doIpSampleCount by remember(vehicle) { mutableStateOf("10") }
@@ -407,7 +415,7 @@ fun CalibrationWorkspaceScreen(
                     OutlinedTextField(doIpDid, { doIpDid = it.uppercase().filter { c -> c in "0123456789ABCDEF" }.take(4) },
                         enabled = idle, singleLine = true, modifier = Modifier.fillMaxWidth(),
                         label = { Text(stringResource(R.string.cal_uds_did)) })
-                    val targetReady = idle && doIpHost.isNotBlank() && doIpTester.length == 4 &&
+                    val targetReady = idle && (doIpHost.isNotBlank() || vinReady) && doIpTester.length == 4 &&
                         doIpEcu.length == 4 && doIpTester != doIpEcu
                     Button(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu, doIpDid, doIpTls, DoIpDirectRead.Operation.VIN) },
                         enabled = targetReady, modifier = Modifier.fillMaxWidth()) {
