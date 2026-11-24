@@ -2316,8 +2316,28 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             activeJob.join()
             if (canMonitorJob === activeJob) {
+                // A LAZY coroutine cancelled before its first instruction never
+                // executes its use/finally cleanup or appends a Stop event.
+                // Treat that case as an aborted capture, not a successful one.
                 canMonitorJob = null
-                _liveCanMonitorState.value = _liveCanMonitorState.value.copy(isCapturing = false)
+                val current = _liveCanMonitorState.value
+                val failureMessage = localizedContext.getString(R.string.can_sniffer_capture_failed)
+                val event = CanConsoleHistoryEntry(
+                    id = System.nanoTime(),
+                    direction = "SYSTEM",
+                    timestampMillis = System.currentTimeMillis(),
+                    content = failureMessage,
+                    succeeded = false
+                )
+                recordConsoleEvents(listOf(event))
+                _liveCanMonitorState.value = current.copy(
+                    isCapturing = false,
+                    rawArchiveFailed = CanConsoleExportPolicy.archiveFailedAfterStop(
+                        current.rawArchiveFailed, writerCompleted = false
+                    ),
+                    message = failureMessage,
+                    consoleHistory = (current.consoleHistory + event).takeLast(300)
+                )
             }
         }
         // Do not detach: a later request must not overtake the adapter cleanup.
