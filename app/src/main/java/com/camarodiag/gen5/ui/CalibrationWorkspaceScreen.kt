@@ -45,6 +45,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.runtime.rememberCoroutineScope
+import android.app.Activity
+import android.content.ContextWrapper
+import android.security.KeyChain
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
+import com.camarodiag.gen5.data.obd.DoIpClientTls
+import com.camarodiag.gen5.data.obd.DoIpClientCertificateSelection
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.pluralStringResource
 import com.camarodiag.gen5.R
@@ -247,7 +256,8 @@ private fun localizedInspectionFormat(format: String): String = stringResource(
 )
 
 data class DoIpConsoleCommand(val host: String, val tester: String, val ecu: String,
-    val tls: Boolean, val payload: String, val vehicle: VehicleProfile, val generation: Long)
+    val tls: Boolean, val payload: String, val vehicle: VehicleProfile, val generation: Long,
+    val certificate: DoIpClientCertificateSelection? = null)
 
 // Keep static UI copy in Android resources so this screen follows the active system locale.
 @Composable
@@ -268,16 +278,17 @@ fun CalibrationWorkspaceScreen(
     onSyncVehicleVinFromEcu: (String) -> Unit,
     onReadUdsDid: (String, String, String, String) -> Unit,
     onReadUdsDtcs: (String, String, String) -> Unit,
-    onReadDirectDoIp: (String, String, String, String, Boolean, DoIpDirectRead.Operation) -> Unit,
+    onReadDirectDoIp: (String, String, String, String, Boolean, DoIpDirectRead.Operation, DoIpClientCertificateSelection?) -> Unit,
+    doIpAccountUid: String?,
     doIpContextGeneration: Long,
     onConfirmDoIpCommand: (DoIpConsoleCommand, EcuWriteConsentFlow.Approval) -> Unit,
     onInspectDoIpGateway: (String, DoIpDirectRead.GatewayOperation) -> Unit,
     onCancelDirectDoIp: () -> Unit,
-    onMonitorDirectDoIp: (String, String, String, String, Boolean, Int, Int) -> Unit,
+    onMonitorDirectDoIp: (String, String, String, String, Boolean, Int, Int, DoIpClientCertificateSelection?) -> Unit,
     onExportDoIpMonitoring: (DoIpMonitorReport) -> Unit,
     onImportDoIpBackupProfile: () -> Unit,
     onVerifyDoIpBackup: (DoIpMemoryBackup.Scope) -> Unit,
-    onCaptureDoIpBackup: (String, String, String, Boolean, DoIpMemoryBackup.Scope) -> Unit,
+    onCaptureDoIpBackup: (String, String, String, Boolean, DoIpMemoryBackup.Scope, DoIpClientCertificateSelection?) -> Unit,
     onConnectJ2534Bridge: (String, String, String, String, String, String) -> Unit,
     onDisconnectJ2534Bridge: () -> Unit,
     onCaptureJ2534Memory: (String, String, Int, EcuBackupCoverage.Region) -> Unit,
@@ -323,6 +334,18 @@ fun CalibrationWorkspaceScreen(
     var pendingDoIpCommand by remember(vehicle, doIpContextGeneration) { mutableStateOf<DoIpConsoleCommand?>(null) }
     var doIpConsentStep by remember(vehicle, doIpContextGeneration) { mutableStateOf(EcuWriteConsentFlow.Step.WARNING) }
     var doIpTls by remember(vehicle) { mutableStateOf(true) }
+    val certContext = LocalContext.current
+    val certActivity = remember(certContext) {
+        generateSequence(certContext) { (it as? ContextWrapper)?.baseContext?.takeUnless { base -> base === it } }
+            .filterIsInstance<Activity>().firstOrNull()
+    }
+    val certCoroutine = rememberCoroutineScope()
+    // Bind to the selected account/vehicle/host. A changed target cannot reuse a stale alias.
+    var doIpCertificate by remember(doIpAccountUid, vehicle, doIpHost, doIpTls) {
+        mutableStateOf<DoIpClientCertificateSelection?>(null)
+    }
+    var doIpCertificateBusy by remember(doIpAccountUid, vehicle, doIpHost, doIpTls) { mutableStateOf(false) }
+    var doIpCertificateError by remember(doIpAccountUid, vehicle, doIpHost, doIpTls) { mutableStateOf(false) }
     var doIpSampleCount by remember(vehicle) { mutableStateOf("10") }
     var doIpInterval by remember(vehicle) { mutableStateOf("1000") }
     var pendingDoIpBackup by remember(vehicle) { mutableStateOf<DoIpMemoryBackup.Scope?>(null) }
@@ -426,16 +449,69 @@ fun CalibrationWorkspaceScreen(
                         Checkbox(checked = doIpTls, onCheckedChange = { doIpTls = it }, enabled = idle)
                         Text(stringResource(R.string.cal_doip_tls))
                     }
+                    if (doIpTls) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedButton(onClick = {
+                                try { certActivity?.startActivity(KeyChain.createInstallIntent()) }
+                                catch (_: Exception) { doIpCertificateError = true }
+                            }, enabled = idle && !doIpCertificateBusy && certActivity != null,
+                                modifier = Modifier.weight(1f)) {
+                                Text(stringResource(R.string.cal_doip_cert_install))
+                            }
+                            OutlinedButton(onClick = {
+                                val activity = certActivity ?: return@OutlinedButton
+                                val host = doIpHost
+                                val vin = vehicle.vin.uppercase()
+                                doIpCertificateBusy = true
+                                doIpCertificateError = false
+                                // Clear the old choice: a cancelled/failed new selection must not reuse it.
+                                doIpCertificate = null
+                                try {
+                                    KeyChain.choosePrivateKeyAlias(activity, { alias ->
+                                        certCoroutine.launch {
+                                            try {
+                                                if (alias != null && alias != "android:alias-selection-denied")
+                                                    doIpCertificate = DoIpClientTls.select(certContext, alias, host, vin)
+                                                else if (alias != null) doIpCertificateError = true
+                                            } catch (cancelled: CancellationException) {
+                                                throw cancelled
+                                            } catch (_: Exception) { doIpCertificateError = true }
+                                            finally { doIpCertificateBusy = false }
+                                        }
+                                    }, null, null, host, 3496, null)
+                                } catch (_: Exception) {
+                                    doIpCertificateBusy = false
+                                    doIpCertificateError = true
+                                }
+                            }, enabled = idle && !doIpCertificateBusy && certActivity != null && vinReady && doIpHost.isNotBlank(),
+                                modifier = Modifier.weight(1f)) {
+                                Text(stringResource(R.string.cal_doip_cert_select))
+                            }
+                        }
+                        doIpCertificate?.let { selected ->
+                            Text(stringResource(R.string.cal_doip_cert_selected, selected.alias, selected.fingerprint),
+                                fontSize = 12.sp)
+                            TextButton(onClick = { doIpCertificate = null }, enabled = idle && !doIpCertificateBusy) {
+                                Text(stringResource(R.string.cal_doip_cert_clear))
+                            }
+                        } ?: Text(stringResource(R.string.cal_doip_cert_none), fontSize = 12.sp)
+                        if (doIpCertificateError) {
+                            Text(stringResource(R.string.cal_doip_tls_error), color = WarnRed, fontSize = 12.sp)
+                            TextButton(onClick = { doIpCertificate = null; doIpCertificateError = false }, enabled = idle) {
+                                Text(stringResource(R.string.cal_doip_cert_clear))
+                            }
+                        }
+                    }
                     OutlinedTextField(doIpDid, { doIpDid = it.uppercase().filter { c -> c in "0123456789ABCDEF" }.take(4) },
                         enabled = idle, singleLine = true, modifier = Modifier.fillMaxWidth(),
                         label = { Text(stringResource(R.string.cal_uds_did)) })
-                    val targetReady = idle && (doIpHost.isNotBlank() || vinReady) && doIpTester.length == 4 &&
+                    val targetReady = idle && !doIpCertificateBusy && !doIpCertificateError && (doIpHost.isNotBlank() || vinReady) && doIpTester.length == 4 &&
                         doIpEcu.length == 4 && doIpTester != doIpEcu
-                    Button(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu, doIpDid, doIpTls, DoIpDirectRead.Operation.VIN) },
+                    Button(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu, doIpDid, doIpTls, DoIpDirectRead.Operation.VIN, doIpCertificate) },
                         enabled = targetReady, modifier = Modifier.fillMaxWidth()) {
                         Text(stringResource(R.string.cal_doip_read_vin))
                     }
-                    OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu, doIpDid, doIpTls, DoIpDirectRead.Operation.DID) },
+                    OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu, doIpDid, doIpTls, DoIpDirectRead.Operation.DID, doIpCertificate) },
                         enabled = targetReady && vinReady && doIpDid.length == 4, modifier = Modifier.fillMaxWidth()) {
                         Text(stringResource(R.string.cal_read_uds_did))
                     }
@@ -443,11 +519,11 @@ fun CalibrationWorkspaceScreen(
                         enabled = idle, singleLine = true, modifier = Modifier.fillMaxWidth(),
                         label = { Text(stringResource(R.string.cal_doip_dtc_mask)) })
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu, doIpDtcMask, doIpTls, DoIpDirectRead.Operation.DTC) },
+                        OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu, doIpDtcMask, doIpTls, DoIpDirectRead.Operation.DTC, doIpCertificate) },
                             enabled = targetReady && vinReady && doIpDtcMask.length == 2, modifier = Modifier.weight(1f)) {
                             Text(stringResource(R.string.cal_read_uds_dtcs))
                         }
-                        OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu, doIpDtcMask, doIpTls, DoIpDirectRead.Operation.DTC_COUNT) },
+                        OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu, doIpDtcMask, doIpTls, DoIpDirectRead.Operation.DTC_COUNT, doIpCertificate) },
                             enabled = targetReady && vinReady && doIpDtcMask.length == 2, modifier = Modifier.weight(1f)) {
                             Text(stringResource(R.string.cal_doip_count_button))
                         }
@@ -474,12 +550,12 @@ fun CalibrationWorkspaceScreen(
                         doIpDetailRecord.length == 2 && doIpDetailRecord != "00"
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu,
-                            doIpDetailDtc + doIpDetailRecord, doIpTls, DoIpDirectRead.Operation.DTC_SNAPSHOT) },
+                            doIpDetailDtc + doIpDetailRecord, doIpTls, DoIpDirectRead.Operation.DTC_SNAPSHOT, doIpCertificate) },
                             enabled = detailReady, modifier = Modifier.weight(1f)) {
                             Text(stringResource(R.string.cal_doip_snapshot))
                         }
                         OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu,
-                            doIpDetailDtc + doIpDetailRecord, doIpTls, DoIpDirectRead.Operation.DTC_EXTENDED) },
+                            doIpDetailDtc + doIpDetailRecord, doIpTls, DoIpDirectRead.Operation.DTC_EXTENDED, doIpCertificate) },
                             enabled = detailReady, modifier = Modifier.weight(1f)) {
                             Text(stringResource(R.string.cal_doip_extended))
                         }
@@ -490,7 +566,7 @@ fun CalibrationWorkspaceScreen(
                     OutlinedButton(onClick = {
                         doIpConsentStep = EcuWriteConsentFlow.Step.WARNING
                         pendingDoIpCommand = DoIpConsoleCommand(doIpHost, doIpTester, doIpEcu,
-                            doIpTls, doIpCommand, vehicle, doIpContextGeneration)
+                            doIpTls, doIpCommand, vehicle, doIpContextGeneration, doIpCertificate)
                     }, enabled = targetReady && vinReady && runCatching { DoIpDirectRead.parseCommands(doIpCommand) }.isSuccess,
                         modifier = Modifier.fillMaxWidth()) {
                         Text(stringResource(R.string.cal_doip_command_send))
@@ -498,7 +574,8 @@ fun CalibrationWorkspaceScreen(
                     pendingDoIpCommand?.let { pending ->
                         val sameContext = pending.vehicle == vehicle && pending.generation == doIpContextGeneration &&
                             pending.host == doIpHost && pending.tester == doIpTester && pending.ecu == doIpEcu &&
-                            pending.tls == doIpTls && pending.payload == doIpCommand && targetReady
+                            pending.tls == doIpTls && pending.certificate == doIpCertificate &&
+                            pending.payload == doIpCommand && targetReady
                         AlertDialog(onDismissRequest = { pendingDoIpCommand = null },
                             title = { Text(stringResource(if (doIpConsentStep == EcuWriteConsentFlow.Step.WARNING)
                                 R.string.ecu_write_warning_title else R.string.ecu_write_confirm_title)) },
@@ -508,6 +585,9 @@ fun CalibrationWorkspaceScreen(
                                     Text(stringResource(R.string.cal_doip_command_target, pending.vehicle.vin,
                                         pending.host.ifBlank { stringResource(R.string.cal_doip_discover_by_vin) },
                                         pending.tester, pending.ecu, if (pending.tls) "TLS" else "TCP"))
+                                    pending.certificate?.let { selected ->
+                                        Text(stringResource(R.string.cal_doip_cert_selected, selected.alias, selected.fingerprint))
+                                    }
                                     Text(pending.payload, fontFamily = FontFamily.Monospace)
                                     Text(stringResource(if (doIpConsentStep == EcuWriteConsentFlow.Step.WARNING)
                                         R.string.ecu_write_warning_message else R.string.ecu_write_confirm_message))
@@ -537,7 +617,7 @@ fun CalibrationWorkspaceScreen(
                     val interval = doIpInterval.toIntOrNull()
                     OutlinedButton(onClick = {
                         if (samples != null && interval != null)
-                            onMonitorDirectDoIp(doIpHost, doIpTester, doIpEcu, doIpDid, doIpTls, samples, interval)
+                            onMonitorDirectDoIp(doIpHost, doIpTester, doIpEcu, doIpDid, doIpTls, samples, interval, doIpCertificate)
                     }, enabled = targetReady && vinReady && doIpDid.length == 4 &&
                         samples != null && samples in 1..30 && interval != null && interval in 250..5000,
                         modifier = Modifier.fillMaxWidth()) {
@@ -573,7 +653,7 @@ fun CalibrationWorkspaceScreen(
                                     scope.vin, "%04X".format(scope.ecu), "%08X".format(scope.start), scope.length)) },
                                 confirmButton = { TextButton(onClick = {
                                     pendingDoIpBackup = null
-                                    onCaptureDoIpBackup(doIpHost, doIpTester, doIpEcu, doIpTls, scope)
+                                    onCaptureDoIpBackup(doIpHost, doIpTester, doIpEcu, doIpTls, scope, doIpCertificate)
                                 }) { Text(stringResource(R.string.cal_doip_backup)) } },
                                 dismissButton = { TextButton(onClick = { pendingDoIpBackup = null }) {
                                     Text(stringResource(R.string.cal_doip_cancel))

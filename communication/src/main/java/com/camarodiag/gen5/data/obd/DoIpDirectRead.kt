@@ -111,6 +111,8 @@ object DoIpDirectRead {
         return Target.parse(requireNotNull(found.host), tester, ecu, expected, tls,
             found.gateway.logicalAddress)
     }
+    internal fun canonicalHost(host: String): String = requireNotNull(parseHost(host).hostAddress)
+
     private fun parseHost(host: String): InetAddress {
         val raw = host.trim()
         val address = if (raw.contains(':')) {
@@ -460,7 +462,9 @@ object DoIpDirectRead {
         onControlTrace: (ControlTrace) -> Unit = {},
         command: ByteArray? = null, approval: EcuWriteConsentFlow.Approval? = null,
         isContextCurrent: () -> Boolean = { false }, dtc: Int = 0, record: Int = 1,
-        commands: List<ByteArray>? = null, onCommandReply: (Int, ByteArray) -> Unit = { _, _ -> }): Outcome {
+        commands: List<ByteArray>? = null, onCommandReply: (Int, ByteArray) -> Unit = { _, _ -> },
+        clientTls: DoIpClientTls? = null): Outcome {
+        clientTls?.requireTarget(target)
         require(timeoutMs in 100..30_000 && did in 0..65535 && mask in 0..255)
         require(operation == Operation.VIN || target.expectedVin.isNotEmpty())
         require(sampleCount in 1..30 && intervalMs in 250..5000)
@@ -500,12 +504,18 @@ object DoIpDirectRead {
                 base.connect(InetSocketAddress(target.address, if (target.tls) 3496 else 13400), timeoutMs)
                 base.soTimeout = timeoutMs
                 val wire = if (target.tls) {
-                    val factory = SSLSocketFactory.getDefault() as SSLSocketFactory
+                    val factory = clientTls?.factory ?: (SSLSocketFactory.getDefault() as SSLSocketFactory)
                     val secure = factory.createSocket(base, target.address.hostAddress, 3496, true) as SSLSocket
                     secure.sslParameters = secure.sslParameters.apply { endpointIdentificationAlgorithm = "HTTPS" }
                     secure.enabledProtocols = secure.supportedProtocols.filter { it == "TLSv1.2" || it == "TLSv1.3" }.toTypedArray()
-                    secure.startHandshake()
-                    secure
+                    try {
+                        secure.startHandshake()
+                        clientTls?.requirePresented(secure)
+                        secure
+                    } catch (error: Exception) {
+                        secure.close()
+                        throw error
+                    }
                 } else base
                 wire.use {
                     val session = Session(wire, gateway, target, trace, rollingTrace = operation == Operation.BACKUP,

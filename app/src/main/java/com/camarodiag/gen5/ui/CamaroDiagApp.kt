@@ -780,14 +780,15 @@ fun CamaroDiagApp(
                     onSyncVehicleVinFromEcu = { viewModel.syncVehicleVinFromEcu(it) },
                     onReadUdsDid = { requestId, responseId, did, protocol -> viewModel.readUdsDid(requestId, responseId, did, protocol) },
                     onReadUdsDtcs = { requestId, responseId, protocol -> viewModel.readUdsDtcs(requestId, responseId, protocol) },
-                    onReadDirectDoIp = { host, tester, ecu, did, tls, operation ->
-                        viewModel.readDirectDoIp(host, tester, ecu, did, tls, operation)
+                    onReadDirectDoIp = { host, tester, ecu, did, tls, operation, certificate ->
+                        viewModel.readDirectDoIp(host, tester, ecu, did, tls, operation, certificate = certificate)
                     },
+                    doIpAccountUid = accountUid,
                     doIpContextGeneration = liveCanMonitorState.consoleContextGeneration,
                     onConfirmDoIpCommand = viewModel::confirmDirectDoIpCommand,
-                    onMonitorDirectDoIp = { host, tester, ecu, did, tls, samples, interval ->
+                    onMonitorDirectDoIp = { host, tester, ecu, did, tls, samples, interval, certificate ->
                         viewModel.readDirectDoIp(host, tester, ecu, did, tls,
-                            com.camarodiag.gen5.data.obd.DoIpDirectRead.Operation.MONITOR, samples, interval)
+                            com.camarodiag.gen5.data.obd.DoIpDirectRead.Operation.MONITOR, samples, interval, certificate = certificate)
                     },
                     onCancelDirectDoIp = viewModel::cancelDirectDoIp,
                     onInspectDoIpGateway = viewModel::inspectDirectDoIpGateway,
@@ -804,8 +805,8 @@ fun CamaroDiagApp(
                             doIpArchivePicker.launch(arrayOf("application/zip", "application/octet-stream"))
                         }
                     },
-                    onCaptureDoIpBackup = { host, tester, ecu, tls, scope ->
-                        withExportFolder { viewModel.captureDirectDoIpBackup(host, tester, ecu, tls, scope) }
+                    onCaptureDoIpBackup = { host, tester, ecu, tls, scope, certificate ->
+                        withExportFolder { viewModel.captureDirectDoIpBackup(host, tester, ecu, tls, scope, certificate) }
                     },
                     onConnectJ2534Bridge = { host, port, token, requestId, responseId, baud ->
                         viewModel.connectJ2534Bridge(host, port, token, requestId, responseId, baud)

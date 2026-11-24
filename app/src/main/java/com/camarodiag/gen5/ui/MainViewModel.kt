@@ -53,6 +53,9 @@ import com.camarodiag.gen5.data.obd.SafeRawCanTransmitPolicy
 import com.camarodiag.gen5.data.obd.CanConsoleRecordParser
 import com.camarodiag.gen5.data.obd.CanConsoleCapabilityPolicy
 import com.camarodiag.gen5.data.obd.EcuWriteConsentFlow
+import com.camarodiag.gen5.data.obd.DoIpClientTls
+import com.camarodiag.gen5.data.obd.DoIpClientCertificateSelection
+import com.camarodiag.gen5.data.obd.DoIpClientCertificateException
 import com.camarodiag.gen5.data.obd.CanConsoleDiagnosticStatus
 import com.camarodiag.gen5.data.obd.CanAdapterRestorationException
 import com.camarodiag.gen5.data.obd.CanConsoleDisplayFilter
@@ -1274,7 +1277,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun captureDirectDoIpBackup(host: String, tester: String, ecu: String, tls: Boolean,
-        scope: DoIpMemoryBackup.Scope) {
+        scope: DoIpMemoryBackup.Scope, certificate: DoIpClientCertificateSelection? = null) {
         if (!requirePremiumLicense() || _calibrationWorkspace.value.doIpBackupScope != scope) return
         launchEnhancedUdsRead(journalDoIp = true) { current ->
             _calibrationWorkspace.update { it.copy(doIpReading = true, doIpResult = "",
@@ -1285,8 +1288,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     expectedGateway = scope.gateway, onControlTrace = { trace -> journalDoIpControlTrace(trace, current) })
                 check(current())
                 require(scope.vin == target.expectedVin && scope.tester == target.tester && scope.ecu == target.ecu)
+                val clientTls = certificate?.let { DoIpClientTls.open(getApplication<Application>(), it, target) }
+                check(current())
                 val result = DoIpDirectRead.read(target, DoIpDirectRead.Operation.BACKUP,
-                    backupScope = scope, onBackupProgress = { pass, offset ->
+                    clientTls = clientTls, backupScope = scope, onBackupProgress = { pass, offset ->
                         check(current())
                         _calibrationWorkspace.update { if (current()) it.copy(doIpBackupBytes = (pass - 1) * scope.length + offset) else it }
                     }, onTrace = { trace ->
@@ -1318,10 +1323,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             } catch (cancelled: CancellationException) {
                 if (current()) _calibrationWorkspace.update { it.copy(doIpReading = false, doIpBackupBytes = 0) }
                 throw cancelled
-            } catch (_: Exception) {
-                if (current()) appendCanConsoleSystemEvent(localizedContext.getString(R.string.cal_doip_failed), succeeded = false)
+            } catch (error: Exception) {
+                val tlsError = error is DoIpClientCertificateException || error is javax.net.ssl.SSLException
+                val resource = if (tlsError) R.string.cal_doip_tls_error else R.string.cal_doip_backup_failed
+                if (current()) appendCanConsoleSystemEvent(localizedContext.getString(resource), succeeded = false)
                 if (current()) _calibrationWorkspace.update { it.copy(doIpReading = false, doIpBackupBytes = 0,
-                    doIpResult = localizedContext.getString(R.string.cal_doip_backup_failed)) }
+                    doIpResult = localizedContext.getString(resource)) }
             }
         }
     }
@@ -1407,12 +1414,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             command.generation != _liveCanMonitorState.value.consoleContextGeneration) return
         val payload = runCatching { DoIpDirectRead.parseCommands(command.payload) }.getOrNull() ?: return
         readDirectDoIp(command.host, command.tester, command.ecu, "", command.tls,
-            DoIpDirectRead.Operation.EXCHANGE, commands = payload, approval = approval)
+            DoIpDirectRead.Operation.EXCHANGE, commands = payload, approval = approval, certificate = command.certificate)
     }
 
     fun readDirectDoIp(host: String, tester: String, ecu: String, didHex: String,
         tls: Boolean, operation: DoIpDirectRead.Operation, sampleCount: Int = 10, intervalMs: Int = 1000,
-        commands: List<ByteArray>? = null, approval: EcuWriteConsentFlow.Approval? = null) {
+        commands: List<ByteArray>? = null, approval: EcuWriteConsentFlow.Approval? = null,
+        certificate: DoIpClientCertificateSelection? = null) {
         if (!requirePremiumLicense() || (operation == DoIpDirectRead.Operation.EXCHANGE &&
                 (commands == null || approval == null))) return
         val fixedCommands = commands?.map { it.copyOf() }
@@ -1435,7 +1443,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 if (isDetail) require(didHex.matches(Regex("[0-9A-Fa-f]{8}")))
                 val detailDtc = if (isDetail) didHex.take(6).toInt(16) else 0
                 val detailRecord = if (isDetail) didHex.takeLast(2).toInt(16) else 1
+                val clientTls = certificate?.let { DoIpClientTls.open(getApplication<Application>(), it, target) }
+                check(current())
                 val result = DoIpDirectRead.read(target, operation, did, mask = mask, sampleCount = sampleCount, intervalMs = intervalMs,
+                    clientTls = clientTls,
                     onTrace = { trace ->
                         journalDoIpTrace(target, trace, current)
                         check(current())
@@ -1495,10 +1506,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             } catch (cancelled: CancellationException) {
                 if (current()) _calibrationWorkspace.update { it.copy(doIpReading = false) }
                 throw cancelled
-            } catch (_: Exception) {
-                if (current()) appendCanConsoleSystemEvent(localizedContext.getString(R.string.cal_doip_failed), succeeded = false)
+            } catch (error: Exception) {
+                val tlsError = error is DoIpClientCertificateException || error is javax.net.ssl.SSLException
+                val resource = if (tlsError) R.string.cal_doip_tls_error else R.string.cal_doip_failed
+                if (current()) appendCanConsoleSystemEvent(localizedContext.getString(resource), succeeded = false)
                 if (current()) _calibrationWorkspace.update {
-                    val error = localizedContext.getString(R.string.cal_doip_failed)
+                    val error = localizedContext.getString(resource)
                     it.copy(doIpReading = false, doIpResult =
                         if (operation == DoIpDirectRead.Operation.EXCHANGE && it.doIpResult.isNotBlank())
                             it.doIpResult + "\n" + error else error)
