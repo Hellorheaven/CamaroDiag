@@ -51,6 +51,24 @@ internal static class DoIpConsolePresentationSelfTests
                     .Contains(DoIpConsolePresentation.Text(key, culture)),
                     "Power mode decoded in " + language);
             }
+            var dtcs = ObdOnUdsServices.DecodeDtcByStatusMask(
+                0x05, [0x59, 0x02, 0x0F, 0x12, 0x34, 0x56, 0x01]);
+            var dtcLines = DoIpConsolePresentation.FormatDtcs(dtcs, 0x05, culture);
+            Check(dtcLines.Count == 3 && dtcLines[0].Contains("0x05") &&
+                dtcLines[0].Contains("0x0F") && dtcLines[1].Contains("0x123456") &&
+                dtcLines[1].Contains("0x01"),
+                "DTC report preserves code and requested/available masks in " + language);
+            var emptyDtcs = ObdOnUdsServices.DecodeDtcByStatusMask(
+                0x80, [0x59, 0x02, 0x01]);
+            var emptyLines = DoIpConsolePresentation.FormatDtcs(emptyDtcs, 0x80, culture);
+            Check(emptyLines.Count == 2 && emptyLines[0].Contains("0x80") &&
+                emptyLines[0].Contains("0x01") &&
+                emptyLines[1] == DoIpConsolePresentation.Text("DtcNotice", culture),
+                "Empty DTC report retains availability limits in " + language);
+            foreach (var dtcKey in new[] { "ReadDtcs", "DtcMask", "InvalidDtcMask",
+                "DtcStarted", "DtcResult", "DtcEntry", "DtcNotice" })
+                Check(!string.IsNullOrWhiteSpace(DoIpConsolePresentation.Text(dtcKey, culture)),
+                    "DTC resource " + dtcKey + " in " + language);
             var rejected = false;
             try { _ = DoIpConsolePresentation.FormatStatus(status, true, culture); }
             catch (InvalidDataException) { rejected = true; }
@@ -60,6 +78,16 @@ internal static class DoIpConsolePresentationSelfTests
                 "StatusNotice", "StatusStarted", "IdentifyFirst" })
                 Check(!string.IsNullOrWhiteSpace(DoIpConsolePresentation.Text(key, culture)),
                     "Resource " + key + " in " + language);
+        }
+        Check(DoIpConsolePresentation.ParseDtcMask("fF") == 0xFF &&
+            DoIpConsolePresentation.ParseDtcMask("00") == 0,
+            "DTC mask accepts exactly two hexadecimal digits.");
+        foreach (var invalid in new[] { "", "F", "0xFF", "GG", " F" })
+        {
+            var invalidMask = false;
+            try { _ = DoIpConsolePresentation.ParseDtcMask(invalid); }
+            catch (ArgumentException) { invalidMask = true; }
+            Check(invalidMask, "Malformed DTC mask rejected: " + invalid);
         }
         return checks;
     }
