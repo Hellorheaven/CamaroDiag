@@ -62,6 +62,10 @@ Examples:
                               --sequence "22F190;1901FF" --expected-vin VIN
                               sends 1–16 ordered commands on one verified session,
                               TLS by default, stops at first error; interactive consent.
+                              --monitor-did F190 or --obd-monitor-did F40C
+                              with --expected-vin VIN, --samples 10, --interval-ms 1000.
+                              Read-only monitoring on one verified ECU, TLS by default.
+                              Samples are provisional until final identity verification.
                               No OEM security bypass, flash recovery or vehicle tests.
 
 Use each option with the exact arguments described above. --help must be alone:

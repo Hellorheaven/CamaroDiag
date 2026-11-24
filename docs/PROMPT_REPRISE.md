@@ -1,3 +1,7 @@
+## PR117 — monitoring DoIP en CLI Windows (24/11/2026)
+
+- Options `--monitor-did` et `--obd-monitor-did` sur `--doip-exchange`, VIN obligatoire, sélection TCP/TLS (TLS par défaut), DID et bornes validés avant réseau, vérification de l’identité avant et après les mesures. Sortie JSONL horodatée, mesures provisoires jusqu’au résultat final, annulation Ctrl+C, aide FR/EN, tests parseur. Les options de temporisation P2/P2* spécialisées restent réservées aux échanges unitaires/séquences ; monitoring utilise le délai global. Aucune mutation ECU. À valider sur le prochain checkpoint.
+
 ## PR117 — découverte DoIP Connectors IPv4 / EID (24/11/2026)
 
 - Extension du client Python et de sa CLI FR/EN : identification unicast par EID, découverte IPv4 explicite générique/VIN/EID, écoute passive, adresse locale de liaison, filtre port/source, déduplication et limite 32 passerelles. L’identification automatique VIN conserve le refus d’ambiguïté. La découverte ne vaut ni authentification ni autorisation d’écriture. Tests UDP locaux et écoute sans émission ajoutés. Qualification matérielle non réalisée ; validation CI à demander avec le lot courant.

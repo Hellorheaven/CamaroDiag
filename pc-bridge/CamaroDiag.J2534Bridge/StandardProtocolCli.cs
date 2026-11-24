@@ -1522,10 +1522,112 @@ internal static class StandardProtocolCli
         finally { Console.CancelKeyPress -= cancel; }
     }
 
+    internal sealed record DoIpMonitorOptions(DoIpOptions Target, string Vin, ushort Did,
+        int Count, int IntervalMs, bool Obd, bool ExplicitVersion);
+
+    internal static DoIpMonitorOptions ParseDoIpMonitor(string[] args)
+    {
+        var allowed = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "--host", "--tester", "--ecu", "--expected-vin", "--monitor-did", "--obd-monitor-did",
+            "--samples", "--interval-ms", "--timeout-ms", "--tls", "--doip-version",
+            "--client-cert-thumbprint", "--routing-activation-type", "--routing-oem-data"
+        };
+        var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        for (var i = args.Length > 0 && args[0].Equals(DoIpCommand, StringComparison.OrdinalIgnoreCase) ? 1 : 0;
+             i < args.Length; i += 2)
+        {
+            if (i + 1 >= args.Length || !allowed.Contains(args[i]) ||
+                args[i + 1].StartsWith("--", StringComparison.Ordinal) ||
+                !values.TryAdd(args[i], args[i + 1]))
+                throw new ArgumentException("Unexpected or repeated DoIP monitoring option.");
+        }
+        var obd = values.TryGetValue("--obd-monitor-did", out var obdDid);
+        var generic = values.TryGetValue("--monitor-did", out var genericDid);
+        if (obd == generic || !values.TryGetValue("--expected-vin", out var vin) ||
+            !DoIpVehicleDiscovery.IsVehicleVin(vin))
+            throw new ArgumentException("One monitoring DID and an explicit expected VIN required.");
+        var did = Address(obd ? obdDid! : genericDid!);
+        if (obd && ObdOnUdsServices.ClassifyDid(did) == ObdOnUdsServices.DataGroup.NotLegislated)
+            throw new ArgumentException("Legislated OBDonUDS DID required.");
+        var count = int.Parse(values.GetValueOrDefault("--samples", "10"), CultureInfo.InvariantCulture);
+        var interval = int.Parse(values.GetValueOrDefault("--interval-ms", "1000"), CultureInfo.InvariantCulture);
+        if (count is < 1 or > 3600 || interval is < 250 or > 60000)
+            throw new ArgumentOutOfRangeException(nameof(args), "Invalid monitoring count or interval.");
+        var explicitVersion = values.ContainsKey("--doip-version");
+        foreach (var key in new[] { "--monitor-did", "--obd-monitor-did", "--samples",
+            "--interval-ms", "--expected-vin" }) values.Remove(key);
+        values["--payload"] = $"22{did:X4}";
+        if (!values.ContainsKey("--tls")) values["--tls"] = "true";
+        var target = ParseDoIp(values.SelectMany(x => new[] { x.Key, x.Value }).ToArray());
+        if (!System.Net.IPAddress.TryParse(target.Host, out var address) ||
+            System.Net.IPAddress.Any.Equals(address) || System.Net.IPAddress.IPv6Any.Equals(address) ||
+            System.Net.IPAddress.Broadcast.Equals(address) || address.IsIPv6Multicast ||
+            (address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork &&
+             address.GetAddressBytes()[0] is >= 224 and <= 239))
+            throw new ArgumentException("DoIP monitoring requires a numeric unicast IP.");
+        return new DoIpMonitorOptions(target, vin, did, count, interval, obd, explicitVersion);
+    }
+
+    private static async Task<int> RunDoIpMonitorAsync(string[] args)
+    {
+        var monitor = ParseDoIpMonitor(args);
+        var o = monitor.Target;
+        using var cancellation = new CancellationTokenSource();
+        ConsoleCancelEventHandler cancel = (_, e) => { e.Cancel = true; cancellation.Cancel(); };
+        Console.CancelKeyPress += cancel;
+        try
+        {
+            var timeout = TimeSpan.FromMilliseconds(o.TimeoutMs);
+            var gateway = await DoIpVehicleDiscovery.DiscoverAsync(o.Host, timeout,
+                cancellation.Token, vin: monitor.Vin);
+            if (gateway.Vin != monitor.Vin ||
+                (monitor.ExplicitVersion && gateway.ProtocolVersion != o.Version) ||
+                gateway.LogicalAddress == o.Tester)
+                throw new InvalidDataException("Observed DoIP gateway differs from the monitoring target.");
+            await using var transport = await DoIpDiagnosticTransport.ConnectAsync(
+                o.Host, o.Tester, o.Ecu, timeout, cancellation.Token,
+                useTls: o.UseTls, protocolVersion: gateway.ProtocolVersion,
+                clientCertificateThumbprint: o.ClientCertificateThumbprint,
+                activationType: o.RoutingActivationType,
+                activationOemData: o.RoutingOemData,
+                expectedGatewayAddress: gateway.LogicalAddress);
+            var interval = TimeSpan.FromMilliseconds(monitor.IntervalMs);
+            void Sample(int index, byte[] data) => Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(
+                new { sample = index, utc = DateTimeOffset.UtcNow, vin = monitor.Vin,
+                    ecu = $"{o.Ecu:X4}", did = $"{monitor.Did:X4}", protocol = monitor.Obd ? "OBDonUDS" : "UDS",
+                    payload = Convert.ToHexString(data), partial = true }));
+            if (monitor.Obd)
+                await DoIpVinReader.MonitorVerifiedObdAsync(transport, monitor.Vin, monitor.Did,
+                    monitor.Count, interval, timeout, cancellation.Token, Sample);
+            else
+            {
+                var vin = await DoIpVinReader.VerifyObservedVinAsync(transport, gateway,
+                    timeout, cancellation.Token, null, null);
+                await DoIpVinReader.MonitorDidAsync(transport, monitor.Did, monitor.Count,
+                    interval, timeout, cancellation.Token, Sample);
+                var after = await DoIpVinReader.VerifyObservedVinAsync(transport, gateway,
+                    timeout, cancellation.Token, null, null);
+                if (vin != after) throw new InvalidDataException("ECU VIN changed during monitoring.");
+            }
+            cancellation.Token.ThrowIfCancellationRequested();
+            Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(new
+            {
+                complete = true, samples = monitor.Count,
+                protocol = monitor.Obd ? "OBDonUDS" : "UDS", vin = monitor.Vin
+            }));
+            return 0;
+        }
+        finally { Console.CancelKeyPress -= cancel; }
+    }
+
     internal static async Task<int> RunDoIpAsync(string[] args)
     {
         try
         {
+            if (args.Contains("--monitor-did", StringComparer.OrdinalIgnoreCase) ||
+                args.Contains("--obd-monitor-did", StringComparer.OrdinalIgnoreCase))
+                return await RunDoIpMonitorAsync(args);
             if (args.Contains("--sequence", StringComparer.OrdinalIgnoreCase))
                 return await RunDoIpSequenceAsync(args);
             var o = ParseDoIp(args);

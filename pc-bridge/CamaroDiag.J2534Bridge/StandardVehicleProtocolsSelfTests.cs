@@ -510,6 +510,25 @@ internal static class StandardVehicleProtocolsSelfTests
               J2534StandardChannel.IsKnownProtocol(J2534StandardChannel.FdIso15765) &&
               !J2534StandardChannel.IsKnownProtocol(0xFFFF),
             "SAE J2534 standard and FD extended protocols recognized.");
+        var verifiedMonitor = StandardProtocolCli.ParseDoIpMonitor([
+            StandardProtocolCli.DoIpCommand, "--host", "192.0.2.10", "--tester", "0E80",
+            "--ecu", "1234", "--expected-vin", "1G1FA1RXXR0123456", "--obd-monitor-did",
+            "F40C", "--samples", "5", "--interval-ms", "250"]);
+        Check(verifiedMonitor.Obd && verifiedMonitor.Target.UseTls &&
+            verifiedMonitor.Did == 0xF40C && verifiedMonitor.Count == 5 &&
+            verifiedMonitor.IntervalMs == 250, "Verified OBD monitoring parses a bounded TLS target.");
+        var monitorArgs = new[] { StandardProtocolCli.DoIpCommand, "--host", "192.0.2.10",
+            "--tester", "0E80", "--ecu", "1234", "--expected-vin", "1G1FA1RXXR0123456",
+            "--obd-monitor-did", "F40C" };
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseDoIpMonitor(
+            [.. monitorArgs, "--payload", "221234"]), "Monitoring rejects arbitrary command options.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseDoIpMonitor(
+            [.. monitorArgs, "--monitor-did", "F190"]), "Monitoring rejects conflicting service routes.");
+        Reject<ArgumentOutOfRangeException>(() => StandardProtocolCli.ParseDoIpMonitor(
+            [.. monitorArgs, "--samples", "0"]), "Monitoring rejects invalid count before network I/O.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseDoIpMonitor(
+            monitorArgs.Select(x => x == "F40C" ? "1234" : x).ToArray()),
+            "Legislated monitoring rejects non-regulatory DID.");
         var parsed = StandardProtocolCli.ParseDoIp([
             StandardProtocolCli.DoIpCommand, "--host", "127.0.0.1",
             "--tester", "0E80", "--ecu", "1234",

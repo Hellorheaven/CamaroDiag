@@ -43,6 +43,7 @@ internal static class BridgeCommandLineHelpSelfTests
             "--listen-ipv6-ifindex", "--multicast-ipv6-ifindex",
             "--doip-version", "--uds-p2-ms", "--uds-p2-star-ms", "--sequence", "--expected-vin",
             "--power-mode true", "--broadcast-ip", "--vin", "--eid",
+            "--monitor-did", "--obd-monitor-did", "--samples", "--interval-ms",
             "--tls true", "--tester", "--ecu", "--payload"
         })
         {

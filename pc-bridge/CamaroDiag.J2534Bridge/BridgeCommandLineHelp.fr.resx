@@ -64,6 +64,10 @@ Exemples :
                               explicite obligatoires ; --sequence "22F190;1901FF"
                               --expected-vin VIN : 1 à 16 commandes sur une session,
                               TLS par défaut, arrêt sur erreur et consentement interactif.
+                              --monitor-did F190 ou --obd-monitor-did F40C
+                              avec --expected-vin VIN, --samples 10, --interval-ms 1000.
+                              Monitoring en lecture seule, sur le même ECU, TLS par défaut.
+                              Mesures provisoires avant vérification finale de l’identité.
                               Ni contournement OEM ni flash ou récupération qualifiés.
 
 Chaque commande nécessite ses paramètres exacts. Utiliser --help seul :
