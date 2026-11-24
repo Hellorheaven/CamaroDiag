@@ -176,6 +176,43 @@ internal static class DoIpUdpDiscoverySelfTests
         catch (ArgumentOutOfRangeException) { invalidPassivePort = true; }
         Check(invalidPassivePort,
             "Invalid passive discovery source-port configuration is rejected.");
+
+        // IPv6 UDP unicast has the same source-port and payload rules as
+        // IPv4; skip the loopback probe only on machines without IPv6.
+        if (Socket.OSSupportsIPv6)
+        {
+            using var ipv6Gateway = new UdpClient(
+                new IPEndPoint(IPAddress.IPv6Loopback, 0));
+            var ipv6Port =
+                ((IPEndPoint)ipv6Gateway.Client.LocalEndPoint!).Port;
+            var ipv6Discovery = DoIpVehicleDiscovery.DiscoverAsync(
+                "::1", TimeSpan.FromSeconds(2), CancellationToken.None,
+                portOverride: ipv6Port);
+            var ipv6Request = await ipv6Gateway.ReceiveAsync()
+                .WaitAsync(TimeSpan.FromSeconds(2));
+            Check(DoIpCodec.Decode(ipv6Request.Buffer).Version == 0xFF,
+                "IPv6 DoIP discovery uses standard default version 0xFF.");
+            await ipv6Gateway.SendAsync(Identity(requested),
+                ipv6Request.RemoteEndPoint);
+            var ipv6Identity = await ipv6Discovery.WaitAsync(TimeSpan.FromSeconds(2));
+            Check(ipv6Identity.Vin == requested &&
+                ipv6Identity.Source.Equals(IPAddress.IPv6Loopback),
+                "IPv6 unicast DoIP vehicle identification parses exact ECU source.");
+
+            var ipv6Status = DoIpVehicleDiscovery.QueryStatusAsync(
+                "::1", false, TimeSpan.FromSeconds(2),
+                CancellationToken.None, portOverride: ipv6Port);
+            var ipv6StatusRequest = await ipv6Gateway.ReceiveAsync()
+                .WaitAsync(TimeSpan.FromSeconds(2));
+            await ipv6Gateway.SendAsync(DoIpCodec.Encode(
+                DoIpCodec.EntityStatusResponse, [0, 2, 1]),
+                ipv6StatusRequest.RemoteEndPoint);
+            var ipv6Entity = DoIpCodec.ParseEntityStatus(
+                await ipv6Status.WaitAsync(TimeSpan.FromSeconds(2)));
+            Check(ipv6Entity.MaxSockets == 2 &&
+                ipv6Entity.CurrentSockets == 1,
+                "IPv6 UDP DoIP status response is correlated and decoded.");
+        }
         return checks;
     }
 }
