@@ -61,10 +61,16 @@ class CanConsoleEventJournalWriter(private val destination: Writer) : Closeable 
         if (closed) return
         closed = true
         var error: IOException? = null
-        try {
-            destination.flush()
-        } catch (e: IOException) {
-            error = e
+        // A previous disk/write failure already made this journal
+        // permanently incomplete. Never retry a failed flush during
+        // teardown: release the handle without manufacturing a successful
+        // archive state or hiding the original error.
+        if (!failed) {
+            try {
+                destination.flush()
+            } catch (e: IOException) {
+                error = e
+            }
         }
         try {
             destination.close()
