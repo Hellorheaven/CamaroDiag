@@ -1,3 +1,7 @@
+## PR117 — correctif compilation tests Android (24/11/2026)
+
+Le run GitHub Actions push 45450659055 sur `70a6c6c` a terminé en échec sur `:diagnostic:compileDebugUnitTestKotlin` : import JUnit assertArrayEquals absent de UdsDtcDecoderTest.kt. Les autres jobs techniques ont réussi (review ignorée sur PR draft). Import ajouté ; aucune modification du protocole liée au correctif. Nouvelle demande de validation à ce HEAD. Le run intermédiaire 45451927382 a été déclenché sur `d11dab8` mais n'est pas une preuve pour le HEAD corrigé.
+
 ## PR117 — sélection de route DoIP et identification OBDonUDS (24/11/2026)
 
 - `4ea1eaf` : Android conserve EID/GID, version, VIN et adresse logique de la passerelle choisie (y compris découverte VIN automatique) ; vérification à la nouvelle découverte avant ouverture TCP/TLS. Affichage EID/GID, invalidation à changement de contexte, tests de substitution. Ce contrôle corrèle les annonces UDP, ne les authentifie pas.

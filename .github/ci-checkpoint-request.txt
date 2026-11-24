@@ -1,3 +1,7 @@
+PR117 — Android unit-test compilation import correction after grouped DoIP / OBDonUDS integration
+Parent: d11dab8cb4940bad1b492a85a0d958351611b984
+Previous run 45450659055: unresolved assertArrayEquals in UdsDtcDecoderTest. Re-run full Debug validation on corrected revision; no merge or release.
+
 PR117 — grouped DoIP selected gateway correlation and OBDonUDS route validation
 Implementation parent: 4ffc898af22dfa560934f953f277a0656ece3cd0
 Validate Android EID/GID identity binding, selected route and F802/F810 correlation; Windows and Python legislated DID paths, FR/EN and regression suite. Intermediate C6. No merge, deployment, release or physical qualification.
