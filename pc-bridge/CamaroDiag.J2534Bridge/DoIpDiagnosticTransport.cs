@@ -147,51 +147,59 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
     }
 
     internal async Task<byte[]> ExchangeUdsAsync(byte[] request,
-        TimeSpan timeout, CancellationToken cancellationToken)
+        TimeSpan timeout, CancellationToken cancellationToken,
+        TimeSpan? p2Timeout = null, TimeSpan? p2StarTimeout = null)
     {
-        if (request is null || request.Length == 0 || request.Length > DoIpCodec.MaxPayload - 4)
-            throw new ArgumentException("UDS request must fit the DoIP diagnostic PDU.", nameof(request));
+        if (request is null || request.Length == 0 ||
+            request.Length > DoIpCodec.MaxPayload - 4)
+            throw new ArgumentException(
+                "UDS request must fit the DoIP diagnostic PDU.", nameof(request));
         if (timeout <= TimeSpan.Zero || timeout > TimeSpan.FromSeconds(30))
             throw new ArgumentOutOfRangeException(nameof(timeout));
+        // Keep the complete request/reply transaction budget, including TX.
+        var overall = System.Diagnostics.Stopwatch.StartNew();
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         deadline.CancelAfter(timeout);
         await SendAsync(DoIpCodec.Diagnostic(
             testerAddress, ecuAddress, request, protocolVersion), deadline.Token);
-        // UDS NRC 0x78 (ResponsePending), DoIP diagnostic ACKs and Alive
-        // Check requests are legitimate interim messages. An arbitrary
-        // count limit can terminate a valid long-running routine. The
-        // caller's bounded deadline, not the number of interim frames,
-        // controls the full exchange.
-        while (true)
-        {
-            deadline.Token.ThrowIfCancellationRequested();
-            var message = await ReceiveAsync(deadline.Token);
-            DoIpCodec.RequireNoGenericNack(message);
-            if (message.Version != protocolVersion)
-                throw new InvalidDataException(
-                    "DoIP diagnostic response changed the negotiated protocol version.");
-            if (message.Type == DoIpCodec.AliveCheckRequest)
+        var remaining = timeout - overall.Elapsed;
+        if (remaining <= TimeSpan.Zero)
+            throw new TimeoutException("DoIP diagnostic TX exhausted exchange budget.");
+
+        // ACKs and gateway AliveCheck messages are not ECU UDS responses.
+        // They cannot reset the P2/P2* timer or the overall deadline.
+        return await UdsResponseSequence.AwaitFinalAsync(request,
+            async (budget, token) =>
             {
-                await SendAsync(DoIpCodec.ReplyToAliveCheck(
-                    message, testerAddress), deadline.Token);
-                continue;
-            }
-            if (DoIpCodec.IsCorrelatedDiagnosticAck(
-                message, testerAddress, ecuAddress, request))
-                continue;
-            var uds = DoIpCodec.RequireDiagnosticResponse(message, testerAddress, ecuAddress);
-            // The UDS server may report a negative response. Do not mistake
-            // it for a passing post-programming self-test.
-            if (uds.Length >= 3 && uds[0] == 0x7F && uds[1] == request[0])
-            {
-                if (uds[2] == 0x78) continue; // UDS ResponsePending; stay within deadline
-                throw new IOException($"ECU negative UDS response: 0x{uds[2]:X2}.");
-            }
-            // One ISO 14229 correlation implementation for CAN and DoIP:
-            // SID, DID, routine ID, security/session subfunction and
-            // TransferData sequence are checked in the same place.
-            return UdsStandardServices.RequireResponse(request, uds);
-        }
+                using var stage = CancellationTokenSource.CreateLinkedTokenSource(token);
+                stage.CancelAfter(budget);
+                while (true)
+                {
+                    DoIpCodec.Message message;
+                    try { message = await ReceiveAsync(stage.Token); }
+                    catch (OperationCanceledException) when (
+                        !token.IsCancellationRequested && stage.IsCancellationRequested)
+                    {
+                        throw new TimeoutException("DoIP diagnostic UDS stage deadline exceeded.");
+                    }
+                    DoIpCodec.RequireNoGenericNack(message);
+                    if (message.Version != protocolVersion)
+                        throw new InvalidDataException(
+                            "DoIP response changed the negotiated protocol version.");
+                    if (message.Type == DoIpCodec.AliveCheckRequest)
+                    {
+                        await SendAsync(DoIpCodec.ReplyToAliveCheck(
+                            message, testerAddress), stage.Token);
+                        continue;
+                    }
+                    if (DoIpCodec.IsCorrelatedDiagnosticAck(
+                        message, testerAddress, ecuAddress, request))
+                        continue;
+                    return DoIpCodec.RequireDiagnosticResponse(
+                        message, testerAddress, ecuAddress);
+                }
+            },
+            remaining, deadline.Token, p2Timeout, p2StarTimeout);
     }
 
     private async Task SendAsync(byte[] frame, CancellationToken token)
