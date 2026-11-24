@@ -229,6 +229,28 @@ internal static class DoIpDiagnosticSessionSelfTests
             }, protocolVersion: selectedVersion);
         }
 
+        // The caller owns the original byte[] and might reuse it as soon
+        // as an async exchange is initiated. All transmission, ACK matching
+        // and UDS SID validation must use the same immutable snapshot.
+        await RunCaseAsync(async stream =>
+        {
+            var frame = await RequireRequestAsync(stream);
+            Check(frame.Payload.AsSpan(4).SequenceEqual(Request),
+                "Gateway received the original approved UDS request.");
+            await SendAsync(stream, DoIpCodec.DiagnosticPositiveAck,
+                [0x12, 0x34, 0x0E, 0x80, 0, .. Request]);
+            await SendAsync(stream, DoIpCodec.DiagnosticMessage,
+                FromEcu(Positive));
+        }, async client =>
+        {
+            var mutable = Request.ToArray();
+            var operation = client.ExchangeUdsAsync(mutable,
+                TimeSpan.FromSeconds(2), CancellationToken.None);
+            Array.Fill(mutable, (byte)0x00);
+            Check((await operation).SequenceEqual(Positive),
+                "DoIP freezes caller-approved request bytes across async ACK matching.");
+        });
+
         // DoIP has no per-request correlation token. Two callers may never
         // interleave on the same socket; serialized reuse *after* success
         // remains legitimate for a diagnostic session.
