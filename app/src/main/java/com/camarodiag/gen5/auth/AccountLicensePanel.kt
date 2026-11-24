@@ -80,6 +80,7 @@ private fun parseAdminAccount(raw: Any?): AdminAccountRow? {
 
 private data class AdminChange(val row: AdminAccountRow, val action: String, val value: Boolean?)
 
+@Suppress("UNUSED_PARAMETER")
 @Composable
 internal fun AccountAdministrationDialog(french: Boolean, onClose: () -> Unit) {
     val functions = remember { FirebaseFunctions.getInstance("europe-west1") }
@@ -106,9 +107,9 @@ internal fun AccountAdministrationDialog(french: Boolean, onClose: () -> Unit) {
             val data = if (task.isSuccessful) task.result?.data as? Map<*, *> else null
             val raw = data?.get("accounts") as? List<*>
             val page = raw?.mapNotNull(::parseAdminAccount)
-            if (page == null || page.size != raw.size) { error = true; return@addOnCompleteListener }
+            if (raw == null || page == null || page.size != raw.size) { error = true; return@addOnCompleteListener }
             rows = (rows + page).distinctBy { it.uid }
-            next = data["nextPageToken"] as? String
+            next = data?.get("nextPageToken") as? String
         }
     }
     fun editable(row: AdminAccountRow) = row.uid != actor && !row.owner
