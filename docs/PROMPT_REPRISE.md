@@ -2,6 +2,7 @@
 
 - C1 console clôturé côté logiciel dans #59 (campagne dédiée #45332946454). Le chantier actif est C2 (#63). Ordre suivant après clôture logicielle de C2 : C4, C6, puis C8 qualité finale. La recette physique relève de la Release (#48).
 - C2 : `aba342861bdd2bd2286b454105099a4ad41cb75f` revalide les octets et leur manifeste pour le rapport de couverture et protège le contenu original lors de son export. Sur JVM, les six suites de couverture, intégrité, manifeste, archive, aperçu et assemblage comptent 75 tests passés.
+- Réexport C2 : `ef009f0355d7780468c6c6e18590b6a98b991979` conserve le canal et les observations du firmware Android. `5d1e1186a365cf0b792e2632f05a2699f268b430` lie les archives Windows au profil effectivement utilisé pour la double acquisition. Validation locale : 125 tests JVM avec frontière J2534 isolée, compilation du projet Windows Debug avec zéro avertissement et zéro erreur, 63 tests d’archives et 11 de qualification simulée exécutés sur .NET 8. Vérifier la campagne dédiée C2 au SHA de sa demande.
 - DoIP (#110) : après le checkpoint #45334468537, `574d6de5e0fee8857f97354db53071a8336506c8` corrige le décodage des annonces dont le VIN mélange ASCII et octets invalides. Validation .NET 8 locale : 37 contrôles UDP existants et une régression VIN. Le checkpoint groupé demandé avec cette mise à jour est à vérifier à son SHA exact avant de passer au protocole suivant.
 
 # Reprise C6/Connectors hors protocoles — 24 novembre 2026

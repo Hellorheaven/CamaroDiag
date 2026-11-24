@@ -12,3 +12,5 @@ No physical ECU qualification, no merge.
 Grouped correction validation — C2 portable restore-export mutation and memory follow-up
 Source HEAD before grouped request: 1bd8819068385be797f5bc6f24b7bca9b25ae771
 No Release, merge or physical ECU validation.
+
+C2 #63 — 24/11/2026. Vérifier ensemble les réexports Android et Windows, le profil acquis, la conservation du firmware, la couverture et les octets du paquet. Dernier commit source 5d1e1186a365cf0b792e2632f05a2699f268b430.
