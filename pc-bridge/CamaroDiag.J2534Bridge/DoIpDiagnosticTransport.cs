@@ -71,6 +71,9 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
             (activationOemData is not null && activationOemData.Length != 4) ||
             (clientCertificateThumbprint is not null && !useTls))
             throw new ArgumentException("Explicit gateway, distinct logical addresses and timeout required.");
+        cancellationToken.ThrowIfCancellationRequested();
+        // Freeze the caller-owned OEM routing bytes before any asynchronous I/O.
+        var fixedActivationOemData = activationOemData?.ToArray();
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         deadline.CancelAfter(timeout);
         var socket = new TcpClient();
@@ -103,7 +106,7 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
             await session.SendAsync(DoIpCodec.RoutingActivation(
                 tester, activationType: activationType,
                 version: protocolVersion,
-                oemSpecificData: activationOemData), deadline.Token);
+                oemSpecificData: fixedActivationOemData), deadline.Token);
             // Code 0x11 is a pending vehicle-side confirmation, not a
             // registered diagnostic routing state. Keep waiting within
             // the original connection deadline for code 0x10.
