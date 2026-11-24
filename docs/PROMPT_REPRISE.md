@@ -1,3 +1,9 @@
+## PR117 — journal DoIP complet des contrôles et découverte VIN Android (24/11/2026)
+
+- HEAD fonctionnel de cette tranche : `a7b3d408f79bbb6a11fc9f4f77abbf7a90814e7f`. Transport `266fdb6` et raccordement console `4100916` : journal commun TX/RX/CSV des contrôles UDP, activation de routage TCP/TLS, alive checks et ACK/NACK, en complément des UDS PDUs déjà raccordées. Les événements de contrôle contiennent les octets de PDU observés et le transport, pas des identifiants CAN artificiels. Pas de capture réseau exhaustive (paquets étrangers, invalides/tronqués ou chiffrement TLS).
+- Découverte VIN IPv4 broadcast (ISO 13400 type 0003), adresse sélectionnée seulement si une seule passerelle annonce le VIN demandé, refus des ambiguïtés, remplissage Android et FR/EN (`c104a2b`, `2c4c9f6`, `13a144d`, `ec1b270`, `36c820f`). Adresse logique ECU et profil restent à établir, aucune attribution DoIP inventée pour LFX 2012. Annulation de la passerelle distincte de l'annulation monitoring/sauvegarde (`192e07b`).
+- Tests loopback UDP écrits (statut, alimentation, NACK, octets, découverte VIN/ambiguïté) `2c67d20`, `a7b3d40` ; pas de résultat de compilation/tests sur ce HEAD à ce stade. Reste intégration complète par fonction, choix véhicule/ECU/protocole, SW-CAN brut TX, GMLAN ELM et autres standards #110. C6 + DoIP actifs, C8 non lancé. Aucune qualification matérielle avant Release #48, aucun merge/Release/déploiement autorisé.
+
 ## PR117 — DoIP vérification, monitoring, SW-CAN et Connectors (24/11/2026)
 
 - Dernière CI complète réussie #45437800068 au SHA 00b2edf3efab9e0005774919800afd1322b7187c : 12 jobs techniques, revue sautée pour PR draft.
