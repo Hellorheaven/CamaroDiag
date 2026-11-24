@@ -997,4 +997,5 @@
     <string name="can_console_capture_profile">Capture CAN %1$d kbit/s, %2$d bits</string>
     <string name="adapter_can_headers">En-têtes CAN</string>
     <string name="adapter_config_accepted">Configurations acceptées (non validées sur véhicule) : %1$s</string>
+    <string name="cal_choose_compatible_profile">Sélectionner un profil CAN compatible</string>
 </resources>

@@ -86,8 +86,34 @@ class BluetoothObdManager(context: Context) {
                 it.supportsCanHeaders
             } == true
 
+    /** A candidate is a configured software path, not proof of ECU response. */
+    fun availableUdsReadProfiles(request: Int? = null, response: Int? = null): Set<Int> {
+        if (request != null && response != null && request == response) return emptySet()
+        val possible = if (isJ2534BridgeConnected()) {
+            if ((request != null && request != j2534BridgeRequestCanId) ||
+                (response != null && response != j2534BridgeResponseCanId)) return emptySet()
+            setOfNotNull(j2534BridgeProtocolNumber)
+        } else {
+            val adapter = activeAdapterCapabilities ?: return emptySet()
+            if (!isObdCommandChannelAvailable) return emptySet()
+            setOf(33, 34, 35, 36, 63, 64).filterTo(linkedSetOf()) { profile ->
+                if (StnUdsSessionAdmission.allowsReadCandidate(adapter, true, profile)) true
+                else if (isElmUdsReadCandidate && profile in setOf(33, 34, 35, 36)) {
+                    val elm = DiagnosticRouteSelector.elmCanProtocol(profile in setOf(34, 36),
+                        if (profile in setOf(35, 36)) 250_000 else 500_000)
+                    elm in adapter.acceptedElmProtocols
+                } else false
+            }
+        }
+        return possible.filterTo(linkedSetOf()) { profile ->
+            val maximum = if (profile in setOf(34, 36, 64)) 0x1FFFFFFF else 0x7FF
+            (request == null || request in 0..maximum) &&
+                (response == null || response in 0..maximum)
+        }
+    }
+
     val isEnhancedUdsReadAvailable: Boolean
-        get() = isJ2534BridgeConnected() || isElmUdsReadCandidate
+        get() = availableUdsReadProfiles().isNotEmpty()
 
     fun getUsbDevices(): List<String> = usbTransport.availableDevices()
 
@@ -1264,6 +1290,9 @@ class BluetoothObdManager(context: Context) {
         require(requestCanId in 0..maxId && responseCanId in 0..maxId &&
             requestCanId != responseCanId)
         transportSessionEpoch.requireCurrent(epoch)
+        require(protocolNumber in availableUdsReadProfiles(requestCanId, responseCanId)) {
+            "The selected connector and ECU address pair do not admit this UDS profile."
+        }
         val result = when {
             isJ2534BridgeConnected() -> withJ2534BridgeUdsSessionAtEpoch(epoch,
                 requestCanId, responseCanId, protocolNumber, timeoutMs, readDids, block)
@@ -1290,7 +1319,8 @@ class BluetoothObdManager(context: Context) {
         block: suspend (UdsClient) -> T
     ): T = commandSessionMutex.withLock {
         transportSessionEpoch.requireQueuedCurrent(epoch)
-        check(isElmUdsReadCandidate)
+        check(isElmUdsReadCandidate && protocolNumber in
+            availableUdsReadProfiles(requestCanId, responseCanId))
         val transport = ElmUdsPayloadTransport(requestCanId, responseCanId, protocolNumber) { command, timeout ->
             sendAtCommandInternal(command, timeout, expectedEpoch = epoch, preserveLines = true)
         }

@@ -994,4 +994,5 @@
     <string name="can_console_capture_profile">CAN capture %1$d kbit/s, %2$d-bit</string>
     <string name="adapter_can_headers">CAN headers</string>
     <string name="adapter_config_accepted">Accepted configurations (not verified on vehicle): %1$s</string>
+    <string name="cal_choose_compatible_profile">Select a compatible CAN profile</string>
 </resources>

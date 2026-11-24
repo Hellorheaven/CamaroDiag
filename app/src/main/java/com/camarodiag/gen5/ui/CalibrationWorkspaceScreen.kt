@@ -238,6 +238,7 @@ fun CalibrationWorkspaceScreen(
     ecmType: String,
     isConnected: Boolean,
     canReadEnhancedUds: Boolean,
+    availableUdsReadProfiles: (String, String) -> Set<Int>,
     onReadIdentification: () -> Unit,
     onReadGmlanIdentification: () -> Unit,
     onReadLfx2012FuelSnapshot: () -> Unit,
@@ -271,6 +272,7 @@ fun CalibrationWorkspaceScreen(
     var udsResponseCanId by remember { mutableStateOf("") }
     var udsDid by remember { mutableStateOf("F190") }
     var udsCanProtocol by remember { mutableStateOf("33") }
+    var udsProfileMenuExpanded by remember { mutableStateOf(false) }
     var j2534Host by remember { mutableStateOf("192.168.1.100") }
     var j2534Port by remember { mutableStateOf("35001") }
     var j2534Token by remember { mutableStateOf("") }
@@ -300,7 +302,18 @@ fun CalibrationWorkspaceScreen(
     var selectedObdbSignalId by remember { mutableStateOf("") }
     val selectedObdbSignal = state.obdbSignals.firstOrNull { it.id == selectedObdbSignalId }
         ?: state.obdbSignals.firstOrNull()
-    val profileUses29BitIds = udsCanProtocol in setOf("34", "36", "64")
+    val compatibleUdsProfiles = availableUdsReadProfiles(udsRequestCanId, udsResponseCanId)
+    val profileAvailable = udsCanProtocol.toIntOrNull() in compatibleUdsProfiles
+    val signalProfiles = selectedObdbSignal?.let { signal ->
+        availableUdsReadProfiles(signal.requestCanId?.toString(16).orEmpty(),
+            signal.responseCanId?.toString(16).orEmpty()).intersect(setOf(33, 35))
+    }.orEmpty()
+    val signalProfile = udsCanProtocol.toIntOrNull()?.takeIf { it in signalProfiles }
+        ?: signalProfiles.singleOrNull()
+    LaunchedEffect(compatibleUdsProfiles, canReadEnhancedUds) {
+        if (canReadEnhancedUds && !profileAvailable && compatibleUdsProfiles.size == 1)
+            udsCanProtocol = compatibleUdsProfiles.single().toString()
+    }
     val canIdsMatchProfile = J2534CanProfileValidation.isValid(
         udsRequestCanId, udsResponseCanId, udsCanProtocol
     )
@@ -744,14 +757,30 @@ fun CalibrationWorkspaceScreen(
                         modifier = Modifier.fillMaxWidth(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii)
                     )
-                    OutlinedTextField(
-                        value = udsCanProtocol,
-                        onValueChange = { udsCanProtocol = it.filter(Char::isDigit).take(2) },
-                        label = { Text(stringResource(R.string.cal_can_profile)) },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-                    )
+                    // Keep the old free-form profile field for reference:
+                    // OutlinedTextField(value = udsCanProtocol, onValueChange = { udsCanProtocol = it.filter(Char::isDigit).take(2) })
+                    val allCanProfiles = setOf(33, 34, 35, 36, 63, 64)
+                    val displayedProfiles = if (canReadEnhancedUds) compatibleUdsProfiles else allCanProfiles
+                    val profileLabels = mapOf(33 to "CAN 11-bit / 500 kbit/s",
+                        34 to "CAN 29-bit / 500 kbit/s", 35 to "CAN 11-bit / 250 kbit/s",
+                        36 to "CAN 29-bit / 250 kbit/s", 63 to "SW-CAN 11-bit / 33.3 kbit/s",
+                        64 to "SW-CAN 29-bit / 33.3 kbit/s")
+                    Box {
+                        OutlinedButton(onClick = { udsProfileMenuExpanded = true },
+                            enabled = !state.isUdsReading && !state.isObdbSignalReading && displayedProfiles.isNotEmpty(),
+                            modifier = Modifier.fillMaxWidth()) {
+                            Text(if (canReadEnhancedUds && !profileAvailable)
+                                stringResource(R.string.cal_choose_compatible_profile)
+                            else profileLabels[udsCanProtocol.toIntOrNull()] ?: stringResource(R.string.cal_can_profile))
+                        }
+                        DropdownMenu(expanded = udsProfileMenuExpanded,
+                            onDismissRequest = { udsProfileMenuExpanded = false }) {
+                            displayedProfiles.sorted().forEach { profile ->
+                                DropdownMenuItem(text = { Text(profileLabels.getValue(profile)) },
+                                    onClick = { udsCanProtocol = profile.toString(); udsProfileMenuExpanded = false })
+                            }
+                        }
+                    }
                     OutlinedTextField(
                         value = udsDid,
                         onValueChange = { udsDid = it.uppercase().filter { ch -> ch.isDigit() || ch in 'A'..'F' }.take(4) },
@@ -1005,8 +1034,8 @@ fun CalibrationWorkspaceScreen(
                     }
                     Button(
                         onClick = { onReadUdsDid(udsRequestCanId, udsResponseCanId, udsDid, udsCanProtocol) },
-                        enabled = canReadEnhancedUds && !state.isUdsReading &&
-                            canIdsMatchProfile && udsDid.length == 4 &&
+                        enabled = canReadEnhancedUds && profileAvailable && !state.isUdsReading &&
+                            !state.isObdbSignalReading && canIdsMatchProfile && udsDid.length == 4 &&
                             udsCanProtocol in setOf("33", "34", "35", "36", "63", "64"),
                         modifier = Modifier.fillMaxWidth()
                     ) {
@@ -1020,8 +1049,8 @@ fun CalibrationWorkspaceScreen(
                     }
                     OutlinedButton(
                         onClick = { onReadUdsDtcs(udsRequestCanId, udsResponseCanId, udsCanProtocol) },
-                        enabled = canReadEnhancedUds && !state.isUdsReading &&
-                            canIdsMatchProfile &&
+                        enabled = canReadEnhancedUds && profileAvailable && !state.isUdsReading &&
+                            !state.isObdbSignalReading && canIdsMatchProfile &&
                             udsCanProtocol in setOf("33", "34", "35", "36", "63", "64"),
                         modifier = Modifier.fillMaxWidth()
                     ) {
@@ -1167,7 +1196,7 @@ fun CalibrationWorkspaceScreen(
                                         udsRequestCanId = signal.requestCanId?.toString(16)?.uppercase() ?: signal.requestHeaderHex
                                         udsResponseCanId = signal.responseCanId?.toString(16)?.uppercase() ?: signal.responseHeaderHex.orEmpty()
                                         udsDid = signal.identifierHex
-                                        udsCanProtocol = "33"
+                                        if (signalProfiles.size == 1) udsCanProtocol = signalProfiles.single().toString()
                                     }
                                 )
                             }
@@ -1200,12 +1229,12 @@ fun CalibrationWorkspaceScreen(
                             )
                         }
                         Button(
-                            onClick = { onReadObdbSignal(signal.id, udsCanProtocol) },
+                            onClick = { signalProfile?.let { onReadObdbSignal(signal.id, it.toString()) } },
                             enabled = canReadEnhancedUds &&
                                 signal.hasSupportedPhysicalCanAddressing &&
-                                !profileUses29BitIds &&
+                                signalProfile != null &&
                                 signal.service == 0x22 &&
-                                !state.isObdbSignalReading,
+                                !state.isUdsReading && !state.isObdbSignalReading,
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             if (state.isObdbSignalReading) CircularProgressIndicator()

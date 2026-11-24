@@ -1158,7 +1158,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val did = signal.identifierHex.toInt(16)
                 val protocolNumber = protocolNumberText.toIntOrNull()
                     ?: error("Profil CAN invalide.")
-                require(protocolNumber in setOf(33, 34, 35, 36, 63, 64)) { "Profil CAN non pris en charge." }
+                // Imported OBDb headers currently describe normal 11-bit ISO 15765.
+                // A different physical bus/format must not be inferred from the UI.
+                require(protocolNumber in setOf(33, 35) &&
+                    protocolNumber in obdManager.availableUdsReadProfiles(requestId, responseId)) {
+                    "The selected profile is incompatible with this OBDb signal."
+                }
                 val raw = obdManager.withSelectedUdsReadSession(
                         requestCanId = requestId,
                         responseCanId = responseId,
@@ -2023,6 +2028,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     /** Read-only UDS transport candidates; physical target responses remain authoritative. */
     fun canReadEnhancedUds(): Boolean =
         obdManager.isEnhancedUdsReadAvailable
+
+    fun availableUdsReadProfiles(requestHex: String, responseHex: String): Set<Int> {
+        val request = requestHex.trim().toIntOrNull(16)
+        val response = responseHex.trim().toIntOrNull(16)
+        if ((requestHex.isNotBlank() && request == null) ||
+            (responseHex.isNotBlank() && response == null)) return emptySet()
+        return obdManager.availableUdsReadProfiles(request, response)
+    }
 
     private fun appendCanConsoleSystemEvent(message: String, succeeded: Boolean = true) {
         val current = _liveCanMonitorState.value
