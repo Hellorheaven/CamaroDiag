@@ -33,20 +33,27 @@ internal static class ObdJ1979VehicleInfo
         var identifiers = new List<string>(count);
         for (var i = 0; i < count; i++)
         {
-            var bytes = response.Slice(3 + i * 16, 16);
-            var padding = false;
-            foreach (var c in bytes)
-            {
-                if (c == 0) padding = true;
-                else if (padding || c is < 0x20 or > 0x7E)
-                    throw new InvalidDataException("Invalid calibration ID ASCII or padding.");
-            }
-            var value = Encoding.ASCII.GetString(bytes).TrimEnd('\0');
-            if (value.Length == 0)
-                throw new InvalidDataException("CALID must not be an empty data item.");
-            identifiers.Add(value);
+            identifiers.Add(ReadPaddedAscii(response.Slice(3 + i * 16, 16)));
         }
         return new(identifiers);
+    }
+
+    internal static string DecodeEcuName(ReadOnlySpan<byte> response)
+    {
+        // J1979 Mode 09 InfoType 0A has two independently padded fields.
+        if (ReadCount(response, 0x0A, 20) != 1 || response[7] != (byte)'-')
+            throw new InvalidDataException("Invalid Mode 09 ECU name record.");
+        var acronym = ReadPaddedAscii(response.Slice(3, 4));
+        var description = ReadPaddedAscii(response.Slice(8, 15));
+        return $"{acronym}-{description}";
+    }
+
+    private static string ReadPaddedAscii(ReadOnlySpan<byte> field)
+    {
+        var value = field.TrimEnd((byte)0);
+        if (value.IsEmpty || value.IndexOfAnyExceptInRange((byte)0x20, (byte)0x7E) >= 0)
+            throw new InvalidDataException("Invalid Mode 09 ASCII field or padding.");
+        return Encoding.ASCII.GetString(value);
     }
 
     internal static CalibrationVerificationNumbers DecodeCvns(ReadOnlySpan<byte> response)

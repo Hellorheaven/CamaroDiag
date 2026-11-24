@@ -87,6 +87,12 @@ internal static class ObdJ1979Interpretation
                 " (not manufacturer authenticity evidence)", true, reply.Service);
         }
 
+        if (request.Length == 2 && request[0] == 0x09 && request[1] == 0x0A)
+        {
+            var name = ObdJ1979VehicleInfo.DecodeEcuName(response);
+            return new Result($"SAE J1979 ECU={name}", true, reply.Service);
+        }
+
         if (request.Length == 2 && request[0] == 0x09 && request[1] == 0x02)
         {
             var vin = ObdJ1979Vin.DecodeIsoTp(response);

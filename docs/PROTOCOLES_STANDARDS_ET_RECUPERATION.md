@@ -346,6 +346,12 @@ CamaroDiag.J2534Bridge.exe --j1979-discover-can --adapter-index 0 --baud 500000 
 La commande s'appuie sur le pilote fournisseur SAE J2534 et sur CAN brut classique, pas CAN-FD et pas sur une simulation ; elle n'a cependant **pas été qualifiée sur adaptateur ni véhicule**. Les preuves tests sont pour le moment uniquement des vecteurs offline écrits, non exécutés. Pour lire les pages suivantes d'un ECU ayant répondu, utiliser ensuite la commande `--j1979-pids` avec une paire TX/RX physique explicitement vérifiée.
 
 
+## SAE J1979 — identification du calculateur (24/11/2026)
+
+Avec le décodage J1979 du pont Windows activé, la requête CAN réassemblée `09 0A` affiche le sigle et le nom déclarés par le calculateur. Le pont contrôle la longueur du champ de 20 octets, le séparateur et le remplissage indépendant du sigle et du nom. Référence de format : SAE J1979, mai 2007, tableau 197.
+
+With J1979 decoding enabled, the Windows bridge displays the ECU acronym and description returned for `09 0A` over ISO-TP. The decoder checks the record count, length, delimiter and ASCII padding before displaying the ECU name.
+
 ## SAE J1979 — corrections d'identification et DTC CAN (23/11/2026)
 
 - Après réassemblage ISO-TP, les réponses CAN des modes **03, 07 et 0A** comportent le nombre de codes défaut avant les paires SAE J2012. Le traitement `ObdJ1979Dtc.DecodeCanCounted` vérifie ce nombre, distingue les paires de remplissage nulles et refuse les codes surnuméraires ou tronqués. Cette interprétation est réservée au chemin CAN ; les variantes historiques ISO 9141, KWP2000 et J1850 ne sont pas traitées comme des trames CAN.

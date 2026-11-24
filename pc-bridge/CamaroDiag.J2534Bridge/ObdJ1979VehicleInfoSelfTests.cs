@@ -74,6 +74,29 @@ internal static class ObdJ1979VehicleInfoSelfTests
         Reject<InvalidDataException>(() =>
             ObdJ1979VehicleInfo.DecodeCalibrationIds(invalid),
             "CALID NUL padding must not hide nonzero subsequent bytes.");
+        var name = new byte[23];
+        name[0] = 0x49;
+        name[1] = 0x0A;
+        name[2] = 1;
+        "ECM"u8.CopyTo(name.AsSpan(3));
+        "-EngineControl"u8.CopyTo(name.AsSpan(7));
+        var interpreted = ObdJ1979Interpretation.Interpret([0x09, 0x0A], name);
+        Check(interpreted.Positive && interpreted.Description == "SAE J1979 ECU=ECM-EngineControl",
+            "ECU name with an independently padded acronym reaches CLI interpretation.");
+        name[6] = (byte)'1';
+        Check(ObdJ1979VehicleInfo.DecodeEcuName(name) == "ECM1-EngineControl",
+            "Fourth acronym character is retained.");
+        foreach (var (index, value) in new (int, byte)[] {
+            (2, 0), (2, 2), (7, (byte)'/'), (4, 0), (11, 0), (10, 0x80)
+        })
+        {
+            var malformed = name.ToArray();
+            malformed[index] = value;
+            Reject<InvalidDataException>(() => ObdJ1979VehicleInfo.DecodeEcuName(malformed),
+                "Invalid ECU name count, delimiter, padding or character.");
+        }
+        Reject<InvalidDataException>(() => ObdJ1979VehicleInfo.DecodeEcuName(name[..^1]),
+            "Incomplete 20-byte ECU name record.");
         return checkedCount;
     }
 }
