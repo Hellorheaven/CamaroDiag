@@ -1,3 +1,7 @@
+## PR117 — WWH-OBD sur DoIP Android (24/11/2026)
+
+- Services 19/42, 19/55 et 19/56 groupe émissions 33 intégrés au transport Android, sélection explicite des masques et du groupe, vérification F802/F810 avant et après sur la même connexion, décodage structuré des défauts et métadonnées FR/EN. Aucune signification OEM inventée, aucune substitution de la liste DTC générale par un rapport filtré. Tests de codec et erreurs ajoutés. CI 45498873150 réussie sur 876015f ; ce nouveau lot et le précédent Python restent à valider.
+
 ## PR117 — services WWH-OBD Connectors sur DoIP (24/11/2026)
 
 - CLI Python : `obd-wwh-dtcs`, `obd-wwh-permanent`, `obd-wwh-readiness` ; services 19/42, 19/55, 19/56 groupe émissions 33, selon les codecs existants Windows. Contrôle F802/F810 avant et après, même ECU/même socket, validation groupe et longueurs, décodage DTC/statut/sévérité sans inventer de signification OEM. Tests d’échanges et refus ajoutés ; nouveau lot postérieur au checkpoint 876015f, non validé matériellement.

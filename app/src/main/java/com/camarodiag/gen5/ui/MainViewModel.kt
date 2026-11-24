@@ -1480,13 +1480,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     require(didHex.matches(Regex("[0-9A-Fa-f]{2}")))
                     didHex.toInt(16)
                 } else 255
+                val wwhMask = operation == DoIpDirectRead.Operation.OBD_WWH_MASK
+                val wwhReadiness = operation == DoIpDirectRead.Operation.OBD_WWH_READINESS
+                if (wwhMask) require(didHex.matches(Regex("[0-9A-Fa-f]{4}")))
+                if (wwhReadiness) require(didHex.matches(Regex("[0-9A-Fa-f]{2}")))
                 val isDetail = operation in setOf(DoIpDirectRead.Operation.DTC_SNAPSHOT, DoIpDirectRead.Operation.DTC_EXTENDED)
                 if (isDetail) require(didHex.matches(Regex("[0-9A-Fa-f]{8}")))
                 val detailDtc = if (isDetail) didHex.take(6).toInt(16) else 0
                 val detailRecord = if (isDetail) didHex.takeLast(2).toInt(16) else 1
                 val clientTls = certificate?.let { DoIpClientTls.open(getApplication<Application>(), it, target) }
                 check(current())
-                val result = DoIpDirectRead.read(target, operation, did, mask = mask, sampleCount = sampleCount, intervalMs = intervalMs,
+                val result = DoIpDirectRead.read(target, operation, did, mask = if (wwhMask) didHex.takeLast(2).toInt(16) else mask,
+                    wwhSeverity = if (wwhMask) didHex.take(2).toInt(16) else 255,
+                    wwhReadinessGroup = if (wwhReadiness) didHex.toInt(16) else null,
+                    sampleCount = sampleCount, intervalMs = intervalMs,
                     timeoutMs = options.timeoutMs, sessionOptions = options, clientTls = clientTls,
                     onTrace = { trace ->
                         journalDoIpTrace(target, trace, current)
@@ -1525,6 +1532,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         result.obdProtocolValue ?: 0, result.vin.orEmpty())
                     operation == DoIpDirectRead.Operation.OBD_DID -> localizedContext.getString(R.string.cal_doip_obd_data,
                         did, result.data?.joinToString(" ") { "%02X".format(it.toInt() and 255) }.orEmpty())
+                    result.wwhReport != null -> requireNotNull(result.wwhReport).let { wwh ->
+                        val unavailable = localizedContext.getString(R.string.cal_status_unresolved)
+                        localizedContext.getString(R.string.cal_doip_wwh_result, wwh.kind.subfunction, wwh.records.size,
+                            wwh.statusAvailability, wwh.format) + "\n" +
+                            localizedContext.getString(R.string.cal_doip_wwh_metadata,
+                                wwh.severityAvailability?.let { "%02X".format(it) } ?: unavailable,
+                                wwh.readinessGroup?.let { "%02X".format(it) } ?: unavailable) +
+                            wwh.records.joinToString(separator = "\n", prefix = "\n") { row ->
+                                localizedContext.getString(R.string.cal_doip_wwh_record, row.dtc, row.status,
+                                    row.severity?.let { "%02X".format(it) } ?: unavailable)
+                            }
+                    }
                     result.commandReplies.isNotEmpty() -> result.commandReplies.mapIndexed { index, reply ->
                         localizedContext.getString(R.string.cal_doip_sequence_reply, index + 1,
                             reply.joinToString(" ") { "%02X".format(it.toInt() and 255) })

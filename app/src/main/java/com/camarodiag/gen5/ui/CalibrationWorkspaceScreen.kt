@@ -338,6 +338,8 @@ fun CalibrationWorkspaceScreen(
     }
     var doIpDid by remember(vehicle) { mutableStateOf("F190") }
     var doIpDtcMask by remember(vehicle) { mutableStateOf("FF") }
+    var doIpWwhSeverity by remember(vehicle) { mutableStateOf("FF") }
+    var doIpWwhReadiness by remember(vehicle) { mutableStateOf("") }
     var doIpDetailDtc by remember(vehicle) { mutableStateOf("") }
     var doIpDetailRecord by remember(vehicle) { mutableStateOf("01") }
     var doIpCommand by remember(vehicle) { mutableStateOf("") }
@@ -642,6 +644,26 @@ fun CalibrationWorkspaceScreen(
                     OutlinedTextField(doIpDtcMask, { doIpDtcMask = it.uppercase().filter { c -> c in "0123456789ABCDEF" }.take(2) },
                         enabled = idle, singleLine = true, modifier = Modifier.fillMaxWidth(),
                         label = { Text(stringResource(R.string.cal_doip_dtc_mask)) })
+                    OutlinedTextField(doIpWwhSeverity, { doIpWwhSeverity = it.uppercase().filter { c -> c in "0123456789ABCDEF" }.take(2) },
+                        enabled = idle, singleLine = true, modifier = Modifier.fillMaxWidth(),
+                        label = { Text(stringResource(R.string.cal_doip_wwh_severity)) })
+                    OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu, doIpWwhSeverity + doIpDtcMask,
+                        doIpTls, DoIpDirectRead.Operation.OBD_WWH_MASK, doIpCertificate, requireNotNull(doIpOptions)) },
+                        enabled = targetReady && vinReady && doIpWwhSeverity.length == 2 && doIpDtcMask.length == 2,
+                        modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.cal_doip_wwh_mask)) }
+                    OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu, "", doIpTls,
+                        DoIpDirectRead.Operation.OBD_WWH_PERMANENT, doIpCertificate, requireNotNull(doIpOptions)) },
+                        enabled = targetReady && vinReady, modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(R.string.cal_doip_wwh_permanent))
+                    }
+                    OutlinedTextField(doIpWwhReadiness, { doIpWwhReadiness = it.uppercase().filter { c -> c in "0123456789ABCDEF" }.take(2) },
+                        enabled = idle, singleLine = true, modifier = Modifier.fillMaxWidth(),
+                        label = { Text(stringResource(R.string.cal_doip_wwh_readiness_group)) })
+                    OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu, doIpWwhReadiness, doIpTls,
+                        DoIpDirectRead.Operation.OBD_WWH_READINESS, doIpCertificate, requireNotNull(doIpOptions)) },
+                        enabled = targetReady && vinReady && doIpWwhReadiness.length == 2, modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(R.string.cal_doip_wwh_readiness))
+                    }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu, doIpDtcMask, doIpTls, DoIpDirectRead.Operation.DTC, doIpCertificate, requireNotNull(doIpOptions)) },
                             enabled = targetReady && vinReady && doIpDtcMask.length == 2, modifier = Modifier.weight(1f)) {

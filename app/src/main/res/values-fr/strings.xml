@@ -1085,4 +1085,12 @@
     <string name="cal_doip_select_interface">Choisir une interface réseau</string>
     <string name="cal_doip_no_interfaces">Aucune interface IPv6 compatible</string>
     <string name="cal_doip_interface_error">Impossible de lister les interfaces réseau.</string>
+    <string name="cal_doip_wwh_severity">Masque de sévérité WWH (hex)</string>
+    <string name="cal_doip_wwh_mask">Lire les défauts émissions WWH</string>
+    <string name="cal_doip_wwh_permanent">Lire les défauts permanents WWH</string>
+    <string name="cal_doip_wwh_readiness_group">Groupe de préparation WWH (hex)</string>
+    <string name="cal_doip_wwh_readiness">Lire les défauts du groupe WWH</string>
+    <string name="cal_doip_wwh_result">WWH 0x%1$02X : %2$d défauts · masque statut 0x%3$02X · format 0x%4$02X</string>
+    <string name="cal_doip_wwh_metadata">Disponibilité sévérité : %1$s · groupe : %2$s</string>
+    <string name="cal_doip_wwh_record">DTC %1$06X · statut %2$02X · sévérité %3$s</string>
 </resources>

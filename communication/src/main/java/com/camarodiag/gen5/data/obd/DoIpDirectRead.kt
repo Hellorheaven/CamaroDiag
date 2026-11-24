@@ -26,7 +26,7 @@ import kotlin.coroutines.resumeWithException
  * A socket is owned by one operation and is never retained after failure.
  */
 object DoIpDirectRead {
-    enum class Operation { VIN, DID, DTC, DTC_COUNT, DTC_SNAPSHOT, DTC_EXTENDED, MONITOR, BACKUP, EXCHANGE, OBD_IDENTIFY, OBD_DID, OBD_MONITOR }
+    enum class Operation { VIN, DID, DTC, DTC_COUNT, DTC_SNAPSHOT, DTC_EXTENDED, MONITOR, BACKUP, EXCHANGE, OBD_IDENTIFY, OBD_DID, OBD_MONITOR, OBD_WWH_MASK, OBD_WWH_PERMANENT, OBD_WWH_READINESS }
     /** Immutable optional parameters. Defaults retain the original global deadline. */
     data class SessionOptions(val timeoutMs: Int = 5000, val p2Ms: Int = timeoutMs,
         val p2StarMs: Int = timeoutMs, val routingType: Int = 0, val routingOemHex: String = "") {
@@ -225,7 +225,8 @@ object DoIpDirectRead {
         val data: ByteArray?, val dtcs: UdsDtcReport?, val trace: List<Trace>,
         val samples: List<Sample> = emptyList(), val capture: DoIpMemoryBackup.Capture? = null,
         val dtcCount: UdsDtcCountReport? = null, val dtcDetail: UdsDtcDetail? = null,
-        val commandReplies: List<ByteArray> = emptyList(), val obdProtocolValue: Int? = null)
+        val commandReplies: List<ByteArray> = emptyList(), val obdProtocolValue: Int? = null,
+        val wwhReport: DoIpWwhDtc.Report? = null)
     data class Sample(val index: Int, val elapsedMs: Long, val data: ByteArray)
 
     private const val MAX_PAYLOAD = 1024 * 1024
@@ -649,7 +650,8 @@ object DoIpDirectRead {
         command: ByteArray? = null, approval: EcuWriteConsentFlow.Approval? = null,
         isContextCurrent: () -> Boolean = { false }, dtc: Int = 0, record: Int = 1,
         commands: List<ByteArray>? = null, onCommandReply: (Int, ByteArray) -> Unit = { _, _ -> },
-        clientTls: DoIpClientTls? = null, sessionOptions: SessionOptions? = null): Outcome {
+        clientTls: DoIpClientTls? = null, sessionOptions: SessionOptions? = null,
+        wwhSeverity: Int = 255, wwhReadinessGroup: Int? = null): Outcome {
         val options = sessionOptions ?: SessionOptions(timeoutMs)
         require(options.timeoutMs == timeoutMs)
         clientTls?.requireTarget(target)
@@ -661,6 +663,13 @@ object DoIpDirectRead {
         require(command == null || commands == null)
         val fixedCommands = (commands ?: command?.let { listOf(it) })?.map { it.copyOf() }
         require((operation == Operation.EXCHANGE) == (fixedCommands != null && approval != null))
+        val wwhKind = when (operation) {
+            Operation.OBD_WWH_MASK -> DoIpWwhDtc.Kind.MASK
+            Operation.OBD_WWH_PERMANENT -> DoIpWwhDtc.Kind.PERMANENT
+            Operation.OBD_WWH_READINESS -> DoIpWwhDtc.Kind.READINESS
+            else -> null
+        }
+        val wwhRequest = wwhKind?.let { DoIpWwhDtc.request(it, mask, wwhSeverity, wwhReadinessGroup) }
         val detailRequest = when (operation) {
             Operation.DTC_SNAPSHOT -> UdsDtcDecoder.readDetailRequest(4, dtc, record)
             Operation.DTC_EXTENDED -> UdsDtcDecoder.readDetailRequest(6, dtc, record)
@@ -678,7 +687,8 @@ object DoIpDirectRead {
         val budget = if (operation == Operation.BACKUP) 600_000L
             else if (operation == Operation.EXCHANGE) timeoutMs * (requireNotNull(fixedCommands).size + 4L)
             else if (operation in setOf(Operation.MONITOR, Operation.OBD_MONITOR))
-            timeoutMs * (sampleCount + 7L) + intervalMs * (sampleCount - 1L) else timeoutMs * 5L
+            timeoutMs * (sampleCount + 7L) + intervalMs * (sampleCount - 1L)
+            else if (wwhKind != null) timeoutMs * 8L else timeoutMs * 5L
         val gateway = discover(target.address, target.expectedVin, timeoutMs, onControlTrace)
         requireGatewayIdentity(target, gateway)
         if (operation == Operation.EXCHANGE) require(gateway.vin == target.expectedVin)
@@ -732,7 +742,7 @@ object DoIpDirectRead {
                         return samples.toList()
                     }
                     val vin: String
-                    if (operation in setOf(Operation.OBD_IDENTIFY, Operation.OBD_DID, Operation.OBD_MONITOR)) {
+                    if (wwhKind != null || operation in setOf(Operation.OBD_IDENTIFY, Operation.OBD_DID, Operation.OBD_MONITOR)) {
                         // OBD-only ECUs may not implement the generic F190 VIN DID.
                         // Do not silently assume F810 support from an unrelated UDS response.
                         vin = readVin(0xF802)
@@ -759,8 +769,16 @@ object DoIpDirectRead {
                                 timeoutMs)) == protocolValue) { "OBDonUDS identity changed during monitoring." }
                             measured
                         } else emptyList()
+                        val wwhReport = wwhKind?.let {
+                            val report = DoIpWwhDtc.decode(it,
+                                session.exchange(requireNotNull(wwhRequest), timeoutMs), wwhReadinessGroup)
+                            require(readVin(0xF802) == vin)
+                            require(decodeObdProtocol(session.exchange(byteArrayOf(0x22, 0xF8.toByte(), 0x10),
+                                timeoutMs)) == protocolValue)
+                            report
+                        }
                         Outcome(gateway, target.ecu, vin, data, null, trace.toList(),
-                            samples = samples, obdProtocolValue = protocolValue)
+                            samples = samples, obdProtocolValue = protocolValue, wwhReport = wwhReport)
                     } else if (operation == Operation.VIN || (operation == Operation.DID && did == 0xF190)) {
                         vin = readVin()
                         Outcome(gateway, target.ecu, vin, vin.toByteArray(Charsets.US_ASCII), null, trace.toList())

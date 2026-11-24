@@ -1082,4 +1082,12 @@
     <string name="cal_doip_select_interface">Choose network interface</string>
     <string name="cal_doip_no_interfaces">No eligible IPv6 interface</string>
     <string name="cal_doip_interface_error">Could not enumerate network interfaces.</string>
+    <string name="cal_doip_wwh_severity">WWH severity mask (hex)</string>
+    <string name="cal_doip_wwh_mask">Read WWH emissions DTCs</string>
+    <string name="cal_doip_wwh_permanent">Read permanent WWH DTCs</string>
+    <string name="cal_doip_wwh_readiness_group">WWH readiness group (hex)</string>
+    <string name="cal_doip_wwh_readiness">Read WWH readiness DTCs</string>
+    <string name="cal_doip_wwh_result">WWH 0x%1$02X: %2$d DTCs · status mask 0x%3$02X · format 0x%4$02X</string>
+    <string name="cal_doip_wwh_metadata">Severity availability: %1$s · readiness group: %2$s</string>
+    <string name="cal_doip_wwh_record">DTC %1$06X · status %2$02X · severity %3$s</string>
 </resources>
