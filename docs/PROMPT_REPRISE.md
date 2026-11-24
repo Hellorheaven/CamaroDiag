@@ -1,3 +1,11 @@
+## Reprise C6/DoIP — état passerelle dans la console (24/11/2026)
+
+- `859401d`, `ad8c010`, `52dc2fc` : présentation commune FR/EN des réponses EntityStatus et PowerMode. `981bead` : raccordement graphique aux requêtes UDP réelles, version reprise de l'identification observée pour l'adresse exacte, invalidation au changement de contexte, annulation ou échec. `7435f65` : même décodage pour CLI. `d21ca1f` : 22 assertions supplémentaires dans les autotests existants (taille présente/absente, trois modes, type incorrect, ressources FR/EN).
+- Aucun résultat de compilation ou de test nouveau constaté. C6 et DoIP restent actifs, C8 non démarré. État passerelle informatif, aucune autorisation ECU, aucun nouveau chemin d'écriture. Sélection transversale et intégration aux autres fonctions restent incomplètes.
+- Un checkpoint groupé de la tranche console et des correctifs précédents est demandé après ce lot ; ne pas assimiler le déclenchement à une réussite. Aucun merge, Release ou essai matériel.
+
+---
+
 ## Reprise C6/DoIP — intégration console Windows (24/11/2026)
 
 - `15ad57b`, `8720d40`, `337cb86` : présentation commune de l'identité de passerelle et ressources FR/EN. `a62a69b` : découverte UDP unicast DoIP depuis la console graphique, avec adresse explicite, timeout, annulation et historique. `b181f75` : annulation à la fermeture et protection UI disposée. `ba9ad23` : CLI réutilise la présentation. `3c04f3f` et `e9a3c70` : vingt assertions de présentation et ressources enregistrées dans la suite d'autotests Windows.
