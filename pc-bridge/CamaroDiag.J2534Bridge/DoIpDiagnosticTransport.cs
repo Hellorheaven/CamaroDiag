@@ -1,4 +1,6 @@
 using System.Buffers.Binary;
+using System.Runtime.ExceptionServices;
+using System.Threading.Channels;
 using System.Net.Security;
 using System.Net.Sockets;
 using System.Security.Authentication;
@@ -26,6 +28,21 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
     // DoIP carries no per-request transaction ID. A late reply after a
     // failed exchange could otherwise be mistaken for a fresh request.
     private int exchangeState;
+    // One owner reads from the TCP stream for the entire activated session.
+    // Gateway AliveChecks must be answered even while no UDS exchange runs.
+    // Channel is bounded: uncorrelated or flooding peers cannot accumulate
+    // unlimited responses. DoIP has no universal request transaction ID.
+    private readonly Channel<DoIpCodec.Message> inbound =
+        Channel.CreateBounded<DoIpCodec.Message>(new BoundedChannelOptions(32)
+        {
+            SingleReader = true,
+            SingleWriter = true,
+            FullMode = BoundedChannelFullMode.Wait
+        });
+    private readonly SemaphoreSlim writeGate = new(1, 1);
+    private readonly CancellationTokenSource lifetime = new();
+    private Task? receiveTask;
+    private Exception? receiveFailure;
 
     private DoIpDiagnosticTransport(TcpClient socket, Stream dataStream,
         ushort tester, ushort ecu, byte version)
@@ -126,6 +143,7 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
                 break;
             }
             deadline.Token.ThrowIfCancellationRequested();
+            session.StartReceivePump();
             return session;
         }
         catch
@@ -224,7 +242,7 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
                     DoIpCodec.Message message;
                     try
                     {
-                        message = await ReceiveAsync(stage.Token);
+                        message = await ReceiveQueuedAsync(stage.Token);
                         // Even a completed TCP read must not cross the
                         // absolute P2/P2* stage deadline.
                         stage.Token.ThrowIfCancellationRequested();
@@ -254,6 +272,10 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
             remaining, deadline.Token, p2Timeout, p2StarTimeout);
         if (Interlocked.CompareExchange(ref exchangeState, 0, 1) != 1)
             throw new ObjectDisposedException(nameof(DoIpDiagnosticTransport));
+        // An EOF received just after a valid final reply retires the
+        // connection, but does not retroactively invalidate that reply.
+        if (Volatile.Read(ref receiveFailure) is not null)
+            Interlocked.Exchange(ref exchangeState, 2);
         return response;
         }
         catch
@@ -262,6 +284,7 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
             // wire. Never silently retry it or allow a late reply to be
             // interpreted as belonging to another operation.
             Interlocked.Exchange(ref exchangeState, 2);
+            lifetime.Cancel();
             stream.Dispose();
             socket.Dispose();
             throw;
@@ -270,8 +293,76 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
 
     private async Task SendAsync(byte[] frame, CancellationToken token)
     {
-        await stream.WriteAsync(frame, token);
-        await stream.FlushAsync(token);
+        // AliveCheck can arrive while a user diagnostic frame is being
+        // written. Never interleave their bytes on the same TCP/TLS stream.
+        await writeGate.WaitAsync(token);
+        try
+        {
+            await stream.WriteAsync(frame, token);
+            await stream.FlushAsync(token);
+        }
+        finally { writeGate.Release(); }
+    }
+
+    private void StartReceivePump()
+    {
+        receiveTask = Task.Run(ReceivePumpAsync);
+    }
+
+    private async Task ReceivePumpAsync()
+    {
+        try
+        {
+            while (!lifetime.IsCancellationRequested)
+            {
+                var message = await ReceiveAsync(lifetime.Token);
+                lifetime.Token.ThrowIfCancellationRequested();
+                if (message.Version != protocolVersion)
+                    throw new InvalidDataException(
+                        "DoIP TCP response changed protocol version.");
+                if (message.Type == DoIpCodec.AliveCheckRequest)
+                {
+                    await SendAsync(DoIpCodec.ReplyToAliveCheck(
+                        message, testerAddress), lifetime.Token);
+                    continue;
+                }
+                // There is no universal UDS transaction identifier. A
+                // duplicate or unsolicited response between exchanges
+                // cannot be safely assigned to the NEXT request.
+                if (Volatile.Read(ref exchangeState) != 1)
+                    throw new InvalidDataException(
+                        "Unsolicited DoIP diagnostic data outside an exchange; reconnect.");
+                if (!inbound.Writer.TryWrite(message))
+                    throw new InvalidDataException(
+                        "DoIP diagnostic receive buffer overflow; reconnect.");
+            }
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested)
+        {
+            inbound.Writer.TryComplete();
+        }
+        catch (Exception error)
+        {
+            Volatile.Write(ref receiveFailure, error);
+            inbound.Writer.TryComplete(error);
+            // If a valid final response was already queued for an active
+            // exchange, allow it to finish before retiring the session.
+            if (Interlocked.CompareExchange(ref exchangeState, 2, 0) == 0)
+            {
+                stream.Dispose();
+                socket.Dispose();
+            }
+        }
+    }
+
+    private async Task<DoIpCodec.Message> ReceiveQueuedAsync(CancellationToken token)
+    {
+        try { return await inbound.Reader.ReadAsync(token); }
+        catch (ChannelClosedException error) when (error.InnerException is not null)
+        {
+            ExceptionDispatchInfo.Capture(error.InnerException).Throw();
+            throw;
+        }
     }
 
     private async Task<DoIpCodec.Message> ReceiveAsync(CancellationToken token)
@@ -285,11 +376,14 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
         return DoIpCodec.Decode(message);
     }
 
-    public ValueTask DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
         Interlocked.Exchange(ref exchangeState, 2);
+        lifetime.Cancel();
         stream.Dispose();
         socket.Dispose();
-        return ValueTask.CompletedTask;
+        if (receiveTask is not null)
+            await receiveTask;
+        lifetime.Dispose();
     }
 }
