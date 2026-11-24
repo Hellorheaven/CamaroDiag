@@ -62,6 +62,9 @@ object DoIpDirectRead {
     data class GatewayStatus(val nodeType: Int, val maxSockets: Int, val currentSockets: Int, val maxDataSize: Long?)
     data class GatewayResult(val gateway: Gateway, val status: GatewayStatus? = null, val power: Int? = null)
     data class Trace(val direction: String, val payloadHex: String, val observedAtUtcMillis: Long = System.currentTimeMillis())
+    /** Complete DoIP control PDU (header + body), separate from UDS payload traces. */
+    data class ControlTrace(val direction: String, val transport: String, val host: String,
+        val payloadHex: String, val observedAtUtcMillis: Long = System.currentTimeMillis())
     data class Outcome(val gateway: Gateway, val ecu: Int, val vin: String?,
         val data: ByteArray?, val dtcs: UdsDtcReport?, val trace: List<Trace>,
         val samples: List<Sample> = emptyList(), val capture: DoIpMemoryBackup.Capture? = null)
@@ -77,6 +80,11 @@ object DoIpDirectRead {
     private fun encode(version: Int, type: Int, data: ByteArray): ByteArray =
         ByteBuffer.allocate(8 + data.size).put(version.toByte()).put((version xor 255).toByte())
             .putShort(type.toShort()).putInt(data.size).put(data).array()
+    private fun controlTrace(direction: String, transport: String, host: InetAddress,
+        bytes: ByteArray, emit: (ControlTrace) -> Unit) {
+        require(bytes.size <= 65544) { "DoIP control PDU exceeds trace limit." }
+        emit(ControlTrace(direction, transport, host.hostAddress.orEmpty(), hex(bytes)))
+    }
     private fun length(header: ByteArray): Int {
         require(header.size == 8 && (header[0].u8() xor header[1].u8()) == 255)
         require(header[0].u8() in setOf(2, 3, 4))
@@ -107,13 +115,15 @@ object DoIpDirectRead {
             }
         } ?: throw SocketTimeoutException("DoIP operation timed out.")
 
-    private suspend fun discover(address: InetAddress, expectedVin: String, timeoutMs: Int): Gateway {
+    private suspend fun discover(address: InetAddress, expectedVin: String, timeoutMs: Int,
+        onControlTrace: (ControlTrace) -> Unit): Gateway {
         val socket = DatagramSocket()
         try {
             return io(timeoutMs.toLong(), socket::close) {
                 socket.connect(address, 13400)
                 val packet = encode(255, 0x0001, byteArrayOf())
                 socket.send(DatagramPacket(packet, packet.size, address, 13400))
+                controlTrace("TX", "UDP", address, packet, onControlTrace)
                 val deadline = deadline(timeoutMs)
                 val buffer = ByteArray(1024)
                 var found: Gateway? = null
@@ -123,6 +133,7 @@ object DoIpDirectRead {
                     socket.receive(received)
                     remaining(deadline)
                     if (received.address != address || received.port != 13400 || received.length < 8) continue
+                    controlTrace("RX", "UDP", address, buffer.copyOf(received.length), onControlTrace)
                     val frame = parseFrame(buffer.copyOfRange(0, 8), buffer.copyOfRange(8, received.length))
                     if (frame.type == 0) throw IOException("DoIP gateway rejected identification.")
                     if (frame.type != 0x0004) continue
@@ -142,12 +153,12 @@ object DoIpDirectRead {
 
     /** Discovery and control messages never activate a diagnostic TCP route. */
     suspend fun inspectGateway(host: String, vin: String, operation: GatewayOperation,
-        timeoutMs: Int = 5000): GatewayResult {
+        timeoutMs: Int = 5000, onControlTrace: (ControlTrace) -> Unit = {}): GatewayResult {
         require(timeoutMs in 100..30_000)
         val address = parseHost(host)
         val expected = vin.trim().uppercase(Locale.ROOT)
         require(expected.isEmpty() || validVin(expected))
-        val gateway = discover(address, expected, timeoutMs)
+        val gateway = discover(address, expected, timeoutMs, onControlTrace)
         if (operation == GatewayOperation.DISCOVER) return GatewayResult(gateway)
         val socket = DatagramSocket()
         try {
@@ -156,6 +167,7 @@ object DoIpDirectRead {
                 val power = operation == GatewayOperation.POWER
                 val request = encode(gateway.version, if (power) 0x4003 else 0x4001, byteArrayOf())
                 socket.send(DatagramPacket(request, request.size, address, 13400))
+                controlTrace("TX", "UDP", address, request, onControlTrace)
                 val end = deadline(timeoutMs)
                 val buffer = ByteArray(1024)
                 var result: GatewayResult? = null
@@ -165,6 +177,7 @@ object DoIpDirectRead {
                     socket.receive(packet)
                     remaining(end)
                     if (packet.address != address || packet.port != 13400 || packet.length < 8) continue
+                    controlTrace("RX", "UDP", address, buffer.copyOf(packet.length), onControlTrace)
                     val frame = parseFrame(buffer.copyOfRange(0, 8), buffer.copyOfRange(8, packet.length))
                     require(frame.version == gateway.version)
                     if (frame.type == 0) throw IOException("DoIP gateway rejected control query.")
@@ -188,7 +201,10 @@ object DoIpDirectRead {
 
     private class Session(private val socket: Socket, private val gateway: Gateway,
         private val target: Target, private val trace: MutableList<Trace>,
-        private val rollingTrace: Boolean = false, private val onTrace: (Trace) -> Unit = {}) {
+        private val rollingTrace: Boolean = false, private val onTrace: (Trace) -> Unit = {},
+        private val onControlTrace: (ControlTrace) -> Unit = {}) {
+        private fun recordControl(direction: String, bytes: ByteArray) =
+            controlTrace(direction, if (target.tls) "TLS" else "TCP", target.address, bytes, onControlTrace)
         private fun record(direction: String, payload: ByteArray) {
             require(payload.size <= 65536)
             if (rollingTrace && trace.size >= 128) trace.removeAt(0)
@@ -212,12 +228,16 @@ object DoIpDirectRead {
         }
         private fun send(type: Int, body: ByteArray, deadline: Long) {
             remaining(deadline)
-            socket.getOutputStream().apply { write(encode(gateway.version, type, body)); flush() }
+            val pdu = encode(gateway.version, type, body)
+            socket.getOutputStream().apply { write(pdu); flush() }
+            if (type != 0x8001) recordControl("TX", pdu)
             remaining(deadline)
         }
         private fun receive(deadline: Long): Frame {
             val header = readExact(8, deadline)
-            val frame = parseFrame(header, readExact(length(header), deadline))
+            val data = readExact(length(header), deadline)
+            val frame = parseFrame(header, data)
+            if (frame.type != 0x8001) recordControl("RX", header + data)
             require(frame.version == gateway.version) { "DoIP protocol version changed." }
             if (frame.type == 0) throw IOException("DoIP generic negative acknowledgement.")
             return frame
@@ -254,7 +274,9 @@ object DoIpDirectRead {
                 if (first < 0) throw EOFException("DoIP socket closed between samples.")
                 val frameEnd = deadline(frameTimeoutMs)
                 val header = byteArrayOf(first.toByte()) + readExact(7, frameEnd)
-                val frame = parseFrame(header, readExact(length(header), frameEnd))
+                val data = readExact(length(header), frameEnd)
+                val frame = parseFrame(header, data)
+                if (frame.type != 0x8001) recordControl("RX", header + data)
                 require(frame.version == gateway.version && alive(frame, frameEnd)) {
                     "Unsolicited DoIP message between samples."
                 }
@@ -303,7 +325,8 @@ object DoIpDirectRead {
         mask: Int = 255, timeoutMs: Int = 5000, sampleCount: Int = 10,
         intervalMs: Int = 1000, backupScope: DoIpMemoryBackup.Scope? = null,
         onBackupProgress: (Int, Int) -> Unit = { _, _ -> },
-        onTrace: (Trace) -> Unit = {}, onSample: (Sample) -> Unit = {}): Outcome {
+        onTrace: (Trace) -> Unit = {}, onSample: (Sample) -> Unit = {},
+        onControlTrace: (ControlTrace) -> Unit = {}): Outcome {
         require(timeoutMs in 100..30_000 && did in 0..65535 && mask in 0..255)
         require(operation == Operation.VIN || target.expectedVin.isNotEmpty())
         require(sampleCount in 1..30 && intervalMs in 250..5000)
@@ -315,7 +338,7 @@ object DoIpDirectRead {
         val budget = if (operation == Operation.BACKUP) 600_000L
             else if (operation == Operation.MONITOR)
             timeoutMs * (sampleCount + 5L) + intervalMs * (sampleCount - 1L) else timeoutMs * 5L
-        val gateway = discover(target.address, target.expectedVin, timeoutMs)
+        val gateway = discover(target.address, target.expectedVin, timeoutMs, onControlTrace)
         require(target.tester != gateway.logicalAddress)
         if (backupScope != null) require(gateway.logicalAddress == backupScope.gateway)
         val trace = mutableListOf<Trace>()
@@ -334,7 +357,7 @@ object DoIpDirectRead {
                 } else base
                 wire.use {
                     val session = Session(wire, gateway, target, trace, rollingTrace = operation == Operation.BACKUP,
-                        onTrace = onTrace)
+                        onTrace = onTrace, onControlTrace = onControlTrace)
                     session.activate(timeoutMs)
                     fun readVin(): String {
                         val reply = session.exchange(byteArrayOf(0x22,0xF1.toByte(),0x90.toByte()), timeoutMs)
