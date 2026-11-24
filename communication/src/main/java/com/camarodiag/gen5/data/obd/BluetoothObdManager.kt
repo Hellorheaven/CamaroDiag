@@ -39,7 +39,7 @@ class BluetoothObdManager(context: Context) {
     // Serialize teardown with epoch-based cleanup and state publication.
     private val adapterLifecycleLock = Any()
 
-    private fun beginWifiConnection(): Long = synchronized(adapterLifecycleLock) {
+    private fun beginAdapterConnection(): Long = synchronized(adapterLifecycleLock) {
         disconnect()
         transportSessionEpoch.capture()
     }
@@ -183,7 +183,7 @@ class BluetoothObdManager(context: Context) {
         } catch (invalid: IllegalArgumentException) {
             return@withContext Result.failure(invalid)
         }
-        val epoch = beginWifiConnection()
+        val epoch = beginAdapterConnection()
         try {
             val connected = wifiTransport.connect(host, port)
             if (connected.isFailure) {
@@ -1118,17 +1118,22 @@ class BluetoothObdManager(context: Context) {
         can29Bit: Boolean,
         protocolNumber: Int = 33
     ): Result<String> = withContext(Dispatchers.IO) {
-        disconnect()
+        val epoch = beginAdapterConnection()
         val bridge = J2534BridgeTransport(host, port, pairingToken)
         try {
             val info = bridge.connect(requestCanId, responseCanId, can29Bit, protocolNumber)
-            j2534BridgeTransport = bridge
-            j2534BridgeRequestCanId = requestCanId
-            j2534BridgeResponseCanId = responseCanId
-            j2534BridgeProtocolNumber = protocolNumber
-            activeTransport = "J2534_BRIDGE"
-            isDemoMode = false
-            isSimulationActive = false
+            // The TLS handshake can finish after a different adapter has been
+            // selected. Never publish a stale bridge over the replacement.
+            synchronized(adapterLifecycleLock) {
+                transportSessionEpoch.requireQueuedCurrent(epoch)
+                j2534BridgeTransport = bridge
+                j2534BridgeRequestCanId = requestCanId
+                j2534BridgeResponseCanId = responseCanId
+                j2534BridgeProtocolNumber = protocolNumber
+                activeTransport = "J2534_BRIDGE"
+                isDemoMode = false
+                isSimulationActive = false
+            }
             Result.success(info)
         } catch (cancelled: kotlinx.coroutines.CancellationException) {
             bridge.close()
