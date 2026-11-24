@@ -95,8 +95,10 @@ internal static class DoIpVehicleDiscovery
 
         if (vin is not null && eid is not null)
             throw new ArgumentException("Choose VIN or EID identification, not both.");
+        // Correlate replies with the same immutable EID used for the request.
+        var fixedEid = eid?.ToArray();
         var request = vin is not null ? BuildVinRequest(vin) :
-            eid is not null ? BuildEidRequest(eid) : BuildRequest();
+            fixedEid is not null ? BuildEidRequest(fixedEid) : BuildRequest();
         // Reject a UDP packet delivered after the receive deadline even if
         // the socket completes concurrently with cancellation.
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -128,7 +130,7 @@ internal static class DoIpVehicleDiscovery
                 if (received.RemoteEndPoint.Port != port) continue;
                 var found = ParseAnnouncement(received.Buffer,
                     received.RemoteEndPoint.Address);
-                if (!MatchesRequestedIdentity(found, vin, eid))
+                if (!MatchesRequestedIdentity(found, vin, fixedEid))
                     continue;
                 var key = found.Source + ":" + found.LogicalAddress.ToString("X4");
                 identified[key] = found;
@@ -351,8 +353,10 @@ internal static class DoIpVehicleDiscovery
         ValidateIpv6MulticastOptions(interfaceIndex, timeout, null, portOverride);
         if (vin is not null && eid is not null)
             throw new ArgumentException("Choose VIN or EID identification, not both.");
+        // Correlate replies with the same immutable EID used for the request.
+        var fixedEid = eid?.ToArray();
         var request = vin is not null ? BuildVinRequest(vin) :
-            eid is not null ? BuildEidRequest(eid) : BuildRequest();
+            fixedEid is not null ? BuildEidRequest(fixedEid) : BuildRequest();
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         deadline.CancelAfter(timeout);
         using var socket = new UdpClient(AddressFamily.InterNetworkV6);
@@ -382,7 +386,7 @@ internal static class DoIpVehicleDiscovery
             {
                 var found = ParseAnnouncement(received.Buffer,
                     received.RemoteEndPoint.Address);
-                if (!MatchesRequestedIdentity(found, vin, eid))
+                if (!MatchesRequestedIdentity(found, vin, fixedEid))
                     continue;
                 var key = found.Source + ":" + found.LogicalAddress.ToString("X4");
                 identified[key] = found;
@@ -425,8 +429,10 @@ internal static class DoIpVehicleDiscovery
         deadline.CancelAfter(timeout);
         using var socket = new UdpClient(address.AddressFamily);
         var destination = new IPEndPoint(address, portOverride ?? 13400);
+        // Correlate replies with the same immutable EID used for the request.
+        var fixedEid = eid?.ToArray();
         var request = vin is not null ? BuildVinRequest(vin) :
-            eid is not null ? BuildEidRequest(eid) : BuildRequest();
+            fixedEid is not null ? BuildEidRequest(fixedEid) : BuildRequest();
         await socket.SendAsync(request.AsMemory(), destination, deadline.Token);
         while (true)
         {
@@ -443,7 +449,7 @@ internal static class DoIpVehicleDiscovery
                 continue; // Other DoIP control packets are not announcements.
             var found = ParseAnnouncement(received.Buffer,
                 received.RemoteEndPoint.Address);
-            if (!MatchesRequestedIdentity(found, vin, eid))
+            if (!MatchesRequestedIdentity(found, vin, fixedEid))
                 continue;
             return found;
         }
