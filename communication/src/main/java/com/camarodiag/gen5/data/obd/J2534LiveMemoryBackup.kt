@@ -89,8 +89,17 @@ object J2534LiveMemoryBackup {
             channel: EcuBackupManifest.Channel? = null,
             firmwareEvidence: EcuBackupManifest.FirmwareEvidence? = null
         ) {
+            require(manifest.channel == null || channel == null || channel == manifest.channel) {
+                "Export route differs from the acquired ECU channel."
+            }
+            require(manifest.firmwareEvidence == null || firmwareEvidence == null ||
+                firmwareEvidence == manifest.firmwareEvidence) {
+                "Export firmware evidence differs from the acquired ECU identity."
+            }
+            val exportChannel = manifest.channel ?: channel
+            val exportFirmware = manifest.firmwareEvidence ?: firmwareEvidence
             if (capture.origin == EcuBackupManifest.Origin.REPORTED_HARDWARE_READ) {
-                requireNotNull(channel) {
+                requireNotNull(exportChannel) {
                     "A physically acquired backup must retain its J2534 CAN route."
                 }
             }
@@ -109,7 +118,7 @@ object J2534LiveMemoryBackup {
             ) { "Capture no longer matches the verified acquisition." }
             EcuBackupArchive.export(
                 output, listOf(snapshot), required, manifest.controllerLabel,
-                manifest.createdAtUtcMillis, manifest.vehicleVin, channel, firmwareEvidence
+                manifest.createdAtUtcMillis, manifest.vehicleVin, exportChannel, exportFirmware
             )
         }
     }

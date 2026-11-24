@@ -1326,7 +1326,7 @@ class BluetoothObdManager(context: Context) {
             ).consistent) {
                 "Physical ECU backup evidence became inconsistent before export."
             }
-            result.export(output, channel, firmwareEvidence)
+            bound.export(output)
             transportSessionEpoch.requireQueuedCurrent(epoch)
             bound
         }

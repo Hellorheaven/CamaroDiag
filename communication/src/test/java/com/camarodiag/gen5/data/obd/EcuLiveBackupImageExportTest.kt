@@ -1,8 +1,11 @@
 package com.camarodiag.gen5.data.obd
 
 import org.junit.Assert.assertArrayEquals
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.nio.file.Files
 
@@ -39,6 +42,24 @@ class EcuLiveBackupImageExportTest {
         } finally {
             root.deleteRecursively()
         }
+    }
+
+    @Test fun reexportPreservesAcquiredChannelAndFirmwareBeforeWriting() {
+        val raw = capture(EcuBackupManifest.Origin.REPORTED_HARDWARE_READ)
+        val observed = EcuBackupManifest.FirmwareEvidence(1234L, 0xC1)
+        val acquired = raw.copy(manifest = raw.manifest.copy(channel = channel, firmwareEvidence = observed))
+        val bytes = ByteArrayOutputStream()
+        assertThrows(IllegalArgumentException::class.java) {
+            acquired.export(bytes, channel.copy(requestCanId = 0x7E1))
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            acquired.export(bytes, channel, observed.copy(operatingSystemId = 5678L))
+        }
+        assertEquals(0, bytes.size())
+        acquired.export(bytes)
+        val reopened = EcuBackupArchive.import(bytes.toByteArray().inputStream())
+        assertEquals(channel, reopened.manifest.channel)
+        assertEquals(observed, reopened.manifest.firmwareEvidence)
     }
 
     @Test fun simulationCannotBeMisrepresentedAsLiveCapture() {

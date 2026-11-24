@@ -27,12 +27,6 @@ object EcuLiveBackupImageExport {
             captureResult.manifest.vehicleVin == identity.vin) {
             "The physical ECU capture or selected vehicle is inconsistent"
         }
-        if (firmwareEvidence != null) {
-            require(captureResult.manifest.firmwareEvidence == null ||
-                captureResult.manifest.firmwareEvidence == firmwareEvidence) {
-                "Physical firmware evidence differs from the captured ECU"
-            }
-        }
         val archive = ByteArrayOutputStream()
         captureResult.export(archive, physicalRoute, firmwareEvidence)
         val imported = EcuBackupArchive.import(
