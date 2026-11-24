@@ -299,6 +299,16 @@ internal static class DoIpUdpDiscoverySelfTests
             new IPEndPoint(IPAddress.Parse("fe80::1234"), 15300), 13400),
             "Wrong UDP source port cannot claim IPv6 DoIP announcement.");
 
+        var scopedV6 = new IPEndPoint(new IPAddress(
+            IPAddress.Parse("fe80::1234").GetAddressBytes(), 2), 13400);
+        Check(DoIpVehicleDiscovery.IsIpv6MulticastAnnouncementSource(
+            scopedV6, 13400, 2),
+            "DoIP IPv6 multicast accepts matching explicit link scope.");
+        Check(!DoIpVehicleDiscovery.IsIpv6MulticastAnnouncementSource(
+            scopedV6, 13400, 3),
+            "DoIP IPv6 multicast rejects another explicit interface scope.");
+
+
         var activeDestination = DoIpVehicleDiscovery.Ipv6MulticastDestination(2);
         Check(activeDestination.AddressFamily == AddressFamily.InterNetworkV6 &&
             activeDestination.IsIPv6Multicast &&
