@@ -164,6 +164,53 @@ internal static class DoIpDiagnosticSessionSelfTests
             }, "Canceled connection is rejected before opening TCP.");
         }
 
+        // Exercise the application VIN reader against the actual TCP codec.
+        const string simulatedVin = "1G1FA1RXXR0123456";
+        await RunCaseAsync(async stream =>
+        {
+            await RequireRequestAsync(stream);
+            await SendAsync(stream, DoIpCodec.DiagnosticMessage,
+                FromEcu([0x62, 0xF1, 0x90, .. System.Text.Encoding.ASCII.GetBytes(simulatedVin)]));
+        }, async client =>
+        {
+            byte[]? tx = null;
+            byte[]? rx = null;
+            var vin = await DoIpVinReader.ReadAsync(client,
+                TimeSpan.FromSeconds(2), CancellationToken.None,
+                requested: bytes =>
+                {
+                    tx = bytes.ToArray();
+                    bytes[0] = 0;
+                },
+                received: bytes =>
+                {
+                    rx = bytes.ToArray();
+                    bytes[0] = 0;
+                });
+            Check(vin == simulatedVin, "Application VIN reader receives the actual UDS VIN.");
+            Check(tx is not null && tx.SequenceEqual(Request),
+                "VIN TX journal receives an independent copy of the request.");
+            Check(rx is not null && rx.Length == 20 && rx[0] == 0x62,
+                "VIN RX journal receives the unmodified positive response.");
+        });
+        foreach (var malformed in new byte[][]
+        {
+            [0x62, 0xF1, 0x90],
+            [0x7F, 0x22, 0x31],
+            [0x62, 0xF1, 0x91, .. System.Text.Encoding.ASCII.GetBytes(simulatedVin)],
+            [0x62, 0xF1, 0x90, .. System.Text.Encoding.ASCII.GetBytes("1G1FA1RXXR012345I")],
+            [0x62, 0xF1, 0x90, .. System.Text.Encoding.ASCII.GetBytes("1G1FA1RXXR012345a")]
+        })
+        {
+            await Expect<InvalidDataException>(() => Task.Run(() =>
+                DoIpVinReader.ParseVin(malformed)), "Reject malformed UDS VIN.");
+        }
+        Check(DoIpVinReader.ParseLogicalAddress("0E80") == Tester,
+            "Logical tester address parsed as hexadecimal.");
+        foreach (var badAddress in new[] { "", "0x12", "12345", "ZZZZ", " 123" })
+            await Expect<ArgumentException>(() => Task.Run(() =>
+                DoIpVinReader.ParseLogicalAddress(badAddress)), "Reject invalid logical address.");
+
         // Full happy path: routing 0x11 pending then 0x10, gateway ACK,
         // AliveCheck and UDS NRC 0x78 followed by final correlated response.
         await RunCaseAsync(async stream =>
