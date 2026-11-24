@@ -144,6 +144,39 @@ internal static class DoIpVinReader
         return new(vin, identification.Value, data);
     }
 
+    internal static async Task<IReadOnlyList<(ushort Did, byte[] Data)>> ReadObservedMultiDidAsync(
+        DoIpVehicleDiscovery.Identity gateway, IPAddress address, ushort tester, ushort ecu,
+        bool tls, string expectedVin, IReadOnlyList<UdsMultiDidCli.Entry> layout, bool obd,
+        TimeSpan timeout, CancellationToken token, string? certificate = null,
+        Action<DoIpDiagnosticTransport.PduTrace>? trace = null,
+        DoIpDiagnosticTransport.SessionOptions? options = null)
+    {
+        var frozen = layout.ToArray();
+        if (!DoIpVehicleDiscovery.IsVehicleVin(expectedVin) || gateway.Vin != expectedVin ||
+            frozen.Length is < 2 or > 16 || frozen.Any(e => e.Length is < 0 or > 4095) ||
+            (obd && frozen.Any(e => ObdOnUdsServices.ClassifyDid(e.Did) == ObdOnUdsServices.DataGroup.NotLegislated)))
+            throw new ArgumentException("Invalid multi-DID target or layout.");
+        var request = UdsMultiDidCli.BuildRequest(frozen);
+        await using var link = await ConnectObservedAsync(gateway, address, tester, ecu,
+            tls, timeout, token, certificate, trace, options);
+        async Task VerifyAsync()
+        {
+            if (obd)
+            {
+                var observed = await ReadVerifiedObdAsync(link, expectedVin, null, timeout, token);
+                if (observed.ProtocolValue != 1)
+                    throw new InvalidDataException("Selected ECU did not identify as OBDonUDS.");
+            }
+            else if (await VerifyObservedVinAsync(link, gateway, timeout, token, null, null) != expectedVin)
+                throw new InvalidDataException("ECU VIN mismatch.");
+        }
+        await VerifyAsync();
+        var reply = await link.ExchangeUdsAsync(request, timeout, token);
+        var values = UdsMultiDidCli.Decode(frozen, request, reply);
+        await VerifyAsync();
+        return values;
+    }
+
     internal static async Task<ObdOnUdsServices.WwhDtcReport> ReadObservedWwhAsync(
         DoIpVehicleDiscovery.Identity gateway, IPAddress address, ushort tester, ushort ecu,
         bool tls, string expectedVin, byte subfunction, byte statusMask, byte severityMask,

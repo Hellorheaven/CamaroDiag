@@ -1,3 +1,7 @@
+## PR117 — multi-DID console Windows DoIP (24/11/2026)
+
+- Accès UI FR/EN aux requêtes multi-DID UDS/OBDonUDS, format CLI Windows déjà existant conservé (0xHHHH:longueur), vérification VIN et protocole avant/après sur une connexion unique, décodage via UdsMultiDidCli et journal existant. Validation à venir avec Android et Connectors multi-DID.
+
 ## PR117 — multi-DID Android DoIP (24/11/2026)
 
 - Requête UDS 22 multi-DID et variante OBDonUDS, géométrie explicitement fournie, validation avant réseau, vérification VIN/protocole avant/après sur le même socket. Interface FR/EN, contrôles stricts d’ordre/longueur/doublons, tests ajoutés. Ce lot est postérieur au checkpoint WWH 45501625699.

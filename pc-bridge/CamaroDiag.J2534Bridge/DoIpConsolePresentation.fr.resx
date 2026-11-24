@@ -108,4 +108,9 @@
   <data name="WwhResult" xml:space="preserve"><value>WWH 0x{0:X2} : {1} défauts ; masque statut 0x{2:X2} ; format 0x{3:X2}</value></data>
   <data name="WwhMetadata" xml:space="preserve"><value>Disponibilité sévérité : {0} ; groupe : {1}</value></data>
   <data name="WwhRecord" xml:space="preserve"><value>DTC {0:X6} ; statut {1:X2} ; sévérité {2}</value></data>
+  <data name="MultiLayout" xml:space="preserve"><value>Longueurs DID (0xHHHH:octets, ...)</value></data>
+  <data name="MultiRead" xml:space="preserve"><value>Lire plusieurs DID UDS</value></data>
+  <data name="ObdMultiRead" xml:space="preserve"><value>Lire plusieurs DID OBD</value></data>
+  <data name="InvalidMultiLayout" xml:space="preserve"><value>Liste DID invalide ou DID OBD non réglementaire.</value></data>
+  <data name="MultiResult" xml:space="preserve"><value>DID {0:X4} ({1} octets) : {2}</value></data>
 </root>
