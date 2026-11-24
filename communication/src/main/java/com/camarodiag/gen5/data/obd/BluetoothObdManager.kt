@@ -35,6 +35,21 @@ class BluetoothObdManager(context: Context) {
     private var outputStream: OutputStream? = null
     private val commandMutex = Mutex()
     private val commandSessionMutex = Mutex()
+    // A superseded Wi-Fi handshake may finish after a new adapter selection.
+    // Serialize teardown with epoch-based cleanup and state publication.
+    private val adapterLifecycleLock = Any()
+
+    private fun beginWifiConnection(): Long = synchronized(adapterLifecycleLock) {
+        disconnect()
+        transportSessionEpoch.capture()
+    }
+
+    private fun disconnectIfCurrent(expectedEpoch: Long) {
+        synchronized(adapterLifecycleLock) {
+            if (transportSessionEpoch.isCurrent(expectedEpoch)) disconnect()
+        }
+    }
+
     private val supportedMode01PidsMutex = Mutex()
     @Volatile private var cachedSupportedMode01Pids: Set<Int>? = null
     @Volatile private var cachedSupportedMode01PidsAtMillis: Long = 0L
@@ -162,22 +177,24 @@ class BluetoothObdManager(context: Context) {
     }
 
     suspend fun connectWifi(host: String, port: Int = 35000): Result<AdapterCapabilities> = withContext(Dispatchers.IO) {
-        disconnect()
+        val epoch = beginWifiConnection()
         try {
             val connected = wifiTransport.connect(host, port)
             if (connected.isFailure) {
-                disconnect()
+                disconnectIfCurrent(epoch)
                 return@withContext Result.failure(connected.exceptionOrNull()!!)
             }
-            activeTransport = "WIFI"
-            probeConnectedAdapter("ELM327 Wi-Fi ($host:$port)", host)
+            synchronized(adapterLifecycleLock) {
+                transportSessionEpoch.requireQueuedCurrent(epoch)
+                activeTransport = "WIFI"
+            }
+            probeConnectedAdapter("ELM327 Wi-Fi ($host:$port)", host, epoch)
         } catch (cancelled: kotlinx.coroutines.CancellationException) {
-            // Propagate cancellation after cleanup: a replacement connection
-            // must not race the teardown of this handshake.
-            disconnect()
+            // An older connection's cancellation cannot tear down a successor.
+            disconnectIfCurrent(epoch)
             throw cancelled
         } catch (error: Exception) {
-            disconnect()
+            disconnectIfCurrent(epoch)
             Result.failure(error)
         }
     }
@@ -287,20 +304,29 @@ class BluetoothObdManager(context: Context) {
 
     private suspend fun probeConnectedAdapter(
         deviceName: String,
-        address: String
+        address: String,
+        expectedEpoch: Long = transportSessionEpoch.capture()
     ): Result<AdapterCapabilities> {
+        // Every probe request is tied to the original adapter generation,
+        // including the last 0100. A newer selection must never receive the
+        // remaining AT commands of the cancelled probe.
+        suspend fun probeCommand(command: String, timeoutMs: Long = 1200L): String =
+            commandSessionMutex.withLock {
+                transportSessionEpoch.requireQueuedCurrent(expectedEpoch)
+                sendAtCommandInternal(command, timeoutMs, expectedEpoch = expectedEpoch)
+            }
         return try {
-            val atz = sendAtCommand("ATZ")
-            sendAtCommand("ATE0")
-            sendAtCommand("ATL0")
-            val headersResp = sendAtCommand("ATH1")
-            val sti = sendAtCommand("STI")
-            val atal = sendAtCommand("ATAL")
-            val stp61 = sendAtCommand("STP 61")
-            val protocolResp = sendAtCommand("ATSP 6")
+            val atz = probeCommand("ATZ")
+            probeCommand("ATE0")
+            probeCommand("ATL0")
+            val headersResp = probeCommand("ATH1")
+            val sti = probeCommand("STI")
+            val atal = probeCommand("ATAL")
+            val stp61 = probeCommand("STP 61")
+            val protocolResp = probeCommand("ATSP 6")
             // A real 0100 response proves that the connected physical command path
             // transmitted a request and received an ECU reply; AT header support alone does not.
-            val transmitProbeResp = sendAtCommand("0100", 2_500L)
+            val transmitProbeResp = probeCommand("0100", 2_500L)
 
             val capabilities = CamaroUdsProtocol.evaluateAdapterProbe(
                 deviceName = deviceName,
@@ -313,16 +339,17 @@ class BluetoothObdManager(context: Context) {
                 protocolResp = protocolResp,
                 transmitProbeResp = transmitProbeResp
             )
-            isDemoMode = false
-            activeAdapterCapabilities = capabilities
+            synchronized(adapterLifecycleLock) {
+                transportSessionEpoch.requireQueuedCurrent(expectedEpoch)
+                isDemoMode = false
+                activeAdapterCapabilities = capabilities
+            }
             Result.success(capabilities)
         } catch (cancelled: kotlinx.coroutines.CancellationException) {
-            // A cancelled probe is not an adapter failure. The caller joins
-            // this cleanup before opening the replacement physical channel.
-            disconnect()
+            disconnectIfCurrent(expectedEpoch)
             throw cancelled
         } catch (error: Exception) {
-            disconnect()
+            disconnectIfCurrent(expectedEpoch)
             Result.failure(error)
         }
     }
@@ -1424,31 +1451,33 @@ class BluetoothObdManager(context: Context) {
         CamaroLfxObdSimulator.createEngine()
 
     fun disconnect() {
-        // Publish teardown before sockets are closed: in-flight commands must not
-        // attach their remaining read/write steps to the next adapter session.
-        transportSessionEpoch.invalidate()
-        // Close every transport independently: one failing close must not leak the others.
-        runCatching { usbTransport.close() }
-        runCatching { wifiTransport.close() }
-        runCatching { bleTransport.close() }
-        runCatching { j2534BridgeTransport?.close() }
-        j2534BridgeTransport = null
-        j2534BridgeRequestCanId = null
-        j2534BridgeResponseCanId = null
-        j2534BridgeProtocolNumber = null
-        runCatching { inputStream?.close() }
-        runCatching { outputStream?.close() }
-        runCatching { socket?.close() }
+        synchronized(adapterLifecycleLock) {
+            // Publish teardown before sockets are closed: in-flight commands must not
+            // attach their remaining read/write steps to the next adapter session.
+            transportSessionEpoch.invalidate()
+            // Close every transport independently: one failing close must not leak the others.
+            runCatching { usbTransport.close() }
+            runCatching { wifiTransport.close() }
+            runCatching { bleTransport.close() }
+            runCatching { j2534BridgeTransport?.close() }
+            j2534BridgeTransport = null
+            j2534BridgeRequestCanId = null
+            j2534BridgeResponseCanId = null
+            j2534BridgeProtocolNumber = null
+            runCatching { inputStream?.close() }
+            runCatching { outputStream?.close() }
+            runCatching { socket?.close() }
 
-        inputStream = null
-        outputStream = null
-        socket = null
-        activeTransport = "BLUETOOTH"
-        cachedSupportedMode01Pids = null
-        cachedSupportedMode01PidsAtMillis = 0L
-        isDemoMode = true
-        isSimulationActive = false
-        activeAdapterCapabilities = null
+            inputStream = null
+            outputStream = null
+            socket = null
+            activeTransport = "BLUETOOTH"
+            cachedSupportedMode01Pids = null
+            cachedSupportedMode01PidsAtMillis = 0L
+            isDemoMode = true
+            isSimulationActive = false
+            activeAdapterCapabilities = null
+        }
     }
 }
 
