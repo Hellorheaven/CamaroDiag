@@ -224,6 +224,14 @@ internal static class DoIpVehicleDiscovery
         UdpClient receiver, TimeSpan duration, CancellationToken cancellationToken,
         int sourcePort)
     {
+        ArgumentNullException.ThrowIfNull(receiver);
+        if (duration <= TimeSpan.Zero || duration > TimeSpan.FromSeconds(30))
+            throw new ArgumentOutOfRangeException(nameof(duration));
+        if (sourcePort is < 1 or > 65535)
+            throw new ArgumentOutOfRangeException(nameof(sourcePort));
+        if (!receiver.Client.IsBound)
+            throw new ArgumentException("Passive DoIP discovery requires an already bound UDP socket.", nameof(receiver));
+        cancellationToken.ThrowIfCancellationRequested();
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         deadline.CancelAfter(duration);
         var identified = new Dictionary<string, Identity>(StringComparer.Ordinal);
