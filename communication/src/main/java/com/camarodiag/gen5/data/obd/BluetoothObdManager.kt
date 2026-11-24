@@ -774,6 +774,10 @@ class BluetoothObdManager(context: Context) {
     suspend fun sendRawCanFrameWithStatus(
         frame: RawCanFrame,
         approval: EcuWriteConsentFlow.Approval,
+        // Passive read-only observation, never an alternative TX permission.
+        // The console stores all physical RX chunks before the matcher drops
+        // older events from its deliberately bounded recent-record window.
+        onPhysicalResponseChunk: (String, Long) -> Unit = { _, _ -> },
         isOperatorContextCurrent: () -> Boolean
     ): CanConsoleRawTransmissionResult =
         withContext(Dispatchers.IO) {
@@ -862,9 +866,13 @@ class BluetoothObdManager(context: Context) {
                 val frameResponse = boundCommand(
                     payload, 4_000L,
                     onChunk = { chunk ->
+                        val receivedAtWallClock = System.currentTimeMillis()
                         timedCorrelation.append(
-                            chunk, System.nanoTime() / 1_000_000L, System.currentTimeMillis()
+                            chunk, System.nanoTime() / 1_000_000L, receivedAtWallClock
                         )
+                        // This callback gets the actual adapter RX chunks,
+                        // including records beyond the 300-item diagnostic window.
+                        onPhysicalResponseChunk(chunk, receivedAtWallClock)
                     },
                     beforeTransmit = {
                         transportSessionEpoch.requireQueuedCurrent(requestedEpoch)
