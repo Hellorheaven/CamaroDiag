@@ -329,6 +329,42 @@ internal static class DoIpDiagnosticSessionSelfTests
                 "DoIP freezes caller-approved request bytes across async ACK matching.");
         });
 
+        // The routing-activated socket must answer gateway AliveChecks
+        // between diagnostic requests, with no UDS request in flight.
+        await RunCaseAsync(async stream =>
+        {
+            await SendAsync(stream, DoIpCodec.AliveCheckRequest, []);
+            var aliveIdle = await ReadAsync(stream);
+            Check(aliveIdle.Type == DoIpCodec.AliveCheckResponse &&
+                aliveIdle.Payload.SequenceEqual(new byte[] { 0x0E, 0x80 }),
+                "DoIP gateway AliveCheck answered while diagnostic socket is idle.");
+            await RequireRequestAsync(stream);
+            await SendAsync(stream, DoIpCodec.DiagnosticMessage, FromEcu(Positive));
+        }, async client =>
+        {
+            await Task.Delay(40); // Keep the socket idle before transmitting.
+            var reply = await client.ExchangeUdsAsync(Request,
+                TimeSpan.FromSeconds(2), CancellationToken.None);
+            Check(reply.SequenceEqual(Positive),
+                "DoIP idle AliveCheck keeps socket usable for a later UDS request.");
+        });
+
+        // Unsolicited diagnostic replies arriving *between* operations
+        // cannot be queued and mistaken for the next UDS transaction.
+        await RunCaseAsync(async stream =>
+        {
+            await SendAsync(stream, DoIpCodec.DiagnosticMessage,
+                FromEcu(Positive));
+            await Task.Delay(60);
+        }, async client =>
+        {
+            await Task.Delay(40);
+            await Expect<InvalidOperationException>(() =>
+                client.ExchangeUdsAsync(Request,
+                    TimeSpan.FromSeconds(1), CancellationToken.None),
+                "DoIP unsolicited idle diagnostic response permanently retires session.");
+        });
+
         // DoIP has no per-request correlation token. Two callers may never
         // interleave on the same socket; serialized reuse *after* success
         // remains legitimate for a diagnostic session.
