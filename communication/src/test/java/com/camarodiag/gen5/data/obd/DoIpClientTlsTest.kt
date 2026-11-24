@@ -26,7 +26,7 @@ class DoIpClientTlsTest {
     private fun createStore(directory: File, name: String, eku: String): KeyStore {
         val file = File(directory, "$name.p12")
         val keytool = File(System.getProperty("java.home"), "bin/keytool" +
-            if (System.getProperty("os.name").startsWith("Windows", true)) ".exe" else "")
+            if (System.getProperty("os.name")?.startsWith("Windows", true) == true) ".exe" else "")
         val process = ProcessBuilder(keytool.absolutePath, "-genkeypair", "-alias", name,
             "-keyalg", "RSA", "-keysize", "2048", "-dname", "CN=$name",
             "-validity", "365", "-ext", "EKU=$eku", "-ext", "SAN=IP:127.0.0.1",

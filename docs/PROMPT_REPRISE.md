@@ -1,3 +1,7 @@
+## PR117 — correction du gate Android (24/11/2026)
+
+- Run 45459305032 sur 8c2c607 : Windows, firmware, natif, Python et vérification de révision verts (11/12 jobs techniques). Android : InvalidTestClassError dans DoIpGatewayControlTraceTest ; deux tests runBlocking inféraient un retour Future.get non-void. Retour Unit explicite, aucune suppression de tests. Correction des trois avertissements Kotlin relevés (visibilité copy des cibles/certificats et propriété système nullable). Nouvelle validation nécessaire.
+
 ## PR117 — validation groupée DoIP (24/11/2026)
 
 - Run 45456278234 sur d3e91f2 : 12/12 jobs techniques réussis. Demande du checkpoint suivant contenant 3a129db2739762ef77288a95cb01b8a478776901 : Android EID/IPv6/écoute passive et sélection interface, contrôle de passerelle Android/Windows/Python, P2/P2* monitoring CLI Windows. Le lot est implémenté, pas encore validé sur ce SHA. Ne pas déclarer le DoIP physiquement qualifié ni clôturer C6/C8.

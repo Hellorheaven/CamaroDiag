@@ -64,7 +64,7 @@ class DoIpGatewayControlTraceTest {
         assertEquals(target.address.hostAddress?.substringBefore('%'), DoIpDirectRead.tlsServerName(target.address))
     }
 
-    @Test fun eidDiscoveryCorrelatesResponseAndPreservesAnnouncementState() = runBlocking {
+    @Test fun eidDiscoveryCorrelatesResponseAndPreservesAnnouncementState(): Unit = runBlocking {
         val loopback = InetAddress.getByName("127.0.0.1")
         DatagramSocket(0, loopback).use { server ->
             server.soTimeout = 2000
@@ -93,7 +93,7 @@ class DoIpGatewayControlTraceTest {
         }
     }
 
-    @Test fun controlQueryRefusesSubstitutedGatewayBeforeSendingStatus() = runBlocking {
+    @Test fun controlQueryRefusesSubstitutedGatewayBeforeSendingStatus(): Unit = runBlocking {
         val loopback = InetAddress.getByName("127.0.0.1")
         DatagramSocket(0, loopback).use { server ->
             server.soTimeout = 2000

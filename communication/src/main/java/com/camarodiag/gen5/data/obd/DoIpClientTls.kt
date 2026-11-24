@@ -19,6 +19,7 @@ import javax.net.ssl.SSLSocketFactory
 import javax.net.ssl.X509ExtendedKeyManager
 
 /** Only public identity metadata is retained in UI state. Android KeyChain owns the key. */
+@ConsistentCopyVisibility
 data class DoIpClientCertificateSelection internal constructor(
     val alias: String, val host: String, val vin: String, val fingerprint: String
 ) {

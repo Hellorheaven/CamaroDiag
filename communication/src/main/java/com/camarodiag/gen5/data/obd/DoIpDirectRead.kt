@@ -50,6 +50,7 @@ object DoIpDirectRead {
     internal fun responseDeadline(overall: Long, now: Long, stageMs: Int): Long =
         minOf(overall, now + stageMs * 1_000_000L)
 
+    @ConsistentCopyVisibility
     data class Target private constructor(val address: InetAddress, val tester: Int, val ecu: Int,
         val expectedVin: String, val tls: Boolean, val expectedGateway: Int? = null,
         val expectedIdentity: Gateway? = null) {
