@@ -29,7 +29,8 @@ import javax.net.ssl.X509TrustManager
 object J2534BridgePairingCodeFormat {
     private val pattern = Regex("^[A-Za-z0-9_-]{43}\\.[0-9a-fA-F]{64}$")
 
-    fun isValid(code: String): Boolean = pattern.matches(code.trim())
+    fun isValid(code: String): Boolean =
+        code.none(Char::isISOControl) && pattern.matches(code.trim())
 }
 
 internal class J2534BridgeTlsPairing private constructor(
@@ -40,11 +41,10 @@ internal class J2534BridgeTlsPairing private constructor(
     val certificateSha256: ByteArray get() = pinnedDigest.copyOf()
     companion object {
         fun parse(pairingCode: String): J2534BridgeTlsPairing {
-            val normalized = pairingCode.trim()
-            require(J2534BridgePairingCodeFormat.isValid(normalized)) {
+            require(J2534BridgePairingCodeFormat.isValid(pairingCode)) {
                 "Appairage non sécurisé : recopier le code complet (jeton.empreinte TLS) affiché par le nouveau pont Windows."
             }
-            val parts = normalized.split('.')
+            val parts = pairingCode.trim().split('.')
             val pin = ByteArray(32) { index ->
                 parts[1].substring(index * 2, index * 2 + 2).toInt(16).toByte()
             }
