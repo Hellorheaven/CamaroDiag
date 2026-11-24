@@ -255,20 +255,8 @@ internal static class StandardProtocolCli
             var status = await DoIpVehicleDiscovery.QueryStatusAsync(
                 host, power, TimeSpan.FromMilliseconds(timeoutMs),
                 CancellationToken.None, protocolVersion: version);
-            if (power)
-            {
-                var mode = DoIpCodec.ParseDiagnosticPowerMode(status);
-                Console.WriteLine($"DoIP diagnostic power mode={mode} " +
-                    $"({(mode == 1 ? "ready" : mode == 0 ? "not ready" : "not supported")})");
-            }
-            else
-            {
-                var entity = DoIpCodec.ParseEntityStatus(status);
-                Console.WriteLine($"DoIP node type={entity.NodeType} " +
-                    $"sockets={entity.CurrentSockets}/{entity.MaxSockets} " +
-                    $"max data size={(entity.MaxDataSize?.ToString() ?? "unspecified")}");
-            }
-            Console.WriteLine("DoIP UDP status is informational and not ECU authorization.");
+            Console.WriteLine(DoIpConsolePresentation.FormatStatus(status, power));
+            Console.WriteLine(DoIpConsolePresentation.Text("StatusNotice"));
             return 0;
         }
         catch (Exception ex) when (ex is ArgumentException or IOException or
