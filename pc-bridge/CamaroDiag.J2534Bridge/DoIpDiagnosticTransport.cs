@@ -19,6 +19,35 @@ namespace CamaroDiag.J2534Bridge;
 /// </summary>
 internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
 {
+    internal sealed record SessionOptions(int P2Ms, int P2StarMs, byte RoutingType, string OemHex)
+    {
+        internal static SessionOptions Parse(int totalMs, string p2, string p2Star, string routing, string oem)
+        {
+            if (routing.Length != 2 || !byte.TryParse(routing,
+                System.Globalization.NumberStyles.AllowHexSpecifier,
+                System.Globalization.CultureInfo.InvariantCulture, out var routingType))
+                throw new ArgumentException("Routing type must contain two hexadecimal digits.");
+            static int Stage(string value, int fallback) => string.IsNullOrWhiteSpace(value) ? fallback :
+                int.TryParse(value, System.Globalization.NumberStyles.None,
+                    System.Globalization.CultureInfo.InvariantCulture, out var parsed) ? parsed :
+                    throw new ArgumentException("Invalid UDS response timing.");
+            var options = new SessionOptions(Stage(p2, totalMs), Stage(p2Star, totalMs),
+                routingType, oem.ToUpperInvariant());
+            options.Validate(TimeSpan.FromMilliseconds(totalMs));
+            return options;
+        }
+
+        internal void Validate(TimeSpan total)
+        {
+            if (P2Ms < 1 || P2StarMs < P2Ms || P2StarMs > total.TotalMilliseconds ||
+                OemHex is null || (OemHex.Length != 0 && (OemHex.Length != 8 || !OemHex.All(Uri.IsHexDigit))))
+                throw new ArgumentException("Invalid bounded UDS timing or four-byte OEM routing data.");
+        }
+
+        internal byte[]? OemBytes => OemHex.Length == 0 ? null : Convert.FromHexString(OemHex);
+    }
+
+    private readonly SessionOptions? sessionOptions;
     private readonly TcpClient socket;
     private readonly Stream stream;
     private readonly ushort testerAddress;
@@ -58,7 +87,7 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
     private Exception? receiveFailure;
 
     private DoIpDiagnosticTransport(TcpClient socket, Stream dataStream,
-        ushort tester, ushort ecu, byte version, Action<PduTrace>? trace)
+        ushort tester, ushort ecu, byte version, Action<PduTrace>? trace, SessionOptions? sessionOptions)
     {
         this.socket = socket;
         stream = dataStream;
@@ -66,6 +95,7 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
         ecuAddress = ecu;
         protocolVersion = version;
         this.trace = trace;
+        this.sessionOptions = sessionOptions;
     }
 
     internal static async Task<DoIpDiagnosticTransport> ConnectAsync(
@@ -75,8 +105,16 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
         string? clientCertificateThumbprint = null,
         int? portOverride = null, byte activationType = 0x00,
         byte[]? activationOemData = null, ushort? expectedGatewayAddress = null,
-        Action<PduTrace>? trace = null)
+        Action<PduTrace>? trace = null, SessionOptions? sessionOptions = null)
     {
+        if (sessionOptions is not null)
+        {
+            sessionOptions.Validate(timeout);
+            if (activationType != 0 || activationOemData is not null)
+                throw new ArgumentException("Use one source of routing activation parameters.");
+            activationType = sessionOptions.RoutingType;
+            activationOemData = sessionOptions.OemBytes;
+        }
         if (string.IsNullOrWhiteSpace(host) || host.Length > 253 ||
             tester == ecu || timeout <= TimeSpan.Zero ||
             timeout > TimeSpan.FromSeconds(30) ||
@@ -122,7 +160,7 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
                 dataStream = tls;
             }
             var session = new DoIpDiagnosticTransport(socket, dataStream,
-                tester, ecu, protocolVersion, trace);
+                tester, ecu, protocolVersion, trace, sessionOptions);
             await session.SendAsync(DoIpCodec.RoutingActivation(
                 tester, activationType: activationType,
                 version: protocolVersion,
@@ -229,6 +267,11 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
                 "UDS request must fit the DoIP diagnostic PDU.", nameof(request));
         if (timeout <= TimeSpan.Zero || timeout > TimeSpan.FromSeconds(30))
             throw new ArgumentOutOfRangeException(nameof(timeout));
+        if (sessionOptions is not null)
+        {
+            p2Timeout ??= TimeSpan.FromMilliseconds(sessionOptions.P2Ms);
+            p2StarTimeout ??= TimeSpan.FromMilliseconds(sessionOptions.P2StarMs);
+        }
         // Reject malformed stage settings *before* sending any potentially
         // modifying UDS request to the ECU, even through non-CLI callers.
         if ((p2Timeout.HasValue &&

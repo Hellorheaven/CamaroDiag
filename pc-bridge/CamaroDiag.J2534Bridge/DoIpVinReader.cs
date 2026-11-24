@@ -76,7 +76,8 @@ internal static class DoIpVinReader
     internal static Task<DoIpDiagnosticTransport> ConnectObservedAsync(
         DoIpVehicleDiscovery.Identity gateway, IPAddress address, ushort tester,
         ushort ecu, bool useTls, TimeSpan timeout, CancellationToken token,
-        string? clientCertificateThumbprint, Action<DoIpDiagnosticTransport.PduTrace>? trace = null)
+        string? clientCertificateThumbprint, Action<DoIpDiagnosticTransport.PduTrace>? trace = null,
+        DoIpDiagnosticTransport.SessionOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(gateway);
         ArgumentNullException.ThrowIfNull(address);
@@ -88,7 +89,7 @@ internal static class DoIpVinReader
             address.ToString(), tester, ecu, timeout, token,
             useTls: useTls, protocolVersion: gateway.ProtocolVersion,
             clientCertificateThumbprint: clientCertificateThumbprint,
-            expectedGatewayAddress: gateway.LogicalAddress, trace: trace);
+            expectedGatewayAddress: gateway.LogicalAddress, trace: trace, sessionOptions: options);
     }
 
     internal static async Task<string> VerifyObservedVinAsync(DoIpDiagnosticTransport transport,
@@ -108,13 +109,14 @@ internal static class DoIpVinReader
         DoIpVehicleDiscovery.Identity gateway, IPAddress address, ushort tester,
         ushort ecu, bool tls, string expectedVin, ushort? did, TimeSpan timeout,
         CancellationToken token, string? certificate = null,
-        Action<DoIpDiagnosticTransport.PduTrace>? trace = null)
+        Action<DoIpDiagnosticTransport.PduTrace>? trace = null,
+        DoIpDiagnosticTransport.SessionOptions? options = null)
     {
         if (!DoIpVehicleDiscovery.IsVehicleVin(expectedVin) || gateway.Vin != expectedVin ||
             (did.HasValue && ObdOnUdsServices.ClassifyDid(did.Value) == ObdOnUdsServices.DataGroup.NotLegislated))
             throw new ArgumentException("Explicit matching VIN and legislated DID required.");
         await using var link = await ConnectObservedAsync(gateway, address, tester, ecu,
-            tls, timeout, token, certificate, trace);
+            tls, timeout, token, certificate, trace, options);
         return await ReadVerifiedObdAsync(link, expectedVin, did, timeout, token);
     }
 
@@ -147,10 +149,11 @@ internal static class DoIpVinReader
         ushort ecu, bool useTls, ushort did, TimeSpan timeout,
         CancellationToken token, Action<byte[]>? requested = null,
         Action<byte[]>? received = null, string? clientCertificateThumbprint = null,
-        Action<DoIpDiagnosticTransport.PduTrace>? trace = null)
+        Action<DoIpDiagnosticTransport.PduTrace>? trace = null,
+        DoIpDiagnosticTransport.SessionOptions? options = null)
     {
         await using var transport = await ConnectObservedAsync(gateway, address, tester,
-            ecu, useTls, timeout, token, clientCertificateThumbprint, trace);
+            ecu, useTls, timeout, token, clientCertificateThumbprint, trace, options);
         var vin = await VerifyObservedVinAsync(transport, gateway, timeout, token, requested, received);
         if (did == 0xF190) return Encoding.ASCII.GetBytes(vin);
         return await ReadDidAsync(transport, did, timeout, token, requested, received);
@@ -202,13 +205,14 @@ internal static class DoIpVinReader
         DoIpVehicleDiscovery.Identity gateway, IPAddress address, ushort tester,
         ushort ecu, bool tls, string expectedVin, ushort did, int sampleCount,
         TimeSpan interval, TimeSpan timeout, CancellationToken token, Action<int, byte[]> sample,
-        string? certificate = null, Action<DoIpDiagnosticTransport.PduTrace>? trace = null)
+        string? certificate = null, Action<DoIpDiagnosticTransport.PduTrace>? trace = null,
+        DoIpDiagnosticTransport.SessionOptions? options = null)
     {
         if (!DoIpVehicleDiscovery.IsVehicleVin(expectedVin) || gateway.Vin != expectedVin ||
             ObdOnUdsServices.ClassifyDid(did) == ObdOnUdsServices.DataGroup.NotLegislated)
             throw new ArgumentException("Explicit matching VIN and legislated DID required.");
         await using var transport = await ConnectObservedAsync(gateway, address, tester,
-            ecu, tls, timeout, token, certificate, trace);
+            ecu, tls, timeout, token, certificate, trace, options);
         await MonitorVerifiedObdAsync(transport, expectedVin, did, sampleCount, interval,
             timeout, token, sample);
     }
@@ -219,10 +223,11 @@ internal static class DoIpVinReader
         TimeSpan timeout, CancellationToken token, Action<int, byte[]> sample,
         Action<byte[]>? requested = null, Action<byte[]>? received = null,
         string? clientCertificateThumbprint = null,
-        Action<DoIpDiagnosticTransport.PduTrace>? trace = null)
+        Action<DoIpDiagnosticTransport.PduTrace>? trace = null,
+        DoIpDiagnosticTransport.SessionOptions? options = null)
     {
         await using var transport = await ConnectObservedAsync(gateway, address, tester,
-            ecu, useTls, timeout, token, clientCertificateThumbprint, trace);
+            ecu, useTls, timeout, token, clientCertificateThumbprint, trace, options);
         var vin = await VerifyObservedVinAsync(transport, gateway, timeout, token, requested, received);
         await MonitorDidAsync(transport, did, sampleCount, interval, timeout, token,
             sample, requested, received);
@@ -236,10 +241,11 @@ internal static class DoIpVinReader
         ushort ecu, bool useTls, byte statusMask, TimeSpan timeout,
         CancellationToken token, Action<byte[]>? requested = null,
         Action<byte[]>? received = null, string? clientCertificateThumbprint = null,
-        Action<DoIpDiagnosticTransport.PduTrace>? trace = null)
+        Action<DoIpDiagnosticTransport.PduTrace>? trace = null,
+        DoIpDiagnosticTransport.SessionOptions? options = null)
     {
         await using var transport = await ConnectObservedAsync(gateway, address, tester,
-            ecu, useTls, timeout, token, clientCertificateThumbprint, trace);
+            ecu, useTls, timeout, token, clientCertificateThumbprint, trace, options);
         _ = await VerifyObservedVinAsync(transport, gateway, timeout, token, requested, received);
         return await ReadDtcsAsync(transport, statusMask, timeout, token, requested, received);
     }
@@ -249,7 +255,8 @@ internal static class DoIpVinReader
     internal static async Task<byte[]> ExchangeObservedGatewayAsync(
         DoIpVehicleDiscovery.Identity gateway, IPAddress address, ushort tester,
         ushort ecu, bool useTls, byte[] command, TimeSpan timeout, CancellationToken token,
-        string? certificate = null, Action<DoIpDiagnosticTransport.PduTrace>? trace = null)
+        string? certificate = null, Action<DoIpDiagnosticTransport.PduTrace>? trace = null,
+        DoIpDiagnosticTransport.SessionOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(command);
         if (command.Length is < 1 or > 4091 || gateway.Vin is null ||
@@ -257,7 +264,7 @@ internal static class DoIpVinReader
             throw new ArgumentException("A valid observed VIN and explicit command are required.");
         var fixedCommand = command.ToArray();
         await using var transport = await ConnectObservedAsync(gateway, address, tester,
-            ecu, useTls, timeout, token, certificate, trace);
+            ecu, useTls, timeout, token, certificate, trace, options);
         return await ExchangeVerifiedAsync(transport, gateway, fixedCommand, timeout, token);
     }
 
@@ -265,13 +272,14 @@ internal static class DoIpVinReader
         DoIpVehicleDiscovery.Identity gateway, IPAddress address, ushort tester, ushort ecu,
         bool useTls, IReadOnlyList<byte[]> commands, TimeSpan timeout, CancellationToken token,
         Action<int, byte[]> onReply, string? certificate = null,
-        Action<DoIpDiagnosticTransport.PduTrace>? trace = null)
+        Action<DoIpDiagnosticTransport.PduTrace>? trace = null,
+        DoIpDiagnosticTransport.SessionOptions? options = null)
     {
         var frozen = FreezeCommands(commands);
         if (gateway.Vin is null || !DoIpVehicleDiscovery.IsVehicleVin(gateway.Vin))
             throw new ArgumentException("A valid observed VIN is required.");
         await using var transport = await ConnectObservedAsync(gateway, address, tester, ecu,
-            useTls, timeout, token, certificate, trace);
+            useTls, timeout, token, certificate, trace, options);
         return await ExchangeSequenceVerifiedAsync(transport, gateway, frozen, timeout, token, onReply);
     }
 
@@ -315,10 +323,11 @@ internal static class DoIpVinReader
     internal static async Task<ObdOnUdsServices.DtcCountReport> CountObservedGatewayDtcsAsync(
         DoIpVehicleDiscovery.Identity gateway, IPAddress address, ushort tester, ushort ecu,
         bool useTls, byte statusMask, TimeSpan timeout, CancellationToken token,
-        string? certificate = null, Action<DoIpDiagnosticTransport.PduTrace>? trace = null)
+        string? certificate = null, Action<DoIpDiagnosticTransport.PduTrace>? trace = null,
+        DoIpDiagnosticTransport.SessionOptions? options = null)
     {
         await using var transport = await ConnectObservedAsync(gateway, address, tester,
-            ecu, useTls, timeout, token, certificate, trace);
+            ecu, useTls, timeout, token, certificate, trace, options);
         _ = await VerifyObservedVinAsync(transport, gateway, timeout, token, null, null);
         var reply = await ExchangeReadAsync(transport,
             ObdOnUdsServices.ReadDtcCountByStatusMask(statusMask), timeout, token, null, null);
@@ -330,12 +339,13 @@ internal static class DoIpVinReader
     internal static async Task<DtcDetail> ReadObservedGatewayDtcDetailAsync(
         DoIpVehicleDiscovery.Identity gateway, IPAddress address, ushort tester, ushort ecu,
         bool useTls, uint dtc, byte record, bool extended, TimeSpan timeout, CancellationToken token,
-        string? certificate = null, Action<DoIpDiagnosticTransport.PduTrace>? trace = null)
+        string? certificate = null, Action<DoIpDiagnosticTransport.PduTrace>? trace = null,
+        DoIpDiagnosticTransport.SessionOptions? options = null)
     {
         var request = extended ? ObdOnUdsServices.ReadDtcExtendedData(dtc, record) :
             ObdOnUdsServices.ReadDtcSnapshot(dtc, record);
         await using var transport = await ConnectObservedAsync(gateway, address, tester,
-            ecu, useTls, timeout, token, certificate, trace);
+            ecu, useTls, timeout, token, certificate, trace, options);
         _ = await VerifyObservedVinAsync(transport, gateway, timeout, token, null, null);
         var reply = await ExchangeReadAsync(transport, request, timeout, token, null, null);
         if (extended)
@@ -352,10 +362,11 @@ internal static class DoIpVinReader
         ushort ecu, bool useTls, TimeSpan timeout, CancellationToken token,
         Action<byte[]>? requested = null, Action<byte[]>? received = null,
         string? clientCertificateThumbprint = null,
-        Action<DoIpDiagnosticTransport.PduTrace>? trace = null)
+        Action<DoIpDiagnosticTransport.PduTrace>? trace = null,
+        DoIpDiagnosticTransport.SessionOptions? options = null)
     {
         await using var transport = await ConnectObservedAsync(gateway, address, tester,
-            ecu, useTls, timeout, token, clientCertificateThumbprint, trace);
+            ecu, useTls, timeout, token, clientCertificateThumbprint, trace, options);
         return await VerifyObservedVinAsync(transport, gateway, timeout, token, requested, received);
     }
 }

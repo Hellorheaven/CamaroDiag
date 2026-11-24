@@ -14,6 +14,22 @@ internal static class DoIpConsolePresentationSelfTests
             if (!condition) throw new InvalidOperationException("DoIP console: " + name);
         }
 
+        var defaults = DoIpDiagnosticTransport.SessionOptions.Parse(3000, "", "", "00", "");
+        Check(defaults.P2Ms == 3000 && defaults.P2StarMs == 3000 &&
+            defaults.RoutingType == 0 && defaults.OemBytes is null, "Blank settings retain total timeout and default routing.");
+        var custom = DoIpDiagnosticTransport.SessionOptions.Parse(5000, "100", "2000", "E0", "01020304");
+        Check(custom.P2Ms == 100 && custom.P2StarMs == 2000 && custom.RoutingType == 0xE0 &&
+            custom.OemBytes!.SequenceEqual(new byte[] { 1, 2, 3, 4 }), "Custom session settings preserve exact OEM bytes.");
+        foreach (var values in new[] { new[] {"0", "2000", "00", ""}, new[] {"2000", "100", "00", ""},
+            new[] {"100", "6000", "00", ""}, new[] {"100", "2000", "000", ""},
+            new[] {"100", "2000", "00", "0102"} })
+        {
+            var rejected = false;
+            try { _ = DoIpDiagnosticTransport.SessionOptions.Parse(5000, values[0], values[1], values[2], values[3]); }
+            catch (ArgumentException) { rejected = true; }
+            Check(rejected, "Invalid settings cannot open a diagnostic session.");
+        }
+
         var observed = new DoIpVehicleDiscovery.Identity(
             "1G1FA1RXXR0123456", 0x1234, [1, 2, 3, 4, 5, 6],
             [7, 8, 9, 10, 11, 12], 0x10, 0x00, IPAddress.Loopback, 3);

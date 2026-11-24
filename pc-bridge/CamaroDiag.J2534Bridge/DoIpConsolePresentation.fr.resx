@@ -94,4 +94,10 @@
   <data name="ObdMonitor" xml:space="preserve"><value>Surveiller un DID OBDonUDS</value></data>
   <data name="ObdMonitorSample" xml:space="preserve"><value>Mesure OBDonUDS {0} : DID {1:X4} = {2}</value></data>
   <data name="ObdMonitorComplete" xml:space="preserve"><value>Monitoring OBDonUDS terminé : {0} mesures, identité ECU revérifiée.</value></data>
+  <data name="SessionP2" xml:space="preserve"><value>P2 (ms, vide = total)</value></data>
+  <data name="SessionP2Star" xml:space="preserve"><value>P2* (ms, vide = total)</value></data>
+  <data name="RoutingType" xml:space="preserve"><value>Type de routage (hex)</value></data>
+  <data name="RoutingOem" xml:space="preserve"><value>Données OEM (8 hex, facultatif)</value></data>
+  <data name="InvalidSessionOptions" xml:space="preserve"><value>Paramètres de session invalides. Vérifier délais et routage.</value></data>
+  <data name="SessionSummary" xml:space="preserve"><value>Délai {0} ms ; P2 {1} ms ; P2* {2} ms ; routage {3:X2} ; OEM {4}</value></data>
 </root>

@@ -1,3 +1,7 @@
+## PR117 — paramètres de session DoIP dans la console Windows (24/11/2026)
+
+- Paramètres P2/P2*, type d’activation et quatre octets OEM facultatifs disponibles dans la GUI Windows, défaut historique conservé, valeurs validées avant réseau. Transmission du contexte immuable à tous les parcours (identification, DID/DTC, monitoring, sauvegarde et séquences) ; paramètres visibles lors du double consentement. Ressources FR/EN et tests de validation ajoutés. Ce complément et les deux précédents ne sont pas inclus dans la CI 45454645809 ; prochain checkpoint nécessaire. C6/DoIP restent actifs.
+
 ## PR117 — options de session DoIP Android (24/11/2026)
 
 - Réglages avancés facultatifs de routage et temporisation UDS sur Android, valeurs par défaut inchangées (5 s), validation P2/P2*/délai global et type d’activation/4 octets OEM avant réseau. Réponse NRC 78 seule renouvelle P2* dans le délai global ; ACK/AliveCheck ne le prolongent pas. Les paramètres choisis sont immuables pour la commande confirmée et affichés dans le dialogue ; sauvegardes et monitoring utilisent les mêmes options. Ressources FR/EN et tests de bornes/format ajoutés. Aucune valeur OEM supposée. À valider au prochain checkpoint (postérieur au run 45454645809).

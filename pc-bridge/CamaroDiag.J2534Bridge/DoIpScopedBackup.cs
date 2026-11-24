@@ -101,14 +101,15 @@ internal static class DoIpScopedBackup
     internal static async Task<Capture> ReadObservedAsync(DoIpVehicleDiscovery.Identity gateway,
         IPAddress address, DoIpBackupScope scope, bool tls, TimeSpan timeout, CancellationToken token,
         Action<int, int>? progress = null, string? certificate = null,
-        Action<DoIpDiagnosticTransport.PduTrace>? trace = null)
+        Action<DoIpDiagnosticTransport.PduTrace>? trace = null,
+        DoIpDiagnosticTransport.SessionOptions? options = null)
     {
         scope.Validate();
         if (!gateway.Source.Equals(address) || gateway.LogicalAddress != scope.Gateway ||
             (gateway.Vin is not null && gateway.Vin != scope.Vin))
             throw new UnauthorizedAccessException("Discovered DoIP gateway differs from the backup profile.");
         await using var link = await DoIpVinReader.ConnectObservedAsync(gateway, address, scope.Tester,
-            scope.Ecu, tls, timeout, token, certificate, trace);
+            scope.Ecu, tls, timeout, token, certificate, trace, options);
         return await ReadAsync(link, scope, timeout, token, progress);
     }
 
