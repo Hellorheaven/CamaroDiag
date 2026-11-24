@@ -1,3 +1,11 @@
+## Reprise DoIP/C6 — 24/11/2026
+
+- `9fb924bfde58073e8938ac48a86369752a50b5f1` : validation du socket UDP déjà lié, durée et port source bornés, annulation préalable explicite.
+- `6dc73472c3cfd0f28994f05c4bd6afa93b6f44c3` : six contrôles de régression ajoutés ; **non exécutés**. Aucun changement de capacité matérielle ni de consentement.
+- Les consultations du checkpoint `266279ef` et de l'ancien HEAD `1b4864f7` ne renvoient aucun run via la vue limitée aux événements PR ; cela ne prouve pas l'absence de runs push. Ne pas dupliquer une campagne sans vérification. DoIP et C6 restent actifs. Sélection automatique par connecteur + ECU + opération et intégration applicative de tous les protocoles toujours à réaliser avant C8.
+
+---
+
 ## Décision propriétaire — sélection par fonction (prioritaire)
 
 - Résoudre automatiquement la pile de communication par **connecteur + ECU + fonction/opération** ; le même couple peut utiliser CAN brut en console et ISO-TP/UDS ou SAE J1979 en diagnostic selon capacités réelles. Distinguer transport, segmentation et service. Ne pas imposer un protocole unique à tout le couple.
