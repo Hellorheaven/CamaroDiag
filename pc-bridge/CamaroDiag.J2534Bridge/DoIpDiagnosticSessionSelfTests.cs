@@ -37,12 +37,17 @@ internal static class DoIpDiagnosticSessionSelfTests
         [0x12, 0x34, 0x0E, 0x80, .. uds];
 
     private static async Task GatewayAsync(Stream stream,
-        Func<Stream, Task> scenario, bool pendingRoute = false)
+        Func<Stream, Task> scenario, bool pendingRoute = false,
+        byte activationType = 0x00, byte[]? activationOemData = null)
     {
         var activation = await ReadAsync(stream);
         if (activation.Type != DoIpCodec.RoutingActivationRequest ||
-            activation.Payload.Length != 7 ||
-            activation.Payload[0] != 0x0E || activation.Payload[1] != 0x80)
+            activation.Payload.Length != (activationOemData is null ? 7 : 11) ||
+            activation.Payload[0] != 0x0E || activation.Payload[1] != 0x80 ||
+            activation.Payload[2] != activationType ||
+            !activation.Payload.AsSpan(3, 4).SequenceEqual([0, 0, 0, 0]) ||
+            (activationOemData is not null &&
+             !activation.Payload.AsSpan(7, 4).SequenceEqual(activationOemData)))
             throw new InvalidOperationException("Unexpected DoIP routing activation.");
         if (pendingRoute)
             await SendAsync(stream, DoIpCodec.RoutingActivationResponse,
@@ -53,7 +58,8 @@ internal static class DoIpDiagnosticSessionSelfTests
     }
 
     private static async Task RunCaseAsync(Func<Stream, Task> gateway,
-        Func<DoIpDiagnosticTransport, Task> client, bool pendingRoute = false)
+        Func<DoIpDiagnosticTransport, Task> client, bool pendingRoute = false,
+        byte activationType = 0x00, byte[]? activationOemData = null)
     {
         var listener = new TcpListener(IPAddress.Loopback, 0);
         listener.Start();
@@ -62,13 +68,16 @@ internal static class DoIpDiagnosticSessionSelfTests
         {
             using var peer = await listener.AcceptTcpClientAsync();
             await using var stream = peer.GetStream();
-            await GatewayAsync(stream, gateway, pendingRoute);
+            await GatewayAsync(stream, gateway, pendingRoute,
+                activationType, activationOemData);
         });
         try
         {
             await using var transport = await DoIpDiagnosticTransport.ConnectAsync(
                 "127.0.0.1", Tester, Ecu, TimeSpan.FromSeconds(3),
-                CancellationToken.None, portOverride: port);
+                CancellationToken.None, portOverride: port,
+                activationType: activationType,
+                activationOemData: activationOemData);
             await client(transport);
             await server.WaitAsync(TimeSpan.FromSeconds(3));
         }
@@ -167,6 +176,20 @@ internal static class DoIpDiagnosticSessionSelfTests
             Check(response.SequenceEqual(Positive),
                 "DoIP routing/ACK/AliveCheck/NRC/positive PDU.");
         }, pendingRoute: true);
+
+        // An OEM-specific activation must be an operator-provided field,
+        // not an invented token or a modified ISO-reserved area.
+        await RunCaseAsync(async stream =>
+        {
+            await RequireRequestAsync(stream);
+            await SendAsync(stream, DoIpCodec.DiagnosticMessage, FromEcu(Positive));
+        }, async client =>
+        {
+            Check((await client.ExchangeUdsAsync(
+                Request, TimeSpan.FromSeconds(2), CancellationToken.None))
+                .SequenceEqual(Positive),
+                "Operator-provided 11-byte OEM routing activation is transmitted.");
+        }, activationType: 0xE0, activationOemData: [1, 2, 3, 4]);
 
         // DoIP has no per-request correlation token. Two callers may never
         // interleave on the same socket; serialized reuse *after* success
