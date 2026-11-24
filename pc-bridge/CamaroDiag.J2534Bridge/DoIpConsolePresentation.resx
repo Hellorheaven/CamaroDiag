@@ -42,4 +42,8 @@
   <data name="DtcResult" xml:space="preserve"><value>DTC count={0}; requested mask=0x{1:X2}; available mask=0x{2:X2}</value></data>
   <data name="DtcEntry" xml:space="preserve"><value>DTC 0x{0:X6}, status 0x{1:X2}</value></data>
   <data name="DtcNotice" xml:space="preserve"><value>Read-only status report; no faults were cleared. An empty result only applies to the requested available status bits.</value></data>
+  <data name="ReadDid" xml:space="preserve"><value>Read ECU data</value></data>
+  <data name="DidLabel" xml:space="preserve"><value>Data identifier DID (hex)</value></data>
+  <data name="DidResult" xml:space="preserve"><value>DID 0x{0:X4}: {1}</value></data>
+  <data name="DidStarted" xml:space="preserve"><value>DoIP / {0} / UDS: DID read at {1}, ECU 0x{2:X4}, tester 0x{3:X4}, version 0x{4:X2}.</value></data>
 </root>
