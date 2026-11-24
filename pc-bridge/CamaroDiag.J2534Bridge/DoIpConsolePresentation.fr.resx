@@ -52,4 +52,12 @@
   <data name="MonitorCount" xml:space="preserve"><value>Échantillons</value></data>
   <data name="MonitorSample" xml:space="preserve"><value>N° {0} DID 0x{1:X4} : {2}</value></data>
   <data name="MonitorComplete" xml:space="preserve"><value>Mesure terminée : {0} échantillons.</value></data>
+  <data name="Backup" xml:space="preserve"><value>Sauvegarder une zone ECU</value></data>
+  <data name="BackupProfile" xml:space="preserve"><value>Sélectionner le profil mémoire DoIP</value></data>
+  <data name="BackupMismatch" xml:space="preserve"><value>Le profil mémoire ne correspond pas à la cible DoIP sélectionnée.</value></data>
+  <data name="BackupExists" xml:space="preserve"><value>Choisissez un nouveau fichier : les sauvegardes ne sont jamais écrasées.</value></data>
+  <data name="BackupConfirm" xml:space="preserve"><value>Lire deux fois la zone ECU ? VIN {0}, ECU 0x{1:X4}, début 0x{2:X8}, {3} octets.</value></data>
+  <data name="BackupStarted" xml:space="preserve"><value>DoIP / {0} : sauvegarde sur {1}, ECU 0x{2:X4}, testeur 0x{3:X4}, version 0x{4:X2}.</value></data>
+  <data name="BackupProgress" xml:space="preserve"><value>Lecture {0}/2 : {1}/{2} octets</value></data>
+  <data name="BackupSaved" xml:space="preserve"><value>Sauvegarde de zone vérifiée : {0} octets, SHA-256 {1}, {2}</value></data>
 </root>

@@ -52,4 +52,12 @@
   <data name="MonitorCount" xml:space="preserve"><value>Samples</value></data>
   <data name="MonitorSample" xml:space="preserve"><value>#{0} DID 0x{1:X4}: {2}</value></data>
   <data name="MonitorComplete" xml:space="preserve"><value>Monitoring finished: {0} samples.</value></data>
+  <data name="Backup" xml:space="preserve"><value>Back up ECU region</value></data>
+  <data name="BackupProfile" xml:space="preserve"><value>Select DoIP memory profile</value></data>
+  <data name="BackupMismatch" xml:space="preserve"><value>The memory profile does not match the selected DoIP target.</value></data>
+  <data name="BackupExists" xml:space="preserve"><value>Choose a new file; backups are never overwritten.</value></data>
+  <data name="BackupConfirm" xml:space="preserve"><value>Read ECU region twice? VIN {0}, ECU 0x{1:X4}, start 0x{2:X8}, {3} bytes.</value></data>
+  <data name="BackupStarted" xml:space="preserve"><value>DoIP / {0}: backup at {1}, ECU 0x{2:X4}, tester 0x{3:X4}, version 0x{4:X2}.</value></data>
+  <data name="BackupProgress" xml:space="preserve"><value>Pass {0}/2: {1}/{2} bytes</value></data>
+  <data name="BackupSaved" xml:space="preserve"><value>Verified region backup: {0} bytes, SHA-256 {1}, {2}</value></data>
 </root>
