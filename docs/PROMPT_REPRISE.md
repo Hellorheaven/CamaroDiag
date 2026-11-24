@@ -1,3 +1,7 @@
+## PR117 — découverte réseau DoIP Android IPv4 passive et IPv6 (24/11/2026)
+
+- Découverte active IPv6 link-local ff02::1 sur index d’interface explicitement choisi et écoute passive IPv4/IPv6, limitée au VIN sélectionné ; même collecte bornée et refus des identités concurrentes. L’écoute n’émet aucune demande diagnostique ou UDP DoIP ; verrou multicast Wi-Fi Android limité à la durée de l’opération, libéré sur annulation/erreur. Boutons FR/EN et tests de filtrage scope ajoutés. Interface numérique requise, multicast physique à qualifier. Validation groupée nécessaire.
+
 ## PR117 — parité monitoring CLI et contrôle Connectors (24/11/2026)
 
 - Monitoring Windows CLI : P2/P2* optionnels dans le délai global, appliqués à toutes les requêtes de la session (identification et mesures), validation avant connexion, aide FR/EN. Connectors Python : contrôle d’identité avant status/power, contrôle du type de nœud annoncé dans EntityStatus, refus de substitution sans émission du contrôle. Tests ajoutés. Aucune qualification physique ; validation groupée à venir.

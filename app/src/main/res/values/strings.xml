@@ -1074,4 +1074,9 @@
     <string name="cal_doip_session_summary">Timeout %1$d ms · P2 %2$d ms · P2* %3$d ms · routing %4$s · OEM %5$s</string>
     <string name="cal_doip_discovery_eid">Gateway EID (12 hex, optional)</string>
     <string name="cal_doip_gateway_announcement_state">Further action: 0x%1$s · VIN/GID synchronization: %2$s</string>
+    <string name="cal_doip_discovery_advanced">Advanced network discovery</string>
+    <string name="cal_doip_listen_ipv4">Listen for IPv4 announcements</string>
+    <string name="cal_doip_ipv6_interface">IPv6 network interface index</string>
+    <string name="cal_doip_discover_ipv6">Discover by IPv6 multicast</string>
+    <string name="cal_doip_listen_ipv6">Listen for IPv6 announcements</string>
 </resources>

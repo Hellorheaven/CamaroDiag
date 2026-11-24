@@ -313,6 +313,8 @@ fun CalibrationWorkspaceScreen(
 ) {
     var doIpHost by remember(vehicle) { mutableStateOf("") }
     var doIpDiscoveryEid by remember(vehicle) { mutableStateOf("") }
+    var doIpDiscoveryInterface by remember(vehicle) { mutableStateOf("") }
+    var doIpDiscoveryAdvanced by remember(vehicle) { mutableStateOf(false) }
     LaunchedEffect(state.doIpGatewayHost, state.doIpDiscoveredVin) {
         if (doIpHost.isBlank() && state.doIpDiscoveredVin.isNotBlank() &&
             state.doIpDiscoveredVin == vehicle.vin.uppercase() && state.doIpGatewayHost.isNotBlank()) {
@@ -446,6 +448,30 @@ fun CalibrationWorkspaceScreen(
                         Text(stringResource(if (doIpHost.isBlank()) R.string.cal_doip_discover_by_vin
                             else R.string.cal_doip_discover))
                     }
+                    if (doIpHost.isBlank()) {
+                        TextButton(onClick = { doIpDiscoveryAdvanced = !doIpDiscoveryAdvanced }, enabled = idle) {
+                            Text(stringResource(R.string.cal_doip_discovery_advanced))
+                        }
+                        if (doIpDiscoveryAdvanced) {
+                            OutlinedButton(onClick = { onInspectDoIpGateway("", DoIpDirectRead.GatewayOperation.LISTEN_IPV4, null) },
+                                enabled = idle && vinReady, modifier = Modifier.fillMaxWidth()) {
+                                Text(stringResource(R.string.cal_doip_listen_ipv4))
+                            }
+                            OutlinedTextField(doIpDiscoveryInterface, { doIpDiscoveryInterface = it.filter(Char::isDigit).take(10) },
+                                enabled = idle, singleLine = true, modifier = Modifier.fillMaxWidth(),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                label = { Text(stringResource(R.string.cal_doip_ipv6_interface)) })
+                            val interfaceReady = (doIpDiscoveryInterface.toIntOrNull() ?: 0) > 0
+                            OutlinedButton(onClick = { onInspectDoIpGateway(doIpDiscoveryInterface, DoIpDirectRead.GatewayOperation.DISCOVER_IPV6, null) },
+                                enabled = idle && vinReady && interfaceReady, modifier = Modifier.fillMaxWidth()) {
+                                Text(stringResource(R.string.cal_doip_discover_ipv6))
+                            }
+                            OutlinedButton(onClick = { onInspectDoIpGateway(doIpDiscoveryInterface, DoIpDirectRead.GatewayOperation.LISTEN_IPV6, null) },
+                                enabled = idle && vinReady && interfaceReady, modifier = Modifier.fillMaxWidth()) {
+                                Text(stringResource(R.string.cal_doip_listen_ipv6))
+                            }
+                        }
+                    }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedButton(onClick = { onInspectDoIpGateway(doIpHost, DoIpDirectRead.GatewayOperation.STATUS, null) },
                             enabled = idle && doIpHost.isNotBlank(), modifier = Modifier.weight(1f)) {
@@ -456,7 +482,7 @@ fun CalibrationWorkspaceScreen(
                             Text(stringResource(R.string.cal_doip_power))
                         }
                     }
-                    if (state.doIpGatewayHost == doIpHost && state.doIpGatewayResult.isNotBlank())
+                    if ((state.doIpGatewayHost == doIpHost || doIpHost.isBlank()) && state.doIpGatewayResult.isNotBlank())
                         Text(state.doIpGatewayResult, color = TextPrimary, fontSize = 12.sp)
                     OutlinedTextField(doIpTester, { doIpTester = it.uppercase().filter { c -> c in "0123456789ABCDEF" }.take(4) },
                         enabled = idle, singleLine = true, modifier = Modifier.fillMaxWidth(),

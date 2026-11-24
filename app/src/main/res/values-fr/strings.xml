@@ -1077,4 +1077,9 @@
     <string name="cal_doip_session_summary">Délai %1$d ms · P2 %2$d ms · P2* %3$d ms · routage %4$s · OEM %5$s</string>
     <string name="cal_doip_discovery_eid">EID passerelle (12 hex, facultatif)</string>
     <string name="cal_doip_gateway_announcement_state">Action supplémentaire : 0x%1$s · synchronisation VIN/GID : %2$s</string>
+    <string name="cal_doip_discovery_advanced">Découverte réseau avancée</string>
+    <string name="cal_doip_listen_ipv4">Écouter les annonces IPv4</string>
+    <string name="cal_doip_ipv6_interface">Index de l’interface réseau IPv6</string>
+    <string name="cal_doip_discover_ipv6">Découvrir par multicast IPv6</string>
+    <string name="cal_doip_listen_ipv6">Écouter les annonces IPv6</string>
 </resources>

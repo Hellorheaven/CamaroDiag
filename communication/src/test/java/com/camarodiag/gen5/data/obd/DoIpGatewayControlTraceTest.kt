@@ -46,6 +46,17 @@ class DoIpGatewayControlTraceTest {
         assertTrue(runCatching { DoIpDirectRead.SessionOptions.parse("5000", "100", "2000", "00", "0102") }.isFailure)
     }
 
+    @Test fun discoverySourceRequiresExpectedIpv6Scope() {
+        val raw = InetAddress.getByName("fe80::2").address
+        val matched = java.net.Inet6Address.getByAddress(null, raw, 3)
+        val other = java.net.Inet6Address.getByAddress(null, raw, 4)
+        assertEquals(matched.hostAddress, DoIpDirectRead.scopedDiscoverySource(matched, 3))
+        assertNull(DoIpDirectRead.scopedDiscoverySource(other, 3))
+        assertNull(DoIpDirectRead.scopedDiscoverySource(InetAddress.getByName("2001:db8::2"), 3))
+        assertNull(DoIpDirectRead.scopedDiscoverySource(matched, null))
+        assertEquals("127.0.0.1", DoIpDirectRead.scopedDiscoverySource(InetAddress.getByName("127.0.0.1"), null))
+    }
+
     @Test fun scopedIpv6IdentityAndTlsNameRemainDistinct() {
         assertTrue(runCatching { DoIpDirectRead.Target.parse("fe80::2", "0E80", "1234", vin, true) }.isFailure)
         assertFalse(DoIpDirectRead.sameHost("fe80::2%3", "fe80::2%4"))

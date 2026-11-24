@@ -1189,15 +1189,24 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         launchEnhancedUdsRead(journalDoIp = true) { current ->
             val snapshot = _calibrationWorkspace.value
             val selected = snapshot.doIpGatewayIdentity?.takeIf {
-                operation != DoIpDirectRead.GatewayOperation.DISCOVER &&
+                operation in setOf(DoIpDirectRead.GatewayOperation.STATUS, DoIpDirectRead.GatewayOperation.POWER) &&
                     runCatching { DoIpDirectRead.sameHost(host, snapshot.doIpGatewayHost) }.getOrDefault(false)
             }
             _calibrationWorkspace.update { it.copy(doIpReading = true, doIpGatewayReading = true,
                 doIpGatewayResult = "", doIpDiscoveredVin = "", doIpGatewayHost = host, doIpGatewayIdentity = selected) }
             try {
-                val result = DoIpDirectRead.inspectGateway(host, _vehicle.value.vin, operation, eid = eid,
-                    selectedGateway = selected,
-                    onControlTrace = { trace -> journalDoIpControlTrace(trace, current) })
+                val multicast = operation in setOf(DoIpDirectRead.GatewayOperation.DISCOVER_IPV6,
+                    DoIpDirectRead.GatewayOperation.LISTEN_IPV6, DoIpDirectRead.GatewayOperation.LISTEN_IPV4)
+                val lock = if (multicast) {
+                    val wifi = getApplication<Application>().applicationContext
+                        .getSystemService(android.content.Context.WIFI_SERVICE) as? android.net.wifi.WifiManager
+                    wifi?.createMulticastLock("CamaroDiag-DoIP")?.apply { setReferenceCounted(false); acquire() }
+                } else null
+                val result = try {
+                    DoIpDirectRead.inspectGateway(host, _vehicle.value.vin, operation, eid = eid,
+                        selectedGateway = selected,
+                        onControlTrace = { trace -> journalDoIpControlTrace(trace, current) })
+                } finally { lock?.release() }
                 if (!current()) return@launchEnhancedUdsRead
                 val unavailable = localizedContext.getString(R.string.cal_status_unresolved)
                 val identity = localizedContext.getString(R.string.cal_doip_gateway_identity,

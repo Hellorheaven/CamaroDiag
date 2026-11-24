@@ -11,6 +11,8 @@ import java.net.DatagramSocket
 import java.net.InetAddress
 import java.net.Inet6Address
 import java.net.InetSocketAddress
+import java.net.MulticastSocket
+import java.net.NetworkInterface
 import java.net.Socket
 import java.net.SocketTimeoutException
 import java.nio.ByteBuffer
@@ -192,7 +194,7 @@ object DoIpDirectRead {
         }
         return address
     }
-    enum class GatewayOperation { DISCOVER, STATUS, POWER }
+    enum class GatewayOperation { DISCOVER, STATUS, POWER, DISCOVER_IPV6, LISTEN_IPV6, LISTEN_IPV4 }
     data class Gateway(val vin: String?, val logicalAddress: Int, val version: Int,
         val eid: String = "", val gid: String = "", val furtherAction: Int = 0,
         val syncStatus: Int? = null) {
@@ -334,39 +336,88 @@ object DoIpDirectRead {
                 val request = encode(255, 0x0003, expected.toByteArray(Charsets.US_ASCII))
                 socket.send(DatagramPacket(request, request.size, destination, port))
                 controlTrace("TX", "UDP", destination, request, onControlTrace)
-                val end = deadline(timeoutMs)
-                // EID/GID distinguish physically competing announcements even
-                // if their source IP and logical address happen to coincide.
-                val matches = linkedMapOf<Triple<InetAddress, Int, String>, Gateway>()
-                val buffer = ByteArray(1024)
-                while (System.nanoTime() < end) {
-                    val wait = try { remaining(end) } catch (_: SocketTimeoutException) { break }
-                    socket.soTimeout = wait
-                    val packet = DatagramPacket(buffer, buffer.size)
-                    try { socket.receive(packet) } catch (_: SocketTimeoutException) { break }
-                    if (System.nanoTime() >= end) break
-                    if (packet.port != port || packet.length < 8 || packet.address.isAnyLocalAddress ||
-                        packet.address.isMulticastAddress) continue
-                    controlTrace("RX", "UDP", packet.address, buffer.copyOf(packet.length), onControlTrace)
-                    val frame = try {
-                        parseFrame(buffer.copyOfRange(0, 8), buffer.copyOfRange(8, packet.length))
-                    } catch (_: IllegalArgumentException) { continue }
-                    if (frame.type != 0x0004 || frame.data.size !in setOf(32, 33)) continue
-                    val observedVin = frame.data.copyOfRange(0, 17).toString(Charsets.US_ASCII)
-                    if (observedVin != expected) continue
-                    val gateway = Gateway(observedVin, u16(frame.data, 17), frame.version,
-                        hex(frame.data.copyOfRange(19, 25)), hex(frame.data.copyOfRange(25, 31)),
-                        frame.data[31].u8(), frame.data.getOrNull(32)?.u8())
-                    val key = Triple(packet.address, gateway.logicalAddress,
-                        hex(frame.data.copyOfRange(19, 31)))
-                    val prior = matches.putIfAbsent(key, gateway)
-                    require(prior == null || prior.matchesIdentity(gateway)) { "Conflicting DoIP gateway announcements." }
-                    if (prior != null) matches[key] = gateway
-                    require(matches.size <= 16) { "Too many DoIP gateways for the selected VIN." }
+                collectSelectedGateway(socket, expected, timeoutMs, port, null, onControlTrace)
+            }
+        } finally { socket.close() }
+    }
+
+    internal fun scopedDiscoverySource(address: InetAddress, interfaceIndex: Int?): String? {
+        if (address.isAnyLocalAddress || address.isMulticastAddress) return null
+        if (interfaceIndex == null) {
+            return if (address !is Inet6Address) address.hostAddress else null
+        }
+        if (address !is Inet6Address || !address.isLinkLocalAddress || address.scopeId != interfaceIndex) return null
+        return address.hostAddress
+    }
+
+    /** No diagnostic traffic, collect the entire window to detect ambiguity. */
+    private fun collectSelectedGateway(socket: DatagramSocket, expected: String, timeoutMs: Int,
+        port: Int, interfaceIndex: Int?, onControlTrace: (ControlTrace) -> Unit): GatewayResult {
+        val end = deadline(timeoutMs)
+        val matches = linkedMapOf<Pair<String, Gateway>, Gateway>()
+        val buffer = ByteArray(1024)
+        while (System.nanoTime() < end) {
+            val wait = try { remaining(end) } catch (_: SocketTimeoutException) { break }
+            socket.soTimeout = wait
+            val packet = DatagramPacket(buffer, buffer.size)
+            try { socket.receive(packet) } catch (_: SocketTimeoutException) { break }
+            if (System.nanoTime() >= end) break
+            if (packet.port != port || packet.length < 8) continue
+            val host = scopedDiscoverySource(packet.address, interfaceIndex) ?: continue
+            controlTrace("RX", "UDP", packet.address, buffer.copyOf(packet.length), onControlTrace)
+            val frame = try {
+                parseFrame(buffer.copyOfRange(0, 8), buffer.copyOfRange(8, packet.length))
+            } catch (_: IllegalArgumentException) { continue }
+            if (frame.type != 0x0004 || frame.data.size !in setOf(32, 33)) continue
+            val observedVin = frame.data.copyOfRange(0, 17).toString(Charsets.US_ASCII)
+            if (observedVin != expected) continue
+            val gateway = Gateway(observedVin, u16(frame.data, 17), frame.version,
+                hex(frame.data.copyOfRange(19, 25)), hex(frame.data.copyOfRange(25, 31)),
+                frame.data[31].u8(), frame.data.getOrNull(32)?.u8())
+            // Distinguish the actual endpoint, EID/GID, version, and logical address.
+            // Further-action and synchronization changes are not identity changes.
+            val key = host to gateway.copy(furtherAction = 0, syncStatus = null)
+            matches[key] = gateway
+            require(matches.size <= 16) { "Too many DoIP gateways for the selected VIN." }
+        }
+        require(matches.size == 1) { "DoIP gateway not found or ambiguous for the selected VIN." }
+        val selected = matches.entries.single()
+        return GatewayResult(selected.value, host = selected.key.first)
+    }
+
+    internal suspend fun listenSelectedVehicleIpv4(vin: String, timeoutMs: Int, port: Int,
+        onControlTrace: (ControlTrace) -> Unit): GatewayResult {
+        val expected = vin.trim().uppercase(Locale.ROOT)
+        require(validVin(expected) && timeoutMs in 100..30_000 && port in 1..65535)
+        val socket = DatagramSocket(null)
+        try {
+            socket.bind(InetSocketAddress("0.0.0.0", port))
+            return io(timeoutMs.toLong() + 1000, socket::close) {
+                collectSelectedGateway(socket, expected, timeoutMs, port, null, onControlTrace)
+            }
+        } finally { socket.close() }
+    }
+
+    private suspend fun discoverSelectedVehicleIpv6(vin: String, interfaceIndex: Int, passive: Boolean,
+        timeoutMs: Int, onControlTrace: (ControlTrace) -> Unit): GatewayResult {
+        val expected = vin.trim().uppercase(Locale.ROOT)
+        require(validVin(expected) && timeoutMs in 100..30_000 && interfaceIndex > 0)
+        val network = requireNotNull(NetworkInterface.getByIndex(interfaceIndex)) { "Unknown network interface." }
+        require(network.isUp && network.supportsMulticast()) { "Interface cannot carry IPv6 multicast." }
+        val group = Inet6Address.getByAddress(null, InetAddress.getByName("ff02::1").address, interfaceIndex)
+        val socket = MulticastSocket(null)
+        try {
+            socket.bind(InetSocketAddress("::", if (passive) DOIP_UDP_PORT else 0))
+            socket.networkInterface = network
+            if (passive) socket.joinGroup(InetSocketAddress(group, DOIP_UDP_PORT), network)
+            return io(timeoutMs.toLong() + 1000, socket::close) {
+                if (!passive) {
+                    socket.timeToLive = 1
+                    val request = encode(255, 0x0003, expected.toByteArray(Charsets.US_ASCII))
+                    socket.send(DatagramPacket(request, request.size, group, DOIP_UDP_PORT))
+                    controlTrace("TX", "UDP", group, request, onControlTrace)
                 }
-                require(matches.size == 1) { "DoIP gateway not found or ambiguous for the selected VIN." }
-                val selected = matches.entries.single()
-                GatewayResult(selected.value, host = selected.key.first.hostAddress)
+                collectSelectedGateway(socket, expected, timeoutMs, DOIP_UDP_PORT, interfaceIndex, onControlTrace)
             }
         } finally { socket.close() }
     }
@@ -376,9 +427,18 @@ object DoIpDirectRead {
         timeoutMs: Int = 5000, eid: String? = null, selectedGateway: Gateway? = null,
         onControlTrace: (ControlTrace) -> Unit = {}): GatewayResult {
         require(eid == null || (host.isNotBlank() && operation == GatewayOperation.DISCOVER))
-        return if (host.isBlank() && operation == GatewayOperation.DISCOVER)
-            discoverSelectedVehicle(vin, timeoutMs, onControlTrace)
-        else inspectGatewayAt(host, vin, operation, timeoutMs, DOIP_UDP_PORT, onControlTrace, eid, selectedGateway)
+        return when (operation) {
+            GatewayOperation.LISTEN_IPV4 -> {
+                require(host.isBlank())
+                listenSelectedVehicleIpv4(vin, timeoutMs, DOIP_UDP_PORT, onControlTrace)
+            }
+            GatewayOperation.DISCOVER_IPV6, GatewayOperation.LISTEN_IPV6 ->
+                discoverSelectedVehicleIpv6(vin, host.toInt(), operation == GatewayOperation.LISTEN_IPV6,
+                    timeoutMs, onControlTrace)
+            else -> if (host.isBlank() && operation == GatewayOperation.DISCOVER)
+                discoverSelectedVehicle(vin, timeoutMs, onControlTrace)
+            else inspectGatewayAt(host, vin, operation, timeoutMs, DOIP_UDP_PORT, onControlTrace, eid, selectedGateway)
+        }
     }
 
     /** The public operation always uses the standardized port; this seam also
@@ -392,6 +452,7 @@ object DoIpDirectRead {
         eid: String?, selectedGateway: Gateway? = null): GatewayResult {
         require(timeoutMs in 100..30_000 && port in 1..65535)
         require(eid == null || operation == GatewayOperation.DISCOVER)
+        require(operation in setOf(GatewayOperation.DISCOVER, GatewayOperation.STATUS, GatewayOperation.POWER))
         val address = parseHost(host)
         val expected = vin.trim().uppercase(Locale.ROOT)
         require(expected.isEmpty() || validVin(expected))
