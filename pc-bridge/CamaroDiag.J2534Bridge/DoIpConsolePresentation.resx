@@ -6,12 +6,23 @@
   <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms</value></resheader>
   <data name="Host" xml:space="preserve"><value>DoIP gateway IP</value></data>
   <data name="Discover" xml:space="preserve"><value>Identify DoIP</value></data>
-  <data name="Cancel" xml:space="preserve"><value>Cancel discovery</value></data>
+  <data name="Cancel" xml:space="preserve"><value>Cancel DoIP operation</value></data>
   <data name="Unavailable" xml:space="preserve"><value>unavailable</value></data>
   <data name="Identity" xml:space="preserve"><value>DoIP gateway={0} version=0x{1:X2} logical=0x{2:X4} VIN={3} EID={4} GID={5} further=0x{6:X2} sync={7}</value></data>
   <data name="Notice" xml:space="preserve"><value>UDP identity is not ECU authentication or programming qualification.</value></data>
   <data name="Started" xml:space="preserve"><value>DoIP / ISO 13400 UDP identification request to {0}.</value></data>
-  <data name="Canceled" xml:space="preserve"><value>DoIP discovery canceled.</value></data>
+  <data name="Canceled" xml:space="preserve"><value>DoIP operation canceled.</value></data>
   <data name="Busy" xml:space="preserve"><value>Close the local J2534 channel and stop the Android bridge before DoIP discovery.</value></data>
   <data name="InvalidHost" xml:space="preserve"><value>Enter an explicit unicast IPv4 or IPv6 gateway address.</value></data>
+  <data name="Status" xml:space="preserve"><value>Gateway status</value></data>
+  <data name="Power" xml:space="preserve"><value>Diagnostic power mode</value></data>
+  <data name="PowerNotReady" xml:space="preserve"><value>not ready</value></data>
+  <data name="PowerReady" xml:space="preserve"><value>ready</value></data>
+  <data name="PowerUnsupported" xml:space="preserve"><value>not supported</value></data>
+  <data name="PowerResult" xml:space="preserve"><value>DoIP diagnostic power mode={0} ({1})</value></data>
+  <data name="StatusResult" xml:space="preserve"><value>DoIP node type={0} sockets={1}/{2} max data size={3}</value></data>
+  <data name="StatusNotice" xml:space="preserve"><value>DoIP UDP status is informational and not ECU authorization.</value></data>
+  <data name="StatusStarted" xml:space="preserve"><value>DoIP / ISO 13400 UDP status request to {0}, version 0x{1:X2}.</value></data>
+  <data name="IdentifyFirst" xml:space="preserve"><value>Identify this gateway first to obtain its observed DoIP version.</value></data>
+  <data name="ContextChanged" xml:space="preserve"><value>Gateway address changed; identify it again.</value></data>
 </root>
