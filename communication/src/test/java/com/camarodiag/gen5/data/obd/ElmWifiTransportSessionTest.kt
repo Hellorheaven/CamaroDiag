@@ -167,6 +167,25 @@ class ElmWifiTransportSessionTest {
         Unit
     }
 
+    @Test fun failedSocketAllocationPreservesActiveWifiAdapter() = runBlocking {
+        val active = FakeSocket()
+        var calls = 0
+        val transport = ElmWifiTransport {
+            if (++calls == 1) active
+            else throw java.io.IOException("Simulated socket allocation failure")
+        }
+        try {
+            assertTrue(transport.connect("192.168.0.10").isSuccess)
+            val failed = transport.connect("192.168.0.11")
+            assertTrue(failed.isFailure)
+            assertTrue(transport.isConnected)
+            assertFalse(active.fakeClosed)
+        } finally {
+            transport.close()
+        }
+        Unit
+    }
+
     @Test fun invalidNewWifiParametersDoNotDisconnectCurrentSession() = runBlocking {
         val active = FakeSocket()
         val transport = ElmWifiTransport { active }
