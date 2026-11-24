@@ -202,41 +202,65 @@ internal object ElmWifiConnectionPolicy {
 }
 
 /** TCP transport for Wi-Fi ELM327 adapters; common defaults are configurable by the caller. */
-class ElmWifiTransport {
-
+class ElmWifiTransport(
+    private val socketFactory: () -> Socket = { Socket() }
+) {
+    private val sessionLock = Any()
     @Volatile private var socket: Socket? = null
-    @Volatile private var connectionLost = false
+    @Volatile private var connectionLost = true
 
     val isConnected: Boolean
-        get() = socket?.let { it.isConnected && !it.isClosed && !it.isInputShutdown && !it.isOutputShutdown && !connectionLost } == true
+        get() = socket?.let {
+            it.isConnected && !it.isClosed && !it.isInputShutdown &&
+                !it.isOutputShutdown && !connectionLost
+        } == true
+
+    /**
+     * Closing an expired socket must never close the *replacement* connection.
+     * Socket.connect is blocking even though connect() runs on Dispatchers.IO,
+     * so a second adapter selection can overtake the first handshake.
+     */
+    private fun retire(expected: Socket) {
+        synchronized(sessionLock) {
+            if (socket === expected) {
+                socket = null
+                connectionLost = true
+            }
+        }
+        try { expected.close() } catch (_: Exception) {}
+    }
 
     suspend fun connect(
         host: String,
         port: Int = 35000,
         timeoutMs: Int = 4000
     ): Result<Unit> = withContext(Dispatchers.IO) {
+        // Invalid inputs must not replace an already working adapter.
+        ElmWifiConnectionPolicy.validate(host, port, timeoutMs)
+        val candidate = socketFactory()
+        val previous = synchronized(sessionLock) {
+            val previous = socket
+            socket = candidate
+            connectionLost = true
+            previous
+        }
+        try { previous?.close() } catch (_: Exception) {}
         try {
-            close()
-            // Socket.connect(..., 0) means an unbounded wait; reject it before
-            // even creating a TCP socket. Disconnection must stay responsive.
-            ElmWifiConnectionPolicy.validate(host, port, timeoutMs)
-            val s = Socket()
-            // Publish the socket before connect so a failed attempt can close it.
-            socket = s
-            s.connect(InetSocketAddress(host, port), timeoutMs)
-            s.tcpNoDelay = true
-            s.soTimeout = 1200
-            connectionLost = false
-
+            candidate.connect(InetSocketAddress(host, port), timeoutMs)
+            candidate.tcpNoDelay = true
+            candidate.soTimeout = 1200
+            synchronized(sessionLock) {
+                check(socket === candidate) {
+                    "Wi-Fi OBD connection attempt was superseded."
+                }
+                connectionLost = false
+            }
             Result.success(Unit)
-
         } catch (cancelled: kotlinx.coroutines.CancellationException) {
-            // A superseded connection must finish closing its handle before
-            // the next adapter handshake can begin.
-            close()
+            retire(candidate)
             throw cancelled
         } catch (e: Exception) {
-            close()
+            retire(candidate)
             Result.failure(e)
         }
     }
@@ -272,13 +296,13 @@ class ElmWifiTransport {
     }
 
     fun close() {
-        try {
-            socket?.close()
-        } catch (_: Exception) {
+        val previous = synchronized(sessionLock) {
+            val previous = socket
+            socket = null
+            connectionLost = true
+            previous
         }
-
-        socket = null
-        connectionLost = false
+        try { previous?.close() } catch (_: Exception) {}
     }
 }
 
