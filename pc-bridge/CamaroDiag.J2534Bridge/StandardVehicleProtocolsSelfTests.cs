@@ -452,6 +452,26 @@ internal static class StandardVehicleProtocolsSelfTests
             "--payload", "2EF19001"]);
         Check(parsed.Request.SequenceEqual(new byte[] { 0x2E, 0xF1, 0x90, 1 }),
             "DoIP bidirectional CLI accepts WDBI service.");
+
+        var doIpTiming = StandardProtocolCli.ParseDoIp([
+            StandardProtocolCli.DoIpCommand, "--host", "127.0.0.1",
+            "--tester", "0E80", "--ecu", "1234",
+            "--payload", "22F190", "--uds-p2-ms", "20",
+            "--uds-p2-star-ms", "150"
+        ]);
+        Check(doIpTiming.DoIpP2Ms == 20 &&
+            doIpTiming.DoIpP2StarMs == 150,
+            "DoIP P2/P2* CLI forwards both stage deadlines.");
+        Check(parsed.DoIpP2Ms == 30000 &&
+            parsed.DoIpP2StarMs == 30000,
+            "DoIP default P2/P2* preserves previous timing.");
+        Reject<ArgumentOutOfRangeException>(() =>
+            StandardProtocolCli.ParseDoIp([
+                StandardProtocolCli.DoIpCommand, "--host", "127.0.0.1",
+                "--tester", "0E80", "--ecu", "1234",
+                "--payload", "22F190", "--uds-p2-ms", "0"
+            ]), "Zero DoIP P2 deadline is invalid.");
+
         var protocolDoIp = StandardProtocolCli.ParseDoIp([
             StandardProtocolCli.DoIpCommand, "--host", "127.0.0.1",
             "--tester", "0E80", "--ecu", "1234",
