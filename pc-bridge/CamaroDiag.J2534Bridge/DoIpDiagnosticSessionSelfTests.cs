@@ -293,6 +293,42 @@ internal static class DoIpDiagnosticSessionSelfTests
             });
         }
 
+        // A VIN-specific gateway discovery is only an announcement. Before
+        // reading a target's DID/DTC, verify its real F190 on the active route.
+        const string selectedVehicleVin = "1G1FA1RXXR0123456";
+        const string otherVehicleVin = "1G1FA1RXXR0123457";
+        var observedForVin = new DoIpVehicleDiscovery.Identity(selectedVehicleVin,
+            Ecu, new byte[6], new byte[6], 0, null, IPAddress.Loopback, DoIpCodec.Version);
+        foreach (var ecuVin in new[] { selectedVehicleVin, otherVehicleVin })
+        {
+            await RunCaseAsync(async stream =>
+            {
+                _ = await RequireRequestAsync(stream);
+                await SendAsync(stream, DoIpCodec.DiagnosticMessage,
+                    FromEcu([0x62, 0xF1, 0x90, .. System.Text.Encoding.ASCII.GetBytes(ecuVin)]));
+            }, async client =>
+            {
+                var tx = new List<byte[]>();
+                var rx = new List<byte[]>();
+                if (ecuVin == selectedVehicleVin)
+                {
+                    var actual = await DoIpVinReader.VerifyObservedVinAsync(client, observedForVin,
+                        TimeSpan.FromSeconds(2), CancellationToken.None, tx.Add, rx.Add);
+                    Check(actual == selectedVehicleVin, "ECU VIN matches observed gateway.");
+                }
+                else
+                {
+                    await Expect<InvalidDataException>(async () =>
+                    {
+                        _ = await DoIpVinReader.VerifyObservedVinAsync(client, observedForVin,
+                            TimeSpan.FromSeconds(2), CancellationToken.None, tx.Add, rx.Add);
+                    }, "ECU VIN mismatch is rejected before DID/DTC traffic.");
+                }
+                Check(tx.Count == 1 && rx.Count == 1 && tx[0].SequenceEqual(Request),
+                    "VIN verification is recorded as one real F190 TX/RX.");
+            });
+        }
+
         // One routed session serves sequential monitored DID requests.
         await RunCaseAsync(async stream =>
         {
