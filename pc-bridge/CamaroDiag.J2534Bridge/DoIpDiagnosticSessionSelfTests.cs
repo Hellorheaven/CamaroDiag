@@ -415,6 +415,93 @@ internal static class DoIpDiagnosticSessionSelfTests
                 "Explicitly closed DoIP socket never reopens implicitly.");
         });
 
+
+        // ACKs from a previous diagnostic request cannot satisfy the
+        // current transaction, even if their TCP channel is still active.
+        await RunCaseAsync(async stream =>
+        {
+            await RequireRequestAsync(stream);
+            await SendAsync(stream, DoIpCodec.DiagnosticPositiveAck,
+                [0x12, 0x34, 0x0E, 0x80, 0, 0x2E, 0xF1, 0x90]);
+        }, async client =>
+        {
+            await Expect<InvalidDataException>(() =>
+                client.ExchangeUdsAsync(Request, TimeSpan.FromSeconds(1),
+                    CancellationToken.None),
+                "Wrong echoed DoIP gateway ACK retires this exchange.");
+            await Expect<InvalidOperationException>(() =>
+                client.ExchangeUdsAsync(Request, TimeSpan.FromSeconds(1),
+                    CancellationToken.None),
+                "A stale ACK cannot be carried into a new UDS exchange.");
+        });
+
+        // Wrong UDS SID must not be accepted just because DoIP source and
+        // destination logical addresses happen to match the active channel.
+        await RunCaseAsync(async stream =>
+        {
+            await RequireRequestAsync(stream);
+            await SendAsync(stream, DoIpCodec.DiagnosticMessage,
+                FromEcu([0x63, 0xF1, 0x90, 0x41]));
+        }, async client =>
+        {
+            await Expect<InvalidDataException>(() =>
+                client.ExchangeUdsAsync(Request, TimeSpan.FromSeconds(1),
+                    CancellationToken.None),
+                "Wrong UDS positive response SID is rejected over DoIP.");
+        });
+
+        // The negotiated protocol version may not change on a live TCP
+        // diagnostic session even if the new version is independently legal.
+        await RunCaseAsync(async stream =>
+        {
+            await RequireRequestAsync(stream);
+            await SendAsync(stream, DoIpCodec.DiagnosticMessage,
+                FromEcu(Positive), version: 0x03);
+        }, async client =>
+        {
+            await Expect<InvalidDataException>(() =>
+                client.ExchangeUdsAsync(Request, TimeSpan.FromSeconds(1),
+                    CancellationToken.None),
+                "DoIP version switch inside a live diagnostic is rejected.");
+        });
+
+        // A truncated TCP payload is not a partial positive UDS response.
+        await RunCaseAsync(async stream =>
+        {
+            await RequireRequestAsync(stream);
+            var packet = DoIpCodec.Encode(DoIpCodec.DiagnosticMessage,
+                FromEcu(Positive));
+            await stream.WriteAsync(packet.AsMemory(0, packet.Length - 2));
+            await stream.FlushAsync();
+        }, async client =>
+        {
+            await Expect<EndOfStreamException>(() =>
+                client.ExchangeUdsAsync(Request, TimeSpan.FromSeconds(1),
+                    CancellationToken.None),
+                "Truncated TCP diagnostic response retires DoIP connection.");
+        });
+
+        // Multiple consecutive NRC 0x78 packets renew P2* only; they are
+        // not themselves positive completion or authorization to write.
+        await RunCaseAsync(async stream =>
+        {
+            await RequireRequestAsync(stream);
+            await SendAsync(stream, DoIpCodec.DiagnosticMessage, FromEcu(Pending));
+            await SendAsync(stream, DoIpCodec.AliveCheckRequest, []);
+            var alive = await ReadAsync(stream);
+            Check(alive.Type == DoIpCodec.AliveCheckResponse,
+                "AliveCheck remains answerable inside a P2* window.");
+            await SendAsync(stream, DoIpCodec.DiagnosticMessage, FromEcu(Pending));
+            await SendAsync(stream, DoIpCodec.DiagnosticMessage, FromEcu(Positive));
+        }, async client =>
+        {
+            var answer = await client.ExchangeUdsAsync(
+                Request, TimeSpan.FromSeconds(2), CancellationToken.None,
+                TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+            Check(answer.SequenceEqual(Positive),
+                "Two NRC 0x78 and AliveCheck yield one final matching reply.");
+        });
+
         return checks;
     }
 }
