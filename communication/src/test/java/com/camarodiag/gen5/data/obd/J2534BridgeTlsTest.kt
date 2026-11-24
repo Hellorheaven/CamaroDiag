@@ -83,4 +83,16 @@ class J2534BridgeTlsTest {
             pairing.verifyCertificate(null)
         }
     }
+    @Test fun pairingCodeRejectsControlCharactersEvenOutsideTheToken() {
+        val clean = "$token.$fingerprint"
+        for (candidate in listOf("\n$clean", "$clean\r", "$clean\n", "\t$clean", "$clean\u0000")) {
+            assertFalse(J2534BridgePairingCodeFormat.isValid(candidate))
+            assertThrows(IllegalArgumentException::class.java) {
+                J2534BridgeTlsPairing.parse(candidate)
+            }
+        }
+        // Ordinary pasted spaces remain harmless; no secret is logged.
+        assertTrue(J2534BridgePairingCodeFormat.isValid("  $clean  "))
+    }
+
 }
