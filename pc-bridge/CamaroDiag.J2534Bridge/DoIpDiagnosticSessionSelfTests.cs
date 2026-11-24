@@ -135,11 +135,13 @@ internal static class DoIpDiagnosticSessionSelfTests
         // remains legitimate for a diagnostic session.
         var firstSeen = new TaskCompletionSource<bool>(
             TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseFirst = new TaskCompletionSource<bool>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
         await RunCaseAsync(async stream =>
         {
             await RequireRequestAsync(stream);
             firstSeen.TrySetResult(true);
-            await Task.Delay(40);
+            await releaseFirst.Task.WaitAsync(TimeSpan.FromSeconds(2));
             await SendAsync(stream, DoIpCodec.DiagnosticMessage, FromEcu(Positive));
             await RequireRequestAsync(stream);
             await SendAsync(stream, DoIpCodec.DiagnosticMessage, FromEcu(Positive));
@@ -152,6 +154,7 @@ internal static class DoIpDiagnosticSessionSelfTests
                 client.ExchangeUdsAsync(
                     Request, TimeSpan.FromSeconds(2), CancellationToken.None),
                 "Concurrent DoIP exchange refused before a second TX.");
+            releaseFirst.TrySetResult(true);
             Check((await inFlight).SequenceEqual(Positive),
                 "First in-flight UDS transaction completed.");
             Check((await client.ExchangeUdsAsync(
@@ -181,12 +184,11 @@ internal static class DoIpDiagnosticSessionSelfTests
                 TimeSpan.FromSeconds(1), CancellationToken.None,
                 p2Timeout: TimeSpan.FromMilliseconds(20));
             await seenForTimeout.Task.WaitAsync(TimeSpan.FromSeconds(2));
-            await Expect<Exception>(async () =>
-            {
-                try { await attempt; }
-                catch (TimeoutException) { throw; }
-                catch (OperationCanceledException) { throw; }
-            }, "Late server P2 must terminate the exchange.");
+            var timedOut = false;
+            try { await attempt; }
+            catch (TimeoutException) { timedOut = true; }
+            catch (OperationCanceledException) { timedOut = true; }
+            Check(timedOut, "Late server P2 must terminate the exchange.");
             await Expect<InvalidOperationException>(() =>
                 client.ExchangeUdsAsync(Request, TimeSpan.FromSeconds(1),
                     CancellationToken.None),
