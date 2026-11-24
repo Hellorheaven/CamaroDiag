@@ -46,12 +46,26 @@ class ElmUsbTransport(private val context: Context) {
     ): Result<Unit> = withContext(Dispatchers.IO) {
         close()
         try {
-            val driver = UsbSerialProber.getDefaultProber()
+            val candidates = UsbSerialProber.getDefaultProber()
                 .findAllDrivers(usbManager)
-                .firstOrNull { it.device.deviceId == deviceId }
-                ?: return@withContext Result.failure(
-                    IllegalArgumentException("USB serial OBD device not found")
+                .filter { it.device.deviceId == deviceId }
+            if (candidates.size != 1) {
+                return@withContext Result.failure(
+                    IllegalArgumentException("USB serial adapter is missing or ambiguously enumerated")
                 )
+            }
+            val driver = candidates.single()
+            // Device IDs may be reused after hot-unplug. Recheck the actual
+            // descriptor immediately before requesting permission/opening USB.
+            // A dedicated prototype cannot masquerade as a normal ELM device.
+            if (!CamaroDiagConnectorDiscovery.allowsUsbDriverFamily(
+                    driver.device.productName, discoveryOnly
+                )
+            ) {
+                return@withContext Result.failure(
+                    IllegalArgumentException("The selected USB adapter family changed")
+                )
+            }
 
             // Connectors' binary prototype supports one unambiguous CDC ACM
             // channel. Never select port zero from an unknown multiport device.
