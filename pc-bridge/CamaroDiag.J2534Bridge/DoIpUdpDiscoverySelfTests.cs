@@ -455,6 +455,50 @@ internal static class DoIpUdpDiscoverySelfTests
             "Active IPv6 multicast VIN filtering excludes foreign gateway.");
 
 
+        // VIN-targeted discovery must wait for competing announcements, not
+        // simply select the first matching response. Same IP/logical address
+        // with different EID is also ambiguous.
+        foreach (var ambiguous in new[] { false, true })
+        {
+            using var vinGateway = new UdpClient(new IPEndPoint(IPAddress.Loopback, 0));
+            var vinPort = ((IPEndPoint)vinGateway.Client.LocalEndPoint!).Port;
+            var trace = new List<(string Direction, byte[] Data)>();
+            var select = DoIpVehicleDiscovery.DiscoverUniqueVinAsync(requested,
+                TimeSpan.FromMilliseconds(800), CancellationToken.None,
+                (direction, _, data) => trace.Add((direction, data)),
+                "127.0.0.1", vinPort);
+            var req = await vinGateway.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(2));
+            var expected = DoIpCodec.Decode(req.Buffer);
+            Check(expected.Type == DoIpCodec.VehicleIdentificationRequestVin &&
+                Encoding.ASCII.GetString(expected.Payload) == requested,
+                "VIN-specific discovery transmits the selected VIN.");
+            var matching = Identity(requested);
+            var conflicting = matching.ToArray();
+            conflicting[8 + 19] ^= 0x10; // different EID, same IP/logical address
+            await vinGateway.SendAsync(Identity(rogueVin), req.RemoteEndPoint);
+            await vinGateway.SendAsync(matching, req.RemoteEndPoint);
+            await vinGateway.SendAsync(matching, req.RemoteEndPoint);
+            if (ambiguous) await vinGateway.SendAsync(conflicting, req.RemoteEndPoint);
+            if (ambiguous)
+            {
+                var refused = false;
+                try { await select; }
+                catch (InvalidOperationException) { refused = true; }
+                Check(refused, "VIN discovery refuses competing gateway identities.");
+            }
+            else
+            {
+                var chosen = await select;
+                Check(chosen.Vin == requested && chosen.Source.Equals(IPAddress.Loopback),
+                    "VIN discovery ignores other VINs and deduplicates identical announcements.");
+            }
+            Check(trace.Count >= 4 && trace[0].Direction == "TX" &&
+                trace[0].Data.SequenceEqual(req.Buffer) &&
+                trace.Skip(1).All(x => x.Direction == "RX") &&
+                trace.Any(x => x.Data.SequenceEqual(matching)),
+                "UDP trace preserves direction and actual datagram bytes.");
+        }
+
         return checks;
     }
 }
