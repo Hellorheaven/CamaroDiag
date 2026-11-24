@@ -72,6 +72,29 @@ class CanConsoleEventJournalWriterTest {
         assertFalse(journal.isComplete)
     }
 
+    @Test fun failedFlushIsNeverRetriedDuringJournalTeardown() {
+        var flushCalls = 0
+        var closeCalls = 0
+        val output = object : StringWriter() {
+            override fun flush() {
+                flushCalls++
+                throw IOException("disk full")
+            }
+            override fun close() {
+                closeCalls++
+                super.close()
+            }
+        }
+        val journal = CanConsoleEventJournalWriter(output)
+        journal.append(1L, CanConsoleEventJournalWriter.Direction.TX, false, "request")
+        assertTrue(runCatching { journal.flush() }.isFailure)
+        assertTrue(journal.hasFailed)
+        journal.close()
+        assertEquals(1, flushCalls)
+        assertEquals(1, closeCalls)
+        assertFalse(journal.isComplete)
+    }
+
     @Test fun closeFailureInvalidatesArchive() {
         val output = object : StringWriter() {
             override fun flush() { throw IOException("flush failed") }
