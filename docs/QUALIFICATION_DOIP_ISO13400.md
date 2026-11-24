@@ -6,7 +6,7 @@ Le pont Windows CamaroDiag utilise le transport standard **Diagnostics over IP (
 
 ### Fonctions disponibles dans le code
 
-- Identification UDP ISO 13400 : demande unicast vers une adresse IPv4 explicite, demande vers une adresse de diffusion explicitement sélectionnée, écoute passive, recherche ciblée VIN ou EID, parsing VIN / adresse logique / EID / GID. Les réponses aux requêtes unicast sont corrélées à l'adresse IP **et au port UDP** du destinataire ; l'écoute d'une annonce n'authentifie pas un ECU.
+- Identification UDP ISO 13400 : demandes de découverte **avec version générique 0xFF uniquement pour les types 0x0001/0x0002/0x0003**, avant de connaître la version ECU ; demande unicast vers une adresse IPv4 explicite, demande vers une adresse de diffusion explicitement sélectionnée, écoute passive, recherche ciblée VIN ou EID, parsing VIN / adresse logique / EID / GID. Les réponses aux requêtes unicast sont corrélées à l'adresse IP **et au port UDP** du destinataire ; l'écoute d'une annonce n'authentifie pas un ECU.
 - Informations de passerelle : état de l'entité, nombre de sockets et mode d'alimentation diagnostique.
 - Session TCP : ouverture vers le port DoIP normalisé, activation du routage et confirmation du véhicule, réponses aux demandes AliveCheck. Gestion des versions DoIP 0x02/0x03/0x04 selon la passerelle.
 - TLS : port sécurisé 3496, authentification du serveur par le système d'exploitation, refus de revenir silencieusement au TCP clair ; certificat client du magasin de certificats Windows si requis et présent.
@@ -42,10 +42,17 @@ DoIP ne fournit pas de numéro de transaction UDS universel : deux réponses tar
 
 CamaroDiag Windows Bridge uses **ISO 13400 Diagnostics over IP** to exchange UDS traffic with an explicitly selected gateway. Transport support does not imply vehicle programming support, authorized OEM security access or recovery capability.
 
-Implemented software includes UDP vehicle identification and entity/power status, TCP routing activation and vehicle confirmation, AliveCheck, TLS with operating-system server trust, optional client certificates from the Windows store, diagnostic positive/negative acknowledgements, generic header NACKs, source and target logical-address correlation and configurable P2/P2* deadlines within a separate overall timeout.
+Implemented software includes UDP vehicle identification using the standard **0xFF default protocol version solely for discovery request types**, entity/power status, TCP routing activation and vehicle confirmation, AliveCheck, TLS with operating-system server trust, optional client certificates from the Windows store, diagnostic positive/negative acknowledgements, generic header NACKs, source and target logical-address correlation and configurable P2/P2* deadlines within a separate overall timeout.
 
 Only **one diagnostic request per TCP connection can be active at a time**. A successful final UDS response permits another sequential exchange; cancellation, timeout or an uncertain transmission permanently retires the existing connection. No automatic re-send of a potentially mutating ECU operation occurs. Active UDP unicast replies must match both the selected IP address and UDP source port.
 
 Use `--doip-discover` for discovery, `--doip-status` for gateway status and `--doip-exchange` for a confirmed diagnostic exchange; `--uds-p2-ms` and `--uds-p2-star-ms` select independent UDS response windows. TLS never silently falls back to clear TCP.
 
 Automated TCP/UDP tests use local simulated gateways and **do not validate any real vehicle, VCI, OEM authentication, BRS, or ECU writing/recovery**. Real-world evidence belongs to the owner-authorized Release acceptance plan (issue #48), after PR #95 closes.
+
+### Références de normalisation / Standards
+
+- [ISO 13400-2:2025](https://www.iso.org/standard/13400-2) : définition du protocole de transport et des services réseau ; l'accès à la version normative complète dépend du détenteur de la licence.
+- [Eclipse OpenSOVD — DoIP communication](https://eclipse-opensovd.github.io/classic-diagnostic-adapter/03_architecture/03_communication/01_doip_communication.html) : notes publiques d'interopérabilité, notamment version générique 0xFF de découverte.
+
+Les comportements et éditions ISO 13400 selon les constructeurs et les certificats OEM doivent encore être vérifiés lors de la recette Release ; les résultats simulés ne sont pas une certification.
