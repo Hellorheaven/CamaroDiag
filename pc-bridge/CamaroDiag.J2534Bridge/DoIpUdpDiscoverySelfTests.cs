@@ -180,13 +180,20 @@ internal static class DoIpUdpDiscoverySelfTests
 
         // A correct endpoint is still not authorized to satisfy an already
         // expired request: the client must not credit a late UDP response.
+        // Windows delivers an ICMP Port Unreachable as SocketException
+        // on the sending UDP socket after the client times out. Each
+        // delayed-response test must use its OWN gateway socket.
+        using var lateIdentityGateway = new UdpClient(
+            new IPEndPoint(IPAddress.Loopback, 0));
+        var lateIdentityPort =
+            ((IPEndPoint)lateIdentityGateway.Client.LocalEndPoint!).Port;
         var lateIdentity = DoIpVehicleDiscovery.DiscoverAsync(
             "127.0.0.1", TimeSpan.FromMilliseconds(30),
-            CancellationToken.None, portOverride: port);
-        var lateIdentityRequest = await gateway.ReceiveAsync()
+            CancellationToken.None, portOverride: lateIdentityPort);
+        var lateIdentityRequest = await lateIdentityGateway.ReceiveAsync()
             .WaitAsync(TimeSpan.FromSeconds(2));
         await Task.Delay(90);
-        await gateway.SendAsync(Identity(requested),
+        await lateIdentityGateway.SendAsync(Identity(requested),
             lateIdentityRequest.RemoteEndPoint);
         var identityExpired = false;
         try { await lateIdentity; }
@@ -194,13 +201,17 @@ internal static class DoIpUdpDiscoverySelfTests
         Check(identityExpired,
             "Late correct-port DoIP identity must not pass deadline.");
 
+        using var lateStatusGateway = new UdpClient(
+            new IPEndPoint(IPAddress.Loopback, 0));
+        var lateStatusPort =
+            ((IPEndPoint)lateStatusGateway.Client.LocalEndPoint!).Port;
         var lateStatus = DoIpVehicleDiscovery.QueryStatusAsync(
             "127.0.0.1", false, TimeSpan.FromMilliseconds(30),
-            CancellationToken.None, portOverride: port);
-        var lateStatusRequest = await gateway.ReceiveAsync()
+            CancellationToken.None, portOverride: lateStatusPort);
+        var lateStatusRequest = await lateStatusGateway.ReceiveAsync()
             .WaitAsync(TimeSpan.FromSeconds(2));
         await Task.Delay(90);
-        await gateway.SendAsync(DoIpCodec.Encode(
+        await lateStatusGateway.SendAsync(DoIpCodec.Encode(
             DoIpCodec.EntityStatusResponse, [0, 4, 2]),
             lateStatusRequest.RemoteEndPoint);
         var statusExpired = false;
