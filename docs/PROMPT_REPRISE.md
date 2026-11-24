@@ -1,3 +1,9 @@
+## PR117 — console DoIP Android et détails DTC Windows/Android (24/11/2026)
+
+- `b3b2a42` : commande UDS hexadécimale unitaire dans l'espace calibration Android, double consentement existant OK puis Oui/Non, contexte véhicule et génération console, payload figé, VIN annoncé et F190 vérifiés avant émission, réponse corrélée par SID et échos applicables. Pas de réémission automatique. Historique UDS TX après écriture socket; pas de preuve de réception ou d'écriture persistée sur le calculateur.
+- `103a959` : lectures détaillées DTC 19/04 (instantanés) et 19/06 (données étendues) Android et Windows, numéro DTC/record explicites, contrôle du DTC retourné, statut et données brutes préservées sans inventer de définition OEM. Interfaces et chaînes FR/EN raccordées, tests ciblés ajoutés.
+- Limites : commande unitaire, pas de session de programmation OEM persistante ni de profil arbitraire ; vérification F190 requise pour les parcours actuels. Reste intégration Connectors/transport/profils et workflows DoIP selon capacités, sélection globale par fonction, validation logicielle. C6/DoIP actifs, C8 non commencé. Les tests de ce lot ne sont pas déclarés exécutés ; demande de CI groupée au prochain marqueur. Pas de merge, déploiement, publication ni qualification matérielle.
+
 ## PR117 — lots fonctionnels groupés, console DoIP et comptage DTC (24/11/2026)
 
 - `6bda16f` : console Windows DoIP avec commande UDS hexadécimale explicite, cible VIN/IP/adresses/logical/TLS et octets figés, double consentement OK puis Oui/Non, lecture F190 sur même session avant envoi, pas de réémission automatique en cas d'échec. Réponse et PDU réelles dans l'historique, FR/EN. Commande unitaire, pas de session OEM de programmation persistante; les ECU ne répondant pas à F190 ne disposent pas de ce parcours vérifié.

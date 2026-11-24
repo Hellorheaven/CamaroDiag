@@ -1,3 +1,7 @@
+PR117 — grouped Android DoIP command and cross-platform DTC details checkpoint
+Implementation HEAD: 103a959555d8431c66c3a68b33a9d339ac28a752
+Validate Android consent-bound exchange, UDS response correlation, Android/Windows DTC 19/04 and 19/06 detail reads, localization and existing regression suite. Intermediate C6/DoIP only; no merge, release, deployment or physical qualification.
+
 PR117 — grouped DoIP command console and DTC count/filter checkpoint
 Parent implementation HEAD: 33709b51ad6ffb64694de28afa14a0d77d5cea25
 Validate Windows confirmed UDS exchange, same-session VIN correlation, Android and Windows 19/01 DTC count, Android 19/02 filtering and FR/EN. Intermediate C6/DoIP only. No merge, release, deployment or physical qualification.
