@@ -108,6 +108,64 @@ internal static class DoIpScopedBackup
         return await ReadAsync(link, scope, timeout, token, progress);
     }
 
+    internal sealed record Verification(DoIpBackupScope Scope, string Sha256, DateTimeOffset CapturedAtUtc);
+
+    internal static Verification VerifyZip(string path, DoIpBackupScope expected, CancellationToken token)
+    {
+        expected.Validate();
+        token.ThrowIfCancellationRequested();
+        if (new FileInfo(path).Length > 2L * NativeScopedMemoryReader.MaximumUiCaptureBytes + 1024 * 1024)
+            throw new InvalidDataException("Oversized DoIP backup.");
+        using var file = File.OpenRead(path);
+        using var zip = new ZipArchive(file, ZipArchiveMode.Read);
+        if (zip.Entries.Count != 3 || !zip.Entries.Select(e => e.FullName)
+            .OrderBy(n => n, StringComparer.Ordinal).SequenceEqual(
+                new[] { "manifest.json", "original.bin", "verification.bin" }))
+            throw new InvalidDataException("Unexpected DoIP backup entries.");
+        byte[] ReadEntry(string name, int maximum, int? exact = null)
+        {
+            token.ThrowIfCancellationRequested();
+            var entry = zip.GetEntry(name) ?? throw new InvalidDataException(name);
+            if (entry.Length < 1 || entry.Length > maximum || (exact is not null && entry.Length != exact.Value))
+                throw new InvalidDataException("Unexpected DoIP backup entry length: " + name);
+            var data = new byte[checked((int)entry.Length)];
+            using var stream = entry.Open();
+            stream.ReadExactly(data);
+            if (stream.ReadByte() != -1) throw new InvalidDataException(name);
+            return data;
+        }
+        using var manifest = JsonDocument.Parse(ReadEntry("manifest.json", 16384));
+        var m = manifest.RootElement;
+        var fields = new HashSet<string>(StringComparer.Ordinal)
+            { "format", "transport", "coverage", "origin", "capturedAtUtc", "scope", "sha256" };
+        foreach (var field in m.EnumerateObject())
+            if (!fields.Remove(field.Name)) throw new InvalidDataException("Unknown or duplicate manifest field.");
+        if (fields.Count != 0 || m.GetProperty("format").GetString() != "CamaroDiag-DoIP-memory-v1" ||
+            m.GetProperty("transport").GetString() != "DoIP" ||
+            m.GetProperty("coverage").GetString() != "SCOPED_REGION_ONLY" ||
+            m.GetProperty("origin").GetString() != "REPORTED_HARDWARE_READ")
+            throw new InvalidDataException("Invalid DoIP manifest.");
+        var stored = m.GetProperty("scope");
+        var canonical = JsonSerializer.SerializeToElement(expected);
+        var scopeFields = canonical.EnumerateObject().Select(p => p.Name).ToHashSet(StringComparer.Ordinal);
+        foreach (var field in stored.EnumerateObject())
+        {
+            if (!scopeFields.Remove(field.Name) || !canonical.TryGetProperty(field.Name, out var value) ||
+                field.Value.GetRawText() != value.GetRawText())
+                throw new InvalidDataException("DoIP backup scope differs from the selected profile.");
+        }
+        if (scopeFields.Count != 0) throw new InvalidDataException("Incomplete DoIP scope.");
+        var first = ReadEntry("original.bin", expected.Length, expected.Length);
+        var second = ReadEntry("verification.bin", expected.Length, expected.Length);
+        var hash = Convert.ToHexString(SHA256.HashData(first));
+        if (!CryptographicOperations.FixedTimeEquals(first, second) ||
+            m.GetProperty("sha256").GetString() != hash)
+            throw new InvalidDataException("DoIP backup bytes or SHA-256 do not match.");
+        var date = m.GetProperty("capturedAtUtc").GetDateTimeOffset();
+        token.ThrowIfCancellationRequested();
+        return new Verification(expected, hash, date);
+    }
+
     internal static void SaveNew(string destination, Capture capture, CancellationToken token)
     {
         capture.Scope.Validate();
@@ -165,6 +223,7 @@ internal static class DoIpScopedBackup
                 Verify("original.bin", first);
                 Verify("verification.bin", second);
             }
+            _ = VerifyZip(staged, capture.Scope, token);
             token.ThrowIfCancellationRequested();
             File.Move(staged, full, overwrite: false);
         }

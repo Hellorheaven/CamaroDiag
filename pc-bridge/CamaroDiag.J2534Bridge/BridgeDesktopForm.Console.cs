@@ -22,6 +22,7 @@ internal sealed partial class BridgeDesktopForm
     private readonly TextBox doIpClientCertificate = new() { Dock = DockStyle.Fill };
     private enum DoIpReadOperation { Vin, Dtcs, Did, MonitorDid, Backup }
     private readonly Button doIpBackup = Button(DoIpConsolePresentation.Text("Backup"));
+    private readonly Button doIpVerifyBackup = Button(DoIpConsolePresentation.Text("BackupVerify"));
     private readonly Button doIpMonitorDid = Button(DoIpConsolePresentation.Text("MonitorDid"));
     private readonly NumericUpDown doIpMonitorInterval = new()
         { Minimum = 250, Maximum = 60000, Increment = 250, Value = 1000, Dock = DockStyle.Fill };
@@ -121,7 +122,11 @@ internal sealed partial class BridgeDesktopForm
         Row(fields, DoIpConsolePresentation.Text("MonitorInterval"), doIpMonitorInterval, doIpMonitorDid);
         Row(fields, DoIpConsolePresentation.Text("MonitorCount"), doIpMonitorCount);
         doIpMonitorDid.Click += async (_, _) => await ReadDoIpDiagnosticFromConsoleAsync(DoIpReadOperation.MonitorDid);
-        WideRow(fields, doIpBackup, 43);
+        var backupButtons = new FlowLayoutPanel { Dock = DockStyle.Fill };
+        backupButtons.Controls.Add(doIpBackup);
+        backupButtons.Controls.Add(doIpVerifyBackup);
+        WideRow(fields, backupButtons, 48);
+        doIpVerifyBackup.Click += async (_, _) => await VerifyDoIpBackupFromConsoleAsync();
         doIpBackup.Click += async (_, _) => await ReadDoIpDiagnosticFromConsoleAsync(DoIpReadOperation.Backup);
         // A logical endpoint or security-mode change invalidates the
         // previously selected diagnostic context, even with the same IP.
@@ -477,6 +482,56 @@ internal sealed partial class BridgeDesktopForm
                 doIpConsoleDiscover.Enabled = true;
                 doIpConsoleStatus.Enabled = doIpConsolePower.Enabled =
                     doIpReadDtcs.Enabled = doIpBackup.Enabled = doIpMonitorDid.Enabled = doIpReadDid.Enabled = doIpReadVin.Enabled = doIpObservedGateway is not null;
+                doIpConsoleCancel.Enabled = false;
+            }
+        }
+    }
+
+    private async Task VerifyDoIpBackupFromConsoleAsync()
+    {
+        if (busy || doIpConsoleDiscoveryCancellation is not null) return;
+        using var profile = new OpenFileDialog
+        {
+            Title = DoIpConsolePresentation.Text("BackupProfile"), Filter = "JSON (*.json)|*.json"
+        };
+        if (profile.ShowDialog(this) != DialogResult.OK) return;
+        using var archive = new OpenFileDialog
+        {
+            Title = DoIpConsolePresentation.Text("BackupVerify"), Filter = "ZIP (*.zip)|*.zip"
+        };
+        if (archive.ShowDialog(this) != DialogResult.OK) return;
+        using var stop = new CancellationTokenSource();
+        doIpConsoleDiscoveryCancellation = stop;
+        doIpVerifyBackup.Enabled = false;
+        doIpConsoleCancel.Enabled = true;
+        try
+        {
+            await RunBusyAsync(async () =>
+            {
+                try
+                {
+                    var result = await Task.Run(() =>
+                    {
+                        var scope = DoIpBackupScope.Load(profile.FileName);
+                        return DoIpScopedBackup.VerifyZip(archive.FileName, scope, stop.Token);
+                    }, stop.Token);
+                    if (!IsDisposed && !Disposing)
+                        ConsoleLine("SYSTEM", string.Format(DoIpConsolePresentation.Text("BackupVerified"),
+                            result.Scope.Length, result.Sha256), Color.DarkGreen);
+                }
+                catch (OperationCanceledException) when (stop.IsCancellationRequested)
+                {
+                    if (!IsDisposed && !Disposing)
+                        ConsoleLine("SYSTEM", DoIpConsolePresentation.Text("Canceled"), Color.DarkSlateGray);
+                }
+            });
+        }
+        finally
+        {
+            doIpConsoleDiscoveryCancellation = null;
+            if (!IsDisposed && !Disposing)
+            {
+                doIpVerifyBackup.Enabled = true;
                 doIpConsoleCancel.Enabled = false;
             }
         }

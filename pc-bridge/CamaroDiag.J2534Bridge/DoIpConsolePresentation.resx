@@ -60,4 +60,6 @@
   <data name="BackupStarted" xml:space="preserve"><value>DoIP / {0}: backup at {1}, ECU 0x{2:X4}, tester 0x{3:X4}, version 0x{4:X2}.</value></data>
   <data name="BackupProgress" xml:space="preserve"><value>Pass {0}/2: {1}/{2} bytes</value></data>
   <data name="BackupSaved" xml:space="preserve"><value>Verified region backup: {0} bytes, SHA-256 {1}, {2}</value></data>
+  <data name="BackupVerify" xml:space="preserve"><value>Verify DoIP backup</value></data>
+  <data name="BackupVerified" xml:space="preserve"><value>Archive integrity verified: {0} bytes, SHA-256 {1}. This check does not establish hardware provenance.</value></data>
 </root>

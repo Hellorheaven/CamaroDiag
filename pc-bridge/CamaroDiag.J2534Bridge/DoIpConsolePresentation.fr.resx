@@ -60,4 +60,6 @@
   <data name="BackupStarted" xml:space="preserve"><value>DoIP / {0} : sauvegarde sur {1}, ECU 0x{2:X4}, testeur 0x{3:X4}, version 0x{4:X2}.</value></data>
   <data name="BackupProgress" xml:space="preserve"><value>Lecture {0}/2 : {1}/{2} octets</value></data>
   <data name="BackupSaved" xml:space="preserve"><value>Sauvegarde de zone vérifiée : {0} octets, SHA-256 {1}, {2}</value></data>
+  <data name="BackupVerify" xml:space="preserve"><value>Vérifier une sauvegarde DoIP</value></data>
+  <data name="BackupVerified" xml:space="preserve"><value>Intégrité de l’archive vérifiée : {0} octets, SHA-256 {1}. Provenance matérielle non attestée par ce contrôle.</value></data>
 </root>
