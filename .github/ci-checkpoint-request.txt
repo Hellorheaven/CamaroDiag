@@ -162,3 +162,8 @@ HEAD du code avant checkpoint : bd71f94dd4c5a146571fed637ddf24568534829c.
 Nouvelle CLI --isotp-audit-trace sur CSV timestamp_us,direction,can_id,payload_hex, analyse SF/FF/FC/CF, BS, CTS/WAIT/OVFLW, STmin et N_Bs ; 11 et 29 bits classiques avec adressage normal ; tests avec faux bus sans driver et refus des journaux horodatés uniquement côté hôte.
 Un seul checkpoint Debug complet (Windows -warnaserror/self-test, Android unit/lint/assemble Debug, native ECU, firmware/connecteurs), vérifier les logs au SHA exact de ce marqueur. Aucun ECU réel, flash ni conformité constructeur attestés.
 PR #95 toujours draft ; ne pas fusionner ni démarrer un protocole suivant avant la qualification matérielle.
+
+24/11/2026 — checkpoint ISO-TP CAN classique, vecteurs hors matériel
+Code HEAD avant marqueur : 938f9ece67c39631e730ee08f93a09eca66ed506.
+Audit CSV indépendant --isotp-audit-trace : SF/FF 12 et 32 bits (4096 octets), CAN 11/29 bits, adressages normal/étendu/mixte, FC CTS/WAIT/OVFLW et WFTmax, N_Bs/N_Cr, STmin, BlockSize, CF séquence et rôles TX/RX. Tests de non-régression positifs et négatifs intégrés aux autotests J2534 ; aucune émission ni lecture ECU.
+Demande unique de campagne Debug groupée au SHA de CE commit marqueur : Windows -warnaserror + --self-test, Android tests/lint/assemble Debug, natif, Connectors. Pas de Release, pas de fusion, pas d'essais matériels avant Release propriétaire.
