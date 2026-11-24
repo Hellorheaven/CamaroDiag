@@ -349,6 +349,18 @@ class CanConsoleRecordParserTest {
     }
 
 
+    @Test fun singleWireMonitorUsesRawStnPresetAndSilentReception() {
+        val speed = DiagnosticRouteSelector.SW_CAN_BITRATE
+        assertEquals("STP 61", CanMonitorProtocolPolicy.protocolCommand(false, speed))
+        assertEquals("STP 62", CanMonitorProtocolPolicy.protocolCommand(true, speed))
+        for (extended in listOf(false, true)) {
+            val commands = CanMonitorProtocolPolicy.setupCommands(extended, true, speed)
+            assertTrue(commands.containsAll(listOf("STCMM 0", "STCSEGR 0", "STCSEGT 0", "STFAC")))
+            assertFalse(commands.any { it.startsWith("ATSP") || it.startsWith("STPX") })
+        }
+        assertTrue(runCatching { CanMonitorProtocolPolicy.setupCommands(false, false, speed) }.isFailure)
+    }
+
     @Test fun diagnosticReplyStatusDistinguishesPositiveNegativeAndAdapterOnly() {
         val physical = requireNotNull(RawCanFrameParser.parse("7E0 03 22 F1 90"))
         assertEquals(CanConsoleDiagnosticStatus.NONE,

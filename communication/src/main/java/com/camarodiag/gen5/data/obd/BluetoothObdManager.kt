@@ -388,7 +388,7 @@ class BluetoothObdManager(context: Context) {
         suspend fun probeCommand(command: String, timeoutMs: Long = 1200L): String =
             commandSessionMutex.withLock {
                 transportSessionEpoch.requireQueuedCurrent(expectedEpoch)
-                sendAtCommandInternal(command, timeoutMs, expectedEpoch = expectedEpoch)
+                sendAtCommandInternal(command, timeoutMs, expectedEpoch = expectedEpoch, preserveLines = true)
             }
         return try {
             val atz = probeCommand("ATZ")

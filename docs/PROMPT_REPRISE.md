@@ -1,3 +1,10 @@
+## PR117 — DoIP vérification, monitoring, SW-CAN et Connectors (24/11/2026)
+
+- Dernière CI complète réussie #45437800068 au SHA 00b2edf3efab9e0005774919800afd1322b7187c : 12 jobs techniques, revue sautée pour PR draft.
+- Nouveaux raccordements : vérification ZIP DoIP Android 09f0cf1 ; monitoring Android en direct, TX/RX horodatés et export CSV VIN/ECU/DID 5333419 ; SW-CAN brut 61/62 capture silencieuse et détection STN c0eeff5 ; identification/état/alimentation passerelle Android UDP 9389efb ; vérificateur ZIP DoIP hôte Connectors 8afb0f8. Android limite de zone 1 Mio ; Windows/hôte 16 Mio. La trace DoIP Android demeure une fenêtre de 128 entrées ; l'archive globale console doit encore intégrer l'intégralité de ce trafic. SW-CAN brut TX non intégré ; UDS SW-CAN via STN déjà distinct.
+- Annulation utilisateur préserve le résultat partiel affiché et interdit export de mesures incomplètes ; changement véhicule/compte/connecteur invalide le contexte.
+- C6 + DoIP actifs. LFX 2012 ne doit pas recevoir de profil DoIP ou DID FlexFuel inventé ; qualification OEM/physique Release #48 uniquement. Reste : intégration intégrale console, sélection véhicule/calculateur/fonction, GMLAN ELM, autres capacités et protocoles de #110. Ne pas ouvrir C8 ni autre PR/branche. Checkpoint groupé intermédiaire, pas de fusion/Release/déploiement.
+
 ## PR117 — DoIP Android/Windows, sauvegardes et sélection de profils (24/11/2026)
 
 - Dernière CI Debug complète réussie : #45431900505, SHA c6e634970337be47e63d9c2d0c27f6c5d8b459b0 (12 jobs techniques). Ne valide pas les changements ci-dessous.

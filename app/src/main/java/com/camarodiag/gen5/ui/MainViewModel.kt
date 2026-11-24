@@ -1146,7 +1146,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun cancelDirectDoIp() {
         if (!_calibrationWorkspace.value.doIpReading) return
-        invalidateEnhancedUdsReads()
+        // A user cancellation is not a vehicle/account change: keep already
+        // received trace and samples visible, but invalidate every late callback.
+        enhancedUdsGeneration++
+        enhancedUdsJob?.cancel()
+        enhancedUdsJob = null
+        _calibrationWorkspace.update { it.copy(doIpReading = false, doIpMonitorReport = null,
+            doIpBackupBytes = 0, doIpResult = localizedContext.getString(R.string.cal_doip_cancel)) }
     }
 
     fun inspectDirectDoIpGateway(host: String, operation: DoIpDirectRead.GatewayOperation) {

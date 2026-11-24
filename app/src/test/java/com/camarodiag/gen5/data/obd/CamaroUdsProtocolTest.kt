@@ -382,6 +382,17 @@ class CamaroUdsProtocolTest {
     }
 
     @Test
+    fun singleWireRawProfilesRequireHardwareAndIndividualAcknowledgements() {
+        fun probe(hardware: String, second: String) = CamaroUdsProtocol.evaluateAdapterProbe(
+            deviceName = "OBDLink MX+", macAddress = "test", atzResp = "OBDLink",
+            stiResp = "STN2255 v5.6.5", atalResp = "OK", stp61Resp = "OK",
+            hardwareResp = hardware, stnProtocolProbe = mapOf(61 to "OK", 62 to second))
+        assertEquals(setOf(61), probe("OBDLink MX+ r3.2.1", "?").acceptedStnProtocols)
+        assertEquals(setOf(61, 62), probe("OBDLink MX+ r3.2.1", "OK").acceptedStnProtocols)
+        assertTrue(probe("OBDLink LX", "OK").acceptedStnProtocols.isEmpty())
+    }
+
+    @Test
     fun adapterCapabilitiesDefaultToDisconnectedAndFailClosed() {
         val adapter = AdapterCapabilities()
         assertEquals(AdapterTier.DISCONNECTED, adapter.tier)
