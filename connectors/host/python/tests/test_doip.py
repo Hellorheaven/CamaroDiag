@@ -7,7 +7,7 @@ from camarodiagconnectors.doip_cli import run
 from camarodiagconnectors.doip import (
     Gateway, Session, DoIpError, NegativeResponse, decode, encode, parse_identity, positive,
     discover, discover_ipv4, discover_ipv6, discovery_request, discover_unique_vin, parse_commands, confirm_commands,
-    endpoint, tls_server_name, status
+    endpoint, tls_server_name, status, parse_did_layout, decode_did_layout
 )
 
 VIN = "1G1FA1RXXR0123456"
@@ -206,6 +206,26 @@ class DoIpTests(unittest.TestCase):
             values = iter(answers)
             self.assertEqual(confirm_commands(commands, GATEWAY, 0xE80, 0x1234, True,
                 lambda: next(values), lambda _: None, french), expected)
+
+    def test_multi_did_layout_and_same_session(self):
+        layout = parse_did_layout("F40C:2,F40D:1")
+        reply = bytes.fromhex("62F40C1234F40D56")
+        self.assertEqual(decode_did_layout(reply, layout)[1]["data"], "56")
+        fake = Session.__new__(Session)
+        fake.read_obd = unittest.mock.Mock(return_value={"obd_on_uds": True})
+        fake.exchange = unittest.mock.Mock(return_value=reply)
+        fake.close = unittest.mock.Mock()
+        self.assertEqual(fake.read_dids(VIN, layout, obd=True)["dids"][0]["data"], "1234")
+        fake.exchange.assert_called_once_with(bytes.fromhex("22F40CF40D"))
+        self.assertEqual(fake.read_obd.call_count, 2)
+        for malformed in ("62F40D56F40C1234", "62F40C1234F40D", "62F40C1234F40D5600"):
+            fake.exchange.return_value = bytes.fromhex(malformed)
+            with self.assertRaises(DoIpError):
+                fake.read_dids(VIN, layout, obd=True)
+        fake.close.assert_called()
+        for invalid in ("F40C:2,F40C:1", "F40C:0,F40D:1", "F40C:2", "F40C:2,F40D:4097"):
+            with self.assertRaises(DoIpError):
+                parse_did_layout(invalid)
 
     def test_obd_did_requires_legislated_vin_and_identification(self):
         for protocol_value in (1, 2):

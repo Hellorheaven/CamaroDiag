@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from typing import Sequence
 
 from .doip import (Session, discover, discover_unique_vin, discover_ipv4, discover_ipv6, gateway_key, status,
-                   DoIpError, valid_vin, parse_commands, confirm_commands)
+                   DoIpError, valid_vin, parse_commands, confirm_commands, parse_did_layout)
 from .doip_archive import load_scope
 from .doip_capture import capture_region, save_capture
 
@@ -72,6 +72,11 @@ def run(argv: Sequence[str] | None = None) -> dict:
     did.add_argument("--did", required=True, type=lambda x: hex_value(x, 4))
     obd_did = sub.add_parser("obd-did", help=tr("Read legislated DID after ECU identification", "Lire un DID réglementaire après identification ECU"))
     obd_did.add_argument("--did", required=True, type=lambda x: hex_value(x, 4))
+    for action in ("dids", "obd-dids"):
+        multi = sub.add_parser(action, help=tr("Read several DIDs in one verified request", "Lire plusieurs DID dans une seule requête vérifiée"))
+        multi.add_argument("--layout", required=True,
+                           help=tr("DID:length in bytes, e.g. F190:17,F187:4; use actual ECU definitions",
+                                   "DID:longueur en octets, ex. F190:17,F187:4 ; utiliser les définitions ECU réelles"))
     for action in ("monitor", "obd-monitor"):
         monitor = sub.add_parser(action, help=tr("Monitor a DID on one verified ECU", "Surveiller un DID sur un ECU vérifié"))
         monitor.add_argument("--did", required=True, type=lambda x: hex_value(x, 4))
@@ -98,6 +103,9 @@ def run(argv: Sequence[str] | None = None) -> dict:
                           help=tr("Hexadecimal commands separated by semicolons", "Commandes hexadécimales séparées par des points-virgules"))
     o = parser.parse_args(argv)
     commands = parse_commands(o.commands) if o.action == "sequence" else None
+    layout = parse_did_layout(o.layout) if o.action in ("dids", "obd-dids") else None
+    if o.action == "obd-dids" and any(not 0xF400 <= did <= 0xF8FF for did, _ in layout):
+        parser.error(tr("Legislated DIDs F400..F8FF required", "DID réglementaires F400..F8FF requis"))
     scope = None
     if o.action == "backup":
         scope = load_scope(o.profile)
@@ -189,6 +197,9 @@ def run(argv: Sequence[str] | None = None) -> dict:
                  trace=trace, context=context, p2=p2, p2_star=p2_star,
                  routing_type=o.routing_activation_type or 0,
                  routing_oem_data=o.routing_oem_data) as session:
+        if layout is not None:
+            return result | {"ecu": o.ecu, "tester": o.tester, "tls": not o.tcp} | session.read_dids(
+                o.vin, layout, obd=o.action == "obd-dids")
         if o.action in ("obd-identify", "obd-did"):
             return result | {"ecu": o.ecu, "tester": o.tester, "tls": not o.tcp} | session.read_obd(
                 o.vin, o.did if o.action == "obd-did" else None)

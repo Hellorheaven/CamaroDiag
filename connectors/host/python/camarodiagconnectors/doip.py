@@ -328,6 +328,47 @@ def status(gateway: Gateway, power: bool = False, timeout: float = 3,
             "max_data_size": int.from_bytes(body[3:], "big") if len(body) == 7 else None}
 
 
+def parse_did_layout(text: str) -> tuple[tuple[int, int], ...]:
+    """Explicit DID lengths from ODX/standard, never infer geometry from an identifier."""
+    fields = text.split(",")
+    if not 2 <= len(fields) <= 32:
+        raise DoIpError("Expected 2..32 DID:length entries")
+    layout = []
+    for field in fields:
+        parts = field.split(":")
+        if len(parts) != 2 or len(parts[0]) != 4 or any(c not in "0123456789abcdefABCDEF" for c in parts[0]) or not parts[1].isascii() or not parts[1].isdigit() or len(parts[1]) > 4:
+            raise DoIpError("Expected hexadecimal DID and decimal byte length")
+        layout.append((int(parts[0], 16), int(parts[1])))
+    return validate_did_layout(tuple(layout))
+
+
+def validate_did_layout(layout: tuple[tuple[int, int], ...]) -> tuple[tuple[int, int], ...]:
+    layout = tuple(tuple(entry) for entry in layout)
+    if not 2 <= len(layout) <= 32:
+        raise DoIpError("Expected 2..32 DIDs")
+    if any(len(entry) != 2 or type(entry[0]) is not int or type(entry[1]) is not int or
+           not 0 <= entry[0] <= 65535 or not 1 <= entry[1] <= 4096 for entry in layout):
+        raise DoIpError("Invalid DID or length")
+    if len({entry[0] for entry in layout}) != len(layout) or 1 + sum(2 + entry[1] for entry in layout) > 65536:
+        raise DoIpError("Duplicate DID or response size exceeds limit")
+    return layout
+
+
+def decode_did_layout(reply: bytes, layout: tuple[tuple[int, int], ...]) -> list[dict]:
+    layout = validate_did_layout(layout)
+    if len(reply) != 1 + sum(2 + length for _, length in layout) or reply[0] != 0x62:
+        raise DoIpError("Multi-DID response length or service mismatch")
+    offset = 1
+    result = []
+    for did, length in layout:
+        if reply[offset:offset+2] != logical(did):
+            raise DoIpError("Multi-DID response order or identifier mismatch")
+        offset += 2
+        result.append({"did": f"{did:04X}", "length": length, "data": reply[offset:offset+length].hex().upper()})
+        offset += length
+    return result
+
+
 def positive(request: bytes, reply: bytes) -> bytes:
     if not reply or reply[0] != request[0] + 0x40:
         raise DoIpError("UDS response service mismatch")
@@ -608,6 +649,28 @@ class Session:
             self.close()
             raise DoIpError("Missing DID data")
         return reply[3:]
+
+    def read_dids(self, expected: str, layout: tuple[tuple[int, int], ...], *, obd: bool = False) -> dict:
+        layout = validate_did_layout(layout)
+        if obd and any(not 0xF400 <= did <= 0xF8FF for did, _ in layout):
+            raise DoIpError("Expected legislated OBDonUDS DIDs")
+        try:
+            if obd:
+                if not self.read_obd(expected)["obd_on_uds"]:
+                    raise DoIpError("Selected ECU did not identify as OBDonUDS")
+            else:
+                self.verify_vin(expected)
+            request = b"\x22" + b"".join(logical(did) for did, _ in layout)
+            rows = decode_did_layout(self.exchange(request), layout)
+            if obd:
+                if not self.read_obd(expected)["obd_on_uds"]:
+                    raise DoIpError("OBDonUDS identification changed")
+            else:
+                self.verify_vin(expected)
+            return {"vin": expected, "service_protocol": "OBDonUDS" if obd else "UDS", "dids": rows}
+        except BaseException:
+            self.close()
+            raise
 
     def dtc_count(self, mask: int) -> dict:
         reply = self.exchange(bytes((0x19, 1, mask)))

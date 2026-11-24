@@ -1,3 +1,7 @@
+## PR117 — multi-DID Connectors DoIP (24/11/2026)
+
+- CLI `dids` / `obd-dids --layout DID:longueur,...` : vraie requête UDS 22 multi-DID, longueur explicite d'après définitions ECU, décodage strict des réponses dans l'ordre, limites et refus des doublons/troncatures. Identité vérifiée avant/après sur même connexion ; F802/F810 pour OBDonUDS. Aucun scaling supposé. Tests ajoutés, postérieurs au checkpoint WWH 45501625699 en cours.
+
 ## PR117 — checkpoint WWH multi-plateforme (24/11/2026)
 
 - Run 45498873150 sur 876015f : réussi. Nouveau checkpoint demandé sur 81013db5c12775018c1c8b397f959e76cdce8275 incluant WWH Python, Android et Windows. Aucune qualification matérielle ni fusion.
