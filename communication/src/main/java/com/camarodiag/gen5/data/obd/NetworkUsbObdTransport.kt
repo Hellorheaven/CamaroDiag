@@ -27,6 +27,7 @@ class ElmUsbTransport(private val context: Context) {
         val port: UsbSerialPort,
         val connection: android.hardware.usb.UsbDeviceConnection
     ) {
+        @Volatile var lost = false
         fun close() {
             try { port.close() } catch (_: Exception) {}
             try { connection.close() } catch (_: Exception) {}
@@ -36,10 +37,9 @@ class ElmUsbTransport(private val context: Context) {
     // The USB open/permission path can be suspended or blocked while the user
     // selects another adapter. Only the newest generation owns the USB handle.
     private val sessions = ObdConnectionSlot<UsbSession>()
-    @Volatile private var connectionLost = true
 
     val isConnected: Boolean
-        get() = sessions.snapshot() != null && !connectionLost
+        get() = sessions.snapshot()?.lost == false
 
     fun availableDevices(): List<String> =
         UsbSerialProber.getDefaultProber()
@@ -55,7 +55,6 @@ class ElmUsbTransport(private val context: Context) {
         requireCdc: Boolean = false
     ): Result<Unit> = withContext(Dispatchers.IO) {
         val selection = sessions.begin()
-        connectionLost = true
         selection.previous?.close()
         var candidate: UsbSession? = null
         try {
@@ -121,7 +120,6 @@ class ElmUsbTransport(private val context: Context) {
                 )
             }
             candidate = null // Ownership transferred atomically to the active slot.
-            connectionLost = false
             Result.success(Unit)
         } catch (cancelled: kotlinx.coroutines.CancellationException) {
             sessions.releaseIfCurrent(selection.generation)?.close()
@@ -136,9 +134,9 @@ class ElmUsbTransport(private val context: Context) {
     }
 
     fun write(data: ByteArray) {
-        if (connectionLost) throw ObdTransportDisconnectedException("USB OBD adapter disconnected")
         val active = sessions.snapshot()
             ?: throw ObdTransportDisconnectedException("USB OBD adapter is not connected")
+        if (active.lost) throw ObdTransportDisconnectedException("USB OBD adapter disconnected")
         try {
             val written = active.port.write(data, 1500)
             if (!sessions.isCurrent(active)) {
@@ -149,34 +147,30 @@ class ElmUsbTransport(private val context: Context) {
             UsbSerialWritePolicy.requireComplete(written, data.size)
         } catch (error: java.io.IOException) {
             if (!sessions.isCurrent(active)) throw ObdSupersededSessionException(error)
-            connectionLost = true
+            active.lost = true
             throw error
         }
     }
 
     fun read(buffer: ByteArray, timeoutMs: Int): Int {
         require(timeoutMs in 1..30_000) { "USB read timeout must be finite and positive" }
-        if (connectionLost) throw ObdTransportDisconnectedException("USB OBD adapter disconnected")
-        val active = sessions.snapshot() ?: run {
-            connectionLost = true
-            return -1
-        }
+        val active = sessions.snapshot() ?: return -1
+        if (active.lost) throw ObdTransportDisconnectedException("USB OBD adapter disconnected")
         return try {
             val count = active.port.read(buffer, timeoutMs)
             if (!sessions.isCurrent(active)) {
                 throw java.io.IOException("USB adapter replaced during serial read")
             }
-            if (count < 0) connectionLost = true
+            if (count < 0) active.lost = true
             count
         } catch (error: java.io.IOException) {
             if (!sessions.isCurrent(active)) throw ObdSupersededSessionException(error)
-            connectionLost = true
+            active.lost = true
             throw error
         }
     }
 
     fun close() {
-        connectionLost = true
         sessions.release()?.close()
     }
 }
