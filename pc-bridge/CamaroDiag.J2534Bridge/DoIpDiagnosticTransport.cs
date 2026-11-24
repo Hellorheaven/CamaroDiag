@@ -27,6 +27,14 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
     internal bool MatchesLogicalTarget(ushort gateway, ushort tester, ushort ecu) =>
         routedGatewayAddress == gateway && testerAddress == tester && ecuAddress == ecu;
     private readonly byte protocolVersion;
+    internal sealed record PduTrace(string Direction, DateTimeOffset ObservedAtUtc, byte[] Bytes);
+    private readonly Action<PduTrace>? trace;
+    private void Trace(string direction, byte[] frame)
+    {
+        // Give the observer a private copy; it cannot alter a transmitted
+        // request or received response. Includes diagnostic and control PDUs.
+        trace?.Invoke(new PduTrace(direction, DateTimeOffset.UtcNow, frame.ToArray()));
+    }
     // 0 = ready, 1 = one UDS exchange in progress, 2 = closed/uncertain.
     // DoIP carries no per-request transaction ID. A late reply after a
     // failed exchange could otherwise be mistaken for a fresh request.
@@ -49,13 +57,14 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
     private Exception? receiveFailure;
 
     private DoIpDiagnosticTransport(TcpClient socket, Stream dataStream,
-        ushort tester, ushort ecu, byte version)
+        ushort tester, ushort ecu, byte version, Action<PduTrace>? trace)
     {
         this.socket = socket;
         stream = dataStream;
         testerAddress = tester;
         ecuAddress = ecu;
         protocolVersion = version;
+        this.trace = trace;
     }
 
     internal static async Task<DoIpDiagnosticTransport> ConnectAsync(
@@ -64,7 +73,8 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
         byte protocolVersion = DoIpCodec.Version,
         string? clientCertificateThumbprint = null,
         int? portOverride = null, byte activationType = 0x00,
-        byte[]? activationOemData = null, ushort? expectedGatewayAddress = null)
+        byte[]? activationOemData = null, ushort? expectedGatewayAddress = null,
+        Action<PduTrace>? trace = null)
     {
         if (string.IsNullOrWhiteSpace(host) || host.Length > 253 ||
             tester == ecu || timeout <= TimeSpan.Zero ||
@@ -105,7 +115,7 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
                 dataStream = tls;
             }
             var session = new DoIpDiagnosticTransport(socket, dataStream,
-                tester, ecu, protocolVersion);
+                tester, ecu, protocolVersion, trace);
             await session.SendAsync(DoIpCodec.RoutingActivation(
                 tester, activationType: activationType,
                 version: protocolVersion,
@@ -321,6 +331,7 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
         {
             await stream.WriteAsync(frame, token);
             await stream.FlushAsync(token);
+            Trace("TX", frame);
         }
         finally { writeGate.Release(); }
     }
@@ -400,6 +411,7 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
         var message = new byte[8 + length];
         header.CopyTo(message, 0);
         if (length > 0) await stream.ReadExactlyAsync(message.AsMemory(8), token);
+        Trace("RX", message);
         return DoIpCodec.Decode(message);
     }
 
