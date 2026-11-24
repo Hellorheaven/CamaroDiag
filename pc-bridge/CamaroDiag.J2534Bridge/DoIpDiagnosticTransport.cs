@@ -21,6 +21,10 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
     private readonly ushort testerAddress;
     private readonly ushort ecuAddress;
     private readonly byte protocolVersion;
+    // 0 = ready, 1 = one UDS exchange in progress, 2 = closed/uncertain.
+    // DoIP carries no per-request transaction ID. A late reply after a
+    // failed exchange could otherwise be mistaken for a fresh request.
+    private int exchangeState;
 
     private DoIpDiagnosticTransport(TcpClient socket, Stream dataStream,
         ushort tester, ushort ecu, byte version)
@@ -36,12 +40,14 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
         string host, ushort tester, ushort ecu, TimeSpan timeout,
         CancellationToken cancellationToken, bool useTls = false,
         byte protocolVersion = DoIpCodec.Version,
-        string? clientCertificateThumbprint = null)
+        string? clientCertificateThumbprint = null,
+        int? portOverride = null)
     {
         if (string.IsNullOrWhiteSpace(host) || host.Length > 253 ||
             tester == ecu || timeout <= TimeSpan.Zero ||
             timeout > TimeSpan.FromSeconds(30) ||
             protocolVersion is not (0x02 or 0x03 or 0x04) ||
+            (portOverride.HasValue && portOverride.Value is < 1 or > 65535) ||
             (clientCertificateThumbprint is not null && !useTls))
             throw new ArgumentException("Explicit gateway, distinct logical addresses and timeout required.");
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -49,7 +55,8 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
         var socket = new TcpClient();
         try
         {
-            await socket.ConnectAsync(host, useTls ? 3496 : 13400, deadline.Token);
+            await socket.ConnectAsync(host,
+                portOverride ?? (useTls ? 3496 : 13400), deadline.Token);
             Stream dataStream = socket.GetStream();
             if (useTls)
             {
@@ -166,6 +173,14 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
                  p2StarTimeout.Value > TimeSpan.FromMinutes(10))))
             throw new ArgumentOutOfRangeException(nameof(p2Timeout),
                 "UDS P2/P2* must be positive and bounded.");
+        cancellationToken.ThrowIfCancellationRequested();
+        var previous = Interlocked.CompareExchange(ref exchangeState, 1, 0);
+        if (previous != 0)
+            throw new InvalidOperationException(previous == 1 ?
+                "DoIP socket already has an active UDS exchange." :
+                "DoIP session was closed or its previous exchange is uncertain; reconnect.");
+        try
+        {
         // Keep the complete request/reply transaction budget, including TX.
         var overall = System.Diagnostics.Stopwatch.StartNew();
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -178,7 +193,7 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
 
         // ACKs and gateway AliveCheck messages are not ECU UDS responses.
         // They cannot reset the P2/P2* timer or the overall deadline.
-        return await UdsResponseSequence.AwaitFinalAsync(request,
+        var response = await UdsResponseSequence.AwaitFinalAsync(request,
             async (budget, token) =>
             {
                 using var stage = CancellationTokenSource.CreateLinkedTokenSource(token);
@@ -210,6 +225,20 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
                 }
             },
             remaining, deadline.Token, p2Timeout, p2StarTimeout);
+        if (Interlocked.CompareExchange(ref exchangeState, 0, 1) != 1)
+            throw new ObjectDisposedException(nameof(DoIpDiagnosticTransport));
+        return response;
+        }
+        catch
+        {
+            // Even a cancelled/timed-out write may already be on the TCP
+            // wire. Never silently retry it or allow a late reply to be
+            // interpreted as belonging to another operation.
+            Interlocked.Exchange(ref exchangeState, 2);
+            stream.Dispose();
+            socket.Dispose();
+            throw;
+        }
     }
 
     private async Task SendAsync(byte[] frame, CancellationToken token)
@@ -231,6 +260,7 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
 
     public ValueTask DisposeAsync()
     {
+        Interlocked.Exchange(ref exchangeState, 2);
         stream.Dispose();
         socket.Dispose();
         return ValueTask.CompletedTask;
