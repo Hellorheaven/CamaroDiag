@@ -1,3 +1,10 @@
+## Décision propriétaire — sélection par fonction (prioritaire)
+
+- Résoudre automatiquement la pile de communication par **connecteur + ECU + fonction/opération** ; le même couple peut utiliser CAN brut en console et ISO-TP/UDS ou SAE J1979 en diagnostic selon capacités réelles. Distinguer transport, segmentation et service. Ne pas imposer un protocole unique à tout le couple.
+- Revalider à chaque changement de contexte, afficher la pile réellement utilisée, conserver les sessions cohérentes et le double consentement lié à l'opération. Aucun repli automatique après émission mutante incertaine. Tester plusieurs fonctions sur un même couple, incompatibilités et changement de contexte. Cette décision précise et prévaut sur la règle précédente à deux critères. C6 et DoIP actifs ; C8 strictement final. Implémentation et tests non réalisés par ce commit documentaire.
+
+---
+
 ## Décision propriétaire — sélection automatique des protocoles
 
 - Le protocole est automatiquement sélectionné à partir du **couple connecteur effectivement utilisé + ECU cible**, en fonction des capacités négociées du connecteur/pilote, du profil ECU et de réponses de découverte non mutantes. Pas de sélecteur manuel obligatoire pour le parcours normal, pas de choix fondé sur le seul véhicule ou le seul connecteur.
