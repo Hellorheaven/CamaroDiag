@@ -8,6 +8,10 @@ namespace CamaroDiag.J2534Bridge;
 internal sealed partial class BridgeDesktopForm
 {
     private J2534Device? consoleDevice;
+    private CancellationTokenSource? doIpConsoleDiscoveryCancellation;
+    private readonly TextBox doIpConsoleHost = new() { Dock = DockStyle.Fill };
+    private readonly Button doIpConsoleDiscover = Button(DoIpConsolePresentation.Text("Discover"));
+    private readonly Button doIpConsoleCancel = Button(DoIpConsolePresentation.Text("Cancel"));
     private readonly TextBox consoleRequestId = new()
         { Text = "7E0", Dock = DockStyle.Fill };
     private readonly TextBox consoleResponseId = new()
@@ -66,6 +70,11 @@ internal sealed partial class BridgeDesktopForm
         consoleBattery.Click += async (_, _) => await ConsoleBatteryAsync();
         consoleSave.Click += (_, _) => SaveConsoleHistory();
         WideRow(fields, identityButtons, 48);
+        Row(fields, DoIpConsolePresentation.Text("Host"), doIpConsoleHost, doIpConsoleDiscover);
+        doIpConsoleCancel.Enabled = false;
+        doIpConsoleDiscover.Click += async (_, _) => await DiscoverDoIpFromConsoleAsync();
+        doIpConsoleCancel.Click += (_, _) => doIpConsoleDiscoveryCancellation?.Cancel();
+        WideRow(fields, doIpConsoleCancel, 43);
         WideRow(fields, new Label
         {
             Text = "Console J2534 locale : TX et RX séparés ; commandes ECU transmises selon " +
@@ -79,6 +88,65 @@ internal sealed partial class BridgeDesktopForm
         tab.Controls.Add(outer);
         ConsoleLine("SYSTEM", "Console prête. Sélectionnez l'interface dans Connexion Android et ouvrez un canal.", Color.DarkSlateGray);
         return tab;
+    }
+
+    private async Task DiscoverDoIpFromConsoleAsync()
+    {
+        if (busy || doIpConsoleDiscoveryCancellation is not null) return;
+        if (consoleDevice is not null || bridgeTask is { IsCompleted: false })
+        {
+            ShowError(DoIpConsolePresentation.Text("Busy"));
+            return;
+        }
+        var host = doIpConsoleHost.Text.Trim();
+        if (!System.Net.IPAddress.TryParse(host, out var address) ||
+            address.Equals(System.Net.IPAddress.Any) ||
+            address.Equals(System.Net.IPAddress.IPv6Any) ||
+            address.Equals(System.Net.IPAddress.Broadcast) ||
+            address.IsIPv6Multicast)
+        {
+            ShowError(DoIpConsolePresentation.Text("InvalidHost"));
+            return;
+        }
+        var timeout = TimeSpan.FromMilliseconds((int)consoleTimeout.Value);
+        using var stop = new CancellationTokenSource();
+        doIpConsoleDiscoveryCancellation = stop;
+        doIpConsoleDiscover.Enabled = false;
+        doIpConsoleCancel.Enabled = true;
+        try
+        {
+            await RunBusyAsync(async () =>
+            {
+                ConsoleLine("SYSTEM", string.Format(DoIpConsolePresentation.Text("Started"),
+                    address), Color.DarkSlateGray);
+                try
+                {
+                    var identity = await DoIpVehicleDiscovery.DiscoverAsync(
+                        address.ToString(), timeout, stop.Token);
+                    stop.Token.ThrowIfCancellationRequested();
+                    if (IsDisposed || Disposing) return;
+                    ConsoleLine("SYSTEM", DoIpConsolePresentation.FormatIdentity(identity),
+                        Color.DarkGreen);
+                    ConsoleLine("SYSTEM", DoIpConsolePresentation.Text("Notice"),
+                        Color.DarkSlateGray);
+                }
+                catch (OperationCanceledException) when (stop.IsCancellationRequested)
+                {
+                    if (!IsDisposed && !Disposing)
+                        ConsoleLine("SYSTEM", DoIpConsolePresentation.Text("Canceled"),
+                            Color.DarkSlateGray);
+                }
+            });
+        }
+        finally
+        {
+            doIpConsoleDiscoveryCancellation = null;
+            if (!IsDisposed && !Disposing)
+            {
+                doIpConsoleDiscover.Enabled = true;
+                doIpConsoleCancel.Enabled = false;
+            }
+        }
     }
 
     private async Task OpenConsoleChannelAsync()
