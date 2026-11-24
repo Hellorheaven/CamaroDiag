@@ -1,3 +1,11 @@
+## Reprise C6/DoIP — intégration console Windows (24/11/2026)
+
+- `15ad57b`, `8720d40`, `337cb86` : présentation commune de l'identité de passerelle et ressources FR/EN. `a62a69b` : découverte UDP unicast DoIP depuis la console graphique, avec adresse explicite, timeout, annulation et historique. `b181f75` : annulation à la fermeture et protection UI disposée. `ba9ad23` : CLI réutilise la présentation. `3c04f3f` et `e9a3c70` : vingt assertions de présentation et ressources enregistrées dans la suite d'autotests Windows.
+- Intégration limitée à l'identification UDP de passerelle, pas à l'authentification ECU, à la console UDS, au diagnostic live ni aux écritures. Pas de faux support, ni d'assimilation au CAN brut. Sélection automatique par fonction et autres parcours encore à réaliser.
+- Tests non exécutés à ce stade. C6/DoIP actifs, C8 strictement final, aucun merge/Release/essai physique. Demander un checkpoint groupé de cette tranche et des correctifs UDP/TCP précédents ; ne pas confondre le SHA de la demande avec un résultat.
+
+---
+
 ## Reprise DoIP/C6 — correctifs supplémentaires du 24/11/2026
 
 - `54e0486317c5290d19fa5331ea56775a4c68c40a` : les quatre collectes UDP propagent l'annulation externe avant de publier les résultats.
