@@ -449,6 +449,44 @@ internal static class DoIpDiagnosticSessionSelfTests
             });
         }
 
+        // Monitoring OBDonUDS verifies the legislated identity at both boundaries.
+        foreach (var finalProtocol in new byte[] { 1, 2 })
+        {
+            await RunCaseAsync(async stream =>
+            {
+                async Task Identify(byte protocolValue)
+                {
+                    var vinRequest = await ReadAsync(stream);
+                    Check(vinRequest.Payload.SequenceEqual((byte[])[0x0E,0x80,0x12,0x34,0x22,0xF8,0x02]),
+                        "OBD monitoring uses F802, not F190.");
+                    await SendAsync(stream, DoIpCodec.DiagnosticMessage,
+                        FromEcu([0x62,0xF8,0x02, .. System.Text.Encoding.ASCII.GetBytes(selectedVehicleVin)]));
+                    var protocol = await ReadAsync(stream);
+                    Check(protocol.Payload.SequenceEqual((byte[])[0x0E,0x80,0x12,0x34,0x22,0xF8,0x10]),
+                        "OBD monitoring verifies F810.");
+                    await SendAsync(stream, DoIpCodec.DiagnosticMessage, FromEcu([0x62,0xF8,0x10,protocolValue]));
+                }
+                await Identify(1);
+                for (byte index = 1; index <= 2; index++)
+                {
+                    var request = await ReadAsync(stream);
+                    Check(request.Payload.SequenceEqual((byte[])[0x0E,0x80,0x12,0x34,0x22,0xF4,0x0C]),
+                        "Same ECU and legislated DID on every sample.");
+                    await SendAsync(stream, DoIpCodec.DiagnosticMessage, FromEcu([0x62,0xF4,0x0C,index]));
+                }
+                await Identify(finalProtocol);
+            }, async client =>
+            {
+                var samples = new List<byte>();
+                async Task Monitor() => await DoIpVinReader.MonitorVerifiedObdAsync(client,
+                    selectedVehicleVin, 0xF40C, 2, TimeSpan.FromMilliseconds(250),
+                    TimeSpan.FromSeconds(2), CancellationToken.None, (_, data) => samples.Add(data[0]));
+                if (finalProtocol == 1) await Monitor();
+                else await Expect<InvalidDataException>(Monitor, "A changed protocol invalidates monitoring completion.");
+                Check(samples.SequenceEqual((byte[])[1,2]), "Observed samples remain available even if final identity differs.");
+            });
+        }
+
         // One routed session serves sequential monitored DID requests.
         await RunCaseAsync(async stream =>
         {

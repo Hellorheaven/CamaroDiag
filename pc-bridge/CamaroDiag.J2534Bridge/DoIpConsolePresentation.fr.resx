@@ -91,4 +91,7 @@
   <data name="ObdInvalidDid" xml:space="preserve"><value>Sélectionnez un DID réglementaire de F400 à F8FF.</value></data>
   <data name="ObdVerified" xml:space="preserve"><value>OBDonUDS confirmé (F810={0:X2}) ; VIN {1}.</value></data>
   <data name="ObdUnknown" xml:space="preserve"><value>OBDonUDS non confirmé (F810={0:X2}) ; VIN {1}.</value></data>
+  <data name="ObdMonitor" xml:space="preserve"><value>Surveiller un DID OBDonUDS</value></data>
+  <data name="ObdMonitorSample" xml:space="preserve"><value>Mesure OBDonUDS {0} : DID {1:X4} = {2}</value></data>
+  <data name="ObdMonitorComplete" xml:space="preserve"><value>Monitoring OBDonUDS terminé : {0} mesures, identité ECU revérifiée.</value></data>
 </root>

@@ -1,3 +1,7 @@
+## PR117 — monitoring DoIP OBDonUDS Windows (24/11/2026)
+
+- Bouton de monitoring réglementaire dans la console Windows, contrôle VIN F802/F810 avant et après mesures sur une seule connexion TCP/TLS, échantillons identifiés OBDonUDS, ressources FR/EN, annulation et trace existantes. Refus de terminer en succès si identification finale différente. Test réseau loopback ajouté. La campagne 45453585549 vise le HEAD précédent ; ce complément attend la prochaine validation groupée, sans interrompre la CI en cours.
+
 ## PR117 — monitoring DoIP OBDonUDS Android et Connectors (24/11/2026)
 
 - Android : bouton de monitoring réglementaire, validation F802/F810 sur le même ECU avant et après mesures, vérification du DID et du contenu, même socket TCP/TLS et certificat choisi, journal/annulation existants, export CSV complet uniquement avec colonne service_protocol (UDS ou OBDonUDS). Mesures partielles visibles mais non exportables comme campagne réussie.

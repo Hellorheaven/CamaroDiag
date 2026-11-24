@@ -178,6 +178,41 @@ internal static class DoIpVinReader
         }
     }
 
+    internal static async Task MonitorVerifiedObdAsync(
+        DoIpDiagnosticTransport transport, string expectedVin, ushort did, int sampleCount,
+        TimeSpan interval, TimeSpan timeout, CancellationToken token, Action<int, byte[]> sample)
+    {
+        if (!DoIpVehicleDiscovery.IsVehicleVin(expectedVin) ||
+            ObdOnUdsServices.ClassifyDid(did) == ObdOnUdsServices.DataGroup.NotLegislated)
+            throw new ArgumentException("Explicit VIN and legislated DID required.");
+        ArgumentNullException.ThrowIfNull(sample);
+        if (sampleCount is < 1 or > 3600 || interval < TimeSpan.FromMilliseconds(250) ||
+            interval > TimeSpan.FromMinutes(1))
+            throw new ArgumentOutOfRangeException(nameof(sampleCount));
+        var before = await ReadVerifiedObdAsync(transport, expectedVin, null, timeout, token);
+        if (before.ProtocolValue != 1)
+            throw new InvalidDataException("Selected ECU did not identify as OBDonUDS.");
+        await MonitorDidAsync(transport, did, sampleCount, interval, timeout, token, sample);
+        var after = await ReadVerifiedObdAsync(transport, expectedVin, null, timeout, token);
+        if (after.ProtocolValue != before.ProtocolValue)
+            throw new InvalidDataException("OBDonUDS identification changed during monitoring.");
+    }
+
+    internal static async Task MonitorObservedObdAsync(
+        DoIpVehicleDiscovery.Identity gateway, IPAddress address, ushort tester,
+        ushort ecu, bool tls, string expectedVin, ushort did, int sampleCount,
+        TimeSpan interval, TimeSpan timeout, CancellationToken token, Action<int, byte[]> sample,
+        string? certificate = null, Action<DoIpDiagnosticTransport.PduTrace>? trace = null)
+    {
+        if (!DoIpVehicleDiscovery.IsVehicleVin(expectedVin) || gateway.Vin != expectedVin ||
+            ObdOnUdsServices.ClassifyDid(did) == ObdOnUdsServices.DataGroup.NotLegislated)
+            throw new ArgumentException("Explicit matching VIN and legislated DID required.");
+        await using var transport = await ConnectObservedAsync(gateway, address, tester,
+            ecu, tls, timeout, token, certificate, trace);
+        await MonitorVerifiedObdAsync(transport, expectedVin, did, sampleCount, interval,
+            timeout, token, sample);
+    }
+
     internal static async Task MonitorObservedGatewayDidAsync(
         DoIpVehicleDiscovery.Identity gateway, IPAddress address, ushort tester,
         ushort ecu, bool useTls, ushort did, int sampleCount, TimeSpan interval,
