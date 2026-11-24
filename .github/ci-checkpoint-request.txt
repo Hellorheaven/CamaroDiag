@@ -142,3 +142,9 @@ Deux correctifs ISO-TP dans la seule PR #95: ignorer les evenements J2534 TX/sta
 Code HEAD avant le checkpoint : 3bdb89a8347cab94a038d161b34e48a96dd2ae3c.
 Deux commits groupés f245429 et 3bdb89a : propagation de cancellation après appel synchrone PassThruWriteMsgs, aucune nouvelle CF après annulation, rejet du flag BRS sur CAN classique, trace CSV TX_UNCONFIRMED quand TX a une issue indéterminée, autotests offline et limites de qualification de banc documentées.
 Déclencher UNE campagne Debug complète sur le SHA de ce marqueur : Windows -warnaserror et --self-test, Android, natif ECU, Connectors. Pas de Release, merge ou revendication de support matériel ECU/VCI.
+
+24/11/2026 — ISO-TP CAN classique, contrôle hors ligne de captures CAN physiques (#110).
+HEAD du code avant checkpoint : bd71f94dd4c5a146571fed637ddf24568534829c.
+Nouvelle CLI --isotp-audit-trace sur CSV timestamp_us,direction,can_id,payload_hex, analyse SF/FF/FC/CF, BS, CTS/WAIT/OVFLW, STmin et N_Bs ; 11 et 29 bits classiques avec adressage normal ; tests avec faux bus sans driver et refus des journaux horodatés uniquement côté hôte.
+Un seul checkpoint Debug complet (Windows -warnaserror/self-test, Android unit/lint/assemble Debug, native ECU, firmware/connecteurs), vérifier les logs au SHA exact de ce marqueur. Aucun ECU réel, flash ni conformité constructeur attestés.
+PR #95 toujours draft ; ne pas fusionner ni démarrer un protocole suivant avant la qualification matérielle.
