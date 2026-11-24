@@ -1,3 +1,9 @@
+## Continuation immédiate après fusion PR95 — 24/11/2026
+
+PR95 fermée et fusionnée dans main au SHA `02c26ffcc79eb25d0b04735020e9ed7985590fd4`. CI Debug #45410206158 et revue #45414433916 réussies sur bf850b3. La branche existante est synchronisée avec main et réutilisée faute d'action de suppression de branche accessible ; une seule PR active. Reprendre C6/DoIP immédiatement : raccordement GUI de la lecture DTC 19/02, tests et FR/EN, puis toutes les intégrations restantes selon le triplet connecteur + ECU + opération. Les reliquats C1/C2/C4, #63, #110 et C8 final restent dus. Aucune qualification physique revendiquée. Les références historiques à PR95 ne désignent plus la PR active.
+
+---
+
 ## Décision propriétaire — scission PR95 et continuité immédiate (24/11/2026)
 
 Le propriétaire autorise la scission, la validation puis la fusion de PR95 et la création immédiate de sa PR de continuation. Cette autorisation ne dispense pas du checkpoint Debug complet sur le HEAD exact ni du contrôle de fusionnabilité. Ne pas fusionner en cas d'échec, ne pas publier de Release intermédiaire volontairement. Conserver tous les commits et les issues ouvertes.
