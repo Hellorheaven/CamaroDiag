@@ -7,6 +7,37 @@ namespace CamaroDiag.J2534Bridge;
 internal static class ConnectorDiscoveryCli
 {
     internal const string Command = "--discover-connector";
+    internal const string ListCommand = "--list-ports";
+
+    /** Enumerate only canonical Windows COM names; never open a serial port. */
+    internal static string[] EnumeratedPortNames(IEnumerable<string> names) =>
+        names.Where(IsValidPort)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+    internal static int ListPorts(string[] args)
+    {
+        if (args.Length != 1 || !args[0].Equals(ListCommand, StringComparison.OrdinalIgnoreCase))
+        {
+            Console.Error.WriteLine("Usage: --list-ports (no other options)");
+            return 2;
+        }
+        try
+        {
+            var names = EnumeratedPortNames(SerialPort.GetPortNames());
+            foreach (var name in names) Console.WriteLine(name);
+            if (names.Length == 0) Console.WriteLine("No serial COM ports found.");
+            Console.WriteLine("Port listing only / Liste des ports uniquement. No device opened / Aucun appareil ouvert.");
+            return 0;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException
+            or InvalidOperationException)
+        {
+            Console.Error.WriteLine("Unable to enumerate COM ports: " + ex.Message);
+            return 1;
+        }
+    }
     internal static bool IsValidPort(string port) =>
         Regex.IsMatch(port, @"\ACOM[1-9][0-9]{0,3}\z", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
