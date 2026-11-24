@@ -139,7 +139,8 @@ class BluetoothObdManager(context: Context) {
 
     @SuppressLint("MissingPermission")
     suspend fun connectAndProbe(macAddress: String): Result<AdapterCapabilities> = withContext(Dispatchers.IO) {
-        disconnect()
+        val epoch = beginAdapterConnection()
+        var ownClassicSocket: BluetoothSocket? = null
         try {
             val device: BluetoothDevice = bluetoothAdapter?.getRemoteDevice(macAddress)
                 ?: return@withContext Result.failure(IllegalStateException("Bluetooth adapter unavailable"))
@@ -150,28 +151,40 @@ class BluetoothObdManager(context: Context) {
             if (useBle) {
                 val bleResult = bleTransport.connect(device)
                 if (bleResult.isFailure) {
-                    disconnect()
+                    disconnectIfCurrent(epoch)
                     return@withContext Result.failure(bleResult.exceptionOrNull()!!)
                 }
-                activeTransport = "BLE"
+                synchronized(adapterLifecycleLock) {
+                    transportSessionEpoch.requireQueuedCurrent(epoch)
+                    activeTransport = "BLE"
+                }
             } else {
                 val btSocket = device.createRfcommSocketToServiceRecord(sppUuid)
-                // Retain the socket before connecting so disconnect() also closes a
-                // failed RFCOMM handshake instead of leaking its descriptor.
-                socket = btSocket
+                ownClassicSocket = btSocket
+                // A pending RFCOMM connect must be owned by its exact epoch;
+                // disconnect() can then close the pending handshake on a switch.
+                synchronized(adapterLifecycleLock) {
+                    transportSessionEpoch.requireQueuedCurrent(epoch)
+                    socket = btSocket
+                }
                 btSocket.connect()
-                activeTransport = "BLUETOOTH"
-                inputStream = btSocket.inputStream
-                outputStream = btSocket.outputStream
+                val connectedInput = btSocket.inputStream
+                val connectedOutput = btSocket.outputStream
+                synchronized(adapterLifecycleLock) {
+                    transportSessionEpoch.requireQueuedCurrent(epoch)
+                    activeTransport = "BLUETOOTH"
+                    inputStream = connectedInput
+                    outputStream = connectedOutput
+                }
             }
-            probeConnectedAdapter(device.name ?: "Bluetooth OBD-II", macAddress)
+            probeConnectedAdapter(device.name ?: "Bluetooth OBD-II", macAddress, epoch)
         } catch (cancelled: kotlinx.coroutines.CancellationException) {
-            // Propagate cancellation after cleanup: a replacement connection
-            // must not race the teardown of this handshake.
-            disconnect()
+            runCatching { ownClassicSocket?.close() }
+            disconnectIfCurrent(epoch)
             throw cancelled
         } catch (error: Exception) {
-            disconnect()
+            runCatching { ownClassicSocket?.close() }
+            disconnectIfCurrent(epoch)
             Result.failure(error)
         }
     }
@@ -279,7 +292,7 @@ class BluetoothObdManager(context: Context) {
         }
 
     suspend fun connectUsb(deviceId: Int, baudRate: Int = 38400): Result<AdapterCapabilities> = withContext(Dispatchers.IO) {
-        disconnect()
+        val epoch = beginAdapterConnection()
         try {
             // Re-check the currently enumerated USB device at the manager boundary.
             // Neither a legacy UI entry nor a saved ELM profile may bypass discovery.
@@ -292,18 +305,19 @@ class BluetoothObdManager(context: Context) {
             }
             val connected = usbTransport.connect(deviceId, baudRate)
             if (connected.isFailure) {
-                disconnect()
+                disconnectIfCurrent(epoch)
                 return@withContext Result.failure(connected.exceptionOrNull()!!)
             }
-            activeTransport = "USB"
-            probeConnectedAdapter("ELM327 USB #$deviceId", "USB:$deviceId")
+            synchronized(adapterLifecycleLock) {
+                transportSessionEpoch.requireQueuedCurrent(epoch)
+                activeTransport = "USB"
+            }
+            probeConnectedAdapter("ELM327 USB #$deviceId", "USB:$deviceId", epoch)
         } catch (cancelled: kotlinx.coroutines.CancellationException) {
-            // Propagate cancellation after cleanup: a replacement connection
-            // must not race the teardown of this handshake.
-            disconnect()
+            disconnectIfCurrent(epoch)
             throw cancelled
         } catch (error: Exception) {
-            disconnect()
+            disconnectIfCurrent(epoch)
             Result.failure(error)
         }
     }
