@@ -2412,13 +2412,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         lateinit var requestJob: Job
         requestJob = viewModelScope.launch(Dispatchers.IO, start = CoroutineStart.LAZY) {
             try {
-                val transmission = obdManager.sendRawCanFrameWithStatus(frame) {
-                    EcuWriteConsentFlow.requireCurrentForTransmit(approval) {
-                        isCurrentAccountGeneration(confirmedAccountGeneration) &&
-                            confirmedAdapterGeneration == connectionAttemptGeneration &&
-                            confirmedVehicle == _vehicle.value &&
-                            confirmedConsoleGeneration == _liveCanMonitorState.value.consoleContextGeneration
-                    }
+                val transmission = obdManager.sendRawCanFrameWithStatus(frame, approval) {
+                    isCurrentAccountGeneration(confirmedAccountGeneration) &&
+                        confirmedAdapterGeneration == connectionAttemptGeneration &&
+                        confirmedVehicle == _vehicle.value &&
+                        confirmedConsoleGeneration == _liveCanMonitorState.value.consoleContextGeneration
                 }
                 val response = transmission.adapterOutput
                 if (canRequestJob === requestJob) {
