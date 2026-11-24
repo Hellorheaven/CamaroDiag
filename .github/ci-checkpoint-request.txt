@@ -1,3 +1,7 @@
+PR117 — DoIP offline verification, live monitoring, SW-CAN capture, gateway controls, Connectors host integration
+Implementation HEAD: 73e5607befd7eb980f465caf0b8cce036e86996b
+Grouped full Debug checkpoint on exact marker SHA: Android unit/lint/assemble, Windows warnings-as-errors/self-tests, native/Connectors firmware/hosts and Firebase offline. Intermediate C6/DoIP, not final C8. No hardware tests, merge, release or Firebase deployment.
+
 PR117 — DoIP Windows/Android functional integration checkpoint — 2026-11-24
 Implementation HEAD 84be7d7ed407c785f96631d08cdf895e9b1e9fef.
 Full Debug gate: Android compile/lint/tests, Windows warnaserror/selftests, native/Connectors and Firebase offline. Intermediate, not C8. No hardware tests, merge, release or deployment.
