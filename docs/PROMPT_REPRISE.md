@@ -1,3 +1,10 @@
+## PR117 — découverte VIN Windows, contrôle identité ECU, cohérence Android (24/11/2026)
+
+- HEAD fonctionnel `92ff94c5bb7737f11ab785ee1c1ac090e839debc`. Windows : découverte IPv4 VIN avec IP vide, sélection d'une passerelle unique (EID/GID compris), renseignement IP automatique, invalidation sur changement VIN/ECU/session, ressources FR/EN et journal TX/RX des octets de contrôle UDP (`ea81112`, `8d73938`, `d34362c`, `74537cb`). Découverte unicast manuelle conservée et filtrée par VIN lorsqu'il est renseigné.
+- Lectures Windows DID/DTC et monitoring vérifient F190 sur la même session routée avant l'opération et le monitoring revérifie le VIN à la fin (`3dc09f3`). Android distingue aussi les EID/GID lors de la découverte VIN (`5755d11`). Pas d'attribution inventée d'adresses ECU, ni programmation DoIP qualifiée. La trace Windows des contrôles TCP/TLS reste à raccorder intégralement ; pas de capture réseau exhaustive.
+- Autotests loopback UDP Windows/Android, F190 positif/discordant et ressources FR/EN écrits (`3abbec6`, `f87b33e`, `edf38f8`, `92ff94c`). Résultats de la CI précédente au SHA deb94e6 non accessibles via consultation des runs et statuts ; ne pas déclarer cette tranche compilée ou testée. Validation groupée sur le prochain marqueur.
+- C6 + DoIP toujours actifs, C8 non commencé. Suite : intégration par fonction et sélection complète, journal TCP/TLS Windows, SW-CAN brut TX et GMLAN ELM dans la suite du périmètre #110. Une seule PR, aucun merge/Release/déploiement, qualification physique sur Release #48 seulement.
+
 ## PR117 — journal DoIP complet des contrôles et découverte VIN Android (24/11/2026)
 
 - HEAD fonctionnel de cette tranche : `a7b3d408f79bbb6a11fc9f4f77abbf7a90814e7f`. Transport `266fdb6` et raccordement console `4100916` : journal commun TX/RX/CSV des contrôles UDP, activation de routage TCP/TLS, alive checks et ACK/NACK, en complément des UDS PDUs déjà raccordées. Les événements de contrôle contiennent les octets de PDU observés et le transport, pas des identifiants CAN artificiels. Pas de capture réseau exhaustive (paquets étrangers, invalides/tronqués ou chiffrement TLS).
