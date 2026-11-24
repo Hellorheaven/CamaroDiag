@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms</value></resheader>
+  <data name="HelpText" xml:space="preserve"><value>Pont Windows J2534 CamaroDiag — ligne de commande
+Lancer sans argument pour ouvrir l'interface graphique.
+
+Utilisation :
+  CamaroDiag.J2534Bridge.exe --help
+  CamaroDiag.J2534Bridge.exe --self-test
+  CamaroDiag.J2534Bridge.exe --probe-drivers
+  CamaroDiag.J2534Bridge.exe --discover-connector COM5
+  CamaroDiag.J2534Bridge.exe --inspect-connector-checkpoint checkpoint.bin
+  CamaroDiag.J2534Bridge.exe --inspect-write-journal attempt.jsonl
+  CamaroDiag.J2534Bridge.exe --inspect-e39-image original-3MiB.bin
+  CamaroDiag.J2534Bridge.exe --port 35001
+  CamaroDiag.J2534Bridge.exe --port 35001 --memory-read-profile profile.json
+  CamaroDiag.J2534Bridge.exe --port 35001 --allow-obd-clear
+
+Exemples :
+  --self-test                 Tests logiciels simulés, sans adaptateur ni calculateur.
+  --probe-drivers             Liste des pilotes J2534 Windows, sans accès calculateur.
+  --discover-connector COM5   Découverte série CD/1 d'une carte prototype isolée.
+  --inspect-write-journal attempt.jsonl
+                              Analyse d'un journal hors ligne, sans reprise ou effacement.
+  --port 35001                Démarre le pont J2534 local avec appairage TLS.
+                              Une vérification de mise à jour peut avoir lieu.
+                              Ne jamais exposer ce port sur Internet.
+  --allow-obd-clear           Autorise localement la suppression des défauts OBD.
+                              Android demande aussi OK, puis Oui séparément.
+
+Chaque commande nécessite ses paramètres exacts. Utiliser --help seul :
+une invocation mélangeant aide et programmation est refusée sans accès matériel.
+L'aide n'active ni flash, ni EEPROM, ni écriture UDS brute.
+Les simulations ne valident pas les calculateurs physiques.
+Pont Linux x64/ARM64 avec CLI identique prévu dans l'issue #115.</value></data>
+</root>
