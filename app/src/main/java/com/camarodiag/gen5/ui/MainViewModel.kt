@@ -2695,11 +2695,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         // the actual bytes on Dispatchers.IO before publishing the export.
         val journalRevisionAtClick = consoleEventJournal.revision()
         var expectedJournalSnapshot: CanConsoleEventJournalStore.Snapshot? = null
+        var expectedRawArchiveSnapshot: CanConsoleRawArchiveIntegrity.Snapshot? = null
         // Do not publish an old snapshot after Clear, a new recording, or a
         // new physical TX has changed the active console since export started.
         fun current() = canResumeExport(exportGeneration, owner) &&
             _vehicle.value == profile && hasPremiumLicense() &&
             activeCanCaptureFile == selectedArchive &&
+            (expectedRawArchiveSnapshot?.let { CanConsoleRawArchiveIntegrity.isCurrent(it) } != false) &&
             !consoleEventJournalFailed && !consoleEventJournal.hasFailed() &&
             consoleEventJournal.revision() == journalRevisionAtClick &&
             (expectedJournalSnapshot?.let { consoleEventJournal.isCurrent(it) } != false) &&
@@ -2717,6 +2719,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 expectedJournalSnapshot = journalSnapshot
                 if (!current()) return@launch
                 val archive = selectedArchive?.takeIf { it.isFile }
+                check(selectedArchive == null || archive != null) {
+                    "The selected complete CAN raw archive disappeared before export"
+                }
                 check(history.isEmpty() || journalSnapshot != null) {
                     "Complete console event journal is unavailable"
                 }
@@ -2731,6 +2736,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 )) {
                     "CAN capture export is not available."
                 }
+                // The raw capture must have the same exact bytes at export
+                // completion as it had at the start. This hashes on IO only;
+                // no entire CAN archive is loaded into RAM.
+                expectedRawArchiveSnapshot = archive?.let {
+                    CanConsoleRawArchiveIntegrity.capture(it)
+                }
+                if (!current()) return@launch
                 val outputText = buildString {
                     appendLine(localizedContext.getString(R.string.can_console_export_header))
                     appendLine(localizedContext.getString(
