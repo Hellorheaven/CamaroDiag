@@ -469,6 +469,38 @@ internal static class StandardVehicleProtocolsSelfTests
         Check(parsed.Request.SequenceEqual(new byte[] { 0x2E, 0xF1, 0x90, 1 }),
             "DoIP bidirectional CLI accepts WDBI service.");
 
+        var customRouting = StandardProtocolCli.ParseDoIp([
+            StandardProtocolCli.DoIpCommand, "--host", "127.0.0.1",
+            "--tester", "0E80", "--ecu", "1234",
+            "--payload", "22F190",
+            "--routing-activation-type", "0xE0",
+            "--routing-oem-data", "01020304"]);
+        Check(customRouting.RoutingActivationType == 0xE0 &&
+            customRouting.RoutingOemData is { Length: 4 } &&
+            customRouting.RoutingOemData.AsSpan().SequenceEqual([1, 2, 3, 4]),
+            "DoIP custom activation type and explicit 4-byte OEM field parsed.");
+        var routeWithOem = DoIpCodec.Decode(
+            DoIpCodec.RoutingActivation(0x0E80, activationType: 0xE0,
+                version: 0x03, oemSpecificData: [1, 2, 3, 4]));
+        Check(routeWithOem.Version == 0x03 &&
+            routeWithOem.Payload.Length == 11 &&
+            routeWithOem.Payload[2] == 0xE0 &&
+            routeWithOem.Payload.AsSpan(3, 4).SequenceEqual([0, 0, 0, 0]) &&
+            routeWithOem.Payload.AsSpan(7, 4).SequenceEqual([1, 2, 3, 4]),
+            "DoIP 11-byte routing activation leaves ISO-reserved bytes zero.");
+        Check(DoIpCodec.Decode(DoIpCodec.RoutingActivation(0x0E80))
+            .Payload.Length == 7,
+            "Legacy routing activation defaults to 7-byte request.");
+        Reject<ArgumentException>(() => DoIpCodec.RoutingActivation(
+            0x0E80, oemSpecificData: [1, 2, 3]),
+            "OEM routing activation data is only accepted at exactly four bytes.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseDoIp([
+            StandardProtocolCli.DoIpCommand, "--host", "127.0.0.1",
+            "--tester", "0E80", "--ecu", "1234",
+            "--payload", "22F190", "--routing-oem-data", "010203"
+        ]), "DoIP CLI refuses truncated OEM routing activation data.");
+
+
         var doIpTiming = StandardProtocolCli.ParseDoIp([
             StandardProtocolCli.DoIpCommand, "--host", "127.0.0.1",
             "--tester", "0E80", "--ecu", "1234",
