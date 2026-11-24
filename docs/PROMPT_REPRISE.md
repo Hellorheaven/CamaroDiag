@@ -1,3 +1,8 @@
+## PR117 — nettoyage interface et checkpoint intermédiaire (24/11/2026)
+
+- Console Windows `4bf89e5`, règle permanente `01024b3`, autres écrans Windows/Android `284ef69`, seconde passe `8ad4445`. Les anciens appels d'affichage sont commentés, ressources préservées ; conserver les états, erreurs, avertissements et limites utiles. Connectors : panneau expérimental et confirmations d'isolement conservés pour sécurité ; pas de GUI indépendante identifiée dans l'inventaire de sources.
+- Inventaire et revue des écrans principaux Windows/Android réalisés ; pas de recette visuelle exhaustive ni de test physique. Déclencher checkpoint Debug groupé au HEAD exact, corriger les échecs avant clôture. C6/DoIP restent actifs ; DID générique `d303cbd`, ressources `3e7305c` / `38c9868`, raccordement graphique DID restant. C8 non commencé.
+
 ## Continuation immédiate après fusion PR95 — 24/11/2026
 
 PR95 fermée et fusionnée dans main au SHA `02c26ffcc79eb25d0b04735020e9ed7985590fd4`. CI Debug #45410206158 et revue #45414433916 réussies sur bf850b3. La branche existante est synchronisée avec main et réutilisée faute d'action de suppression de branche accessible ; une seule PR active. Reprendre C6/DoIP immédiatement : raccordement GUI de la lecture DTC 19/02, tests et FR/EN, puis toutes les intégrations restantes selon le triplet connecteur + ECU + opération. Les reliquats C1/C2/C4, #63, #110 et C8 final restent dus. Aucune qualification physique revendiquée. Les références historiques à PR95 ne désignent plus la PR active.
