@@ -1,3 +1,17 @@
+C8 SINGLE GROUPED CHECKPOINT — 2026-11-24 — C2/C6 non-protocol work
+Implementation HEAD before gate: f7da32776d382eb38563e8ebfad0033ecf4157cc
+Developer work: persistent Android ECU sector archive streams write/readback by
+bounded chunks; multi-MiB simulation regression. Windows bridge --help/-h/?,
+FR/EN .resx user CLI examples, safe help dispatch BEFORE updater/VCI/ECU,
+strict startup parser rejecting unknown/duplicate/malformed port or memory
+profile before any network activity, plus hardware-free regression tests.
+Process decision: NO real vehicle/ECU/hardware test during PR #95.
+User's physical validation only AFTER PR close, on authorized Release with
+Lot 8 test workbook issue #48. Before merge, require full Debug software
+checks, lint and builds, C8 merge/conflict audit. No merge or release here.
+Run Android testDebugUnitTest/lintDebug/assembleDebug, Windows Debug self-test,
+native ECU and Connectors all platforms, backend on the exact resulting SHA.
+
 C8 GROUPED CHECKPOINT — connectors discovery / C2 durability / C6 pairing — 2026-11-23
 Exact implementation HEAD before gate: 504ca9dcd25253c7b924233214f5950e36b79265
 Scope of this non-protocol increment:
