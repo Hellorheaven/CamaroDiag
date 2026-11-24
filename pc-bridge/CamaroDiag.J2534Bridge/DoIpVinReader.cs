@@ -211,7 +211,8 @@ internal static class DoIpVinReader
 
     internal static async Task<int> ExchangeSequenceVerifiedAsync(DoIpDiagnosticTransport transport,
         DoIpVehicleDiscovery.Identity gateway, IReadOnlyList<byte[]> commands, TimeSpan timeout,
-        CancellationToken token, Action<int, byte[]> onReply)
+        CancellationToken token, Action<int, byte[]> onReply,
+        TimeSpan? p2Timeout = null, TimeSpan? p2StarTimeout = null)
     {
         ArgumentNullException.ThrowIfNull(onReply);
         var frozen = FreezeCommands(commands);
@@ -219,7 +220,7 @@ internal static class DoIpVinReader
         for (var i = 0; i < frozen.Length; i++)
         {
             token.ThrowIfCancellationRequested();
-            var reply = await transport.ExchangeUdsAsync(frozen[i], timeout, token);
+            var reply = await transport.ExchangeUdsAsync(frozen[i], timeout, token, p2Timeout, p2StarTimeout);
             token.ThrowIfCancellationRequested();
             onReply(i + 1, reply.ToArray());
         }

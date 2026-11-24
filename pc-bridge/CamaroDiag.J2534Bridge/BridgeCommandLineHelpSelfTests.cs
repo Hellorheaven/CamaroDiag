@@ -41,7 +41,7 @@ internal static class BridgeCommandLineHelpSelfTests
         foreach (var option in new[] {
             "--doip-discover", "--doip-status", "--doip-exchange", "--doip-backup", "--doip-verify-backup", "--confirm-read true",
             "--listen-ipv6-ifindex", "--multicast-ipv6-ifindex",
-            "--doip-version", "--uds-p2-ms", "--uds-p2-star-ms",
+            "--doip-version", "--uds-p2-ms", "--uds-p2-star-ms", "--sequence", "--expected-vin",
             "--power-mode true", "--broadcast-ip", "--vin", "--eid",
             "--tls true", "--tester", "--ecu", "--payload"
         })

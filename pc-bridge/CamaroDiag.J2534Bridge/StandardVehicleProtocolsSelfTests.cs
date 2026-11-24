@@ -517,6 +517,23 @@ internal static class StandardVehicleProtocolsSelfTests
         Check(parsed.Request.SequenceEqual(new byte[] { 0x2E, 0xF1, 0x90, 1 }),
             "DoIP bidirectional CLI accepts WDBI service.");
 
+        var sequence = StandardProtocolCli.ParseDoIpSequence([
+            StandardProtocolCli.DoIpCommand, "--host", "127.0.0.1",
+            "--tester", "0E80", "--ecu", "1234", "--expected-vin", "1G1FA1RXXR0123456",
+            "--sequence", "22F190;1901FF"]);
+        Check(sequence.Target.UseTls && sequence.Commands.Length == 2 &&
+            sequence.Commands[1].SequenceEqual(new byte[] {0x19,1,0xFF}) &&
+            !sequence.ExplicitVersion, "DoIP sequence defaults to TLS and preserves command order.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseDoIpSequence([
+            StandardProtocolCli.DoIpCommand, "--host", "127.0.0.1",
+            "--tester", "0E80", "--ecu", "1234", "--sequence", "22F190"]),
+            "DoIP sequence requires explicit VIN.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseDoIpSequence([
+            StandardProtocolCli.DoIpCommand, "--host", "127.0.0.1",
+            "--tester", "0E80", "--ecu", "1234", "--expected-vin", "1G1FA1RXXR0123456",
+            "--sequence", "22F190;1901FF", "--payload", "22F190"]),
+            "DoIP sequence rejects competing payload option.");
+
         var customRouting = StandardProtocolCli.ParseDoIp([
             StandardProtocolCli.DoIpCommand, "--host", "127.0.0.1",
             "--tester", "0E80", "--ecu", "1234",

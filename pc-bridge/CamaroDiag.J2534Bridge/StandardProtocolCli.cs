@@ -1442,10 +1442,92 @@ internal static class StandardProtocolCli
         output.Flush(flushToDisk: true);
     }
 
+    internal sealed record DoIpSequenceOptions(DoIpOptions Target, string Vin,
+        byte[][] Commands, bool ExplicitVersion);
+
+    internal static DoIpSequenceOptions ParseDoIpSequence(string[] args)
+    {
+        // Parse every option as an explicit pair, reject duplicated or
+        // unrelated options instead of silently changing the approved target.
+        var allowed = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "--host", "--tester", "--ecu", "--expected-vin", "--sequence", "--timeout-ms",
+            "--tls", "--doip-version", "--client-cert-thumbprint", "--uds-p2-ms",
+            "--uds-p2-star-ms", "--routing-activation-type", "--routing-oem-data"
+        };
+        var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        for (var i = args.Length > 0 && args[0].Equals(DoIpCommand, StringComparison.OrdinalIgnoreCase) ? 1 : 0;
+             i < args.Length; i += 2)
+        {
+            if (i + 1 >= args.Length || !allowed.Contains(args[i]) ||
+                args[i + 1].StartsWith("--", StringComparison.Ordinal) ||
+                !values.TryAdd(args[i], args[i + 1]))
+                throw new ArgumentException("Unexpected or repeated DoIP sequence option.");
+        }
+        if (!values.TryGetValue("--expected-vin", out var vin) ||
+            !DoIpVehicleDiscovery.IsVehicleVin(vin) ||
+            !values.TryGetValue("--sequence", out var sequence))
+            throw new ArgumentException("Explicit expected VIN and sequence required.");
+        var commands = DoIpConsolePresentation.ParseCommands(sequence);
+        var explicitVersion = values.ContainsKey("--doip-version");
+        values.Remove("--sequence");
+        values.Remove("--expected-vin");
+        values["--payload"] = Convert.ToHexString(commands[0]);
+        if (!values.ContainsKey("--tls")) values["--tls"] = "true";
+        var target = ParseDoIp(values.SelectMany(x => new[] { x.Key, x.Value }).ToArray());
+        if (!System.Net.IPAddress.TryParse(target.Host, out _))
+            throw new ArgumentException("DoIP sequence requires a numeric unicast IP.");
+        return new DoIpSequenceOptions(target, vin, commands, explicitVersion);
+    }
+
+    private static async Task<int> RunDoIpSequenceAsync(string[] args)
+    {
+        var sequence = ParseDoIpSequence(args);
+        var o = sequence.Target;
+        if (Console.IsInputRedirected)
+            throw new InvalidOperationException("Interactive terminal required for ECU consent.");
+        using var cancellation = new CancellationTokenSource();
+        ConsoleCancelEventHandler cancel = (_, e) => { e.Cancel = true; cancellation.Cancel(); };
+        Console.CancelKeyPress += cancel;
+        try
+        {
+            var timeout = TimeSpan.FromMilliseconds(o.TimeoutMs);
+            var gateway = await DoIpVehicleDiscovery.DiscoverAsync(o.Host, timeout,
+                cancellation.Token, vin: sequence.Vin);
+            if (gateway.Vin != sequence.Vin ||
+                (sequence.ExplicitVersion && gateway.ProtocolVersion != o.Version) ||
+                gateway.LogicalAddress == o.Tester)
+                throw new InvalidDataException("Observed DoIP gateway differs from the sequence target.");
+            if (!Confirm($"DoIP {(o.UseTls ? "TLS" : "TCP")} VIN={sequence.Vin} " +
+                $"IP={o.Host} gateway=0x{gateway.LogicalAddress:X4} ECU=0x{o.Ecu:X4} tester=0x{o.Tester:X4} " +
+                $"v=0x{gateway.ProtocolVersion:X2} routing=0x{o.RoutingActivationType:X2} " +
+                $"OEM={(o.RoutingOemData is null ? "none" : Convert.ToHexString(o.RoutingOemData))} " +
+                $"commands={string.Join("; ", sequence.Commands.Select(c => Convert.ToHexString(c)))}"))
+                return 2;
+            cancellation.Token.ThrowIfCancellationRequested();
+            await using var transport = await DoIpDiagnosticTransport.ConnectAsync(
+                o.Host, o.Tester, o.Ecu, timeout, cancellation.Token,
+                useTls: o.UseTls, protocolVersion: gateway.ProtocolVersion,
+                clientCertificateThumbprint: o.ClientCertificateThumbprint,
+                activationType: o.RoutingActivationType, activationOemData: o.RoutingOemData,
+                expectedGatewayAddress: gateway.LogicalAddress);
+            var count = await DoIpVinReader.ExchangeSequenceVerifiedAsync(transport, gateway,
+                sequence.Commands, timeout, cancellation.Token, (index, reply) =>
+                    Console.WriteLine(string.Format(DoIpConsolePresentation.Text("SequenceReply"),
+                        index, Convert.ToHexString(reply))),
+                TimeSpan.FromMilliseconds(o.DoIpP2Ms), TimeSpan.FromMilliseconds(o.DoIpP2StarMs));
+            Console.WriteLine(string.Format(DoIpConsolePresentation.Text("SequenceComplete"), count));
+            return 0;
+        }
+        finally { Console.CancelKeyPress -= cancel; }
+    }
+
     internal static async Task<int> RunDoIpAsync(string[] args)
     {
         try
         {
+            if (args.Contains("--sequence", StringComparer.OrdinalIgnoreCase))
+                return await RunDoIpSequenceAsync(args);
             var o = ParseDoIp(args);
             if (!Confirm($"DoIP {(o.UseTls ? "TLS" : "TCP")} " +
                 $"{o.Host}:{(o.UseTls ? 3496 : 13400)} ECU=0x{o.Ecu:X4} " +
@@ -1489,7 +1571,7 @@ internal static class StandardProtocolCli
         catch (Exception ex) when (ex is ArgumentException or
             IOException or SocketException or OperationCanceledException or
             InvalidDataException or TimeoutException or
-            System.Security.Authentication.AuthenticationException or FormatException or OverflowException)
+            System.Security.Authentication.AuthenticationException or FormatException or OverflowException or InvalidOperationException)
         {
             Console.Error.WriteLine("DoIP exchange failed: " + ex.Message);
             return 6;

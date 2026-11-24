@@ -1,3 +1,7 @@
+PR117 — grouped host DoIP transport and scoped capture, cross-platform command sequences checkpoint
+Parent implementation HEAD: 17ba6af8cedd06e14d8bd9d45332d7f9cace2cb5
+Validate Connectors Python UDP/TCP/TLS host, VIN ambiguity, DTC/monitor, scoped capture archive, consent and ordered sequence; Android and Windows GUI/CLI same-session UDS sequence, correlation, cancellation, localization, existing Debug checks. No merge/release/deployment/physical qualification.
+
 PR117 — grouped Android DoIP command and cross-platform DTC details checkpoint
 Implementation HEAD: 103a959555d8431c66c3a68b33a9d339ac28a752
 Validate Android consent-bound exchange, UDS response correlation, Android/Windows DTC 19/04 and 19/06 detail reads, localization and existing regression suite. Intermediate C6/DoIP only; no merge, release, deployment or physical qualification.
