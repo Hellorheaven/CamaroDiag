@@ -819,7 +819,7 @@ class BluetoothObdManager(context: Context) {
                 command, timeoutMs, expectedEpoch = requestedEpoch,
                 onChunk = onChunk, beforeTransmit = beforeTransmit
             )
-            val protocol = if (frame.isExtended) "7" else "6"
+            val protocol = DiagnosticRouteSelector.elmCanProtocol(frame.isExtended, 500_000).toString()
             val header = if (frame.isExtended) {
                 frame.canId.toString(16).uppercase().padStart(8, '0')
             } else {
@@ -1223,6 +1223,40 @@ class BluetoothObdManager(context: Context) {
      * Both the queued session and the completed result are tied to the current
      * connection epoch, so reconnects cannot reuse an obsolete bridge.
      */
+    suspend fun <T> withSelectedUdsReadSession(
+        requestCanId: Int,
+        responseCanId: Int,
+        protocolNumber: Int,
+        timeoutMs: Long = 5000L,
+        readDids: Set<Int> = emptySet(),
+        block: suspend (UdsClient) -> T
+    ): T {
+        // Route once per operation, never retry on a different ECU or adapter.
+        val epoch = transportSessionEpoch.capture()
+        val extended = protocolNumber in setOf(34, 36, 64)
+        require(protocolNumber in setOf(33, 34, 35, 36, 63, 64))
+        val maxId = if (extended) 0x1FFFFFFF else 0x7FF
+        require(requestCanId in 0..maxId && responseCanId in 0..maxId &&
+            requestCanId != responseCanId)
+        transportSessionEpoch.requireCurrent(epoch)
+        val result = when {
+            isJ2534BridgeConnected() -> withJ2534BridgeUdsSession(
+                requestCanId, responseCanId, protocolNumber, timeoutMs, readDids, block)
+            isStnUdsReadAvailable -> {
+                if (protocolNumber in setOf(63, 64)) {
+                    check(activeAdapterCapabilities?.supportsSwCan == true) {
+                        "The connected adapter has not confirmed SW-CAN support."
+                    }
+                }
+                withStnUdsSession(requestCanId, responseCanId, protocolNumber,
+                    timeoutMs, readDids, block = block)
+            }
+            else -> error("No compatible implemented UDS transport on the current adapter.")
+        }
+        transportSessionEpoch.requireCurrent(epoch)
+        return result
+    }
+
     suspend fun <T> withJ2534BridgeUdsSession(
         requestCanId: Int,
         responseCanId: Int,

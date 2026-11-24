@@ -1125,23 +1125,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val protocolNumber = protocolNumberText.toIntOrNull()
                     ?: error("Profil CAN invalide.")
                 require(protocolNumber in setOf(33, 34, 35, 36, 63, 64)) { "Profil CAN non pris en charge." }
-                val raw = if (obdManager.isJ2534BridgeConnected()) {
-                    obdManager.withJ2534BridgeUdsSession(
+                val raw = obdManager.withSelectedUdsReadSession(
                         requestCanId = requestId,
                         responseCanId = responseId,
                         protocolNumber = protocolNumber,
                         timeoutMs = 5000L,
                         readDids = setOf(did)
                     ) { client -> client.readDataByIdentifier(did) }
-                } else {
-                    obdManager.withStnUdsSession(
-                        requestCanId = requestId,
-                        responseCanId = responseId,
-                        protocolNumber = protocolNumber,
-                        timeoutMs = 5000L,
-                        readDids = setOf(did)
-                    ) { client -> client.readDataByIdentifier(did) }
-                }
                 val decoded = signal.decode(raw)
                 val rendered = when {
                     decoded.unavailable -> localizedContext.getString(R.string.vm_sentinel_unavailable)
@@ -1447,23 +1437,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val protocolNumber = protocolNumberText.toIntOrNull()
                     ?: error("Profil CAN invalide.")
                 require(protocolNumber in setOf(33, 34, 35, 36, 63, 64)) { "Profil CAN non pris en charge." }
-                val data = if (obdManager.isJ2534BridgeConnected()) {
-                    obdManager.withJ2534BridgeUdsSession(
+                val data = obdManager.withSelectedUdsReadSession(
                         requestCanId = requestId,
                         responseCanId = responseId,
                         protocolNumber = protocolNumber,
                         timeoutMs = 5000L,
                         readDids = setOf(did)
                     ) { client -> client.readDataByIdentifier(did) }
-                } else {
-                    obdManager.withStnUdsSession(
-                        requestCanId = requestId,
-                        responseCanId = responseId,
-                        protocolNumber = protocolNumber,
-                        timeoutMs = 5000L,
-                        readDids = setOf(did)
-                    ) { client -> client.readDataByIdentifier(did) }
-                }
                 val hex = data.joinToString(" ") { "%02X".format(it.toInt() and 0xFF) }
                 val isVinDid = did == 0xF190
                 val rendered = if (isVinDid) {
@@ -1513,21 +1493,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val protocolNumber = protocolNumberText.toIntOrNull()
                     ?: error("Profil CAN invalide.")
                 require(protocolNumber in setOf(33, 34, 35, 36, 63, 64)) { "Profil CAN non pris en charge." }
-                val report = if (obdManager.isJ2534BridgeConnected()) {
-                    obdManager.withJ2534BridgeUdsSession(
+                val report = obdManager.withSelectedUdsReadSession(
                         requestCanId = requestId,
                         responseCanId = responseId,
                         protocolNumber = protocolNumber,
                         timeoutMs = 5000L
                     ) { client -> client.readDtcReport() }
-                } else {
-                    obdManager.withStnUdsSession(
-                        requestCanId = requestId,
-                        responseCanId = responseId,
-                        protocolNumber = protocolNumber,
-                        timeoutMs = 5000L
-                    ) { client -> client.readDtcReport() }
-                }
                 val moduleId = "ECU ${responseCanIdHex.uppercase()}"
                 val mappedDtcs = report.records.map { record ->
                     val baseCode = record.code.substringBefore('-')
