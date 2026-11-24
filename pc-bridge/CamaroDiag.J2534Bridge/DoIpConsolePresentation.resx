@@ -35,4 +35,11 @@
   <data name="VinNotice" xml:space="preserve"><value>VIN correlation is not ECU authentication or authorization for writing.</value></data>
   <data name="InvalidLogical" xml:space="preserve"><value>Enter distinct, explicit four-digit hexadecimal tester and ECU addresses.</value></data>
   <data name="InvalidCertificate" xml:space="preserve"><value>Client certificate requires TLS and a valid 40-digit hexadecimal thumbprint.</value></data>
+  <data name="ReadDtcs" xml:space="preserve"><value>Read ECU DTCs (UDS)</value></data>
+  <data name="DtcMask" xml:space="preserve"><value>DTC status mask (hex)</value></data>
+  <data name="InvalidDtcMask" xml:space="preserve"><value>Enter exactly two hexadecimal digits for the DTC status mask.</value></data>
+  <data name="DtcStarted" xml:space="preserve"><value>DoIP / {0} / UDS: DTC read at gateway {1}, ECU 0x{2:X4}, tester 0x{3:X4}, version 0x{4:X2}.</value></data>
+  <data name="DtcResult" xml:space="preserve"><value>DTC count={0}; requested mask=0x{1:X2}; available mask=0x{2:X2}</value></data>
+  <data name="DtcEntry" xml:space="preserve"><value>DTC 0x{0:X6}, status 0x{1:X2}</value></data>
+  <data name="DtcNotice" xml:space="preserve"><value>Read-only status report; no faults were cleared. An empty result only applies to the requested available status bits.</value></data>
 </root>
