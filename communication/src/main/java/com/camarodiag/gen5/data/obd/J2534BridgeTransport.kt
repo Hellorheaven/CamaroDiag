@@ -1,6 +1,8 @@
 package com.camarodiag.gen5.data.obd
 
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -88,6 +90,12 @@ class J2534BridgeTransport(
                 // completes BEFORE the first pairing token or UDS command is sent.
                 val connected = pairing.openSocket(host, port)
                 socket = connected
+                // TLS handshake is synchronous: cancellation or app Close can
+                // race it. No pairing bearer token or CAN "open" request may
+                // be sent after the operator switched away from this bridge.
+                J2534BridgeHandshakeAdmission.requireCurrent(
+                    currentCoroutineContext().isActive, externallyClosed
+                )
                 connected.soTimeout = 12_000
                 reader = BufferedReader(InputStreamReader(connected.getInputStream(), Charsets.UTF_8))
                 writer = BufferedWriter(OutputStreamWriter(connected.getOutputStream(), Charsets.UTF_8))
@@ -100,6 +108,11 @@ class J2534BridgeTransport(
                         .put("can29Bit", can29Bit)
                         .put("protocolNumber", protocolNumber),
                     10_000
+                )
+                // Even a valid reply can arrive after cancellation: do not
+                // publish capabilities for a closed/superseded TLS session.
+                J2534BridgeHandshakeAdmission.requireCurrent(
+                    currentCoroutineContext().isActive, externallyClosed
                 )
                 val requestLabel = requestCanId.toString(16).uppercase().padStart(if (can29Bit) 8 else 3, '0')
                 val responseLabel = responseCanId.toString(16).uppercase().padStart(if (can29Bit) 8 else 3, '0')
@@ -591,6 +604,20 @@ class J2534BridgeTransport(
 
     private fun String.hexToBytes(): ByteArray =
         chunked(2).map { it.toInt(16).toByte() }.toByteArray()
+}
+
+/** Pure fail-closed admission used after blocking TLS I/O and before publication. */
+internal object J2534BridgeHandshakeAdmission {
+    fun requireCurrent(coroutineActive: Boolean, closedByApp: Boolean) {
+        if (!coroutineActive) {
+            throw kotlinx.coroutines.CancellationException(
+                "J2534 TLS connection was cancelled before admission"
+            )
+        }
+        check(!closedByApp) {
+            "J2534 bridge connection was closed during the TLS handshake"
+        }
+    }
 }
 
 /** Bounded framing helpers for the untrusted JSON-lines PC bridge stream. */
