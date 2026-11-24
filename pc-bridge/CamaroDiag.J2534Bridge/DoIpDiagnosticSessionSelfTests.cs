@@ -502,6 +502,50 @@ internal static class DoIpDiagnosticSessionSelfTests
                 "Two NRC 0x78 and AliveCheck yield one final matching reply.");
         });
 
+
+        // TLS must never silently fall back to the clear-text DoIP port
+        // if the peer responds with non-TLS data. This loopback test uses
+        // no certificate, trust-store mutation, ECU, or real network.
+        var plainServer = new TcpListener(IPAddress.Loopback, 0);
+        plainServer.Start();
+        var plainPort = ((IPEndPoint)plainServer.LocalEndpoint).Port;
+        var sawClientHello = false;
+        var plainTask = Task.Run(async () =>
+        {
+            using var peer = await plainServer.AcceptTcpClientAsync();
+            await using var wire = peer.GetStream();
+            var header = new byte[5];
+            await wire.ReadExactlyAsync(header).WaitAsync(TimeSpan.FromSeconds(3));
+            sawClientHello = header[0] == 0x16 &&
+                header[1] == 0x03; // TLS record, never raw DoIP 0x02/0x03.
+            await wire.WriteAsync(new byte[]
+                {0x48, 0x54, 0x54, 0x50, 0x2F, 0x31, 0x2E, 0x31});
+            await wire.FlushAsync();
+        });
+        try
+        {
+            var refused = false;
+            try
+            {
+                await using var _ = await DoIpDiagnosticTransport.ConnectAsync(
+                    "127.0.0.1", Tester, Ecu, TimeSpan.FromSeconds(3),
+                    CancellationToken.None, useTls: true, portOverride: plainPort);
+            }
+            catch (Exception error) when (error is
+                System.Security.Authentication.AuthenticationException or
+                IOException or InvalidDataException)
+            {
+                refused = true;
+            }
+            await plainTask.WaitAsync(TimeSpan.FromSeconds(3));
+            Check(sawClientHello && refused,
+                "TLS mode never falls back to plaintext DoIP routing.");
+        }
+        finally
+        {
+            plainServer.Stop();
+        }
+
         return checks;
     }
 }
