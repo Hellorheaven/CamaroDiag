@@ -1,3 +1,7 @@
+PR95 SPLIT — FULL DEBUG PRE-MERGE CHECKPOINT — 2026-11-24
+Implementation and handoff HEAD: 7f28463935512e048a34c8bdd1ac06fdb29539d5
+Validate all Debug jobs on the exact resulting HEAD before owner-authorized merge. Intermediate stabilization only, not final C8. No physical qualification claimed. Preserve remaining scope in immediate continuation PR.
+
 C6 / DOIP CONSOLE INTEGRATION CHECKPOINT — 2026-11-24
 Implementation HEAD: 61c263944b2f068d743ad41b783ec9f1a091fe11
 Grouped Debug validation of Windows console DoIP identity, EntityStatus and PowerMode, observed-version routing, cancellation and FR/EN presentation; earlier UDP/TCP regression fixes included. Windows warnings-as-errors and self-tests, Android, native and Connectors. Intermediate validation, NOT C8; no physical tests, merge or Release. DoIP and C6 remain active.
