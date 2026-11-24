@@ -4,6 +4,9 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 import org.junit.Test
 
 /** Pure concurrency lifecycle tests; no Android, USB adapter or ECU. */
@@ -46,6 +49,29 @@ class ObdConnectionSlotTest {
         assertTrue(slot.publish(current.generation, handle))
         assertSame(handle, slot.releaseIfCurrent(current.generation))
         assertNull(slot.snapshot())
+    }
+
+    @Test fun onlyOneParallelOpenCanPublishTheSameUsbSessionGeneration() {
+        val slot = ObdConnectionSlot<Any>()
+        val generation = slot.begin().generation
+        val start = CountDownLatch(1)
+        val ready = CountDownLatch(8)
+        val accepted = AtomicInteger()
+        val handles = List(8) { Any() }
+        val threads = handles.map { handle ->
+            Thread {
+                ready.countDown()
+                if (start.await(5, TimeUnit.SECONDS) &&
+                    slot.publish(generation, handle)
+                ) accepted.incrementAndGet()
+            }.apply { start() }
+        }
+        assertTrue(ready.await(5, TimeUnit.SECONDS))
+        start.countDown()
+        threads.forEach { it.join(5000) }
+        assertTrue(threads.none { it.isAlive })
+        org.junit.Assert.assertEquals(1, accepted.get())
+        assertTrue(handles.any { slot.isCurrent(it) })
     }
 
     @Test fun aPublishedHandleCannotBeSilentlyOverwrittenInSameGeneration() {
