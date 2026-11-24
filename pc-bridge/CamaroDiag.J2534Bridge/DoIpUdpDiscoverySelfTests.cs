@@ -250,6 +250,58 @@ internal static class DoIpUdpDiscoverySelfTests
                 "Passive DoIP discovery filters wrong UDP source ports.");
         }
 
+        // The bound-socket entry point must enforce the same constraints as
+        // the public passive discovery path without taking socket ownership.
+        using (var unbound = new UdpClient(AddressFamily.InterNetwork))
+        {
+            var rejected = false;
+            try
+            {
+                await DoIpVehicleDiscovery.ListenOnBoundSocketAsync(
+                    unbound, TimeSpan.FromMilliseconds(100),
+                    CancellationToken.None, port);
+            }
+            catch (ArgumentException) { rejected = true; }
+            Check(rejected, "Unbound passive UDP receiver is rejected.");
+        }
+        using (var bound = new UdpClient(new IPEndPoint(IPAddress.Loopback, 0)))
+        {
+            foreach (var invalidDuration in new[] { TimeSpan.Zero, TimeSpan.FromSeconds(31) })
+            {
+                var rejected = false;
+                try
+                {
+                    await DoIpVehicleDiscovery.ListenOnBoundSocketAsync(
+                        bound, invalidDuration, CancellationToken.None, port);
+                }
+                catch (ArgumentOutOfRangeException) { rejected = true; }
+                Check(rejected, "Bound passive receiver rejects invalid duration.");
+            }
+            foreach (var invalidSourcePort in new[] { 0, 65536 })
+            {
+                var rejected = false;
+                try
+                {
+                    await DoIpVehicleDiscovery.ListenOnBoundSocketAsync(
+                        bound, TimeSpan.FromMilliseconds(100),
+                        CancellationToken.None, invalidSourcePort);
+                }
+                catch (ArgumentOutOfRangeException) { rejected = true; }
+                Check(rejected, "Bound passive receiver rejects invalid source port.");
+            }
+            using var canceled = new CancellationTokenSource();
+            canceled.Cancel();
+            var cancellationObserved = false;
+            try
+            {
+                await DoIpVehicleDiscovery.ListenOnBoundSocketAsync(
+                    bound, TimeSpan.FromMilliseconds(100), canceled.Token, port);
+            }
+            catch (OperationCanceledException) { cancellationObserved = true; }
+            Check(cancellationObserved && bound.Client.IsBound,
+                "Canceled passive discovery preserves caller-owned socket.");
+        }
+
         var invalidPassivePort = false;
         try
         {
