@@ -1,3 +1,18 @@
+C8 COHERENT ANDROID CONNECTION CHECKPOINT — 2026-11-24
+Implementation SHA before checkpoint: b2d9251e26bdd25ffec65344ddeae2feb6b297bf
+Scope: outside ISO/SAE protocols, PR #95 only.
+- C6 Wi-Fi ELM/STN socket generation: stale attempts may not disconnect a
+  newer connection, invalid reconnect leaves the current connection intact;
+  tests simulate overlapping connect/failure and zero live networking.
+- C6 OBDLink BLE: fixed 128-packet receive queue, strict max ATT payload,
+  fail closed without silent byte drops, detach GATT before teardown callbacks;
+  bounded queue and defensive-copy offline regression tests.
+- Full Android unit tests, lint warnings-fail, APK Debug build, Windows Debug
+  bridge self-tests, all Connectors/firmware/native checks.
+- Policy: no live vehicle, ECU, or adapter qualification during PR #95.
+  Owner runs release-only physical acceptance via Lot 8 issue #48.
+No merge, release, other PR or branch; protocol chat owns ISO/SAE sources.
+
 C8 SINGLE GROUPED CHECKPOINT — 2026-11-24 — C2/C6 non-protocol work
 Implementation HEAD before gate: f7da32776d382eb38563e8ebfad0033ecf4157cc
 Developer work: persistent Android ECU sector archive streams write/readback by
