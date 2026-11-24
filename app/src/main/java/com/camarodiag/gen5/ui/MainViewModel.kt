@@ -2698,9 +2698,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         var expectedRawArchiveSnapshot: CanConsoleRawArchiveIntegrity.Snapshot? = null
         // Do not publish an old snapshot after Clear, a new recording, or a
         // new physical TX has changed the active console since export started.
-        fun current() = canResumeExport(exportGeneration, owner) &&
+        fun sameConsoleContext() = canResumeExport(exportGeneration, owner) &&
             _vehicle.value == profile && hasPremiumLicense() &&
             activeCanCaptureFile == selectedArchive &&
+            _liveCanMonitorState.value.consoleContextGeneration == snapshot.consoleContextGeneration
+        fun current() = sameConsoleContext() &&
             (expectedRawArchiveSnapshot?.let { CanConsoleRawArchiveIntegrity.isCurrent(it) } != false) &&
             !consoleEventJournalFailed && !consoleEventJournal.hasFailed() &&
             consoleEventJournal.revision() == journalRevisionAtClick &&
@@ -2717,7 +2719,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 if (!current()) return@launch
                 val journalSnapshot = consoleEventJournal.snapshot()
                 expectedJournalSnapshot = journalSnapshot
-                if (!current()) return@launch
+                check(current()) { "Console event journal changed before export" }
                 val archive = selectedArchive?.takeIf { it.isFile }
                 check(selectedArchive == null || archive != null) {
                     "The selected complete CAN raw archive disappeared before export"
@@ -2742,7 +2744,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 expectedRawArchiveSnapshot = archive?.let {
                     CanConsoleRawArchiveIntegrity.capture(it)
                 }
-                if (!current()) return@launch
+                check(current()) { "CAN raw archive changed before export" }
                 val outputText = buildString {
                     appendLine(localizedContext.getString(R.string.can_console_export_header))
                     appendLine(localizedContext.getString(
@@ -2777,7 +2779,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
-                if (current()) _liveCanMonitorState.update {
+                // A corrupted journal or changed raw archive intentionally
+                // makes current() false. Still tell the user that this export
+                // failed, but never overwrite a new account/vehicle/session.
+                if (sameConsoleContext() &&
+                    !_liveCanMonitorState.value.isCapturing &&
+                    !_liveCanMonitorState.value.isSendingRequest
+                ) _liveCanMonitorState.update {
                     it.copy(message = localizedContext.getString(R.string.can_sniffer_capture_failed))
                 }
             }
