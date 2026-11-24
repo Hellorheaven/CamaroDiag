@@ -87,7 +87,7 @@ class BluetoothObdManager(context: Context) {
             } == true
 
     val isEnhancedUdsReadAvailable: Boolean
-        get() = isJ2534BridgeConnected() || isStnUdsReadAvailable || isElmUdsReadCandidate
+        get() = isJ2534BridgeConnected() || isElmUdsReadCandidate
 
     fun getUsbDevices(): List<String> = usbTransport.availableDevices()
 
@@ -1267,15 +1267,10 @@ class BluetoothObdManager(context: Context) {
         val result = when {
             isJ2534BridgeConnected() -> withJ2534BridgeUdsSessionAtEpoch(epoch,
                 requestCanId, responseCanId, protocolNumber, timeoutMs, readDids, block)
-            isStnUdsReadAvailable -> {
-                if (protocolNumber in setOf(63, 64)) {
-                    check(activeAdapterCapabilities?.supportsSwCan == true) {
-                        "The connected adapter has not confirmed SW-CAN support."
-                    }
-                }
+            StnUdsSessionAdmission.allowsReadCandidate(activeAdapterCapabilities,
+                isObdCommandChannelAvailable, protocolNumber) ->
                 withStnUdsSessionAtEpoch(epoch, requestCanId, responseCanId, protocolNumber,
-                    timeoutMs, readDids, null, block)
-            }
+                    timeoutMs, readDids, null, block, readCandidate = true)
             isElmUdsReadCandidate && protocolNumber in setOf(33, 34, 35, 36) ->
                 withElmUdsReadSession(epoch, requestCanId, responseCanId, protocolNumber,
                     timeoutMs, readDids, block)
@@ -1542,17 +1537,18 @@ class BluetoothObdManager(context: Context) {
     private suspend fun <T> withStnUdsSessionAtEpoch(
         requestedEpoch: Long, requestCanId: Int, responseCanId: Int,
         protocolNumber: Int, timeoutMs: Long, readDids: Set<Int>,
-        policy: UdsAccessPolicy?, block: suspend (UdsClient) -> T
+        policy: UdsAccessPolicy?, block: suspend (UdsClient) -> T,
+        readCandidate: Boolean = false
     ): T {
         transportSessionEpoch.requireCurrent(requestedEpoch)
-        check(StnUdsSessionAdmission.allowsRead(
-            activeAdapterCapabilities, isObdCommandChannelAvailable
-        )) { "A connected physical OBDLink STN adapter with verified CAN transmit is required." }
+        require(!readCandidate || policy == null)
+        fun admitted() = if (readCandidate) StnUdsSessionAdmission.allowsReadCandidate(
+            activeAdapterCapabilities, isObdCommandChannelAvailable, protocolNumber
+        ) else StnUdsSessionAdmission.allowsRead(activeAdapterCapabilities, isObdCommandChannelAvailable)
+        check(admitted()) { "A connected physical OBDLink STN adapter with verified CAN transmit is required." }
         return commandSessionMutex.withLock {
             transportSessionEpoch.requireQueuedCurrent(requestedEpoch)
-            check(StnUdsSessionAdmission.allowsRead(
-                activeAdapterCapabilities, isObdCommandChannelAvailable
-            )) { "The physical STN adapter disconnected while waiting for the UDS session." }
+            check(admitted()) { "The physical STN adapter disconnected while waiting for the UDS session." }
             val transport = StnUdsPayloadTransport(
                 requestCanId = requestCanId,
                 responseCanId = responseCanId,

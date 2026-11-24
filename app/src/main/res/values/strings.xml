@@ -992,4 +992,6 @@
     <string name="can_console_history_recent_scope">On-screen history: up to 300 recent events. The complete raw RX stream may be archived separately; older TX entries are not retained.</string>
     <string name="can_console_bitrate_changed">CAN %1$d kbit/s</string>
     <string name="can_console_capture_profile">CAN capture %1$d kbit/s, %2$d-bit</string>
+    <string name="adapter_can_headers">CAN headers</string>
+    <string name="adapter_config_accepted">Accepted configurations (not verified on vehicle): %1$s</string>
 </resources>

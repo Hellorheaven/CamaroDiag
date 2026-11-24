@@ -70,8 +70,7 @@ class StnUdsPayloadTransport(
         // "OBDLink MX+ clone" cannot be mistaken for an unrelated model.
         // These identifiers are sufficient for the diagnostic transport only;
         // an adapter string can NEVER authorize ECU erasure/programming.
-        val model = Regex("""(?i)\bOBDLink\s+(MX\+|MX|EX|CX|LX|SX)(?=\s|$)""")
-            .find(hardware)?.groupValues?.get(1)?.uppercase(Locale.ROOT)
+        val model = hardwareModel(hardware)
         require(firmware.contains("STN", true) && model != null) {
             "An identified OBDLink STN adapter is required for STPX diagnostics. Detected: $hardware / $firmware"
         }
@@ -96,6 +95,15 @@ class StnUdsPayloadTransport(
         )
         requireOk(sendCommand("ATCRA ${formatId(responseCanId)}", timeoutMs), "filter ECU response CAN ID")
         configured = true
+    }
+
+    companion object {
+        /** Only a complete STDI model/revision is accepted, never a Bluetooth name. */
+        internal fun hardwareModel(hardware: String): String? {
+            val pattern = Regex("""(?i)^OBDLink\s+(MX\+|MX|EX|CX|LX|SX)(?:\s+r[0-9]+(?:\.[0-9]+)*)?$""")
+            return hardware.lineSequence().mapNotNull { pattern.matchEntire(it.trim()) }
+                .firstOrNull()?.groupValues?.get(1)?.uppercase(Locale.ROOT)
+        }
     }
 
     private fun requireOk(response: String, operation: String) {

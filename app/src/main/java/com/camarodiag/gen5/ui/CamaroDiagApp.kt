@@ -1085,18 +1085,37 @@ fun AdapterScreen(
                         )
                     } else {
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            BadgeChip("CAN 11-bit / 500k", adapter.supportsCanHeaders)
+                            BadgeChip(stringResource(R.string.adapter_can_headers), adapter.supportsCanHeaders)
                             BadgeChip("CAN TX", adapter.supportsCanTransmit)
                             BadgeChip(stringResource(R.string.swcan_wiring_verified), adapter.supportsSwCan)
                             BadgeChip(stringResource(R.string.long_response_mode), adapter.supportsLongFrames)
                         }
                     }
-                    if (adapter.rawProbeLog.isNotEmpty()) {
-                        Spacer(Modifier.height(6.dp))
-                        adapter.rawProbeLog.forEach { line ->
-                            Text(line, fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = TextMuted)
+                    if (adapter.acceptedElmProtocols.isNotEmpty()) {
+                        val names = adapter.acceptedElmProtocols.sorted().mapNotNull { number ->
+                            when (number) {
+                                1 -> "J1850 PWM"
+                                2 -> "J1850 VPW"
+                                3 -> "ISO 9141-2"
+                                4 -> "KWP2000 5-baud"
+                                5 -> "KWP2000 fast init"
+                                6 -> "CAN 11-bit / 500k"
+                                7 -> "CAN 29-bit / 500k"
+                                8 -> "CAN 11-bit / 250k"
+                                9 -> "CAN 29-bit / 250k"
+                                10 -> "J1939"
+                                else -> null
+                            }
                         }
+                        Text(stringResource(R.string.adapter_config_accepted, names.joinToString(", ")),
+                            fontSize = 11.sp, color = TextMuted)
                     }
+                    // if (adapter.rawProbeLog.isNotEmpty()) {
+                    //     Spacer(Modifier.height(6.dp))
+                    //     adapter.rawProbeLog.forEach { line ->
+                    //         Text(line, fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = TextMuted)
+                    //     }
+                    // }
                 }
             }
         }
