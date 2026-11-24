@@ -138,6 +138,7 @@ internal static class DoIpVehicleDiscovery
                 // Unrelated or malformed UDP announcements are not discoveries.
             }
         }
+        cancellationToken.ThrowIfCancellationRequested();
         return identified.Values.ToArray();
     }
 
@@ -263,6 +264,7 @@ internal static class DoIpVehicleDiscovery
                 // Ignore non-identification and malformed network traffic.
             }
         }
+        cancellationToken.ThrowIfCancellationRequested();
         return identified.Values.ToArray();
     }
 
@@ -312,6 +314,7 @@ internal static class DoIpVehicleDiscovery
                 // Other protocols and invalid UDP frames are not ECU identities.
             }
         }
+        cancellationToken.ThrowIfCancellationRequested();
         return identified.Values.ToArray();
     }
 
@@ -389,6 +392,7 @@ internal static class DoIpVehicleDiscovery
                 // Ignore unrelated IPv6 UDP payloads and malformed messages.
             }
         }
+        cancellationToken.ThrowIfCancellationRequested();
         return identified.Values.ToArray();
     }
 
