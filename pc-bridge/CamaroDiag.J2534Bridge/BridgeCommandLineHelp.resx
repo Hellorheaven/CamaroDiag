@@ -44,6 +44,8 @@ Examples:
                               (one ACTIVE UDP identity request). Replace interface 3
                               with the known link-local interface; never guess it.
                               --vin or --eid filters discoveries; not both.
+                              Output includes version=0x02/0x03/0x04 as observed;
+                              verify gateway identity before selecting --doip-version.
   --doip-status               Read entity status or --power-mode true over UDP.
                               --doip-version 2, 3 or 4; version 255 is discovery-only.
   --doip-exchange             TCP/TLS UDS diagnostic exchange: user-selected --host,
