@@ -236,7 +236,13 @@ class ElmWifiTransport(
         timeoutMs: Int = 4000
     ): Result<Unit> = withContext(Dispatchers.IO) {
         // Invalid inputs must not replace an already working adapter.
-        ElmWifiConnectionPolicy.validate(host, port, timeoutMs)
+        // Preserve the transport's Result contract rather than throwing
+        // a validation exception across its public suspend API.
+        try {
+            ElmWifiConnectionPolicy.validate(host, port, timeoutMs)
+        } catch (error: IllegalArgumentException) {
+            return@withContext Result.failure(error)
+        }
         val candidate = socketFactory()
         val previous = synchronized(sessionLock) {
             val previous = socket
