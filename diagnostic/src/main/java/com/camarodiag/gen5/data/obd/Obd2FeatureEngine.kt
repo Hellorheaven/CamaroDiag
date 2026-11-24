@@ -117,13 +117,17 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
     }
 
     /** Reads Mode 01 supported-PID bitmaps (PID 00, 20, ... E0). */
-    suspend fun discoverSupportedPids(): Set<Int> {
+    data class PidDiscovery(val supported: Set<Int>, val firstUnresolvedPid: Int?)
+
+    suspend fun discoverSupportedPids(): Set<Int> = discoverPidAvailability().supported
+
+    suspend fun discoverPidAvailability(): PidDiscovery {
         val supported = linkedSetOf<Int>()
         var basePid = 0x00
         repeat(8) {
             val response = ask("01%02X".format(Locale.US, basePid))
-            val bytes = payload(response, 0x41, basePid) ?: return supported
-            if (bytes.size < 4) return supported
+            val bytes = payload(response, 0x41, basePid)
+            if (bytes == null || bytes.size < 4) return PidDiscovery(supported, basePid + 1)
 
             for (bit in 0 until 32) {
                 val mask = 1 shl (7 - (bit % 8))
@@ -135,10 +139,10 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
             }
 
             val hasNextPage = (bytes[3] and 0x01) != 0
-            if (!hasNextPage) return supported
+            if (!hasNextPage) return PidDiscovery(supported, null)
             basePid += 0x20
         }
-        return supported
+        return PidDiscovery(supported, null)
     }
 
     /**

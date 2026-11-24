@@ -7,6 +7,23 @@ import org.junit.Test
 
 class CamaroLfxObdSimulatorTest {
 
+    @Test fun missingAdvertisedSupportPagePreservesEarlierObservations() = runBlocking {
+        val engine = Obd2FeatureEngine { command, _ ->
+            when (command) {
+                "0100" -> "410004000001"
+                "0120" -> "412000000001"
+                "0140" -> "NO DATA"
+                else -> error("Unexpected PID request")
+            }
+        }
+        val discovery = engine.discoverPidAvailability()
+        assertEquals(setOf(0x06), discovery.supported)
+        assertEquals(0x41, discovery.firstUnresolvedPid)
+        val terminal = Obd2FeatureEngine { _, _ -> "410000000000" }.discoverPidAvailability()
+        assertEquals(emptySet<Int>(), terminal.supported)
+        assertEquals(null, terminal.firstUnresolvedPid)
+    }
+
     @Test
     fun fullScanReturnsClearlySyntheticLfxDataWithoutHardware() = runBlocking {
         val report = CamaroLfxObdSimulator.createEngine().fullReadOnlyScan()

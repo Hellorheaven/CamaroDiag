@@ -3,6 +3,7 @@ package com.camarodiag.gen5.data.obd
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -50,6 +51,32 @@ class Lfx2012FuelReadOnlyTest {
             snapshot.reading(0x07).availability)
         assertEquals(0.0, snapshot.reading(0x06).percent!!, 0.000001)
         assertEquals(0L, snapshot.reading(0x06).raw!!.toLong() - 128L)
+    }
+
+    @Test fun unansweredSupportPageLeavesEthanolUnknownAndPreservesKnownTrims() {
+        val supported = setOf(0x06)
+        val survey = Lfx2012FuelReadOnly.Survey(
+            Lfx2012FuelReadOnly.Source.ELM, supported,
+            pids.associateWith { if (it == 0x06) "410680" else null }, firstUnresolvedPid = 0x41
+        )
+        val readings = Lfx2012FuelReadOnly.inspect(
+            survey, pids.associateWith { if (it == 0x06) intArrayOf(128) else null }, 1L
+        )
+        assertEquals(Lfx2012FuelReadOnly.Availability.NO_VALID_RESPONSE, readings.reading(0x52).availability)
+        assertEquals(Lfx2012FuelReadOnly.Availability.UNSUPPORTED, readings.reading(0x07).availability)
+        assertEquals(0.0, readings.reading(0x06).percent!!, 0.0)
+    }
+
+    @Test fun unavailableReadingCannotCarryAPercentageOrRawByteIntoHistory() {
+        for (status in listOf(Lfx2012FuelReadOnly.Availability.UNSUPPORTED,
+            Lfx2012FuelReadOnly.Availability.NO_VALID_RESPONSE)) {
+            assertThrows(IllegalArgumentException::class.java) {
+                Lfx2012FuelReadOnly.Reading(0x52, status, percent = 0.0)
+            }
+            assertThrows(IllegalArgumentException::class.java) {
+                Lfx2012FuelReadOnly.Reading(0x52, status, raw = 0)
+            }
+        }
     }
 
     @Test fun explicitZeroEthanolIsDifferentFromUnsupportedEthanol() {

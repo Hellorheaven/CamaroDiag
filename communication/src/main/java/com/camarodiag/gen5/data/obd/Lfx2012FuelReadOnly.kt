@@ -20,7 +20,8 @@ object Lfx2012FuelReadOnly {
     data class Survey(
         val source: Source,
         val supportedPids: Set<Int>,
-        val responses: Map<Int, String?>
+        val responses: Map<Int, String?>,
+        val firstUnresolvedPid: Int? = null
     ) {
         init {
             require(responses.keys == PIDS.toSet()) {
@@ -40,8 +41,8 @@ object Lfx2012FuelReadOnly {
     ) {
         init {
             require(pid in PIDS)
-            require((availability == Availability.REPORTED) ==
-                (percent != null && raw != null))
+            val reported = availability == Availability.REPORTED
+            require((percent != null) == reported && (raw != null) == reported)
             require(percent == null || percent in -100.0..100.0)
             require(raw == null || raw in 0..255)
         }
@@ -72,7 +73,9 @@ object Lfx2012FuelReadOnly {
     ): Snapshot {
         require(rawData.keys == PIDS.toSet()) { "All fuel PIDs must have a decoding slot." }
         val readings = PIDS.map { pid ->
-            if (pid !in survey.supportedPids) {
+            if (survey.firstUnresolvedPid != null && pid >= survey.firstUnresolvedPid) {
+                Reading(pid, Availability.NO_VALID_RESPONSE)
+            } else if (pid !in survey.supportedPids) {
                 Reading(pid, Availability.UNSUPPORTED)
             } else {
                 val data = rawData[pid]

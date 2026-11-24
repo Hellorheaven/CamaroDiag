@@ -513,16 +513,16 @@ class BluetoothObdManager(context: Context) {
         }
         return withObdCommandSession { engine ->
             transportSessionEpoch.requireQueuedCurrent(epoch)
-            val supported = engine.discoverSupportedPids()
+            val discovery = engine.discoverPidAvailability()
             transportSessionEpoch.requireQueuedCurrent(epoch)
             val replies = linkedMapOf<Int, String?>()
             for (pid in Lfx2012FuelReadOnly.PIDS) {
                 transportSessionEpoch.requireQueuedCurrent(epoch)
-                replies[pid] = engine.readMode01PidIfSupported(pid, supported)
+                replies[pid] = engine.readMode01PidIfSupported(pid, discovery.supported)
                 transportSessionEpoch.requireQueuedCurrent(epoch)
             }
             Lfx2012FuelReadOnly.Survey(
-                Lfx2012FuelReadOnly.Source.ELM, supported, replies
+                Lfx2012FuelReadOnly.Source.ELM, discovery.supported, replies, discovery.firstUnresolvedPid
             )
         }
     }
