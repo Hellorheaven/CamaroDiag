@@ -1,3 +1,10 @@
+## PR117 — DoIP Android/Windows, sauvegardes et sélection de profils (24/11/2026)
+
+- Dernière CI Debug complète réussie : #45431900505, SHA c6e634970337be47e63d9c2d0c27f6c5d8b459b0 (12 jobs techniques). Ne valide pas les changements ci-dessous.
+- Depuis : sauvegarde mémoire DoIP Windows profil logique/VIN/identité, acquisition double et vérification ZIP, interface et CLI FR/EN (15203e3, b224cdf, e58a8ab, df0c557, 69d4cdf, 643430b). Android : sélection UDS/OBDb par capacités 3291f5a, correction DTC UDS db2e940, transport direct DoIP 1f2b709, interface VIN/DID/DTC et annulation 1626d32, monitoring 30 mesures ebaa4f4, console CAN filtrée 58314f0, sauvegarde DoIP 1 Mio avec profil JSON, deux lectures et export vérifié 9a4b53f/84be7d7. Dernier HEAD fonctionnel 84be7d7ed407c785f96631d08cdf895e9b1e9fef.
+- Limites : Android DoIP unicast TCP/TLS, pas de certificat client OEM ni programmation ; mémoire limitée à 1 Mio/8192 blocs par passe/600 s, pas de carte ECU inventée, ZIP compatible format Windows mais compatibilité à tester. Trace Android sauvegarde limitée aux 128 dernières entrées. Pas de preuve physique, aucune qualification constructeur ; C6 et DoIP restent actifs, refonte globale véhicule/calculateur/fonction incomplète.
+- Checkpoint groupé demandé sur le SHA du marqueur ci-dessous. Corriger les échecs avant progression. C8 final non commencé, une PR active, aucun merge/Release/déploiement Firebase sans autorisation. Priorité propriétaire : intégration fonctionnelle avant multiplication des tests.
+
 ## PR117 — intégrations fonctionnelles prioritaires, capacités et contexte (24/11/2026)
 
 - Dernier checkpoint vert connu : #45423976707 sur 6f3545b8 ; **ne valide pas les commits ultérieurs**. Nouvelle CI groupée demandée à la révision exacte de ce lot.
