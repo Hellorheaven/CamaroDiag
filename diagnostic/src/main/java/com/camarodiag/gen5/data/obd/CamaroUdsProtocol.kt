@@ -16,17 +16,22 @@ object CamaroUdsProtocol {
         headersResp: String = "OK",
         protocolResp: String = "OK",
         swCanWiringVerified: Boolean = false,
-        transmitProbeResp: String = ""
+        transmitProbeResp: String = "",
+        hardwareResp: String = "",
+        elmProtocolProbe: Map<Int, String> = emptyMap()
     ): AdapterCapabilities {
         val logs = listOf(
             "> ATZ  -> $atzResp",
             "> STI  -> $stiResp",
+            "> STDI -> $hardwareResp",
             "> ATAL -> $atalResp",
             "> STP 61 -> $stp61Resp",
             "> ATH1 -> $headersResp",
             "> ATSP 6 -> $protocolResp",
             "> 0100 (physical TX verification) -> $transmitProbeResp"
-        )
+        ) + elmProtocolProbe.toSortedMap().map { (number, answer) ->
+            "> ATTP${number.toString(16).uppercase(Locale.ROOT)} -> $answer"
+        }
 
         // Select STN-only monitor commands only when the adapter's firmware response
         // identifies an STN chipset. A Bluetooth name or the OBDLink product banner is
@@ -34,10 +39,10 @@ object CamaroUdsProtocol {
         val isStn = hasStnFirmwareBanner(stiResp) ||
             hasStnFirmwareBanner(atzResp)
 
-        // STP 61 alone is not proof of DLC pin-1 wiring. MX/MX+ are explicitly listed by the adapter maker as SW-CAN capable.
-        val normalizedDeviceName = deviceName.uppercase(Locale.ROOT)
-        val verifiedObdLinkMxHardware = normalizedDeviceName.contains("OBDLINK MX+") ||
-            Regex("\\bOBDLINK MX\\b").containsMatchIn(normalizedDeviceName)
+        // A Bluetooth device name is user-editable. Use the firmware hardware
+        // identification (STDI) or separately verified physical wiring.
+        val mxModel = Regex("^OBDLink\\s+(MX\\+|MX)(?:\\s+.*)?$", RegexOption.IGNORE_CASE)
+        val verifiedObdLinkMxHardware = hardwareResp.lineSequence().any { mxModel.matches(it.trim()) }
         val supportsSwCan = (swCanWiringVerified || verifiedObdLinkMxHardware) && isStn &&
             hasStandaloneOk(stp61Resp)
         val supportsLong = hasStandaloneOk(atalResp)
@@ -58,7 +63,11 @@ object CamaroUdsProtocol {
             supportsCanHeaders = hasStandaloneOk(headersResp) &&
                 hasStandaloneOk(protocolResp),
             rawProbeLog = logs,
-            supportsCanTransmit = hasPositiveMode01Pid00Response(transmitProbeResp)
+            supportsCanTransmit = hasPositiveMode01Pid00Response(transmitProbeResp),
+            hardwareId = hardwareResp.trim(),
+            acceptedElmProtocols = elmProtocolProbe.filter { (number, answer) ->
+                number in 1..10 && hasStandaloneOk(answer)
+            }.keys.toSet() + if (hasStandaloneOk(protocolResp)) setOf(6) else emptySet()
         )
     }
 

@@ -167,6 +167,7 @@ class CamaroUdsProtocolTest {
     fun echoedAtCommandsWithSeparateOkAcknowledgementsRemainSupported() {
         val capabilities = CamaroUdsProtocol.evaluateAdapterProbe(
             deviceName = "OBDLink MX+",
+            hardwareResp = "OBDLink MX+",
             macAddress = "00:00:00:00:00:01",
             atzResp = "OBDLink",
             stiResp = "STN2120 v5.6.5",
@@ -333,6 +334,7 @@ class CamaroUdsProtocolTest {
     fun enablesSwCanOnlyForDocumentedMxHardwareWithAcceptedProtocol() {
         val mxPlus = CamaroUdsProtocol.evaluateAdapterProbe(
             deviceName = "OBDLink MX+",
+            hardwareResp = "OBDLink MX+",
             macAddress = "00:00:00:00:00:00",
             atzResp = "OBDLink",
             stiResp = "STN2120 v5.6.5",

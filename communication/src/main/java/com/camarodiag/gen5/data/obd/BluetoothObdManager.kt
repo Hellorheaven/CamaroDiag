@@ -83,7 +83,7 @@ class BluetoothObdManager(context: Context) {
     val isElmUdsReadCandidate: Boolean
         get() = isObdCommandChannelAvailable &&
             activeAdapterCapabilities?.let {
-                it.supportsCanHeaders && it.supportsCanTransmit
+                it.supportsCanHeaders
             } == true
 
     val isEnhancedUdsReadAvailable: Boolean
@@ -358,8 +358,15 @@ class BluetoothObdManager(context: Context) {
             probeCommand("ATL0")
             val headersResp = probeCommand("ATH1")
             val sti = probeCommand("STI")
+            val hardware = probeCommand("STDI")
             val atal = probeCommand("ATAL")
             val stp61 = probeCommand("STP 61")
+            // ATTP selects a trial configuration without sending a vehicle request.
+            // Keep acceptance separate from physical wiring and ECU evidence.
+            val protocolProbe = linkedMapOf<Int, String>()
+            for (number in 1..10) {
+                protocolProbe[number] = probeCommand("ATTP" + number.toString(16).uppercase(java.util.Locale.ROOT))
+            }
             val protocolResp = probeCommand("ATSP 6")
             // A real 0100 response proves that the connected physical command path
             // transmitted a request and received an ECU reply; AT header support alone does not.
@@ -374,7 +381,9 @@ class BluetoothObdManager(context: Context) {
                 stp61Resp = stp61,
                 headersResp = headersResp,
                 protocolResp = protocolResp,
-                transmitProbeResp = transmitProbeResp
+                transmitProbeResp = transmitProbeResp,
+                hardwareResp = hardware,
+                elmProtocolProbe = protocolProbe
             )
             synchronized(adapterLifecycleLock) {
                 transportSessionEpoch.requireQueuedCurrent(expectedEpoch)
@@ -408,6 +417,7 @@ class BluetoothObdManager(context: Context) {
                 macAddress = "00:04:3E:8A:12:9F",
                 atzResp = "ELM327 v1.4b",
                 stiResp = "STN2255 v5.6.5",
+                hardwareResp = "OBDLink MX+",
                 atalResp = "OK",
                 stp61Resp = "OK"
             )

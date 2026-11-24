@@ -99,7 +99,7 @@ enum class CanBusType(val label: String, val pinout: String) {
 
 enum class AdapterTier(val titleEn: String, val titleFr: String) {
     PRO_STN("STN1170 / STN2255 (OBDLink MX+ / vLinker MC+)", "STN1170 / STN2255 (OBDLink MX+ / vLinker MC+)"),
-    GENUINE_ELM("Genuine ELM327 v1.4b/v1.5 (HS-CAN Only)", "ELM327 Authentique v1.4b/v1.5 (HS-CAN Seul)"),
+    GENUINE_ELM("ELM327-compatible adapter", "Adaptateur compatible ELM327"),
     CLONE_ELM("Generic ELM327 v2.1 Clone (Limited)", "Clone ELM327 v2.1 Générique (Limité)"),
     DISCONNECTED("Not connected", "Non connecté")
 }
@@ -114,7 +114,11 @@ data class AdapterCapabilities(
     val supportsCanHeaders: Boolean = false,
     val rawProbeLog: List<String> = emptyList(),
     /** True only after a real ECU response confirms that the physical command path transmits. */
-    val supportsCanTransmit: Boolean = false
+    val supportsCanTransmit: Boolean = false,
+    /** Firmware-reported hardware identification, not the Bluetooth display name. */
+    val hardwareId: String = "",
+    /** Accepted configuration commands only; neither wiring nor ECU support is implied. */
+    val acceptedElmProtocols: Set<Int> = emptySet()
 )
 
 enum class ModuleStatus { ACCESSIBLE, REQUIRES_SWCAN, UNSUPPORTED_BY_ADAPTER, NOT_EQUIPPED, DISCOVERY_REQUIRED }
