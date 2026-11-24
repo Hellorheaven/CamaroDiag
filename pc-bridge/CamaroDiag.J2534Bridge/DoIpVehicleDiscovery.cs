@@ -147,8 +147,12 @@ internal static class DoIpVehicleDiscovery
     /// </summary>
     internal static async Task<DoIpCodec.Message> QueryStatusAsync(
         string host, bool powerMode, TimeSpan timeout,
-        CancellationToken cancellationToken, int? portOverride = null)
+        CancellationToken cancellationToken, int? portOverride = null,
+        byte protocolVersion = DoIpCodec.Version)
     {
+        if (protocolVersion is not (0x02 or 0x03 or 0x04))
+            throw new ArgumentOutOfRangeException(nameof(protocolVersion),
+                "Gateway UDP control query requires an explicit supported DoIP version.");
         if (!IPAddress.TryParse(host, out var address) ||
             address.AddressFamily is not (AddressFamily.InterNetwork or
                 AddressFamily.InterNetworkV6) ||
@@ -163,7 +167,8 @@ internal static class DoIpVehicleDiscovery
         deadline.CancelAfter(timeout);
         using var socket = new UdpClient(address.AddressFamily);
         var request = DoIpCodec.Encode(powerMode ?
-            DoIpCodec.PowerModeRequest : DoIpCodec.EntityStatusRequest, []);
+            DoIpCodec.PowerModeRequest : DoIpCodec.EntityStatusRequest, [],
+            protocolVersion);
         var port = portOverride ?? 13400;
         await socket.SendAsync(request.AsMemory(),
             new IPEndPoint(address, port), deadline.Token);
@@ -177,6 +182,9 @@ internal static class DoIpVehicleDiscovery
                 response.RemoteEndPoint.Port != port)
                 continue;
             var decoded = DoIpCodec.Decode(response.Buffer);
+            if (decoded.Version != protocolVersion)
+                throw new InvalidDataException(
+                    "DoIP UDP control response changed the requested protocol version.");
             // The gateway explicitly rejected our UDP request: expose the
             // standard DoIP error instead of eventually claiming silence.
             DoIpCodec.RequireNoGenericNack(decoded);
