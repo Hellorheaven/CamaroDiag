@@ -12,6 +12,9 @@ internal sealed partial class BridgeDesktopForm
     private readonly TextBox doIpConsoleHost = new() { Dock = DockStyle.Fill };
     private readonly Button doIpConsoleDiscover = Button(DoIpConsolePresentation.Text("Discover"));
     private readonly Button doIpConsoleCancel = Button(DoIpConsolePresentation.Text("Cancel"));
+    private readonly Button doIpConsoleStatus = Button(DoIpConsolePresentation.Text("Status"));
+    private readonly Button doIpConsolePower = Button(DoIpConsolePresentation.Text("Power"));
+    private DoIpVehicleDiscovery.Identity? doIpObservedGateway;
     private readonly TextBox consoleRequestId = new()
         { Text = "7E0", Dock = DockStyle.Fill };
     private readonly TextBox consoleResponseId = new()
@@ -74,7 +77,20 @@ internal sealed partial class BridgeDesktopForm
         doIpConsoleCancel.Enabled = false;
         doIpConsoleDiscover.Click += async (_, _) => await DiscoverDoIpFromConsoleAsync();
         doIpConsoleCancel.Click += (_, _) => doIpConsoleDiscoveryCancellation?.Cancel();
-        WideRow(fields, doIpConsoleCancel, 43);
+        var doIpOperations = new FlowLayoutPanel { Dock = DockStyle.Fill };
+        doIpOperations.Controls.Add(doIpConsoleStatus);
+        doIpOperations.Controls.Add(doIpConsolePower);
+        doIpOperations.Controls.Add(doIpConsoleCancel);
+        doIpConsoleStatus.Enabled = doIpConsolePower.Enabled = false;
+        doIpConsoleStatus.Click += async (_, _) => await RunDoIpConsoleOperationAsync(false);
+        doIpConsolePower.Click += async (_, _) => await RunDoIpConsoleOperationAsync(true);
+        doIpConsoleHost.TextChanged += (_, _) =>
+        {
+            doIpObservedGateway = null;
+            doIpConsoleStatus.Enabled = doIpConsolePower.Enabled = false;
+            doIpConsoleDiscoveryCancellation?.Cancel();
+        };
+        WideRow(fields, doIpOperations, 48);
         WideRow(fields, new Label
         {
             Text = "Console J2534 locale : TX et RX séparés ; commandes ECU transmises selon " +
@@ -90,7 +106,10 @@ internal sealed partial class BridgeDesktopForm
         return tab;
     }
 
-    private async Task DiscoverDoIpFromConsoleAsync()
+    private Task DiscoverDoIpFromConsoleAsync() => RunDoIpConsoleOperationAsync(null);
+
+    // null = identification; false = entity status; true = power mode.
+    private async Task RunDoIpConsoleOperationAsync(bool? powerMode)
     {
         if (busy || doIpConsoleDiscoveryCancellation is not null) return;
         if (consoleDevice is not null || bridgeTask is { IsCompleted: false })
@@ -108,33 +127,68 @@ internal sealed partial class BridgeDesktopForm
             ShowError(DoIpConsolePresentation.Text("InvalidHost"));
             return;
         }
+        var observed = doIpObservedGateway;
+        if (powerMode.HasValue &&
+            (observed is null || !observed.Source.Equals(address)))
+        {
+            ShowError(DoIpConsolePresentation.Text("IdentifyFirst"));
+            return;
+        }
+        if (!powerMode.HasValue) doIpObservedGateway = null;
         var timeout = TimeSpan.FromMilliseconds((int)consoleTimeout.Value);
         using var stop = new CancellationTokenSource();
         doIpConsoleDiscoveryCancellation = stop;
-        doIpConsoleDiscover.Enabled = false;
+        doIpConsoleDiscover.Enabled = doIpConsoleStatus.Enabled = doIpConsolePower.Enabled = false;
+        doIpConsoleHost.Enabled = false;
         doIpConsoleCancel.Enabled = true;
         try
         {
             await RunBusyAsync(async () =>
             {
-                ConsoleLine("SYSTEM", string.Format(DoIpConsolePresentation.Text("Started"),
-                    address), Color.DarkSlateGray);
                 try
                 {
-                    var identity = await DoIpVehicleDiscovery.DiscoverAsync(
-                        address.ToString(), timeout, stop.Token);
-                    stop.Token.ThrowIfCancellationRequested();
-                    if (IsDisposed || Disposing) return;
-                    ConsoleLine("SYSTEM", DoIpConsolePresentation.FormatIdentity(identity),
-                        Color.DarkGreen);
-                    ConsoleLine("SYSTEM", DoIpConsolePresentation.Text("Notice"),
-                        Color.DarkSlateGray);
+                    if (powerMode.HasValue)
+                    {
+                        var version = observed!.ProtocolVersion;
+                        ConsoleLine("SYSTEM", string.Format(
+                            DoIpConsolePresentation.Text("StatusStarted"), address, version),
+                            Color.DarkSlateGray);
+                        var response = await DoIpVehicleDiscovery.QueryStatusAsync(
+                            address.ToString(), powerMode.Value, timeout, stop.Token,
+                            protocolVersion: version);
+                        stop.Token.ThrowIfCancellationRequested();
+                        if (IsDisposed || Disposing) return;
+                        ConsoleLine("SYSTEM", DoIpConsolePresentation.FormatStatus(
+                            response, powerMode.Value), Color.DarkGreen);
+                        ConsoleLine("SYSTEM", DoIpConsolePresentation.Text("StatusNotice"),
+                            Color.DarkSlateGray);
+                    }
+                    else
+                    {
+                        ConsoleLine("SYSTEM", string.Format(
+                            DoIpConsolePresentation.Text("Started"), address), Color.DarkSlateGray);
+                        var identity = await DoIpVehicleDiscovery.DiscoverAsync(
+                            address.ToString(), timeout, stop.Token);
+                        stop.Token.ThrowIfCancellationRequested();
+                        if (IsDisposed || Disposing) return;
+                        doIpObservedGateway = identity;
+                        ConsoleLine("SYSTEM", DoIpConsolePresentation.FormatIdentity(identity),
+                            Color.DarkGreen);
+                        ConsoleLine("SYSTEM", DoIpConsolePresentation.Text("Notice"),
+                            Color.DarkSlateGray);
+                    }
                 }
                 catch (OperationCanceledException) when (stop.IsCancellationRequested)
                 {
+                    doIpObservedGateway = null;
                     if (!IsDisposed && !Disposing)
                         ConsoleLine("SYSTEM", DoIpConsolePresentation.Text("Canceled"),
                             Color.DarkSlateGray);
+                }
+                catch
+                {
+                    doIpObservedGateway = null;
+                    throw;
                 }
             });
         }
@@ -143,7 +197,9 @@ internal sealed partial class BridgeDesktopForm
             doIpConsoleDiscoveryCancellation = null;
             if (!IsDisposed && !Disposing)
             {
+                doIpConsoleHost.Enabled = true;
                 doIpConsoleDiscover.Enabled = true;
+                doIpConsoleStatus.Enabled = doIpConsolePower.Enabled = doIpObservedGateway is not null;
                 doIpConsoleCancel.Enabled = false;
             }
         }
