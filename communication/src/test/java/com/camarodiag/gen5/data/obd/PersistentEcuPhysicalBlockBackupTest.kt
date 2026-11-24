@@ -36,6 +36,28 @@ class PersistentEcuPhysicalBlockBackupTest {
         Unit
     }
 
+    @Test fun multiMegabyteSectorIsDurablyVerifiedWithoutSecondFullImageBuffer() = runBlocking {
+        val folder = Files.createTempDirectory("camarodiag-large-ecu-block").toFile()
+        try {
+            val journal = File(folder, "attempt.journal")
+            assertTrue(journal.createNewFile())
+            val target = EcuProgrammingDriverContract.FirmwareTarget("E39", "ECM", "OS-A")
+            val store = PersistentEcuPhysicalBlockBackup(journal, target, "1G1FA1RXXR0123456")
+            val live = ByteArray(2 * 1024 * 1024 + 17) { (it * 37).toByte() }
+            val sha = EcuBenchExpertPlan.sha256Hex(live)
+            val region = EcuProgrammingDriverContract.RegionRequest(
+                EcuBackupCoverage.Region.CALIBRATION, 0x8000L, live.size.toLong()
+            )
+            store.preserve(region, live, sha)
+            val file = store.directory.listFiles().orEmpty().single()
+            assertTrue(file.length() > live.size)
+            val stored = file.readBytes()
+            assertTrue(stored.takeLast(64) == live.takeLast(64))
+            assertTrue(stored.takeLast(64).any { it != 0.toByte() })
+        } finally { folder.deleteRecursively() }
+        Unit
+    }
+
     @Test fun wrongLiveBytesOrWrongPhysicalSizeCannotBeArchived() = runBlocking {
         val folder = Files.createTempDirectory("camarodiag-ecu-block-failure").toFile()
         try {
