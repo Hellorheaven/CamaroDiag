@@ -71,6 +71,7 @@ object DoIpDirectRead {
     data class Sample(val index: Int, val elapsedMs: Long, val data: ByteArray)
 
     private const val MAX_PAYLOAD = 1024 * 1024
+    private const val DOIP_UDP_PORT = 13400
     private data class Frame(val version: Int, val type: Int, val data: ByteArray)
     private fun validVin(value: String) = value.matches(Regex("[A-HJ-NPR-Z0-9]{17}"))
     private fun Byte.u8() = toInt() and 255
@@ -116,13 +117,13 @@ object DoIpDirectRead {
         } ?: throw SocketTimeoutException("DoIP operation timed out.")
 
     private suspend fun discover(address: InetAddress, expectedVin: String, timeoutMs: Int,
-        onControlTrace: (ControlTrace) -> Unit): Gateway {
+        onControlTrace: (ControlTrace) -> Unit, port: Int = DOIP_UDP_PORT): Gateway {
         val socket = DatagramSocket()
         try {
             return io(timeoutMs.toLong(), socket::close) {
-                socket.connect(address, 13400)
+                socket.connect(address, port)
                 val packet = encode(255, 0x0001, byteArrayOf())
-                socket.send(DatagramPacket(packet, packet.size, address, 13400))
+                socket.send(DatagramPacket(packet, packet.size, address, port))
                 controlTrace("TX", "UDP", address, packet, onControlTrace)
                 val deadline = deadline(timeoutMs)
                 val buffer = ByteArray(1024)
@@ -132,7 +133,7 @@ object DoIpDirectRead {
                     val received = DatagramPacket(buffer, buffer.size)
                     socket.receive(received)
                     remaining(deadline)
-                    if (received.address != address || received.port != 13400 || received.length < 8) continue
+                    if (received.address != address || received.port != port || received.length < 8) continue
                     controlTrace("RX", "UDP", address, buffer.copyOf(received.length), onControlTrace)
                     val frame = parseFrame(buffer.copyOfRange(0, 8), buffer.copyOfRange(8, received.length))
                     if (frame.type == 0) throw IOException("DoIP gateway rejected identification.")
@@ -153,20 +154,26 @@ object DoIpDirectRead {
 
     /** Discovery and control messages never activate a diagnostic TCP route. */
     suspend fun inspectGateway(host: String, vin: String, operation: GatewayOperation,
-        timeoutMs: Int = 5000, onControlTrace: (ControlTrace) -> Unit = {}): GatewayResult {
-        require(timeoutMs in 100..30_000)
+        timeoutMs: Int = 5000, onControlTrace: (ControlTrace) -> Unit = {}): GatewayResult =
+        inspectGatewayAt(host, vin, operation, timeoutMs, DOIP_UDP_PORT, onControlTrace)
+
+    /** The public operation always uses the standardized port; this seam also
+     * permits a loopback simulator to bind an OS-assigned port without collisions. */
+    internal suspend fun inspectGatewayAt(host: String, vin: String, operation: GatewayOperation,
+        timeoutMs: Int, port: Int, onControlTrace: (ControlTrace) -> Unit): GatewayResult {
+        require(timeoutMs in 100..30_000 && port in 1..65535)
         val address = parseHost(host)
         val expected = vin.trim().uppercase(Locale.ROOT)
         require(expected.isEmpty() || validVin(expected))
-        val gateway = discover(address, expected, timeoutMs, onControlTrace)
+        val gateway = discover(address, expected, timeoutMs, onControlTrace, port)
         if (operation == GatewayOperation.DISCOVER) return GatewayResult(gateway)
         val socket = DatagramSocket()
         try {
             return io(timeoutMs.toLong(), socket::close) {
-                socket.connect(address, 13400)
+                socket.connect(address, port)
                 val power = operation == GatewayOperation.POWER
                 val request = encode(gateway.version, if (power) 0x4003 else 0x4001, byteArrayOf())
-                socket.send(DatagramPacket(request, request.size, address, 13400))
+                socket.send(DatagramPacket(request, request.size, address, port))
                 controlTrace("TX", "UDP", address, request, onControlTrace)
                 val end = deadline(timeoutMs)
                 val buffer = ByteArray(1024)
@@ -176,7 +183,7 @@ object DoIpDirectRead {
                     val packet = DatagramPacket(buffer, buffer.size)
                     socket.receive(packet)
                     remaining(end)
-                    if (packet.address != address || packet.port != 13400 || packet.length < 8) continue
+                    if (packet.address != address || packet.port != port || packet.length < 8) continue
                     controlTrace("RX", "UDP", address, buffer.copyOf(packet.length), onControlTrace)
                     val frame = parseFrame(buffer.copyOfRange(0, 8), buffer.copyOfRange(8, packet.length))
                     require(frame.version == gateway.version)
