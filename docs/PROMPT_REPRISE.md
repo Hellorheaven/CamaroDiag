@@ -1,3 +1,9 @@
+# Reprise PR #95 — 24 novembre 2026, C2 et DoIP
+
+- C1 console clôturé côté logiciel dans #59 (campagne dédiée #45332946454). Le chantier actif est C2 (#63). Ordre suivant après clôture logicielle de C2 : C4, C6, puis C8 qualité finale. La recette physique relève de la Release (#48).
+- C2 : `aba342861bdd2bd2286b454105099a4ad41cb75f` revalide les octets et leur manifeste pour le rapport de couverture et protège le contenu original lors de son export. Sur JVM, les six suites de couverture, intégrité, manifeste, archive, aperçu et assemblage comptent 75 tests passés.
+- DoIP (#110) : après le checkpoint #45334468537, `574d6de5e0fee8857f97354db53071a8336506c8` corrige le décodage des annonces dont le VIN mélange ASCII et octets invalides. Validation .NET 8 locale : 37 contrôles UDP existants et une régression VIN. Le checkpoint groupé demandé avec cette mise à jour est à vérifier à son SHA exact avant de passer au protocole suivant.
+
 # Reprise C6/Connectors hors protocoles — 24 novembre 2026
 
 - **Décision propriétaire définitive** : PR #95 reste en draft sur `chore/unified-ci`, **aucun test réel sur voiture ou ECU pendant cette PR**. Seule la **Release après fermeture de PR** sera testée physiquement par le propriétaire via le **Lot 8, issue #48**. Une CI verte prouve le logiciel, pas la compatibilité physique ; ne plus présenter les essais véhicule comme un bloqueur de fusion. Règles reprises dans `AGENTS.md`, `docs/VALIDATION_LOGICIELLE.md`, `docs/AUDIT_PR95_C1_C2_C4_C6_C8.md` et issue #48. Toujours aucun merge, Release, branche ou PR nouvelle sans autorisation.
