@@ -26,4 +26,7 @@
     <string name="admin_table_yes">Oui</string>
     <string name="admin_table_no">Non</string>
     <string name="admin_table_unknown">Inconnu</string>
+    <string name="admin_table_actions">Actions</string>
+    <string name="admin_table_delete">Supprimer</string>
+    <string name="admin_table_delete_warning">Supprimer définitivement le compte %1$s ? Son accès sera supprimé. Cette opération est irréversible.</string>
 </resources>

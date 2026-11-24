@@ -36,4 +36,12 @@ function isVerifiedGoogleSession(token) {
     token?.firebase?.sign_in_provider === "google.com";
 }
 
-module.exports = { displayLicenseWithoutLookup, isSessionRevoked, isVerifiedGoogleSession, isValidAuthTime, isRecentAuthTime };
+// Account deletion never targets the caller, an owner or an administrator.
+function mayDeleteAccount(actorUid, target) {
+  return typeof actorUid === "string" && !!actorUid && typeof target?.uid === "string" &&
+    !!target.uid && target.uid !== actorUid &&
+    target.customClaims?.owner_functional_tests !== true &&
+    target.customClaims?.admin_accounts !== true;
+}
+
+module.exports = { mayDeleteAccount, displayLicenseWithoutLookup, isSessionRevoked, isVerifiedGoogleSession, isValidAuthTime, isRecentAuthTime };

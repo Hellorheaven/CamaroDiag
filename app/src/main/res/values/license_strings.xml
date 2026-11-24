@@ -26,4 +26,7 @@
     <string name="admin_table_yes">Yes</string>
     <string name="admin_table_no">No</string>
     <string name="admin_table_unknown">Unknown</string>
+    <string name="admin_table_actions">Actions</string>
+    <string name="admin_table_delete">Delete</string>
+    <string name="admin_table_delete_warning">Permanently delete account %1$s? Access will be removed. This cannot be undone.</string>
 </resources>

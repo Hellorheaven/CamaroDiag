@@ -55,3 +55,11 @@ test("administration freshness rejects invalid, future and stale authentication 
   assert.equal(isRecentAuthTime(now + 1, now, 300), false);
   assert.equal(isRecentAuthTime(String(now), now, 300), false);
 });
+
+const { mayDeleteAccount } = require("./account-policy");
+test("account deletion protects caller, owner and administrators", () => {
+  assert.equal(mayDeleteAccount("actor", {uid: "other"}), true);
+  for (const target of [null, {}, {uid: "actor"}, {uid:"other",customClaims:{owner_functional_tests:true}}, {uid:"other",customClaims:{admin_accounts:true}}])
+    assert.equal(mayDeleteAccount("actor", target), false);
+  assert.equal(mayDeleteAccount("", {uid:"other"}), false);
+});

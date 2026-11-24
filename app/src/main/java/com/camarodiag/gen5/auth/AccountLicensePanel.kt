@@ -114,7 +114,7 @@ internal fun AccountAdministrationDialog(french: Boolean, onClose: () -> Unit) {
     }
     fun editable(row: AdminAccountRow) = row.uid != actor && !row.owner
     fun apply(change: AdminChange) {
-        if (busy || !current() || !editable(change.row)) return
+        if (busy || !current() || !editable(change.row) || (change.action == "delete" && change.row.admin)) return
         busy = true
         error = false
         val data = mutableMapOf<String, Any>("uid" to change.row.uid, "action" to change.action)
@@ -123,6 +123,12 @@ internal fun AccountAdministrationDialog(french: Boolean, onClose: () -> Unit) {
             if (!current()) return@addOnCompleteListener
             busy = false
             val envelope = if (task.isSuccessful) task.result?.data as? Map<*, *> else null
+            if (change.action == "delete") {
+                if (envelope?.get("deletedUid") != change.row.uid) { error = true; return@addOnCompleteListener }
+                rows = rows.filterNot { it.uid == change.row.uid }
+                if (selected?.uid == change.row.uid) selected = null
+                return@addOnCompleteListener
+            }
             val result = parseAdminAccount(envelope?.get("account"))
             if (result == null || result.uid != change.row.uid) { error = true; return@addOnCompleteListener }
             rows = rows.map { if (it.uid == result.uid) result else it }
@@ -152,9 +158,10 @@ internal fun AccountAdministrationDialog(french: Boolean, onClose: () -> Unit) {
                         Text(stringResource(R.string.admin_table_admin), Modifier.width(130.dp))
                         Text(stringResource(R.string.admin_table_active), Modifier.width(100.dp))
                         Text(stringResource(R.string.admin_table_verified), Modifier.width(100.dp))
+                        Text(stringResource(R.string.admin_table_actions), Modifier.width(130.dp))
                     }
                     HorizontalDivider()
-                    LazyColumn(Modifier.width(670.dp).heightIn(max = 440.dp)) {
+                    LazyColumn(Modifier.width(800.dp).heightIn(max = 440.dp)) {
                         items(rows, key = { it.uid }) { row ->
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 TextButton(onClick = { selected = row }, modifier = Modifier.width(240.dp)) {
@@ -170,6 +177,11 @@ internal fun AccountAdministrationDialog(french: Boolean, onClose: () -> Unit) {
                                 TextButton(onClick = { pending = AdminChange(row, "disable", !row.disabled) },
                                     enabled = !busy && editable(row) && (!row.admin || row.disabled), modifier = Modifier.width(100.dp)) { Text(status(!row.disabled)) }
                                 Text(status(row.verified), Modifier.width(100.dp))
+                                TextButton(enabled = !busy && editable(row) && !row.admin,
+                                    onClick = { pending = AdminChange(row, "delete", true) },
+                                    modifier = Modifier.width(130.dp)) {
+                                    Text(stringResource(R.string.admin_table_delete), color = if (!busy && editable(row) && !row.admin) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f))
+                                }
                             }
                             HorizontalDivider()
                         }
@@ -199,6 +211,7 @@ internal fun AccountAdministrationDialog(french: Boolean, onClose: () -> Unit) {
     }
     pending?.let { change ->
         val permission = stringResource(when(change.action) {
+            "delete" -> R.string.admin_table_delete
             "license" -> R.string.admin_table_license
             "administrator" -> R.string.admin_table_admin
             "disable" -> R.string.admin_table_active
@@ -206,7 +219,7 @@ internal fun AccountAdministrationDialog(french: Boolean, onClose: () -> Unit) {
         })
         AlertDialog(onDismissRequest = { pending = null },
             title = { Text(stringResource(R.string.admin_table_confirm)) },
-            text = { Text(change.row.email.ifBlank { change.row.uid } + "\n" + permission +
+            text = { if (change.action == "delete") Text(stringResource(R.string.admin_table_delete_warning, change.row.email.ifBlank { change.row.uid })) else Text(change.row.email.ifBlank { change.row.uid } + "\n" + permission +
                 (change.value?.let { ": " + status(if (change.action == "disable") !it else it) } ?: "")) },
             confirmButton = { TextButton(onClick = { pending = null; apply(change) }) { Text(stringResource(R.string.admin_table_confirm)) } },
             dismissButton = { TextButton(onClick = { pending = null }) { Text(stringResource(R.string.admin_table_cancel)) } })
