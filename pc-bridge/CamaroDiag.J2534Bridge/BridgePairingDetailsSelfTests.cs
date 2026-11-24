@@ -48,6 +48,19 @@ internal static class BridgePairingDetailsSelfTests
         MustReject<ArgumentException>(() =>
             BridgePairingDetails.FormatForAndroid("0.0.0.0", 35001, code));
         checks++;
+        // .NET accepts some noncanonical IPv4 shorthands that the Android
+        // pairing parser deliberately rejects. Never display such an address.
+        foreach (var invalidIp in new[]
+        {
+            "192.168.1", "192.168.001.42", "192.168.1.042",
+            " 192.168.1.42", "192.168.1.42 ", "0xC0A8012A",
+            "192.168.1.256", "192.168.1.42\n", "192.168.1.-1"
+        })
+        {
+            MustReject<ArgumentException>(() =>
+                BridgePairingDetails.FormatForAndroid(invalidIp, 35001, code));
+            checks++;
+        }
         foreach (var invalid in new[]
         {
             "short." + new string('A', 64),
