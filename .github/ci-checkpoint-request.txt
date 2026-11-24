@@ -1,3 +1,23 @@
+C8 GROUPED CONNECTION LIFECYCLE CHECKPOINT — 2026-11-24
+Implementation HEAD: e509113810a78528f702344c27ef710d49d0120c
+Scope: C6 / all adapter connections, NON-PROTOCOL (ISO/SAE owned by other chat).
+- Wi-Fi: socket generation prevents stale connect/read/write completions, test
+  fake TCP sockets with no real network, manager ties AT probe and cleanup to
+  original session/vehicle adapter epoch.
+- Bluetooth Classic and BLE: manager refuses a stale completed handshake,
+  GATT closes before callbacks can change a later session, BLE receive queue
+  bounded without silently dropping bytes.
+- J2534 TLS bridge: late handshake may never replace the latest paired bridge.
+- USB: atomic connection-slot ownership, open/configure before publication,
+  exact I/O loss state per session, no read/write result attributed to a
+  newly selected adapter, partial serial writes rejected, tests of generation
+  isolation and size validation without USB hardware.
+- Full C8: Android Debug unit/lint/assemble, Windows/J2534 Debug, native ECU,
+  ESP32-S3/STM32 firmware build, native/Python/Windows connector tests.
+Validation policy: zero real vehicle/ECU testing until the Release after PR
+closure. Lot 8 issue #48 is the owner's post-Release acceptance workbook.
+No merge, branch, release or PR creation.
+
 C8 COHERENT ANDROID CONNECTION CHECKPOINT — 2026-11-24
 Implementation SHA before checkpoint: b2d9251e26bdd25ffec65344ddeae2feb6b297bf
 Scope: outside ISO/SAE protocols, PR #95 only.
