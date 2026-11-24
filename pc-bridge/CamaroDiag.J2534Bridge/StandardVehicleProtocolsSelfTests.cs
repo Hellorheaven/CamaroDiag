@@ -208,19 +208,35 @@ internal static class StandardVehicleProtocolsSelfTests
         var identificationRequest = DoIpCodec.Decode(
             DoIpVehicleDiscovery.BuildRequest());
         Check(identificationRequest.Type == DoIpCodec.VehicleIdentificationRequest &&
+            identificationRequest.Version == 0xFF &&
             identificationRequest.Payload.Length == 0,
-            "DoIP UDP identification request has 0x0001 and empty payload.");
+            "DoIP UDP discovery uses 0xFF default version until ECU version is known.");
         var vinRequest = DoIpCodec.Decode(
             DoIpVehicleDiscovery.BuildVinRequest("12345678901234567"));
         Check(vinRequest.Type == DoIpCodec.VehicleIdentificationRequestVin &&
+            vinRequest.Version == 0xFF &&
             System.Text.Encoding.ASCII.GetString(vinRequest.Payload) ==
                 "12345678901234567",
             "DoIP type 0x0003 VIN-specific UDP request.");
         var eidRequest = DoIpCodec.Decode(
             DoIpVehicleDiscovery.BuildEidRequest([1, 2, 3, 4, 5, 6]));
         Check(eidRequest.Type == DoIpCodec.VehicleIdentificationRequestEid &&
+            eidRequest.Version == 0xFF &&
             eidRequest.Payload.SequenceEqual(new byte[] {1, 2, 3, 4, 5, 6}),
             "DoIP type 0x0002 EID-specific UDP request.");
+        Reject<ArgumentOutOfRangeException>(() =>
+            DoIpCodec.Encode(DoIpCodec.DiagnosticMessage, [0x22, 0xF1, 0x90],
+                version: 0xFF),
+            "Default 0xFF DoIP version cannot be used for a diagnostic TCP PDU.");
+        Reject<ArgumentOutOfRangeException>(() =>
+            DoIpCodec.Encode(DoIpCodec.GenericNegativeAck, [0], version: 0xFF),
+            "Default 0xFF DoIP version cannot be used for generic NACK.");
+        var invalidDefaultVersion = DoIpCodec.Encode(DoIpCodec.DiagnosticMessage,
+            [0x00, 0x00, 0x00, 0x00, 0x22]);
+        invalidDefaultVersion[0] = 0xFF;
+        invalidDefaultVersion[1] = 0x00;
+        Reject<InvalidDataException>(() => DoIpCodec.Decode(invalidDefaultVersion),
+            "Incoming diagnostic TCP PDU with discovery-only version is rejected.");
         Reject<ArgumentException>(() =>
             DoIpVehicleDiscovery.BuildVinRequest("short"),
             "Invalid VIN length is rejected before transmitting.");
