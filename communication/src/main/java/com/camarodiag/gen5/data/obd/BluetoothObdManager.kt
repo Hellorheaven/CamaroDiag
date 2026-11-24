@@ -380,10 +380,16 @@ class BluetoothObdManager(context: Context) {
     }
 
     suspend fun activateSimulatedAdapter(preset: String): AdapterCapabilities = withContext(Dispatchers.Default) {
-        disconnect()
-        isDemoMode = true
-        isSimulationActive = true
+        val epoch = synchronized(adapterLifecycleLock) {
+            disconnect()
+            isDemoMode = true
+            isSimulationActive = true
+            transportSessionEpoch.capture()
+        }
         delay(350)
+        // A pending demo animation cannot report its simulated adapter as
+        // current after USB/BLE/Wi-Fi/J2534 was selected instead.
+        transportSessionEpoch.requireQueuedCurrent(epoch)
         when (preset) {
             "MX_PLUS" -> CamaroUdsProtocol.evaluateAdapterProbe(
                 deviceName = "OBDLink MX+ (Simulated)",
