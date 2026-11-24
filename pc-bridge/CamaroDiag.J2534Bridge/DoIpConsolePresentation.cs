@@ -37,6 +37,31 @@ internal static class DoIpConsolePresentation
                 Text("Unavailable", culture));
     }
 
+    internal static IReadOnlyList<string> FormatDtcs(
+        ObdOnUdsServices.DtcStatusReport report, byte requestedMask,
+        CultureInfo? culture = null)
+    {
+        ArgumentNullException.ThrowIfNull(report);
+        var lines = new List<string>(report.Codes.Count + 2)
+        {
+            string.Format(CultureInfo.InvariantCulture, Text("DtcResult", culture),
+                report.Codes.Count, requestedMask, report.AvailabilityMask)
+        };
+        foreach (var code in report.Codes)
+            lines.Add(string.Format(CultureInfo.InvariantCulture,
+                Text("DtcEntry", culture), code.Code, code.Status));
+        lines.Add(Text("DtcNotice", culture));
+        return lines;
+    }
+
+    internal static byte ParseDtcMask(string text)
+    {
+        if (text.Length != 2 || !byte.TryParse(text, NumberStyles.AllowHexSpecifier,
+                CultureInfo.InvariantCulture, out var mask))
+            throw new ArgumentException("Expected two hexadecimal digits.", nameof(text));
+        return mask;
+    }
+
     internal static string FormatIdentity(DoIpVehicleDiscovery.Identity identity,
         CultureInfo? culture = null)
     {
