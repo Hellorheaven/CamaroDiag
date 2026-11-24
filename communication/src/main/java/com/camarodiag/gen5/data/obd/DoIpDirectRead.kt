@@ -23,7 +23,7 @@ import kotlin.coroutines.resumeWithException
  * A socket is owned by one operation and is never retained after failure.
  */
 object DoIpDirectRead {
-    enum class Operation { VIN, DID, DTC, MONITOR }
+    enum class Operation { VIN, DID, DTC, MONITOR, BACKUP }
     data class Target private constructor(val address: InetAddress, val tester: Int, val ecu: Int,
         val expectedVin: String, val tls: Boolean) {
         companion object {
@@ -57,7 +57,7 @@ object DoIpDirectRead {
     data class Trace(val direction: String, val payloadHex: String)
     data class Outcome(val gateway: Gateway, val ecu: Int, val vin: String?,
         val data: ByteArray?, val dtcs: UdsDtcReport?, val trace: List<Trace>,
-        val samples: List<Sample> = emptyList())
+        val samples: List<Sample> = emptyList(), val capture: DoIpMemoryBackup.Capture? = null)
     data class Sample(val index: Int, val elapsedMs: Long, val data: ByteArray)
 
     private const val MAX_PAYLOAD = 1024 * 1024
@@ -134,7 +134,14 @@ object DoIpDirectRead {
     }
 
     private class Session(private val socket: Socket, private val gateway: Gateway,
-        private val target: Target, private val trace: MutableList<Trace>) {
+        private val target: Target, private val trace: MutableList<Trace>,
+        private val rollingTrace: Boolean = false) {
+        private fun record(direction: String, payload: ByteArray) {
+            require(payload.size <= 65536)
+            if (rollingTrace && trace.size >= 128) trace.removeAt(0)
+            check(trace.size < 128) { "DoIP diagnostic trace limit exceeded." }
+            trace += Trace(direction, hex(payload))
+        }
         private fun readExact(size: Int, deadline: Long): ByteArray {
             val output = ByteArray(size)
             var offset = 0
@@ -200,8 +207,7 @@ object DoIpDirectRead {
         }
         fun exchange(request: ByteArray, timeout: Int): ByteArray {
             val end = deadline(timeout)
-            check(trace.size < 128) { "Too many DoIP diagnostic messages." }
-            trace += Trace("TX", hex(request))
+            record("TX", request)
             send(0x8001, addr(target.tester) + addr(target.ecu) + request, end)
             while (true) {
                 val frame = receive(end)
@@ -218,8 +224,7 @@ object DoIpDirectRead {
                     continue
                 }
                 val reply = frame.data.copyOfRange(4, frame.data.size)
-                check(trace.size < 128 && reply.size <= 65536) { "DoIP diagnostic trace limit exceeded." }
-                trace += Trace("RX", hex(reply))
+                record("RX", reply)
                 if (reply[0].u8() == 0x7F) {
                     require(reply.size == 3 && reply[1] == request[0])
                     if (reply[2].u8() == 0x78) continue // same absolute transaction deadline
@@ -228,7 +233,8 @@ object DoIpDirectRead {
                 require(reply[0].u8() == request[0].u8() + 0x40)
                 if (request[0].u8() == 0x22)
                     require(reply.size >= 4 && reply[1] == request[1] && reply[2] == request[2])
-                else require(reply.size >= 3 && reply[1] == request[1])
+                else if (request[0].u8() == 0x19) require(reply.size >= 3 && reply[1] == request[1])
+                else require(request[0].u8() == 0x23 && reply.size >= 2)
                 return reply
             }
         }
@@ -240,14 +246,22 @@ object DoIpDirectRead {
      */
     suspend fun read(target: Target, operation: Operation, did: Int = 0xF190,
         mask: Int = 255, timeoutMs: Int = 5000, sampleCount: Int = 10,
-        intervalMs: Int = 1000): Outcome {
+        intervalMs: Int = 1000, backupScope: DoIpMemoryBackup.Scope? = null,
+        onBackupProgress: (Int, Int) -> Unit = { _, _ -> }): Outcome {
         require(timeoutMs in 100..30_000 && did in 0..65535 && mask in 0..255)
         require(operation == Operation.VIN || target.expectedVin.isNotEmpty())
         require(sampleCount in 1..30 && intervalMs in 250..5000)
-        val budget = if (operation == Operation.MONITOR)
+        require((operation == Operation.BACKUP) == (backupScope != null))
+        if (backupScope != null) {
+            backupScope.validate()
+            require(backupScope.vin == target.expectedVin && backupScope.tester == target.tester && backupScope.ecu == target.ecu)
+        }
+        val budget = if (operation == Operation.BACKUP) 600_000L
+            else if (operation == Operation.MONITOR)
             timeoutMs * (sampleCount + 5L) + intervalMs * (sampleCount - 1L) else timeoutMs * 5L
         val gateway = discover(target, timeoutMs)
         require(target.tester != gateway.logicalAddress)
+        if (backupScope != null) require(gateway.logicalAddress == backupScope.gateway)
         val trace = mutableListOf<Trace>()
         val base = Socket()
         try {
@@ -263,7 +277,7 @@ object DoIpDirectRead {
                     secure
                 } else base
                 wire.use {
-                    val session = Session(wire, gateway, target, trace)
+                    val session = Session(wire, gateway, target, trace, rollingTrace = operation == Operation.BACKUP)
                     session.activate(timeoutMs)
                     fun readVin(): String {
                         val reply = session.exchange(byteArrayOf(0x22,0xF1.toByte(),0x90.toByte()), timeoutMs)
@@ -283,7 +297,41 @@ object DoIpDirectRead {
                         // The gateway's announcement is not proof of the selected ECU identity.
                         vin = readVin()
                         require(vin == target.expectedVin)
-                        if (operation == Operation.MONITOR) {
+                        if (operation == Operation.BACKUP) {
+                            val scope = checkNotNull(backupScope)
+                            fun identity() {
+                                require(readVin() == scope.vin)
+                                val response = session.exchange(byteArrayOf(0x22, (scope.identityDid shr 8).toByte(), scope.identityDid.toByte()), timeoutMs)
+                                require(hex(response.copyOfRange(3, response.size)) == scope.identityHex) { "ECU identity differs from memory scope." }
+                            }
+                            fun pass(index: Int): ByteArray {
+                                identity()
+                                val data = ByteArray(scope.length)
+                                var offset = 0
+                                var blocks = 0
+                                while (offset < data.size) {
+                                    if (blocks > 0 && blocks % 32 == 0) identity()
+                                    val count = minOf(scope.blockSize, data.size - offset)
+                                    val address = scope.start + offset
+                                    val request = byteArrayOf(0x23, if (count > 255) 0x24 else 0x14,
+                                        (address shr 24).toByte(), (address shr 16).toByte(),
+                                        (address shr 8).toByte(), address.toByte()) +
+                                        if (count > 255) byteArrayOf((count shr 8).toByte(), count.toByte()) else byteArrayOf(count.toByte())
+                                    val reply = session.exchange(request, timeoutMs)
+                                    require(reply.size == count + 1) { "Incomplete scoped memory response." }
+                                    reply.copyInto(data, offset, 1)
+                                    offset += count
+                                    blocks++
+                                    if (blocks % 32 == 0 || offset == data.size) onBackupProgress(index, offset)
+                                }
+                                return data
+                            }
+                            val first = pass(1)
+                            val second = pass(2)
+                            identity()
+                            val capture = DoIpMemoryBackup.createCapture(scope, first, second)
+                            Outcome(gateway, target.ecu, vin, null, null, trace.toList(), capture = capture)
+                        } else if (operation == Operation.MONITOR) {
                             val samples = mutableListOf<Sample>()
                             val start = System.nanoTime()
                             for (index in 1..sampleCount) {
