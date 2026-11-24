@@ -170,6 +170,9 @@ internal static class DoIpVehicleDiscovery
                 response.RemoteEndPoint.Port != port)
                 continue;
             var decoded = DoIpCodec.Decode(response.Buffer);
+            // The gateway explicitly rejected our UDP request: expose the
+            // standard DoIP error instead of eventually claiming silence.
+            DoIpCodec.RequireNoGenericNack(decoded);
             if (decoded.Type != expectedType)
                 continue;
             if (powerMode) _ = DoIpCodec.ParseDiagnosticPowerMode(decoded);
@@ -257,8 +260,12 @@ internal static class DoIpVehicleDiscovery
             if (!received.RemoteEndPoint.Address.Equals(address) ||
                 received.RemoteEndPoint.Port != destination.Port)
                 continue;
-            // Reject invalid announcements from the selected gateway rather
-            // than silently interpreting arbitrary UDP traffic as an ECU.
+            // An explicit generic NACK from the selected gateway is a
+            // transport rejection, not an absent/malformed vehicle identity.
+            var decoded = DoIpCodec.Decode(received.Buffer);
+            DoIpCodec.RequireNoGenericNack(decoded);
+            if (decoded.Type != DoIpCodec.VehicleIdentificationResponse)
+                continue; // Other DoIP control packets are not announcements.
             var found = ParseAnnouncement(received.Buffer,
                 received.RemoteEndPoint.Address);
             if (!MatchesRequestedIdentity(found, vin, eid))
