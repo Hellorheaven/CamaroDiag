@@ -147,15 +147,18 @@ internal static class DoIpVehicleDiscovery
         CancellationToken cancellationToken, int? portOverride = null)
     {
         if (!IPAddress.TryParse(host, out var address) ||
-            address.AddressFamily != AddressFamily.InterNetwork ||
+            address.AddressFamily is not (AddressFamily.InterNetwork or
+                AddressFamily.InterNetworkV6) ||
             address.Equals(IPAddress.Any) ||
             address.Equals(IPAddress.Broadcast) ||
+            address.Equals(IPAddress.IPv6Any) ||
+            address.IsIPv6Multicast ||
             timeout <= TimeSpan.Zero || timeout > TimeSpan.FromSeconds(30) ||
             (portOverride.HasValue && portOverride.Value is < 1 or > 65535))
-            throw new ArgumentException("Provide a valid unicast DoIP IPv4 gateway, port and timeout.");
+            throw new ArgumentException("Provide a valid unicast DoIP IPv4/IPv6 gateway, port and timeout.");
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         deadline.CancelAfter(timeout);
-        using var socket = new UdpClient(AddressFamily.InterNetwork);
+        using var socket = new UdpClient(address.AddressFamily);
         var request = DoIpCodec.Encode(powerMode ?
             DoIpCodec.PowerModeRequest : DoIpCodec.EntityStatusRequest, []);
         var port = portOverride ?? 13400;
@@ -238,18 +241,21 @@ internal static class DoIpVehicleDiscovery
         string? vin = null, byte[]? eid = null, int? portOverride = null)
     {
         if (!IPAddress.TryParse(host, out var address) ||
-            address.AddressFamily != AddressFamily.InterNetwork ||
+            address.AddressFamily is not (AddressFamily.InterNetwork or
+                AddressFamily.InterNetworkV6) ||
             address.Equals(IPAddress.Any) ||
             address.Equals(IPAddress.Broadcast) ||
+            address.Equals(IPAddress.IPv6Any) ||
+            address.IsIPv6Multicast ||
             timeout <= TimeSpan.Zero || timeout > TimeSpan.FromSeconds(30) ||
             (portOverride.HasValue && portOverride.Value is < 1 or > 65535))
             throw new ArgumentException(
-                "Provide an explicit unicast IPv4 gateway, port and bounded timeout.");
+                "Provide an explicit unicast IPv4/IPv6 gateway, port and bounded timeout.");
         if (vin is not null && eid is not null)
             throw new ArgumentException("Use either VIN or EID identification, not both.");
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         deadline.CancelAfter(timeout);
-        using var socket = new UdpClient(AddressFamily.InterNetwork);
+        using var socket = new UdpClient(address.AddressFamily);
         var destination = new IPEndPoint(address, portOverride ?? 13400);
         var request = vin is not null ? BuildVinRequest(vin) :
             eid is not null ? BuildEidRequest(eid) : BuildRequest();
