@@ -12,6 +12,20 @@ internal static class ObdJ1979PidValues
     internal sealed record Value(byte Mode, byte Pid,
         string Name, double Number, string Unit);
 
+    internal static int? DataLength(byte pid) => pid switch
+    {
+        0x0C or 0x10 or 0x1F or 0x21 or 0x22 or 0x23 or 0x31 or
+            0x32 or 0x3C or 0x3D or 0x3E or 0x3F or 0x42 or 0x43 or
+            0x44 or 0x4D or 0x4E or 0x53 or 0x54 or 0x59 or 0x5D or
+            0x5E or 0x63 => 2,
+        0x04 or 0x05 or 0x06 or 0x07 or 0x08 or 0x09 or 0x0A or
+            0x0B or 0x0D or 0x0E or 0x0F or 0x11 or 0x2C or 0x2D or
+            0x2E or 0x2F or 0x30 or 0x33 or 0x45 or 0x46 or 0x47 or
+            0x48 or 0x49 or 0x4A or 0x4B or 0x4C or 0x52 or 0x5A or
+            0x5B or 0x5C or 0x61 or 0x62 => 1,
+        _ => null
+    };
+
     internal static Value? Decode(ReadOnlySpan<byte> request,
         ReadOnlySpan<byte> response)
     {
@@ -29,85 +43,8 @@ internal static class ObdJ1979PidValues
             throw new InvalidDataException("PID or freeze-frame reply identity differs.");
         var values = result.Data.AsSpan(offset);
         var pid = request[1];
-        var needed = pid is 0x0C or
-            0x10 or
-            0x1F or
-            0x21 or
-            0x22 or
-            0x23 or
-            0x31 or
-            0x32 or
-            0x3C or
-            0x3D or
-            0x3E or
-            0x3F or
-            0x42 or
-            0x43 or
-            0x44 or
-            0x4D or
-            0x4E or
-            0x53 or
-            0x54 or
-            0x59 or
-            0x5D or
-            0x5E or
-            0x63 ? 2 : 1;
-        if (pid is not (0x04 or
-            0x05 or
-            0x06 or
-            0x07 or
-            0x08 or
-            0x09 or
-            0x0A or
-            0x0B or
-            0x0C or
-            0x0D or
-            0x0E or
-            0x0F or
-            0x10 or
-            0x11 or
-            0x1F or
-            0x21 or
-            0x22 or
-            0x23 or
-            0x2C or
-            0x2D or
-            0x2E or
-            0x2F or
-            0x30 or
-            0x31 or
-            0x32 or
-            0x33 or
-            0x3C or
-            0x3D or
-            0x3E or
-            0x3F or
-            0x42 or
-            0x43 or
-            0x44 or
-            0x45 or
-            0x46 or
-            0x47 or
-            0x48 or
-            0x49 or
-            0x4A or
-            0x4B or
-            0x4C or
-            0x4D or
-            0x4E or
-            0x52 or
-            0x53 or
-            0x54 or
-            0x59 or
-            0x5A or
-            0x5B or
-            0x5C or
-            0x5D or
-            0x5E or
-            0x61 or
-            0x62 or
-            0x63))
-            return null;
+        var needed = DataLength(pid);
+        if (needed is null) return null;
         if (values.Length != needed)
             throw new InvalidDataException("Incorrect byte count for the selected SAE J1979 PID.");
         var a = values[0];

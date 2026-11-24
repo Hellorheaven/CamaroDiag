@@ -346,6 +346,12 @@ CamaroDiag.J2534Bridge.exe --j1979-discover-can --adapter-index 0 --baud 500000 
 La commande s'appuie sur le pilote fournisseur SAE J2534 et sur CAN brut classique, pas CAN-FD et pas sur une simulation ; elle n'a cependant **pas été qualifiée sur adaptateur ni véhicule**. Les preuves tests sont pour le moment uniquement des vecteurs offline écrits, non exécutés. Pour lire les pages suivantes d'un ECU ayant répondu, utiliser ensuite la commande `--j1979-pids` avec une paire TX/RX physique explicitement vérifiée.
 
 
+## SAE J1979 — plusieurs PID dans une même lecture CAN
+
+En mode 01, le décodeur traite jusqu’à six PID par requête. En mode 02, il traite jusqu’à trois couples PID/numéro d’image figée. Il accepte des réponses dans un ordre différent, conserve les mesures répétées demandées et indique les éléments sans réponse. Si la largeur d’une donnée est inconnue, la suite du message reste consultable en hexadécimal. Référence : SAE J1979, mai 2007, sections 7.1 et 7.2.
+
+The CAN decoder handles reordered, repeated and omitted records in multi-PID live data and freeze-frame replies. It only splits records whose lengths are known.
+
 ## SAE J1979 — image figée et moniteurs antipollution
 
 Le pont interprète le code déclencheur renvoyé en mode 02 PID 02 pour le numéro d’image demandé. Une valeur nulle indique l’absence d’image enregistrée. En mode 01 PID 01, le pont affiche quels moniteurs pris en charge ont terminé leurs tests depuis le dernier effacement des défauts. Il applique la table correspondant au type d’allumage annoncé et conserve les octets bruts B/C/D. Référence : SAE J1979 (mai 2007), tableaux 35, 37 et B2.

@@ -45,6 +45,31 @@ internal static class ObdJ1979InterpretationSelfTests
         Reject<InvalidDataException>(() => ObdJ1979Interpretation.Interpret(
             [0x02, 0x02, 0], [0x42, 0x02, 0, 1, 0x30, 0]), "Oversized trigger code.");
 
+        var reordered = ObdJ1979Interpretation.Interpret(
+            [0x01, 0x0C, 0x0D, 0x0D], [0x41, 0x0D, 30, 0x0C, 0x10, 0, 0x0D, 31]);
+        Check(reordered.Positive && reordered.Description.Contains("30") &&
+            reordered.Description.Contains("1024") && reordered.Description.Contains("31") &&
+            !reordered.Description.Contains("not-returned"), "Reordered and repeated Mode 01 values.");
+        var partial = ObdJ1979Interpretation.Interpret(
+            [0x02, 0x02, 0, 0x02, 1], [0x42, 0x02, 1, 0x01, 0x30]);
+        Check(partial.Positive && partial.Description.Contains("DTC=P0130") &&
+            partial.Description.Contains("not-returned=02/00"), "Unanswered freeze frames stay missing.");
+        var multiplePages = ObdJ1979Interpretation.Interpret(
+            [0x01, 0x00, 0x20], [0x41, 0x20, 0x80, 0, 0, 0]);
+        Check(multiplePages.Description.Contains("supported=21") &&
+            multiplePages.Description.Contains("not-returned=00"), "A later requested page may answer first.");
+        Reject<InvalidDataException>(() => ObdJ1979Interpretation.Interpret(
+            [0x01, 0x0C, 0x0D], [0x41, 0x0D, 0, 0x0D, 1]), "Extra unrequested duplicate.");
+        Reject<InvalidDataException>(() => ObdJ1979Interpretation.Interpret(
+            [0x02, 0x0C, 0, 0x0C, 1], [0x42, 0x0C, 2, 0, 0]), "Unrequested freeze frame.");
+        Reject<InvalidDataException>(() => ObdJ1979Interpretation.Interpret(
+            [0x01, 0x0D, 0x0C], [0x41, 0x0D, 31, 0x0C, 0]), "Incomplete final data record.");
+        Reject<ArgumentException>(() => ObdJ1979Interpretation.Interpret(
+            [0x01, 0x00, 0x0D], [0x41, 0x0D, 0]), "Support pages and data cannot mix.");
+        var unparsed = ObdJ1979Interpretation.Interpret(
+            [0x01, 0x0D, 0xFE], [0x41, 0xFE, 0x0D, 0x40]);
+        Check(unparsed.Description.Contains("unparsed-from-PID=FE raw=FE0D40") &&
+            !unparsed.Description.Contains("not-returned"), "Unknown width keeps the tail uninterpreted.");
         var monitors = ObdJ1979Interpretation.Interpret(
             [0x06, 0x00], [0x46, 0, 0x80, 0, 0, 1]);
         Check(monitors.Positive &&
