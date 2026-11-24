@@ -177,3 +177,8 @@ Demander UNE validation globale Debug du HEAD marqueur : Windows -warnaserror / 
 HEAD du code avant marqueur : 45d73af55ada03b138318c05ad153bc9419bbdee.
 Apres le checkpoint CAN-FD #45305792189 reussi : delais UDS P2 (premiere reponse) et P2* (apres NRC 0x78), avec budget global inchange et refus des reponses tardives d'un pilote; parametrage CLI ISO-TP --uds-p2-ms/--uds-p2-star-ms sur echanges UDS valides ; tests positifs et negatifs offline, doc FR/EN. DoIP et timing OEM physiques non qualifies, pas de modification ECU.
 Verifier UNE suite Debug complete au SHA de ce marqueur Windows 0 warnings / --self-test, Android test/lint/assemble, noyau natif, connecteurs. Pas de merge ni release sans accord. Tests vehicule uniquement Release par proprietaire.
+
+24/11/2026 — checkpoint de cloture logicielle UDS ISO 14229, P2/P2* via ISO-TP et DoIP (#110)
+HEAD des corrections avant marqueur : 8b5fe7820759319efc45e3734f51a40492efdf0a.
+Checkpoint UDS ISO-TP precedent #45306777798 SUCCESS au SHA 04ec829. Depuis : DoIpDiagnosticTransport utilise UdsResponseSequence pour P2/P2* avec ACK/AliveCheck intermediaires qui ne reinitialisent pas l'echeance ni la session, validation avant toute TX de P2/P2* explicites, options DoIP CLI --uds-p2-ms / --uds-p2-star-ms, tests parser et documentation FR/EN. P2/P2* OEM et hardware toujours a qualifier seulement sur Release.
+Demander un unique gate Debug complet au SHA exact de ce marqueur : Windows -warnaserror et --self-test, Android test/lint/assemble, noyau et firmware/connecteurs. Pas de Release, pas de merge ni essais ECU physiques en PR #95.
