@@ -1045,12 +1045,13 @@
     <string name="cal_doip_count_button">Compter les DTC</string>
     <string name="cal_doip_count_result">Nombre de DTC : %1$d ; masque demandé 0x%2$02X, disponible 0x%3$02X, format 0x%4$02X</string>
     <string name="cal_doip_filtered_dtc_result">DTC : %1$d ; masque demandé 0x%2$02X, disponible 0x%3$02X</string>
-    <string name="cal_doip_command_payload">Commande UDS (hex)</string>
-    <string name="cal_doip_command_send">Envoyer la commande UDS</string>
+    <string name="cal_doip_command_payload">Commandes UDS (hex ; séparateur ;)</string>
+    <string name="cal_doip_command_send">Envoyer la séquence UDS</string>
     <string name="cal_doip_command_target">VIN %1$s · %2$s · testeur 0x%3$s · ECU 0x%4$s · %5$s</string>
     <string name="cal_doip_detail_dtc">DTC (6 chiffres hex)</string>
     <string name="cal_doip_detail_record">Enregistrement (hex)</string>
     <string name="cal_doip_snapshot">Instantané</string>
     <string name="cal_doip_extended">Données étendues</string>
     <string name="cal_doip_detail_result">DTC 0x%1$06X · statut 0x%2$02X · enregistrements bruts : %3$s</string>
+    <string name="cal_doip_sequence_reply">Commande %1$d : %2$s</string>
 </resources>

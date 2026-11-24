@@ -1405,17 +1405,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun confirmDirectDoIpCommand(command: DoIpConsoleCommand, approval: EcuWriteConsentFlow.Approval) {
         if (!requirePremiumLicense() || command.vehicle != _vehicle.value ||
             command.generation != _liveCanMonitorState.value.consoleContextGeneration) return
-        val payload = runCatching { DoIpDirectRead.parseCommand(command.payload) }.getOrNull() ?: return
+        val payload = runCatching { DoIpDirectRead.parseCommands(command.payload) }.getOrNull() ?: return
         readDirectDoIp(command.host, command.tester, command.ecu, "", command.tls,
-            DoIpDirectRead.Operation.EXCHANGE, command = payload, approval = approval)
+            DoIpDirectRead.Operation.EXCHANGE, commands = payload, approval = approval)
     }
 
     fun readDirectDoIp(host: String, tester: String, ecu: String, didHex: String,
         tls: Boolean, operation: DoIpDirectRead.Operation, sampleCount: Int = 10, intervalMs: Int = 1000,
-        command: ByteArray? = null, approval: EcuWriteConsentFlow.Approval? = null) {
+        commands: List<ByteArray>? = null, approval: EcuWriteConsentFlow.Approval? = null) {
         if (!requirePremiumLicense() || (operation == DoIpDirectRead.Operation.EXCHANGE &&
-                (command == null || approval == null))) return
-        val fixedCommand = command?.copyOf()
+                (commands == null || approval == null))) return
+        val fixedCommands = commands?.map { it.copyOf() }
         launchEnhancedUdsRead(journalDoIp = true) { current ->
             _calibrationWorkspace.update { it.copy(doIpReading = true, doIpResult = "", doIpTrace = emptyList(), doIpBackupBytes = 0,
                 doIpMonitorReport = null, doIpLiveSamples = emptyList()) }
@@ -1449,8 +1449,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             if (current()) it.copy(doIpLiveSamples = it.doIpLiveSamples + doIpSampleRow(sample)) else it
                         }
                     }, onControlTrace = { trace -> journalDoIpControlTrace(trace, current) },
-                    command = fixedCommand, approval = approval, isContextCurrent = current,
-                    dtc = detailDtc, record = detailRecord)
+                    commands = fixedCommands, approval = approval, isContextCurrent = current,
+                    dtc = detailDtc, record = detailRecord, onCommandReply = { index, reply ->
+                        check(current())
+                        val line = localizedContext.getString(R.string.cal_doip_sequence_reply, index,
+                            reply.joinToString(" ") { "%02X".format(it.toInt() and 255) })
+                        _calibrationWorkspace.update { if (current()) it.copy(doIpResult =
+                            (it.doIpResult + "\n" + line).trimStart()) else it }
+                    })
                 if (!current()) return@launchEnhancedUdsRead
                 val module = "DoIP 0x" + ecu.uppercase()
                 val report = result.dtcs
@@ -1462,6 +1468,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val count = result.dtcCount
                 val detail = result.dtcDetail
                 val rendered = when {
+                    result.commandReplies.isNotEmpty() -> result.commandReplies.mapIndexed { index, reply ->
+                        localizedContext.getString(R.string.cal_doip_sequence_reply, index + 1,
+                            reply.joinToString(" ") { "%02X".format(it.toInt() and 255) })
+                    }.joinToString("\n")
                     detail != null -> localizedContext.getString(R.string.cal_doip_detail_result,
                         detail.dtc, detail.status, detail.records.joinToString(" ") { "%02X".format(it.toInt() and 255) })
                     count != null -> localizedContext.getString(R.string.cal_doip_count_result,

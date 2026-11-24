@@ -50,6 +50,12 @@ object DoIpDirectRead {
         }
     }
 
+    fun parseCommands(text: String): List<ByteArray> {
+        val parts = text.split(';')
+        require(parts.size in 1..16)
+        return parts.map(::parseCommand).also { require(it.sumOf { it.size } <= 4091) }
+    }
+
     /** Correlation checks do not restrict manufacturer-specific service IDs.
      * A positive service echo alone is not proof that a write was persisted. */
     internal fun requirePositiveResponse(request: ByteArray, reply: ByteArray) {
@@ -132,7 +138,8 @@ object DoIpDirectRead {
     data class Outcome(val gateway: Gateway, val ecu: Int, val vin: String?,
         val data: ByteArray?, val dtcs: UdsDtcReport?, val trace: List<Trace>,
         val samples: List<Sample> = emptyList(), val capture: DoIpMemoryBackup.Capture? = null,
-        val dtcCount: UdsDtcCountReport? = null, val dtcDetail: UdsDtcDetail? = null)
+        val dtcCount: UdsDtcCountReport? = null, val dtcDetail: UdsDtcDetail? = null,
+        val commandReplies: List<ByteArray> = emptyList())
     data class Sample(val index: Int, val elapsedMs: Long, val data: ByteArray)
 
     private const val MAX_PAYLOAD = 1024 * 1024
@@ -452,20 +459,23 @@ object DoIpDirectRead {
         onTrace: (Trace) -> Unit = {}, onSample: (Sample) -> Unit = {},
         onControlTrace: (ControlTrace) -> Unit = {},
         command: ByteArray? = null, approval: EcuWriteConsentFlow.Approval? = null,
-        isContextCurrent: () -> Boolean = { false }, dtc: Int = 0, record: Int = 1): Outcome {
+        isContextCurrent: () -> Boolean = { false }, dtc: Int = 0, record: Int = 1,
+        commands: List<ByteArray>? = null, onCommandReply: (Int, ByteArray) -> Unit = { _, _ -> }): Outcome {
         require(timeoutMs in 100..30_000 && did in 0..65535 && mask in 0..255)
         require(operation == Operation.VIN || target.expectedVin.isNotEmpty())
         require(sampleCount in 1..30 && intervalMs in 250..5000)
         require((operation == Operation.BACKUP) == (backupScope != null))
-        require((operation == Operation.EXCHANGE) == (command != null && approval != null))
+        require(command == null || commands == null)
+        val fixedCommands = (commands ?: command?.let { listOf(it) })?.map { it.copyOf() }
+        require((operation == Operation.EXCHANGE) == (fixedCommands != null && approval != null))
         val detailRequest = when (operation) {
             Operation.DTC_SNAPSHOT -> UdsDtcDecoder.readDetailRequest(4, dtc, record)
             Operation.DTC_EXTENDED -> UdsDtcDecoder.readDetailRequest(6, dtc, record)
             else -> null
         }
-        val fixedCommand = command?.copyOf()
         if (operation == Operation.EXCHANGE) {
-            require(fixedCommand != null && fixedCommand.size in 1..4091)
+            require(fixedCommands != null && fixedCommands.size in 1..16 &&
+                fixedCommands.all { it.size in 1..4091 } && fixedCommands.sumOf { it.size } <= 4091)
             EcuWriteConsentFlow.requireCurrentForTransmit(requireNotNull(approval), isContextCurrent)
         }
         if (backupScope != null) {
@@ -473,6 +483,7 @@ object DoIpDirectRead {
             require(backupScope.vin == target.expectedVin && backupScope.tester == target.tester && backupScope.ecu == target.ecu)
         }
         val budget = if (operation == Operation.BACKUP) 600_000L
+            else if (operation == Operation.EXCHANGE) timeoutMs * (requireNotNull(fixedCommands).size + 4L)
             else if (operation == Operation.MONITOR)
             timeoutMs * (sampleCount + 5L) + intervalMs * (sampleCount - 1L) else timeoutMs * 5L
         val gateway = discover(target.address, target.expectedVin, timeoutMs, onControlTrace)
@@ -519,9 +530,15 @@ object DoIpDirectRead {
                         vin = readVin()
                         require(vin == target.expectedVin)
                         if (operation == Operation.EXCHANGE) {
-                            EcuWriteConsentFlow.requireCurrentForTransmit(requireNotNull(approval), isContextCurrent)
-                            val reply = session.exchange(requireNotNull(fixedCommand), timeoutMs)
-                            Outcome(gateway, target.ecu, vin, reply, null, trace.toList())
+                            val replies = mutableListOf<ByteArray>()
+                            for ((index, payload) in requireNotNull(fixedCommands).withIndex()) {
+                                EcuWriteConsentFlow.requireCurrentForTransmit(requireNotNull(approval), isContextCurrent)
+                                val reply = session.exchange(payload, timeoutMs)
+                                EcuWriteConsentFlow.requireCurrentForTransmit(requireNotNull(approval), isContextCurrent)
+                                replies += reply
+                                onCommandReply(index + 1, reply.copyOf())
+                            }
+                            Outcome(gateway, target.ecu, vin, replies.last(), null, trace.toList(), commandReplies = replies.toList())
                         } else if (operation == Operation.BACKUP) {
                             val scope = checkNotNull(backupScope)
                             fun identity() {

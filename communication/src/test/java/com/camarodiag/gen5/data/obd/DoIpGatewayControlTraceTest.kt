@@ -169,6 +169,11 @@ class DoIpGatewayControlTraceTest {
     }
 
     @Test fun explicitCommandPreservesBytesAndCorrelatesStandardResponse() {
+        val commands = DoIpDirectRead.parseCommands("22 F1 90;19 01 FF")
+        assertEquals(2, commands.size)
+        assertArrayEquals(byteArrayOf(0x19, 1, 0xFF.toByte()), commands[1])
+        for (invalid in listOf("22;", ";22", "22;;19", List(17) { "22" }.joinToString(";")))
+            assertTrue(runCatching { DoIpDirectRead.parseCommands(invalid) }.isFailure)
         val command = DoIpDirectRead.parseCommand("22 F1 90")
         assertArrayEquals(byteArrayOf(0x22, 0xF1.toByte(), 0x90.toByte()), command)
         DoIpDirectRead.requirePositiveResponse(command, byteArrayOf(0x62, 0xF1.toByte(), 0x90.toByte(), 1))

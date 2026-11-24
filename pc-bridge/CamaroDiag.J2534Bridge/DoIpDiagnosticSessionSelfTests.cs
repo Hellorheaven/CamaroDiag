@@ -370,6 +370,45 @@ internal static class DoIpDiagnosticSessionSelfTests
             Check(commandReceived == vinMatches, "Explicit command follows only matching F190.");
         }
 
+        // An explicit confirmed sequence uses one routing activation and stops
+        // immediately on the first negative or malformed response.
+        foreach (var failFirst in new[] { false, true })
+        {
+            var replies = new List<int>();
+            await RunCaseAsync(async stream =>
+            {
+                _ = await RequireRequestAsync(stream);
+                await SendAsync(stream, DoIpCodec.DiagnosticMessage,
+                    FromEcu([0x62, 0xF1, 0x90, .. System.Text.Encoding.ASCII.GetBytes(selectedVehicleVin)]));
+                var first = await ReadAsync(stream);
+                Check(first.Payload.SequenceEqual(new byte[] {0x0E,0x80,0x12,0x34,0x22,0x12,0x34}),
+                    "Sequence command one sent in order.");
+                await SendAsync(stream, DoIpCodec.DiagnosticMessage,
+                    FromEcu(failFirst ? new byte[] {0x7F,0x22,0x31} : new byte[] {0x62,0x12,0x34,0x01}));
+                if (!failFirst)
+                {
+                    var second = await ReadAsync(stream);
+                    Check(second.Payload.SequenceEqual(new byte[] {0x0E,0x80,0x12,0x34,0x19,0x01,0xFF}),
+                        "Sequence command two sent on the same session.");
+                    await SendAsync(stream, DoIpCodec.DiagnosticMessage, FromEcu([0x59,1,0xFF,0,0,1]));
+                }
+            }, async client =>
+            {
+                try
+                {
+                    var done = await DoIpVinReader.ExchangeSequenceVerifiedAsync(client, observedForVin,
+                        new byte[][] { [0x22,0x12,0x34], [0x19,1,0xFF] }, TimeSpan.FromSeconds(2),
+                        CancellationToken.None, (index, _) => replies.Add(index));
+                    Check(!failFirst && done == 2, "Sequence completes only on both correlated replies.");
+                }
+                catch (Exception) when (failFirst)
+                {
+                    Check(replies.Count == 0, "Failed sequence publishes no successful reply.");
+                }
+            });
+            Check(replies.Count == (failFirst ? 0 : 2), "Sequence stopped or completed as expected.");
+        }
+
         // One routed session serves sequential monitored DID requests.
         await RunCaseAsync(async stream =>
         {

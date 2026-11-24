@@ -1042,12 +1042,13 @@
     <string name="cal_doip_count_button">Count DTCs</string>
     <string name="cal_doip_count_result">DTC count: %1$d; requested mask 0x%2$02X, available 0x%3$02X, format 0x%4$02X</string>
     <string name="cal_doip_filtered_dtc_result">DTCs: %1$d; requested mask 0x%2$02X, available 0x%3$02X</string>
-    <string name="cal_doip_command_payload">UDS command (hex)</string>
-    <string name="cal_doip_command_send">Send UDS command</string>
+    <string name="cal_doip_command_payload">UDS commands (hex; separated by ;)</string>
+    <string name="cal_doip_command_send">Send UDS sequence</string>
     <string name="cal_doip_command_target">VIN %1$s · %2$s · tester 0x%3$s · ECU 0x%4$s · %5$s</string>
     <string name="cal_doip_detail_dtc">DTC (6 hex digits)</string>
     <string name="cal_doip_detail_record">Record (hex)</string>
     <string name="cal_doip_snapshot">Snapshot</string>
     <string name="cal_doip_extended">Extended data</string>
     <string name="cal_doip_detail_result">DTC 0x%1$06X · status 0x%2$02X · raw records: %3$s</string>
+    <string name="cal_doip_sequence_reply">Command %1$d: %2$s</string>
 </resources>

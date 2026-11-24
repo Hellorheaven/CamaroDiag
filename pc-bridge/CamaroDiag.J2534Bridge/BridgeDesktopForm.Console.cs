@@ -376,10 +376,10 @@ internal sealed partial class BridgeDesktopForm
                 return;
             }
         }
-        byte[]? command = null;
+        byte[][]? commands = null;
         if (operation == DoIpReadOperation.Exchange)
         {
-            try { command = DoIpConsolePresentation.ParsePayload(doIpPayload.Text); }
+            try { commands = DoIpConsolePresentation.ParseCommands(doIpPayload.Text); }
             catch (ArgumentException)
             {
                 ShowError(DoIpConsolePresentation.Text("InvalidPayload"));
@@ -392,7 +392,8 @@ internal sealed partial class BridgeDesktopForm
                 return;
             }
             var details = string.Format(DoIpConsolePresentation.Text("ExchangeTarget"),
-                observed.Vin, address, ecu, tester, useTls ? "TLS" : "TCP", Convert.ToHexString(command));
+                observed.Vin, address, ecu, tester, useTls ? "TLS" : "TCP",
+                string.Join("; ", commands.Select(x => Convert.ToHexString(x))));
             bool SameContext() => !busy && doIpConsoleDiscoveryCancellation is null &&
                 ReferenceEquals(observed, doIpObservedGateway) && consoleDevice is null &&
                 bridgeTask is not { IsCompleted: false };
@@ -524,14 +525,20 @@ internal sealed partial class BridgeDesktopForm
                     }
                     else if (operation == DoIpReadOperation.Exchange)
                     {
-                        var reply = await DoIpVinReader.ExchangeObservedGatewayAsync(observed,
-                            address, tester, ecu, useTls, command ?? throw new InvalidOperationException(),
-                            timeout, stop.Token, certificate, Trace);
+                        var count = await DoIpVinReader.ExchangeSequenceObservedAsync(observed,
+                            address, tester, ecu, useTls, commands ?? throw new InvalidOperationException(),
+                            timeout, stop.Token, (index, reply) =>
+                            {
+                                RequireCompleteTrace();
+                                if (!IsDisposed && !Disposing)
+                                    ConsoleLine("SYSTEM", string.Format(DoIpConsolePresentation.Text("SequenceReply"),
+                                        index, Convert.ToHexString(reply)), Color.DarkGreen);
+                            }, certificate, Trace);
                         RequireCompleteTrace();
                         stop.Token.ThrowIfCancellationRequested();
                         if (!IsDisposed && !Disposing)
-                            ConsoleLine("SYSTEM", string.Format(DoIpConsolePresentation.Text("ExchangeResult"),
-                                Convert.ToHexString(reply)), Color.DarkGreen);
+                            ConsoleLine("SYSTEM", string.Format(DoIpConsolePresentation.Text("SequenceComplete"),
+                                count), Color.DarkGreen);
                     }
                     else if (operation is DoIpReadOperation.DtcSnapshot or DoIpReadOperation.DtcExtended)
                     {

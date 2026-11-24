@@ -186,6 +186,47 @@ internal static class DoIpVinReader
         return await ExchangeVerifiedAsync(transport, gateway, fixedCommand, timeout, token);
     }
 
+    internal static async Task<int> ExchangeSequenceObservedAsync(
+        DoIpVehicleDiscovery.Identity gateway, IPAddress address, ushort tester, ushort ecu,
+        bool useTls, IReadOnlyList<byte[]> commands, TimeSpan timeout, CancellationToken token,
+        Action<int, byte[]> onReply, string? certificate = null,
+        Action<DoIpDiagnosticTransport.PduTrace>? trace = null)
+    {
+        var frozen = FreezeCommands(commands);
+        if (gateway.Vin is null || !DoIpVehicleDiscovery.IsVehicleVin(gateway.Vin))
+            throw new ArgumentException("A valid observed VIN is required.");
+        await using var transport = await ConnectObservedAsync(gateway, address, tester, ecu,
+            useTls, timeout, token, certificate, trace);
+        return await ExchangeSequenceVerifiedAsync(transport, gateway, frozen, timeout, token, onReply);
+    }
+
+    private static byte[][] FreezeCommands(IReadOnlyList<byte[]> commands)
+    {
+        ArgumentNullException.ThrowIfNull(commands);
+        if (commands.Count is < 1 or > 16 || commands.Any(c => c is null || c.Length is < 1 or > 4091) ||
+            commands.Sum(c => (long)c.Length) > 4091)
+            throw new ArgumentException("Expected 1..16 commands, at most 4091 total bytes.");
+        return commands.Select(c => c.ToArray()).ToArray();
+    }
+
+    internal static async Task<int> ExchangeSequenceVerifiedAsync(DoIpDiagnosticTransport transport,
+        DoIpVehicleDiscovery.Identity gateway, IReadOnlyList<byte[]> commands, TimeSpan timeout,
+        CancellationToken token, Action<int, byte[]> onReply)
+    {
+        ArgumentNullException.ThrowIfNull(onReply);
+        var frozen = FreezeCommands(commands);
+        _ = await VerifyObservedVinAsync(transport, gateway, timeout, token, null, null);
+        for (var i = 0; i < frozen.Length; i++)
+        {
+            token.ThrowIfCancellationRequested();
+            var reply = await transport.ExchangeUdsAsync(frozen[i], timeout, token);
+            token.ThrowIfCancellationRequested();
+            onReply(i + 1, reply.ToArray());
+        }
+        token.ThrowIfCancellationRequested();
+        return frozen.Length;
+    }
+
     internal static async Task<byte[]> ExchangeVerifiedAsync(DoIpDiagnosticTransport transport,
         DoIpVehicleDiscovery.Identity gateway, byte[] command, TimeSpan timeout, CancellationToken token)
     {

@@ -73,6 +73,17 @@ internal static class DoIpConsolePresentation
         string.Format(CultureInfo.InvariantCulture, Text("DetailResult", culture),
             dtc, status, Convert.ToHexString(records));
 
+    internal static byte[][] ParseCommands(string text)
+    {
+        var parts = text.Split(';');
+        if (parts.Length is < 1 or > 16)
+            throw new ArgumentException("Expected 1..16 semicolon-separated commands.");
+        var commands = parts.Select(ParsePayload).ToArray();
+        if (commands.Sum(x => x.Length) > 4091)
+            throw new ArgumentException("Command sequence is too large.");
+        return commands;
+    }
+
     internal static byte[] ParsePayload(string text)
     {
         var compact = string.Concat(text.Where(c => !char.IsWhiteSpace(c)));

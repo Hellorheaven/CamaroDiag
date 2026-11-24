@@ -116,6 +116,16 @@ internal static class DoIpConsolePresentationSelfTests
             catch (ArgumentException) { rejected = true; }
             Check(rejected, "Malformed or oversized UDS command rejected.");
         }
+        var commands = DoIpConsolePresentation.ParseCommands("22 F1 90;19 01 FF");
+        Check(commands.Length == 2 && commands[0].SequenceEqual(new byte[] {0x22, 0xf1, 0x90}) &&
+            commands[1].SequenceEqual(new byte[] {0x19, 0x01, 0xff}), "Ordered sequence parsing.");
+        foreach (var invalid in new[] {"22;", ";22", "22;;19", string.Join(";", Enumerable.Repeat("22", 17))})
+        {
+            var rejected = false;
+            try { _ = DoIpConsolePresentation.ParseCommands(invalid); }
+            catch (ArgumentException) { rejected = true; }
+            Check(rejected, "Invalid sequence rejected.");
+        }
         return checks;
     }
 }

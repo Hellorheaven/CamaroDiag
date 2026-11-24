@@ -489,7 +489,7 @@ fun CalibrationWorkspaceScreen(
                         doIpConsentStep = EcuWriteConsentFlow.Step.WARNING
                         pendingDoIpCommand = DoIpConsoleCommand(doIpHost, doIpTester, doIpEcu,
                             doIpTls, doIpCommand, vehicle, doIpContextGeneration)
-                    }, enabled = targetReady && vinReady && runCatching { DoIpDirectRead.parseCommand(doIpCommand) }.isSuccess,
+                    }, enabled = targetReady && vinReady && runCatching { DoIpDirectRead.parseCommands(doIpCommand) }.isSuccess,
                         modifier = Modifier.fillMaxWidth()) {
                         Text(stringResource(R.string.cal_doip_command_send))
                     }
