@@ -136,6 +136,38 @@ internal static class DoIpUdpDiscoverySelfTests
         catch (OperationCanceledException) { rejectedSpoof = true; }
         Check(rejectedSpoof, "Sole wrong-source-port announcement cannot pass discovery.");
 
+        // A correct endpoint is still not authorized to satisfy an already
+        // expired request: the client must not credit a late UDP response.
+        var lateIdentity = DoIpVehicleDiscovery.DiscoverAsync(
+            "127.0.0.1", TimeSpan.FromMilliseconds(30),
+            CancellationToken.None, portOverride: port);
+        var lateIdentityRequest = await gateway.ReceiveAsync()
+            .WaitAsync(TimeSpan.FromSeconds(2));
+        await Task.Delay(90);
+        await gateway.SendAsync(Identity(requested),
+            lateIdentityRequest.RemoteEndPoint);
+        var identityExpired = false;
+        try { await lateIdentity; }
+        catch (OperationCanceledException) { identityExpired = true; }
+        Check(identityExpired,
+            "Late correct-port DoIP identity must not pass deadline.");
+
+        var lateStatus = DoIpVehicleDiscovery.QueryStatusAsync(
+            "127.0.0.1", false, TimeSpan.FromMilliseconds(30),
+            CancellationToken.None, portOverride: port);
+        var lateStatusRequest = await gateway.ReceiveAsync()
+            .WaitAsync(TimeSpan.FromSeconds(2));
+        await Task.Delay(90);
+        await gateway.SendAsync(DoIpCodec.Encode(
+            DoIpCodec.EntityStatusResponse, [0, 4, 2]),
+            lateStatusRequest.RemoteEndPoint);
+        var statusExpired = false;
+        try { await lateStatus; }
+        catch (OperationCanceledException) { statusExpired = true; }
+        Check(statusExpired,
+            "Late correct-port DoIP status must not pass deadline.");
+
+
         var invalidPort = false;
         try
         {
