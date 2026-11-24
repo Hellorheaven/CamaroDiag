@@ -1627,6 +1627,96 @@ internal static class StandardProtocolCli
         finally { Console.CancelKeyPress -= cancel; }
     }
 
+    internal sealed record VerifiedDoIpRead(DoIpOptions Target, string Vin, bool Obd, bool ExplicitVersion);
+
+    internal static VerifiedDoIpRead ParseVerifiedDoIpRead(string[] args)
+    {
+        var vin = Required(args, "--expected-vin");
+        if (!DoIpVehicleDiscovery.IsVehicleVin(vin))
+            throw new ArgumentException("Explicit valid VIN required.");
+        // Optional verification mode is for typed reads, not a restriction on the raw exchange engine.
+        if (Optional(args, "--payload") is not null || Optional(args, "--payload-file") is not null)
+            throw new ArgumentException("For arbitrary UDS commands use the verified --sequence path.");
+        var multi = Optional(args, "--uds-dids");
+        var obd = multi is null || bool.Parse(Optional(args, "--obd-verified") ?? "false");
+        if (Optional(args, "--obd-verified") is not null && multi is null)
+            throw new ArgumentException("--obd-verified is only needed with --uds-dids.");
+        if (obd && multi is not null && UdsMultiDidCli.Parse(multi).Any(e =>
+            ObdOnUdsServices.ClassifyDid(e.Did) == ObdOnUdsServices.DataGroup.NotLegislated))
+            throw new ArgumentException("Expected legislated DIDs.");
+        // Identification itself may report an unknown protocol, so leave the
+        // verified read path to the actual OBD data services.
+        if (args.Contains("--obd-identify", StringComparer.OrdinalIgnoreCase))
+            throw new ArgumentException("Use discovery/identification or the verified data-read mode.");
+        var tlsDefault = Optional(args, "--tls") is null;
+        var target = ParseDoIp(tlsDefault ? [..args, "--tls", "true"] : args);
+        if (!System.Net.IPAddress.TryParse(target.Host, out var address) ||
+            !DoIpVehicleDiscovery.IsExplicitUnicast(address) ||
+            target.Request[0] is not (0x22 or 0x19))
+            throw new ArgumentException("Verified reads require numeric unicast IP and a typed read.");
+        var p2 = Math.Min(target.TimeoutMs, target.DoIpP2Ms);
+        var p2Star = Math.Min(target.TimeoutMs, target.DoIpP2StarMs);
+        if (p2 > p2Star || (Optional(args, "--uds-p2-ms") is not null && target.DoIpP2Ms > target.TimeoutMs) ||
+            (Optional(args, "--uds-p2-star-ms") is not null && target.DoIpP2StarMs > target.TimeoutMs))
+            throw new ArgumentException("Expected P2 <= P2* <= total timeout.");
+        return new(target with { DoIpP2Ms = p2, DoIpP2StarMs = p2Star }, vin, obd,
+            Optional(args, "--doip-version") is not null);
+    }
+
+    private static async Task<int> RunVerifiedDoIpReadAsync(string[] args)
+    {
+        var verified = ParseVerifiedDoIpRead(args);
+        var o = verified.Target;
+        using var stop = new CancellationTokenSource();
+        ConsoleCancelEventHandler cancel = (_, e) => { e.Cancel = true; stop.Cancel(); };
+        Console.CancelKeyPress += cancel;
+        try
+        {
+            var timeout = TimeSpan.FromMilliseconds(o.TimeoutMs);
+            var gateway = await DoIpVehicleDiscovery.DiscoverAsync(o.Host, timeout, stop.Token, vin: verified.Vin);
+            if (gateway.Vin != verified.Vin || gateway.LogicalAddress == o.Tester ||
+                (verified.ExplicitVersion && gateway.ProtocolVersion != o.Version))
+                throw new InvalidDataException("Observed gateway differs from selected vehicle.");
+            if (!Confirm($"Verified {(verified.Obd ? "OBDonUDS" : "UDS")} read VIN={verified.Vin} " +
+                $"host={o.Host} ECU={o.Ecu:X4} TLS={o.UseTls} TX={Convert.ToHexString(o.Request)}"))
+                return 2;
+            await DoIpVehicleDiscovery.RequireCurrentIdentityAsync(gateway, timeout, stop.Token);
+            await using var link = await DoIpDiagnosticTransport.ConnectAsync(o.Host, o.Tester, o.Ecu,
+                timeout, stop.Token, useTls: o.UseTls, protocolVersion: gateway.ProtocolVersion,
+                clientCertificateThumbprint: o.ClientCertificateThumbprint,
+                expectedGatewayAddress: gateway.LogicalAddress,
+                sessionOptions: new DoIpDiagnosticTransport.SessionOptions(o.DoIpP2Ms, o.DoIpP2StarMs,
+                    o.RoutingActivationType, o.RoutingOemData is null ? "" : Convert.ToHexString(o.RoutingOemData)));
+            async Task VerifyAsync()
+            {
+                if (verified.Obd)
+                {
+                    var identity = await DoIpVinReader.ReadVerifiedObdAsync(link, verified.Vin, null, timeout, stop.Token);
+                    if (identity.ProtocolValue != 1)
+                        throw new InvalidDataException("Selected ECU did not identify as OBDonUDS.");
+                }
+                else if (await DoIpVinReader.VerifyObservedVinAsync(link, gateway, timeout, stop.Token, null, null) != verified.Vin)
+                    throw new InvalidDataException("ECU VIN mismatch.");
+            }
+            await VerifyAsync();
+            var reply = await link.ExchangeUdsAsync(o.Request, timeout, stop.Token);
+            await VerifyAsync();
+            stop.Token.ThrowIfCancellationRequested();
+            PrintMultiDidResponse(args, o.Request, reply);
+            PrintObdOnUdsResponse(o.Request, reply);
+            if (o.ReceiveFile is not null) await SaveDoIpReplyAsync(o.ReceiveFile, reply);
+            Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(new
+            {
+                complete = true, vin = verified.Vin, ecu = $"{o.Ecu:X4}",
+                protocol = verified.Obd ? "OBDonUDS" : "UDS",
+                bytes = reply.Length, sha256 = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(reply)),
+                raw = o.ReceiveFile is null && reply.Length <= 4096 ? Convert.ToHexString(reply) : null
+            }));
+            return 0;
+        }
+        finally { Console.CancelKeyPress -= cancel; }
+    }
+
     internal static async Task<int> RunDoIpAsync(string[] args)
     {
         try
@@ -1636,6 +1726,10 @@ internal static class StandardProtocolCli
                 return await RunDoIpMonitorAsync(args);
             if (args.Contains("--sequence", StringComparer.OrdinalIgnoreCase))
                 return await RunDoIpSequenceAsync(args);
+            if (args.Contains("--expected-vin", StringComparer.OrdinalIgnoreCase))
+                return await RunVerifiedDoIpReadAsync(args);
+            if (args.Contains("--obd-verified", StringComparer.OrdinalIgnoreCase))
+                throw new ArgumentException("--obd-verified requires --expected-vin.");
             var o = ParseDoIp(args);
             if (!Confirm($"DoIP {(o.UseTls ? "TLS" : "TCP")} " +
                 $"{o.Host}:{(o.UseTls ? 3496 : 13400)} ECU=0x{o.Ecu:X4} " +

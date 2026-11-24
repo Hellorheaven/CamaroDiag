@@ -67,6 +67,9 @@ Examples:
                               Read-only monitoring on one verified ECU, TLS by default.
                               Optional --uds-p2-ms and --uds-p2-star-ms within total timeout.
                               Samples are provisional until final identity verification.
+                              Typed OBD reads with --expected-vin VIN verify F802/F810
+                              before and after. --uds-dids 0xF40C:2,0xF40D:1 may add
+                              --obd-verified true; use actual ECU lengths.
                               No OEM security bypass, flash recovery or vehicle tests.
 
 Use each option with the exact arguments described above. --help must be alone:

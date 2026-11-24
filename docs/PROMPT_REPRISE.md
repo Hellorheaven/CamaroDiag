@@ -1,3 +1,7 @@
+## PR117 — lecture CLI Windows vérifiée (24/11/2026)
+
+- Les lectures typées existantes (WWH/OBD/DTC/multi-DID) peuvent sélectionner explicitement `--expected-vin` : relecture passerelle après consentement, F802/F810 pour OBD ou F190 pour multi-DID générique avant/après sur même session, TLS par défaut dans ce mode, options P2/P2* bornées, résultat complet seulement après vérification. `--obd-verified true` pour multi-DID réglementaires ; échange brut historique et séquence bidirectionnelle conservés. Tests de parseur ajoutés, validation à venir.
+
 ## PR117 — multi-DID console Windows DoIP (24/11/2026)
 
 - Accès UI FR/EN aux requêtes multi-DID UDS/OBDonUDS, format CLI Windows déjà existant conservé (0xHHHH:longueur), vérification VIN et protocole avant/après sur une connexion unique, décodage via UdsMultiDidCli et journal existant. Validation à venir avec Android et Connectors multi-DID.

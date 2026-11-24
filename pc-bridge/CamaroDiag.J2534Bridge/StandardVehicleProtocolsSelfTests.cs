@@ -633,6 +633,21 @@ internal static class StandardVehicleProtocolsSelfTests
         Check(informationDoIp.Request.SequenceEqual(new byte[] {0x22, 0xF8, 0x10}),
             "DoIP OBDonUDS protocol information F810 can be selected.");
 
+        var verifiedRead = StandardProtocolCli.ParseVerifiedDoIpRead([
+            StandardProtocolCli.DoIpCommand, "--host", "127.0.0.1", "--tester", "0E80",
+            "--ecu", "1234", "--expected-vin", "1G1FA1RX0J0100001", "--obd-wwh-permanent"]);
+        Check(verifiedRead.Obd && verifiedRead.Target.UseTls && verifiedRead.Target.DoIpP2Ms == 5000,
+            "Verified OBD read defaults to TLS and bounded stage deadlines.");
+        var verifiedMulti = StandardProtocolCli.ParseVerifiedDoIpRead([
+            "--host", "127.0.0.1", "--tester", "0E80", "--ecu", "1234",
+            "--expected-vin", "1G1FA1RX0J0100001", "--uds-dids", "0xF40C:2,0xF40D:1",
+            "--obd-verified", "true"]);
+        Check(verifiedMulti.Obd && verifiedMulti.Target.Request.SequenceEqual(
+            new byte[] { 0x22, 0xF4, 0x0C, 0xF4, 0x0D }), "Verified multi-DID OBD route.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseVerifiedDoIpRead([
+            "--host", "127.0.0.1", "--tester", "0E80", "--ecu", "1234",
+            "--expected-vin", "1G1FA1RX0J0100001", "--payload", "22F190"]),
+            "Raw exchanges use the separate confirmed sequence path.");
         var wwhDoIp = StandardProtocolCli.ParseDoIp([
             StandardProtocolCli.DoIpCommand, "--host", "127.0.0.1",
             "--tester", "0E80", "--ecu", "1234",
