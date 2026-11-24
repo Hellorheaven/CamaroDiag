@@ -371,15 +371,19 @@ internal class OBDLinkBleTransport(private val context: Context) {
     }
 
     fun close() {
+        // Detach before invoking Bluetooth API teardown. Some vendor stacks
+        // deliver synchronous disconnect/descriptor callbacks from disconnect()
+        // or close(); none may mutate a replacement session's state.
+        val closingGatt = gatt
+        gatt = null
         // Wake readers without enqueuing a fake packet that a new session could consume.
         val closed = ObdTransportDisconnectedException("OBDLink BLE session was closed")
         readWakeup.signal(closed)
         connectResult?.completeExceptionally(closed)
         writeResult?.completeExceptionally(closed)
         mtuResult?.completeExceptionally(closed)
-        try { gatt?.disconnect() } catch (_: Exception) {}
-        try { gatt?.close() } catch (_: Exception) {}
-        gatt = null
+        try { closingGatt?.disconnect() } catch (_: Exception) {}
+        try { closingGatt?.close() } catch (_: Exception) {}
         writeCharacteristic = null
         characteristicWriteType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
         // A new GATT session starts at the default ATT MTU until negotiation succeeds.
