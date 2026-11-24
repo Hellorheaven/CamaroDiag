@@ -97,6 +97,8 @@ internal static class DoIpVehicleDiscovery
             throw new ArgumentException("Choose VIN or EID identification, not both.");
         var request = vin is not null ? BuildVinRequest(vin) :
             eid is not null ? BuildEidRequest(eid) : BuildRequest();
+        // Reject a UDP packet delivered after the receive deadline even if
+        // the socket completes concurrently with cancellation.
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         deadline.CancelAfter(timeout);
         using var socket = new UdpClient(AddressFamily.InterNetwork)
@@ -113,6 +115,7 @@ internal static class DoIpVehicleDiscovery
             try
             {
                 received = await socket.ReceiveAsync(deadline.Token);
+                deadline.Token.ThrowIfCancellationRequested();
             }
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
             {
@@ -169,6 +172,7 @@ internal static class DoIpVehicleDiscovery
         while (true)
         {
             var response = await socket.ReceiveAsync(deadline.Token);
+            deadline.Token.ThrowIfCancellationRequested();
             if (!response.RemoteEndPoint.Address.Equals(address) ||
                 response.RemoteEndPoint.Port != port)
                 continue;
@@ -212,6 +216,7 @@ internal static class DoIpVehicleDiscovery
             try
             {
                 received = await receiver.ReceiveAsync(deadline.Token);
+                deadline.Token.ThrowIfCancellationRequested();
             }
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
             {
@@ -261,6 +266,7 @@ internal static class DoIpVehicleDiscovery
             try
             {
                 received = await receiver.ReceiveAsync(deadline.Token);
+                deadline.Token.ThrowIfCancellationRequested();
             }
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
             {
@@ -331,6 +337,7 @@ internal static class DoIpVehicleDiscovery
             try
             {
                 received = await socket.ReceiveAsync(deadline.Token);
+                deadline.Token.ThrowIfCancellationRequested();
             }
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
             {
@@ -390,6 +397,7 @@ internal static class DoIpVehicleDiscovery
         while (true)
         {
             var received = await socket.ReceiveAsync(deadline.Token);
+            deadline.Token.ThrowIfCancellationRequested();
             if (!received.RemoteEndPoint.Address.Equals(address) ||
                 received.RemoteEndPoint.Port != destination.Port)
                 continue;
