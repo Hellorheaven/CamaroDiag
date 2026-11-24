@@ -236,6 +236,70 @@ internal static class DoIpVehicleDiscovery
         return identified.Values.ToArray();
     }
 
+    /// <summary>
+    /// ISO 13400 passive IPv6 link-local vehicle announcements are delivered
+    /// to the all-nodes multicast group ff02::1. An explicit local interface
+    /// index is required: a link-local scope cannot be guessed safely.
+    /// No UDP request, UDS service or ECU command is transmitted.
+    /// </summary>
+    internal static async Task<IReadOnlyList<Identity>> ListenIpv6MulticastAsync(
+        int interfaceIndex, TimeSpan duration, CancellationToken cancellationToken,
+        int? localPortOverride = null, int? sourcePortOverride = null)
+    {
+        ValidateIpv6MulticastOptions(interfaceIndex, duration,
+            localPortOverride, sourcePortOverride);
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        deadline.CancelAfter(duration);
+        var port = localPortOverride ?? 13400;
+        using var receiver = new UdpClient(AddressFamily.InterNetworkV6);
+        receiver.Client.Bind(new IPEndPoint(IPAddress.IPv6Any, port));
+        receiver.JoinMulticastGroup(interfaceIndex, IPAddress.Parse("ff02::1"));
+        var identified = new Dictionary<string, Identity>(StringComparer.Ordinal);
+        while (identified.Count < 32)
+        {
+            UdpReceiveResult received;
+            try
+            {
+                received = await receiver.ReceiveAsync(deadline.Token);
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                break;
+            }
+            if (!IsIpv6MulticastAnnouncementSource(received.RemoteEndPoint,
+                    sourcePortOverride ?? 13400))
+                continue;
+            try
+            {
+                var found = ParseAnnouncement(received.Buffer,
+                    received.RemoteEndPoint.Address);
+                var key = found.Source + ":" + found.LogicalAddress.ToString("X4");
+                identified[key] = found;
+            }
+            catch (InvalidDataException)
+            {
+                // Other protocols and invalid UDP frames are not ECU identities.
+            }
+        }
+        return identified.Values.ToArray();
+    }
+
+    internal static void ValidateIpv6MulticastOptions(int interfaceIndex,
+        TimeSpan duration, int? localPort, int? sourcePort)
+    {
+        if (interfaceIndex <= 0 || duration <= TimeSpan.Zero ||
+            duration > TimeSpan.FromSeconds(30) ||
+            (localPort.HasValue && localPort.Value is < 1 or > 65535) ||
+            (sourcePort.HasValue && sourcePort.Value is < 1 or > 65535))
+            throw new ArgumentOutOfRangeException(nameof(interfaceIndex),
+                "IPv6 multicast DoIP listening requires an explicit interface index and bounded ports/time.");
+    }
+
+    internal static bool IsIpv6MulticastAnnouncementSource(
+        IPEndPoint remote, int sourcePort) =>
+        remote.Address.AddressFamily == AddressFamily.InterNetworkV6 &&
+        remote.Address.IsIPv6LinkLocal && remote.Port == sourcePort;
+
     internal static async Task<Identity> DiscoverAsync(string host,
         TimeSpan timeout, CancellationToken cancellationToken,
         string? vin = null, byte[]? eid = null, int? portOverride = null)
