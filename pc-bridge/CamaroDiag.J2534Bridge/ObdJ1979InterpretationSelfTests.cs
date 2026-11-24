@@ -30,6 +30,21 @@ internal static class ObdJ1979InterpretationSelfTests
         Check(freeze.Positive && freeze.Description.Contains("freeze-frame=1"),
             "Mode 02 freeze-frame correlation.");
 
+        var trigger = ObdJ1979Interpretation.Interpret(
+            [0x02, 0x02, 1], [0x42, 0x02, 1, 0x01, 0x30]);
+        Check(trigger.Positive && trigger.Description.EndsWith("freeze-frame=1 DTC=P0130"),
+            "Freeze-frame number and stored trigger code are both preserved.");
+        var emptyFrame = ObdJ1979Interpretation.Interpret(
+            [0x02, 0x02, 0], [0x42, 0x02, 0, 0, 0]);
+        Check(emptyFrame.Positive && emptyFrame.Description.EndsWith("DTC=none"),
+            "A zero DTC means no stored freeze frame.");
+        Reject<InvalidDataException>(() => ObdJ1979Interpretation.Interpret(
+            [0x02, 0x02, 1], [0x42, 0x02, 0, 0x01, 0x30]), "Unrelated frame number.");
+        Reject<InvalidDataException>(() => ObdJ1979Interpretation.Interpret(
+            [0x02, 0x02, 0], [0x42, 0x02, 0, 1]), "Truncated trigger code.");
+        Reject<InvalidDataException>(() => ObdJ1979Interpretation.Interpret(
+            [0x02, 0x02, 0], [0x42, 0x02, 0, 1, 0x30, 0]), "Oversized trigger code.");
+
         var monitors = ObdJ1979Interpretation.Interpret(
             [0x06, 0x00], [0x46, 0, 0x80, 0, 0, 1]);
         Check(monitors.Positive &&

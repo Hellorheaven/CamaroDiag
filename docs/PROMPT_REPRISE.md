@@ -1,9 +1,9 @@
-# Reprise PR #95 — 24 novembre 2026, C2 et DoIP
+# Reprise PR #95 — 24 novembre 2026, C4 et SAE J1979 classique
 
-- C1 console clôturé côté logiciel dans #59 (campagne dédiée #45332946454). Le chantier actif est C2 (#63). Ordre suivant après clôture logicielle de C2 : C4, C6, puis C8 qualité finale. La recette physique relève de la Release (#48).
-- C2 : `aba342861bdd2bd2286b454105099a4ad41cb75f` revalide les octets et leur manifeste pour le rapport de couverture et protège le contenu original lors de son export. Sur JVM, les six suites de couverture, intégrité, manifeste, archive, aperçu et assemblage comptent 75 tests passés.
-- Réexport C2 : `ef009f0355d7780468c6c6e18590b6a98b991979` conserve le canal et les observations du firmware Android. `5d1e1186a365cf0b792e2632f05a2699f268b430` lie les archives Windows au profil effectivement utilisé pour la double acquisition. Validation locale : 125 tests JVM avec frontière J2534 isolée, compilation du projet Windows Debug avec zéro avertissement et zéro erreur, 63 tests d’archives et 11 de qualification simulée exécutés sur .NET 8. Vérifier la campagne dédiée C2 au SHA de sa demande.
-- DoIP (#110) : après le checkpoint #45334468537, `574d6de5e0fee8857f97354db53071a8336506c8` corrige le décodage des annonces dont le VIN mélange ASCII et octets invalides. Validation .NET 8 locale : 37 contrôles UDP existants et une régression VIN. Le checkpoint groupé demandé avec cette mise à jour est à vérifier à son SHA exact avant de passer au protocole suivant.
+- C1 console clôturé côté logiciel (#59, campagne #45332946454).
+- C2 : le périmètre logiciel de PR95 est terminé sur `cb5241a35635d80f0b9803e615ad77b4868d6ff6`. Les deux jobs de la [campagne C2 dédiée](https://github.com/Hellorheaven/CamaroDiag/actions/runs/45351021895) ont réussi : Android communication/app et Windows Debug/autotests. Les correctifs `aba34286`, `ef009f03` et `5d1e1186` protègent les octets d’origine et leur couverture, le canal J2534, le firmware observé et le profil de lecture à l’export. Le rapport reste partiel pour une plage isolée. La couverture de toute la mémoire constructeur et la restauration physique relèvent des essais Release #48 et du suivi #63.
+- Chantier actif suivant : C4 (#52), relevés éthanol/corrections carburant en lecture sur LFX 2012. C6 puis C8 qualité finale suivent dans cet ordre.
+- DoIP : acceptation logicielle du correctif VIN ASCII `574d6de5` confirmée au SHA `5b9f8c00c3cdff01d77d70db92107ab9f9eacb7c` par la [campagne Debug](https://github.com/Hellorheaven/CamaroDiag/actions/runs/45350268159). Le protocole actif devient SAE J1979 classique (#110). `60c1b123` décode le nom de calculateur Mode 09 sur CAN. Le Mode 02 PID 02 identifie le code ayant déclenché une image figée et signale aussi l’absence d’image.
 
 # Reprise C6/Connectors hors protocoles — 24 novembre 2026
 

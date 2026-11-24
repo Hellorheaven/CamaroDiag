@@ -50,6 +50,15 @@ internal static class ObdJ1979Interpretation
             return new Result(ObdJ1979MonitorStatus.Format(status), true, reply.Service);
         }
 
+        if (request.Length == 3 && request[0] == 0x02 && request[1] == 0x02)
+        {
+            if (reply.Data.Length != 4 || reply.Data[1] != request[2])
+                throw new InvalidDataException("Incorrect freeze-frame number or DTC length.");
+            var code = System.Buffers.Binary.BinaryPrimitives.ReadUInt16BigEndian(reply.Data.AsSpan(2));
+            var display = code == 0 ? "none" : ObdJ1979Dtc.Decode(code).Display;
+            return new Result($"SAE J1979 freeze-frame={request[2]} DTC={display}", true, reply.Service);
+        }
+
         if (request[0] is 0x01 or 0x02 &&
             request.Length >= 2 && request[1] <= 0xE0 &&
             request[1] % 0x20 == 0)
