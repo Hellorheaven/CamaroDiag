@@ -41,13 +41,15 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
         CancellationToken cancellationToken, bool useTls = false,
         byte protocolVersion = DoIpCodec.Version,
         string? clientCertificateThumbprint = null,
-        int? portOverride = null)
+        int? portOverride = null, byte activationType = 0x00,
+        byte[]? activationOemData = null)
     {
         if (string.IsNullOrWhiteSpace(host) || host.Length > 253 ||
             tester == ecu || timeout <= TimeSpan.Zero ||
             timeout > TimeSpan.FromSeconds(30) ||
             protocolVersion is not (0x02 or 0x03 or 0x04) ||
             (portOverride.HasValue && portOverride.Value is < 1 or > 65535) ||
+            (activationOemData is not null && activationOemData.Length != 4) ||
             (clientCertificateThumbprint is not null && !useTls))
             throw new ArgumentException("Explicit gateway, distinct logical addresses and timeout required.");
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -80,7 +82,9 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
             var session = new DoIpDiagnosticTransport(socket, dataStream,
                 tester, ecu, protocolVersion);
             await session.SendAsync(DoIpCodec.RoutingActivation(
-                tester, version: protocolVersion), deadline.Token);
+                tester, activationType: activationType,
+                version: protocolVersion,
+                oemSpecificData: activationOemData), deadline.Token);
             // Code 0x11 is a pending vehicle-side confirmation, not a
             // registered diagnostic routing state. Keep waiting within
             // the original connection deadline for code 0x10.
