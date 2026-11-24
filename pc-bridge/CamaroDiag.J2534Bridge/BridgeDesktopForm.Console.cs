@@ -395,6 +395,36 @@ internal sealed partial class BridgeDesktopForm
         doIpConsoleHost.Enabled = doIpExpectedVin.Enabled = doIpTesterAddress.Enabled =
             doIpEcuAddress.Enabled = doIpDtcMask.Enabled = doIpDid.Enabled = doIpMonitorInterval.Enabled = doIpMonitorCount.Enabled = doIpUseTls.Enabled = doIpClientCertificate.Enabled = false;
         doIpConsoleCancel.Enabled = true;
+        // The receive pump runs on a worker thread. Queue physical PDUs
+        // without touching WinForms controls, and drain only on the UI thread.
+        var pendingTrace = new System.Collections.Concurrent.ConcurrentQueue<DoIpDiagnosticTransport.PduTrace>();
+        long pendingBytes = 0;
+        int traceOverflow = 0;
+        void Trace(DoIpDiagnosticTransport.PduTrace entry)
+        {
+            if (Interlocked.Add(ref pendingBytes, entry.Bytes.Length) > 16L * 1024 * 1024)
+            {
+                Interlocked.Add(ref pendingBytes, -entry.Bytes.Length);
+                Interlocked.Exchange(ref traceOverflow, 1);
+                throw new IOException("DoIP console trace backlog exceeded; capture incomplete.");
+            }
+            pendingTrace.Enqueue(entry);
+        }
+        void DrainTrace()
+        {
+            while (pendingTrace.TryDequeue(out var entry))
+            {
+                Interlocked.Add(ref pendingBytes, -entry.Bytes.Length);
+                if (!IsDisposed && !Disposing)
+                    ConsoleLine(entry.Direction, "DoIP " + (useTls ? "TLS" : "TCP") + " " +
+                        address + " PDU " + Convert.ToHexString(entry.Bytes),
+                        entry.Direction == "TX" ? Color.DarkOrange : Color.DarkGreen,
+                        entry.ObservedAtUtc);
+            }
+        }
+        using var traceTimer = new System.Windows.Forms.Timer { Interval = 100 };
+        traceTimer.Tick += (_, _) => DrainTrace();
+        traceTimer.Start();
         try
         {
             await RunBusyAsync(async () =>
@@ -405,22 +435,6 @@ internal sealed partial class BridgeDesktopForm
                         DoIpConsolePresentation.Text(operation switch { DoIpReadOperation.Backup => "BackupStarted", DoIpReadOperation.Dtcs => "DtcStarted", DoIpReadOperation.Did or DoIpReadOperation.MonitorDid => "DidStarted", _ => "VinStarted" }),
                         useTls ? "TLS" : "TCP", address, ecu, tester, observed.ProtocolVersion),
                         Color.DarkSlateGray);
-                    void Requested(byte[] data)
-                    {
-                        if (!IsDisposed && !Disposing)
-                            ConsoleLine("TX", Convert.ToHexString(data) + " [" +
-                                BridgeConsoleTxEvidence.Label(BridgeConsoleTxState.Requested) + "]",
-                                Color.DarkOrange);
-                    }
-                    void Received(byte[] data)
-                    {
-                        if (!IsDisposed && !Disposing)
-                        {
-                            ConsoleLine("SYSTEM", BridgeConsoleTxEvidence.Label(
-                                BridgeConsoleTxState.EcuReplied), Color.DarkSlateGray);
-                            ConsoleLine("RX", Convert.ToHexString(data), Color.DarkGreen);
-                        }
-                    }
                     var certificate = thumbprint.Length == 0 ? null : thumbprint;
                     if (operation == DoIpReadOperation.Backup)
                     {
@@ -429,11 +443,13 @@ internal sealed partial class BridgeDesktopForm
                         var capture = await DoIpScopedBackup.ReadObservedAsync(observed, address,
                             scope, useTls, timeout, stop.Token, (pass, count) =>
                             {
+                                DrainTrace();
                                 if (!IsDisposed && !Disposing)
                                     ConsoleLine("SYSTEM", string.Format(
                                         DoIpConsolePresentation.Text("BackupProgress"), pass, count, scope.Length),
                                         Color.DarkSlateGray);
-                            }, certificate);
+                            }, certificate, trace: Trace);
+                        DrainTrace();
                         stop.Token.ThrowIfCancellationRequested();
                         await Task.Run(() => DoIpScopedBackup.SaveNew(destination, capture, stop.Token),
                             stop.Token);
@@ -445,7 +461,8 @@ internal sealed partial class BridgeDesktopForm
                     {
                         var report = await DoIpVinReader.ReadObservedGatewayDtcsAsync(
                             observed, address, tester, ecu, useTls, dtcMask, timeout, stop.Token,
-                            Requested, Received, certificate);
+                            clientCertificateThumbprint: certificate, trace: Trace);
+                        DrainTrace();
                         stop.Token.ThrowIfCancellationRequested();
                         if (IsDisposed || Disposing) return;
                         foreach (var line in DoIpConsolePresentation.FormatDtcs(report, dtcMask))
@@ -457,11 +474,13 @@ internal sealed partial class BridgeDesktopForm
                             observed, address, tester, ecu, useTls, did, sampleCount, interval,
                             timeout, stop.Token, (index, data) =>
                             {
+                                DrainTrace();
                                 if (!IsDisposed && !Disposing)
                                     ConsoleLine("SYSTEM", string.Format(
                                         DoIpConsolePresentation.Text("MonitorSample"), index,
                                         did, Convert.ToHexString(data)), Color.DarkGreen);
-                            }, Requested, Received, certificate);
+                            }, clientCertificateThumbprint: certificate, trace: Trace);
+                        DrainTrace();
                         stop.Token.ThrowIfCancellationRequested();
                         if (!IsDisposed && !Disposing)
                             ConsoleLine("SYSTEM", string.Format(
@@ -472,7 +491,8 @@ internal sealed partial class BridgeDesktopForm
                     {
                         var data = await DoIpVinReader.ReadObservedGatewayDidAsync(
                             observed, address, tester, ecu, useTls, did, timeout, stop.Token,
-                            Requested, Received, certificate);
+                            clientCertificateThumbprint: certificate, trace: Trace);
+                        DrainTrace();
                         stop.Token.ThrowIfCancellationRequested();
                         if (IsDisposed || Disposing) return;
                         ConsoleLine("SYSTEM", string.Format(
@@ -483,7 +503,8 @@ internal sealed partial class BridgeDesktopForm
                     {
                         var vin = await DoIpVinReader.ReadObservedGatewayAsync(
                             observed, address, tester, ecu, useTls, timeout, stop.Token,
-                            Requested, Received, certificate);
+                            clientCertificateThumbprint: certificate, trace: Trace);
+                        DrainTrace();
                         stop.Token.ThrowIfCancellationRequested();
                         if (IsDisposed || Disposing) return;
                         ConsoleLine("SYSTEM", string.Format(
@@ -493,12 +514,14 @@ internal sealed partial class BridgeDesktopForm
                 }
                 catch (OperationCanceledException) when (stop.IsCancellationRequested)
                 {
+                    DrainTrace();
                     doIpObservedGateway = null;
                     if (!IsDisposed && !Disposing)
                         ConsoleLine("SYSTEM", DoIpConsolePresentation.Text("Canceled"), Color.DarkSlateGray);
                 }
                 catch
                 {
+                    DrainTrace();
                     doIpObservedGateway = null;
                     throw;
                 }
@@ -506,6 +529,10 @@ internal sealed partial class BridgeDesktopForm
         }
         finally
         {
+            traceTimer.Stop();
+            DrainTrace();
+            if (Volatile.Read(ref traceOverflow) != 0 && !IsDisposed && !Disposing)
+                ConsoleLine("SYSTEM", DoIpConsolePresentation.Text("TraceIncomplete"), Color.DarkRed);
             doIpConsoleDiscoveryCancellation = null;
             if (!IsDisposed && !Disposing)
             {
@@ -792,12 +819,13 @@ internal sealed partial class BridgeDesktopForm
         catch (UnauthorizedAccessException ex) { ShowError(ex.Message); }
     }
 
-    private void ConsoleLine(string direction, string message, Color color)
+    private void ConsoleLine(string direction, string message, Color color,
+        DateTimeOffset? observedAtUtc = null)
     {
         consoleHistory.SelectionStart = consoleHistory.TextLength;
         consoleHistory.SelectionLength = 0;
         consoleHistory.SelectionColor = color;
-        consoleHistory.AppendText($"{DateTime.Now:HH:mm:ss} [{BridgeConsoleDirection.Normalize(direction)}] {message}{Environment.NewLine}");
+        consoleHistory.AppendText($"{(observedAtUtc?.ToLocalTime() ?? DateTimeOffset.Now):HH:mm:ss.fff} [{BridgeConsoleDirection.Normalize(direction)}] {message}{Environment.NewLine}");
         consoleHistory.SelectionColor = consoleHistory.ForeColor;
         consoleHistory.ScrollToCaret();
     }
