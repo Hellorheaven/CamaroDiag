@@ -50,13 +50,20 @@ object DoIpDirectRead {
      * the selected ECU/profile, never guessed from the VIN or gateway. */
     suspend fun resolveTarget(host: String, tester: String, ecu: String, vin: String,
         tls: Boolean, expectedGateway: Int? = null,
-        onControlTrace: (ControlTrace) -> Unit = {}): Target {
+        onControlTrace: (ControlTrace) -> Unit = {}): Target =
+        resolveTargetWithDiscovery(host, tester, ecu, vin, tls, expectedGateway) {
+            discoverSelectedVehicle(it, onControlTrace = onControlTrace)
+        }
+
+    internal suspend fun resolveTargetWithDiscovery(host: String, tester: String, ecu: String,
+        vin: String, tls: Boolean, expectedGateway: Int?,
+        discoverVehicle: suspend (String) -> GatewayResult): Target {
         if (host.isNotBlank()) return Target.parse(host, tester, ecu, vin, tls, expectedGateway)
         val expected = vin.trim().uppercase(Locale.ROOT)
         val source = logicalAddress(tester)
         require(validVin(expected) && source != logicalAddress(ecu))
         require(expectedGateway == null || (expectedGateway in 0..65535 && source != expectedGateway))
-        val found = discoverSelectedVehicle(expected, onControlTrace = onControlTrace)
+        val found = discoverVehicle(expected)
         require(found.gateway.vin == expected)
         require(expectedGateway == null || found.gateway.logicalAddress == expectedGateway) {
             "Discovered gateway does not match the selected ECU profile."
