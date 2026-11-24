@@ -31,6 +31,12 @@ internal static class Program
             return 2;
         }
 
+        // Help is intentionally resolved before updater, DLL enumeration,
+        // network listener and *all* protocol/ECU command dispatch.
+        // A mixed --help + destructive option is rejected without I/O.
+        if (BridgeCommandLineHelp.IsHelpRequest(args))
+            return BridgeCommandLineHelp.Run(args);
+
         // Explicit bidirectional ISO/SAE exchanges. No default startup
         // programming and no network-listener fallback on malformed CLI.
         if (args.Contains(StandardProtocolCli.J1939FdCmdtCommand,
