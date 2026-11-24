@@ -45,6 +45,43 @@ internal static class DoIpVinReader
         return ParseVin(reply);
     }
 
+    internal static async Task<ObdOnUdsServices.DtcStatusReport> ReadDtcsAsync(
+        DoIpDiagnosticTransport transport, byte statusMask, TimeSpan timeout,
+        CancellationToken token, Action<byte[]>? requested = null,
+        Action<byte[]>? received = null)
+    {
+        ArgumentNullException.ThrowIfNull(transport);
+        token.ThrowIfCancellationRequested();
+        var request = ObdOnUdsServices.ReadDtcByStatusMask(statusMask);
+        requested?.Invoke(request.ToArray());
+        token.ThrowIfCancellationRequested();
+        var reply = await transport.ExchangeUdsAsync(request, timeout, token);
+        token.ThrowIfCancellationRequested();
+        received?.Invoke(reply.ToArray());
+        token.ThrowIfCancellationRequested();
+        return ObdOnUdsServices.DecodeDtcByStatusMask(statusMask, reply);
+    }
+
+    internal static async Task<ObdOnUdsServices.DtcStatusReport> ReadObservedGatewayDtcsAsync(
+        DoIpVehicleDiscovery.Identity gateway, IPAddress address, ushort tester,
+        ushort ecu, bool useTls, byte statusMask, TimeSpan timeout,
+        CancellationToken token, Action<byte[]>? requested = null,
+        Action<byte[]>? received = null, string? clientCertificateThumbprint = null)
+    {
+        ArgumentNullException.ThrowIfNull(gateway);
+        ArgumentNullException.ThrowIfNull(address);
+        if (!gateway.Source.Equals(address) || tester == ecu ||
+            gateway.ProtocolVersion is not (0x02 or 0x03 or 0x04))
+            throw new ArgumentException("The DoIP target must match a discovered gateway and explicit logical addresses.");
+        token.ThrowIfCancellationRequested();
+        await using var transport = await DoIpDiagnosticTransport.ConnectAsync(
+            address.ToString(), tester, ecu, timeout, token,
+            useTls: useTls, protocolVersion: gateway.ProtocolVersion,
+            clientCertificateThumbprint: clientCertificateThumbprint,
+            expectedGatewayAddress: gateway.LogicalAddress);
+        return await ReadDtcsAsync(transport, statusMask, timeout, token, requested, received);
+    }
+
     internal static async Task<string> ReadObservedGatewayAsync(
         DoIpVehicleDiscovery.Identity gateway, IPAddress address, ushort tester,
         ushort ecu, bool useTls, TimeSpan timeout, CancellationToken token,
