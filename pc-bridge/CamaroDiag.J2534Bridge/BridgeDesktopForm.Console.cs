@@ -422,6 +422,12 @@ internal sealed partial class BridgeDesktopForm
                         entry.ObservedAtUtc);
             }
         }
+        void RequireCompleteTrace()
+        {
+            DrainTrace();
+            if (Volatile.Read(ref traceOverflow) != 0)
+                throw new IOException(DoIpConsolePresentation.Text("TraceIncomplete"));
+        }
         using var traceTimer = new System.Windows.Forms.Timer { Interval = 100 };
         traceTimer.Tick += (_, _) => DrainTrace();
         traceTimer.Start();
@@ -449,7 +455,7 @@ internal sealed partial class BridgeDesktopForm
                                         DoIpConsolePresentation.Text("BackupProgress"), pass, count, scope.Length),
                                         Color.DarkSlateGray);
                             }, certificate, trace: Trace);
-                        DrainTrace();
+                        RequireCompleteTrace();
                         stop.Token.ThrowIfCancellationRequested();
                         await Task.Run(() => DoIpScopedBackup.SaveNew(destination, capture, stop.Token),
                             stop.Token);
@@ -462,7 +468,7 @@ internal sealed partial class BridgeDesktopForm
                         var report = await DoIpVinReader.ReadObservedGatewayDtcsAsync(
                             observed, address, tester, ecu, useTls, dtcMask, timeout, stop.Token,
                             clientCertificateThumbprint: certificate, trace: Trace);
-                        DrainTrace();
+                        RequireCompleteTrace();
                         stop.Token.ThrowIfCancellationRequested();
                         if (IsDisposed || Disposing) return;
                         foreach (var line in DoIpConsolePresentation.FormatDtcs(report, dtcMask))
@@ -480,7 +486,7 @@ internal sealed partial class BridgeDesktopForm
                                         DoIpConsolePresentation.Text("MonitorSample"), index,
                                         did, Convert.ToHexString(data)), Color.DarkGreen);
                             }, clientCertificateThumbprint: certificate, trace: Trace);
-                        DrainTrace();
+                        RequireCompleteTrace();
                         stop.Token.ThrowIfCancellationRequested();
                         if (!IsDisposed && !Disposing)
                             ConsoleLine("SYSTEM", string.Format(
@@ -492,7 +498,7 @@ internal sealed partial class BridgeDesktopForm
                         var data = await DoIpVinReader.ReadObservedGatewayDidAsync(
                             observed, address, tester, ecu, useTls, did, timeout, stop.Token,
                             clientCertificateThumbprint: certificate, trace: Trace);
-                        DrainTrace();
+                        RequireCompleteTrace();
                         stop.Token.ThrowIfCancellationRequested();
                         if (IsDisposed || Disposing) return;
                         ConsoleLine("SYSTEM", string.Format(
@@ -504,7 +510,7 @@ internal sealed partial class BridgeDesktopForm
                         var vin = await DoIpVinReader.ReadObservedGatewayAsync(
                             observed, address, tester, ecu, useTls, timeout, stop.Token,
                             clientCertificateThumbprint: certificate, trace: Trace);
-                        DrainTrace();
+                        RequireCompleteTrace();
                         stop.Token.ThrowIfCancellationRequested();
                         if (IsDisposed || Disposing) return;
                         ConsoleLine("SYSTEM", string.Format(
@@ -795,6 +801,11 @@ internal sealed partial class BridgeDesktopForm
 
     private void SaveConsoleHistory()
     {
+        if (doIpConsoleDiscoveryCancellation is not null)
+        {
+            ShowError(DoIpConsolePresentation.Text("Busy"));
+            return;
+        }
         using var picker = new SaveFileDialog
         {
             Title = "Exporter la console CAN/OBD",
