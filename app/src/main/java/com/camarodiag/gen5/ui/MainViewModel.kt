@@ -144,6 +144,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             accountUid != null && level != LicenseLevel.OWNER
         ) LicenseLevel.PREMIUM else level
         if (LicenseRolloutConfig.ENABLED && level == LicenseLevel.FREE) {
+            invalidateEnhancedUdsReads()
             gmlanIdentityGeneration++
             _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                 isGmlanReading = false, gmlanIdentity = null, gmlanIdentityFailed = false
@@ -933,6 +934,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
 
     private fun clearVehicleEvidence(preserveCanConsole: Boolean = false) {
+        invalidateEnhancedUdsReads()
         calibrationIdentityGeneration++
         gmlanIdentityGeneration++
         fuelSnapshotGeneration++
@@ -1098,10 +1100,41 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         )
     }
 
+    private var enhancedUdsJob: Job? = null
+    private var enhancedUdsGeneration = 0L
+
+    private fun invalidateEnhancedUdsReads() {
+        enhancedUdsGeneration++
+        enhancedUdsJob?.cancel()
+        enhancedUdsJob = null
+        _calibrationWorkspace.update {
+            it.copy(isUdsReading = false, isObdbSignalReading = false,
+                udsDidResponse = "", udsDtcResponse = "", udsMessage = "",
+                obdbSignalValue = "", obdbSignalMessage = "")
+        }
+    }
+
+    // The three read-only entrypoints share one context-bound operation slot.
+    // Cancellation propagates through the adapter session and prevents queued
+    // work or returned bytes from being attached to a replacement vehicle.
+    private fun launchEnhancedUdsRead(block: suspend (() -> Boolean) -> Unit) {
+        if (enhancedUdsJob?.isActive == true) return
+        val generation = ++enhancedUdsGeneration
+        val account = accountSessionGeneration
+        val connection = connectionAttemptGeneration
+        val vehicle = _vehicle.value
+        fun current() = generation == enhancedUdsGeneration &&
+            isCurrentAccountGeneration(account) && connection == connectionAttemptGeneration &&
+            vehicle == _vehicle.value && hasPremiumLicense()
+        enhancedUdsJob = viewModelScope.launch {
+            if (current()) block(::current)
+        }
+    }
+
     /** Reads and decodes one read-only Camaro signal from the imported OBDb signalset. */
     fun readObdbSignal(signalId: String, protocolNumberText: String) {
         if (!requirePremiumLicense()) return
-        viewModelScope.launch {
+        launchEnhancedUdsRead { current ->
             _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                 isObdbSignalReading = true,
                 obdbSignalValue = "",
@@ -1132,6 +1165,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         timeoutMs = 5000L,
                         readDids = setOf(did)
                     ) { client -> client.readDataByIdentifier(did) }
+                if (!current()) return@launchEnhancedUdsRead
                 val decoded = signal.decode(raw)
                 val rendered = when {
                     decoded.unavailable -> localizedContext.getString(R.string.vm_sentinel_unavailable)
@@ -1152,10 +1186,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     )
                 )
             } catch (cancelled: CancellationException) {
-                _calibrationWorkspace.value = _calibrationWorkspace.value.copy(isObdbSignalReading = false)
+                if (current()) _calibrationWorkspace.value = _calibrationWorkspace.value.copy(isObdbSignalReading = false)
                 throw cancelled
             } catch (error: Exception) {
+                if (!current()) return@launchEnhancedUdsRead
                 reportConnectionLoss(error)
+                if (!current()) return@launchEnhancedUdsRead
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     isObdbSignalReading = false,
                     obdbSignalValue = "",
@@ -1414,10 +1450,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    /** Reads one UDS DID over the verified STPX CAN transport; CAN IDs must be supplied from service data. */
+    /** Reads one UDS DID using the selected physical transport and service-data CAN IDs. */
     fun readUdsDid(requestCanIdHex: String, responseCanIdHex: String, didHex: String, protocolNumberText: String) {
         if (!requirePremiumLicense()) return
-        viewModelScope.launch {
+        launchEnhancedUdsRead { current ->
             _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                 isUdsReading = true,
                 udsDidResponse = "",
@@ -1444,6 +1480,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         timeoutMs = 5000L,
                         readDids = setOf(did)
                     ) { client -> client.readDataByIdentifier(did) }
+                if (!current()) return@launchEnhancedUdsRead
                 val hex = data.joinToString(" ") { "%02X".format(it.toInt() and 0xFF) }
                 val isVinDid = did == 0xF190
                 val rendered = if (isVinDid) {
@@ -1458,10 +1495,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     )
                 )
             } catch (cancelled: CancellationException) {
-                _calibrationWorkspace.value = _calibrationWorkspace.value.copy(isUdsReading = false)
+                if (current()) _calibrationWorkspace.value = _calibrationWorkspace.value.copy(isUdsReading = false)
                 throw cancelled
             } catch (error: Exception) {
+                if (!current()) return@launchEnhancedUdsRead
                 reportConnectionLoss(error)
+                if (!current()) return@launchEnhancedUdsRead
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     isUdsReading = false,
                     udsDidResponse = "",
@@ -1474,7 +1513,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     /** Reads UDS ReadDTCInformation (0x19/0x02) from the selected physical ECU. */
     fun readUdsDtcs(requestCanIdHex: String, responseCanIdHex: String, protocolNumberText: String) {
         if (!requirePremiumLicense()) return
-        viewModelScope.launch {
+        launchEnhancedUdsRead { current ->
             _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                 isUdsReading = true,
                 udsDtcResponse = "",
@@ -1499,6 +1538,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         protocolNumber = protocolNumber,
                         timeoutMs = 5000L
                     ) { client -> client.readDtcReport() }
+                if (!current()) return@launchEnhancedUdsRead
                 val moduleId = "ECU ${responseCanIdHex.uppercase()}"
                 val mappedDtcs = report.records.map { record ->
                     val baseCode = record.code.substringBefore('-')
@@ -1532,10 +1572,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     udsMessage = localizedContext.getString(R.string.vm_uds_read_complete)
                 )
             } catch (cancelled: CancellationException) {
-                _calibrationWorkspace.value = _calibrationWorkspace.value.copy(isUdsReading = false)
+                if (current()) _calibrationWorkspace.value = _calibrationWorkspace.value.copy(isUdsReading = false)
                 throw cancelled
             } catch (error: Exception) {
+                if (!current()) return@launchEnhancedUdsRead
                 reportConnectionLoss(error)
+                if (!current()) return@launchEnhancedUdsRead
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     isUdsReading = false,
                     udsDtcResponse = "",
@@ -3606,6 +3648,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      * A consent dialog from an older revision can never authorize a write.
      */
     private fun nextConnectionGeneration(): Long {
+        invalidateEnhancedUdsReads()
         val next = ++connectionAttemptGeneration
         pendingUsbPermissionRetry = null
         _connectionGeneration.value = next
