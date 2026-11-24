@@ -48,6 +48,11 @@ internal static class ConnectorDiscoverySelfTests
     }
     internal static int Run()
     {
+        // Local enumeration never opens a J2534 DLL or a serial port.
+        Require(ConnectorDiscoveryCli.ListPorts(["--list-ports", "--program-e39-bench"]) == 2);
+        Require(ConnectorDiscoveryCli.EnumeratedPortNames([
+            "COM7", "com3", "COM7", "/dev/ttyUSB0", "COM0", "COM5\\n"
+        ]).SequenceEqual(["com3", "COM7"]));
         Require(ConnectorDiscoveryCli.IsValidPort("COM5"));
         Require(ConnectorDiscoveryCli.IsValidPort("com120"));
         foreach(var badPort in new[]{"COM0","COM99999","COM5 ","COM5\n","\\\\.\\COM1","ttyUSB0",""})
