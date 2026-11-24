@@ -244,8 +244,20 @@ class Session:
     """Sequential, one-owner routed socket. Any uncertain exchange retires it."""
     def __init__(self, gateway: Gateway, tester: int, ecu: int, *,
                  tls: bool = True, timeout: float = 3, trace: Trace | None = None,
-                 context: ssl.SSLContext | None = None, port: int | None = None):
+                 context: ssl.SSLContext | None = None, port: int | None = None,
+                 p2: float | None = None, p2_star: float | None = None,
+                 routing_type: int = 0, routing_oem_data: bytes | None = None):
         _timeout(timeout)
+        p2 = timeout if p2 is None else p2
+        p2_star = timeout if p2_star is None else p2_star
+        if not 0.001 <= p2 <= timeout or not p2 <= p2_star <= timeout:
+            raise DoIpError("Expected 0.001 <= P2 <= P2* <= overall timeout")
+        if type(routing_type) is not int or not 0 <= routing_type <= 255:
+            raise DoIpError("Invalid routing activation type")
+        if routing_oem_data is not None and (not isinstance(routing_oem_data, bytes) or
+                                             len(routing_oem_data) != 4):
+            raise DoIpError("Routing OEM data must contain exactly four bytes")
+        activation = logical(tester) + bytes((routing_type,)) + bytes(4) + (routing_oem_data or b"")
         endpoint(gateway.host)
         logical(tester)
         logical(ecu)
@@ -256,6 +268,7 @@ class Session:
             raise DoIpError("TLS certificate and endpoint verification required")
         self.gateway, self.tester, self.ecu = gateway, tester, ecu
         self.timeout, self.trace, self.tls = timeout, trace, tls
+        self.p2, self.p2_star = p2, p2_star
         self._socket: socket.socket | None = None
         self._busy = False
         deadline = time.monotonic() + timeout
@@ -268,7 +281,7 @@ class Session:
                 wire.settimeout(remaining(deadline))
                 wire = secure.wrap_socket(wire, server_hostname=gateway.host)
             self._socket = wire
-            self._send(5, logical(tester) + b"\x00" * 5, deadline)
+            self._send(5, activation, deadline)
             while True:
                 kind, body = self._receive(deadline)
                 if self._alive(kind, body, deadline):
@@ -371,9 +384,11 @@ class Session:
         expected = logical(self.ecu) + logical(self.tester)
         try:
             self._send(0x8001, logical(self.tester) + logical(self.ecu) + request, deadline)
+            response_deadline = min(deadline, time.monotonic() + self.p2)
             while True:
-                kind, body = self._receive(deadline)
-                if self._alive(kind, body, deadline):
+                kind, body = self._receive(response_deadline)
+                remaining(response_deadline)
+                if self._alive(kind, body, response_deadline):
                     continue
                 if kind not in (0x8001, 0x8002, 0x8003) or len(body) < 5 or body[:4] != expected:
                     raise DoIpError("Uncorrelated diagnostic PDU")
@@ -386,6 +401,7 @@ class Session:
                     if len(reply) != 3 or reply[1] != request[0]:
                         raise DoIpError("Uncorrelated UDS negative response")
                     if reply[2] == 0x78:
+                        response_deadline = min(deadline, time.monotonic() + self.p2_star)
                         continue
                     raise NegativeResponse(reply[1], reply[2])
                 return positive(request, reply)

@@ -42,7 +42,16 @@ def run(argv: Sequence[str] | None = None) -> dict:
     parser.add_argument("--ca-file", help=tr("Trusted CA file for TLS", "Fichier AC de confiance TLS"))
     parser.add_argument("--client-cert", help=tr("TLS client certificate file", "Certificat client TLS"))
     parser.add_argument("--client-key", help=tr("TLS client private key file", "Clé privée client TLS"))
-    parser.add_argument("--timeout", type=float, default=3)
+    parser.add_argument("--timeout", type=float, default=3,
+                        help=tr("Overall timeout in seconds (0.1..30)", "Délai global en secondes (0,1..30)"))
+    parser.add_argument("--p2-ms", type=int,
+                        help=tr("Initial UDS response deadline in milliseconds", "Délai de première réponse UDS en millisecondes"))
+    parser.add_argument("--p2-star-ms", type=int,
+                        help=tr("UDS response deadline after NRC 78 in milliseconds", "Délai de réponse UDS après NRC 78 en millisecondes"))
+    parser.add_argument("--routing-activation-type", type=lambda x: hex_value(x, 2),
+                        help=tr("Two hex digits supplied by the gateway manufacturer", "Deux chiffres hexadécimaux fournis par le constructeur"))
+    parser.add_argument("--routing-oem-data", type=lambda x: hex_value(x, 8).to_bytes(4, "big"),
+                        help=tr("Optional four OEM bytes, eight hex digits", "Quatre octets OEM facultatifs, huit chiffres hexadécimaux"))
     parser.add_argument("--trace", action="store_true", help=tr("Write observed PDUs to stderr", "Journal PDU vers stderr"))
     sub = parser.add_subparsers(dest="action", required=True)
     for action in ("discover", "status", "power", "vin", "obd-identify"):
@@ -83,6 +92,15 @@ def run(argv: Sequence[str] | None = None) -> dict:
             parser.error(tr("Profile exceeds 8192 blocks per pass", "Le profil dépasse 8192 blocs par passe"))
     trace = _trace if o.trace else None
     network_only = o.action in ("discover", "status", "power")
+    p2 = o.timeout if o.p2_ms is None else o.p2_ms / 1000
+    p2_star = o.timeout if o.p2_star_ms is None else o.p2_star_ms / 1000
+    if not 0.1 <= o.timeout <= 30 or not 0.001 <= p2 <= p2_star <= o.timeout:
+        parser.error(tr("Expected 1 ms <= P2 <= P2* <= overall timeout (0.1..30 s)",
+                        "Attendu : 1 ms <= P2 <= P2* <= délai global (0,1..30 s)"))
+    if network_only and any(value is not None for value in
+                            (o.p2_ms, o.p2_star_ms, o.routing_activation_type, o.routing_oem_data)):
+        parser.error(tr("Routing and UDS options require a diagnostic action",
+                        "Les options de routage et UDS nécessitent une action de diagnostic"))
     if not network_only and (o.vin is None or not valid_vin(o.vin) or o.tester is None or o.ecu is None or o.tester == o.ecu):
         parser.error(tr("Expected VIN and distinct tester/ECU addresses required", "VIN attendu et adresses testeur/ECU distinctes requis"))
     if o.action == "obd-did" and not 0xF400 <= o.did <= 0xF8FF:
@@ -121,7 +139,9 @@ def run(argv: Sequence[str] | None = None) -> dict:
             not o.tcp, input, lambda line: print(line, file=sys.stderr), fr):
         return result | {"cancelled": True, "commands_sent": 0}
     with Session(gateway, o.tester, o.ecu, tls=not o.tcp, timeout=o.timeout,
-                 trace=trace, context=context) as session:
+                 trace=trace, context=context, p2=p2, p2_star=p2_star,
+                 routing_type=o.routing_activation_type or 0,
+                 routing_oem_data=o.routing_oem_data) as session:
         if o.action in ("obd-identify", "obd-did"):
             return result | {"ecu": o.ecu, "tester": o.tester, "tls": not o.tcp} | session.read_obd(
                 o.vin, o.did if o.action == "obd-did" else None)

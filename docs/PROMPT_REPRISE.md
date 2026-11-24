@@ -1,3 +1,9 @@
+## PR117 — parité DoIP Connectors : temporisations UDS et routage configurable (24/11/2026)
+
+- Client hôte Python : P2/P2* configurables, délai global indépendant, NRC 78 seul prolonge le délai de réponse sans dépasser le délai global. ACK et AliveCheck ne prolongent pas ce délai ; socket retiré après expiration ou erreur. Valeurs par défaut conservées (délai global).
+- CLI FR/EN : `--p2-ms`, `--p2-star-ms`, `--routing-activation-type` (2 hex), `--routing-oem-data` (8 hex). Activation normalisée 7 ou 11 octets ; paramètres invalides refusés avant réseau. Aucune valeur OEM inventée. Tests d'horloge déterministe, routage TCP loopback et refus avant connexion ajoutés. Tests de cette tranche à confirmer par CI.
+- C6/DoIP restent actifs ; aucune fusion, Release, qualification physique ou déploiement.
+
 ## PR117 — correctif compilation tests Android (24/11/2026)
 
 Le run GitHub Actions push 45450659055 sur `70a6c6c` a terminé en échec sur `:diagnostic:compileDebugUnitTestKotlin` : import JUnit assertArrayEquals absent de UdsDtcDecoderTest.kt. Les autres jobs techniques ont réussi (review ignorée sur PR draft). Import ajouté ; aucune modification du protocole liée au correctif. Nouvelle demande de validation à ce HEAD. Le run intermédiaire 45451927382 a été déclenché sur `d11dab8` mais n'est pas une preuve pour le HEAD corrigé.
