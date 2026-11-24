@@ -134,17 +134,18 @@ class ElmUsbTransport(private val context: Context) {
     }
 
     fun write(data: ByteArray) {
+        UsbSerialWritePolicy.requireNonEmpty(data)
         val active = sessions.snapshot()
             ?: throw ObdTransportDisconnectedException("USB OBD adapter is not connected")
         if (active.lost) throw ObdTransportDisconnectedException("USB OBD adapter disconnected")
         try {
-            val written = active.port.write(data, 1500)
+            // usb-serial-for-android's UsbSerialPort.write returns Unit, not a
+            // byte count. It either completes its internal write loop or
+            // throws. Never invent byte-count or bus-delivery evidence.
+            active.port.write(data, 1500)
             if (!sessions.isCurrent(active)) {
                 throw java.io.IOException("USB adapter replaced during serial write")
             }
-            // A partial USB write must not be mistaken for complete CAN/OBD
-            // transmission. Recovery requires a fresh adapter session.
-            UsbSerialWritePolicy.requireComplete(written, data.size)
         } catch (error: java.io.IOException) {
             if (!sessions.isCurrent(active)) throw ObdSupersededSessionException(error)
             active.lost = true
