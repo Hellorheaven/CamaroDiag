@@ -35,4 +35,11 @@
   <data name="VinNotice" xml:space="preserve"><value>La concordance VIN ne constitue ni une authentification ECU ni une autorisation d’écriture.</value></data>
   <data name="InvalidLogical" xml:space="preserve"><value>Saisissez deux adresses logiques distinctes de quatre chiffres hexadécimaux.</value></data>
   <data name="InvalidCertificate" xml:space="preserve"><value>Le certificat client nécessite TLS et une empreinte hexadécimale valide de 40 chiffres.</value></data>
+  <data name="ReadDtcs" xml:space="preserve"><value>Lire les défauts ECU (UDS)</value></data>
+  <data name="DtcMask" xml:space="preserve"><value>Masque d’état DTC (hex)</value></data>
+  <data name="InvalidDtcMask" xml:space="preserve"><value>Saisissez exactement deux chiffres hexadécimaux pour le masque d’état DTC.</value></data>
+  <data name="DtcStarted" xml:space="preserve"><value>DoIP / {0} / UDS : lecture DTC via {1}, ECU 0x{2:X4}, testeur 0x{3:X4}, version 0x{4:X2}.</value></data>
+  <data name="DtcResult" xml:space="preserve"><value>Nombre de DTC={0} ; masque demandé=0x{1:X2} ; masque disponible=0x{2:X2}</value></data>
+  <data name="DtcEntry" xml:space="preserve"><value>DTC 0x{0:X6}, état 0x{1:X2}</value></data>
+  <data name="DtcNotice" xml:space="preserve"><value>Rapport en lecture seule ; aucun défaut effacé. Un résultat vide concerne uniquement les bits d’état demandés et disponibles.</value></data>
 </root>
