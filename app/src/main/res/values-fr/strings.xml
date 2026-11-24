@@ -1061,4 +1061,9 @@
     <string name="cal_doip_cert_none">TLS serveur uniquement (aucun certificat client sélectionné).</string>
     <string name="cal_doip_tls_error">Authentification TLS échouée ou certificat client indisponible/expiré. Vérifiez la confiance serveur et sélectionnez le bon certificat client.</string>
     <string name="cal_doip_gateway_eid_gid">Passerelle EID %1$s · GID %2$s</string>
+    <string name="cal_doip_obd_identify">Identifier OBDonUDS</string>
+    <string name="cal_doip_obd_read">Lire DID OBDonUDS</string>
+    <string name="cal_doip_obd_verified">OBDonUDS confirmé (F810=%1$02X) · VIN %2$s</string>
+    <string name="cal_doip_obd_unknown">OBDonUDS non confirmé (F810=%1$02X) · VIN %2$s</string>
+    <string name="cal_doip_obd_data">DID OBDonUDS %1$04X · Données brutes : %2$s</string>
 </resources>

@@ -23,7 +23,7 @@ import kotlin.coroutines.resumeWithException
  * A socket is owned by one operation and is never retained after failure.
  */
 object DoIpDirectRead {
-    enum class Operation { VIN, DID, DTC, DTC_COUNT, DTC_SNAPSHOT, DTC_EXTENDED, MONITOR, BACKUP, EXCHANGE }
+    enum class Operation { VIN, DID, DTC, DTC_COUNT, DTC_SNAPSHOT, DTC_EXTENDED, MONITOR, BACKUP, EXCHANGE, OBD_IDENTIFY, OBD_DID }
     data class Target private constructor(val address: InetAddress, val tester: Int, val ecu: Int,
         val expectedVin: String, val tls: Boolean, val expectedGateway: Int? = null,
         val expectedIdentity: Gateway? = null) {
@@ -45,6 +45,33 @@ object DoIpDirectRead {
                     expectedGateway ?: expectedIdentity?.logicalAddress, expectedIdentity)
             }
         }
+    }
+
+    /** SAE J1979-2 standardized DID range; availability/scaling is ECU-specific. */
+    fun isObdDid(did: Int): Boolean = did in 0xF400..0xF8FF
+
+    internal fun decodeObdProtocol(reply: ByteArray): Int {
+        require(reply.size == 4 && reply[0].u8() == 0x62 && reply[1].u8() == 0xF8 && reply[2].u8() == 0x10)
+        return reply[3].u8()
+    }
+
+    /** The common selector only exposes an OBD service route after the selected ECU
+     * returned both the legislated VIN and the OBDonUDS identification value.
+     * A DID on that route can still be unsupported; its reply remains authoritative. */
+    internal fun selectObdReadRoute(target: Target, ecuVin: String, protocolValue: Int): DiagnosticRouteSelector.Selection {
+        val selector = DiagnosticRouteSelector
+        val protocol = DiagnosticRouteSelector.Protocol(DiagnosticRouteSelector.Link.ETHERNET,
+            DiagnosticRouteSelector.Framing.DOIP, DiagnosticRouteSelector.Service.OBD)
+        val sameVin = target.expectedVin.isNotEmpty() && ecuVin == target.expectedVin
+        val verified = sameVin && protocolValue == 1
+        return selector.select(listOf(DiagnosticRouteSelector.Capability(protocol,
+            if (verified) DiagnosticRouteSelector.Evidence.VERIFIED else DiagnosticRouteSelector.Evidence.UNKNOWN,
+            true, setOf(DiagnosticRouteSelector.Operation.IDENTIFY, DiagnosticRouteSelector.Operation.MONITOR))),
+            DiagnosticRouteSelector.Target(target.expectedVin.ifEmpty { "unknown" },
+                "%04X".format(target.ecu),
+                if (sameVin) setOf(DiagnosticRouteSelector.Link.ETHERNET) else emptySet(),
+                if (verified) setOf(protocol) else emptySet(), sameVin),
+            DiagnosticRouteSelector.Operation.MONITOR)
     }
 
     fun parseCommand(text: String): ByteArray {
@@ -163,7 +190,7 @@ object DoIpDirectRead {
         val data: ByteArray?, val dtcs: UdsDtcReport?, val trace: List<Trace>,
         val samples: List<Sample> = emptyList(), val capture: DoIpMemoryBackup.Capture? = null,
         val dtcCount: UdsDtcCountReport? = null, val dtcDetail: UdsDtcDetail? = null,
-        val commandReplies: List<ByteArray> = emptyList())
+        val commandReplies: List<ByteArray> = emptyList(), val obdProtocolValue: Int? = null)
     data class Sample(val index: Int, val elapsedMs: Long, val data: ByteArray)
 
     private const val MAX_PAYLOAD = 1024 * 1024
@@ -492,6 +519,7 @@ object DoIpDirectRead {
         require(timeoutMs in 100..30_000 && did in 0..65535 && mask in 0..255)
         require(operation == Operation.VIN || target.expectedVin.isNotEmpty())
         require(sampleCount in 1..30 && intervalMs in 250..5000)
+        require(operation != Operation.OBD_DID || isObdDid(did))
         require((operation == Operation.BACKUP) == (backupScope != null))
         require(command == null || commands == null)
         val fixedCommands = (commands ?: command?.let { listOf(it) })?.map { it.copyOf() }
@@ -542,8 +570,8 @@ object DoIpDirectRead {
                     val session = Session(wire, gateway, target, trace, rollingTrace = operation == Operation.BACKUP,
                         onTrace = onTrace, onControlTrace = onControlTrace)
                     session.activate(timeoutMs)
-                    fun readVin(): String {
-                        val reply = session.exchange(byteArrayOf(0x22,0xF1.toByte(),0x90.toByte()), timeoutMs)
+                    fun readVin(vinDid: Int = 0xF190): String {
+                        val reply = session.exchange(byteArrayOf(0x22, (vinDid shr 8).toByte(), vinDid.toByte()), timeoutMs)
                         require(reply.size == 20)
                         val vin = reply.copyOfRange(3,20).toString(Charsets.US_ASCII)
                         require(validVin(vin) && (gateway.vin == null || gateway.vin == vin) &&
@@ -553,7 +581,26 @@ object DoIpDirectRead {
                         return vin
                     }
                     val vin: String
-                    if (operation == Operation.VIN || (operation == Operation.DID && did == 0xF190)) {
+                    if (operation == Operation.OBD_IDENTIFY || operation == Operation.OBD_DID) {
+                        // OBD-only ECUs may not implement the generic F190 VIN DID.
+                        // Do not silently assume F810 support from an unrelated UDS response.
+                        vin = readVin(0xF802)
+                        require(vin == target.expectedVin)
+                        val protocolValue = decodeObdProtocol(session.exchange(
+                            byteArrayOf(0x22, 0xF8.toByte(), 0x10), timeoutMs))
+                        val data = if (operation == Operation.OBD_DID) {
+                            require(selectObdReadRoute(target, vin, protocolValue).routes.isNotEmpty()) {
+                                "Selected ECU did not identify as OBDonUDS."
+                            }
+                            when (did) {
+                                0xF802 -> vin.toByteArray(Charsets.US_ASCII)
+                                0xF810 -> byteArrayOf(protocolValue.toByte())
+                                else -> session.exchange(byteArrayOf(0x22, (did shr 8).toByte(), did.toByte()),
+                                    timeoutMs).let { it.copyOfRange(3, it.size) }
+                            }
+                        } else null
+                        Outcome(gateway, target.ecu, vin, data, null, trace.toList(), obdProtocolValue = protocolValue)
+                    } else if (operation == Operation.VIN || (operation == Operation.DID && did == 0xF190)) {
                         vin = readVin()
                         Outcome(gateway, target.ecu, vin, vin.toByteArray(Charsets.US_ASCII), null, trace.toList())
                     } else {

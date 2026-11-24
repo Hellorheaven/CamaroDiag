@@ -516,6 +516,19 @@ fun CalibrationWorkspaceScreen(
                         enabled = targetReady && vinReady && doIpDid.length == 4, modifier = Modifier.fillMaxWidth()) {
                         Text(stringResource(R.string.cal_read_uds_did))
                     }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu, "F810", doIpTls,
+                            DoIpDirectRead.Operation.OBD_IDENTIFY, doIpCertificate) },
+                            enabled = targetReady && vinReady, modifier = Modifier.weight(1f)) {
+                            Text(stringResource(R.string.cal_doip_obd_identify))
+                        }
+                        OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu, doIpDid, doIpTls,
+                            DoIpDirectRead.Operation.OBD_DID, doIpCertificate) },
+                            enabled = targetReady && vinReady && doIpDid.length == 4 &&
+                                doIpDid.toIntOrNull(16)?.let(DoIpDirectRead::isObdDid) == true, modifier = Modifier.weight(1f)) {
+                            Text(stringResource(R.string.cal_doip_obd_read))
+                        }
+                    }
                     OutlinedTextField(doIpDtcMask, { doIpDtcMask = it.uppercase().filter { c -> c in "0123456789ABCDEF" }.take(2) },
                         enabled = idle, singleLine = true, modifier = Modifier.fillMaxWidth(),
                         label = { Text(stringResource(R.string.cal_doip_dtc_mask)) })

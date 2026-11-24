@@ -180,6 +180,18 @@ class DoIpGatewayControlTraceTest {
             assertTrue(runCatching { DoIpDirectRead.requireGatewayIdentity(target, changed) }.isFailure)
     }
 
+    @Test fun obdOnUdsReadRouteRequiresMatchingVinAndProtocolIdentification() {
+        val target = DoIpDirectRead.Target.parse("127.0.0.1", "0E80", "1001", vin, true)
+        assertEquals(1, DoIpDirectRead.decodeObdProtocol(byteArrayOf(0x62, 0xF8.toByte(), 0x10, 1)))
+        assertTrue(DoIpDirectRead.selectObdReadRoute(target, vin, 1).routes.isNotEmpty())
+        assertTrue(DoIpDirectRead.selectObdReadRoute(target, vin, 2).routes.isEmpty())
+        assertTrue(DoIpDirectRead.selectObdReadRoute(target, "1G1FA1RX0J0100002", 1).routes.isEmpty())
+        assertTrue(runCatching { DoIpDirectRead.decodeObdProtocol(byteArrayOf(0x62, 0xF8.toByte(), 0x11, 1)) }.isFailure)
+        assertTrue(DoIpDirectRead.isObdDid(0xF400))
+        assertTrue(DoIpDirectRead.isObdDid(0xF8FF))
+        assertFalse(DoIpDirectRead.isObdDid(0xF190))
+    }
+
     @Test fun explicitCommandPreservesBytesAndCorrelatesStandardResponse() {
         val commands = DoIpDirectRead.parseCommands("22 F1 90;19 01 FF")
         assertEquals(2, commands.size)

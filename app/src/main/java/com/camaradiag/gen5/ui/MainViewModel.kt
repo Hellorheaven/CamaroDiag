@@ -1451,7 +1451,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val target = resolveSelectedDoIpTarget(host, tester, ecu, _vehicle.value.vin, tls,
                     onTrace = { trace -> journalDoIpControlTrace(trace, current) })
                 check(current())
-                val did = if (operation in setOf(DoIpDirectRead.Operation.DID, DoIpDirectRead.Operation.MONITOR)) {
+                val did = if (operation in setOf(DoIpDirectRead.Operation.DID, DoIpDirectRead.Operation.MONITOR, DoIpDirectRead.Operation.OBD_DID)) {
                     require(didHex.matches(Regex("[0-9A-Fa-f]{4}")))
                     didHex.toInt(16)
                 } else 0xF190
@@ -1499,6 +1499,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val count = result.dtcCount
                 val detail = result.dtcDetail
                 val rendered = when {
+                    operation == DoIpDirectRead.Operation.OBD_IDENTIFY -> localizedContext.getString(
+                        if (result.obdProtocolValue == 1) R.string.cal_doip_obd_verified else R.string.cal_doip_obd_unknown,
+                        result.obdProtocolValue ?: 0, result.vin.orEmpty())
+                    operation == DoIpDirectRead.Operation.OBD_DID -> localizedContext.getString(R.string.cal_doip_obd_data,
+                        did, result.data?.joinToString(" ") { "%02X".format(it.toInt() and 255) }.orEmpty())
                     result.commandReplies.isNotEmpty() -> result.commandReplies.mapIndexed { index, reply ->
                         localizedContext.getString(R.string.cal_doip_sequence_reply, index + 1,
                             reply.joinToString(" ") { "%02X".format(it.toInt() and 255) })

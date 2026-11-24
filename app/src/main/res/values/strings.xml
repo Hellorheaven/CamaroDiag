@@ -1058,4 +1058,9 @@
     <string name="cal_doip_cert_none">Server TLS only (no client certificate selected).</string>
     <string name="cal_doip_tls_error">TLS authentication failed or client certificate unavailable/expired. Verify server trust and select the correct client certificate.</string>
     <string name="cal_doip_gateway_eid_gid">Gateway EID %1$s · GID %2$s</string>
+    <string name="cal_doip_obd_identify">Identify OBDonUDS</string>
+    <string name="cal_doip_obd_read">Read OBDonUDS DID</string>
+    <string name="cal_doip_obd_verified">OBDonUDS confirmed (F810=%1$02X) · VIN %2$s</string>
+    <string name="cal_doip_obd_unknown">OBDonUDS not confirmed (F810=%1$02X) · VIN %2$s</string>
+    <string name="cal_doip_obd_data">OBDonUDS DID %1$04X · Raw data: %2$s</string>
 </resources>
