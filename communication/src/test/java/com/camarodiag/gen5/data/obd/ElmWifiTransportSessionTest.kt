@@ -2,6 +2,8 @@ package com.camarodiag.gen5.data.obd
 
 import java.net.Socket
 import java.net.SocketAddress
+import java.io.InputStream
+import java.io.OutputStream
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
@@ -15,10 +17,16 @@ import org.junit.Test
 class ElmWifiTransportSessionTest {
     private class FakeSocket(
         private val blockConnect: Boolean = false,
-        private val failAfterWait: Boolean = false
+        private val failAfterWait: Boolean = false,
+        private val blockRead: Boolean = false,
+        private val blockWrite: Boolean = false
     ) : Socket() {
         val entered = CountDownLatch(1)
         val released = CountDownLatch(1)
+        val readEntered = CountDownLatch(1)
+        val readReleased = CountDownLatch(1)
+        val writeEntered = CountDownLatch(1)
+        val writeReleased = CountDownLatch(1)
         @Volatile var fakeClosed = false
         @Volatile var connected = false
 
@@ -34,6 +42,29 @@ class ElmWifiTransportSessionTest {
         }
         override fun setTcpNoDelay(on: Boolean) {}
         override fun setSoTimeout(timeout: Int) {}
+        override fun getInputStream(): InputStream = object : InputStream() {
+            override fun read(): Int {
+                readEntered.countDown()
+                if (blockRead) check(readReleased.await(5, TimeUnit.SECONDS))
+                return 0x42
+            }
+            override fun read(bytes: ByteArray, off: Int, len: Int): Int {
+                readEntered.countDown()
+                if (blockRead) check(readReleased.await(5, TimeUnit.SECONDS))
+                bytes[off] = 0x42
+                return 1
+            }
+        }
+        override fun getOutputStream(): OutputStream = object : OutputStream() {
+            override fun write(value: Int) {
+                writeEntered.countDown()
+                if (blockWrite) check(writeReleased.await(5, TimeUnit.SECONDS))
+            }
+            override fun write(bytes: ByteArray, off: Int, len: Int) {
+                writeEntered.countDown()
+                if (blockWrite) check(writeReleased.await(5, TimeUnit.SECONDS))
+            }
+        }
         override fun isConnected(): Boolean = connected
         override fun isClosed(): Boolean = fakeClosed
         override fun isInputShutdown(): Boolean = false
@@ -85,6 +116,52 @@ class ElmWifiTransportSessionTest {
             assertFalse(current.fakeClosed)
         } finally {
             old.released.countDown()
+            transport.close()
+        }
+        Unit
+    }
+
+    @Test fun lateWifiReadFromReplacedSocketIsNeverReturnedAsCurrentData() = runBlocking {
+        val old = FakeSocket(blockRead = true)
+        val current = FakeSocket()
+        val sockets = ArrayDeque(listOf(old, current))
+        val transport = ElmWifiTransport { synchronized(sockets) { sockets.removeFirst() } }
+        try {
+            assertTrue(transport.connect("192.168.0.10").isSuccess)
+            val stale = async(Dispatchers.IO) {
+                runCatching { transport.read(ByteArray(8)) }.exceptionOrNull()
+            }
+            assertTrue(old.readEntered.await(5, TimeUnit.SECONDS))
+            assertTrue(transport.connect("192.168.0.11").isSuccess)
+            old.readReleased.countDown()
+            assertTrue(stale.await() is ObdSupersededSessionException)
+            assertTrue(transport.isConnected)
+            assertFalse(current.fakeClosed)
+        } finally {
+            old.readReleased.countDown()
+            transport.close()
+        }
+        Unit
+    }
+
+    @Test fun lateWifiWriteFromReplacedSocketCannotReportSuccess() = runBlocking {
+        val old = FakeSocket(blockWrite = true)
+        val current = FakeSocket()
+        val sockets = ArrayDeque(listOf(old, current))
+        val transport = ElmWifiTransport { synchronized(sockets) { sockets.removeFirst() } }
+        try {
+            assertTrue(transport.connect("192.168.0.10").isSuccess)
+            val stale = async(Dispatchers.IO) {
+                runCatching { transport.write(byteArrayOf(0x41)) }.exceptionOrNull()
+            }
+            assertTrue(old.writeEntered.await(5, TimeUnit.SECONDS))
+            assertTrue(transport.connect("192.168.0.11").isSuccess)
+            old.writeReleased.countDown()
+            assertTrue(stale.await() is ObdSupersededSessionException)
+            assertTrue(transport.isConnected)
+            assertFalse(current.fakeClosed)
+        } finally {
+            old.writeReleased.countDown()
             transport.close()
         }
         Unit
