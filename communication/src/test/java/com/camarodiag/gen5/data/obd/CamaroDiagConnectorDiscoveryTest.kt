@@ -147,6 +147,24 @@ class CamaroDiagConnectorDiscoveryTest {
         ))
     }
 
+    @Test fun liveUsbDriverFamilyCannotSwitchBetweenElmAndIsolatedConnector() {
+        val policy = CamaroDiagConnectorDiscovery::allowsUsbDriverFamily
+        // Normal adapters may expose generic descriptors, while expressly
+        // named connector/KKL devices must never be opened through ELM.
+        assertTrue(policy("OBDLink USB", false))
+        assertTrue(policy("FT232R USB UART", false))
+        assertTrue(policy(null, false))
+        assertFalse(policy("CamaroDiagConnectors CDC", false))
+        assertFalse(policy("FTDI KKL", false))
+        assertFalse(policy("CamaroDiagConnectors K-Line", false))
+        // Discovery only requires a named isolated board; its public ID does
+        // not authenticate firmware or enable any ECU service.
+        assertTrue(policy("CamaroDiagConnectors CDC", true))
+        assertFalse(policy("ELM327 USB", true))
+        assertFalse(policy(null, true))
+        assertFalse(policy("CamaroDiagConnectors K-Line", true))
+    }
+
     @Test fun onlyEnumeratedNamedNonKklUsbBoardCanBeDiscovered() {
         val labels = listOf(
             "CamaroDiagConnectors (#17)",
