@@ -25,22 +25,44 @@ import kotlin.coroutines.resumeWithException
 object DoIpDirectRead {
     enum class Operation { VIN, DID, DTC, MONITOR, BACKUP }
     data class Target private constructor(val address: InetAddress, val tester: Int, val ecu: Int,
-        val expectedVin: String, val tls: Boolean) {
+        val expectedVin: String, val tls: Boolean, val expectedGateway: Int? = null) {
         companion object {
-            fun parse(host: String, tester: String, ecu: String, vin: String, tls: Boolean): Target {
+            fun parse(host: String, tester: String, ecu: String, vin: String, tls: Boolean,
+                expectedGateway: Int? = null): Target {
                 val address = parseHost(host)
-                fun logical(text: String): Int {
-                    require(text.trim().matches(Regex("[0-9A-Fa-f]{4}")))
-                    return text.trim().toInt(16)
-                }
-                val source = logical(tester)
-                val destination = logical(ecu)
+                val source = logicalAddress(tester)
+                val destination = logicalAddress(ecu)
                 require(source != destination)
+                require(expectedGateway == null || (expectedGateway in 0..65535 && source != expectedGateway))
                 val expected = vin.trim().uppercase(Locale.ROOT)
                 require(expected.isEmpty() || validVin(expected))
-                return Target(address, source, destination, expected, tls)
+                return Target(address, source, destination, expected, tls, expectedGateway)
             }
         }
+    }
+
+    private fun logicalAddress(text: String): Int {
+        require(text.trim().matches(Regex("[0-9A-Fa-f]{4}")))
+        return text.trim().toInt(16)
+    }
+
+    /** Resolve only the network endpoint. Logical addresses remain supplied by
+     * the selected ECU/profile, never guessed from the VIN or gateway. */
+    suspend fun resolveTarget(host: String, tester: String, ecu: String, vin: String,
+        tls: Boolean, expectedGateway: Int? = null,
+        onControlTrace: (ControlTrace) -> Unit = {}): Target {
+        if (host.isNotBlank()) return Target.parse(host, tester, ecu, vin, tls, expectedGateway)
+        val expected = vin.trim().uppercase(Locale.ROOT)
+        val source = logicalAddress(tester)
+        require(validVin(expected) && source != logicalAddress(ecu))
+        require(expectedGateway == null || (expectedGateway in 0..65535 && source != expectedGateway))
+        val found = discoverSelectedVehicle(expected, onControlTrace = onControlTrace)
+        require(found.gateway.vin == expected)
+        require(expectedGateway == null || found.gateway.logicalAddress == expectedGateway) {
+            "Discovered gateway does not match the selected ECU profile."
+        }
+        return Target.parse(requireNotNull(found.host), tester, ecu, expected, tls,
+            found.gateway.logicalAddress)
     }
     private fun parseHost(host: String): InetAddress {
         val raw = host.trim()
@@ -404,6 +426,9 @@ object DoIpDirectRead {
             timeoutMs * (sampleCount + 5L) + intervalMs * (sampleCount - 1L) else timeoutMs * 5L
         val gateway = discover(target.address, target.expectedVin, timeoutMs, onControlTrace)
         require(target.tester != gateway.logicalAddress)
+        require(target.expectedGateway == null || target.expectedGateway == gateway.logicalAddress) {
+            "Gateway identity changed after route selection."
+        }
         if (backupScope != null) require(gateway.logicalAddress == backupScope.gateway)
         val trace = mutableListOf<Trace>()
         val base = Socket()
