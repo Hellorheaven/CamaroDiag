@@ -1,3 +1,18 @@
+C4 COHERENT READ-ONLY FUEL HISTORY CHECKPOINT — 2026-11-24
+Implementation HEAD before this one-time grouped gate: 25b9feb7961e92a869c5cf48c413a78ac5ae6f3c
+C4 (#52), no ISO/SAE protocol changes, no C6 work, NOT final C8.
+Changes: immutable snapshot of in-memory fuel survey/readings before CSV
+validation and streaming, preventing a concurrent caller clear/update from
+changing rows after acceptance; offline regression mutates both the caller
+list and its nested readings while Writer receives the header.
+Also verify C4 fuel export policy tests: changed ethanol content at identical
+timestamps and mixed-session history cannot be exported (3be145c5).
+Run ONE full software Debug checkpoint: Android unit/lint/assemble with warnings
+failing, Windows/J2534 Debug self-tests, native ECU and all Connectors.
+Do not assume previous successes validate this SHA; inspect each job.
+No vehicle/ECU/adapter tests in this PR. Owner's physical Release acceptance
+is issue #48. No merge, PR closure, new branch or Release without approval.
+
 C1 FOLLOW-UP ACCEPTANCE — 2026-11-24 (NOT FINAL C8)
 C1 fix: Physical RAW CAN replies exceeding the previous 300-item
 diagnostic correlation window now stream into the complete chronological
