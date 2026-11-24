@@ -1,3 +1,7 @@
+PR117 — UI CLEANUP AND DOIP INTERMEDIATE DEBUG CHECKPOINT — 2026-11-24
+Implementation + handoff HEAD: 8523a18dc0612cdb7446da5d079140d8912e6af3
+Run full Debug validation of Android and Windows UI cleanup, DoIP DTC TCP regression tests and shared DID reading, native and connectors. This is not C8 final. No merge or release.
+
 PR95 MERGE CONFLICT RESOLUTION — FULL DEBUG CHECKPOINT
 Preserve both UDS response deadline test suites and integrate main cfadb863d5ef9ffcadcde064bfd60224e3217058 into PR95 0ec8be1d7e7c8a0717d3333cf39273a1cd896e51. Validate exact merge candidate before final merge. No release or final C8 implied.
 
