@@ -276,12 +276,18 @@ internal sealed partial class BridgeDesktopForm
                         requested: data =>
                         {
                             if (!IsDisposed && !Disposing)
-                                ConsoleLine("TX", Convert.ToHexString(data), Color.DarkOrange);
+                                ConsoleLine("TX", Convert.ToHexString(data) + " [" +
+                                    BridgeConsoleTxEvidence.Label(BridgeConsoleTxState.Requested) + "]",
+                                    Color.DarkOrange);
                         },
                         received: data =>
                         {
                             if (!IsDisposed && !Disposing)
+                                {
+                                ConsoleLine("SYSTEM", BridgeConsoleTxEvidence.Label(
+                                    BridgeConsoleTxState.EcuReplied), Color.DarkSlateGray);
                                 ConsoleLine("RX", Convert.ToHexString(data), Color.DarkGreen);
+                            }
                         },
                         clientCertificateThumbprint: thumbprint.Length == 0 ? null : thumbprint);
                     stop.Token.ThrowIfCancellationRequested();
