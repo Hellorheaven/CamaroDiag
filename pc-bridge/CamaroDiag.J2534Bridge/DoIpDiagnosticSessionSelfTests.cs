@@ -152,6 +152,18 @@ internal static class DoIpDiagnosticSessionSelfTests
             Check(matched, label);
         }
 
+        // A pre-canceled connection must not initiate routing or TCP I/O.
+        using (var canceled = new CancellationTokenSource())
+        {
+            canceled.Cancel();
+            await Expect<OperationCanceledException>(async () =>
+            {
+                await using var unused = await DoIpDiagnosticTransport.ConnectAsync(
+                    "127.0.0.1", Tester, Ecu, TimeSpan.FromSeconds(2),
+                    canceled.Token, portOverride: 1);
+            }, "Canceled connection is rejected before opening TCP.");
+        }
+
         // Full happy path: routing 0x11 pending then 0x10, gateway ACK,
         // AliveCheck and UDS NRC 0x78 followed by final correlated response.
         await RunCaseAsync(async stream =>
