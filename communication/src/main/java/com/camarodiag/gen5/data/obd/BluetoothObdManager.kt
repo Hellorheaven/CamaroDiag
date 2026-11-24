@@ -650,7 +650,7 @@ class BluetoothObdManager(context: Context) {
 
     suspend fun clearJ2534StandardDtcs(
         approval: EcuWriteConsentFlow.Approval,
-        beforeTransmit: () -> Unit = {}
+        beforeTransmit: () -> Unit
     ) {
         require(approval.warningAcknowledged && approval.confirmedYes) {
             "Risk notice OK and separate YES are required before clearing ECU DTCs."
@@ -660,7 +660,10 @@ class BluetoothObdManager(context: Context) {
         commandSessionMutex.withLock {
             transportSessionEpoch.requireQueuedCurrent(epoch)
             check(isJ2534StandardObdClearAvailable())
-            checkNotNull(j2534BridgeTransport).clearStandardObdDtcs(approval, beforeTransmit)
+            checkNotNull(j2534BridgeTransport).clearStandardObdDtcs(approval) {
+                transportSessionEpoch.requireQueuedCurrent(epoch)
+                beforeTransmit()
+            }
             transportSessionEpoch.requireQueuedCurrent(epoch)
         }
     }
