@@ -66,4 +66,14 @@
   <data name="InvalidExpectedVin" xml:space="preserve"><value>Enter a valid 17-character VIN.</value></data>
   <data name="VinDiscoveryStarted" xml:space="preserve"><value>Discovering DoIP gateway for VIN {0}</value></data>
   <data name="TraceIncomplete" xml:space="preserve"><value>DoIP history incomplete: receive buffer limit exceeded.</value></data>
+  <data name="Exchange" xml:space="preserve"><value>Send UDS command</value></data>
+  <data name="Payload" xml:space="preserve"><value>UDS payload (hex)</value></data>
+  <data name="InvalidPayload" xml:space="preserve"><value>Enter a valid hexadecimal UDS command.</value></data>
+  <data name="ExpectedVinRequired" xml:space="preserve"><value>Enter the expected VIN and discover the matching gateway before sending.</value></data>
+  <data name="ExchangeTarget" xml:space="preserve"><value>VIN {0}, gateway {1}, ECU 0x{2:X4}, tester 0x{3:X4}, {4}, command {5}</value></data>
+  <data name="ExchangeWarning" xml:space="preserve"><value>This command may change or erase ECU data and render the ECU unusable. Select OK to continue to the separate confirmation.</value></data>
+  <data name="ExchangeWarningTitle" xml:space="preserve"><value>ECU command warning</value></data>
+  <data name="ExchangeConfirm" xml:space="preserve"><value>Send this exact command to the selected ECU? No cancels without sending.</value></data>
+  <data name="ExchangeStarted" xml:space="preserve"><value>DoIP / {0} / UDS: command at {1}, ECU 0x{2:X4}, tester 0x{3:X4}, version 0x{4:X2}.</value></data>
+  <data name="ExchangeResult" xml:space="preserve"><value>ECU response: {0}</value></data>
 </root>

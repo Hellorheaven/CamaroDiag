@@ -66,4 +66,14 @@
   <data name="InvalidExpectedVin" xml:space="preserve"><value>Saisissez un VIN valide de 17 caractères.</value></data>
   <data name="VinDiscoveryStarted" xml:space="preserve"><value>Recherche de la passerelle DoIP du VIN {0}</value></data>
   <data name="TraceIncomplete" xml:space="preserve"><value>Historique DoIP incomplet : limite du tampon de réception dépassée.</value></data>
+  <data name="Exchange" xml:space="preserve"><value>Envoyer la commande UDS</value></data>
+  <data name="Payload" xml:space="preserve"><value>Commande UDS (hex)</value></data>
+  <data name="InvalidPayload" xml:space="preserve"><value>Saisissez une commande UDS hexadécimale valide.</value></data>
+  <data name="ExpectedVinRequired" xml:space="preserve"><value>Saisissez le VIN attendu et identifiez la passerelle correspondante avant l’envoi.</value></data>
+  <data name="ExchangeTarget" xml:space="preserve"><value>VIN {0}, passerelle {1}, ECU 0x{2:X4}, testeur 0x{3:X4}, {4}, commande {5}</value></data>
+  <data name="ExchangeWarning" xml:space="preserve"><value>Cette commande peut modifier ou effacer les données du calculateur et le rendre inutilisable. Cliquez sur OK pour accéder à la confirmation distincte.</value></data>
+  <data name="ExchangeWarningTitle" xml:space="preserve"><value>Avertissement commande ECU</value></data>
+  <data name="ExchangeConfirm" xml:space="preserve"><value>Envoyer exactement cette commande au calculateur sélectionné ? Non annule sans émission.</value></data>
+  <data name="ExchangeStarted" xml:space="preserve"><value>DoIP / {0} / UDS : commande à {1}, ECU 0x{2:X4}, testeur 0x{3:X4}, version 0x{4:X2}.</value></data>
+  <data name="ExchangeResult" xml:space="preserve"><value>Réponse ECU : {0}</value></data>
 </root>

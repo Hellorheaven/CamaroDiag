@@ -54,6 +54,15 @@ internal static class DoIpConsolePresentation
         return lines;
     }
 
+    internal static byte[] ParsePayload(string text)
+    {
+        var compact = string.Concat(text.Where(c => !char.IsWhiteSpace(c)));
+        if (compact.Length is < 2 or > 8182 || compact.Length % 2 != 0 ||
+            compact.Any(c => !Uri.IsHexDigit(c)))
+            throw new ArgumentException("Expected a hexadecimal UDS payload.");
+        return Convert.FromHexString(compact);
+    }
+
     internal static byte ParseDtcMask(string text)
     {
         if (text.Length != 2 || !byte.TryParse(text, NumberStyles.AllowHexSpecifier,

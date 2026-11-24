@@ -80,7 +80,8 @@ internal static class DoIpConsolePresentationSelfTests
             foreach (var key in new[] { "Host", "Discover", "Cancel", "Notice",
                 "Started", "Canceled", "Busy", "InvalidHost", "Status", "Power",
                 "StatusNotice", "StatusStarted", "IdentifyFirst", "ExpectedVin",
-                "InvalidExpectedVin", "VinDiscoveryStarted", "TraceIncomplete" })
+                "InvalidExpectedVin", "VinDiscoveryStarted", "TraceIncomplete",
+                "Exchange", "Payload", "InvalidPayload", "ExpectedVinRequired", "ExchangeTarget", "ExchangeWarning", "ExchangeWarningTitle", "ExchangeConfirm", "ExchangeStarted", "ExchangeResult" })
                 Check(!string.IsNullOrWhiteSpace(DoIpConsolePresentation.Text(key, culture)),
                     "Resource " + key + " in " + language);
         }
@@ -93,6 +94,15 @@ internal static class DoIpConsolePresentationSelfTests
             try { _ = DoIpConsolePresentation.ParseDtcMask(invalid); }
             catch (ArgumentException) { invalidMask = true; }
             Check(invalidMask, "Malformed DTC mask rejected: " + invalid);
+        }
+        Check(DoIpConsolePresentation.ParsePayload("22 f1 90").SequenceEqual(new byte[] { 0x22, 0xf1, 0x90 }),
+            "Console accepts exact command bytes.");
+        foreach (var invalid in new[] { "", "0x22", "ABC", "GG", new string('A', 8184) })
+        {
+            var rejected = false;
+            try { _ = DoIpConsolePresentation.ParsePayload(invalid); }
+            catch (ArgumentException) { rejected = true; }
+            Check(rejected, "Malformed or oversized UDS command rejected.");
         }
         return checks;
     }

@@ -4,7 +4,7 @@ using System.Text;
 
 namespace CamaroDiag.J2534Bridge;
 
-/// <summary>Read-only UDS application services over a discovered DoIP gateway.</summary>
+/// <summary>UDS application services over a discovered DoIP gateway.</summary>
 internal static class DoIpVinReader
 {
     internal static ushort ParseLogicalAddress(string text)
@@ -167,6 +167,25 @@ internal static class DoIpVinReader
             ecu, useTls, timeout, token, clientCertificateThumbprint, trace);
         _ = await VerifyObservedVinAsync(transport, gateway, timeout, token, requested, received);
         return await ReadDtcsAsync(transport, statusMask, timeout, token, requested, received);
+    }
+
+    // Caller obtains consent for the exact immutable request and context.
+    // No automatic replay on negative response, timeout or interrupted connection.
+    internal static async Task<byte[]> ExchangeObservedGatewayAsync(
+        DoIpVehicleDiscovery.Identity gateway, IPAddress address, ushort tester,
+        ushort ecu, bool useTls, byte[] command, TimeSpan timeout, CancellationToken token,
+        string? certificate = null, Action<DoIpDiagnosticTransport.PduTrace>? trace = null)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        if (command.Length is < 1 or > 4091 || gateway.Vin is null ||
+            !DoIpVehicleDiscovery.IsVehicleVin(gateway.Vin))
+            throw new ArgumentException("A valid observed VIN and explicit command are required.");
+        var fixedCommand = command.ToArray();
+        await using var transport = await ConnectObservedAsync(gateway, address, tester,
+            ecu, useTls, timeout, token, certificate, trace);
+        _ = await VerifyObservedVinAsync(transport, gateway, timeout, token, null, null);
+        token.ThrowIfCancellationRequested();
+        return await transport.ExchangeUdsAsync(fixedCommand, timeout, token);
     }
 
     internal static async Task<string> ReadObservedGatewayAsync(
