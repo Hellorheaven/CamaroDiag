@@ -46,6 +46,41 @@ class DoIpGatewayControlTraceTest {
         assertTrue(runCatching { DoIpDirectRead.SessionOptions.parse("5000", "100", "2000", "00", "0102") }.isFailure)
     }
 
+    @Test fun scopedIpv6IdentityAndTlsNameRemainDistinct() {
+        assertTrue(runCatching { DoIpDirectRead.Target.parse("fe80::2", "0E80", "1234", vin, true) }.isFailure)
+        assertFalse(DoIpDirectRead.sameHost("fe80::2%3", "fe80::2%4"))
+        val target = DoIpDirectRead.Target.parse("fe80::2%3", "0E80", "1234", vin, true)
+        assertEquals(target.address.hostAddress?.substringBefore('%'), DoIpDirectRead.tlsServerName(target.address))
+    }
+
+    @Test fun eidDiscoveryCorrelatesResponseAndPreservesAnnouncementState() = runBlocking {
+        val loopback = InetAddress.getByName("127.0.0.1")
+        DatagramSocket(0, loopback).use { server ->
+            server.soTimeout = 2000
+            val executor = Executors.newSingleThreadExecutor()
+            val eid = byteArrayOf(1, 2, 3, 4, 5, 6)
+            val expected = pdu(255, 2, eid)
+            val future = executor.submit {
+                val request = DatagramPacket(ByteArray(1024), 1024)
+                server.receive(request)
+                assertArrayEquals(expected, request.data.copyOf(request.length))
+                val other = identity()
+                server.send(DatagramPacket(other, other.size, request.address, request.port))
+                val announcement = pdu(2, 4, vin.toByteArray(Charsets.US_ASCII) +
+                    byteArrayOf(0x10, 0) + eid + ByteArray(6) + byteArrayOf(0x10, 0x10))
+                server.send(DatagramPacket(announcement, announcement.size, request.address, request.port))
+            }
+            try {
+                val found = DoIpDirectRead.inspectGatewayAt("127.0.0.1", vin,
+                    DoIpDirectRead.GatewayOperation.DISCOVER, 2000, server.localPort, {}, "010203040506")
+                assertEquals("010203040506", found.gateway.eid)
+                assertEquals(0x10, found.gateway.furtherAction)
+                assertEquals(0x10, found.gateway.syncStatus)
+                future.get(3, TimeUnit.SECONDS)
+            } finally { executor.shutdownNow() }
+        }
+    }
+
     @Test fun statusAndPowerRecordActualUdpBytesAndDirection() = runBlocking {
         val loopback = InetAddress.getByName("127.0.0.1")
         val cases = listOf(

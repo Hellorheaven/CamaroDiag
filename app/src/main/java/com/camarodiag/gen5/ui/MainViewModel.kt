@@ -1184,13 +1184,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun inspectDirectDoIpGateway(host: String, operation: DoIpDirectRead.GatewayOperation) {
+    fun inspectDirectDoIpGateway(host: String, operation: DoIpDirectRead.GatewayOperation, eid: String?) {
         if (!requirePremiumLicense()) return
         launchEnhancedUdsRead(journalDoIp = true) { current ->
             _calibrationWorkspace.update { it.copy(doIpReading = true, doIpGatewayReading = true,
                 doIpGatewayResult = "", doIpDiscoveredVin = "", doIpGatewayHost = host, doIpGatewayIdentity = null) }
             try {
-                val result = DoIpDirectRead.inspectGateway(host, _vehicle.value.vin, operation,
+                val result = DoIpDirectRead.inspectGateway(host, _vehicle.value.vin, operation, eid = eid,
                     onControlTrace = { trace -> journalDoIpControlTrace(trace, current) })
                 if (!current()) return@launchEnhancedUdsRead
                 val unavailable = localizedContext.getString(R.string.cal_status_unresolved)
@@ -1215,6 +1215,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     doIpDiscoveredVin = if (result.host != null) result.gateway.vin.orEmpty() else "",
                     doIpGatewayResult = listOfNotNull(identity,
                         localizedContext.getString(R.string.cal_doip_gateway_eid_gid, result.gateway.eid, result.gateway.gid),
+                        localizedContext.getString(R.string.cal_doip_gateway_announcement_state,
+                            "%02X".format(result.gateway.furtherAction), result.gateway.syncStatus?.let { "%02X".format(it) } ?: unavailable),
                         status, power).joinToString("\n")) }
                 if (current()) appendCanConsoleSystemEvent(localizedContext.getString(R.string.cal_doip_console_complete))
             } catch (cancelled: CancellationException) {
@@ -1286,10 +1288,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         tls: Boolean, expectedGateway: Int? = null, onTrace: (DoIpDirectRead.ControlTrace) -> Unit): DoIpDirectRead.Target {
         val snapshot = _calibrationWorkspace.value
         val selected = snapshot.doIpGatewayIdentity?.takeIf {
-            it.vin == vin.uppercase(java.util.Locale.ROOT) &&
+            (it.vin == null || it.vin == vin.uppercase(java.util.Locale.ROOT)) &&
                 host.isNotBlank() && snapshot.doIpGatewayHost.isNotBlank() &&
-                runCatching { DoIpDirectRead.Target.parse(host, tester, ecu, vin, tls).address ==
-                    DoIpDirectRead.Target.parse(snapshot.doIpGatewayHost, tester, ecu, vin, tls).address }.getOrDefault(false)
+                runCatching { DoIpDirectRead.sameHost(host, snapshot.doIpGatewayHost) }.getOrDefault(false)
         }
         return if (selected != null)
             DoIpDirectRead.Target.parse(host, tester, ecu, vin, tls, expectedGateway, selected)

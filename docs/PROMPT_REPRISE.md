@@ -1,3 +1,7 @@
+## PR117 — identification EID Android et portée IPv6 (24/11/2026)
+
+- Découverte unicast ciblée par EID (champ optionnel FR/EN) et contrôle de la réponse avant sélection ; affiche aussi les octets d’action supplémentaire et de synchronisation VIN/GID sans interprétation OEM. Les changements d’état d’annonce ne sont pas confondus avec une substitution d’identité. IPv6 link-local : scope obligatoire, comparaison des hôtes avec scope et nom IP TLS sans scope, contrôle d’identité même si VIN UDP indisponible. Tests UDP loopback et scope ajoutés. Postérieur au checkpoint en cours 45456278234 ; nouvelle validation nécessaire. C6/DoIP actifs.
+
 ## PR117 — validation DoIP (24/11/2026)
 
 - Run 45454645809 sur 8b4672f : succès de tous les 12 jobs techniques, dont Windows (0 erreur/avertissement), Android et Connectors. Revue ignorée sur PR draft.

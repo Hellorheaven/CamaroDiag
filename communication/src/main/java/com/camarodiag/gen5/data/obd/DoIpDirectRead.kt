@@ -9,6 +9,7 @@ import java.io.IOException
 import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.InetAddress
+import java.net.Inet6Address
 import java.net.InetSocketAddress
 import java.net.Socket
 import java.net.SocketTimeoutException
@@ -169,6 +170,10 @@ object DoIpDirectRead {
     }
     internal fun canonicalHost(host: String): String = requireNotNull(parseHost(host).hostAddress)
 
+    fun sameHost(first: String, second: String): Boolean = canonicalHost(first) == canonicalHost(second)
+
+    internal fun tlsServerName(address: InetAddress): String = requireNotNull(address.hostAddress).substringBefore('%')
+
     private fun parseHost(host: String): InetAddress {
         val raw = host.trim()
         val address = if (raw.contains(':')) {
@@ -182,11 +187,15 @@ object DoIpDirectRead {
         }
         require(!address.isAnyLocalAddress && !address.isMulticastAddress &&
             address.hostAddress != "255.255.255.255") { "An explicit unicast gateway is required." }
+        require(address !is Inet6Address || !address.isLinkLocalAddress || address.scopeId > 0) {
+            "Link-local IPv6 requires an explicit interface scope."
+        }
         return address
     }
     enum class GatewayOperation { DISCOVER, STATUS, POWER }
     data class Gateway(val vin: String?, val logicalAddress: Int, val version: Int,
-        val eid: String = "", val gid: String = "") {
+        val eid: String = "", val gid: String = "", val furtherAction: Int = 0,
+        val syncStatus: Int? = null) {
         /** Correlation, not cryptographic authentication of the gateway. */
         fun matchesIdentity(other: Gateway): Boolean =
             vin == other.vin && logicalAddress == other.logicalAddress && version == other.version &&
@@ -263,12 +272,15 @@ object DoIpDirectRead {
         } ?: throw SocketTimeoutException("DoIP operation timed out.")
 
     private suspend fun discover(address: InetAddress, expectedVin: String, timeoutMs: Int,
-        onControlTrace: (ControlTrace) -> Unit, port: Int = DOIP_UDP_PORT): Gateway {
+        onControlTrace: (ControlTrace) -> Unit, port: Int = DOIP_UDP_PORT, eid: String? = null): Gateway {
+        require(eid == null || eid.matches(Regex("[0-9A-Fa-f]{12}")))
+        val requestedEid = eid?.uppercase(Locale.ROOT)
         val socket = DatagramSocket()
         try {
             return io(timeoutMs.toLong(), socket::close) {
                 socket.connect(address, port)
-                val packet = encode(255, 0x0001, byteArrayOf())
+                val packet = if (requestedEid == null) encode(255, 0x0001, byteArrayOf())
+                    else encode(255, 0x0002, parseCommand(requestedEid))
                 socket.send(DatagramPacket(packet, packet.size, address, port))
                 controlTrace("TX", "UDP", address, packet, onControlTrace)
                 val deadline = deadline(timeoutMs)
@@ -291,8 +303,11 @@ object DoIpDirectRead {
                     if (vin != null && expectedVin.isNotEmpty()) require(vin == expectedVin) {
                         "Discovered DoIP vehicle differs from the selected VIN."
                     }
+                    val observedEid = hex(frame.data.copyOfRange(19, 25))
+                    if (requestedEid != null && requestedEid != observedEid) continue
                     found = Gateway(vin, u16(frame.data, 17), frame.version,
-                        hex(frame.data.copyOfRange(19, 25)), hex(frame.data.copyOfRange(25, 31)))
+                        observedEid, hex(frame.data.copyOfRange(25, 31)), frame.data[31].u8(),
+                        frame.data.getOrNull(32)?.u8())
                 }
                 found
             }
@@ -340,11 +355,13 @@ object DoIpDirectRead {
                     val observedVin = frame.data.copyOfRange(0, 17).toString(Charsets.US_ASCII)
                     if (observedVin != expected) continue
                     val gateway = Gateway(observedVin, u16(frame.data, 17), frame.version,
-                        hex(frame.data.copyOfRange(19, 25)), hex(frame.data.copyOfRange(25, 31)))
+                        hex(frame.data.copyOfRange(19, 25)), hex(frame.data.copyOfRange(25, 31)),
+                        frame.data[31].u8(), frame.data.getOrNull(32)?.u8())
                     val key = Triple(packet.address, gateway.logicalAddress,
                         hex(frame.data.copyOfRange(19, 31)))
                     val prior = matches.putIfAbsent(key, gateway)
-                    require(prior == null || prior == gateway) { "Conflicting DoIP gateway announcements." }
+                    require(prior == null || prior.matchesIdentity(gateway)) { "Conflicting DoIP gateway announcements." }
+                    if (prior != null) matches[key] = gateway
                     require(matches.size <= 16) { "Too many DoIP gateways for the selected VIN." }
                 }
                 require(matches.size == 1) { "DoIP gateway not found or ambiguous for the selected VIN." }
@@ -356,20 +373,28 @@ object DoIpDirectRead {
 
     /** Discovery and control messages never activate a diagnostic TCP route. */
     suspend fun inspectGateway(host: String, vin: String, operation: GatewayOperation,
-        timeoutMs: Int = 5000, onControlTrace: (ControlTrace) -> Unit = {}): GatewayResult =
-        if (host.isBlank() && operation == GatewayOperation.DISCOVER)
+        timeoutMs: Int = 5000, eid: String? = null, onControlTrace: (ControlTrace) -> Unit = {}): GatewayResult {
+        require(eid == null || (host.isNotBlank() && operation == GatewayOperation.DISCOVER))
+        return if (host.isBlank() && operation == GatewayOperation.DISCOVER)
             discoverSelectedVehicle(vin, timeoutMs, onControlTrace)
-        else inspectGatewayAt(host, vin, operation, timeoutMs, DOIP_UDP_PORT, onControlTrace)
+        else inspectGatewayAt(host, vin, operation, timeoutMs, DOIP_UDP_PORT, onControlTrace, eid)
+    }
 
     /** The public operation always uses the standardized port; this seam also
      * permits a loopback simulator to bind an OS-assigned port without collisions. */
     internal suspend fun inspectGatewayAt(host: String, vin: String, operation: GatewayOperation,
-        timeoutMs: Int, port: Int, onControlTrace: (ControlTrace) -> Unit): GatewayResult {
+        timeoutMs: Int, port: Int, onControlTrace: (ControlTrace) -> Unit): GatewayResult =
+        inspectGatewayAt(host, vin, operation, timeoutMs, port, onControlTrace, null)
+
+    internal suspend fun inspectGatewayAt(host: String, vin: String, operation: GatewayOperation,
+        timeoutMs: Int, port: Int, onControlTrace: (ControlTrace) -> Unit,
+        eid: String?): GatewayResult {
         require(timeoutMs in 100..30_000 && port in 1..65535)
+        require(eid == null || operation == GatewayOperation.DISCOVER)
         val address = parseHost(host)
         val expected = vin.trim().uppercase(Locale.ROOT)
         require(expected.isEmpty() || validVin(expected))
-        val gateway = discover(address, expected, timeoutMs, onControlTrace, port)
+        val gateway = discover(address, expected, timeoutMs, onControlTrace, port, eid)
         if (operation == GatewayOperation.DISCOVER) return GatewayResult(gateway)
         val socket = DatagramSocket()
         try {
@@ -585,7 +610,7 @@ object DoIpDirectRead {
                 base.soTimeout = timeoutMs
                 val wire = if (target.tls) {
                     val factory = clientTls?.factory ?: (SSLSocketFactory.getDefault() as SSLSocketFactory)
-                    val secure = factory.createSocket(base, target.address.hostAddress, 3496, true) as SSLSocket
+                    val secure = factory.createSocket(base, tlsServerName(target.address), 3496, true) as SSLSocket
                     secure.sslParameters = secure.sslParameters.apply { endpointIdentificationAlgorithm = "HTTPS" }
                     secure.enabledProtocols = secure.supportedProtocols.filter { it == "TLSv1.2" || it == "TLSv1.3" }.toTypedArray()
                     try {

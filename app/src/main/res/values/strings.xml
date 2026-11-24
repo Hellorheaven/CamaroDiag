@@ -1072,4 +1072,6 @@
     <string name="cal_doip_routing_oem">OEM data (8 hex, optional)</string>
     <string name="cal_doip_invalid_session">Invalid session parameters. Check timing and routing fields.</string>
     <string name="cal_doip_session_summary">Timeout %1$d ms · P2 %2$d ms · P2* %3$d ms · routing %4$s · OEM %5$s</string>
+    <string name="cal_doip_discovery_eid">Gateway EID (12 hex, optional)</string>
+    <string name="cal_doip_gateway_announcement_state">Further action: 0x%1$s · VIN/GID synchronization: %2$s</string>
 </resources>

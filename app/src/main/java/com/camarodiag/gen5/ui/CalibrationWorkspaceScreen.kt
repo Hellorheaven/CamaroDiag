@@ -284,7 +284,7 @@ fun CalibrationWorkspaceScreen(
     doIpAccountUid: String?,
     doIpContextGeneration: Long,
     onConfirmDoIpCommand: (DoIpConsoleCommand, EcuWriteConsentFlow.Approval) -> Unit,
-    onInspectDoIpGateway: (String, DoIpDirectRead.GatewayOperation) -> Unit,
+    onInspectDoIpGateway: (String, DoIpDirectRead.GatewayOperation, String?) -> Unit,
     onCancelDirectDoIp: () -> Unit,
     onMonitorDirectDoIp: (String, String, String, String, Boolean, Int, Int, Boolean, DoIpClientCertificateSelection?, DoIpDirectRead.SessionOptions) -> Unit,
     onExportDoIpMonitoring: (DoIpMonitorReport) -> Unit,
@@ -312,6 +312,7 @@ fun CalibrationWorkspaceScreen(
     onClearFile: () -> Unit
 ) {
     var doIpHost by remember(vehicle) { mutableStateOf("") }
+    var doIpDiscoveryEid by remember(vehicle) { mutableStateOf("") }
     LaunchedEffect(state.doIpGatewayHost, state.doIpDiscoveredVin) {
         if (doIpHost.isBlank() && state.doIpDiscoveredVin.isNotBlank() &&
             state.doIpDiscoveredVin == vehicle.vin.uppercase() && state.doIpGatewayHost.isNotBlank()) {
@@ -433,17 +434,24 @@ fun CalibrationWorkspaceScreen(
                         enabled = idle, singleLine = true, modifier = Modifier.fillMaxWidth(),
                         label = { Text(stringResource(R.string.cal_doip_host)) })
                     val vinReady = vehicle.vin.uppercase().matches(Regex("[A-HJ-NPR-Z0-9]{17}"))
-                    OutlinedButton(onClick = { onInspectDoIpGateway(doIpHost, DoIpDirectRead.GatewayOperation.DISCOVER) },
-                        enabled = idle && (doIpHost.isNotBlank() || vinReady), modifier = Modifier.fillMaxWidth()) {
+                    if (doIpHost.isNotBlank()) {
+                        OutlinedTextField(doIpDiscoveryEid, { doIpDiscoveryEid = it.uppercase().filter { c -> c in "0123456789ABCDEF" }.take(12) },
+                            enabled = idle, singleLine = true, modifier = Modifier.fillMaxWidth(),
+                            label = { Text(stringResource(R.string.cal_doip_discovery_eid)) })
+                    }
+                    OutlinedButton(onClick = { onInspectDoIpGateway(doIpHost, DoIpDirectRead.GatewayOperation.DISCOVER,
+                        doIpDiscoveryEid.takeIf { doIpHost.isNotBlank() && it.isNotEmpty() }) },
+                        enabled = idle && (doIpHost.isNotBlank() || vinReady) &&
+                            (doIpHost.isBlank() || doIpDiscoveryEid.length in setOf(0, 12)), modifier = Modifier.fillMaxWidth()) {
                         Text(stringResource(if (doIpHost.isBlank()) R.string.cal_doip_discover_by_vin
                             else R.string.cal_doip_discover))
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(onClick = { onInspectDoIpGateway(doIpHost, DoIpDirectRead.GatewayOperation.STATUS) },
+                        OutlinedButton(onClick = { onInspectDoIpGateway(doIpHost, DoIpDirectRead.GatewayOperation.STATUS, null) },
                             enabled = idle && doIpHost.isNotBlank(), modifier = Modifier.weight(1f)) {
                             Text(stringResource(R.string.cal_doip_gateway_status_button))
                         }
-                        OutlinedButton(onClick = { onInspectDoIpGateway(doIpHost, DoIpDirectRead.GatewayOperation.POWER) },
+                        OutlinedButton(onClick = { onInspectDoIpGateway(doIpHost, DoIpDirectRead.GatewayOperation.POWER, null) },
                             enabled = idle && doIpHost.isNotBlank(), modifier = Modifier.weight(1f)) {
                             Text(stringResource(R.string.cal_doip_power))
                         }
