@@ -1,3 +1,7 @@
+PR117 — DoIP grouped validation after successful 8b4672f checkpoint
+Implementation parent: 962a70b66d96670d006d89d2c3ecc6a25aebdf7b
+Run 45454645809 completed successfully. Validate new Android and Windows session settings (P2/P2*, routing OEM), Python scoped IPv6 discovery and TLS IP verification; full Debug, no merge, Release, deployment or physical qualification.
+
 PR117 — grouped DoIP Windows receive race, monitor CLI, IPv4/EID discovery and TLS identity checkpoint
 Implementation parent: e888c091d1e669a638fb86f8da139058fadd1af0
 Previous run 45453585549 at 9afc5ff2606fda563ebdf565c87250ed864696b0: 11 technical jobs succeeded including Android; Windows compilation 0 warnings/errors but monitoring self-test failed. Validate Windows serialized receive exchange boundaries and 128 exchanges, OBD monitor GUI and CLI, UDP gateway revalidation, selected mTLS certificate check, Python discovery EID/broadcast/passive and confirmation revalidation, all Debug jobs. Intermediate C6/DoIP; no merge, Release or deployment.

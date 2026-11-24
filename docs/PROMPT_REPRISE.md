@@ -1,3 +1,8 @@
+## PR117 — validation DoIP (24/11/2026)
+
+- Run 45454645809 sur 8b4672f : succès de tous les 12 jobs techniques, dont Windows (0 erreur/avertissement), Android et Connectors. Revue ignorée sur PR draft.
+- Nouveau checkpoint demandé sur le lot contenant 962a70b66d96670d006d89d2c3ecc6a25aebdf7b (IPv6 Python, paramètres session Android et Windows). Ce dernier lot reste à vérifier. C6 et DoIP actifs ; aucune fusion/Release.
+
 ## PR117 — paramètres de session DoIP dans la console Windows (24/11/2026)
 
 - Paramètres P2/P2*, type d’activation et quatre octets OEM facultatifs disponibles dans la GUI Windows, défaut historique conservé, valeurs validées avant réseau. Transmission du contexte immuable à tous les parcours (identification, DID/DTC, monitoring, sauvegarde et séquences) ; paramètres visibles lors du double consentement. Ressources FR/EN et tests de validation ajoutés. Ce complément et les deux précédents ne sont pas inclus dans la CI 45454645809 ; prochain checkpoint nécessaire. C6/DoIP restent actifs.
