@@ -24,6 +24,29 @@ import kotlin.coroutines.resumeWithException
  */
 object DoIpDirectRead {
     enum class Operation { VIN, DID, DTC, DTC_COUNT, DTC_SNAPSHOT, DTC_EXTENDED, MONITOR, BACKUP, EXCHANGE, OBD_IDENTIFY, OBD_DID, OBD_MONITOR }
+    /** Immutable optional parameters. Defaults retain the original global deadline. */
+    data class SessionOptions(val timeoutMs: Int = 5000, val p2Ms: Int = timeoutMs,
+        val p2StarMs: Int = timeoutMs, val routingType: Int = 0, val routingOemHex: String = "") {
+        init {
+            require(timeoutMs in 100..30_000 && p2Ms in 1..timeoutMs && p2StarMs in p2Ms..timeoutMs)
+            require(routingType in 0..255)
+            require(routingOemHex.isEmpty() || routingOemHex.matches(Regex("[0-9A-F]{8}")))
+        }
+        companion object {
+            fun parse(timeout: String, p2: String, p2Star: String, routing: String, oem: String): SessionOptions {
+                require(routing.matches(Regex("[0-9A-Fa-f]{2}")))
+                return SessionOptions(timeout.toInt(), p2.toInt(), p2Star.toInt(),
+                    routing.toInt(16), oem.uppercase(Locale.ROOT))
+            }
+        }
+        internal fun activationBody(tester: Int): ByteArray =
+            addr(tester) + byteArrayOf(routingType.toByte(), 0, 0, 0, 0) +
+                if (routingOemHex.isEmpty()) byteArrayOf() else parseCommand(routingOemHex)
+    }
+
+    internal fun responseDeadline(overall: Long, now: Long, stageMs: Int): Long =
+        minOf(overall, now + stageMs * 1_000_000L)
+
     data class Target private constructor(val address: InetAddress, val tester: Int, val ecu: Int,
         val expectedVin: String, val tls: Boolean, val expectedGateway: Int? = null,
         val expectedIdentity: Gateway? = null) {
@@ -390,7 +413,8 @@ object DoIpDirectRead {
     private class Session(private val socket: Socket, private val gateway: Gateway,
         private val target: Target, private val trace: MutableList<Trace>,
         private val rollingTrace: Boolean = false, private val onTrace: (Trace) -> Unit = {},
-        private val onControlTrace: (ControlTrace) -> Unit = {}) {
+        private val onControlTrace: (ControlTrace) -> Unit = {},
+        private val options: SessionOptions = SessionOptions()) {
         private fun recordControl(direction: String, bytes: ByteArray) =
             controlTrace(direction, if (target.tls) "TLS" else "TCP", target.address, bytes, onControlTrace)
         private fun record(direction: String, payload: ByteArray) {
@@ -438,7 +462,7 @@ object DoIpDirectRead {
         }
         fun activate(timeout: Int) {
             val end = deadline(timeout)
-            send(0x0005, addr(target.tester) + byteArrayOf(0,0,0,0,0), end)
+            send(0x0005, options.activationBody(target.tester), end)
             while (true) {
                 val frame = receive(end)
                 if (alive(frame, end)) continue
@@ -474,9 +498,11 @@ object DoIpDirectRead {
             val end = deadline(timeout)
             send(0x8001, addr(target.tester) + addr(target.ecu) + request, end)
             record("TX", request)
+            var responseEnd = responseDeadline(end, System.nanoTime(), options.p2Ms)
             while (true) {
-                val frame = receive(end)
-                if (alive(frame, end)) continue
+                val frame = receive(responseEnd)
+                remaining(responseEnd)
+                if (alive(frame, responseEnd)) continue
                 require(frame.type in setOf(0x8001, 0x8002, 0x8003) && frame.data.size >= 5 &&
                     u16(frame.data,0) == target.ecu && u16(frame.data,2) == target.tester) {
                     "Uncorrelated DoIP diagnostic response."
@@ -492,7 +518,10 @@ object DoIpDirectRead {
                 record("RX", reply)
                 if (reply[0].u8() == 0x7F) {
                     require(reply.size == 3 && reply[1] == request[0])
-                    if (reply[2].u8() == 0x78) continue // same absolute transaction deadline
+                    if (reply[2].u8() == 0x78) {
+                        responseEnd = responseDeadline(end, System.nanoTime(), options.p2StarMs)
+                        continue
+                    }
                     throw UdsNegativeResponseException(reply[1].u8(), reply[2].u8())
                 }
                 requirePositiveResponse(request, reply)
@@ -514,7 +543,9 @@ object DoIpDirectRead {
         command: ByteArray? = null, approval: EcuWriteConsentFlow.Approval? = null,
         isContextCurrent: () -> Boolean = { false }, dtc: Int = 0, record: Int = 1,
         commands: List<ByteArray>? = null, onCommandReply: (Int, ByteArray) -> Unit = { _, _ -> },
-        clientTls: DoIpClientTls? = null): Outcome {
+        clientTls: DoIpClientTls? = null, sessionOptions: SessionOptions? = null): Outcome {
+        val options = sessionOptions ?: SessionOptions(timeoutMs)
+        require(options.timeoutMs == timeoutMs)
         clientTls?.requireTarget(target)
         require(timeoutMs in 100..30_000 && did in 0..65535 && mask in 0..255)
         require(operation == Operation.VIN || target.expectedVin.isNotEmpty())
@@ -568,7 +599,7 @@ object DoIpDirectRead {
                 } else base
                 wire.use {
                     val session = Session(wire, gateway, target, trace, rollingTrace = operation == Operation.BACKUP,
-                        onTrace = onTrace, onControlTrace = onControlTrace)
+                        onTrace = onTrace, onControlTrace = onControlTrace, options = options)
                     session.activate(timeoutMs)
                     fun readVin(vinDid: Int = 0xF190): String {
                         val reply = session.exchange(byteArrayOf(0x22, (vinDid shr 8).toByte(), vinDid.toByte()), timeoutMs)

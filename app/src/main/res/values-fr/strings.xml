@@ -1067,4 +1067,12 @@
     <string name="cal_doip_obd_unknown">OBDonUDS non confirmé (F810=%1$02X) · VIN %2$s</string>
     <string name="cal_doip_obd_data">DID OBDonUDS %1$04X · Données brutes : %2$s</string>
     <string name="cal_doip_obd_monitor">Surveiller un DID OBDonUDS</string>
+    <string name="cal_doip_advanced_session">Paramètres de session avancés</string>
+    <string name="cal_doip_total_ms">Délai global (ms)</string>
+    <string name="cal_doip_p2_ms">P2 (ms)</string>
+    <string name="cal_doip_p2_star_ms">P2* (ms)</string>
+    <string name="cal_doip_routing_type">Type routage (hex)</string>
+    <string name="cal_doip_routing_oem">Données OEM (8 hex, facultatif)</string>
+    <string name="cal_doip_invalid_session">Paramètres de session invalides. Vérifier les délais et le routage.</string>
+    <string name="cal_doip_session_summary">Délai %1$d ms · P2 %2$d ms · P2* %3$d ms · routage %4$s · OEM %5$s</string>
 </resources>

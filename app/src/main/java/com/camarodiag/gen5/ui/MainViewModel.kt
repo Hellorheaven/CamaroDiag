@@ -1297,7 +1297,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun captureDirectDoIpBackup(host: String, tester: String, ecu: String, tls: Boolean,
-        scope: DoIpMemoryBackup.Scope, certificate: DoIpClientCertificateSelection? = null) {
+        scope: DoIpMemoryBackup.Scope, certificate: DoIpClientCertificateSelection? = null,
+        options: DoIpDirectRead.SessionOptions = DoIpDirectRead.SessionOptions()) {
         if (!requirePremiumLicense() || _calibrationWorkspace.value.doIpBackupScope != scope) return
         launchEnhancedUdsRead(journalDoIp = true) { current ->
             _calibrationWorkspace.update { it.copy(doIpReading = true, doIpResult = "",
@@ -1311,6 +1312,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val clientTls = certificate?.let { DoIpClientTls.open(getApplication<Application>(), it, target) }
                 check(current())
                 val result = DoIpDirectRead.read(target, DoIpDirectRead.Operation.BACKUP,
+                    timeoutMs = options.timeoutMs, sessionOptions = options,
                     clientTls = clientTls, backupScope = scope, onBackupProgress = { pass, offset ->
                         check(current())
                         _calibrationWorkspace.update { if (current()) it.copy(doIpBackupBytes = (pass - 1) * scope.length + offset) else it }
@@ -1435,13 +1437,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             command.generation != _liveCanMonitorState.value.consoleContextGeneration) return
         val payload = runCatching { DoIpDirectRead.parseCommands(command.payload) }.getOrNull() ?: return
         readDirectDoIp(command.host, command.tester, command.ecu, "", command.tls,
-            DoIpDirectRead.Operation.EXCHANGE, commands = payload, approval = approval, certificate = command.certificate)
+            DoIpDirectRead.Operation.EXCHANGE, commands = payload, approval = approval,
+            certificate = command.certificate, options = command.options)
     }
 
     fun readDirectDoIp(host: String, tester: String, ecu: String, didHex: String,
         tls: Boolean, operation: DoIpDirectRead.Operation, sampleCount: Int = 10, intervalMs: Int = 1000,
         commands: List<ByteArray>? = null, approval: EcuWriteConsentFlow.Approval? = null,
-        certificate: DoIpClientCertificateSelection? = null) {
+        certificate: DoIpClientCertificateSelection? = null,
+        options: DoIpDirectRead.SessionOptions = DoIpDirectRead.SessionOptions()) {
         if (!requirePremiumLicense() || (operation == DoIpDirectRead.Operation.EXCHANGE &&
                 (commands == null || approval == null))) return
         val fixedCommands = commands?.map { it.copyOf() }
@@ -1467,7 +1471,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val clientTls = certificate?.let { DoIpClientTls.open(getApplication<Application>(), it, target) }
                 check(current())
                 val result = DoIpDirectRead.read(target, operation, did, mask = mask, sampleCount = sampleCount, intervalMs = intervalMs,
-                    clientTls = clientTls,
+                    timeoutMs = options.timeoutMs, sessionOptions = options, clientTls = clientTls,
                     onTrace = { trace ->
                         journalDoIpTrace(target, trace, current)
                         check(current())

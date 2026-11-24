@@ -30,6 +30,22 @@ class DoIpGatewayControlTraceTest {
         socket.send(DatagramPacket(reply, reply.size, incoming.address, incoming.port))
     }
 
+    @Test fun routingAndResponseOptionsAreBoundedAndPreserveWireBytes() {
+        val defaults = DoIpDirectRead.SessionOptions()
+        assertArrayEquals(byteArrayOf(0x0E, 0x80.toByte(), 0, 0, 0, 0, 0),
+            defaults.activationBody(0x0E80))
+        val custom = DoIpDirectRead.SessionOptions.parse("5000", "100", "2000", "e0", "01020304")
+        assertArrayEquals(byteArrayOf(0x0E, 0x80.toByte(), 0xE0.toByte(), 0, 0, 0, 0, 1, 2, 3, 4),
+            custom.activationBody(0x0E80))
+        assertEquals(100_000_000L, DoIpDirectRead.responseDeadline(5_000_000_000L, 0, 100))
+        assertEquals(5_000_000_000L, DoIpDirectRead.responseDeadline(5_000_000_000L, 4_000_000_000L, 2000))
+        assertTrue(runCatching { DoIpDirectRead.SessionOptions.parse("99", "10", "50", "00", "") }.isFailure)
+        assertTrue(runCatching { DoIpDirectRead.SessionOptions.parse("5000", "100", "50", "00", "") }.isFailure)
+        assertTrue(runCatching { DoIpDirectRead.SessionOptions.parse("5000", "100", "6000", "00", "") }.isFailure)
+        assertTrue(runCatching { DoIpDirectRead.SessionOptions.parse("5000", "100", "2000", "000", "") }.isFailure)
+        assertTrue(runCatching { DoIpDirectRead.SessionOptions.parse("5000", "100", "2000", "00", "0102") }.isFailure)
+    }
+
     @Test fun statusAndPowerRecordActualUdpBytesAndDirection() = runBlocking {
         val loopback = InetAddress.getByName("127.0.0.1")
         val cases = listOf(

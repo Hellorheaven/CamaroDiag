@@ -1,3 +1,7 @@
+## PR117 — options de session DoIP Android (24/11/2026)
+
+- Réglages avancés facultatifs de routage et temporisation UDS sur Android, valeurs par défaut inchangées (5 s), validation P2/P2*/délai global et type d’activation/4 octets OEM avant réseau. Réponse NRC 78 seule renouvelle P2* dans le délai global ; ACK/AliveCheck ne le prolongent pas. Les paramètres choisis sont immuables pour la commande confirmée et affichés dans le dialogue ; sauvegardes et monitoring utilisent les mêmes options. Ressources FR/EN et tests de bornes/format ajoutés. Aucune valeur OEM supposée. À valider au prochain checkpoint (postérieur au run 45454645809).
+
 ## PR117 — découverte IPv6 link-local DoIP Connectors (24/11/2026)
 
 - Client hôte Python : découverte active ff02::1 limitée à une interface explicite et écoute passive sur cette même interface, filtrage port/source link-local/scope, déduplication, VIN/EID et limite 32 résultats. CLI FR/EN `--multicast-ipv6-ifindex` et `--listen-ipv6-ifindex` ; aucune commande diagnostique émise pendant la découverte, aucune émission en mode passif. Les IP link-local unicast exigent un scope ; le scope de routage est distinct de l’identité IP vérifiée par TLS. Tests sockets simulés et parsing CLI ajoutés ; multicast réel non qualifié. Ce complément est postérieur au checkpoint 45454645809, qui valide le SHA précédent.
