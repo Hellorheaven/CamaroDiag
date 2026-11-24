@@ -1,3 +1,12 @@
+## Reprise C6/DoIP — annulation et changement de contexte (24/11/2026)
+
+- `fcfbc672544a12ad5c1ca4ee577534bcd636b9c9` : réutilisation de ReadDid F190 et contrôle d'annulation après callback RX et avant publication du VIN corrélé.
+- `acea1693eee0287ab0f3111767348db714f75c57` : test loopback d'annulation pendant callback RX, écrit mais non exécuté.
+- `b3c3819085a91a488afbd3df89f4ea3fb7f5e6f1` : invalidation de la découverte et annulation lors du changement d'adresse logique testeur/ECU, TLS ou certificat client. Nouvelle découverte requise. Aucun nouveau chemin d'écriture.
+- C6/DoIP restent actifs ; intégration transversale incomplète, C8 non commencé. Aucun résultat CI PR visible au HEAD initial e3766b0 ; ne pas assimiler cette absence à un résultat de CI push. Aucun merge ou Release.
+
+---
+
 ## Reprise C6/DoIP — lecture VIN ECU UDS Windows (24/11/2026)
 
 - `7201e38` : contrôle facultatif de l'adresse logique annoncée par la passerelle lors du routage TCP/TLS. `47ddb6a` : service UDS F190 lecture seule, VIN ASCII 17 caractères valides, concordance avec le VIN UDP disponible, adresses explicites, copie indépendante TX/RX. `613bac4`, `6ba26de`, `d3b25a5` : ressources EN/FR et raccordement console Windows, TLS par défaut, certificat client facultatif, annulation et invalidation après erreur. `49a84bb` : historique TX demandé/RX corrélé distinct.
