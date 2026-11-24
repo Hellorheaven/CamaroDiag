@@ -339,16 +339,8 @@ internal static class StandardProtocolCli
             if (identities.Count == 0)
                 throw new TimeoutException("No DoIP gateway identity received.");
             foreach (var identity in identities)
-                Console.WriteLine($"DoIP gateway={identity.Source} " +
-                    $"version=0x{identity.ProtocolVersion:X2} " +
-                    $"VIN={identity.Vin ?? "unavailable"} " +
-                    $"logical=0x{identity.LogicalAddress:X4} " +
-                    $"EID={Convert.ToHexString(identity.Eid)} " +
-                    $"GID={Convert.ToHexString(identity.Gid)} " +
-                    $"further=0x{identity.FurtherAction:X2} " +
-                    $"sync={(identity.VinGidStatus.HasValue ?
-                        $"0x{identity.VinGidStatus.Value:X2}" : "unspecified")}");
-            Console.WriteLine("UDP identities are not ECU authentication or programming qualification.");
+                Console.WriteLine(DoIpConsolePresentation.FormatIdentity(identity));
+            Console.WriteLine(DoIpConsolePresentation.Text("Notice"));
             return 0;
         }
         catch (Exception ex) when (ex is ArgumentException or IOException or
