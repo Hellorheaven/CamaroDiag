@@ -277,9 +277,7 @@ class ElmWifiTransport(
         try {
             activeSocket.getOutputStream().write(data)
             if (socket !== activeSocket) {
-                throw ObdSupersededSessionException(
-                    java.io.IOException("Wi-Fi OBD connection replaced during write")
-                )
+                throw java.io.IOException("Wi-Fi OBD connection replaced during write")
             }
         } catch (error: java.io.IOException) {
             if (socket !== activeSocket) throw ObdSupersededSessionException(error)
@@ -297,9 +295,7 @@ class ElmWifiTransport(
         return try {
             val count = activeSocket.getInputStream().read(buffer)
             if (socket !== activeSocket) {
-                throw ObdSupersededSessionException(
-                    java.io.IOException("Wi-Fi OBD connection replaced during read")
-                )
+                throw java.io.IOException("Wi-Fi OBD connection replaced during read")
             }
             if (count < 0) connectionLost = true
             count
