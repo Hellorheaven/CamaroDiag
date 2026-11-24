@@ -7,6 +7,21 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class UdsDtcDecoderTest {
+    @Test fun standardStatusReportAcceptsNoDtcAndRejectsInventedFormatByte() {
+        val empty = UdsDtcDecoder.decodeStatusMaskReport(byteArrayOf(0x7F), 0xFF)
+        assertNull(empty.formatIdentifier)
+        assertTrue(empty.records.isEmpty())
+        assertTrue(runCatching {
+            UdsDtcDecoder.decodeStatusMaskReport(byteArrayOf(0x7F, 0x01), 0xFF)
+        }.isFailure)
+        val valid = UdsDtcDecoder.decodeStatusMaskReport(
+            byteArrayOf(0x09, 0x12, 0x34, 0x56, 0x01), 0x01)
+        assertEquals("0x123456", valid.records.single().code)
+        assertTrue(runCatching {
+            UdsDtcDecoder.decodeStatusMaskReport(byteArrayOf(0x09, 0x12, 0x34, 0x56, 0x08), 0x01)
+        }.isFailure)
+    }
+
     @Test
     fun decodesJ2012Format00AcrossPowertrainChassisBodyAndNetworkFamilies() {
         val payload = byteArrayOf(

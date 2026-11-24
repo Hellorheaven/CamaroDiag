@@ -74,14 +74,15 @@ fun DecodedUdsDtcRecord.toDiagnosticDtc(moduleId: String): DiagnosticDtc {
 
 data class UdsDtcReport(
     val statusAvailabilityMask: Int,
-    val formatIdentifier: Int,
+    /** Null when the ECU did not provide a DTC format (e.g. 19/02). */
+    val formatIdentifier: Int?,
     val format: UdsDtcFormat?,
     val records: List<DecodedUdsDtcRecord>
 )
 
 object UdsDtcDecoder {
     /**
-     * Input is the payload returned by UdsReadOnlyClient.readDtcInformation():
+     * Historical/offline format-tagged input, NOT a standard 19/02 wire response:
      * DTCStatusAvailabilityMask, DTCFormatIdentifier, then 4-byte records
      * (3-byte DTC + 1-byte status).
      */
@@ -93,10 +94,33 @@ object UdsDtcDecoder {
             "UDS DTC payload has a truncated DTCAndStatusRecord."
         }
 
-        val availability = payload[0].toInt() and 0xFF
-        val formatIdentifier = payload[1].toInt() and 0xFF
-        val format = UdsDtcFormat.from(formatIdentifier)
-        val records = payload.drop(2).chunked(4).map { bytes ->
+        return decodeRecords(payload[0].toInt() and 0xFF, payload[1].toInt() and 0xFF,
+            payload.copyOfRange(2, payload.size))
+    }
+
+    /** ISO 14229 19/02: availability mask followed directly by DTC/status records.
+     * A format may only be supplied from an independently documented/observed source.
+     */
+    fun decodeStatusMaskReport(payload: ByteArray, requestedMask: Int,
+        formatIdentifier: Int? = null): UdsDtcReport {
+        require(requestedMask in 0..255 && (formatIdentifier == null || formatIdentifier in 0..255))
+        require(payload.isNotEmpty() && (payload.size - 1) % 4 == 0) {
+            "UDS 19/02 payload has a missing availability mask or truncated record."
+        }
+        val availability = payload[0].toInt() and 255
+        val report = decodeRecords(availability, formatIdentifier, payload.copyOfRange(1, payload.size))
+        val effective = availability and requestedMask
+        require(report.records.map { it.rawDtc }.distinct().size == report.records.size &&
+            report.records.all { (it.statusByte and effective) != 0 &&
+                (it.statusByte and availability.inv() and 255) == 0 }) {
+            "UDS 19/02 returned duplicate DTCs or status outside the requested available mask."
+        }
+        return report
+    }
+
+    private fun decodeRecords(availability: Int, formatIdentifier: Int?, data: ByteArray): UdsDtcReport {
+        val format = formatIdentifier?.let(UdsDtcFormat::from)
+        val records = data.toList().chunked(4).map { bytes ->
             val b0 = bytes[0].toInt() and 0xFF
             val b1 = bytes[1].toInt() and 0xFF
             val b2 = bytes[2].toInt() and 0xFF

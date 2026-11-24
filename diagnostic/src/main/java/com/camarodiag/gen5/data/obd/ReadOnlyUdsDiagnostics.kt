@@ -306,9 +306,9 @@ class UdsReadOnlyClient(
         return response.copyOfRange(2, response.size)
     }
 
-    /** Reads and decodes the ECU's declared DTC format without guessing OEM definitions. */
+    /** Reads ISO 14229 19/02; no format identifier is present in this wire response. */
     suspend fun readDtcReport(statusMask: Int = 0xFF): UdsDtcReport =
-        UdsDtcDecoder.decodeReadDtcInformation(readDtcInformation(statusMask))
+        UdsDtcDecoder.decodeStatusMaskReport(readDtcInformation(statusMask), statusMask)
 
     private fun verifyPositiveResponse(response: ByteArray, requestedService: Int) {
         require(response.isNotEmpty()) { "ECU returned an empty UDS response." }
