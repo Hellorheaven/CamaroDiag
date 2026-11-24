@@ -1,15 +1,12 @@
 package com.camarodiag.gen5.data.obd
 
-import java.io.IOException
-
-/** A driver accepting only part of an OBD request is NOT a successful write. */
+/**
+ * USB-serial-for-android returns Unit for UsbSerialPort.write; it does not
+ * expose the number of accepted bytes or proof that an ECU received them.
+ * Reject empty commands before I/O and rely on driver I/O exceptions.
+ */
 internal object UsbSerialWritePolicy {
-    fun requireComplete(written: Int, requested: Int) {
-        require(requested > 0) { "USB serial requests must be nonempty." }
-        if (written != requested) {
-            throw IOException(
-                "Incomplete USB serial write: $written bytes accepted of $requested requested"
-            )
-        }
+    fun requireNonEmpty(payload: ByteArray) {
+        require(payload.isNotEmpty()) { "USB serial requests must be nonempty." }
     }
 }
