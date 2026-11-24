@@ -1,5 +1,10 @@
 # Règles durables de développement — CamaroDiag
 
+## PR active — décision du propriétaire du 24/11/2026
+
+La PR #95 est fusionnée et fermée. **La seule PR active est désormais #117**, branche `chore/unified-ci` vers `main`, continuation intégrale des reliquats PR95. Les références historiques ci-dessous à PR95 désignent le périmètre hérité, non une PR encore ouverte. C6 et DoIP restent actifs ; C8 final reste à réaliser. Appliquer toutes les exigences existantes à la PR117 et vérifier son HEAD avant chaque reprise. La CI intermédiaire PR95 ne valide pas les futurs changements PR117.
+
+
 > Directives du propriétaire, décisions du 23 novembre 2026 et méthode de travail. Elles s'appliquent à **tout nouveau chat, agent ou reprise du dépôt**. Lire aussi [docs/PROMPT_REPRISE.md](docs/PROMPT_REPRISE.md), [docs/CHANGELOG_PR95.md](docs/CHANGELOG_PR95.md) et l'état **actuel** de GitHub avant d'agir. Les mentions historiques de PR #35, de branches périmées et de verrouillage ECU en lecture seule dans les anciens fichiers ne prévalent PAS sur les décisions ci-dessous.
 
 ## Gestion du dépôt et des validations
