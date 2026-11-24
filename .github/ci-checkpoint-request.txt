@@ -1,3 +1,7 @@
+PR117 — revalidate Android JUnit signatures and Kotlin warnings after 11/12 checkpoint
+Implementation parent: b618d3477a3e42a8a4f5d0526abe5febb6a113dc
+Run 45459305032: all non-Android technical jobs passed, Android JUnit initialization failed. Full Debug gate, no merge or release.
+
 PR117 — validate complete new DoIP discovery/control/monitoring batch
 Implementation parent: 3a129db2739762ef77288a95cb01b8a478776901
 Previous run 45456278234 succeeded all 12 technical jobs. Validate Android EID, gateway control preservation, scoped IPv6 and passive discovery, interface selector and multicast lock, Windows gateway status correlation/scoped TLS/monitor P2-P2*, Python status identity validation. Full Debug only; no merge, release, physical qualification or deployment.

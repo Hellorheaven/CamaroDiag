@@ -1,3 +1,7 @@
+## PR117 — checkpoint de correction Android (24/11/2026)
+
+- Validation groupée demandée sur le lot corrigé b618d3477a3e42a8a4f5d0526abe5febb6a113dc. Aucun essai matériel ni Release.
+
 ## PR117 — correction du gate Android (24/11/2026)
 
 - Run 45459305032 sur 8c2c607 : Windows, firmware, natif, Python et vérification de révision verts (11/12 jobs techniques). Android : InvalidTestClassError dans DoIpGatewayControlTraceTest ; deux tests runBlocking inféraient un retour Future.get non-void. Retour Unit explicite, aucune suppression de tests. Correction des trois avertissements Kotlin relevés (visibilité copy des cibles/certificats et propriété système nullable). Nouvelle validation nécessaire.
