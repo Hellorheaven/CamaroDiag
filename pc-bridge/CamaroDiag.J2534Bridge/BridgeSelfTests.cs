@@ -9,6 +9,7 @@ internal static class BridgeSelfTests
 {
     public static int Run()
     {
+        BridgeCommandLineHelpSelfTests.Run();
         ConnectorTlsReferenceSelfTests.Run();
         if (ConnectorDiscoverySelfTests.Run() != 0) return 1;
         ConnectorCheckpointSelfTests.Run();
