@@ -230,6 +230,69 @@ internal static class DoIpDiagnosticSessionSelfTests
             await Expect<ArgumentException>(() => Task.Run(() =>
                 DoIpVinReader.ParseLogicalAddress(badAddress)), "Reject invalid logical address.");
 
+        // Exercise the application DTC reader through real loopback TCP.
+        byte[] dtcRequest = [0x19, 0x02, 0x05];
+        byte[] dtcReply = [0x59, 0x02, 0x0F, 0x12, 0x34, 0x56, 0x01];
+        await RunCaseAsync(async stream =>
+        {
+            var message = await ReadAsync(stream);
+            Check(message.Type == DoIpCodec.DiagnosticMessage &&
+                message.Payload.SequenceEqual((byte[])[0x0E, 0x80, 0x12, 0x34, .. dtcRequest]),
+                "DTC request reaches the selected logical ECU.");
+            await SendAsync(stream, DoIpCodec.DiagnosticMessage, FromEcu(dtcReply));
+        }, async client =>
+        {
+            byte[]? tx = null;
+            byte[]? rx = null;
+            var report = await DoIpVinReader.ReadDtcsAsync(client, 0x05,
+                TimeSpan.FromSeconds(2), CancellationToken.None,
+                requested: bytes => { tx = bytes.ToArray(); bytes[0] = 0; },
+                received: bytes => { rx = bytes.ToArray(); bytes[0] = 0; });
+            Check(report.AvailabilityMask == 0x0F && report.Codes.Count == 1 &&
+                report.Codes[0].Code == 0x123456 && report.Codes[0].Status == 1,
+                "DTC read returns correlated fault and availability.");
+            Check(tx is not null && tx.SequenceEqual(dtcRequest), "DTC TX journal copy.");
+            Check(rx is not null && rx.SequenceEqual(dtcReply), "DTC RX journal copy.");
+        });
+
+        foreach (var invalidDtcReply in new byte[][]
+        {
+            [0x59, 0x02, 0x0F, 0x12, 0x34, 0x56, 0x02],
+            [0x59, 0x02, 0x0F, 0x12, 0x34, 0x56],
+            [0x59, 0x02, 0x01, 0x12, 0x34, 0x56, 0x01, 0x12, 0x34, 0x56, 0x01]
+        })
+        {
+            await RunCaseAsync(async stream =>
+            {
+                _ = await ReadAsync(stream);
+                await SendAsync(stream, DoIpCodec.DiagnosticMessage, FromEcu(invalidDtcReply));
+            }, async client =>
+            {
+                await Expect<InvalidDataException>(async () =>
+                {
+                    _ = await DoIpVinReader.ReadDtcsAsync(client, 0x05,
+                        TimeSpan.FromSeconds(2), CancellationToken.None);
+                }, "Malformed or uncorrelated DTC report rejected.");
+            });
+        }
+
+        using (var canceledDtc = new CancellationTokenSource())
+        {
+            await RunCaseAsync(async stream =>
+            {
+                _ = await ReadAsync(stream);
+                await SendAsync(stream, DoIpCodec.DiagnosticMessage, FromEcu(dtcReply));
+            }, async client =>
+            {
+                await Expect<OperationCanceledException>(async () =>
+                {
+                    _ = await DoIpVinReader.ReadDtcsAsync(client, 0x05,
+                        TimeSpan.FromSeconds(2), canceledDtc.Token,
+                        received: _ => canceledDtc.Cancel());
+                }, "Cancellation during DTC RX prevents publication.");
+            });
+        }
+
         // UDP and TCP identity correlation: no diagnostic PDU may be sent
         // if routing activation reports a different logical gateway.
         var mismatchListener = new TcpListener(IPAddress.Loopback, 0);
