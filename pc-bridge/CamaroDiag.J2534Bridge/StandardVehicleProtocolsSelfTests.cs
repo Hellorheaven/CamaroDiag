@@ -464,6 +464,25 @@ internal static class StandardVehicleProtocolsSelfTests
         oversizedHeader[4] = 0xFF;
         Reject<InvalidDataException>(() => DoIpCodec.Decode(oversizedHeader),
             "DoIP oversized declared length.");
+        // The implementation deliberately caps a DoIP PDU at one MiB:
+        // exercise that exact boundary, including its 32-bit wire header,
+        // without pretending to support unbounded ISO 13400 transfers.
+        var largestUds = new byte[DoIpCodec.MaxPayload - 4];
+        largestUds[0] = 0x36; // Simulated UDS TransferData, never sent to a car.
+        var maximumDoIp = DoIpCodec.Diagnostic(0x0E80, 0x1234, largestUds);
+        Check(maximumDoIp.Length == DoIpCodec.MaxPayload + 8 &&
+            DoIpCodec.ReadPayloadLength(maximumDoIp.AsSpan(0, 8)) ==
+                DoIpCodec.MaxPayload &&
+            DoIpCodec.RequireDiagnosticResponse(
+                DoIpCodec.Decode(DoIpCodec.Encode(
+                    DoIpCodec.DiagnosticMessage,
+                    [0x12, 0x34, 0x0E, 0x80, .. largestUds])),
+                0x0E80, 0x1234).Length == largestUds.Length,
+            "DoIP maximum bounded diagnostic payload encodes/decodes correctly.");
+        Reject<ArgumentException>(() =>
+            DoIpCodec.Diagnostic(0x0E80, 0x1234,
+                new byte[DoIpCodec.MaxPayload - 3]),
+            "DoIP refuses payload beyond the explicit one-MiB implementation cap.");
 
         // The same DoIP transport carries read, write, erase, and transfer
         // services. No invented SID blacklist at the network layer.
