@@ -63,3 +63,16 @@ USB 5 V prioritaire pour la logique du boîtier ; alimentation externe stabilis�
 La découverte ASCII/binaire ne prouve pas l'identité de la carte. Le TLS mutuel de simulation ne s'applique pas encore au transport USB. Le journal logiciel ne garantit pas la restauration d'un calculateur et ne doit pas servir à déclencher une écriture. Aucun mode de programmation ne peut être activé sans qualification par cible, alimentation et route (#8, #9, #10).
 
 La commande `verify-doip` vérifie hors connexion les archives de zones ECU DoIP produites par Windows ou Android (jusqu’à 16 Mio par zone), avec leur profil original. Elle ne prouve pas la provenance matérielle et n’autorise aucune écriture. / `verify-doip` checks scoped DoIP backups against their original profile, offline (up to 16 MiB per region). It does not establish hardware provenance or authorize programming.
+
+## Diagnostic DoIP réseau du PC / PC network DoIP diagnostics
+
+Le client hôte communique directement avec une passerelle ISO 13400 sur le réseau du PC. Il ne passe pas par le firmware USB ESP32 et ne lui attribue aucune nouvelle capacité. TLS avec validation de certificat et de l'adresse IP par défaut ; `--tcp` uniquement pour une passerelle autorisant explicitement le transport non chiffré. IP numérique et adresses logiques ECU/testeur à fournir depuis le profil réel.
+
+```bash
+cd host/python
+python -m camarodiagconnectors.doip_cli --host 192.0.2.10 discover
+python -m camarodiagconnectors.doip_cli --fr --host 192.0.2.10 --vin 1G1FA1RXXR0123456 --tester 0E80 --ecu 1234 did --did F190
+python -m camarodiagconnectors.doip_cli --host 192.0.2.10 --vin 1G1FA1RXXR0123456 --tester 0E80 --ecu 1234 --trace monitor --did 1235 --samples 5
+```
+
+Exemples fictifs, à remplacer par les données de la passerelle et du calculateur réellement sélectionnés. Services disponibles : découverte, statut, alimentation, VIN, DID, comptage/liste DTC, instantanés/données étendues et monitoring. Les données constructeur sans définition restent brutes ; aucun flash ni qualification physique. / The host connects directly over IP, not through the USB prototype. Use real verified logical addresses; no physical qualification or programming is implied.
