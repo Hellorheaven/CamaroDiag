@@ -296,7 +296,8 @@ object DoIpDirectRead {
         val decodedSnapshot: UdsSnapshotRecords? = null,
         val decodedExtended: UdsDecodedExtendedRecords? = null, val decodedMemory: Int? = null, val requestedStoredRecord: Int? = null)
     data class Sample(val index: Int, val elapsedMs: Long, val data: ByteArray,
-        val values: List<DoIpMultiDid.Value> = emptyList())
+        val values: List<DoIpMultiDid.Value> = emptyList(),
+        val verifiedVin: String? = null, val gatewayLogicalAddress: Int? = null)
 
     private const val MAX_PAYLOAD = 1024 * 1024
     private const val DOIP_UDP_PORT = 13400
@@ -956,8 +957,10 @@ object DoIpDirectRead {
                                 if (multiMonitor) reply.copyOf() else reply.copyOfRange(3, reply.size), values)
                             verifySample()
                             check(isReadContextCurrent()) { "DoIP operation context changed." }
-                            samples += sample
-                            onSample(sample.copy(data = sample.data.copyOf(),
+                            val verified = sample.copy(verifiedVin = target.expectedVin,
+                                gatewayLogicalAddress = gateway.logicalAddress)
+                            samples += verified
+                            onSample(verified.copy(data = verified.data.copyOf(),
                                 values = values.map { it.copy(data = it.data.copyOf()) }))
                             if (index < sampleCount) session.waitBetweenSamples(intervalMs, timeoutMs)
                         }

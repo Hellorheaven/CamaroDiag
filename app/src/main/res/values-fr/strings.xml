@@ -1025,6 +1025,7 @@
     <string name="cal_doip_monitor_complete">Mesure terminée : %1$d échantillons.</string>
     <string name="cal_doip_monitor_samples_received">Échantillons reçus : %1$d</string>
     <string name="cal_doip_monitor_partial">Mesure incomplète : export CSV indisponible.</string>
+    <string name="cal_doip_monitor_partial_verified">Capture partielle : %1$d/%2$d échantillons vérifiés. Export CSV disponible.</string>
     <string name="cal_doip_monitor_export">Exporter les mesures (CSV)</string>
     <string name="cal_doip_monitor_exported">Mesures enregistrées : %1$s</string>
     <string name="cal_doip_monitor_export_failed">Impossible d’exporter les mesures DoIP.</string>

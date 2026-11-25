@@ -1101,6 +1101,10 @@ fun CalibrationWorkspaceScreen(
                         }
                         if (idle && state.doIpMonitorReport == null)
                             Text(stringResource(R.string.cal_doip_monitor_partial), color = CamaroAmber, fontSize = 11.sp)
+                        state.doIpMonitorReport?.takeIf { idle && !it.complete }?.let { report ->
+                            Text(stringResource(R.string.cal_doip_monitor_partial_verified,
+                                report.samples.size, report.requestedSamples), color = CamaroAmber, fontSize = 11.sp)
+                        }
                     }
                     state.doIpMonitorReport?.let { report ->
                         OutlinedButton(onClick = { onExportDoIpMonitoring(report) },

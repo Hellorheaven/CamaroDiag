@@ -1,3 +1,7 @@
+## PR117 — export des mesures DoIP partielles vérifiées (25/11/2026)
+
+- C6/DoIP Android : chaque échantillon validé porte le VIN et l'adresse logique de passerelle observés ; un rapport partiel est constitué immédiatement et reste exportable après annulation ou erreur ultérieure, exclusivement pour le contexte véhicule/compte courant. CSV avec capture_complete, requested_samples et verified_samples ; statut partiel visible en FR/EN. Aucun résultat non vérifié ajouté ; changement de contexte efface toujours les données. Régressions écrites non exécutées, aucun checkpoint. C6/DoIP restent actifs.
+
 ## PR117 — parité Android / CLI des échantillons DoIP (25/11/2026)
 
 - C6/DoIP : Android mono/multi-DID et OBDonUDS, CLI Windows DID simple : chaque mesure est vérifiée sur la même connexion avant publication. Recontrôle du contexte Android après la vérification ; résultats déjà confirmés conservés en cas d'échec ultérieur. Régression Android UDP/TCP loopback écrite pour deux mesures, VIN ou protocole divergent sur la deuxième ; aucune exécution. Cadence dépendante des temps ECU supplémentaires, pas de promesse de temps réel déterministe. Aucun checkpoint CI. C6 et DoIP restent actifs.

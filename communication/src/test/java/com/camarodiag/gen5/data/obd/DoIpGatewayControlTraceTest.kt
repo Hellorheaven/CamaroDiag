@@ -413,7 +413,11 @@ class DoIpGatewayControlTraceTest {
                             DoIpDirectRead.readAt(target,
                                 if (obd) DoIpDirectRead.Operation.OBD_MONITOR else DoIpDirectRead.Operation.MONITOR,
                                 did = 0xF40D, timeoutMs = 2000, sampleCount = 2, intervalMs = 250,
-                                onSample = { samples += it.index }, udpPort = udp.localPort, tcpPort = tcp.localPort)
+                                onSample = {
+                                    assertEquals(vin, it.verifiedVin)
+                                    assertEquals(0x1000, it.gatewayLogicalAddress)
+                                    samples += it.index
+                                }, udpPort = udp.localPort, tcpPort = tcp.localPort)
                         }
                         server.get(6, TimeUnit.SECONDS)
                         assertEquals(lastMatches, result.isSuccess)

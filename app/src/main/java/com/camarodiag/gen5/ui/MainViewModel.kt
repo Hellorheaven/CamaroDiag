@@ -116,10 +116,19 @@ data class CanConsoleHistoryEntry(
     val succeeded: Boolean = true
 )
 
-/** Completed, VIN-verified DoIP monitoring capture; partial runs are never exported. */
+/** Identity-verified samples; completion describes the run, not sample validity. */
 data class DoIpMonitorReport(val vin: String, val gateway: Int, val tester: Int, val ecu: Int,
     val did: Int, val tls: Boolean, val completedAtUtcMillis: Long,
-    val samples: List<DoIpMonitorRow>, val obdOnUds: Boolean = false)
+    val samples: List<DoIpMonitorRow>, val obdOnUds: Boolean = false,
+    val complete: Boolean = true, val requestedSamples: Int = samples.size) {
+    fun appendVerified(row: DoIpMonitorRow, observedVin: String, observedGateway: Int,
+        nowMillis: Long): DoIpMonitorReport {
+        require(!complete && vin == observedVin && gateway == observedGateway)
+        require(row.index == samples.size + 1 && row.index <= requestedSamples)
+        require(samples.lastOrNull()?.let { row.elapsedMs >= it.elapsedMs } != false)
+        return copy(samples = samples + row, completedAtUtcMillis = nowMillis)
+    }
+}
 data class DoIpMonitorValue(val did: Int, val payloadHex: String)
 data class DoIpMonitorRow(val index: Int, val elapsedMs: Long, val payloadHex: String,
     val values: List<DoIpMonitorValue> = emptyList())
@@ -1204,7 +1213,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val message = localizedContext.getString(R.string.cal_doip_cancel)
             if (it.doIpGatewayReading) it.copy(doIpReading = false, doIpGatewayReading = false,
                 doIpGatewayResult = message)
-            else it.copy(doIpReading = false, doIpMonitorReport = null,
+            else it.copy(doIpReading = false,
                 doIpBackupBytes = 0, doIpResult = message)
         }
     }
@@ -1455,7 +1464,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     category = CamaroDiagExportStorage.Category.REPORTS,
                     beforePublish = { check(current()) }) { output ->
                     val writer = output.bufferedWriter(Charsets.UTF_8)
-                    writer.appendLine("vin,gateway_logical,tester_logical,ecu_logical,did,transport,completed_utc_ms,sample,elapsed_ms,payload_hex,service_protocol")
+                    writer.appendLine("vin,gateway_logical,tester_logical,ecu_logical,did,transport,completed_utc_ms,sample,elapsed_ms,payload_hex,service_protocol,capture_complete,requested_samples,verified_samples")
                     for (sample in report.samples) {
                         check(current())
                         val values = sample.values.ifEmpty { listOf(DoIpMonitorValue(report.did, sample.payloadHex)) }
@@ -1465,7 +1474,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                                 "%04X".format(report.tester), "%04X".format(report.ecu),
                                 "%04X".format(value.did), if (report.tls) "TLS" else "TCP",
                                 report.completedAtUtcMillis, sample.index, sample.elapsedMs, value.payloadHex,
-                                if (report.obdOnUds) "OBDonUDS" else "UDS").joinToString(","))
+                                if (report.obdOnUds) "OBDonUDS" else "UDS", report.complete,
+                                report.requestedSamples, report.samples.size).joinToString(","))
                         }
                     }
                     writer.flush()
@@ -1631,7 +1641,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     }, onSample = { sample ->
                         check(current())
                         _calibrationWorkspace.update {
-                            if (current()) it.copy(doIpLiveSamples = it.doIpLiveSamples + doIpSampleRow(sample)) else it
+                            if (!current()) it else {
+                                val row = doIpSampleRow(sample)
+                                val observedVin = requireNotNull(sample.verifiedVin)
+                                val observedGateway = requireNotNull(sample.gatewayLogicalAddress)
+                                require(observedVin == target.expectedVin)
+                                val previous = it.doIpMonitorReport ?: DoIpMonitorReport(
+                                    observedVin, observedGateway, target.tester, target.ecu, did, tls,
+                                    System.currentTimeMillis(), emptyList(),
+                                    obdOnUds = operation in setOf(DoIpDirectRead.Operation.OBD_MONITOR,
+                                        DoIpDirectRead.Operation.OBD_MULTI_MONITOR),
+                                    complete = false, requestedSamples = sampleCount)
+                                val report = previous.appendVerified(row, observedVin, observedGateway,
+                                    System.currentTimeMillis())
+                                it.copy(doIpLiveSamples = report.samples, doIpMonitorReport = report)
+                            }
                         }
                     }, onControlTrace = { trace -> journalDoIpControlTrace(trace, current) },
                     commands = fixedCommands, approval = approval, isContextCurrent = current,
@@ -1819,9 +1843,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     DoIpMonitorReport(checkNotNull(result.vin), result.gateway.logicalAddress,
                         target.tester, target.ecu, did, tls, System.currentTimeMillis(),
                         result.samples.map(::doIpSampleRow), obdOnUds = operation in setOf(
-                            DoIpDirectRead.Operation.OBD_MONITOR, DoIpDirectRead.Operation.OBD_MULTI_MONITOR)) else null
-                _calibrationWorkspace.update { it.copy(doIpReading = false, doIpResult = rendered,
-                    doIpTrace = result.trace.map(::doIpTraceLine), doIpMonitorReport = monitorReport) }
+                            DoIpDirectRead.Operation.OBD_MONITOR, DoIpDirectRead.Operation.OBD_MULTI_MONITOR),
+                        complete = result.samples.size == sampleCount, requestedSamples = sampleCount) else null
+                _calibrationWorkspace.update { if (current()) it.copy(doIpReading = false, doIpResult = rendered,
+                    doIpTrace = result.trace.map(::doIpTraceLine), doIpMonitorReport = monitorReport) else it }
                 if (current()) appendCanConsoleSystemEvent(localizedContext.getString(R.string.cal_doip_console_complete))
             } catch (cancelled: CancellationException) {
                 if (current()) _calibrationWorkspace.update { it.copy(doIpReading = false) }
