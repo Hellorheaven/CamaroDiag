@@ -86,8 +86,44 @@ data class UdsDtcDetail(val dtc: Int, val status: Int, val records: ByteArray)
 
 data class UdsSnapshotReference(val dtc: Int, val record: Int)
 data class UdsFaultCounter(val dtc: Int, val counter: Int)
+data class UdsSeverityRecord(val dtc: Int, val severity: Int, val functionalUnit: Int, val status: Int)
+data class UdsSeverityReport(val subfunction: Int, val availabilityMask: Int,
+    val records: List<UdsSeverityRecord> = emptyList(), val count: Int? = null, val formatIdentifier: Int? = null)
 
 object UdsDtcDecoder {
+    fun severityRequest(subfunction: Int, severityMask: Int, statusMask: Int, dtc: Int): ByteArray {
+        require(subfunction in 7..9 && severityMask in 0..255 && statusMask in 0..255 && dtc in 0..0xFFFFFF)
+        return if (subfunction == 9) byteArrayOf(0x19, 9, (dtc shr 16).toByte(), (dtc shr 8).toByte(), dtc.toByte())
+        else byteArrayOf(0x19, subfunction.toByte(), severityMask.toByte(), statusMask.toByte())
+    }
+
+    /** 19/07 count; 19/08 filtered records; 19/09 zero or one specific DTC record. */
+    fun decodeSeverity(request: ByteArray, reply: ByteArray): UdsSeverityReport {
+        require(request.size >= 2 && request[0] == 0x19.toByte() && reply.size >= 3 &&
+            reply[0] == 0x59.toByte() && reply[1] == request[1])
+        fun Byte.u8() = toInt() and 255
+        val sub = request[1].u8()
+        require(sub in 7..9 && request.size == (if (sub == 9) 5 else 4))
+        val availability = reply[2].u8()
+        if (sub == 7) {
+            require(reply.size == 6)
+            val count = (reply[4].u8() shl 8) or reply[5].u8()
+            require(count == 0 || (request[2].u8() != 0 && (request[3].u8() and availability) != 0))
+            return UdsSeverityReport(sub, availability, count = count, formatIdentifier = reply[3].u8())
+        }
+        require((reply.size - 3) % 6 == 0 && (sub != 9 || reply.size in setOf(3, 9)))
+        val records = (3 until reply.size step 6).map { offset ->
+            val dtc = (reply[offset+2].u8() shl 16) or (reply[offset+3].u8() shl 8) or reply[offset+4].u8()
+            val row = UdsSeverityRecord(dtc, reply[offset].u8(), reply[offset+1].u8(), reply[offset+5].u8())
+            require((row.status and availability.inv() and 255) == 0)
+            if (sub == 9) require(reply.copyOfRange(offset+2, offset+5).contentEquals(request.copyOfRange(2, 5)))
+            else require((row.severity and request[2].u8()) != 0 && (row.status and request[3].u8() and availability) != 0)
+            row
+        }
+        require(records.map { it.dtc }.distinct().size == records.size)
+        return UdsSeverityReport(sub, availability, records)
+    }
+
     /** 19/14 contains DTC/FDC pairs, no availability mask or status byte.
      * Keep the signed ECU value even when it is nonpositive; do not infer a confirmed fault. */
     fun decodeFaultCounters(reply: ByteArray): List<UdsFaultCounter> {

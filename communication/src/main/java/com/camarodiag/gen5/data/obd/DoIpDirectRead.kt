@@ -26,7 +26,7 @@ import kotlin.coroutines.resumeWithException
  * A socket is owned by one operation and is never retained after failure.
  */
 object DoIpDirectRead {
-    enum class Operation { VIN, DID, DTC, DTC_COUNT, DTC_SNAPSHOT, DTC_EXTENDED, MONITOR, BACKUP, EXCHANGE, OBD_IDENTIFY, OBD_DID, OBD_MONITOR, OBD_WWH_MASK, OBD_WWH_PERMANENT, OBD_WWH_READINESS, MULTI_DID, OBD_MULTI_DID, SCALING_DID, OBD_DTC, OBD_DTC_COUNT, OBD_DTC_SNAPSHOT, OBD_DTC_EXTENDED, SUPPORTED_DTCS, SNAPSHOT_INDEX, MULTI_MONITOR, OBD_MULTI_MONITOR, FIRST_FAILED_DTC, FIRST_CONFIRMED_DTC, RECENT_FAILED_DTC, RECENT_CONFIRMED_DTC, FAULT_COUNTERS }
+    enum class Operation { VIN, DID, DTC, DTC_COUNT, DTC_SNAPSHOT, DTC_EXTENDED, MONITOR, BACKUP, EXCHANGE, OBD_IDENTIFY, OBD_DID, OBD_MONITOR, OBD_WWH_MASK, OBD_WWH_PERMANENT, OBD_WWH_READINESS, MULTI_DID, OBD_MULTI_DID, SCALING_DID, OBD_DTC, OBD_DTC_COUNT, OBD_DTC_SNAPSHOT, OBD_DTC_EXTENDED, SUPPORTED_DTCS, SNAPSHOT_INDEX, MULTI_MONITOR, OBD_MULTI_MONITOR, FIRST_FAILED_DTC, FIRST_CONFIRMED_DTC, RECENT_FAILED_DTC, RECENT_CONFIRMED_DTC, FAULT_COUNTERS, SEVERITY_COUNT, SEVERITY_LIST, SEVERITY_INFO }
     /** Immutable optional parameters. Defaults retain the original global deadline. */
     data class SessionOptions(val timeoutMs: Int = 5000, val p2Ms: Int = timeoutMs,
         val p2StarMs: Int = timeoutMs, val routingType: Int = 0, val routingOemHex: String = "") {
@@ -138,6 +138,10 @@ object DoIpDirectRead {
                 } else {
                     require(reply.size >= 3)
                     if (subfunction == 0x0A) require(request.size == 2 && (reply.size - 3) % 4 == 0)
+                }
+                if (subfunction == 9) {
+                    require(request.size == 5 && reply.size in setOf(3, 9) &&
+                        (reply.size == 3 || reply.copyOfRange(5, 8).contentEquals(request.copyOfRange(2, 5))))
                 }
                 if (subfunction in setOf(0x04, 0x06)) {
                     require(request.size == 6 && reply.size >= 6 &&
@@ -254,7 +258,8 @@ object DoIpDirectRead {
         val wwhReport: DoIpWwhDtc.Report? = null,
         val multiValues: List<DoIpMultiDid.Value> = emptyList(),
         val snapshotIndex: List<UdsSnapshotReference>? = null,
-        val faultCounters: List<UdsFaultCounter>? = null)
+        val faultCounters: List<UdsFaultCounter>? = null,
+        val severityReport: UdsSeverityReport? = null)
     data class Sample(val index: Int, val elapsedMs: Long, val data: ByteArray,
         val values: List<DoIpMultiDid.Value> = emptyList())
 
@@ -685,7 +690,7 @@ object DoIpDirectRead {
         clientTls: DoIpClientTls? = null, sessionOptions: SessionOptions? = null,
         wwhSeverity: Int = 255, wwhReadinessGroup: Int? = null,
         multiLayout: List<DoIpMultiDid.Field>? = null,
-        isReadContextCurrent: () -> Boolean = { true }): Outcome {
+        isReadContextCurrent: () -> Boolean = { true }, severityMask: Int = 255): Outcome {
         check(isReadContextCurrent()) { "DoIP operation context changed." }
         val options = sessionOptions ?: SessionOptions(timeoutMs)
         require(options.timeoutMs == timeoutMs)
@@ -715,6 +720,12 @@ object DoIpDirectRead {
         val wwhRequest = wwhKind?.let { DoIpWwhDtc.request(it, mask, wwhSeverity, wwhReadinessGroup) }
         val obdDtc = operation in setOf(Operation.OBD_DTC, Operation.OBD_DTC_COUNT,
             Operation.OBD_DTC_SNAPSHOT, Operation.OBD_DTC_EXTENDED)
+        val severityRequest = when (operation) {
+            Operation.SEVERITY_COUNT -> UdsDtcDecoder.severityRequest(7, severityMask, mask, dtc)
+            Operation.SEVERITY_LIST -> UdsDtcDecoder.severityRequest(8, severityMask, mask, dtc)
+            Operation.SEVERITY_INFO -> UdsDtcDecoder.severityRequest(9, severityMask, mask, dtc)
+            else -> null
+        }
         val historicalSubfunction = when (operation) {
             Operation.FIRST_FAILED_DTC -> 0x0B
             Operation.FIRST_CONFIRMED_DTC -> 0x0C
@@ -894,6 +905,10 @@ object DoIpDirectRead {
                                 onCommandReply(index + 1, reply.copyOf())
                             }
                             Outcome(gateway, target.ecu, vin, replies.last(), null, trace.toList(), commandReplies = replies.toList())
+                        } else if (severityRequest != null) {
+                            val report = UdsDtcDecoder.decodeSeverity(severityRequest, session.exchange(severityRequest, timeoutMs))
+                            require(readVin() == vin)
+                            Outcome(gateway, target.ecu, vin, null, null, trace.toList(), severityReport = report)
                         } else if (operation == Operation.FAULT_COUNTERS) {
                             val rows = UdsDtcDecoder.decodeFaultCounters(session.exchange(byteArrayOf(0x19, 0x14), timeoutMs))
                             require(readVin() == vin)

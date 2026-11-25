@@ -1,3 +1,7 @@
+## PR117 — lectures sévérité DTC Android (25/11/2026)
+
+- UDS 19/07, 19/08, 19/09 : masques explicites, sévérité/unité/statut bruts et compte/format, réponse vide possible, validation du DTC et des filtres, F190 avant/après, résultats séparés de la liste active. UI FR/EN, tests écrits non exécutés. Windows reste à raccorder. Aucun checkpoint CI.
+
 ## PR117 — sévérité DTC UDS 19/07 à 19/09 Connectors (25/11/2026)
 
 - CLI severity-count, severity-dtcs (masques sévérité/statut explicites), severity-info (DTC 24 bits). Compte et format bruts, sévérité/unité fonctionnelle/statut séparés ; résultat vide possible, corrélation du DTC et des masques, refus des doublons/troncatures et revalidation F190. Référence de format https://uds.readthedocs.io/en/stable/pages/knowledge_base/service.html et https://udsoncan.readthedocs.io/en/latest/_modules/udsoncan/services/ReadDTCInformation.html ; pas de conformité matérielle revendiquée. Tests écrits non exécutés. Android et Windows à raccorder.

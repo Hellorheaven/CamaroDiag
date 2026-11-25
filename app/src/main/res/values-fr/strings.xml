@@ -1116,4 +1116,11 @@
     <string name="cal_doip_no_historical_dtc">Aucun DTC historique correspondant</string>
     <string name="cal_doip_fault_counters">Compteurs de détection des défauts</string>
     <string name="cal_doip_fault_counters_result">Compteurs de détection : %1$d enregistrements</string>
+    <string name="cal_doip_severity_mask">Masque de sévérité UDS (hex)</string>
+    <string name="cal_doip_severity_count">Nombre par sévérité</string>
+    <string name="cal_doip_severity_list">DTC par sévérité</string>
+    <string name="cal_doip_severity_info">Sévérité du DTC</string>
+    <string name="cal_doip_severity_count_result">DTC correspondants : %1$d ; disponibilité 0x%2$02X ; format 0x%3$02X</string>
+    <string name="cal_doip_severity_list_result">Enregistrements de sévérité : %1$d ; disponibilité 0x%2$02X</string>
+    <string name="cal_doip_severity_record">DTC 0x%1$06X — sévérité 0x%2$02X, unité 0x%3$02X, statut 0x%4$02X</string>
 </resources>

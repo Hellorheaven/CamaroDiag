@@ -8,6 +8,23 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class UdsDtcDecoderTest {
+    @Test fun severityQueriesPreserveRawFieldsAndRejectMismatches() {
+        fun hex(s: String) = s.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
+        val countRequest = UdsDtcDecoder.severityRequest(7, 0x80, 8, 0)
+        assertArrayEquals(hex("19078008"), countRequest)
+        assertEquals(2, UdsDtcDecoder.decodeSeverity(countRequest, hex("590708010002")).count)
+        val listRequest = UdsDtcDecoder.severityRequest(8, 0x80, 8, 0)
+        val report = UdsDtcDecoder.decodeSeverity(listRequest, hex("590808801212345608"))
+        assertEquals(UdsSeverityRecord(0x123456, 0x80, 0x12, 8), report.records.single())
+        val detailRequest = UdsDtcDecoder.severityRequest(9, 255, 255, 0x123456)
+        assertArrayEquals(hex("1909123456"), detailRequest)
+        assertTrue(UdsDtcDecoder.decodeSeverity(detailRequest, hex("590908")).records.isEmpty())
+        assertEquals(0, UdsDtcDecoder.decodeSeverity(detailRequest, hex("590908401212345600")).records.single().status)
+        assertTrue(runCatching { UdsDtcDecoder.decodeSeverity(detailRequest, hex("590908801212345708")) }.isFailure)
+        assertTrue(runCatching { UdsDtcDecoder.decodeSeverity(listRequest, hex("590808401212345608")) }.isFailure)
+        assertTrue(runCatching { UdsDtcDecoder.decodeSeverity(listRequest, hex("590808801212345601")) }.isFailure)
+    }
+
     @Test fun faultCountersPreserveSignedByteWithoutStatusInference() {
         assertTrue(UdsDtcDecoder.decodeFaultCounters(byteArrayOf(0x59, 0x14)).isEmpty())
         val report = UdsDtcDecoder.decodeFaultCounters(byteArrayOf(0x59, 0x14,

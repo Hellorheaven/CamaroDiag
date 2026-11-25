@@ -1113,4 +1113,11 @@
     <string name="cal_doip_no_historical_dtc">No matching historical DTC</string>
     <string name="cal_doip_fault_counters">Fault detection counters</string>
     <string name="cal_doip_fault_counters_result">Fault detection counters: %1$d records</string>
+    <string name="cal_doip_severity_mask">UDS severity mask (hex)</string>
+    <string name="cal_doip_severity_count">Count by severity</string>
+    <string name="cal_doip_severity_list">DTCs by severity</string>
+    <string name="cal_doip_severity_info">DTC severity information</string>
+    <string name="cal_doip_severity_count_result">Matching DTCs: %1$d; availability 0x%2$02X; format 0x%3$02X</string>
+    <string name="cal_doip_severity_list_result">Severity records: %1$d; availability 0x%2$02X</string>
+    <string name="cal_doip_severity_record">DTC 0x%1$06X — severity 0x%2$02X, unit 0x%3$02X, status 0x%4$02X</string>
 </resources>

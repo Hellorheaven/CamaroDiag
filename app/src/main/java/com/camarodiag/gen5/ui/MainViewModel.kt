@@ -1496,17 +1496,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     require(didHex.matches(Regex("[0-9A-Fa-f]{2}")))
                     didHex.toInt(16)
                 } else 255
+                val severityFilter = operation in setOf(DoIpDirectRead.Operation.SEVERITY_COUNT, DoIpDirectRead.Operation.SEVERITY_LIST)
+                val severityInfo = operation == DoIpDirectRead.Operation.SEVERITY_INFO
+                if (severityFilter) require(didHex.matches(Regex("[0-9A-Fa-f]{4}")))
+                if (severityInfo) require(didHex.matches(Regex("[0-9A-Fa-f]{6}")))
                 val wwhMask = operation == DoIpDirectRead.Operation.OBD_WWH_MASK
                 val wwhReadiness = operation == DoIpDirectRead.Operation.OBD_WWH_READINESS
                 if (wwhMask) require(didHex.matches(Regex("[0-9A-Fa-f]{4}")))
                 if (wwhReadiness) require(didHex.matches(Regex("[0-9A-Fa-f]{2}")))
                 val isDetail = operation in setOf(DoIpDirectRead.Operation.DTC_SNAPSHOT, DoIpDirectRead.Operation.DTC_EXTENDED, DoIpDirectRead.Operation.OBD_DTC_SNAPSHOT, DoIpDirectRead.Operation.OBD_DTC_EXTENDED)
                 if (isDetail) require(didHex.matches(Regex("[0-9A-Fa-f]{8}")))
-                val detailDtc = if (isDetail) didHex.take(6).toInt(16) else 0
+                val detailDtc = if (isDetail || severityInfo) didHex.take(6).toInt(16) else 0
                 val detailRecord = if (isDetail) didHex.takeLast(2).toInt(16) else 1
                 val clientTls = certificate?.let { DoIpClientTls.open(getApplication<Application>(), it, target) }
                 check(current())
-                val result = DoIpDirectRead.read(target, operation, did, mask = if (wwhMask) didHex.takeLast(2).toInt(16) else mask,
+                val result = DoIpDirectRead.read(target, operation, did, mask = if (wwhMask || severityFilter) didHex.takeLast(2).toInt(16) else mask,
+                    severityMask = if (severityFilter) didHex.take(2).toInt(16) else 255,
                     wwhSeverity = if (wwhMask) didHex.take(2).toInt(16) else 255,
                     wwhReadinessGroup = if (wwhReadiness) didHex.toInt(16) else null, multiLayout = layout,
                     sampleCount = sampleCount, intervalMs = intervalMs,
@@ -1594,6 +1599,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             report.records.joinToString(separator = "\n", prefix = "\n") {
                                 "0x%06X — 0x%02X".format(it.rawDtc, it.statusByte)
                             }
+                    result.severityReport != null -> requireNotNull(result.severityReport).let { report ->
+                        if (report.count != null)
+                            localizedContext.getString(R.string.cal_doip_severity_count_result, report.count,
+                                report.availabilityMask, report.formatIdentifier ?: 0)
+                        else localizedContext.getString(R.string.cal_doip_severity_list_result, report.records.size, report.availabilityMask) +
+                            report.records.joinToString(separator = "\n", prefix = "\n") { row ->
+                                localizedContext.getString(R.string.cal_doip_severity_record, row.dtc, row.severity, row.functionalUnit, row.status)
+                            }
+                    }
                     result.faultCounters != null -> requireNotNull(result.faultCounters).let { rows ->
                         localizedContext.getString(R.string.cal_doip_fault_counters_result, rows.size) +
                             rows.joinToString(separator = "\n", prefix = "\n") {
