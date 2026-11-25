@@ -410,11 +410,13 @@ internal static class UdsStandardServices
                 throw new InvalidDataException("Wrong legacy mirror-memory DTC detail.");
             if (subfunction == 5)
             {
-                if (request.Length != 3 || response.Length < 3 || response[2] != request[2])
+                if (request.Length != 3 || response.Length < 3 ||
+                    (request[2] != 255 && response[2] != request[2]) ||
+                    (request[2] == 255 && ((response.Length == 3) != (response[2] == 255))))
                     throw new InvalidDataException("Wrong stored DTC record response.");
                 if (response.Length != 3 && (response.Length < 8 ||
                     response.Length - 8 < response[7] * 2 ||
-                    (response[7] == 0 && response.Length != 8)))
+                    (request[2] != 255 && response[7] == 0 && response.Length != 8)))
                     throw new InvalidDataException("Truncated or inconsistent stored DTC record.");
             }
             if (subfunction == 0x16 && (request.Length != 3 || response.Length < 3 || response[2] != request[2]))
