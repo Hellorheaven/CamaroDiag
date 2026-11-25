@@ -25,6 +25,24 @@ class UdsDtcDecoderTest {
         assertTrue(runCatching { UdsDtcDecoder.decodeSeverity(listRequest, hex("590808801212345601")) }.isFailure)
     }
 
+    @Test fun extendedRecordUsesDocumentedWidthAndEcho() {
+        fun hex(s: String) = s.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
+        assertArrayEquals(hex("191A01"), UdsDtcDecoder.extendedRecordRequest(1, null))
+        assertArrayEquals(hex("191601"), UdsDtcDecoder.extendedRecordRequest(1, 2))
+        val supported = UdsDtcDecoder.decodeExtendedRecord(1, null, hex("591A08010102030001020408"))
+        assertEquals(8, supported.availability)
+        assertEquals(0, supported.entries.first().status)
+        val data = UdsDtcDecoder.decodeExtendedRecord(1, 2, hex("59160101020308AABB01020400CCDD"))
+        assertEquals(2, data.entries.size)
+        assertArrayEquals(hex("CCDD"), data.entries.last().records)
+        assertTrue(UdsDtcDecoder.decodeExtendedRecord(1, 2, hex("591601")).entries.isEmpty())
+        for (bad in listOf("591A0802", "591A080101020301", "591A08010102030801020300"))
+            assertTrue(runCatching { UdsDtcDecoder.decodeExtendedRecord(1, null, hex(bad)) }.isFailure)
+        for (bad in listOf("591602", "59160101020308AA", "59160101020308AABB01020308CCDD"))
+            assertTrue(runCatching { UdsDtcDecoder.decodeExtendedRecord(1, 2, hex(bad)) }.isFailure)
+        assertTrue(runCatching { UdsDtcDecoder.extendedRecordRequest(0xFF, 2) }.isFailure)
+    }
+
     @Test fun explicitUserMemoryCorrelatesListAndRawRecords() {
         fun hex(s: String) = s.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
         val list = UdsDtcDecoder.userMemoryRequest(0x17, 2, 8, 0, 1)

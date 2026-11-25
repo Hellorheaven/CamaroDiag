@@ -26,7 +26,7 @@ import kotlin.coroutines.resumeWithException
  * A socket is owned by one operation and is never retained after failure.
  */
 object DoIpDirectRead {
-    enum class Operation { VIN, DID, DTC, DTC_COUNT, DTC_SNAPSHOT, DTC_EXTENDED, MONITOR, BACKUP, EXCHANGE, OBD_IDENTIFY, OBD_DID, OBD_MONITOR, OBD_WWH_MASK, OBD_WWH_PERMANENT, OBD_WWH_READINESS, MULTI_DID, OBD_MULTI_DID, SCALING_DID, OBD_DTC, OBD_DTC_COUNT, OBD_DTC_SNAPSHOT, OBD_DTC_EXTENDED, SUPPORTED_DTCS, PERMANENT_DTCS, SNAPSHOT_INDEX, MULTI_MONITOR, OBD_MULTI_MONITOR, FIRST_FAILED_DTC, FIRST_CONFIRMED_DTC, RECENT_FAILED_DTC, RECENT_CONFIRMED_DTC, FAULT_COUNTERS, SEVERITY_COUNT, SEVERITY_LIST, SEVERITY_INFO, INVENTORY, OBD_INVENTORY, MEMORY_DTCS, MEMORY_SNAPSHOT, MEMORY_EXTENDED }
+    enum class Operation { VIN, DID, DTC, DTC_COUNT, DTC_SNAPSHOT, DTC_EXTENDED, MONITOR, BACKUP, EXCHANGE, OBD_IDENTIFY, OBD_DID, OBD_MONITOR, OBD_WWH_MASK, OBD_WWH_PERMANENT, OBD_WWH_READINESS, MULTI_DID, OBD_MULTI_DID, SCALING_DID, OBD_DTC, OBD_DTC_COUNT, OBD_DTC_SNAPSHOT, OBD_DTC_EXTENDED, SUPPORTED_DTCS, PERMANENT_DTCS, SNAPSHOT_INDEX, MULTI_MONITOR, OBD_MULTI_MONITOR, FIRST_FAILED_DTC, FIRST_CONFIRMED_DTC, RECENT_FAILED_DTC, RECENT_CONFIRMED_DTC, FAULT_COUNTERS, SEVERITY_COUNT, SEVERITY_LIST, SEVERITY_INFO, INVENTORY, OBD_INVENTORY, MEMORY_DTCS, MEMORY_SNAPSHOT, MEMORY_EXTENDED, EXTENDED_RECORD_SUPPORT, EXTENDED_RECORD_DATA }
     /** Immutable optional parameters. Defaults retain the original global deadline. */
     data class SessionOptions(val timeoutMs: Int = 5000, val p2Ms: Int = timeoutMs,
         val p2StarMs: Int = timeoutMs, val routingType: Int = 0, val routingOemHex: String = "") {
@@ -140,6 +140,9 @@ object DoIpDirectRead {
                     require(reply.size >= 3)
                     if (subfunction in setOf(0x0A, 0x15)) require(request.size == 2 && (reply.size - 3) % 4 == 0)
                 }
+                if (subfunction == 0x16) require(request.size == 3 && reply.size >= 3 && reply[2] == request[2])
+                if (subfunction == 0x1A) require(request.size == 3 && reply.size >= 4 &&
+                    reply[3] == request[2] && (reply.size - 4) % 4 == 0)
                 if (subfunction == 0x17) {
                     require(request.size == 4 && reply.size >= 4 && reply[2] == request[3] &&
                         (reply.size - 4) % 4 == 0)
@@ -272,7 +275,8 @@ object DoIpDirectRead {
         val snapshotIndex: List<UdsSnapshotReference>? = null,
         val faultCounters: List<UdsFaultCounter>? = null,
         val severityReport: UdsSeverityReport? = null,
-        val memoryReport: UdsMemoryDtcReport? = null)
+        val memoryReport: UdsMemoryDtcReport? = null,
+        val extendedRecordReport: UdsExtendedRecordReport? = null)
     data class Sample(val index: Int, val elapsedMs: Long, val data: ByteArray,
         val values: List<DoIpMultiDid.Value> = emptyList())
 
@@ -759,7 +763,7 @@ object DoIpDirectRead {
         clientTls: DoIpClientTls? = null, sessionOptions: SessionOptions? = null,
         wwhSeverity: Int = 255, wwhReadinessGroup: Int? = null,
         multiLayout: List<DoIpMultiDid.Field>? = null,
-        isReadContextCurrent: () -> Boolean = { true }, severityMask: Int = 255, memory: Int? = null): Outcome {
+        isReadContextCurrent: () -> Boolean = { true }, severityMask: Int = 255, memory: Int? = null, extendedRecordSize: Int? = null): Outcome {
         check(isReadContextCurrent()) { "DoIP operation context changed." }
         val options = sessionOptions ?: SessionOptions(timeoutMs)
         require(options.timeoutMs == timeoutMs)
@@ -796,6 +800,9 @@ object DoIpDirectRead {
             Operation.SEVERITY_INFO -> UdsDtcDecoder.severityRequest(9, severityMask, mask, dtc)
             else -> null
         }
+        require((operation == Operation.EXTENDED_RECORD_DATA) == (extendedRecordSize != null))
+        val extendedRecordRequest = if (operation in setOf(Operation.EXTENDED_RECORD_SUPPORT, Operation.EXTENDED_RECORD_DATA))
+            UdsDtcDecoder.extendedRecordRequest(record, extendedRecordSize) else null
         val memorySub = when (operation) {
             Operation.MEMORY_DTCS -> 0x17
             Operation.MEMORY_SNAPSHOT -> 0x18
@@ -982,6 +989,11 @@ object DoIpDirectRead {
                                 onCommandReply(index + 1, reply.copyOf())
                             }
                             Outcome(gateway, target.ecu, vin, replies.last(), null, trace.toList(), commandReplies = replies.toList())
+                        } else if (extendedRecordRequest != null) {
+                            val report = UdsDtcDecoder.decodeExtendedRecord(record, extendedRecordSize,
+                                session.exchange(extendedRecordRequest, timeoutMs))
+                            require(readVin() == vin)
+                            Outcome(gateway, target.ecu, vin, null, null, trace.toList(), extendedRecordReport = report)
                         } else if (memoryRequest != null) {
                             val report = UdsDtcDecoder.decodeUserMemory(memoryRequest, session.exchange(memoryRequest, timeoutMs))
                             require(readVin() == vin)

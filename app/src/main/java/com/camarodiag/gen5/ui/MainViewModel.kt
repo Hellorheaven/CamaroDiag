@@ -1485,6 +1485,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 if (multiMonitor) com.camarodiag.gen5.data.obd.DoIpMultiDid.validateMonitor(requireNotNull(layout))
                 require(operation !in setOf(DoIpDirectRead.Operation.OBD_MULTI_DID, DoIpDirectRead.Operation.OBD_MULTI_MONITOR) ||
                     requireNotNull(layout).all { DoIpDirectRead.isObdDid(it.did) })
+                val extendedSupport = operation == DoIpDirectRead.Operation.EXTENDED_RECORD_SUPPORT
+                val extendedData = operation == DoIpDirectRead.Operation.EXTENDED_RECORD_DATA
+                val extendedParts = if (extendedData) didHex.split(':') else listOf(didHex)
+                val extendedRecordSize = if (extendedData) {
+                    require(extendedParts.size == 2 && extendedParts[1].matches(Regex("[0-9]{1,4}")))
+                    extendedParts[1].toInt().also { require(it in 1..4090) }
+                } else null
+                val extendedRecord = if (extendedSupport || extendedData) {
+                    require(extendedParts[0].matches(Regex("[0-9A-Fa-f]{2}")))
+                    extendedParts[0].toInt(16).also { require(it in 1..0xEF) }
+                } else null
                 val memoryList = operation == DoIpDirectRead.Operation.MEMORY_DTCS
                 val memoryDetail = operation in setOf(DoIpDirectRead.Operation.MEMORY_SNAPSHOT, DoIpDirectRead.Operation.MEMORY_EXTENDED)
                 if (memoryList || memoryDetail) require(didHex.matches(Regex(if (memoryList) "[0-9A-Fa-f]{4}" else "[0-9A-Fa-f]{10}")))
@@ -1545,7 +1556,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     return@launchEnhancedUdsRead
                 }
                 val result = DoIpDirectRead.read(target, operation, did, mask = if (memoryList) didHex.take(2).toInt(16) else if (wwhMask || severityFilter) didHex.takeLast(2).toInt(16) else mask,
-                    memory = memory,
+                    memory = memory, extendedRecordSize = extendedRecordSize,
                     severityMask = if (severityFilter) didHex.take(2).toInt(16) else 255,
                     wwhSeverity = if (wwhMask) didHex.take(2).toInt(16) else 255,
                     wwhReadinessGroup = if (wwhReadiness) didHex.toInt(16) else null, multiLayout = layout,
@@ -1566,7 +1577,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     }, onControlTrace = { trace -> journalDoIpControlTrace(trace, current) },
                     commands = fixedCommands, approval = approval, isContextCurrent = current,
                     isReadContextCurrent = current,
-                    dtc = detailDtc, record = detailRecord, onCommandReply = { index, reply ->
+                    dtc = detailDtc, record = extendedRecord ?: detailRecord, onCommandReply = { index, reply ->
                         check(current())
                         val line = localizedContext.getString(R.string.cal_doip_sequence_reply, index,
                             reply.joinToString(" ") { "%02X".format(it.toInt() and 255) })
@@ -1612,6 +1623,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         localizedContext.getString(R.string.cal_doip_sequence_reply, index + 1,
                             reply.joinToString(" ") { "%02X".format(it.toInt() and 255) })
                     }.joinToString("\n")
+                    result.extendedRecordReport != null -> requireNotNull(result.extendedRecordReport).let { report ->
+                        val heading = localizedContext.getString(R.string.cal_doip_extended_record_result, report.record, report.entries.size)
+                        heading + (report.availability?.let { "\n" + localizedContext.getString(R.string.cal_doip_extended_record_mask, it) } ?: "") +
+                            report.entries.joinToString("\n", prefix = "\n") { entry ->
+                                if (report.availability != null) "0x%06X — 0x%02X".format(entry.dtc, entry.status)
+                                else localizedContext.getString(R.string.cal_doip_detail_result, entry.dtc, entry.status,
+                                    entry.records.joinToString(" ") { "%02X".format(it.toInt() and 255) })
+                            }
+                    }
                     result.memoryReport != null -> requireNotNull(result.memoryReport).let { memoryReport ->
                         val heading = localizedContext.getString(R.string.cal_doip_memory_result, memoryReport.memory)
                         val list = memoryReport.list

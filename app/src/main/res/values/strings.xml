@@ -1103,6 +1103,11 @@
     <string name="cal_doip_supported_dtcs">Supported DTCs</string>
     <string name="cal_doip_permanent_dtcs">Permanent UDS DTCs</string>
     <string name="cal_doip_permanent_result">Permanent DTCs: %1$d; available status mask 0x%2$02X</string>
+    <string name="cal_doip_extended_record_support">DTCs supporting the extended record</string>
+    <string name="cal_doip_extended_record_size">Uniform documented record length (bytes)</string>
+    <string name="cal_doip_extended_record_data">Read extended data by record</string>
+    <string name="cal_doip_extended_record_result">Record 0x%1$02X — %2$d DTCs</string>
+    <string name="cal_doip_extended_record_mask">Available status mask 0x%1$02X</string>
     <string name="cal_doip_memory_selection">DTC memory (hex)</string>
     <string name="cal_doip_memory_dtcs">DTCs in selected memory</string>
     <string name="cal_doip_memory_snapshot">Snapshot in selected memory</string>

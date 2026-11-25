@@ -1,3 +1,7 @@
+## PR117 — données étendues par numéro Android (25/11/2026)
+
+- UDS 19/1A et 19/16 : deux actions FR/EN, numéro explicite et taille uniforme documentée pour 19/16, vérification écho/longueur/doublons/masque, F190 avant/après, résultat distinct de la liste active. Tests écrits non exécutés. Windows reste à raccorder, aucun checkpoint CI.
+
 ## PR117 — données étendues par numéro Connectors (25/11/2026)
 
 - UDS 19/1A inventorie les DTC qui prennent en charge un numéro d'enregistrement ; 19/16 lit ses données pour plusieurs DTC avec taille uniforme explicite (pas de découpage OEM inventé). Écho, doublons, longueur et statut disponible contrôlés ; statut nul accepté pour 1A. VIN F190 avant/après, TLS par défaut, CLI FR/EN, tests écrits non exécutés. Référence : https://uds.readthedocs.io/en/stable/pages/knowledge_base/service.html . Android/Windows restent à raccorder ; aucun checkpoint CI.

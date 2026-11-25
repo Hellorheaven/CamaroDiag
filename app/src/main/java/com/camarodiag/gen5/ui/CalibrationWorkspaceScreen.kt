@@ -346,6 +346,7 @@ fun CalibrationWorkspaceScreen(
     var doIpDetailDtc by remember(vehicle) { mutableStateOf("") }
     var doIpDetailRecord by remember(vehicle) { mutableStateOf("01") }
     var doIpDtcMemory by remember(vehicle) { mutableStateOf("") }
+    var doIpExtendedRecordSize by remember(vehicle) { mutableStateOf("") }
     var doIpCommand by remember(vehicle) { mutableStateOf("") }
     var pendingDoIpCommand by remember(vehicle, doIpContextGeneration) { mutableStateOf<DoIpConsoleCommand?>(null) }
     var doIpConsentStep by remember(vehicle, doIpContextGeneration) { mutableStateOf(EcuWriteConsentFlow.Step.WARNING) }
@@ -814,6 +815,21 @@ fun CalibrationWorkspaceScreen(
                         enabled = targetReady && vinReady, modifier = Modifier.fillMaxWidth()) {
                         Text(stringResource(R.string.cal_doip_permanent_dtcs))
                     }
+                    val extendedRecordReady = targetReady && vinReady && doIpDetailRecord.length == 2 &&
+                        (doIpDetailRecord.toIntOrNull(16) ?: 0) in 1..0xEF
+                    OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu,
+                        doIpDetailRecord, doIpTls, DoIpDirectRead.Operation.EXTENDED_RECORD_SUPPORT, doIpCertificate, requireNotNull(doIpOptions)) },
+                        enabled = extendedRecordReady, modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(R.string.cal_doip_extended_record_support))
+                    }
+                    OutlinedTextField(doIpExtendedRecordSize, { doIpExtendedRecordSize = it.filter { c -> c in '0'..'9' }.take(4) },
+                        enabled = idle, singleLine = true, modifier = Modifier.fillMaxWidth(),
+                        label = { Text(stringResource(R.string.cal_doip_extended_record_size)) })
+                    OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu,
+                        doIpDetailRecord + ":" + doIpExtendedRecordSize, doIpTls, DoIpDirectRead.Operation.EXTENDED_RECORD_DATA,
+                        doIpCertificate, requireNotNull(doIpOptions)) },
+                        enabled = extendedRecordReady && (doIpExtendedRecordSize.toIntOrNull() ?: 0) in 1..4090,
+                        modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.cal_doip_extended_record_data)) }
                     OutlinedTextField(doIpDtcMemory, { doIpDtcMemory = it.uppercase().filter { c -> c in "0123456789ABCDEF" }.take(2) },
                         enabled = idle, singleLine = true, modifier = Modifier.fillMaxWidth(),
                         label = { Text(stringResource(R.string.cal_doip_memory_selection)) })

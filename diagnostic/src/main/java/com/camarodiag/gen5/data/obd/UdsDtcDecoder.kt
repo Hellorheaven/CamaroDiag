@@ -92,7 +92,33 @@ data class UdsSeverityReport(val subfunction: Int, val availabilityMask: Int,
 
 data class UdsMemoryDtcReport(val memory: Int, val list: UdsDtcReport? = null, val detail: UdsDtcDetail? = null)
 
+data class UdsExtendedRecordReport(val record: Int, val availability: Int?,
+    val entries: List<UdsDtcDetail>)
+
 object UdsDtcDecoder {
+    fun extendedRecordRequest(record: Int, size: Int?): ByteArray {
+        require(record in 1..0xEF && (size == null || size in 1..4090))
+        return byteArrayOf(0x19, if (size == null) 0x1A else 0x16, record.toByte())
+    }
+
+    fun decodeExtendedRecord(record: Int, size: Int?, reply: ByteArray): UdsExtendedRecordReport {
+        val request = extendedRecordRequest(record, size)
+        val start = if (size == null) 4 else 3
+        val width = 4 + (size ?: 0)
+        require(reply.size >= start && reply[0] == 0x59.toByte() && reply[1] == request[1] &&
+            reply[start - 1] == request[2] && (reply.size - start) % width == 0)
+        val available = if (size == null) reply[2].toInt() and 255 else null
+        val seen = mutableSetOf<Int>()
+        val entries = (start until reply.size step width).map { offset ->
+            val dtc = ((reply[offset].toInt() and 255) shl 16) or
+                ((reply[offset + 1].toInt() and 255) shl 8) or (reply[offset + 2].toInt() and 255)
+            val status = reply[offset + 3].toInt() and 255
+            require(seen.add(dtc) && (available == null || (status and available.inv()) == 0))
+            UdsDtcDetail(dtc, status, reply.copyOfRange(offset + 4, offset + width))
+        }
+        return UdsExtendedRecordReport(record, available, entries)
+    }
+
     fun userMemoryRequest(sub: Int, memory: Int, mask: Int, dtc: Int, record: Int): ByteArray {
         require(memory in 0..255 && mask in 0..255)
         if (sub == 0x17) return byteArrayOf(0x19, 0x17, mask.toByte(), memory.toByte())
