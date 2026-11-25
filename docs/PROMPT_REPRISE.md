@@ -1,3 +1,7 @@
+## PR117 — identité des mesures DID simples (25/11/2026)
+
+- Windows GUI/CLI : monitoring DID simple vérifie chaque VIN F190/F802 et protocole F810 demandé avant publication, comme le multi-DID. Connectors : lecture DID simple via méthode vérifiée ; F190 renvoie le VIN observé sans seconde lecture contradictoire, autres DID revalidation sur la même session. Tests de régression écrits, non lancés. DoIP reste actif, aucune CI intermédiaire.
+
 ## PR117 — corrélation des DID d'identité dans les mesures (25/11/2026)
 
 - Multi-DID Android/Windows/Connectors et monitoring Android/Connectors : si la réponse contient le VIN ou la valeur F810 correspondant à la route, vérifier également ces octets dans chaque réponse avant publication (pas seulement avant/après la campagne). CLI Windows : même contrôle des DID simples et multi-DID. Budget Android identification stable ajusté. Exemples utilisateur Connectors FR/EN, tests écrits. Aucun lancement CI.

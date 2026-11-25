@@ -743,6 +743,22 @@ class Session:
             raise DoIpError("Missing DID data")
         return reply[3:]
 
+    def read_verified_did(self, expected: str, did: int) -> bytes:
+        """Read one generic DID and validate any returned identity before publication."""
+        logical(did)
+        try:
+            vin = self.verify_vin(expected)
+            if did == 0xF190:
+                return vin.encode("ascii")
+            data = self.read_did(did)
+            if not data:
+                raise DoIpError("Missing DID data")
+            self.verify_vin(expected)
+            return data
+        except BaseException:
+            self.close()
+            raise
+
     def read_scaling_did(self, expected: str, did: int) -> bytes:
         """Read ISO 14229 SID 24 metadata; retain raw ECU-provided scaling records."""
         request = b"\x24" + logical(did)

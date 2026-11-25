@@ -269,9 +269,12 @@ internal static class DoIpVinReader
     internal static async Task MonitorDidAsync(
         DoIpDiagnosticTransport transport, ushort did, int sampleCount, TimeSpan interval,
         TimeSpan timeout, CancellationToken token, Action<int, byte[]> sample,
-        Action<byte[]>? requested = null, Action<byte[]>? received = null)
+        Action<byte[]>? requested = null, Action<byte[]>? received = null,
+        string? expectedVin = null, bool obd = false)
     {
         ArgumentNullException.ThrowIfNull(sample);
+        if (expectedVin is not null && !DoIpVehicleDiscovery.IsVehicleVin(expectedVin))
+            throw new ArgumentException("Invalid monitoring VIN.");
         if (sampleCount is < 1 or > 3600 || interval < TimeSpan.FromMilliseconds(250) ||
             interval > TimeSpan.FromMinutes(1))
             throw new ArgumentOutOfRangeException(nameof(sampleCount));
@@ -280,8 +283,10 @@ internal static class DoIpVinReader
             token.ThrowIfCancellationRequested();
             var data = await ReadDidAsync(transport, did, timeout, token, requested, received);
             token.ThrowIfCancellationRequested();
-            if (data.Length > 4096)
-                throw new InvalidDataException("DID payload exceeds the monitoring sample limit; use a single read.");
+            if (data.Length is < 1 or > 4096)
+                throw new InvalidDataException("Missing or oversized monitoring sample.");
+            if (expectedVin is not null)
+                UdsMultiDidCli.RequireIdentity(new (ushort Did, byte[] Data)[] { (did, data) }, expectedVin, obd);
             sample(index, data);
             token.ThrowIfCancellationRequested();
             if (index < sampleCount) await Task.Delay(interval, token);
@@ -360,7 +365,8 @@ internal static class DoIpVinReader
         var before = await ReadVerifiedObdAsync(transport, expectedVin, null, timeout, token);
         if (before.ProtocolValue != 1)
             throw new InvalidDataException("Selected ECU did not identify as OBDonUDS.");
-        await MonitorDidAsync(transport, did, sampleCount, interval, timeout, token, sample);
+        await MonitorDidAsync(transport, did, sampleCount, interval, timeout, token, sample,
+            expectedVin: expectedVin, obd: true);
         var after = await ReadVerifiedObdAsync(transport, expectedVin, null, timeout, token);
         if (after.ProtocolValue != before.ProtocolValue)
             throw new InvalidDataException("OBDonUDS identification changed during monitoring.");
@@ -395,7 +401,7 @@ internal static class DoIpVinReader
             ecu, useTls, timeout, token, clientCertificateThumbprint, trace, options);
         var vin = await VerifyObservedVinAsync(transport, gateway, timeout, token, requested, received);
         await MonitorDidAsync(transport, did, sampleCount, interval, timeout, token,
-            sample, requested, received);
+            sample, requested, received, expectedVin: vin);
         var finalVin = await VerifyObservedVinAsync(transport, gateway, timeout, token, requested, received);
         if (!string.Equals(vin, finalVin, StringComparison.Ordinal))
             throw new InvalidDataException("UDS VIN changed during DoIP monitoring.");

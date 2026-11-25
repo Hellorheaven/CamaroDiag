@@ -245,6 +245,10 @@ def run(argv: Sequence[str] | None = None) -> dict:
                                                dtc=getattr(o, "dtc", None), record=getattr(o, "record", None), obd=obd)
             return result | {"vin": o.vin, "ecu": o.ecu, "tester": o.tester, "tls": not o.tcp,
                              "service_protocol": "OBDonUDS" if obd else "UDS"} | report
+        if o.action == "did":
+            data = session.read_verified_did(o.vin, o.did)
+            return result | {"vin": o.vin, "ecu": o.ecu, "tester": o.tester, "tls": not o.tcp,
+                             "did": o.did, "data": data.hex().upper()}
         vin = session.verify_vin(o.vin)
         result |= {"vin": vin, "ecu": o.ecu, "tester": o.tester, "tls": not o.tcp}
         if commands is not None:
@@ -261,10 +265,6 @@ def run(argv: Sequence[str] | None = None) -> dict:
             return result | save_capture(o.output, o.profile, scope, first, second)
         if o.action == "vin":
             return result
-        if o.action == "did":
-            data = session.read_did(o.did)
-            session.verify_vin(o.vin)
-            return result | {"did": o.did, "data": data.hex().upper()}
         raise DoIpError("Unsupported diagnostic action")
 
 

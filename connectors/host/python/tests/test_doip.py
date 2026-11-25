@@ -333,6 +333,23 @@ class DoIpTests(unittest.TestCase):
             Session.monitor_dids(fake, VIN, ((0xF40C, 4096), (0xF40D, 1)))
         fake.exchange.assert_not_called()
 
+    def test_verified_single_did_uses_actual_vin_and_revalidates_data(self):
+        fake = unittest.mock.Mock(spec=Session)
+        fake.verify_vin.return_value = VIN
+        self.assertEqual(Session.read_verified_did(fake, VIN, 0xF190), VIN.encode("ascii"))
+        fake.read_did.assert_not_called()
+        fake.verify_vin.assert_called_once_with(VIN)
+        fake.reset_mock()
+        fake.read_did.return_value = b"\x12\x34"
+        self.assertEqual(Session.read_verified_did(fake, VIN, 0xF187), b"\x12\x34")
+        self.assertEqual(fake.verify_vin.call_count, 2)
+        fake.read_did.assert_called_once_with(0xF187)
+        fake.reset_mock()
+        fake.verify_vin.side_effect = [VIN, DoIpError("changed VIN")]
+        with self.assertRaises(DoIpError):
+            Session.read_verified_did(fake, VIN, 0xF187)
+        fake.close.assert_called_once()
+
     def test_scaling_did_identity_and_correlation(self):
         fake = unittest.mock.Mock(spec=Session)
         fake.verify_vin.return_value = VIN

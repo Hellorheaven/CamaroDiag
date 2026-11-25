@@ -1687,7 +1687,7 @@ internal static class StandardProtocolCli
                 var vin = await DoIpVinReader.VerifyObservedVinAsync(transport, gateway,
                     timeout, cancellation.Token, null, null);
                 await DoIpVinReader.MonitorDidAsync(transport, monitor.Did, monitor.Count,
-                    interval, timeout, cancellation.Token, Sample);
+                    interval, timeout, cancellation.Token, Sample, expectedVin: vin);
                 var after = await DoIpVinReader.VerifyObservedVinAsync(transport, gateway,
                     timeout, cancellation.Token, null, null);
                 if (vin != after) throw new InvalidDataException("ECU VIN changed during monitoring.");

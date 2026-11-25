@@ -606,6 +606,23 @@ internal static class DoIpDiagnosticSessionSelfTests
             });
         }
 
+        // A contradictory identity in a single sample must never be published.
+        await RunCaseAsync(async stream =>
+        {
+            var query = await ReadAsync(stream);
+            Check(query.Payload.SequenceEqual((byte[])[0x0E,0x80,0x12,0x34,0x22,0xF1,0x90]),
+                "Single monitoring VIN request uses F190.");
+            await SendAsync(stream, DoIpCodec.DiagnosticMessage,
+                FromEcu([0x62,0xF1,0x90, .. System.Text.Encoding.ASCII.GetBytes(otherVehicleVin)]));
+        }, async client =>
+        {
+            var published = 0;
+            await Expect<InvalidDataException>(() => DoIpVinReader.MonitorDidAsync(client, 0xF190, 1,
+                TimeSpan.FromMilliseconds(250), TimeSpan.FromSeconds(2), CancellationToken.None,
+                (_, _) => published++, expectedVin: selectedVehicleVin), "Contradictory sampled VIN rejected.");
+            Check(published == 0, "No contradictory sample was published.");
+        });
+
         // Regression: an immediately consumed final response must not
         // be mistaken for a response crossing the exchange boundary.
         await RunCaseAsync(async stream =>
