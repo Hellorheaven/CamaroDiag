@@ -252,9 +252,11 @@ internal static class StandardProtocolCli
                 CultureInfo.InvariantCulture);
             var version = checked((byte)Number(
                 Optional(args, "--doip-version") ?? "2"));
+            using var journal = OpenDoIpUdpTrace(args);
             var status = await DoIpVehicleDiscovery.QueryStatusAsync(
                 host, power, TimeSpan.FromMilliseconds(timeoutMs),
-                CancellationToken.None, protocolVersion: version);
+                CancellationToken.None, protocolVersion: version,
+                trace: journal is null ? null : journal.RecordDatagram);
             Console.WriteLine(DoIpConsolePresentation.FormatStatus(status, power));
             Console.WriteLine(DoIpConsolePresentation.Text("StatusNotice"));
             return 0;
@@ -300,6 +302,8 @@ internal static class StandardProtocolCli
                 throw new ArgumentException("Choose VIN or EID, not both.");
             var eid = eidHex is null ? null : Convert.FromHexString(eidHex);
             var timeout = TimeSpan.FromMilliseconds(timeoutMs);
+            using var journal = OpenDoIpUdpTrace(args);
+            DoIpVehicleDiscovery.DatagramTrace? trace = journal is null ? null : journal.RecordDatagram;
             IReadOnlyList<DoIpVehicleDiscovery.Identity> identities;
             if (passiveListen)
             {
@@ -308,22 +312,22 @@ internal static class StandardProtocolCli
                         "Passive DoIP listening cannot apply an outgoing VIN/EID request.");
                 identities = ipv6Interface.HasValue ?
                     await DoIpVehicleDiscovery.ListenIpv6MulticastAsync(
-                        ipv6Interface.Value, timeout, CancellationToken.None) :
+                        ipv6Interface.Value, timeout, CancellationToken.None, trace: trace) :
                     await DoIpVehicleDiscovery.ListenAsync(
-                        timeout, CancellationToken.None);
+                        timeout, CancellationToken.None, trace: trace);
             }
             else if (activeIpv6Interface.HasValue)
                 identities = await DoIpVehicleDiscovery.DiscoverIpv6MulticastAsync(
                     activeIpv6Interface.Value, timeout, CancellationToken.None,
-                    vin: requestedVin, eid: eid);
+                    vin: requestedVin, eid: eid, trace: trace);
             else if (broadcastIp is not null)
                 identities = await DoIpVehicleDiscovery.DiscoverBroadcastAsync(
                     broadcastIp, timeout, CancellationToken.None,
-                    vin: requestedVin, eid: eid);
+                    vin: requestedVin, eid: eid, trace: trace);
             else
                 identities = [await DoIpVehicleDiscovery.DiscoverAsync(
                     host!, timeout, CancellationToken.None,
-                    vin: requestedVin, eid: eid)];
+                    vin: requestedVin, eid: eid, trace: trace)];
             if (identities.Count == 0)
                 throw new TimeoutException("No DoIP gateway identity received.");
             foreach (var identity in identities)
@@ -1398,21 +1402,7 @@ internal static class StandardProtocolCli
             throw new ArgumentException(
                 "DoIP OEM routing-activation data must be exactly four bytes.");
         var receiveFile = Optional(args, "--rx-file");
-        var traceFile = Optional(args, "--trace-file");
-        if (args.Count(x => x.Equals("--trace-file", StringComparison.OrdinalIgnoreCase)) > 1)
-            throw new ArgumentException("Repeated DoIP trace file option.");
-        if (traceFile is not null)
-        {
-            if (string.IsNullOrWhiteSpace(traceFile))
-                throw new ArgumentException("DoIP trace file path cannot be empty.");
-            traceFile = Path.GetFullPath(traceFile);
-            if (File.Exists(traceFile) || Directory.Exists(traceFile) ||
-                !Directory.Exists(Path.GetDirectoryName(traceFile)))
-                throw new ArgumentException("Choose a new DoIP trace file in an existing directory.");
-            if (receiveFile is not null && string.Equals(traceFile, Path.GetFullPath(receiveFile),
-                StringComparison.OrdinalIgnoreCase))
-                throw new ArgumentException("DoIP trace and response files must be distinct.");
-        }
+        var traceFile = ParseDoIpTracePath(args, receiveFile);
         var clientCert = Optional(args, "--client-cert-thumbprint");
         if (clientCert is not null &&
             (!useTls || clientCert.Length != 40 ||
@@ -1541,6 +1531,28 @@ internal static class StandardProtocolCli
         output.Flush(flushToDisk: true);
     }
 
+    internal static string? ParseDoIpTracePath(string[] args, string? otherOutput = null)
+    {
+        var path = Optional(args, "--trace-file");
+        if (args.Count(x => x.Equals("--trace-file", StringComparison.OrdinalIgnoreCase)) > 1)
+            throw new ArgumentException("Repeated DoIP trace file option.");
+        if (path is null) return null;
+        if (string.IsNullOrWhiteSpace(path)) throw new ArgumentException("DoIP trace path cannot be empty.");
+        path = Path.GetFullPath(path);
+        if (File.Exists(path) || Directory.Exists(path) || !Directory.Exists(Path.GetDirectoryName(path)))
+            throw new ArgumentException("Choose a new DoIP trace file in an existing directory.");
+        if (otherOutput is not null && string.Equals(path, Path.GetFullPath(otherOutput), StringComparison.OrdinalIgnoreCase))
+            throw new ArgumentException("DoIP trace and response files must be distinct.");
+        return path;
+    }
+
+    internal static string FormatDoIpDatagramTrace(string direction, System.Net.IPEndPoint endpoint,
+        byte[] data, DateTimeOffset utc) => System.Text.Json.JsonSerializer.Serialize(new
+        {
+            utc, direction, transport = "UDP", host = endpoint.Address.ToString(),
+            port = endpoint.Port, bytes = data.Length, pdu = Convert.ToHexString(data)
+        });
+
     internal static string FormatDoIpTrace(DoIpOptions target, DoIpDiagnosticTransport.PduTrace frame) =>
         System.Text.Json.JsonSerializer.Serialize(new
         {
@@ -1553,24 +1565,28 @@ internal static class StandardProtocolCli
     // The transport can invoke the observer on either its reader or writer.
     // Keep complete JSON lines in chronological callback order. A failed file
     // write is not silently ignored; the exchange must not claim full logging.
-    private sealed class DoIpTraceJournal : IDisposable
+    internal sealed class DoIpTraceJournal : IDisposable
     {
         private readonly object gate = new();
         private readonly StreamWriter writer;
-        private readonly DoIpOptions target;
+        private readonly DoIpOptions? target;
         private bool disposed;
-        internal DoIpTraceJournal(DoIpOptions target)
+        internal DoIpTraceJournal(string path, DoIpOptions? target = null)
         {
             this.target = target;
-            writer = new StreamWriter(new FileStream(target.TraceFile!, FileMode.CreateNew,
+            writer = new StreamWriter(new FileStream(path, FileMode.CreateNew,
                 FileAccess.Write, FileShare.Read), new System.Text.UTF8Encoding(false)) { AutoFlush = true };
         }
-        internal void Record(DoIpDiagnosticTransport.PduTrace frame)
+        internal void Record(DoIpDiagnosticTransport.PduTrace frame) =>
+            Write(FormatDoIpTrace(target ?? throw new InvalidOperationException("TCP trace target missing."), frame));
+        internal void RecordDatagram(string direction, System.Net.IPEndPoint endpoint, byte[] data) =>
+            Write(FormatDoIpDatagramTrace(direction, endpoint, data, DateTimeOffset.UtcNow));
+        private void Write(string line)
         {
             lock (gate)
             {
                 if (disposed) throw new ObjectDisposedException(nameof(DoIpTraceJournal));
-                writer.WriteLine(FormatDoIpTrace(target, frame));
+                writer.WriteLine(line);
             }
         }
         public void Dispose()
@@ -1585,7 +1601,10 @@ internal static class StandardProtocolCli
     }
 
     private static DoIpTraceJournal? OpenDoIpTrace(DoIpOptions target) =>
-        target.TraceFile is null ? null : new DoIpTraceJournal(target);
+        target.TraceFile is null ? null : new DoIpTraceJournal(target.TraceFile, target);
+
+    private static DoIpTraceJournal? OpenDoIpUdpTrace(string[] args) =>
+        ParseDoIpTracePath(args) is string path ? new DoIpTraceJournal(path) : null;
 
     internal sealed record DoIpSequenceOptions(DoIpOptions Target, string Vin,
         byte[][] Commands, bool ExplicitVersion);
@@ -1637,8 +1656,9 @@ internal static class StandardProtocolCli
         try
         {
             var timeout = TimeSpan.FromMilliseconds(o.TimeoutMs);
+            using var journal = OpenDoIpTrace(o);
             var gateway = await DoIpVehicleDiscovery.DiscoverAsync(o.Host, timeout,
-                cancellation.Token, vin: sequence.Vin);
+                cancellation.Token, vin: sequence.Vin, trace: journal is null ? null : journal.RecordDatagram);
             if (gateway.Vin != sequence.Vin ||
                 (sequence.ExplicitVersion && gateway.ProtocolVersion != o.Version) ||
                 gateway.LogicalAddress == o.Tester)
@@ -1650,8 +1670,8 @@ internal static class StandardProtocolCli
                 $"commands={string.Join("; ", sequence.Commands.Select(c => Convert.ToHexString(c)))}"))
                 return 2;
             cancellation.Token.ThrowIfCancellationRequested();
-            await DoIpVehicleDiscovery.RequireCurrentIdentityAsync(gateway, timeout, cancellation.Token);
-            using var journal = OpenDoIpTrace(o);
+            await DoIpVehicleDiscovery.RequireCurrentIdentityAsync(gateway, timeout, cancellation.Token,
+                trace: journal is null ? null : journal.RecordDatagram);
             await using var transport = await DoIpDiagnosticTransport.ConnectAsync(
                 o.Host, o.Tester, o.Ecu, timeout, cancellation.Token,
                 useTls: o.UseTls, protocolVersion: gateway.ProtocolVersion,
@@ -1737,13 +1757,15 @@ internal static class StandardProtocolCli
         try
         {
             var timeout = TimeSpan.FromMilliseconds(o.TimeoutMs);
+            using var journal = OpenDoIpTrace(o);
             var gateway = await DoIpVehicleDiscovery.DiscoverAsync(o.Host, timeout,
-                cancellation.Token, vin: monitor.Vin);
+                cancellation.Token, vin: monitor.Vin, trace: journal is null ? null : journal.RecordDatagram);
             if (gateway.Vin != monitor.Vin ||
                 (monitor.ExplicitVersion && gateway.ProtocolVersion != o.Version) ||
                 gateway.LogicalAddress == o.Tester)
                 throw new InvalidDataException("Observed DoIP gateway differs from the monitoring target.");
-            using var journal = OpenDoIpTrace(o);
+            await DoIpVehicleDiscovery.RequireCurrentIdentityAsync(gateway, timeout, cancellation.Token,
+                trace: journal is null ? null : journal.RecordDatagram);
             await using var transport = await DoIpDiagnosticTransport.ConnectAsync(
                 o.Host, o.Tester, o.Ecu, timeout, cancellation.Token,
                 useTls: o.UseTls, protocolVersion: gateway.ProtocolVersion,
@@ -1853,15 +1875,17 @@ internal static class StandardProtocolCli
         try
         {
             var timeout = TimeSpan.FromMilliseconds(o.TimeoutMs);
-            var gateway = await DoIpVehicleDiscovery.DiscoverAsync(o.Host, timeout, stop.Token, vin: verified.Vin);
+            using var journal = OpenDoIpTrace(o);
+            var gateway = await DoIpVehicleDiscovery.DiscoverAsync(o.Host, timeout, stop.Token, vin: verified.Vin,
+                trace: journal is null ? null : journal.RecordDatagram);
             if (gateway.Vin != verified.Vin || gateway.LogicalAddress == o.Tester ||
                 (verified.ExplicitVersion && gateway.ProtocolVersion != o.Version))
                 throw new InvalidDataException("Observed gateway differs from selected vehicle.");
             if (!Confirm($"Verified {(verified.Obd ? "OBDonUDS" : "UDS")} read VIN={verified.Vin} " +
                 $"host={o.Host} ECU={o.Ecu:X4} TLS={o.UseTls} TX={Convert.ToHexString(o.Request)}"))
                 return 2;
-            await DoIpVehicleDiscovery.RequireCurrentIdentityAsync(gateway, timeout, stop.Token);
-            using var journal = OpenDoIpTrace(o);
+            await DoIpVehicleDiscovery.RequireCurrentIdentityAsync(gateway, timeout, stop.Token,
+                trace: journal is null ? null : journal.RecordDatagram);
             await using var link = await DoIpDiagnosticTransport.ConnectAsync(o.Host, o.Tester, o.Ecu,
                 timeout, stop.Token, useTls: o.UseTls, protocolVersion: gateway.ProtocolVersion,
                 clientCertificateThumbprint: o.ClientCertificateThumbprint,

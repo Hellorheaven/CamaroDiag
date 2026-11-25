@@ -1,3 +1,7 @@
+## PR117 — journal UDP DoIP Windows (25/11/2026)
+
+- Extension de --trace-file aux découvertes unicast/broadcast/multicast IPv6, écoute passive IPv4/IPv6, état/alimentation, et identification UDP des sessions vérifiées. JSONL conserve endpoint, port, direction, données réelles, UTC. Les opérations de découverte peuvent être journalisées avant consentement ; aucun PDU diagnostique mutateur avant consentement. Monitoring revalide l'identité de passerelle avant connexion. Tests écrits non exécutés. Aucun checkpoint CI.
+
 ## PR117 — journal DoIP CLI Windows (25/11/2026)
 
 - --trace-file NEW.jsonl pour les échanges bruts, séquences vérifiées, lectures typées et monitoring simple/multi-DID. Journal des PDU réels de session TCP/TLS (contrôle et diagnostic), UTC/direction/adresses/octets, écrit après consentement, CreateNew, jamais écrasé, conservé en cas d'erreur ; distinction du fichier RX. Ne couvre pas encore les datagrammes UDP de découverte. Aide FR/EN et tests écrits non exécutés. Aucun checkpoint CI.

@@ -62,8 +62,9 @@ Exemples :
                               --uds-p2-star-ms fixent les délais.
                               Peut modifier l'ECU : identité et consentement
                               explicite obligatoires ; --trace-file NOUVEAU.jsonl
-                              journalise les PDU TCP/TLS complets, UTC, TX/RX et cible,
-                              conservés en cas d'échec ; --sequence "22F190;1901FF"
+                              journalise les datagrammes UDP et les PDU TCP/TLS,
+                              UTC, TX/RX et cible ; disponible en découverte/état,
+                              conservé en cas d'échec ; --sequence "22F190;1901FF"
                               --expected-vin VIN : 1 à 16 commandes sur une session,
                               TLS par défaut, arrêt sur erreur et consentement interactif.
                               --monitor-did F190 ou --obd-monitor-did F40C

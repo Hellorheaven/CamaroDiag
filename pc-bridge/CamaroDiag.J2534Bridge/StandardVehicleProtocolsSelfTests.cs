@@ -536,6 +536,15 @@ internal static class StandardVehicleProtocolsSelfTests
             "--host", "127.0.0.1", "--tester", "0E80", "--ecu", "1234",
             "--payload", "22F190", "--trace-file", tracePath, "--rx-file", tracePath]),
             "Trace and response cannot use the same file.");
+        using (var datagram = System.Text.Json.JsonDocument.Parse(StandardProtocolCli.FormatDoIpDatagramTrace(
+            "RX", new System.Net.IPEndPoint(System.Net.IPAddress.IPv6Loopback, 13400),
+            [2, 0xFD, 0, 4, 0, 0, 0, 0], DateTimeOffset.UnixEpoch)))
+        {
+            Check(datagram.RootElement.GetProperty("transport").GetString() == "UDP" &&
+                datagram.RootElement.GetProperty("port").GetInt32() == 13400 &&
+                datagram.RootElement.GetProperty("pdu").GetString() == "02FD000400000000",
+                "UDP journal preserves endpoint and complete datagram.");
+        }
         var monitorArgs = new[] { StandardProtocolCli.DoIpCommand, "--host", "192.0.2.10",
             "--tester", "0E80", "--ecu", "1234", "--expected-vin", "1G1FA1RXXR0123456",
             "--obd-monitor-did", "F40C" };
