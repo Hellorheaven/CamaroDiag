@@ -1814,6 +1814,13 @@ internal static class StandardProtocolCli
                 if (o.Request[2] == 0x10 && ObdOnUdsServices.DecodeProtocolIdentification(reply).Value != 1)
                     throw new InvalidDataException("Returned protocol differs from verified OBDonUDS identity.");
             }
+            var layoutText = Optional(args, "--uds-dids");
+            if (layoutText is not null)
+                UdsMultiDidCli.RequireIdentity(UdsMultiDidCli.Decode(UdsMultiDidCli.Parse(layoutText),
+                    o.Request, reply), verified.Vin, verified.Obd);
+            if (singleGeneric && o.Request.SequenceEqual(UdsStandardServices.ReadDid(0xF190)) &&
+                DoIpVinReader.ParseVin(reply) != verified.Vin)
+                throw new InvalidDataException("Returned VIN differs from selected vehicle.");
             await VerifyAsync();
             stop.Token.ThrowIfCancellationRequested();
             PrintMultiDidResponse(args, o.Request, reply);

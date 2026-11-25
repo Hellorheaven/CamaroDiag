@@ -376,6 +376,16 @@ def decode_did_layout(reply: bytes, layout: tuple[tuple[int, int], ...]) -> list
     return result
 
 
+def require_sample_identity(rows: list[dict], expected: str, obd: bool) -> None:
+    for row in rows:
+        did = int(row["did"], 16)
+        data = bytes.fromhex(row["data"])
+        if did == (0xF802 if obd else 0xF190) and data != expected.encode("ascii"):
+            raise DoIpError("Sample VIN differs from selected ECU")
+        if obd and did == 0xF810 and data != b"\x01":
+            raise DoIpError("Sample protocol differs from verified OBDonUDS")
+
+
 def positive(request: bytes, reply: bytes) -> bytes:
     if not request or not reply or reply[0] != (request[0] + 0x40) & 0xFF:
         raise DoIpError("UDS response service mismatch")
@@ -657,6 +667,7 @@ class Session:
                 data = self.read_did(did)
                 if not 1 <= len(data) <= 4096:
                     raise DoIpError("Missing or oversized DID monitoring sample")
+                require_sample_identity([{"did": f"{did:04X}", "data": data.hex()}], expected, obd)
                 row = {"index": index, "utc": datetime.now(timezone.utc).isoformat(),
                        "elapsed_ms": int((time.monotonic() - start) * 1000),
                        "data": data.hex().upper()}
@@ -696,6 +707,7 @@ class Session:
             start = time.monotonic()
             for index in range(1, samples + 1):
                 values = decode_did_layout(self.exchange(request), layout)
+                require_sample_identity(values, expected, obd)
                 row = {"index": index, "utc": datetime.now(timezone.utc).isoformat(),
                        "elapsed_ms": int((time.monotonic() - start) * 1000), "dids": values}
                 rows.append(row)
@@ -757,6 +769,7 @@ class Session:
                 self.verify_vin(expected)
             request = b"\x22" + b"".join(logical(did) for did, _ in layout)
             rows = decode_did_layout(self.exchange(request), layout)
+            require_sample_identity(rows, expected, obd)
             if obd:
                 if not self.read_obd(expected)["obd_on_uds"]:
                     raise DoIpError("OBDonUDS identification changed")

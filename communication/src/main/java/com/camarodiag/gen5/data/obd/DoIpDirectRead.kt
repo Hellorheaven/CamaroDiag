@@ -732,7 +732,7 @@ object DoIpDirectRead {
             else if (operation == Operation.EXCHANGE) timeoutMs * (requireNotNull(fixedCommands).size + 4L)
             else if (monitoring)
             timeoutMs * (sampleCount + 7L) + intervalMs * (sampleCount - 1L)
-            else if (wwhKind != null || multi || obdDtc || operation == Operation.OBD_DID) timeoutMs * 8L else timeoutMs * 5L
+            else if (wwhKind != null || multi || obdDtc || operation in setOf(Operation.OBD_DID, Operation.OBD_IDENTIFY)) timeoutMs * 8L else timeoutMs * 5L
         check(isReadContextCurrent()) { "DoIP operation context changed." }
         val gateway = discover(target.address, target.expectedVin, timeoutMs, onControlTrace)
         check(isReadContextCurrent()) { "DoIP operation context changed." }
@@ -774,7 +774,7 @@ object DoIpDirectRead {
                         }
                         return vin
                     }
-                    fun monitorDid(): List<Sample> {
+                    fun monitorDid(obd: Boolean = false): List<Sample> {
                         val samples = mutableListOf<Sample>()
                         val start = System.nanoTime()
                         for (index in 1..sampleCount) {
@@ -783,6 +783,8 @@ object DoIpDirectRead {
                             val reply = session.exchange(request, timeoutMs)
                             require(reply.size in 4..4099) { "Missing or oversized DID monitoring sample." }
                             val values = if (multiMonitor) DoIpMultiDid.decode(requireNotNull(layout), reply) else emptyList()
+                            DoIpMultiDid.requireIdentity(if (multiMonitor) values else
+                                listOf(DoIpMultiDid.Value(did, reply.copyOfRange(3, reply.size))), target.expectedVin, obd)
                             val sample = Sample(index, (System.nanoTime() - start) / 1_000_000,
                                 if (multiMonitor) reply.copyOf() else reply.copyOfRange(3, reply.size), values)
                             samples += sample
@@ -826,7 +828,7 @@ object DoIpDirectRead {
                                 timeoutMs)) == protocolValue) { "OBDonUDS identity changed during DID read." }
                         }
                         val samples = if (operation in setOf(Operation.OBD_MONITOR, Operation.OBD_MULTI_MONITOR)) {
-                            val measured = monitorDid()
+                            val measured = monitorDid(obd = true)
                             require(readVin(0xF802) == vin)
                             require(decodeObdProtocol(session.exchange(byteArrayOf(0x22, 0xF8.toByte(), 0x10),
                                 timeoutMs)) == protocolValue) { "OBDonUDS identity changed during monitoring." }
@@ -843,6 +845,7 @@ object DoIpDirectRead {
                         val multiValues = if (operation == Operation.OBD_MULTI_DID) {
                             val values = DoIpMultiDid.decode(requireNotNull(layout),
                                 session.exchange(requireNotNull(multiRequest), timeoutMs))
+                            DoIpMultiDid.requireIdentity(values, vin, obd = true)
                             require(readVin(0xF802) == vin)
                             require(decodeObdProtocol(session.exchange(byteArrayOf(0x22, 0xF8.toByte(), 0x10),
                                 timeoutMs)) == protocolValue)
@@ -932,6 +935,7 @@ object DoIpDirectRead {
                         } else if (operation == Operation.MULTI_DID) {
                             val values = DoIpMultiDid.decode(requireNotNull(layout),
                                 session.exchange(requireNotNull(multiRequest), timeoutMs))
+                            DoIpMultiDid.requireIdentity(values, vin, obd = false)
                             require(readVin() == vin)
                             Outcome(gateway, target.ecu, vin, null, null, trace.toList(), multiValues = values)
                         } else if (operation in setOf(Operation.DID, Operation.SCALING_DID)) {

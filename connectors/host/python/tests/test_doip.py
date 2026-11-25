@@ -298,6 +298,17 @@ class DoIpTests(unittest.TestCase):
                 Session.read_dtc_inventory(fake, VIN, snapshot_index=snapshot)
             fake.close.assert_called_once()
 
+    def test_multi_monitor_rejects_contradictory_sample_identity(self):
+        fake = unittest.mock.Mock(spec=Session)
+        fake.read_obd.return_value = {"obd_on_uds": True}
+        fake.exchange.return_value = bytes.fromhex("62F81002F40D56")
+        observed = []
+        with self.assertRaises(DoIpError):
+            Session.monitor_dids(fake, VIN, ((0xF810, 1), (0xF40D, 1)), 1, 0.25,
+                                 obd=True, on_sample=observed.append)
+        self.assertEqual(observed, [])
+        fake.close.assert_called_once()
+
     def test_multi_did_monitoring_revalidates_and_keeps_samples_isolated(self):
         layout = parse_did_layout("F40C:2,F40D:1")
         fake = unittest.mock.Mock(spec=Session)

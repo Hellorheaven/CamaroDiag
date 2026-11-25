@@ -1,3 +1,7 @@
+## PR117 — corrélation des DID d'identité dans les mesures (25/11/2026)
+
+- Multi-DID Android/Windows/Connectors et monitoring Android/Connectors : si la réponse contient le VIN ou la valeur F810 correspondant à la route, vérifier également ces octets dans chaque réponse avant publication (pas seulement avant/après la campagne). CLI Windows : même contrôle des DID simples et multi-DID. Budget Android identification stable ajusté. Exemples utilisateur Connectors FR/EN, tests écrits. Aucun lancement CI.
+
 ## PR117 — identification OBDonUDS vérifiée sur DoIP (25/11/2026)
 
 - CLI Windows : --obd-identify avec --expected-vin, TLS par défaut, découverte F802/F810 répétée sur même session, résultat JSON stable y compris valeur non reconnue sans prétendre à une route OBDonUDS. Android, Windows GUI et Connectors CLI : même revalidation d'identification. CLI Windows contrôle également les données DID simples OBD, notamment VIN et valeur F810 retournés. Aide FR/EN, tests écrits, aucun lancement CI.

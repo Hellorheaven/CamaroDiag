@@ -15,6 +15,13 @@ class DoIpMultiDidTest {
         for (bad in listOf("62F40D56F40C1234", "62F40C1234F40D", "62F40C1234F40D5600"))
             assertTrue(runCatching { DoIpMultiDid.decode(layout, hex(bad)) }.isFailure)
     }
+    @Test fun identityFieldsInsideSampleMustMatchVerifiedRoute() {
+        val vin = "1G1FA1RXXR0123456"
+        DoIpMultiDid.requireIdentity(listOf(DoIpMultiDid.Value(0xF802, vin.toByteArray()),
+            DoIpMultiDid.Value(0xF810, byteArrayOf(1))), vin, true)
+        assertTrue(runCatching { DoIpMultiDid.requireIdentity(listOf(DoIpMultiDid.Value(0xF810, byteArrayOf(2))), vin, true) }.isFailure)
+        assertTrue(runCatching { DoIpMultiDid.requireIdentity(listOf(DoIpMultiDid.Value(0xF190, byteArrayOf(1))), vin, false) }.isFailure)
+    }
     @Test fun monitoringBoundsTheWholeSample() {
         assertEquals(2, DoIpMultiDid.validateMonitor(DoIpMultiDid.parse("F40C:2,F40D:1")).size)
         assertTrue(runCatching { DoIpMultiDid.validateMonitor(DoIpMultiDid.parse("F40C:4096,F40D:1")) }.isFailure)

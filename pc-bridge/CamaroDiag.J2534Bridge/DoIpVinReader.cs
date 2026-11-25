@@ -190,6 +190,7 @@ internal static class DoIpVinReader
         await VerifyAsync();
         var reply = await link.ExchangeUdsAsync(request, timeout, token);
         var values = UdsMultiDidCli.Decode(frozen, request, reply);
+        UdsMultiDidCli.RequireIdentity(values, expectedVin, obd);
         await VerifyAsync();
         return values;
     }
@@ -318,6 +319,7 @@ internal static class DoIpVinReader
             token.ThrowIfCancellationRequested();
             var reply = await transport.ExchangeUdsAsync(request, timeout, token);
             var values = UdsMultiDidCli.Decode(frozen, request, reply);
+            UdsMultiDidCli.RequireIdentity(values, expectedVin, obd);
             token.ThrowIfCancellationRequested();
             sample(index, values);
             token.ThrowIfCancellationRequested();

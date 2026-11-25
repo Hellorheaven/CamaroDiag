@@ -42,6 +42,19 @@ internal static class UdsMultiDidCli
         return parsed;
     }
 
+    internal static void RequireIdentity(IReadOnlyList<(ushort Did, byte[] Data)> values,
+        string expectedVin, bool obd)
+    {
+        foreach (var value in values)
+        {
+            if (value.Did == (obd ? 0xF802 : 0xF190) &&
+                !value.Data.SequenceEqual(System.Text.Encoding.ASCII.GetBytes(expectedVin)))
+                throw new InvalidDataException("Sample VIN differs from selected ECU.");
+            if (obd && value.Did == 0xF810 && !value.Data.SequenceEqual(new byte[] { 1 }))
+                throw new InvalidDataException("Sample protocol differs from verified OBDonUDS.");
+        }
+    }
+
     internal static IReadOnlyList<Entry> ValidateMonitor(IReadOnlyList<Entry> entries)
     {
         ArgumentNullException.ThrowIfNull(entries);

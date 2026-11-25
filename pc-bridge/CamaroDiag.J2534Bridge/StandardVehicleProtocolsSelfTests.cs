@@ -534,6 +534,15 @@ internal static class StandardVehicleProtocolsSelfTests
         Reject<ArgumentException>(() => StandardProtocolCli.ParseDoIpMonitor(
             monitorArgs.Select(x => x == "F40C" ? "1234" : x).ToArray()),
             "Legislated monitoring rejects non-regulatory DID.");
+        UdsMultiDidCli.RequireIdentity(new (ushort Did, byte[] Data)[] {
+            (0xF802, System.Text.Encoding.ASCII.GetBytes("1G1FA1RXXR0123456")), (0xF810, new byte[] { 1 }) },
+            "1G1FA1RXXR0123456", true);
+        Reject<InvalidDataException>(() => UdsMultiDidCli.RequireIdentity(
+            new (ushort Did, byte[] Data)[] { (0xF810, new byte[] { 2 }) },
+            "1G1FA1RXXR0123456", true), "Contradictory sampled protocol rejected.");
+        Reject<InvalidDataException>(() => UdsMultiDidCli.RequireIdentity(
+            new (ushort Did, byte[] Data)[] { (0xF190, new byte[] { 1 }) },
+            "1G1FA1RXXR0123456", false), "Contradictory sampled VIN rejected.");
         var multiMonitorArgs = new[] { "--host", "127.0.0.1", "--tester", "0E80", "--ecu", "1234",
             "--expected-vin", "1G1FA1RXXR0123456", "--obd-monitor-dids", "0xF40C:2,0xF40D:1" };
         var multiMonitor = StandardProtocolCli.ParseDoIpMonitor(multiMonitorArgs);

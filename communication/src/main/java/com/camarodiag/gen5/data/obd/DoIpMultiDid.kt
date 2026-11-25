@@ -20,6 +20,16 @@ object DoIpMultiDid {
             1 + frozen.sumOf { 2 + it.length } <= 65536)
         return frozen
     }
+    fun requireIdentity(values: List<Value>, expectedVin: String, obd: Boolean) {
+        for (value in values) {
+            if (value.did == (if (obd) 0xF802 else 0xF190))
+                require(value.data.contentEquals(expectedVin.toByteArray(Charsets.US_ASCII))) {
+                    "Sample VIN differs from selected ECU."
+                }
+            if (obd && value.did == 0xF810)
+                require(value.data.contentEquals(byteArrayOf(1))) { "Sample protocol differs from verified OBDonUDS." }
+        }
+    }
     fun validateMonitor(fields: List<Field>): List<Field> = validate(fields).also { layout ->
         require(1 + layout.sumOf { 2 + it.length } <= 4096) { "Multi-DID monitor sample exceeds 4096 bytes." }
     }

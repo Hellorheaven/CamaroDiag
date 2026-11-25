@@ -77,6 +77,19 @@ python -m camarodiagconnectors.doip_cli --host 192.0.2.10 --vin 1G1FA1RXXR012345
 
 Exemples fictifs, à remplacer par les données de la passerelle et du calculateur réellement sélectionnés. Services disponibles : découverte, statut, alimentation, VIN, DID, comptage/liste DTC, instantanés/données étendues et monitoring. Les données constructeur sans définition restent brutes ; aucun flash ni qualification physique. / The host connects directly over IP, not through the USB prototype. Use real verified logical addresses; no physical qualification or programming is implied.
 
+### DTC et monitoring multi-DID / DTCs and multi-DID monitoring
+
+```bash
+python -m camarodiagconnectors.doip_cli --host 192.0.2.10 --vin 1G1FA1RXXR0123456 --tester 0E80 --ecu 1234 supported-dtcs
+python -m camarodiagconnectors.doip_cli --host 192.0.2.10 --vin 1G1FA1RXXR0123456 --tester 0E80 --ecu 1234 snapshot-index
+python -m camarodiagconnectors.doip_cli --host 192.0.2.10 --vin 1G1FA1RXXR0123456 --tester 0E80 --ecu 1234 obd-identify
+python -m camarodiagconnectors.doip_cli --host 192.0.2.10 --vin 1G1FA1RXXR0123456 --tester 0E80 --ecu 1234 monitor-dids --layout F190:17,F187:4 --samples 5
+```
+
+L'inventaire des DTC n'est pas une liste de défauts actifs. L'index snapshot donne les références à lire avec `snapshot --dtc ... --record ...`. Pour le monitoring, indiquer les longueurs réelles de chaque DID ; `obd-monitor-dids` requiert un ECU ayant confirmé OBDonUDS. Les exemples sont illustratifs, pas des définitions ECU. Les échantillons restent provisoires jusqu'à la vérification finale.
+
+The supported-DTC inventory is not an active fault list. The snapshot index gives references for the `snapshot` action. Supply actual DID lengths for monitoring; `obd-monitor-dids` requires confirmed OBDonUDS. Examples do not establish ECU definitions. Samples remain provisional until final verification.
+
 ### Acquisition mémoire DoIP / DoIP memory capture
 
 ```bash
