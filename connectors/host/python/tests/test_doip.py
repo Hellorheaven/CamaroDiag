@@ -634,6 +634,31 @@ class DoIpTests(unittest.TestCase):
             Session.read_legacy_dtc(fake, VIN, 0x10, dtc=1, record=0xF0)
         fake.verify_vin.assert_not_called()
 
+    def test_decoded_snapshots_preserve_historical_data(self):
+        lengths = {0xF40C: 2, 0xF40D: 1}
+        response = bytes.fromhex("5904010203080102F40C1234F40D560201F40D78")
+        for obd in (False, True):
+            fake = unittest.mock.Mock(spec=Session)
+            fake.read_obd.return_value = {"obd_on_uds": True}
+            fake.exchange.return_value = response
+            result = Session.read_snapshot_records(fake, VIN, 0x010203, 255, lengths, obd=obd)
+            self.assertEqual([r["record"] for r in result["records"]], [1, 2])
+            self.assertEqual(result["records"][1]["dids"][0]["data"], "78")
+            self.assertEqual(result["raw_response"], response.hex().upper())
+            fake.exchange.assert_called_once_with(bytes.fromhex("1904010203FF"))
+            self.assertEqual(fake.read_obd.call_count if obd else fake.verify_vin.call_count, 2)
+        for payload in ("59040102030801", "5904010203080101F40C12",
+                        "5904010203080101FFFFAA", "59040102030801000100",
+                        "5904010204080100"):
+            fake = unittest.mock.Mock(spec=Session)
+            fake.exchange.return_value = bytes.fromhex(payload)
+            with self.assertRaises(DoIpError):
+                Session.read_snapshot_records(fake, VIN, 0x010203, 255, lengths)
+            fake.close.assert_called_once()
+        fake = unittest.mock.Mock(spec=Session)
+        fake.exchange.return_value = bytes.fromhex("590401020308")
+        self.assertEqual(Session.read_snapshot_records(fake, VIN, 0x010203, 0, lengths)["records"], [])
+
     def test_all_stored_records_use_explicit_lengths_and_verify_identity(self):
         lengths = parse_stored_did_lengths("F40C:2,F40D:1")
         response = bytes.fromhex("5905010102030802F40C1234F40D56020405060001F40D78")
