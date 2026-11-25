@@ -211,6 +211,18 @@ object UdsDtcDecoder {
 
     fun allStoredRecordsRequest(): ByteArray = byteArrayOf(0x19, 0x05, 0xFF.toByte())
 
+    fun decodeStoredRecords(record: Int, reply: ByteArray, lengths: Map<Int, Int>): UdsAllStoredRecords {
+        require(record in 0..255)
+        require(lengths.size in 1..255 && lengths.all { (did, size) -> did in 0..65535 && size in 1..4096 })
+        if (record != 255) {
+            decodeStoredRecord(record, reply)
+            if (reply.size == 3) return UdsAllStoredRecords(emptyList(), reply.copyOf())
+        }
+        val report = decodeAllStoredRecords(reply, lengths)
+        require(record == 255 || (report.records.size == 1 && report.records.single().record == record))
+        return report
+    }
+
     fun decodeAllStoredRecords(reply: ByteArray, lengths: Map<Int, Int>): UdsAllStoredRecords {
         val catalog = lengths.toMap()
         require(catalog.size in 1..255 && catalog.all { (did, size) -> did in 0..65535 && size in 1..4096 })
