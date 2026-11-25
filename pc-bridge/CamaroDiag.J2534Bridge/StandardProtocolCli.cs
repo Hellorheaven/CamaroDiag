@@ -1363,7 +1363,7 @@ internal static class StandardProtocolCli
             "--uds-stored-record", "--uds-all-stored-records", "--uds-extended-record-support", "--uds-extended-record-data", "--uds-extended-record-size",
             "--uds-mirror-mask", "--uds-mirror-count", "--uds-mirror-extended", "--uds-mirror-record",
             "--uds-legacy-emissions-mask", "--uds-legacy-emissions-count",
-            "--uds-dtc-mask", "--uds-dtc-count-mask", "--uds-snapshot", "--uds-snapshot-record", "--snapshot-did-lengths",
+            "--uds-dtc-mask", "--uds-dtc-count-mask", "--uds-snapshot", "--uds-snapshot-record", "--snapshot-did-lengths", "--extended-record-lengths",
             "--uds-extended-dtc", "--uds-extended-record", "--obd-wwh-status", "--obd-readiness-group",
             "--obd-snapshot", "--obd-snapshot-record", "--obd-extended-dtc", "--obd-extended-record",
             "--obd-wwh-severity", "--timeout-ms", "--uds-p2-ms", "--uds-p2-star-ms", "--tls",
@@ -1459,6 +1459,17 @@ internal static class StandardProtocolCli
         if (extendedRecord is not null && extendedDtc is null)
             throw new ArgumentException(
                 "DTC extended-data record option requires --obd-extended-dtc.");
+        var extendedCatalog = Optional(args, "--extended-record-lengths");
+        if (extendedCatalog is not null)
+        {
+            if ((udsExtended is null) == (extendedDtc is null) ||
+                Optional(args, "--expected-vin") is null ||
+                (extendedDtc is not null && extendedRecord is null))
+                throw new ArgumentException("Decoded extended data requires VIN, one DTC selector and explicit record.");
+            _ = ObdOnUdsServices.ReadDecodedExtended(Number(udsExtended ?? extendedDtc!),
+                checked((byte)Number(udsExtendedRecord ?? extendedRecord!)),
+                ObdOnUdsServices.ParseExtendedRecordLengths(extendedCatalog));
+        }
         var snapshotCatalog = Optional(args, "--snapshot-did-lengths");
         if (snapshotCatalog is not null)
         {
@@ -1543,6 +1554,9 @@ internal static class StandardProtocolCli
                 checked((byte)Number(udsDtcMask))) :
             udsDtcCountMask is not null ? ObdOnUdsServices.ReadDtcCountByStatusMask(
                 checked((byte)Number(udsDtcCountMask))) :
+            extendedCatalog is not null ? ObdOnUdsServices.ReadDecodedExtended(
+                Number(udsExtended ?? extendedDtc!), checked((byte)Number(udsExtendedRecord ?? extendedRecord!)),
+                ObdOnUdsServices.ParseExtendedRecordLengths(extendedCatalog)) :
             snapshotCatalog is not null ? ObdOnUdsServices.ReadDecodedSnapshot(
                 Number(udsSnapshot ?? snapshotDtc!), checked((byte)Number(udsSnapshotRecord ?? snapshotRecord!))) :
             udsSnapshot is not null ? ObdOnUdsServices.ReadDtcSnapshot(
@@ -2145,7 +2159,23 @@ internal static class StandardProtocolCli
             var sizeText = Optional(args, "--uds-extended-record-size");
             var storedCatalog = Optional(args, "--uds-all-stored-records");
             var snapshotCatalog = Optional(args, "--snapshot-did-lengths");
-            if (snapshotCatalog is not null)
+            var extendedCatalog = Optional(args, "--extended-record-lengths");
+            if (extendedCatalog is not null)
+            {
+                uint dtc = ((uint)o.Request[2] << 16) | ((uint)o.Request[3] << 8) | o.Request[4];
+                var report = ObdOnUdsServices.DecodeExtendedRecords(dtc, o.Request[5], reply,
+                    ObdOnUdsServices.ParseExtendedRecordLengths(extendedCatalog));
+                Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(new
+                {
+                    dtc = report.Dtc.ToString("X6"), status = report.Status,
+                    requested_record = report.RequestedRecord, raw_response = Convert.ToHexString(report.RawResponse),
+                    records = report.Records.Select(row => new
+                    {
+                        record = row.Number, length = row.Data.Length, data = Convert.ToHexString(row.Data)
+                    })
+                }));
+            }
+            else if (snapshotCatalog is not null)
             {
                 uint dtc = ((uint)o.Request[2] << 16) | ((uint)o.Request[3] << 8) | o.Request[4];
                 var report = ObdOnUdsServices.DecodeSnapshotRecords(dtc, o.Request[5], reply,
