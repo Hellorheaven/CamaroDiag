@@ -298,6 +298,37 @@ class DoIpTests(unittest.TestCase):
                 Session.read_dtc_inventory(fake, VIN, snapshot_index=snapshot)
             fake.close.assert_called_once()
 
+    def test_dtc_severity_queries_preserve_raw_fields_and_identity(self):
+        for sub, data, options, request in (
+                (7, "590708010002", {"severity_mask": 0x80, "status_mask": 8}, "19078008"),
+                (8, "590808801212345608", {"severity_mask": 0x80, "status_mask": 8}, "19088008"),
+                (9, "590908401212345600", {"dtc": 0x123456}, "1909123456"),
+                (9, "590908", {"dtc": 0x123456}, "1909123456")):
+            fake = unittest.mock.Mock(spec=Session)
+            fake.exchange.return_value = bytes.fromhex(data)
+            report = Session.read_dtc_severity(fake, VIN, sub, **options)
+            self.assertEqual(report["availability_mask"], 8)
+            fake.exchange.assert_called_once_with(bytes.fromhex(request))
+            self.assertEqual(fake.verify_vin.call_count, 2)
+            if sub == 7:
+                self.assertEqual(report["count"], 2)
+                self.assertEqual(report["format_identifier"], 1)
+            elif len(data) > 6:
+                self.assertEqual(report["records"][0]["dtc"], "123456")
+                self.assertEqual(report["records"][0]["functional_unit"], 0x12)
+            else:
+                self.assertEqual(report["records"], [])
+        for sub, data, options in (
+                (7, "59070801", {}),
+                (8, "590808401212345608", {"severity_mask": 0x80, "status_mask": 8}),
+                (8, "590808801212345601", {"severity_mask": 0x80, "status_mask": 8}),
+                (9, "590908801212345708", {"dtc": 0x123456})):
+            fake = unittest.mock.Mock(spec=Session)
+            fake.exchange.return_value = bytes.fromhex(data)
+            with self.assertRaises(DoIpError):
+                Session.read_dtc_severity(fake, VIN, sub, **options)
+            fake.close.assert_called_once()
+
     def test_fault_counters_are_signed_and_separate_from_status(self):
         for payload, counters in (("5914", []), ("59140102037F01020480010205FF", [127, -128, -1])):
             fake = unittest.mock.Mock(spec=Session)

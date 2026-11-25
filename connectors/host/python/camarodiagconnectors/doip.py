@@ -406,6 +406,9 @@ def positive(request: bytes, reply: bytes) -> bytes:
                 raise DoIpError("Malformed DTC index or fault counter report")
         elif len(reply) < 3 or (subfunction == 10 and (len(request) != 2 or (len(reply) - 3) % 4)):
             raise DoIpError("Malformed DTC report")
+        if subfunction == 9:
+            if len(request) != 5 or len(reply) not in (3, 9) or (len(reply) == 9 and reply[5:8] != request[2:5]):
+                raise DoIpError("DTC severity identity mismatch")
         if subfunction in (0x04, 0x06):
             if len(request) != 6 or len(reply) < 6 or reply[2:5] != request[2:5]:
                 raise DoIpError("UDS DTC identity mismatch")
@@ -822,6 +825,58 @@ class Session:
             else:
                 result = self.dtc_detail(dtc, record, action == "extended")
             verify()
+            return result
+        except BaseException:
+            self.close()
+            raise
+
+    def read_dtc_severity(self, expected: str, subfunction: int, *,
+                          severity_mask: int = 255, status_mask: int = 255, dtc: int | None = None) -> dict:
+        """ISO 14229 19/07, 08 and 09; preserve ECU severity and functional-unit bytes."""
+        if type(subfunction) is not int or subfunction not in (7, 8, 9):
+            raise DoIpError("Invalid DTC severity selector")
+        if subfunction == 9:
+            if type(dtc) is not int or not 0 <= dtc <= 0xFFFFFF:
+                raise DoIpError("Explicit 24-bit DTC required")
+            request = bytes((0x19, 9)) + dtc.to_bytes(3, "big")
+        else:
+            if dtc is not None or any(type(mask) is not int or not 0 <= mask <= 255
+                                      for mask in (severity_mask, status_mask)):
+                raise DoIpError("Invalid DTC severity/status masks")
+            request = bytes((0x19, subfunction, severity_mask, status_mask))
+        try:
+            self.verify_vin(expected)
+            reply = self.exchange(request)
+            if len(reply) < 3 or reply[:2] != bytes((0x59, subfunction)):
+                raise DoIpError("Malformed DTC severity response")
+            availability = reply[2]
+            result = {"subfunction": subfunction, "availability_mask": availability}
+            if subfunction == 7:
+                if len(reply) != 6:
+                    raise DoIpError("Invalid severity count response")
+                count = int.from_bytes(reply[4:6], "big")
+                if count and (not severity_mask or not (status_mask & availability)):
+                    raise DoIpError("DTC count contradicts requested masks")
+                result.update(format_identifier=reply[3], count=count)
+            else:
+                if (len(reply) - 3) % 6 or (subfunction == 9 and len(reply) not in (3, 9)):
+                    raise DoIpError("Invalid DTC severity record length")
+                rows, seen = [], set()
+                for offset in range(3, len(reply), 6):
+                    severity, unit = reply[offset:offset+2]
+                    code = int.from_bytes(reply[offset+2:offset+5], "big")
+                    status = reply[offset+5]
+                    if code in seen or status & ~availability:
+                        raise DoIpError("Duplicate DTC or unavailable status bit")
+                    if subfunction == 9 and code != dtc:
+                        raise DoIpError("Severity record belongs to another DTC")
+                    if subfunction == 8 and (not (severity & severity_mask) or not (status & status_mask & availability)):
+                        raise DoIpError("DTC severity record does not match requested masks")
+                    seen.add(code)
+                    rows.append({"dtc": f"{code:06X}", "severity": severity,
+                                 "functional_unit": unit, "status": status})
+                result["records"] = rows
+            self.verify_vin(expected)
             return result
         except BaseException:
             self.close()

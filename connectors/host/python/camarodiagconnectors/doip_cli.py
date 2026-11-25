@@ -90,6 +90,12 @@ def run(argv: Sequence[str] | None = None) -> dict:
         monitor.add_argument("--interval", type=float, default=1)
     sub.add_parser("supported-dtcs", help=tr("List supported DTCs", "Lister les DTC pris en charge"))
     sub.add_parser("snapshot-index", help=tr("List snapshot references", "Lister les références des snapshots"))
+    for action in ("severity-count", "severity-dtcs"):
+        severity = sub.add_parser(action, help=tr("Filter DTCs by severity and status", "Filtrer les DTC par sévérité et statut"))
+        severity.add_argument("--severity-mask", required=True, type=lambda x: hex_value(x, 2))
+        severity.add_argument("--mask", required=True, type=lambda x: hex_value(x, 2))
+    severity_detail = sub.add_parser("severity-info", help=tr("Read severity for one DTC", "Lire la sévérité d'un DTC"))
+    severity_detail.add_argument("--dtc", required=True, type=lambda x: hex_value(x, 6))
     sub.add_parser("fault-counters", help=tr("Read DTC fault detection counters", "Lire les compteurs de détection DTC"))
     historical_actions = {"first-failed-dtc": 0x0B, "first-confirmed-dtc": 0x0C,
                           "recent-failed-dtc": 0x0D, "recent-confirmed-dtc": 0x0E}
@@ -239,6 +245,12 @@ def run(argv: Sequence[str] | None = None) -> dict:
                 print(json.dumps({"partial_sample": row}), file=sys.stderr)
             return result | {"ecu": o.ecu, "tester": o.tester, "tls": not o.tcp} | session.monitor(
                 o.vin, o.did, o.samples, o.interval, obd=o.action == "obd-monitor", on_sample=on_sample)
+        if o.action in ("severity-count", "severity-dtcs", "severity-info"):
+            subfunction = {"severity-count": 7, "severity-dtcs": 8, "severity-info": 9}[o.action]
+            report = session.read_dtc_severity(o.vin, subfunction, severity_mask=getattr(o, "severity_mask", 255),
+                                              status_mask=getattr(o, "mask", 255), dtc=getattr(o, "dtc", None))
+            return result | {"vin": o.vin, "ecu": o.ecu, "tester": o.tester, "tls": not o.tcp,
+                             "service_protocol": "UDS"} | report
         if o.action == "fault-counters":
             report = session.read_fault_counters(o.vin)
             return result | {"vin": o.vin, "ecu": o.ecu, "tester": o.tester, "tls": not o.tcp,

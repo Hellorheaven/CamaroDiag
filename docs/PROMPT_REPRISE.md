@@ -1,3 +1,7 @@
+## PR117 — sévérité DTC UDS 19/07 à 19/09 Connectors (25/11/2026)
+
+- CLI severity-count, severity-dtcs (masques sévérité/statut explicites), severity-info (DTC 24 bits). Compte et format bruts, sévérité/unité fonctionnelle/statut séparés ; résultat vide possible, corrélation du DTC et des masques, refus des doublons/troncatures et revalidation F190. Référence de format https://uds.readthedocs.io/en/stable/pages/knowledge_base/service.html et https://udsoncan.readthedocs.io/en/latest/_modules/udsoncan/services/ReadDTCInformation.html ; pas de conformité matérielle revendiquée. Tests écrits non exécutés. Android et Windows à raccorder.
+
 ## PR117 — trace et paramètres de session sauvegarde DoIP Windows (25/11/2026)
 
 - CLI --doip-backup : --trace-file distinct du ZIP, conserve découverte et deux lectures réelles même en cas d'interruption ; options P2/P2*, routage ISO 13400 et quatre octets OEM explicites. Contrôle VIN/passerelle au départ et revalidation avant ouverture du socket, identité ECU et double lecture inchangées. Vérification offline reste sans réseau. Aide FR/EN et tests écrits non exécutés, aucune CI. Ne pas partager les traces contenant des données ECU ou VIN sans autorisation.
