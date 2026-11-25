@@ -1113,6 +1113,7 @@
     <string name="cal_doip_legacy_emissions_count">Comptage DTC émissions historiques</string>
     <string name="cal_doip_legacy_mirror_result">Mémoire miroir UDS historique</string>
     <string name="cal_doip_legacy_emissions_result">Émissions UDS historiques</string>
+    <string name="cal_doip_decoded_stored_record">Enregistrement mémorisé décodé</string>
     <string name="cal_doip_stored_record">Lire les données DTC mémorisées par numéro</string>
     <string name="cal_doip_stored_record_result">Enregistrement mémorisé 0x%1$02X</string>
     <string name="cal_doip_stored_record_count">Nombre de DID annoncé : %1$d</string>
