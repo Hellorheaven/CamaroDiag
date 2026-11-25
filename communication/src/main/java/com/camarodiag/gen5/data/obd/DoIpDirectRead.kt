@@ -712,7 +712,7 @@ object DoIpDirectRead {
             else if (operation == Operation.EXCHANGE) timeoutMs * (requireNotNull(fixedCommands).size + 4L)
             else if (operation in setOf(Operation.MONITOR, Operation.OBD_MONITOR))
             timeoutMs * (sampleCount + 7L) + intervalMs * (sampleCount - 1L)
-            else if (wwhKind != null || multi) timeoutMs * 8L else timeoutMs * 5L
+            else if (wwhKind != null || multi || operation == Operation.OBD_DID) timeoutMs * 8L else timeoutMs * 5L
         val gateway = discover(target.address, target.expectedVin, timeoutMs, onControlTrace)
         requireGatewayIdentity(target, gateway)
         if (operation == Operation.EXCHANGE) require(gateway.vin == target.expectedVin)
@@ -786,6 +786,12 @@ object DoIpDirectRead {
                                     timeoutMs).let { it.copyOfRange(3, it.size) }
                             }
                         } else null
+                        if (operation == Operation.OBD_DID) {
+                            require(!requireNotNull(data).isEmpty()) { "Missing DID data." }
+                            require(readVin(0xF802) == vin)
+                            require(decodeObdProtocol(session.exchange(byteArrayOf(0x22, 0xF8.toByte(), 0x10),
+                                timeoutMs)) == protocolValue) { "OBDonUDS identity changed during DID read." }
+                        }
                         val samples = if (operation == Operation.OBD_MONITOR) {
                             val measured = monitorDid()
                             require(readVin(0xF802) == vin)
@@ -874,6 +880,8 @@ object DoIpDirectRead {
                             Outcome(gateway, target.ecu, vin, null, null, trace.toList(), multiValues = values)
                         } else if (operation == Operation.DID) {
                             val reply = session.exchange(byteArrayOf(0x22, (did shr 8).toByte(), did.toByte()), timeoutMs)
+                            require(reply.size > 3) { "Missing DID data." }
+                            require(readVin() == vin)
                             Outcome(gateway, target.ecu, vin, reply.copyOfRange(3, reply.size), null, trace.toList())
                         } else if (detailRequest != null) {
                             val reply = session.exchange(detailRequest, timeoutMs)

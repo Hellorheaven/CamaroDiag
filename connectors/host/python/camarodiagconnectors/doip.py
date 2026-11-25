@@ -602,6 +602,11 @@ class Session:
                 if not result["obd_on_uds"]:
                     raise DoIpError("Selected ECU did not identify as OBDonUDS")
                 data = vin.encode("ascii") if did == 0xF802 else protocol if did == 0xF810 else self.read_did(did)
+                if not data:
+                    raise DoIpError("Missing DID data")
+                self.verify_vin(expected, 0xF802)
+                if self.read_did(0xF810) != protocol:
+                    raise DoIpError("OBDonUDS identification changed during DID read")
                 result.update(did=did, data=data.hex().upper())
             return result
         except BaseException:

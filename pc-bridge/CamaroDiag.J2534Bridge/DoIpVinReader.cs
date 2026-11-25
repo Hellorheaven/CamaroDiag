@@ -141,6 +141,10 @@ internal static class DoIpVinReader
             _ => ObdOnUdsServices.DecodeReadDid(did.Value, await link.ExchangeUdsAsync(
                 ObdOnUdsServices.ReadObdDid(did.Value), timeout, token))
         };
+        if (data.Length == 0) throw new InvalidDataException("Missing DID data.");
+        var after = await ReadVerifiedObdAsync(link, expectedVin, null, timeout, token);
+        if (after.ProtocolValue != identification.Value)
+            throw new InvalidDataException("OBDonUDS identification changed during DID read.");
         return new(vin, identification.Value, data);
     }
 
@@ -224,7 +228,11 @@ internal static class DoIpVinReader
             ecu, useTls, timeout, token, clientCertificateThumbprint, trace, options);
         var vin = await VerifyObservedVinAsync(transport, gateway, timeout, token, requested, received);
         if (did == 0xF190) return Encoding.ASCII.GetBytes(vin);
-        return await ReadDidAsync(transport, did, timeout, token, requested, received);
+        var data = await ReadDidAsync(transport, did, timeout, token, requested, received);
+        if (data.Length == 0) throw new InvalidDataException("Missing DID data.");
+        if (await VerifyObservedVinAsync(transport, gateway, timeout, token, requested, received) != vin)
+            throw new InvalidDataException("ECU VIN changed during DID read.");
+        return data;
     }
 
     internal static async Task MonitorDidAsync(

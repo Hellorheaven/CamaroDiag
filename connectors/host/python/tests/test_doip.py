@@ -255,12 +255,20 @@ class DoIpTests(unittest.TestCase):
             fake = Fake()
             if protocol_value == 1:
                 self.assertEqual(Session.read_obd(fake, VIN, 0xF40C)["data"], "AB")
-                self.assertEqual(fake.requests, [0xF802, 0xF810, 0xF40C])
+                self.assertEqual(fake.requests, [0xF802, 0xF810, 0xF40C, 0xF802, 0xF810])
             else:
                 with self.assertRaises(DoIpError):
                     Session.read_obd(fake, VIN, 0xF40C)
                 self.assertEqual(fake.requests, [0xF802, 0xF810])
                 self.assertTrue(fake.closed)
+
+    def test_obd_single_did_rejects_changed_protocol(self):
+        fake = unittest.mock.Mock(spec=Session)
+        fake.verify_vin.return_value = VIN
+        fake.read_did.side_effect = [b"\x01", b"\xab", b"\x02"]
+        with self.assertRaises(DoIpError):
+            Session.read_obd(fake, VIN, 0xF40C)
+        fake.close.assert_called_once()
 
     def test_verified_wwh_dtc_requests_and_correlation(self):
         cases = [

@@ -1,3 +1,7 @@
+## PR117 — vérification après lecture DID (25/11/2026)
+
+- Lecture simple DoIP Android/Windows : rejet des données vides et relecture de l'identité avant publication du résultat (F190 pour UDS, F802/F810 pour OBDonUDS). Connectors : même protection OBDonUDS, test de changement du protocole en cours de session. Checkpoint WWH 45501625699 terminé avec 12/12 jobs techniques réussis ; lot multi-DID et durcissement suivants à valider.
+
 ## PR117 — corrélation UDS DoIP Android/Connectors (24/11/2026)
 
 - Alignement du contrôle de réponse brute sur le comportement déjà présent Windows : SID 24, DTC 19/04 et 19/06 avec identifiant 24 bits et numéro de record spécifique (sélecteurs FE/FF préservés), groupe fonctionnel WWH et groupe 19/56. Les réponses contradictoires sont refusées au niveau transport, pas seulement dans les écrans spécialisés. Tests positifs/négatifs ajoutés, aucune restriction d’émission SID.
