@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 from typing import Sequence
 
 from .doip import (Session, discover, discover_unique_vin, discover_ipv4, discover_ipv6, gateway_key, status,
-                   DoIpError, InventoryTraceError, valid_vin, parse_commands, confirm_commands, parse_did_layout, validate_monitor_layout, parse_ecu_inventory, inventory_ecus)
+                   DoIpError, InventoryTraceError, valid_vin, parse_commands, confirm_commands, parse_did_layout, parse_stored_did_lengths, validate_monitor_layout, parse_ecu_inventory, inventory_ecus)
 from .doip_archive import load_scope
 from .doip_capture import capture_region, save_capture
 
@@ -135,6 +135,10 @@ def _run(argv: Sequence[str] | None, resources: ExitStack) -> dict:
     sub.add_parser("supported-dtcs", help=tr("List supported DTCs", "Lister les DTC pris en charge"))
     stored = sub.add_parser("stored-record", help=tr("Read stored DTC data by record number", "Lire les données DTC mémorisées par numéro"))
     stored.add_argument("--record", required=True, type=lambda x: hex_value(x, 2))
+    all_stored = sub.add_parser("stored-records", help=tr("Read all stored DTC records", "Lire tous les enregistrements DTC mémorisés"))
+    all_stored.add_argument("--did-lengths", required=True, help=tr(
+        "Documented DID:length catalog, e.g. F190:17,F40D:1",
+        "Catalogue DID:longueur documenté, ex. F190:17,F40D:1"))
     sub.add_parser("snapshot-index", help=tr("List snapshot references", "Lister les références des snapshots"))
     sub.add_parser("permanent-dtcs", help=tr("Read permanent UDS DTCs", "Lire les DTC permanents UDS"))
     for action in ("severity-count", "severity-dtcs"):
@@ -210,6 +214,7 @@ def _run(argv: Sequence[str] | None, resources: ExitStack) -> dict:
     layout = parse_did_layout(o.layout) if multi_monitor or o.action in ("dids", "obd-dids") else None
     if multi_monitor:
         layout = validate_monitor_layout(layout)
+    stored_lengths = parse_stored_did_lengths(o.did_lengths) if o.action == "stored-records" else None
     if o.action in ("obd-dids", "obd-monitor-dids") and any(not 0xF400 <= did <= 0xF8FF for did, _ in layout):
         parser.error(tr("Legislated DIDs F400..F8FF required", "DID réglementaires F400..F8FF requis"))
     if o.action == "mirror-extended" and (o.record == 0 or 0xF0 <= o.record <= 0xFD):
@@ -372,6 +377,10 @@ def _run(argv: Sequence[str] | None, resources: ExitStack) -> dict:
             subfunction = {"severity-count": 7, "severity-dtcs": 8, "severity-info": 9}[o.action]
             report = session.read_dtc_severity(o.vin, subfunction, severity_mask=getattr(o, "severity_mask", 255),
                                               status_mask=getattr(o, "mask", 255), dtc=getattr(o, "dtc", None))
+            return result | {"vin": o.vin, "ecu": o.ecu, "tester": o.tester, "tls": not o.tcp,
+                             "service_protocol": "UDS"} | report
+        if o.action == "stored-records":
+            report = session.read_all_stored_dtc_records(o.vin, stored_lengths)
             return result | {"vin": o.vin, "ecu": o.ecu, "tester": o.tester, "tls": not o.tcp,
                              "service_protocol": "UDS"} | report
         if o.action == "stored-record":
