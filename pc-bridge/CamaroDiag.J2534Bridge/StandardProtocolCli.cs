@@ -1069,15 +1069,6 @@ internal static class StandardProtocolCli
             throw new ArgumentException("DTC snapshot record option requires --obd-snapshot.");
         if (extendedRecord is not null && extendedDtc is null)
             throw new ArgumentException("DTC extended-data record option requires --obd-extended-dtc.");
-        var snapshotCatalog = Optional(args, "--snapshot-did-lengths");
-        if (snapshotCatalog is not null)
-        {
-            if ((udsSnapshot is null) == (snapshotDtc is null) ||
-                Optional(args, "--expected-vin") is null ||
-                (snapshotDtc is not null && snapshotRecord is null))
-                throw new ArgumentException("Decoded snapshots require VIN, one DTC selector and explicit record.");
-            _ = ObdOnUdsServices.ParseStoredDidLengths(snapshotCatalog);
-        }
         var wwhSeverity = Optional(args, "--obd-wwh-severity");
         var wwhPermanent = args.Contains("--obd-wwh-permanent",
             StringComparer.OrdinalIgnoreCase);
@@ -1468,6 +1459,15 @@ internal static class StandardProtocolCli
         if (extendedRecord is not null && extendedDtc is null)
             throw new ArgumentException(
                 "DTC extended-data record option requires --obd-extended-dtc.");
+        var snapshotCatalog = Optional(args, "--snapshot-did-lengths");
+        if (snapshotCatalog is not null)
+        {
+            if ((udsSnapshot is null) == (snapshotDtc is null) ||
+                Optional(args, "--expected-vin") is null ||
+                (snapshotDtc is not null && snapshotRecord is null))
+                throw new ArgumentException("Decoded snapshots require VIN, one DTC selector and explicit record.");
+            _ = ObdOnUdsServices.ParseStoredDidLengths(snapshotCatalog);
+        }
         var wwhSeverity = Optional(args, "--obd-wwh-severity");
         var wwhPermanent = args.Contains("--obd-wwh-permanent",
             StringComparer.OrdinalIgnoreCase);
