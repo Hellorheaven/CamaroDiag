@@ -119,6 +119,15 @@ class Obd2FeatureEngine(
         }
     }
 
+    /** One operator-selected read. Keep the original response, including
+     * line boundaries. Let ELM assemble Mode 09 and DTC records, then
+     * restore its header-bearing telemetry format before releasing the lock. */
+    suspend fun readConsoleRequest(request: SafeObdRequest): String {
+        require(SafeObdRequestPolicy.parse(request.elmCommand) == request)
+        return if (request.service == 0x01) ask(request.elmCommand, 4_000L)
+        else withHeaderlessRecords { ask(request.elmCommand, 4_000L) }
+    }
+
     suspend fun initialize(): Map<String, String> {
         val result = linkedMapOf<String, String>()
         listOf("ATZ", "ATE0", "ATL0", "ATS0", "ATH0", "ATSP6").forEach {

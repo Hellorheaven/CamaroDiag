@@ -630,10 +630,11 @@ class BluetoothObdManager(context: Context) {
         if (!isJ2534BridgeConnected()) {
             check(isObdCommandChannelAvailable) { "No connected OBD read channel." }
             val epoch = transportSessionEpoch.capture()
-            return commandSessionMutex.withLock {
+            return withObdCommandSession { engine ->
                 transportSessionEpoch.requireQueuedCurrent(epoch)
-                check(isObdCommandChannelAvailable) { "OBD channel disconnected." }
-                sendAtCommandInternal(request.elmCommand, 4_000L, expectedEpoch = epoch)
+                engine.readConsoleRequest(request).also {
+                    transportSessionEpoch.requireQueuedCurrent(epoch)
+                }
             }
         }
         val epoch = transportSessionEpoch.capture()

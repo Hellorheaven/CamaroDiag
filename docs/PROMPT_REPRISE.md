@@ -1,3 +1,7 @@
+## PR117 — intégration console OBD des formats ELM/J2534 (25/11/2026)
+
+- C6 : console opérateur ELM conserve les lignes physiques pour PID ; Mode 09 et DTC utilisent temporairement le format sans en-tête pour l'assemblage natif, puis restaurent ATH1/ATS0 sous verrou et invalident la session en cas d'échec. La console J2534 conserve l'adresse du répondant physique déjà vérifiée avec la réponse assemblée. Tests de régression ELM et progression DoIP Windows écrits non exécutés. Aucun checkpoint C6/DoIP.
+
 ## PR117 — suivi des acquisitions DoIP interrompues Windows / CLI (25/11/2026)
 
 - C6/DoIP : CLI NDJSON publie les échantillons vérifiés avec adresse passerelle/testeur/ECU, transport et temps écoulé ; bilan final explicite même en échec ou annulation, sans transformer l'erreur en succès. Console Windows affiche le nombre réellement vérifié en cas de capture partielle (FR/EN), contrôle le journal avant chaque publication. Suivi séquentiel partagé ; aucune mesure non vérifiée déclarée complète. Régressions de ressources écrites non exécutées ; aucun checkpoint. C6/DoIP restent actifs.

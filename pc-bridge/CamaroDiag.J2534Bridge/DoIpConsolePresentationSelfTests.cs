@@ -14,6 +14,24 @@ internal static class DoIpConsolePresentationSelfTests
             if (!condition) throw new InvalidOperationException("DoIP console: " + name);
         }
 
+        var progress = new DoIpMonitoringProgress(2);
+        progress.RecordVerified(1);
+        Check(!progress.Complete && progress.VerifiedSamples == 1, "Verified partial capture.");
+        foreach (var index in new[] { 1, 3, 0 })
+        {
+            var rejected = false;
+            try { progress.RecordVerified(index); }
+            catch (InvalidDataException) { rejected = true; }
+            Check(rejected && progress.VerifiedSamples == 1, "Reject duplicate or out-of-order sample.");
+        }
+        var premature = false;
+        try { progress.MarkComplete(); }
+        catch (InvalidDataException) { premature = true; }
+        Check(premature && !progress.Complete, "Incomplete capture cannot succeed.");
+        progress.RecordVerified(2);
+        progress.MarkComplete();
+        Check(progress.Complete && progress.VerifiedSamples == progress.RequestedSamples, "Complete verified capture.");
+
         var defaults = DoIpDiagnosticTransport.SessionOptions.Parse(3000, "", "", "00", "");
         Check(defaults.P2Ms == 3000 && defaults.P2StarMs == 3000 &&
             defaults.RoutingType == 0 && defaults.OemBytes is null, "Blank settings retain total timeout and default routing.");

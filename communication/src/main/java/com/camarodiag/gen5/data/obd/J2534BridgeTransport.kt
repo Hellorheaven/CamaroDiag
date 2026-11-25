@@ -308,7 +308,9 @@ class J2534BridgeTransport(
         check(isStandardObdPhysicalReadEnabled) {
             "J2534 disconnected before the physical console response was accepted."
         }
-        return reply.toHex()
+        // exchange() already verified the configured physical response ID;
+        // retain it alongside the assembled payload for console provenance.
+        return checkNotNull(connectedResponseCanId) + " " + reply.toHex()
     }
 
     internal companion object {
