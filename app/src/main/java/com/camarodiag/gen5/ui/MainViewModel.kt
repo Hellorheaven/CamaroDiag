@@ -531,6 +531,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _livePids = MutableStateFlow<List<LivePidValue>>(emptyList())
     val livePids: StateFlow<List<LivePidValue>> = _livePids.asStateFlow()
+    private val _detectedLiveSensors = MutableStateFlow<List<LiveSensorDefinition>>(emptyList())
+    val detectedLiveSensors: StateFlow<List<LiveSensorDefinition>> = _detectedLiveSensors.asStateFlow()
+    // null = no complete scan, empty = all requested modes positively answered.
+    private val _dtcScanNotice = MutableStateFlow<String?>(null)
+    val dtcScanNotice: StateFlow<String?> = _dtcScanNotice.asStateFlow()
+    private var liveEvidenceGeneration = 0L
+
+    private fun resetLiveAndDtcEvidence() {
+        liveEvidenceGeneration++
+        _livePids.value = emptyList()
+        _detectedLiveSensors.value = emptyList()
+        _dtcScanNotice.value = null
+    }
 
     private val _isStreamingLive = MutableStateFlow(true)
     val isStreamingLive: StateFlow<Boolean> = _isStreamingLive.asStateFlow()
@@ -958,6 +971,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
 
     private fun clearVehicleEvidence(preserveCanConsole: Boolean = false) {
+        resetLiveAndDtcEvidence()
         invalidateEnhancedUdsReads()
         calibrationIdentityGeneration++
         gmlanIdentityGeneration++
@@ -4380,6 +4394,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      * A consent dialog from an older revision can never authorize a write.
      */
     private fun nextConnectionGeneration(): Long {
+        resetLiveAndDtcEvidence()
         invalidateEnhancedUdsReads()
         val next = ++connectionAttemptGeneration
         pendingUsbPermissionRetry = null
@@ -4737,41 +4752,50 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun scanDtcs() {
         val startedGeneration = accountSessionGeneration
+        val evidenceGeneration = liveEvidenceGeneration
+        fun current() = isCurrentAccountGeneration(startedGeneration) && evidenceGeneration == liveEvidenceGeneration
         viewModelScope.launch {
-            if (!isCurrentAccountGeneration(startedGeneration)) return@launch
+            if (!current()) return@launch
+            _dtcScanNotice.value = null
             beginBusyOperation()
             try {
                 if (obdManager.isSimulationActive) {
                     val (confirmed, pending, permanent) =
                         obdManager.createSimulatedObd2FeatureEngine().readDtcs()
+                    if (!current()) return@launch
                     _dtcs.value = mapObdDtcs(confirmed + pending + permanent)
                     _connectionMessage.value = localizedContext.getString(R.string.msg_dtc_simulated_lfx)
+                    _dtcScanNotice.value = _connectionMessage.value
                 } else if (!obdManager.isStandardObdReadAvailable()) {
                     // No SAE OBD channel is available; keep independently read UDS ECU records.
                     _dtcs.value = _dtcs.value.filterNot { it.module.equals("ECM", ignoreCase = true) }
                     _connectionMessage.value = if (obdManager.isJ2534BridgeConnected())
                         localizedContext.getString(R.string.msg_dtc_j2534_unavailable)
                     else localizedContext.getString(R.string.msg_dtc_adapter_required)
+                    _dtcScanNotice.value = _connectionMessage.value
                 } else {
                     if (obdManager.isJ2534StandardObdAvailable()) {
                         val snapshot = obdManager.readJ2534StandardDtcs()
-                        if (!isCurrentAccountGeneration(startedGeneration)) return@launch
+                        if (!current()) return@launch
                         replaceStandardDtcRecords(snapshot.records, snapshot.unavailableModes)
                         _connectionMessage.value = unavailableDtcNotice(snapshot.unavailableModes)
+                        _dtcScanNotice.value = _connectionMessage.value.orEmpty()
                     } else {
                         val modes = obdManager.withObdCommandSession { engine -> engine.readDtcModeEvidence() }
-                        if (!isCurrentAccountGeneration(startedGeneration)) return@launch
+                        if (!current()) return@launch
                         val unavailable = modes.filterValues { it == null }.keys
                         replaceStandardDtcRecords(modes.values.filterNotNull().flatten(), unavailable)
                         _connectionMessage.value = unavailableDtcNotice(unavailable)
+                        _dtcScanNotice.value = _connectionMessage.value.orEmpty()
                     }
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
-                if (isCurrentAccountGeneration(startedGeneration)) {
+                if (current()) {
                     reportConnectionLoss(error)
                     _connectionMessage.value = localizedContext.getString(R.string.msg_dtc_scan_failed)
+                    if (current()) _dtcScanNotice.value = _connectionMessage.value
                 }
             } finally {
                 endBusyOperation()
@@ -5323,6 +5347,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 } else {
                     replaceStandardDtcRecords(allDtcs, report.unavailableDtcModes)
                 }
+                _dtcScanNotice.value = if (obdManager.isSimulationActive)
+                    localizedContext.getString(R.string.msg_dtc_simulated_lfx)
+                else unavailableDtcNotice(report.unavailableDtcModes).orEmpty()
                 _obdScanMessage.value = if (obdManager.isSimulationActive) {
                     localizedContext.getString(R.string.msg_full_scan_simulation_complete, report.supportedPids.size, allDtcs.size)
                 } else {
@@ -5489,7 +5516,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             var consecutiveFailures = 0
             var activeTelemetryBatch = 0
             val histories = mutableMapOf<String, ArrayDeque<Double>>()
-            val sensorRecency = LiveSignalRecency()
+            var sensorRecency = LiveSignalRecency()
+            var lastEvidenceGeneration = -1L
+            var batchEvidenceGeneration = -1L
 
             fun push(id: String, value: Double): List<Double> {
                 val queue = histories.getOrPut(id) { ArrayDeque() }
@@ -5504,7 +5533,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 // Spread the supported PID catalogue across four polling batches. This avoids
                 // flooding slower ELM327 adapters with every optional sensor on each refresh.
                 if (pidValue % 4 != activeTelemetryBatch) return null
+                if (batchEvidenceGeneration != liveEvidenceGeneration) return null
                 val response = obdManager.readMode01PidIfSupported(pidValue) ?: return null
+                if (batchEvidenceGeneration != liveEvidenceGeneration) return null
                 if (response.equals("NO_SOCKET", ignoreCase = true) ||
                     response.contains("UNABLE TO CONNECT", ignoreCase = true)) {
                     throw ObdTransportDisconnectedException("Live OBD transport is disconnected")
@@ -5516,6 +5547,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
             while (currentCoroutineContext().isActive) {
                 if (_isStreamingLive.value) {
+                    batchEvidenceGeneration = liveEvidenceGeneration
+                    if (lastEvidenceGeneration != batchEvidenceGeneration) {
+                        histories.clear()
+                        sensorRecency = LiveSignalRecency()
+                        lastEvidenceGeneration = batchEvidenceGeneration
+                    }
                     activeTelemetryBatch = (activeTelemetryBatch + 1) % 4
                     var valuesForRecording = emptyList<LivePidValue>()
                     try {
@@ -5701,6 +5738,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                                     val v = (b[0] * 256 + b[1]) / 1000.0
                                     values += LivePidValue("BAT", "Control Module Voltage", "Tension calculateur", v, "V", v, "V", 9.0, 16.0, push("BAT", v))
                                 }
+                                if (batchEvidenceGeneration != liveEvidenceGeneration) continue
                                 val mergedValues = _livePids.value.associateBy { it.id }.toMutableMap()
                                 val now = System.currentTimeMillis()
                                 values.forEach {
@@ -5718,11 +5756,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                                 }
                             }
                         }
-                        captureLiveTelemetrySample(valuesForRecording)
+                        if (batchEvidenceGeneration == liveEvidenceGeneration) {
+                            _detectedLiveSensors.value = LiveSensorCatalog.mergeObserved(
+                                _detectedLiveSensors.value,
+                                valuesForRecording.map { LiveSensorDefinition(it.id, it.labelEn, it.labelFr) }
+                            )
+                            captureLiveTelemetrySample(valuesForRecording)
+                        }
                         consecutiveFailures = 0
                     } catch (cancelled: CancellationException) {
                         throw cancelled
                     } catch (error: Exception) {
+                        if (batchEvidenceGeneration != liveEvidenceGeneration) continue
                         val connectionLost = ObdTransportFailurePolicy.isConnectionLoss(error)
                         if (connectionLost) {
                             // A physical disconnect stops polling; retain the dedicated

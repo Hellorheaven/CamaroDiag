@@ -197,6 +197,8 @@ fun CamaroDiagApp(
     val modules by viewModel.modules.collectAsState()
     val dtcs by viewModel.dtcs.collectAsState()
     val livePids by viewModel.livePids.collectAsState()
+    val detectedLiveSensors by viewModel.detectedLiveSensors.collectAsState()
+    val dtcScanNotice by viewModel.dtcScanNotice.collectAsState()
     val isStreaming by viewModel.isStreamingLive.collectAsState()
     val liveRecording by viewModel.liveRecordingState.collectAsState()
     val liveTelemetryMessage by viewModel.liveTelemetryMessage.collectAsState()
@@ -699,12 +701,8 @@ fun CamaroDiagApp(
                         ?: vehicle.vin.trim().uppercase(Locale.ROOT)
                             .takeIf { it.matches(Regex("[A-HJ-NPR-Z0-9]{17}")) }
                             ?.let { "vin_$it" },
-                    catalogSignals = calibrationWorkspace.nativeSignals
-                        .filterNot { it.hidden }
-                        .map { LiveSensorDefinition("ECU:" + it.id, it.name, it.name) } +
-                        calibrationWorkspace.obdbSignals
-                            .filterNot { it.hidden }
-                            .map { LiveSensorDefinition("OBDB:" + it.id, it.name, it.name) },
+                    detectedSensors = detectedLiveSensors,
+                    connectionGeneration = connectionGeneration,
                     onToggleStream = { viewModel.toggleLiveStream() },
                     onToggleUnits = {
                         viewModel.setUnitSystem(if (units == UnitSystem.METRIC) UnitSystem.IMPERIAL else UnitSystem.METRIC)
@@ -736,7 +734,7 @@ fun CamaroDiagApp(
                     onClearHistory = { viewModel.clearCanConsoleHistory() },
                     onExport = { withExportFolder { viewModel.exportCanCapture("CamaroDiag_CAN_${System.currentTimeMillis()}.txt") } }
                 )
-                DiagTab.DTCS -> DtcScreen(dtcs, vehicle, calibrationWorkspace.vinComparison, connectionGeneration, { viewModel.scanDtcs() }, { approval, epoch, confirmedVehicle -> viewModel.clearDtcs(approval, epoch, confirmedVehicle) })
+                DiagTab.DTCS -> DtcScreen(dtcs, vehicle, calibrationWorkspace.vinComparison, connectionGeneration, dtcScanNotice, { viewModel.scanDtcs() }, { approval, epoch, confirmedVehicle -> viewModel.clearDtcs(approval, epoch, confirmedVehicle) })
                 DiagTab.MILEAGE -> MileageScreen(mileageReport, { viewModel.runMileageAudit() }, { withExportFolder { viewModel.saveCurrentSession() } })
                 DiagTab.ABOUT -> LazyColumn {
                     item { AboutUpdateCard() }
@@ -1497,7 +1495,8 @@ fun LiveDataScreen(
     telemetryMessage: String?,
     vehicleIdentity: String?,
     accountUid: String?,
-    catalogSignals: List<LiveSensorDefinition>,
+    detectedSensors: List<LiveSensorDefinition>,
+    connectionGeneration: Long,
     onToggleStream: () -> Unit,
     onToggleUnits: () -> Unit,
     onToggleRecording: () -> Unit,
@@ -1516,13 +1515,11 @@ fun LiveDataScreen(
     var selectedPidIds by remember(storageKey) {
         mutableStateOf<Set<String>?>(storedSelection)
     }
-    var choosingSensors by remember(storageKey) { mutableStateOf(false) }
-    val allPidIds = pids.map { it.id }.toSet()
-    val liveCatalog = remember(pids, catalogSignals) {
-        LiveSensorCatalog.entriesWithObserved(
-            catalogSignals + pids.map { LiveSensorDefinition(it.id, it.labelEn, it.labelFr) }
-        )
+    var choosingSensors by remember(storageKey, connectionGeneration) { mutableStateOf(false) }
+    val liveCatalog = remember(detectedSensors) {
+        LiveSensorCatalog.availableEntries(detectedSensors)
     }
+    val allPidIds = liveCatalog.map { it.id }.toSet()
     val localeFrench = LocalConfiguration.current.locales[0].language.equals("fr", ignoreCase = true)
     // Android resources are authoritative for known signals. Legacy bilingual labels
     // remain a fallback only for signals discovered outside the known catalog.
@@ -1572,7 +1569,7 @@ fun LiveDataScreen(
         signal.id to (sensorLabelResources[signal.id]?.let(sensorContext::getString)
             ?: if (localeFrench) signal.labelFr else signal.labelEn)
     }
-    val activePidIds = selectedPidIds ?: allPidIds
+    val activePidIds = (selectedPidIds ?: allPidIds).intersect(allPidIds)
     val visiblePids = pids.filter { it.id in activePidIds }
 
     if (choosingSensors) {
@@ -1600,9 +1597,8 @@ fun LiveDataScreen(
                             },
                             key = { it.id }
                         ) { signal ->
-                            val measured = LiveSensorCatalog.isMeasured(signal.id, allPidIds)
                             Row(
-                                Modifier.fillMaxWidth().clickable(enabled = measured) {
+                                Modifier.fillMaxWidth().clickable {
                                     pendingIds = if (signal.id in pendingIds) pendingIds - signal.id
                                         else pendingIds + signal.id
                                 },
@@ -1610,19 +1606,12 @@ fun LiveDataScreen(
                             ) {
                                 Checkbox(
                                     checked = signal.id in pendingIds,
-                                    enabled = measured,
-                                    onCheckedChange = { checked ->
-                                        pendingIds = if (checked) pendingIds + signal.id
-                                            else pendingIds - signal.id
-                                    }
+                                    onCheckedChange = null
                                 )
                                 Column {
                                     Text(sensorLabels[signal.id] ?: signal.id)
                                     Text(signal.id, color = TextMuted, fontSize = 11.sp)
-                                    if (!measured) {
-                                        Text(stringResource(R.string.obd_sensor_not_measured),
-                                            color = TextMuted, fontSize = 11.sp)
-                                    }
+                                    // Only session-observed signals are listed; no disabled catalogue rows.
                                 }
                             }
                         }
@@ -1712,11 +1701,11 @@ fun LiveDataScreen(
             Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
                 Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
-                        stringResource(R.string.live_selected_sensors, visiblePids.size, pids.size),
+                        stringResource(R.string.live_selected_sensors, activePidIds.size, allPidIds.size),
                         color = CamaroAmber,
                         fontWeight = FontWeight.Bold
                     )
-                    Button(onClick = { choosingSensors = true }, modifier = Modifier.fillMaxWidth()) {
+                    Button(onClick = { choosingSensors = true }, enabled = liveCatalog.isNotEmpty(), modifier = Modifier.fillMaxWidth()) {
                         Text(stringResource(R.string.obd_choose_sensors))
                     }
                     TextButton(onClick = {
@@ -2573,7 +2562,7 @@ private fun localizedDtcDescription(dtc: DiagnosticDtc): String {
 }
 
 @Composable
-fun DtcScreen(dtcs: List<DiagnosticDtc>, vehicle: VehicleProfile, ecuVinComparison: VehicleVinComparison?, connectionGeneration: Long, onScan: () -> Unit, onClear: (EcuWriteConsentFlow.Approval, Long, VehicleProfile) -> Unit) {
+fun DtcScreen(dtcs: List<DiagnosticDtc>, vehicle: VehicleProfile, ecuVinComparison: VehicleVinComparison?, connectionGeneration: Long, scanNotice: String?, onScan: () -> Unit, onClear: (EcuWriteConsentFlow.Approval, Long, VehicleProfile) -> Unit) {
     var confirmClear by remember { mutableStateOf(false) }
     var pendingClearGeneration by remember { mutableStateOf<Long?>(null) }
     var pendingClearVehicle by remember { mutableStateOf<VehicleProfile?>(null) }
@@ -2687,9 +2676,13 @@ fun DtcScreen(dtcs: List<DiagnosticDtc>, vehicle: VehicleProfile, ecuVinComparis
                 )
             }
         }
+        if (scanNotice != null && scanNotice.isNotEmpty()) {
+            item { Text(scanNotice, color = CamaroAmber) }
+        }
         if (dtcs.isEmpty()) {
             item {
-                Text(stringResource(R.string.dtc_none_returned), color = OkGreen)
+                if (scanNotice == "") Text(stringResource(R.string.dtc_none_returned), color = OkGreen)
+                else if (scanNotice == null) Text(stringResource(R.string.obd_data_unavailable), color = CamaroAmber)
             }
         } else {
             items(dtcs) { dtc ->

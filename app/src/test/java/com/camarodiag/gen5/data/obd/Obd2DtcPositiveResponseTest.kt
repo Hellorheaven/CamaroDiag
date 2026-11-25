@@ -19,6 +19,27 @@ class Obd2DtcPositiveResponseTest {
         assertEquals(listOf("03", "07", "0A"), commands)
     }
 
+    @Test fun paddedCanAndNumberedElmResponsesAreDecodedWithoutPaddingCodes() = runBlocking {
+        val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+            when (command) {
+                "03" -> "7E8 04 43 01 03 00 AA AA AA>"
+                "07" -> "008\r0: 47 03 01 00 02\r1: 00 03 00"
+                else -> "7E9 02 4A 00 00 00 00 00 00"
+            }
+        })
+        val modes = engine.readDtcModeEvidence()
+        assertEquals(listOf("P0300"), modes[3]?.map { it.code })
+        assertEquals(listOf("P0100", "P0200", "P0300"), modes[7]?.map { it.code })
+        assertEquals(emptyList<ObdDtc>(), modes[10])
+    }
+
+    @Test fun incompleteNumberedElmResponseIsNotPositiveEvidence() = runBlocking {
+        val engine = Obd2FeatureEngine(ObdCommandChannel { _, _ ->
+            "008\r0: 43 03 01 00 02"
+        })
+        assertEquals(null, engine.readDtcModeEvidence()[3])
+    }
+
     @Test fun positiveResponseWithZeroDtcIsRealEvidence() = runBlocking {
         val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
             if (command == "03") "430000" else "NO DATA"

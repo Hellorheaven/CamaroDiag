@@ -502,8 +502,41 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
     private fun decodeDtcResponseOrNull(
         response: String, positiveService: Int, status: String
     ): List<ObdDtc>? {
-        val decoded = response.lineSequence().mapNotNull { rawLine ->
-            val line = rawLine.trim().uppercase(Locale.ROOT)
+        val lines = response.lineSequence().map { it.trim().removeSuffix(">").trim().uppercase(Locale.ROOT) }
+            .filter { it.isNotEmpty() }.toList()
+        // ELM auto-formatting represents an assembled ISO-TP response as a
+        // hexadecimal length followed by numbered lines. Do not decode fragments
+        // independently, and never accept an incomplete or reordered sequence.
+        val numbered = Regex("^([0-9A-F]):\\s*([0-9A-F\\s]+)$")
+        val lengthLine = Regex("^[0-9A-F]{3}$")
+        val assembled = mutableListOf<List<ObdDtc>>()
+        var index = 0
+        while (index < lines.size) {
+            val declared = lines[index].takeIf(lengthLine::matches)?.toInt(16)
+            if (declared == null || index + 1 >= lines.size || !numbered.matches(lines[index + 1])) {
+                index++
+                continue
+            }
+            index++
+            var expectedIndex = 0
+            var valid = declared in 2..4095
+            val payload = StringBuilder()
+            while (index < lines.size) {
+                val match = numbered.matchEntire(lines[index]) ?: break
+                if (match.groupValues[1].toInt(16) != expectedIndex % 16) valid = false
+                val fragment = match.groupValues[2].filterNot(Char::isWhitespace)
+                if (fragment.isEmpty() || fragment.length % 2 != 0) valid = false
+                payload.append(fragment)
+                expectedIndex++
+                index++
+            }
+            if (valid && payload.length == declared * 2) {
+                val bytes = payload.toString().chunked(2).map { it.toInt(16) }
+                if (bytes.firstOrNull() == positiveService)
+                    decodeSingleDtcPayload(bytes.drop(1), status)?.let(assembled::add)
+            }
+        }
+        val decoded = lines.mapNotNull { line ->
             if (line.isEmpty()) return@mapNotNull null
             // Decode each physical responder independently. Concatenating
             // several CAN frames can create synthetic fault codes.
@@ -531,13 +564,24 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
                 dataText.any { it !in '0'..'9' && it !in 'A'..'F' }
             ) return@mapNotNull null
             val raw = dataText.chunked(2).map { it.toInt(16) }
-            val bytes = if (raw.first() in 1..8 && raw.first() == raw.size - 1) raw.drop(1)
-                else raw
+            // With a physical CAN header, accept ISO-TP single-frame padding
+            // only after the declared PCI length and service have been checked.
+            val physical = compactHeader != null || tagged.containsMatchIn(line)
+            val frame = if (physical && raw.size >= 3 && raw.first() == raw.size - 1 &&
+                raw[1] in 1..7 && raw[2] == positiveService) raw.drop(1) else raw
+            val bytes = when {
+                physical && frame.size <= 8 && frame.first() in 1..7 &&
+                    frame.first() <= frame.size - 1 && frame.getOrNull(1) == positiveService ->
+                    frame.drop(1).take(frame.first())
+                raw.first() in 1..8 && raw.first() == raw.size - 1 -> raw.drop(1)
+                else -> raw
+            }
             if (bytes.firstOrNull() != positiveService) return@mapNotNull null
             decodeSingleDtcPayload(bytes.drop(1), status)
         }.toList()
-        if (decoded.isEmpty()) return null
-        return decoded.flatten().distinctBy(ObdDtc::code)
+        val complete = decoded + assembled
+        if (complete.isEmpty()) return null
+        return complete.flatten().distinctBy(ObdDtc::code)
     }
 
     private fun decodeSingleDtcPayload(payload: List<Int>, status: String): List<ObdDtc>? {

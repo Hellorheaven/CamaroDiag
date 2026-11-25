@@ -1,3 +1,8 @@
+## PR117 — retour Mustang : sélection Live et lecture DTC (25/11/2026)
+
+- Android C6 : le sélecteur Live ne présente que les signaux réellement décodés dans le contexte courant ; disponibilité mémorisée séparément de la fraîcheur des valeurs, cases sélectionnables, catalogue OEM non lu masqué, remise à zéro sur changement véhicule/connexion et rejet des lots obsolètes. Les préférences restent par véhicule/compte. Un PID annoncé mais jamais décodé n'est pas affiché.
+- DTC OBD : messages de résultat dans l'écran DTC, zéro défaut vert uniquement après réponse complète ; absence ou réponse partielle distincte. Décodeur prend en charge réponses CAN single-frame avec padding/PCI et réponses ELM multi-lignes numérotées complètes, sans interpréter les fragments ni modifier les ECU. Régressions écrites non exécutées. La cause exacte sur la Mustang reste inconnue faute de traces brutes ; recette CAN/DTC sur Release par le propriétaire. Aucun test/build/checkpoint, C6/DoIP restent ouverts.
+
 ## PR117 — séparation lecture VIN et concordance profil (25/11/2026)
 
 - C6 Android : lecture VIN physique et concordance du profil sont deux preuves distinctes ; un VIN Ford valide reste une lecture réussie mais une discordance avec le profil Camaro est signalée séparément. Même filtrage de topologie pour OBD et J2534, y compris VIN absent. Export : un rapport interrompu ne peut être entièrement réussi. Tests écrits, non exécutés ; aucun checkpoint CI. DoIP/C6 restent actifs, aucune qualification matérielle supplémentaire.

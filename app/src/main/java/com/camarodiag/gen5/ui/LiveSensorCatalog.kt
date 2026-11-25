@@ -58,6 +58,15 @@ internal object LiveSensorCatalog {
     fun entriesWithObserved(observed: Collection<LiveSensorDefinition>): List<LiveSensorDefinition> =
         (known + observed).distinctBy { it.id }.sortedBy { it.id }
 
+    /** Only signals actually read in this connection/vehicle context are selectable. */
+    fun availableEntries(observed: Collection<LiveSensorDefinition>): List<LiveSensorDefinition> {
+        val ids = observed.map { it.id }.toSet()
+        return entriesWithObserved(observed).filter { it.id in ids }
+    }
+
+    fun mergeObserved(previous: List<LiveSensorDefinition>, fresh: Collection<LiveSensorDefinition>): List<LiveSensorDefinition> =
+        availableEntries(previous + fresh)
+
     /** Never equate a documented PID with a successfully read PID. */
     fun isMeasured(id: String, measuredIds: Set<String>): Boolean = id in measuredIds
 }

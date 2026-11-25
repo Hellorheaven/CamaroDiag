@@ -25,6 +25,17 @@ class LiveSensorCatalogTest {
         assertEquals(entries.sortedBy { it.id }, entries)
     }
 
+    @Test fun onlyObservedSensorsAreSelectableAndDiscoverySurvivesPollingGaps() {
+        val speed = LiveSensorDefinition("SPD", "Speed", "Vitesse")
+        val voltage = LiveSensorDefinition("BAT", "Voltage", "Tension")
+        assertTrue(LiveSensorCatalog.availableEntries(emptyList()).isEmpty())
+        val first = LiveSensorCatalog.mergeObserved(emptyList(), listOf(speed))
+        val later = LiveSensorCatalog.mergeObserved(first, listOf(voltage))
+        assertEquals(setOf("SPD", "BAT"), later.map { it.id }.toSet())
+        assertEquals(later, LiveSensorCatalog.mergeObserved(later, emptyList()))
+        assertFalse(later.any { it.id == "RPM" || it.id == "OIL" })
+    }
+
     @Test fun knownCatalogNeverImpliesMeasuredOrSupported() {
         val observedIds = setOf("RPM", "ECT")
         assertTrue(LiveSensorCatalog.isMeasured("RPM", observedIds))
