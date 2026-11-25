@@ -536,6 +536,40 @@ internal static class DoIpDiagnosticSessionSelfTests
             });
         }
 
+        // Stored data by record number is published only after the final ECU identity check.
+        foreach (var finalMatches in new[] { true, false })
+        {
+            await RunCaseAsync(async stream =>
+            {
+                _ = await RequireRequestAsync(stream);
+                await SendAsync(stream, DoIpCodec.DiagnosticMessage,
+                    FromEcu([0x62, 0xF1, 0x90, .. System.Text.Encoding.ASCII.GetBytes(selectedVehicleVin)]));
+                var query = await ReadAsync(stream);
+                Check(query.Payload.SequenceEqual(new byte[] { 0x0E, 0x80, 0x12, 0x34, 0x19, 5, 1 }),
+                    "Stored data uses exact record selector.");
+                await SendAsync(stream, DoIpCodec.DiagnosticMessage, FromEcu([0x59, 5, 1, 1, 2, 3, 8, 1, 0xF1, 0x90, 0xAA]));
+                _ = await RequireRequestAsync(stream);
+                await SendAsync(stream, DoIpCodec.DiagnosticMessage,
+                    FromEcu([0x62, 0xF1, 0x90, .. System.Text.Encoding.ASCII.GetBytes(
+                        finalMatches ? selectedVehicleVin : otherVehicleVin)]));
+            }, async client =>
+            {
+                var timeout = TimeSpan.FromSeconds(2);
+                var token = CancellationToken.None;
+                var request = ObdOnUdsServices.ReadStoredRecord(1);
+                Task<ObdOnUdsServices.StoredRecordReport> Read() =>
+                    DoIpVinReader.ReadVerifiedDtcAsync(client, observedForVin, timeout, token, async () =>
+                        ObdOnUdsServices.DecodeStoredRecord(1, await client.ExchangeUdsAsync(request, timeout, token)));
+                if (finalMatches)
+                {
+                    var report = await Read();
+                    Check(report.Dtc == 0x010203 && report.RawData.Length == 4, "Stored record retained.");
+                }
+                else
+                    await Expect<InvalidDataException>(async () => { _ = await Read(); }, "Changed VIN prevents stored data publication.");
+            });
+        }
+
         // Multi-DID polling: one request per sample, no complete result before final VIN.
         foreach (var finalIdentityMatches in new[] { true, false })
         {

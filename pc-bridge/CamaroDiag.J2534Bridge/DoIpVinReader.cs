@@ -554,6 +554,17 @@ internal static class DoIpVinReader
             ObdOnUdsServices.DecodeLegacyDtc(request, await link.ExchangeUdsAsync(request, timeout, token)));
     }
 
+    internal static async Task<ObdOnUdsServices.StoredRecordReport> ReadObservedStoredRecordAsync(
+        DoIpVehicleDiscovery.Identity gateway, IPAddress address, ushort tester, ushort ecu,
+        bool tls, byte record, TimeSpan timeout, CancellationToken token,
+        string? certificate, Action<DoIpDiagnosticTransport.PduTrace>? trace, DoIpDiagnosticTransport.SessionOptions? options)
+    {
+        var request = ObdOnUdsServices.ReadStoredRecord(record);
+        await using var link = await ConnectObservedAsync(gateway, address, tester, ecu, tls, timeout, token, certificate, trace, options);
+        return await ReadVerifiedDtcAsync(link, gateway, timeout, token, async () =>
+            ObdOnUdsServices.DecodeStoredRecord(record, await link.ExchangeUdsAsync(request, timeout, token)));
+    }
+
     internal static async Task<ObdOnUdsServices.ExtendedRecordReport> ReadObservedExtendedRecordAsync(
         DoIpVehicleDiscovery.Identity gateway, IPAddress address, ushort tester, ushort ecu,
         bool tls, byte record, int? size, TimeSpan timeout, CancellationToken token,

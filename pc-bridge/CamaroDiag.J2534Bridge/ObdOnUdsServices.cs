@@ -437,6 +437,22 @@ internal static class ObdOnUdsServices
         return new(sub, null, null, DecodeDtcExtendedData(dtc, normalized));
     }
 
+    internal sealed record StoredRecordReport(byte Record, uint? Dtc, byte? Status, byte[] RawData, byte[] RawResponse);
+
+    internal static byte[] ReadStoredRecord(byte record)
+    {
+        if (record == 0xFF) throw new ArgumentException("Select a single stored record 00..FE.");
+        return UdsStandardServices.ReadDtc(0x05, [record]);
+    }
+
+    internal static StoredRecordReport DecodeStoredRecord(byte record, ReadOnlySpan<byte> reply)
+    {
+        _ = UdsStandardServices.RequireResponse(ReadStoredRecord(record), reply);
+        if (reply.Length == 3) return new(record, null, null, [], reply.ToArray());
+        uint dtc = ((uint)reply[3] << 16) | ((uint)reply[4] << 8) | reply[5];
+        return new(record, dtc, reply[6], reply[7..].ToArray(), reply.ToArray());
+    }
+
     internal sealed record ExtendedRecordEntry(uint Dtc, byte Status, byte[] Data);
     internal sealed record ExtendedRecordReport(byte Record, byte? Availability, IReadOnlyList<ExtendedRecordEntry> Entries);
 

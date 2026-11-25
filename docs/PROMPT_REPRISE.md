@@ -1,3 +1,7 @@
+## PR117 — UDS 19/05 Windows GUI/CLI (25/11/2026)
+
+- Parité Android/Windows/Connectors : numéro explicite, interface FR/EN, CLI --uds-stored-record avec VIN obligatoire, F190 avant/après, validation de l'écho et des bornes minimales DID, préservation brute et absence de données distincte. Tests parseur, codec, aide et loopback écrits, non exécutés. FF multi-record reste non proposé sans définition OEM. Aucun checkpoint CI ; DoIP/C6 restent ouverts.
+
 ## PR117 — UDS 19/05 Connectors et Android (25/11/2026)
 
 - Lecture d'un enregistrement mémorisé explicite 00..FE, sans FF (découpage multi-record OEM non défini), F190 avant/après, réponse vide distinguée, écho et structure DID minimale contrôlés, données brutes conservées. Actions CLI Python/Android FR/EN ; 00 réservé au cas réglementaire compatible. Tests écrits non exécutés. Windows reste à raccorder. Référence https://uds.readthedocs.io/en/stable/pages/knowledge_base/service.html . Aucun checkpoint CI.

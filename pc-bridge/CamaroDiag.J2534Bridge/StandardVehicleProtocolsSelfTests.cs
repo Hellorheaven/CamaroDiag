@@ -849,6 +849,15 @@ internal static class StandardVehicleProtocolsSelfTests
             "Explicit mirror record required.");
         string[] recordArgs = ["--host", "127.0.0.1", "--tester", "0E80", "--ecu", "1234",
             "--expected-vin", "1G1FA1RX0J0100001"];
+        var stored = StandardProtocolCli.ParseVerifiedDoIpRead([..recordArgs, "--uds-stored-record", "0x01"]);
+        Check(!stored.Obd && stored.Target.Request.SequenceEqual(new byte[] { 0x19, 5, 1 }), "Stored record uses verified UDS.");
+        Check(!ObdOnUdsServices.DecodeStoredRecord(1, [0x59, 5, 1]).Dtc.HasValue, "Empty record is distinct.");
+        var storedData = ObdOnUdsServices.DecodeStoredRecord(1, [0x59, 5, 1, 1, 2, 3, 8, 1, 0xF1, 0x90, 0xAA]);
+        Check(storedData.Dtc == 0x010203 && storedData.RawData.SequenceEqual(new byte[] { 1, 0xF1, 0x90, 0xAA }),
+            "Stored data preserved raw.");
+        Reject<InvalidDataException>(() => ObdOnUdsServices.DecodeStoredRecord(1, [0x59, 5, 2]), "Wrong record rejected.");
+        Reject<InvalidDataException>(() => ObdOnUdsServices.DecodeStoredRecord(1, [0x59, 5, 1, 1, 2, 3, 8, 2, 0xF1, 0x90]), "Missing DID rejected.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseVerifiedDoIpRead([..recordArgs, "--uds-stored-record", "0xFF"]), "Wildcard requires OEM layout.");
         var recordSupport = StandardProtocolCli.ParseVerifiedDoIpRead([..recordArgs, "--uds-extended-record-support", "0x01"]);
         Check(!recordSupport.Obd && recordSupport.Target.Request.SequenceEqual(new byte[] { 0x19, 0x1A, 1 }),
             "Support query is verified UDS.");

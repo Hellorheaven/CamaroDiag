@@ -408,6 +408,15 @@ internal static class UdsStandardServices
                 !response.Slice(2, 3).SequenceEqual(request.Slice(2, 3)) ||
                 (response.Length >= 7 && request[5] is not (0xFE or 0xFF) && response[6] != request[5])))
                 throw new InvalidDataException("Wrong legacy mirror-memory DTC detail.");
+            if (subfunction == 5)
+            {
+                if (request.Length != 3 || response.Length < 3 || response[2] != request[2])
+                    throw new InvalidDataException("Wrong stored DTC record response.");
+                if (response.Length != 3 && (response.Length < 8 ||
+                    response.Length - 8 < response[7] * 2 ||
+                    (response[7] == 0 && response.Length != 8)))
+                    throw new InvalidDataException("Truncated or inconsistent stored DTC record.");
+            }
             if (subfunction == 0x16 && (request.Length != 3 || response.Length < 3 || response[2] != request[2]))
                 throw new InvalidDataException("Wrong extended record response.");
             if (subfunction == 0x1A && (request.Length != 3 || response.Length < 4 ||

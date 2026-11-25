@@ -127,6 +127,10 @@
   <data name="LegacyEmissionsCount" xml:space="preserve"><value>Comptage DTC émissions historiques</value></data>
   <data name="LegacyMirrorResult" xml:space="preserve"><value>Mémoire miroir UDS historique</value></data>
   <data name="LegacyEmissionsResult" xml:space="preserve"><value>Émissions UDS historiques</value></data>
+  <data name="StoredRecord" xml:space="preserve"><value>Lire les données DTC mémorisées par numéro</value></data>
+  <data name="InvalidStoredRecord" xml:space="preserve"><value>Choisir un enregistrement 00..FE.</value></data>
+  <data name="StoredRecordResult" xml:space="preserve"><value>Enregistrement mémorisé 0x{0:X2}</value></data>
+  <data name="StoredRecordEmpty" xml:space="preserve"><value>Aucune donnée mémorisée pour cet enregistrement</value></data>
   <data name="ExtendedRecordSupport" xml:space="preserve"><value>DTC prenant en charge cet enregistrement</value></data>
   <data name="ExtendedRecordSize" xml:space="preserve"><value>Longueur uniforme documentée (octets)</value></data>
   <data name="ExtendedRecordData" xml:space="preserve"><value>Lire les données étendues</value></data>
