@@ -135,6 +135,10 @@
   <data name="StoredCatalog" xml:space="preserve"><value>Documented DID lengths (F40C:2,F40D:1)</value></data>
   <data name="InvalidStoredCatalog" xml:space="preserve"><value>Enter documented DID lengths.</value></data>
   <data name="AllStoredResult" xml:space="preserve"><value>Stored records: {0}</value></data>
+  <data name="DecodedSnapshot" xml:space="preserve"><value>Decoded UDS snapshots</value></data>
+  <data name="ObdDecodedSnapshot" xml:space="preserve"><value>Decoded OBDonUDS snapshots</value></data>
+  <data name="DecodedSnapshotResult" xml:space="preserve"><value>DTC {0:X6} — status {1:X2} — snapshots: {2}</value></data>
+  <data name="SnapshotRecordResult" xml:space="preserve"><value>Snapshot 0x{0:X2}</value></data>
   <data name="StoredRecordEmpty" xml:space="preserve"><value>No stored data for this record</value></data>
   <data name="ExtendedRecordSupport" xml:space="preserve"><value>DTCs supporting extended record</value></data>
   <data name="ExtendedRecordSize" xml:space="preserve"><value>Uniform documented record length (bytes)</value></data>
