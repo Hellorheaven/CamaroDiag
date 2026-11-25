@@ -4783,7 +4783,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     /** Keep the prior records for an explicitly unavailable optional read mode. */
     private fun replaceStandardDtcRecords(records: List<ObdDtc>, unavailableModes: Set<Int>) {
         _dtcs.value = _dtcs.value.filter { previous ->
-            !previous.module.equals("ECM", ignoreCase = true) ||
+            (!previous.module.equals("ECM", ignoreCase = true) && !previous.module.equals("OBD", ignoreCase = true)) ||
                 (7 in unavailableModes && previous.statusEn.equals("Pending", ignoreCase = true)) ||
                 (10 in unavailableModes && previous.statusEn.equals("Permanent", ignoreCase = true))
         } + mapObdDtcs(records)
@@ -4800,7 +4800,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         records.distinctBy { it.code to it.status }.map { dtc ->
             DiagnosticDtc(
                 code = dtc.code,
-                module = "ECM",
+                module = if (obdManager.isSimulationActive || (VehicleVinMatcher.isCamaroCandidate(_calibrationWorkspace.value.ecuVinResponse) &&
+                    VehicleVinMatcher.normalize(_vehicle.value.vin) == _calibrationWorkspace.value.ecuVinResponse)) "ECM" else "OBD",
                 statusEn = when (dtc.status) {
                     "pending" -> "Pending"
                     "permanent" -> "Permanent"
@@ -4820,9 +4821,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private fun standardDtcDescription(code: String, isFr: Boolean): String {
         val entry = DtcCatalogRegistry.genericDescription(code)
             ?: return if (isFr) {
-                "Description normalisée indisponible ; vérifier la documentation GM correspondant au VIN et au calculateur."
+                "Description normalisée indisponible ; vérifier la documentation du constructeur correspondant au VIN et au calculateur."
             } else {
-                "Generic description unavailable; check GM service information for this VIN and reporting ECU."
+                "Generic description unavailable; check manufacturer service information for this VIN and reporting ECU."
             }
         return if (isFr) entry.second else entry.first
     }
@@ -5304,6 +5305,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 if (!current()) return@launch
                 _obdScanReport.value = report
+                if (!obdManager.isSimulationActive && report.vin != null && !VehicleVinMatcher.isCamaroCandidate(report.vin)) {
+                    _modules.value = emptyList()
+                    _calibrationWorkspace.value = _calibrationWorkspace.value.copy(ecuVinResponse = report.vin,
+                        ecuIdentityFromSimulation = false, vinComparison = VehicleVinMatcher.compare(selectedVin, report.vin),
+                        vinModelYear = VehicleVinMatcher.modelYearFromVin(report.vin))
+                }
                 if (report.physicalCanResponder == null &&
                     com.camarodiag.gen5.domain.model.VehicleVinMatcher.isCamaroCandidate(report.vin) &&
                     com.camarodiag.gen5.domain.model.VehicleVinMatcher.normalize(selectedVin) == report.vin) {
@@ -5449,9 +5456,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     )
                     // Do not automatically interpret or audit data against the wrong saved vehicle.
                     // The user can resolve the mismatch first, then start diagnostics explicitly.
-                    if (comparison?.matches == true && com.camarodiag.gen5.domain.model.VehicleVinMatcher.isCamaroCandidate(identity.vin)) {
+                    if (comparison?.matches == true && VehicleVinMatcher.isCamaroCandidate(identity.vin)) {
                         scanDtcs()
                         runMileageAudit()
+                    } else if (!sourceWasSimulated && identity.vin != null && !VehicleVinMatcher.isCamaroCandidate(identity.vin)) {
+                        _modules.value = emptyList()
+                        _connectionMessage.value = localizedContext.getString(R.string.msg_vehicle_non_camaro_vin)
                     }
                 } catch (cancelled: CancellationException) {
                     throw cancelled
