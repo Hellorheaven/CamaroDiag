@@ -296,6 +296,30 @@ class DoIpTests(unittest.TestCase):
                 Session.read_dtc_inventory(fake, VIN, snapshot_index=snapshot)
             fake.close.assert_called_once()
 
+    def test_multi_did_monitoring_revalidates_and_keeps_samples_isolated(self):
+        layout = parse_did_layout("F40C:2,F40D:1")
+        fake = unittest.mock.Mock(spec=Session)
+        fake.exchange.side_effect = [bytes.fromhex("62F40C1234F40D56"), bytes.fromhex("62F40C5678F40D90")]
+        fake.read_obd.side_effect = [{"obd_on_uds": True}, {"obd_on_uds": True}]
+        def observe(row):
+            row["dids"][0]["data"] = "BAD"
+        report = Session.monitor_dids(fake, VIN, layout, 2, 0.25, obd=True, on_sample=observe)
+        self.assertEqual([row["dids"][0]["data"] for row in report["samples"]], ["1234", "5678"])
+        self.assertEqual(fake.exchange.call_count, 2)
+        fake.wait.assert_called_once_with(0.25)
+        self.assertEqual(fake.read_obd.call_count, 2)
+        fake.close.assert_not_called()
+        fake = unittest.mock.Mock(spec=Session)
+        fake.exchange.return_value = bytes.fromhex("62F40C1234F40D56")
+        fake.read_obd.side_effect = [{"obd_on_uds": True}, {"obd_on_uds": False}]
+        with self.assertRaises(DoIpError):
+            Session.monitor_dids(fake, VIN, layout, 1, 0.25, obd=True)
+        fake.close.assert_called_once()
+        fake = unittest.mock.Mock(spec=Session)
+        with self.assertRaises(DoIpError):
+            Session.monitor_dids(fake, VIN, ((0xF40C, 4096), (0xF40D, 1)))
+        fake.exchange.assert_not_called()
+
     def test_scaling_did_identity_and_correlation(self):
         fake = unittest.mock.Mock(spec=Session)
         fake.verify_vin.return_value = VIN

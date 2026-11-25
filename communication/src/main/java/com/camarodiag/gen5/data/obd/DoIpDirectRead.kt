@@ -26,7 +26,7 @@ import kotlin.coroutines.resumeWithException
  * A socket is owned by one operation and is never retained after failure.
  */
 object DoIpDirectRead {
-    enum class Operation { VIN, DID, DTC, DTC_COUNT, DTC_SNAPSHOT, DTC_EXTENDED, MONITOR, BACKUP, EXCHANGE, OBD_IDENTIFY, OBD_DID, OBD_MONITOR, OBD_WWH_MASK, OBD_WWH_PERMANENT, OBD_WWH_READINESS, MULTI_DID, OBD_MULTI_DID, SCALING_DID, OBD_DTC, OBD_DTC_COUNT, OBD_DTC_SNAPSHOT, OBD_DTC_EXTENDED, SUPPORTED_DTCS, SNAPSHOT_INDEX }
+    enum class Operation { VIN, DID, DTC, DTC_COUNT, DTC_SNAPSHOT, DTC_EXTENDED, MONITOR, BACKUP, EXCHANGE, OBD_IDENTIFY, OBD_DID, OBD_MONITOR, OBD_WWH_MASK, OBD_WWH_PERMANENT, OBD_WWH_READINESS, MULTI_DID, OBD_MULTI_DID, SCALING_DID, OBD_DTC, OBD_DTC_COUNT, OBD_DTC_SNAPSHOT, OBD_DTC_EXTENDED, SUPPORTED_DTCS, SNAPSHOT_INDEX, MULTI_MONITOR, OBD_MULTI_MONITOR }
     /** Immutable optional parameters. Defaults retain the original global deadline. */
     data class SessionOptions(val timeoutMs: Int = 5000, val p2Ms: Int = timeoutMs,
         val p2StarMs: Int = timeoutMs, val routingType: Int = 0, val routingOemHex: String = "") {
@@ -246,7 +246,8 @@ object DoIpDirectRead {
         val wwhReport: DoIpWwhDtc.Report? = null,
         val multiValues: List<DoIpMultiDid.Value> = emptyList(),
         val snapshotIndex: List<UdsSnapshotReference>? = null)
-    data class Sample(val index: Int, val elapsedMs: Long, val data: ByteArray)
+    data class Sample(val index: Int, val elapsedMs: Long, val data: ByteArray,
+        val values: List<DoIpMultiDid.Value> = emptyList())
 
     private const val MAX_PAYLOAD = 1024 * 1024
     private const val DOIP_UDP_PORT = 13400
@@ -683,10 +684,13 @@ object DoIpDirectRead {
         require(command == null || commands == null)
         val fixedCommands = (commands ?: command?.let { listOf(it) })?.map { it.copyOf() }
         require((operation == Operation.EXCHANGE) == (fixedCommands != null && approval != null))
-        val multi = operation in setOf(Operation.MULTI_DID, Operation.OBD_MULTI_DID)
+        val multiMonitor = operation in setOf(Operation.MULTI_MONITOR, Operation.OBD_MULTI_MONITOR)
+        val monitoring = multiMonitor || operation in setOf(Operation.MONITOR, Operation.OBD_MONITOR)
+        val multi = multiMonitor || operation in setOf(Operation.MULTI_DID, Operation.OBD_MULTI_DID)
         require(multi == (multiLayout != null))
-        val layout = multiLayout?.let(DoIpMultiDid::validate)
-        require(operation != Operation.OBD_MULTI_DID || requireNotNull(layout).all { isObdDid(it.did) })
+        val layout = multiLayout?.let { if (multiMonitor) DoIpMultiDid.validateMonitor(it) else DoIpMultiDid.validate(it) }
+        require(operation !in setOf(Operation.OBD_MULTI_DID, Operation.OBD_MULTI_MONITOR) ||
+            requireNotNull(layout).all { isObdDid(it.did) })
         val multiRequest = layout?.let(DoIpMultiDid::request)
         val wwhKind = when (operation) {
             Operation.OBD_WWH_MASK -> DoIpWwhDtc.Kind.MASK
@@ -713,7 +717,7 @@ object DoIpDirectRead {
         }
         val budget = if (operation == Operation.BACKUP) 600_000L
             else if (operation == Operation.EXCHANGE) timeoutMs * (requireNotNull(fixedCommands).size + 4L)
-            else if (operation in setOf(Operation.MONITOR, Operation.OBD_MONITOR))
+            else if (monitoring)
             timeoutMs * (sampleCount + 7L) + intervalMs * (sampleCount - 1L)
             else if (wwhKind != null || multi || obdDtc || operation == Operation.OBD_DID) timeoutMs * 8L else timeoutMs * 5L
         val gateway = discover(target.address, target.expectedVin, timeoutMs, onControlTrace)
@@ -741,7 +745,7 @@ object DoIpDirectRead {
                     }
                 } else base
                 wire.use {
-                    val session = Session(wire, gateway, target, trace, rollingTrace = operation == Operation.BACKUP,
+                    val session = Session(wire, gateway, target, trace, rollingTrace = operation == Operation.BACKUP || monitoring,
                         onTrace = onTrace, onControlTrace = onControlTrace, options = options)
                     session.activate(timeoutMs)
                     fun readVin(vinDid: Int = 0xF190): String {
@@ -758,18 +762,22 @@ object DoIpDirectRead {
                         val samples = mutableListOf<Sample>()
                         val start = System.nanoTime()
                         for (index in 1..sampleCount) {
-                            val reply = session.exchange(byteArrayOf(0x22, (did shr 8).toByte(), did.toByte()), timeoutMs)
+                            val request = if (multiMonitor) requireNotNull(multiRequest)
+                                else byteArrayOf(0x22, (did shr 8).toByte(), did.toByte())
+                            val reply = session.exchange(request, timeoutMs)
                             require(reply.size in 4..4099) { "Missing or oversized DID monitoring sample." }
+                            val values = if (multiMonitor) DoIpMultiDid.decode(requireNotNull(layout), reply) else emptyList()
                             val sample = Sample(index, (System.nanoTime() - start) / 1_000_000,
-                                reply.copyOfRange(3, reply.size))
+                                if (multiMonitor) reply.copyOf() else reply.copyOfRange(3, reply.size), values)
                             samples += sample
-                            onSample(sample.copy(data = sample.data.copyOf()))
+                            onSample(sample.copy(data = sample.data.copyOf(),
+                                values = values.map { it.copy(data = it.data.copyOf()) }))
                             if (index < sampleCount) session.waitBetweenSamples(intervalMs, timeoutMs)
                         }
                         return samples.toList()
                     }
                     val vin: String
-                    if (wwhKind != null || obdDtc || operation in setOf(Operation.OBD_IDENTIFY, Operation.OBD_DID, Operation.OBD_MONITOR, Operation.OBD_MULTI_DID)) {
+                    if (wwhKind != null || obdDtc || operation in setOf(Operation.OBD_IDENTIFY, Operation.OBD_DID, Operation.OBD_MONITOR, Operation.OBD_MULTI_DID, Operation.OBD_MULTI_MONITOR)) {
                         // OBD-only ECUs may not implement the generic F190 VIN DID.
                         // Do not silently assume F810 support from an unrelated UDS response.
                         vin = readVin(0xF802)
@@ -795,7 +803,7 @@ object DoIpDirectRead {
                             require(decodeObdProtocol(session.exchange(byteArrayOf(0x22, 0xF8.toByte(), 0x10),
                                 timeoutMs)) == protocolValue) { "OBDonUDS identity changed during DID read." }
                         }
-                        val samples = if (operation == Operation.OBD_MONITOR) {
+                        val samples = if (operation in setOf(Operation.OBD_MONITOR, Operation.OBD_MULTI_MONITOR)) {
                             val measured = monitorDid()
                             require(readVin(0xF802) == vin)
                             require(decodeObdProtocol(session.exchange(byteArrayOf(0x22, 0xF8.toByte(), 0x10),
@@ -895,7 +903,7 @@ object DoIpDirectRead {
                             identity()
                             val capture = DoIpMemoryBackup.createCapture(scope, first, second)
                             Outcome(gateway, target.ecu, vin, null, null, trace.toList(), capture = capture)
-                        } else if (operation == Operation.MONITOR) {
+                        } else if (operation in setOf(Operation.MONITOR, Operation.MULTI_MONITOR)) {
                             val samples = monitorDid()
                             require(readVin() == vin)
                             Outcome(gateway, target.ecu, vin, null, null, trace.toList(), samples)

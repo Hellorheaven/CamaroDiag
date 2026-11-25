@@ -20,6 +20,9 @@ object DoIpMultiDid {
             1 + frozen.sumOf { 2 + it.length } <= 65536)
         return frozen
     }
+    fun validateMonitor(fields: List<Field>): List<Field> = validate(fields).also { layout ->
+        require(1 + layout.sumOf { 2 + it.length } <= 4096) { "Multi-DID monitor sample exceeds 4096 bytes." }
+    }
     fun request(fields: List<Field>): ByteArray =
         byteArrayOf(0x22) + validate(fields).flatMap {
             listOf((it.did shr 8).toByte(), it.did.toByte())

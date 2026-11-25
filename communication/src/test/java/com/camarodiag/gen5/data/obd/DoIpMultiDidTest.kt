@@ -15,6 +15,10 @@ class DoIpMultiDidTest {
         for (bad in listOf("62F40D56F40C1234", "62F40C1234F40D", "62F40C1234F40D5600"))
             assertTrue(runCatching { DoIpMultiDid.decode(layout, hex(bad)) }.isFailure)
     }
+    @Test fun monitoringBoundsTheWholeSample() {
+        assertEquals(2, DoIpMultiDid.validateMonitor(DoIpMultiDid.parse("F40C:2,F40D:1")).size)
+        assertTrue(runCatching { DoIpMultiDid.validateMonitor(DoIpMultiDid.parse("F40C:4096,F40D:1")) }.isFailure)
+    }
     @Test fun invalidLayoutsRejectedBeforeNetwork() {
         for (bad in listOf("F40C:1,F40C:2", "F40C:0,F40D:1", "F40C:1", "F40C:4097,F40D:1",
             "F40C:1,F40D:1,", "F40C:1,XYZ1:2"))

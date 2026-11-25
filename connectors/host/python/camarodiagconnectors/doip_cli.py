@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from typing import Sequence
 
 from .doip import (Session, discover, discover_unique_vin, discover_ipv4, discover_ipv6, gateway_key, status,
-                   DoIpError, valid_vin, parse_commands, confirm_commands, parse_did_layout)
+                   DoIpError, valid_vin, parse_commands, confirm_commands, parse_did_layout, validate_monitor_layout)
 from .doip_archive import load_scope
 from .doip_capture import capture_region, save_capture
 
@@ -79,9 +79,13 @@ def run(argv: Sequence[str] | None = None) -> dict:
         multi.add_argument("--layout", required=True,
                            help=tr("DID:length in bytes, e.g. F190:17,F187:4; use actual ECU definitions",
                                    "DID:longueur en octets, ex. F190:17,F187:4 ; utiliser les définitions ECU réelles"))
-    for action in ("monitor", "obd-monitor"):
-        monitor = sub.add_parser(action, help=tr("Monitor a DID on one verified ECU", "Surveiller un DID sur un ECU vérifié"))
-        monitor.add_argument("--did", required=True, type=lambda x: hex_value(x, 4))
+    for action in ("monitor", "obd-monitor", "monitor-dids", "obd-monitor-dids"):
+        monitor = sub.add_parser(action, help=tr("Monitor DIDs on one verified ECU", "Surveiller les DID sur un ECU vérifié"))
+        if action.endswith("-dids"):
+            monitor.add_argument("--layout", required=True, help=tr("DID:length, e.g. F40C:2,F40D:1",
+                                                                   "DID:longueur, ex. F40C:2,F40D:1"))
+        else:
+            monitor.add_argument("--did", required=True, type=lambda x: hex_value(x, 4))
         monitor.add_argument("--samples", type=int, default=10)
         monitor.add_argument("--interval", type=float, default=1)
     sub.add_parser("supported-dtcs", help=tr("List supported DTCs", "Lister les DTC pris en charge"))
@@ -107,8 +111,11 @@ def run(argv: Sequence[str] | None = None) -> dict:
                           help=tr("Hexadecimal commands separated by semicolons", "Commandes hexadécimales séparées par des points-virgules"))
     o = parser.parse_args(argv)
     commands = parse_commands(o.commands) if o.action == "sequence" else None
-    layout = parse_did_layout(o.layout) if o.action in ("dids", "obd-dids") else None
-    if o.action == "obd-dids" and any(not 0xF400 <= did <= 0xF8FF for did, _ in layout):
+    multi_monitor = o.action in ("monitor-dids", "obd-monitor-dids")
+    layout = parse_did_layout(o.layout) if multi_monitor or o.action in ("dids", "obd-dids") else None
+    if multi_monitor:
+        layout = validate_monitor_layout(layout)
+    if o.action in ("obd-dids", "obd-monitor-dids") and any(not 0xF400 <= did <= 0xF8FF for did, _ in layout):
         parser.error(tr("Legislated DIDs F400..F8FF required", "DID réglementaires F400..F8FF requis"))
     scope = None
     if o.action == "backup":
@@ -136,7 +143,7 @@ def run(argv: Sequence[str] | None = None) -> dict:
         parser.error(tr("Expected VIN and distinct tester/ECU addresses required", "VIN attendu et adresses testeur/ECU distinctes requis"))
     if o.action in ("obd-did", "obd-monitor") and not 0xF400 <= o.did <= 0xF8FF:
         parser.error(tr("Legislated DID F400..F8FF required", "DID réglementaire F400..F8FF requis"))
-    if o.action in ("monitor", "obd-monitor") and not (1 <= o.samples <= 3600 and 0.25 <= o.interval <= 60):
+    if (multi_monitor or o.action in ("monitor", "obd-monitor")) and not (1 <= o.samples <= 3600 and 0.25 <= o.interval <= 60):
         parser.error(tr("Invalid sample count or interval", "Nombre de mesures ou intervalle invalide"))
     if o.action in ("snapshot", "extended", "obd-snapshot", "obd-extended") and o.record == 0:
         parser.error(tr("Record must be nonzero", "Enregistrement non nul requis"))
@@ -204,6 +211,11 @@ def run(argv: Sequence[str] | None = None) -> dict:
         if o.action == "scaling-did":
             return result | {"vin": o.vin, "ecu": o.ecu, "tester": o.tester, "tls": not o.tcp,
                              "did": o.did, "scaling_data": session.read_scaling_did(o.vin, o.did).hex().upper()}
+        if multi_monitor:
+            def on_multi_sample(row):
+                print(json.dumps({"partial_sample": row}), file=sys.stderr)
+            return result | {"ecu": o.ecu, "tester": o.tester, "tls": not o.tcp} | session.monitor_dids(
+                o.vin, layout, o.samples, o.interval, obd=o.action == "obd-monitor-dids", on_sample=on_multi_sample)
         if layout is not None:
             return result | {"ecu": o.ecu, "tester": o.tester, "tls": not o.tcp} | session.read_dids(
                 o.vin, layout, obd=o.action == "obd-dids")

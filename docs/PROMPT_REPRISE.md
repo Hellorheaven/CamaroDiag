@@ -1,3 +1,7 @@
+## PR117 — monitoring multi-DID DoIP Android et Connectors (25/11/2026)
+
+- Monitoring UDS/OBDonUDS de plusieurs DID dans chaque requête 22, disposition explicite, plafond 4096 octets par échantillon, validation de chaque réponse et identité avant/après sur le même socket. Android : UI FR/EN, rendu par DID, export CSV avec une ligne par DID et même index d'échantillon ; journal complet et fenêtre récente glissante. Connectors CLI : monitor-dids et obd-monitor-dids avec --layout, mesures provisoires sur stderr et résultat complet uniquement après revalidation. Tests écrits, non exécutés. Windows reste à raccorder. Aucun marqueur CI modifié.
+
 ## PR117 — inventaire DTC et index snapshots DoIP Windows (25/11/2026)
 
 - Parité Windows GUI/CLI avec Android et Connectors : UDS 19/0A et 19/03, F190 avant/après, résultats séparés des défauts actifs. Ressources FR/EN, sélecteurs CLI exclusifs avec VIN, tests écrits. Aucun test ni compilation lancé. Référence de comportement : documentation udsoncan ReadDTCInformation (ISO 14229), sans revendication de conformité normative complète.

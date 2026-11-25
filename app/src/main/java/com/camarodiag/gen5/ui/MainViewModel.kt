@@ -119,7 +119,9 @@ data class CanConsoleHistoryEntry(
 data class DoIpMonitorReport(val vin: String, val gateway: Int, val tester: Int, val ecu: Int,
     val did: Int, val tls: Boolean, val completedAtUtcMillis: Long,
     val samples: List<DoIpMonitorRow>, val obdOnUds: Boolean = false)
-data class DoIpMonitorRow(val index: Int, val elapsedMs: Long, val payloadHex: String)
+data class DoIpMonitorValue(val did: Int, val payloadHex: String)
+data class DoIpMonitorRow(val index: Int, val elapsedMs: Long, val payloadHex: String,
+    val values: List<DoIpMonitorValue> = emptyList())
 
 data class LiveCanMonitorState(
     val isCapturing: Boolean = false,
@@ -1406,7 +1408,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         "${trace.observedAtUtcMillis} ${if (trace.direction == "TX") "TX_REQUEST" else "RX"} ${trace.payloadHex}"
 
     private fun doIpSampleRow(sample: DoIpDirectRead.Sample) = DoIpMonitorRow(sample.index,
-        sample.elapsedMs, sample.data.joinToString("") { "%02X".format(it.toInt() and 255) })
+        sample.elapsedMs, sample.data.joinToString("") { "%02X".format(it.toInt() and 255) },
+        sample.values.map { value -> DoIpMonitorValue(value.did,
+            value.data.joinToString("") { "%02X".format(it.toInt() and 255) }) })
 
     fun exportDoIpMonitoring(report: DoIpMonitorReport) {
         if (!requirePremiumLicense() || _calibrationWorkspace.value.doIpMonitorReport !== report) return
@@ -1429,11 +1433,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     writer.appendLine("vin,gateway_logical,tester_logical,ecu_logical,did,transport,completed_utc_ms,sample,elapsed_ms,payload_hex,service_protocol")
                     for (sample in report.samples) {
                         check(current())
-                        writer.appendLine(listOf(report.vin, "%04X".format(report.gateway),
-                            "%04X".format(report.tester), "%04X".format(report.ecu),
-                            "%04X".format(report.did), if (report.tls) "TLS" else "TCP",
-                            report.completedAtUtcMillis, sample.index, sample.elapsedMs, sample.payloadHex,
-                            if (report.obdOnUds) "OBDonUDS" else "UDS").joinToString(","))
+                        val values = sample.values.ifEmpty { listOf(DoIpMonitorValue(report.did, sample.payloadHex)) }
+                        for (value in values) {
+                            check(current())
+                            writer.appendLine(listOf(report.vin, "%04X".format(report.gateway),
+                                "%04X".format(report.tester), "%04X".format(report.ecu),
+                                "%04X".format(value.did), if (report.tls) "TLS" else "TCP",
+                                report.completedAtUtcMillis, sample.index, sample.elapsedMs, value.payloadHex,
+                                if (report.obdOnUds) "OBDonUDS" else "UDS").joinToString(","))
+                        }
                     }
                     writer.flush()
                 }
@@ -1469,9 +1477,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _calibrationWorkspace.update { it.copy(doIpReading = true, doIpResult = "", doIpTrace = emptyList(), doIpBackupBytes = 0,
                 doIpMonitorReport = null, doIpLiveSamples = emptyList()) }
             try {
-                val multi = operation in setOf(DoIpDirectRead.Operation.MULTI_DID, DoIpDirectRead.Operation.OBD_MULTI_DID)
+                val multiMonitor = operation in setOf(DoIpDirectRead.Operation.MULTI_MONITOR, DoIpDirectRead.Operation.OBD_MULTI_MONITOR)
+                val multi = multiMonitor || operation in setOf(DoIpDirectRead.Operation.MULTI_DID, DoIpDirectRead.Operation.OBD_MULTI_DID)
                 val layout = if (multi) com.camarodiag.gen5.data.obd.DoIpMultiDid.parse(didHex) else null
-                require(operation != DoIpDirectRead.Operation.OBD_MULTI_DID ||
+                if (multiMonitor) com.camarodiag.gen5.data.obd.DoIpMultiDid.validateMonitor(requireNotNull(layout))
+                require(operation !in setOf(DoIpDirectRead.Operation.OBD_MULTI_DID, DoIpDirectRead.Operation.OBD_MULTI_MONITOR) ||
                     requireNotNull(layout).all { DoIpDirectRead.isObdDid(it.did) })
                 val target = resolveSelectedDoIpTarget(host, tester, ecu, _vehicle.value.vin, tls,
                     onTrace = { trace -> journalDoIpControlTrace(trace, current) })
@@ -1581,10 +1591,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     operation == DoIpDirectRead.Operation.VIN -> result.vin.orEmpty()
                     else -> result.data?.joinToString(" ") { "%02X".format(it.toInt() and 255) }.orEmpty()
                 }
-                val monitorReport = if (operation in setOf(DoIpDirectRead.Operation.MONITOR, DoIpDirectRead.Operation.OBD_MONITOR))
+                val monitorReport = if (multiMonitor || operation in setOf(DoIpDirectRead.Operation.MONITOR, DoIpDirectRead.Operation.OBD_MONITOR))
                     DoIpMonitorReport(checkNotNull(result.vin), result.gateway.logicalAddress,
                         target.tester, target.ecu, did, tls, System.currentTimeMillis(),
-                        result.samples.map(::doIpSampleRow), obdOnUds = operation == DoIpDirectRead.Operation.OBD_MONITOR) else null
+                        result.samples.map(::doIpSampleRow), obdOnUds = operation in setOf(
+                            DoIpDirectRead.Operation.OBD_MONITOR, DoIpDirectRead.Operation.OBD_MULTI_MONITOR)) else null
                 _calibrationWorkspace.update { it.copy(doIpReading = false, doIpResult = rendered,
                     doIpTrace = result.trace.map(::doIpTraceLine), doIpMonitorReport = monitorReport) }
                 if (current()) appendCanConsoleSystemEvent(localizedContext.getString(R.string.cal_doip_console_complete))

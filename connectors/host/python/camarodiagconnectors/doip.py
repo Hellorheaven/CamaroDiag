@@ -354,6 +354,13 @@ def validate_did_layout(layout: tuple[tuple[int, int], ...]) -> tuple[tuple[int,
     return layout
 
 
+def validate_monitor_layout(layout: tuple[tuple[int, int], ...]) -> tuple[tuple[int, int], ...]:
+    layout = validate_did_layout(layout)
+    if 1 + sum(2 + length for _, length in layout) > 4096:
+        raise DoIpError("Multi-DID monitor sample exceeds 4096 bytes")
+    return layout
+
+
 def decode_did_layout(reply: bytes, layout: tuple[tuple[int, int], ...]) -> list[dict]:
     layout = validate_did_layout(layout)
     if len(reply) != 1 + sum(2 + length for _, length in layout) or reply[0] != 0x62:
@@ -647,6 +654,39 @@ class Session:
                 self.verify_vin(expected)
             return {"vin": expected, "did": did, "service_protocol": "OBDonUDS" if obd else "UDS",
                     "samples": rows}
+        except BaseException:
+            self.close()
+            raise
+
+    def monitor_dids(self, expected: str, layout: tuple[tuple[int, int], ...],
+                     samples: int = 10, interval: float = 1, *, obd: bool = False,
+                     on_sample=lambda _: None) -> dict:
+        layout = validate_monitor_layout(layout)
+        if type(samples) is not int or not 1 <= samples <= 3600 or not 0.25 <= interval <= 60:
+            raise DoIpError("Invalid monitoring sample count or interval")
+        if obd and any(not 0xF400 <= did <= 0xF8FF for did, _ in layout):
+            raise DoIpError("Expected legislated OBDonUDS DIDs")
+        def verify():
+            if obd:
+                if not self.read_obd(expected)["obd_on_uds"]:
+                    raise DoIpError("Selected ECU did not identify as OBDonUDS")
+            else:
+                self.verify_vin(expected)
+        try:
+            verify()
+            request = b"\x22" + b"".join(logical(did) for did, _ in layout)
+            rows = []
+            start = time.monotonic()
+            for index in range(1, samples + 1):
+                values = decode_did_layout(self.exchange(request), layout)
+                row = {"index": index, "utc": datetime.now(timezone.utc).isoformat(),
+                       "elapsed_ms": int((time.monotonic() - start) * 1000), "dids": values}
+                rows.append(row)
+                on_sample({**row, "dids": [dict(item) for item in values]})
+                if index < samples:
+                    self.wait(interval)
+            verify()
+            return {"vin": expected, "service_protocol": "OBDonUDS" if obd else "UDS", "samples": rows}
         except BaseException:
             self.close()
             raise

@@ -286,7 +286,7 @@ fun CalibrationWorkspaceScreen(
     onConfirmDoIpCommand: (DoIpConsoleCommand, EcuWriteConsentFlow.Approval) -> Unit,
     onInspectDoIpGateway: (String, DoIpDirectRead.GatewayOperation, String?) -> Unit,
     onCancelDirectDoIp: () -> Unit,
-    onMonitorDirectDoIp: (String, String, String, String, Boolean, Int, Int, Boolean, DoIpClientCertificateSelection?, DoIpDirectRead.SessionOptions) -> Unit,
+    onMonitorDirectDoIp: (String, String, String, String, Boolean, Int, Int, DoIpDirectRead.Operation, DoIpClientCertificateSelection?, DoIpDirectRead.SessionOptions) -> Unit,
     onExportDoIpMonitoring: (DoIpMonitorReport) -> Unit,
     onImportDoIpBackupProfile: () -> Unit,
     onVerifyDoIpBackup: (DoIpMemoryBackup.Scope) -> Unit,
@@ -825,7 +825,7 @@ fun CalibrationWorkspaceScreen(
                     val interval = doIpInterval.toIntOrNull()
                     OutlinedButton(onClick = {
                         if (samples != null && interval != null)
-                            onMonitorDirectDoIp(doIpHost, doIpTester, doIpEcu, doIpDid, doIpTls, samples, interval, false, doIpCertificate, requireNotNull(doIpOptions))
+                            onMonitorDirectDoIp(doIpHost, doIpTester, doIpEcu, doIpDid, doIpTls, samples, interval, DoIpDirectRead.Operation.MONITOR, doIpCertificate, requireNotNull(doIpOptions))
                     }, enabled = targetReady && vinReady && doIpDid.length == 4 &&
                         samples != null && samples in 1..30 && interval != null && interval in 250..5000,
                         modifier = Modifier.fillMaxWidth()) {
@@ -833,12 +833,34 @@ fun CalibrationWorkspaceScreen(
                     }
                     OutlinedButton(onClick = {
                         if (samples != null && interval != null)
-                            onMonitorDirectDoIp(doIpHost, doIpTester, doIpEcu, doIpDid, doIpTls, samples, interval, true, doIpCertificate, requireNotNull(doIpOptions))
+                            onMonitorDirectDoIp(doIpHost, doIpTester, doIpEcu, doIpDid, doIpTls, samples, interval, DoIpDirectRead.Operation.OBD_MONITOR, doIpCertificate, requireNotNull(doIpOptions))
                     }, enabled = targetReady && vinReady && doIpDid.length == 4 &&
                         doIpDid.toIntOrNull(16)?.let(DoIpDirectRead::isObdDid) == true &&
                         samples != null && samples in 1..30 && interval != null && interval in 250..5000,
                         modifier = Modifier.fillMaxWidth()) {
                         Text(stringResource(R.string.cal_doip_obd_monitor))
+                    }
+                    val multiMonitorReady = multiLayout?.let {
+                        runCatching { com.camarodiag.gen5.data.obd.DoIpMultiDid.validateMonitor(it) }.isSuccess
+                    } == true
+                    OutlinedButton(onClick = {
+                        if (samples != null && interval != null)
+                            onMonitorDirectDoIp(doIpHost, doIpTester, doIpEcu, doIpMultiLayout, doIpTls,
+                                samples, interval, DoIpDirectRead.Operation.MULTI_MONITOR, doIpCertificate, requireNotNull(doIpOptions))
+                    }, enabled = targetReady && vinReady && multiMonitorReady &&
+                        samples != null && samples in 1..30 && interval != null && interval in 250..5000,
+                        modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(R.string.cal_doip_multi_monitor))
+                    }
+                    OutlinedButton(onClick = {
+                        if (samples != null && interval != null)
+                            onMonitorDirectDoIp(doIpHost, doIpTester, doIpEcu, doIpMultiLayout, doIpTls,
+                                samples, interval, DoIpDirectRead.Operation.OBD_MULTI_MONITOR, doIpCertificate, requireNotNull(doIpOptions))
+                    }, enabled = targetReady && vinReady && multiMonitorReady &&
+                        multiLayout?.all { DoIpDirectRead.isObdDid(it.did) } == true &&
+                        samples != null && samples in 1..30 && interval != null && interval in 250..5000,
+                        modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(R.string.cal_doip_obd_multi_monitor))
                     }
                     HorizontalDivider()
                     OutlinedButton(onClick = onImportDoIpBackupProfile, enabled = idle && vinReady,
@@ -894,7 +916,10 @@ fun CalibrationWorkspaceScreen(
                         Text(stringResource(R.string.cal_doip_monitor_samples_received, state.doIpLiveSamples.size),
                             color = CamaroAmber, fontWeight = FontWeight.Bold)
                         state.doIpLiveSamples.forEach { sample ->
-                            Text("#${sample.index}  ${sample.elapsedMs} ms  ${sample.payloadHex}",
+                            val data = if (sample.values.isEmpty()) sample.payloadHex else sample.values.joinToString("  ") {
+                                "%04X=%s".format(it.did, it.payloadHex)
+                            }
+                            Text("#${sample.index}  ${sample.elapsedMs} ms  $data",
                                 color = TextPrimary, fontFamily = FontFamily.Monospace, fontSize = 11.sp)
                         }
                         if (idle && state.doIpMonitorReport == null)
