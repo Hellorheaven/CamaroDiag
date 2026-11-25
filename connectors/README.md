@@ -96,6 +96,18 @@ L'inventaire des DTC n'est pas une liste de défauts actifs. `permanent-dtcs` li
 
 The supported-DTC inventory is not an active fault list. `permanent-dtcs` reads permanent UDS DTCs if supported by the ECU; a permanent DTC need not be currently active. The snapshot index gives references for the `snapshot` action. Supply actual DID lengths for monitoring; `obd-monitor-dids` requires confirmed OBDonUDS. Examples do not establish ECU definitions. Samples remain provisional until final verification.
 
+### Données historiques DTC / Historical DTC data
+
+Les snapshots et les données étendues peuvent être décodés avec les longueurs fournies par la documentation du calculateur. Les résultats restent des octets historiques, pas des mesures en temps réel. / Snapshots and extended data can be decoded with ECU-documented lengths. Results remain historical bytes, not live measurements.
+
+```sh
+python -m camarodiagconnectors.doip_cli --host 192.0.2.10 --vin 1G1FA1RXXR0123456 --tester 0E80 --ecu 1234 snapshot-decoded --dtc 010203 --record FF --did-lengths F40C:2,F40D:1
+python -m camarodiagconnectors.doip_cli --host 192.0.2.10 --vin 1G1FA1RXXR0123456 --tester 0E80 --ecu 1234 stored-records --did-lengths F40C:2,F40D:1
+python -m camarodiagconnectors.doip_cli --host 192.0.2.10 --vin 1G1FA1RXXR0123456 --tester 0E80 --ecu 1234 extended-decoded --dtc 010203 --record FF --record-lengths 01:2,90:1
+```
+
+Pour les données étendues, FE limite la réponse aux enregistrements OBD réglementaires 90–9F ; FF demande tous les enregistrements. Les actions `obd-snapshot-decoded` et `obd-extended-decoded` vérifient également l'identification OBDonUDS. Les longueurs ci-dessus sont des exemples de syntaxe, à remplacer par les définitions réelles. / FE selects regulated OBD records 90–9F; FF requests all records. OBD-specific actions also verify OBDonUDS identification. Replace example lengths with actual documented ECU lengths.
+
 ### Acquisition mémoire DoIP / DoIP memory capture
 
 ```bash
