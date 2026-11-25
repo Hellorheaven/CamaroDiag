@@ -108,7 +108,54 @@ data class UdsAllStoredRecords(val records: List<UdsStoredRecordEntry>, val rawR
 data class UdsSnapshotRecords(val dtc: Int, val status: Int, val requestedRecord: Int,
     val records: List<UdsStoredRecordEntry>, val rawResponse: ByteArray)
 
+data class UdsExtendedRecord(val number: Int, val data: ByteArray)
+data class UdsDecodedExtendedRecords(val dtc: Int, val status: Int, val requestedRecord: Int,
+    val records: List<UdsExtendedRecord>, val rawResponse: ByteArray)
+
 object UdsDtcDecoder {
+    fun parseExtendedRecordLengths(text: String): Map<Int, Int> {
+        val fields = text.split(',')
+        require(fields.size in 1..239)
+        val catalog = linkedMapOf<Int, Int>()
+        for (field in fields) {
+            val parts = field.split(':')
+            require(parts.size == 2 && parts[0].matches(Regex("[0-9a-fA-F]{2}")) &&
+                parts[1].matches(Regex("[0-9]{1,4}")))
+            val record = parts[0].toInt(16)
+            val size = parts[1].toInt()
+            require(record in 1..0xEF && size in 1..4090 && catalog.put(record, size) == null)
+        }
+        return catalog.toMap()
+    }
+
+    fun extendedRecordsRequest(dtc: Int, record: Int, lengths: Map<Int, Int>): ByteArray {
+        require(dtc in 0..0xFFFFFF && (record in 1..0xEF || record in 0xFE..0xFF))
+        require(lengths.size in 1..239 && lengths.all { (number, size) -> number in 1..0xEF && size in 1..4090 })
+        require(record > 0xEF || record in lengths)
+        return byteArrayOf(0x19, 6, (dtc shr 16).toByte(), (dtc shr 8).toByte(), dtc.toByte(), record.toByte())
+    }
+
+    fun decodeExtendedRecords(dtc: Int, record: Int, reply: ByteArray,
+        lengths: Map<Int, Int>): UdsDecodedExtendedRecords {
+        val catalog = lengths.toMap()
+        val request = extendedRecordsRequest(dtc, record, catalog)
+        require(reply.size >= 6 && reply[0] == 0x59.toByte() && reply[1] == 6.toByte() &&
+            reply.copyOfRange(2, 5).contentEquals(request.copyOfRange(2, 5)))
+        val records = mutableListOf<UdsExtendedRecord>()
+        val seen = mutableSetOf<Int>()
+        var offset = 6
+        while (offset < reply.size) {
+            val number = reply[offset].toInt() and 255
+            val size = requireNotNull(catalog[number])
+            require(seen.add(number) && (record != 0xFE || number in 0x90..0x9F) &&
+                (record > 0xEF || number == record) && reply.size - offset - 1 >= size)
+            offset++
+            records += UdsExtendedRecord(number, reply.copyOfRange(offset, offset + size))
+            offset += size
+        }
+        return UdsDecodedExtendedRecords(dtc, reply[5].toInt() and 255, record, records.toList(), reply.copyOf())
+    }
+
     fun parseStoredDidLengths(text: String): Map<Int, Int> {
         val fields = text.split(',')
         require(fields.size in 1..255)
