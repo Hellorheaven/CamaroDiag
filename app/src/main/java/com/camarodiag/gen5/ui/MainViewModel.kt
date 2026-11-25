@@ -1640,8 +1640,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         val heading = localizedContext.getString(R.string.cal_doip_stored_record_result, stored.record)
                         val detail = stored.detail
                         heading + "\n" + if (detail == null) localizedContext.getString(R.string.cal_doip_stored_record_empty)
-                        else localizedContext.getString(R.string.cal_doip_detail_result, detail.dtc, detail.status,
-                            detail.records.joinToString(" ") { "%02X".format(it.toInt() and 255) })
+                        else localizedContext.getString(R.string.cal_doip_stored_record_count,
+                            detail.records.first().toInt() and 255) + "\n" +
+                            localizedContext.getString(R.string.cal_doip_detail_result, detail.dtc, detail.status,
+                                detail.records.joinToString(" ") { "%02X".format(it.toInt() and 255) })
                     }
                     result.legacyReport != null -> requireNotNull(result.legacyReport).let { legacy ->
                         val heading = localizedContext.getString(if (legacy.subfunction in 0x0F..0x11)
