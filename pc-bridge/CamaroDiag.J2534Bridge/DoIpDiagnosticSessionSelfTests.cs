@@ -330,6 +330,43 @@ internal static class DoIpDiagnosticSessionSelfTests
             });
         }
 
+        // Typed DTC reads are not published until the final F190 matches.
+        foreach (var finalMatches in new[] { true, false })
+        {
+            await RunCaseAsync(async stream =>
+            {
+                _ = await RequireRequestAsync(stream);
+                await SendAsync(stream, DoIpCodec.DiagnosticMessage,
+                    FromEcu([0x62, 0xF1, 0x90, .. System.Text.Encoding.ASCII.GetBytes(selectedVehicleVin)]));
+                var query = await ReadAsync(stream);
+                Check(query.Payload.SequenceEqual(new byte[] {0x0E,0x80,0x12,0x34,0x19,0x02,0x05}),
+                    "Verified DTC query follows initial VIN.");
+                await SendAsync(stream, DoIpCodec.DiagnosticMessage, FromEcu(dtcReply));
+                _ = await RequireRequestAsync(stream);
+                await SendAsync(stream, DoIpCodec.DiagnosticMessage,
+                    FromEcu([0x62, 0xF1, 0x90, .. System.Text.Encoding.ASCII.GetBytes(
+                        finalMatches ? selectedVehicleVin : otherVehicleVin)]));
+            }, async client =>
+            {
+                var timeout = TimeSpan.FromSeconds(2);
+                var token = CancellationToken.None;
+                if (finalMatches)
+                {
+                    var report = await DoIpVinReader.ReadVerifiedDtcAsync(client, observedForVin,
+                        timeout, token, () => DoIpVinReader.ReadDtcsAsync(client, 0x05, timeout, token));
+                    Check(report.Codes.Count == 1, "Verified DTC result published after final VIN.");
+                }
+                else
+                {
+                    await Expect<InvalidDataException>(async () =>
+                    {
+                        _ = await DoIpVinReader.ReadVerifiedDtcAsync(client, observedForVin,
+                            timeout, token, () => DoIpVinReader.ReadDtcsAsync(client, 0x05, timeout, token));
+                    }, "Changed final VIN prevents DTC publication.");
+                }
+            });
+        }
+
         // Explicit console request follows the same-session VIN read, not
         // a stale discovery. A mismatch never reaches the requested service.
         foreach (var vinMatches in new[] { true, false })

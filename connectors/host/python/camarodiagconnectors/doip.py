@@ -710,6 +710,31 @@ class Session:
             self.close()
             raise
 
+    def read_verified_dtc(self, expected: str, action: str, *, mask: int = 255,
+                          dtc: int | None = None, record: int | None = None) -> dict:
+        """Publish typed DTC data only after same-session F190 revalidation."""
+        if action not in ("dtcs", "count", "snapshot", "extended"):
+            raise DoIpError("Unsupported DTC read action")
+        if action in ("dtcs", "count"):
+            if type(mask) is not int or not 0 <= mask <= 255:
+                raise DoIpError("Invalid DTC mask")
+        elif (type(dtc) is not int or not 0 <= dtc <= 0xFFFFFF or
+              type(record) is not int or not 1 <= record <= 255):
+            raise DoIpError("Invalid DTC or record")
+        try:
+            self.verify_vin(expected)
+            if action == "dtcs":
+                result = self.dtcs(mask)
+            elif action == "count":
+                result = self.dtc_count(mask)
+            else:
+                result = self.dtc_detail(dtc, record, action == "extended")
+            self.verify_vin(expected)
+            return result
+        except BaseException:
+            self.close()
+            raise
+
     def dtc_count(self, mask: int) -> dict:
         reply = self.exchange(bytes((0x19, 1, mask)))
         if len(reply) != 6:

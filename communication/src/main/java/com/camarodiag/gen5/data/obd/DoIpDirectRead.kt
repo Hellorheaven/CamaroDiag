@@ -887,14 +887,17 @@ object DoIpDirectRead {
                         } else if (detailRequest != null) {
                             val reply = session.exchange(detailRequest, timeoutMs)
                             val detail = UdsDtcDecoder.decodeDetail(detailRequest[1].u8(), dtc, reply)
+                            require(readVin() == vin) { "ECU VIN changed during DTC read." }
                             Outcome(gateway, target.ecu, vin, null, null, trace.toList(), dtcDetail = detail)
                         } else if (operation == Operation.DTC_COUNT) {
                             val reply = session.exchange(byteArrayOf(0x19,0x01,mask.toByte()), timeoutMs)
                             val count = UdsDtcDecoder.decodeCountByStatusMask(reply)
+                            require(readVin() == vin) { "ECU VIN changed during DTC read." }
                             Outcome(gateway, target.ecu, vin, null, null, trace.toList(), dtcCount = count)
                         } else {
                             val reply = session.exchange(byteArrayOf(0x19,0x02,mask.toByte()), timeoutMs)
                             val report = UdsDtcDecoder.decodeStatusMaskReport(reply.copyOfRange(2, reply.size), mask)
+                            require(readVin() == vin) { "ECU VIN changed during DTC read." }
                             Outcome(gateway, target.ecu, vin, null, report, trace.toList())
                         }
                     }

@@ -219,6 +219,37 @@ class DoIpTests(unittest.TestCase):
             with self.assertRaises(DoIpError):
                 positive(bytes.fromhex(request), bytes.fromhex(reply))
 
+    def test_verified_dtc_reads_require_final_vin(self):
+        for action, method, arguments in (
+                ("dtcs", "dtcs", (8,)), ("count", "dtc_count", (8,)),
+                ("snapshot", "dtc_detail", (0x123456, 1, False)),
+                ("extended", "dtc_detail", (0x123456, 1, True))):
+            for final_matches in (True, False):
+                with self.subTest(action=action, final_matches=final_matches):
+                    fake = unittest.mock.Mock(spec=Session)
+                    fake.verify_vin.side_effect = [VIN, VIN if final_matches else DoIpError("VIN changed")]
+                    read = getattr(fake, method)
+                    read.return_value = {"data": "test"}
+                    if final_matches:
+                        self.assertEqual(Session.read_verified_dtc(fake, VIN, action, mask=8,
+                                                                  dtc=0x123456, record=1), {"data": "test"})
+                        fake.close.assert_not_called()
+                    else:
+                        with self.assertRaises(DoIpError):
+                            Session.read_verified_dtc(fake, VIN, action, mask=8, dtc=0x123456, record=1)
+                        fake.close.assert_called_once()
+                    read.assert_called_once_with(*arguments)
+                    self.assertEqual(fake.mock_calls[:3], [
+                        unittest.mock.call.verify_vin(VIN),
+                        getattr(unittest.mock.call, method)(*arguments),
+                        unittest.mock.call.verify_vin(VIN)])
+        fake = unittest.mock.Mock(spec=Session)
+        fake.verify_vin.side_effect = DoIpError("VIN changed")
+        with self.assertRaises(DoIpError):
+            Session.read_verified_dtc(fake, VIN, "dtcs")
+        fake.dtcs.assert_not_called()
+        fake.close.assert_called_once()
+
     def test_scaling_did_identity_and_correlation(self):
         fake = unittest.mock.Mock(spec=Session)
         fake.verify_vin.return_value = VIN

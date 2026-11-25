@@ -219,6 +219,10 @@ def run(argv: Sequence[str] | None = None) -> dict:
                 print(json.dumps({"partial_sample": row}), file=sys.stderr)
             return result | {"ecu": o.ecu, "tester": o.tester, "tls": not o.tcp} | session.monitor(
                 o.vin, o.did, o.samples, o.interval, obd=o.action == "obd-monitor", on_sample=on_sample)
+        if o.action in ("dtcs", "count", "snapshot", "extended"):
+            report = session.read_verified_dtc(o.vin, o.action, mask=getattr(o, "mask", 255),
+                                               dtc=getattr(o, "dtc", None), record=getattr(o, "record", None))
+            return result | {"vin": o.vin, "ecu": o.ecu, "tester": o.tester, "tls": not o.tcp} | report
         vin = session.verify_vin(o.vin)
         result |= {"vin": vin, "ecu": o.ecu, "tester": o.tester, "tls": not o.tcp}
         if commands is not None:
@@ -239,12 +243,6 @@ def run(argv: Sequence[str] | None = None) -> dict:
             data = session.read_did(o.did)
             session.verify_vin(o.vin)
             return result | {"did": o.did, "data": data.hex().upper()}
-        if o.action == "dtcs":
-            return result | session.dtcs(o.mask)
-        if o.action == "count":
-            return result | session.dtc_count(o.mask)
-        if o.action in ("snapshot", "extended"):
-            return result | session.dtc_detail(o.dtc, o.record, o.action == "extended")
         raise DoIpError("Unsupported diagnostic action")
 
 

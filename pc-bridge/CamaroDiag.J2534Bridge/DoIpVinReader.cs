@@ -329,6 +329,21 @@ internal static class DoIpVinReader
             throw new InvalidDataException("UDS VIN changed during DoIP monitoring.");
     }
 
+    // Do not publish decoded read-only DTC data until F190 is verified again
+    // on the same routed session. The raw console trace remains available.
+    internal static async Task<T> ReadVerifiedDtcAsync<T>(DoIpDiagnosticTransport transport,
+        DoIpVehicleDiscovery.Identity gateway, TimeSpan timeout, CancellationToken token,
+        Func<Task<T>> read, Action<byte[]>? requested = null, Action<byte[]>? received = null)
+    {
+        var vin = await VerifyObservedVinAsync(transport, gateway, timeout, token, requested, received);
+        var result = await read();
+        var finalVin = await VerifyObservedVinAsync(transport, gateway, timeout, token, requested, received);
+        if (!string.Equals(vin, finalVin, StringComparison.Ordinal))
+            throw new InvalidDataException("ECU VIN changed during DTC read.");
+        token.ThrowIfCancellationRequested();
+        return result;
+    }
+
     internal static async Task<ObdOnUdsServices.DtcStatusReport> ReadObservedGatewayDtcsAsync(
         DoIpVehicleDiscovery.Identity gateway, IPAddress address, ushort tester,
         ushort ecu, bool useTls, byte statusMask, TimeSpan timeout,
@@ -339,8 +354,9 @@ internal static class DoIpVinReader
     {
         await using var transport = await ConnectObservedAsync(gateway, address, tester,
             ecu, useTls, timeout, token, clientCertificateThumbprint, trace, options);
-        _ = await VerifyObservedVinAsync(transport, gateway, timeout, token, requested, received);
-        return await ReadDtcsAsync(transport, statusMask, timeout, token, requested, received);
+        return await ReadVerifiedDtcAsync(transport, gateway, timeout, token,
+            () => ReadDtcsAsync(transport, statusMask, timeout, token, requested, received),
+            requested, received);
     }
 
     // Caller obtains consent for the exact immutable request and context.
@@ -421,10 +437,12 @@ internal static class DoIpVinReader
     {
         await using var transport = await ConnectObservedAsync(gateway, address, tester,
             ecu, useTls, timeout, token, certificate, trace, options);
-        _ = await VerifyObservedVinAsync(transport, gateway, timeout, token, null, null);
-        var reply = await ExchangeReadAsync(transport,
-            ObdOnUdsServices.ReadDtcCountByStatusMask(statusMask), timeout, token, null, null);
-        return ObdOnUdsServices.DecodeDtcCountByStatusMask(reply);
+        return await ReadVerifiedDtcAsync(transport, gateway, timeout, token, async () =>
+        {
+            var reply = await ExchangeReadAsync(transport,
+                ObdOnUdsServices.ReadDtcCountByStatusMask(statusMask), timeout, token, null, null);
+            return ObdOnUdsServices.DecodeDtcCountByStatusMask(reply);
+        });
     }
 
     internal sealed record DtcDetail(uint Dtc, byte Status, byte[] Records);
@@ -439,15 +457,17 @@ internal static class DoIpVinReader
             ObdOnUdsServices.ReadDtcSnapshot(dtc, record);
         await using var transport = await ConnectObservedAsync(gateway, address, tester,
             ecu, useTls, timeout, token, certificate, trace, options);
-        _ = await VerifyObservedVinAsync(transport, gateway, timeout, token, null, null);
-        var reply = await ExchangeReadAsync(transport, request, timeout, token, null, null);
-        if (extended)
+        return await ReadVerifiedDtcAsync(transport, gateway, timeout, token, async () =>
         {
-            var detail = ObdOnUdsServices.DecodeDtcExtendedData(dtc, reply);
-            return new DtcDetail(detail.Dtc, detail.Status, detail.RawExtendedDataRecords);
-        }
-        var snapshot = ObdOnUdsServices.DecodeDtcSnapshot(dtc, reply);
-        return new DtcDetail(snapshot.Dtc, snapshot.Status, snapshot.RawSnapshotRecords);
+            var reply = await ExchangeReadAsync(transport, request, timeout, token, null, null);
+            if (extended)
+            {
+                var detail = ObdOnUdsServices.DecodeDtcExtendedData(dtc, reply);
+                return new DtcDetail(detail.Dtc, detail.Status, detail.RawExtendedDataRecords);
+            }
+            var snapshot = ObdOnUdsServices.DecodeDtcSnapshot(dtc, reply);
+            return new DtcDetail(snapshot.Dtc, snapshot.Status, snapshot.RawSnapshotRecords);
+        });
     }
 
     internal static async Task<string> ReadObservedGatewayAsync(

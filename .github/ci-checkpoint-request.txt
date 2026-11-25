@@ -1,3 +1,7 @@
+PR117 — grouped Debug revalidation after Windows simulator fix, scaling DID and typed DTC identity
+Parent: 61ae62ee15599fd02a31aa223d2399ba388a5f5b
+Validate prior Windows F802/F810 loopback correction, SID 24 on Android/Windows/Connectors, final F190 on typed DTC reads, Windows loopback and Python tests. Intermediate C6 / DoIP only. No merge, release or physical qualification.
+
 PR117 — grouped Debug validation of multi-DID and verified DoIP reads
 Implementation parent: cfccf02cbb9efc21b219aa4755f5e4e17a9e6aa6
 Previous full Debug run 45501625699 passed all 12 technical jobs. Validate multi-DID Android Windows Python, Windows verified CLI, DTC record and WWH correlation, single DID identity revalidation and Python CLI generic DID revalidation in this checkpoint. No merge, release or physical qualification.

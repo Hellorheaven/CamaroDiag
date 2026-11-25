@@ -1,3 +1,7 @@
+## PR117 — vérification finale des défauts DoIP (25/11/2026)
+
+- Android, Windows GUI et Connectors CLI : lectures DTC 19/01, 19/02, 19/04, 19/06 vérifient désormais le VIN F190 avant et après sur la même session, sans publier le résultat typé si l'identité a changé. Trace brute conservée. Tests Windows loopback et Python ajoutés. Checkpoint groupé demandé ; aucun résultat de compilation ou qualification matérielle revendiqué.
+
 ## PR117 — correction du simulateur Windows (25/11/2026)
 
 - Checkpoint 45548303381 : compilation Windows 0 erreur/0 avertissement, autotest interrompu car serveur simulé ne répondait pas aux nouvelles vérifications F802/F810 de fin de lecture. Scénario ajusté au véritable dialogue, cas de protocole changé ajouté. Aucun retrait de test ni de contrôle de production. Nouvelle validation nécessaire.
