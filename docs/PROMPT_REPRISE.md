@@ -1,3 +1,10 @@
+## PR117 — lecture multiple UDS 19/05 FF (25/11/2026)
+
+- Android, Windows GUI/CLI et Connectors CLI Python : requête 19 05 FF, catalogue DID:longueur explicite issu de la documentation ECU, vérification F190 avant/après sur la même session, découpage des enregistrements et DID, conservation des réponses brutes, refus des enregistrements dupliqués, DID inconnus et troncatures. Aucun calcul de longueur OEM par heuristique.
+- CLI Python : `stored-records --did-lengths F40C:2,F40D:1` ; Windows : `--uds-all-stored-records F40C:2,F40D:1` avec VIN et adresses de la cible. Exemples de syntaxe uniquement, longueurs à confirmer pour chaque ECU. Interface FR/EN.
+- Régressions codec, CLI et identité Python écrites, non exécutées. Restent à compléter : loopback de clôture Windows/Android, couverture d'intégration et validation finale DoIP. Aucun checkpoint CI, fusion, Release ou qualification physique.
+- Référence structure du service : https://uds.readthedocs.io/en/stable/pages/knowledge_base/service.html#reportdtcstoreddata-by-record-number-0x05 (section 19/05).
+
 ## PR117 — consolidation 19/05 (25/11/2026)
 
 - Implémentation Windows concurrente GUI/CLI conservée ; les deux méthodes redondantes et la validation dupliquée ajoutées pendant cette reprise ont été retirées. Un seul parcours typé Windows demeure.
