@@ -107,6 +107,7 @@ Exemples :
                               --uds-memory-snapshot 0x123456 / --uds-memory-extended 0x123456
                               avec --uds-memory-record 1. --expected-vin explicite requis.
                               --uds-stored-record 0x01 avec --expected-vin VIN : enregistrement mémorisé individuel.
+                              --uds-all-stored-records F40C:2,F40D:1 avec --expected-vin VIN : catalogue DID documenté, tous les enregistrements.
                               --uds-extended-record-support 0x01 ou --uds-extended-record-data 0x01
                               avec --uds-extended-record-size 2 (longueur uniforme documentée).
                               Les deux exigent --expected-vin VIN.
