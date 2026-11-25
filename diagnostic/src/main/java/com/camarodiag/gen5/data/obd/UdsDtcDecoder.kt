@@ -321,6 +321,24 @@ object UdsDtcDecoder {
         return UdsExtendedRecordReport(record, available, entries)
     }
 
+    fun decodeUserMemorySnapshot(memory: Int, dtc: Int, record: Int, reply: ByteArray,
+        lengths: Map<Int, Int>): UdsSnapshotRecords {
+        val request = userMemoryRequest(0x18, memory, 255, dtc, record)
+        require(reply.size >= 7 && reply[0] == 0x59.toByte() && reply[1] == request[1] &&
+            reply[2] == request[6] && reply.copyOfRange(3, 6).contentEquals(request.copyOfRange(2, 5)))
+        return decodeSnapshotRecords(dtc, record, byteArrayOf(0x59, 4) + reply.copyOfRange(3, reply.size), lengths)
+            .copy(rawResponse = reply.copyOf())
+    }
+
+    fun decodeUserMemoryExtended(memory: Int, dtc: Int, record: Int, reply: ByteArray,
+        lengths: Map<Int, Int>): UdsDecodedExtendedRecords {
+        val request = userMemoryRequest(0x19, memory, 255, dtc, record)
+        require(reply.size >= 7 && reply[0] == 0x59.toByte() && reply[1] == request[1] &&
+            reply[2] == request[6] && reply.copyOfRange(3, 6).contentEquals(request.copyOfRange(2, 5)))
+        return decodeExtendedRecords(dtc, record, byteArrayOf(0x59, 6) + reply.copyOfRange(3, reply.size), lengths)
+            .copy(rawResponse = reply.copyOf())
+    }
+
     fun userMemoryRequest(sub: Int, memory: Int, mask: Int, dtc: Int, record: Int): ByteArray {
         require(memory in 0..255 && mask in 0..255)
         if (sub == 0x17) return byteArrayOf(0x19, 0x17, mask.toByte(), memory.toByte())
