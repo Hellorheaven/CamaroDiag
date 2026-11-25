@@ -1,3 +1,7 @@
+## PR117 — attribution des DTC et sélection télémétrie par ECU (25/11/2026)
+
+- C6 : les DTC SAE sur canal J2534 physique sont identifiés par adresse CAN, les DTC ELM fonctionnels restent OBD sans attribution ECM inventée. Les listes standard et UDS sont distinctes ; un rescan ne remplace que les modes confirmés du répondant courant. Effacement J2534 ne retire que les défauts standard non permanents du canal confirmé ; ACK fonctionnel ELM ne prouve pas l'effacement de tous les répondants, conserve le snapshot jusqu'à rescan. La télémétrie générique accepte les ECU secondaires même sur Camaro, restriction FlexFuel primaire maintenue. Mode 03 explicitement non supporté toléré dans le scan J2534 partiel. Tests écrits non exécutés. Aucun checkpoint C6/DoIP.
+
 ## PR117 — parité Android des canaux J2534 secondaires (25/11/2026)
 
 - C6 Android : même politique de paires physiques que le pont Windows ; lecture sur ECU secondaire explicitement sélectionné, pas d'effacement ni de FlexFuel sur ces canaux. Adresse réelle du répondant conservée en télémétrie ; longueurs strictes pour PID 5B, E0 et sondes large bande supplémentaires. Tests ajoutés non exécutés. Accès aux fichiers rétabli après correction du chemin. C6/DoIP restent ouverts, aucun checkpoint.

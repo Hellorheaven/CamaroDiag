@@ -160,7 +160,9 @@ data class DiagnosticDtc(
     val statusFr: String,
     val descEn: String,
     val descFr: String,
-    val isPending: Boolean = false
+    val isPending: Boolean = false,
+    /** A standard emissions read is distinct from an enhanced ECU DTC list. */
+    val standardObd: Boolean = false
 )
 
 enum class ConfidenceLevel(val labelEn: String, val labelFr: String) {

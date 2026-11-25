@@ -4794,7 +4794,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     _dtcScanNotice.value = _connectionMessage.value
                 } else if (!obdManager.isStandardObdReadAvailable()) {
                     // No SAE OBD channel is available; keep independently read UDS ECU records.
-                    _dtcs.value = _dtcs.value.filterNot { it.module.equals("ECM", ignoreCase = true) }
+                    _dtcs.value = _dtcs.value.filterNot { it.standardObd }
                     _connectionMessage.value = if (obdManager.isJ2534BridgeConnected())
                         localizedContext.getString(R.string.msg_dtc_j2534_unavailable)
                     else localizedContext.getString(R.string.msg_dtc_adapter_required)
@@ -4831,12 +4831,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     /** Keep the prior records for an explicitly unavailable optional read mode. */
     private fun replaceStandardDtcRecords(records: List<ObdDtc>, unavailableModes: Set<Int>) {
-        _dtcs.value = _dtcs.value.filter { previous ->
-            (!previous.module.equals("ECM", ignoreCase = true) && !previous.module.equals("OBD", ignoreCase = true)) ||
-                (3 in unavailableModes && previous.statusEn.equals("Confirmed", ignoreCase = true)) ||
-                (7 in unavailableModes && previous.statusEn.equals("Pending", ignoreCase = true)) ||
-                (10 in unavailableModes && previous.statusEn.equals("Permanent", ignoreCase = true))
-        } + mapObdDtcs(records)
+        val module = obdManager.standardObdDtcModule()
+        _dtcs.value = StandardObdDtcInventory.replace(_dtcs.value, mapObdDtcs(records), module, unavailableModes)
     }
 
     private fun unavailableDtcNotice(modes: Set<Int>): String? =
@@ -4850,8 +4846,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         records.distinctBy { it.code to it.status }.map { dtc ->
             DiagnosticDtc(
                 code = dtc.code,
-                module = if (obdManager.isSimulationActive || (VehicleVinMatcher.isCamaroCandidate(_calibrationWorkspace.value.ecuVinResponse) &&
-                    VehicleVinMatcher.normalize(_vehicle.value.vin) == _calibrationWorkspace.value.ecuVinResponse)) "ECM" else "OBD",
+                module = obdManager.standardObdDtcModule(),
                 statusEn = when (dtc.status) {
                     "pending" -> "Pending"
                     "permanent" -> "Permanent"
@@ -4864,7 +4859,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 },
                 descEn = standardDtcDescription(dtc.code, false),
                 descFr = standardDtcDescription(dtc.code, true),
-                isPending = dtc.status == "pending"
+                isPending = dtc.status == "pending",
+                standardObd = true
             )
         }
 
@@ -4909,10 +4905,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     if (!current()) return@launch
                     // Mode 04 does not erase permanent emissions DTCs. Preserve
                     // all other module records and require a new scan to refresh.
-                    _dtcs.value = _dtcs.value.filterNot {
-                        it.module.equals("ECM", ignoreCase = true) &&
-                            !it.statusEn.equals("Permanent", ignoreCase = true)
-                    }
+                    _dtcs.value = StandardObdDtcInventory.afterClear(_dtcs.value, obdManager.standardObdDtcModule())
+                    _dtcScanNotice.value = null
                     _connectionMessage.value = null
                 } else if (!obdManager.isObdCommandChannelAvailable) {
                     _connectionMessage.value = when {
@@ -4930,10 +4924,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     if (com.camarodiag.gen5.data.obd.StandardObdClearEvidence.acknowledged(response)) {
                         // SAE Mode 04 clears standardized emissions DTCs only.
                         // Preserve enhanced UDS records from other ECUs: no GM UDS clear is issued here.
-                        _dtcs.value = _dtcs.value.filterNot {
-                            it.module.equals("ECM", ignoreCase = true) &&
-                                !it.statusEn.equals("Permanent", ignoreCase = true)
-                        }
+                        // A functional ACK does not establish that every ECU
+                        // cleared its records. Keep the old snapshot until rescanned.
+                        _dtcScanNotice.value = null
                         _connectionMessage.value = null
                     } else {
                         _connectionMessage.value = localizedContext.getString(R.string.msg_dtc_clear_not_confirmed, response)
@@ -5600,11 +5593,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     response.contains("UNABLE TO CONNECT", ignoreCase = true)) {
                     throw ObdTransportDisconnectedException("Live OBD transport is disconnected")
                 }
-                val observedVin = _calibrationWorkspace.value.ecuVinResponse
-                val confirmedCamaro = VehicleVinMatcher.isCamaroCandidate(observedVin) &&
-                    VehicleVinMatcher.normalize(_vehicle.value.vin) == observedVin
-                val observation = liveSources.select(pidValue, CamaroUdsProtocol.parsePidObservations(
-                    response, pid, primaryPowertrainResponderOnly = confirmedCamaro))
+                // Generic live data may come from an explicitly selected
+                // secondary ECU even on a Camaro; fuel analysis has its own
+                // primary powertrain restriction.
+                val observation = liveSources.select(pidValue, CamaroUdsProtocol.parsePidObservations(response, pid))
                 lastReadResponder = observation?.responder
                 return observation?.bytes?.toIntArray()
             }

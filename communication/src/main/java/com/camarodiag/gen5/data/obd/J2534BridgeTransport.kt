@@ -386,7 +386,7 @@ class J2534BridgeTransport(
             }) { "Unsupported physical OBD scan command." }
             val reply = exchange(payload, timeout)
             if (J2534StandardObd.isExplicitlyUnsupported(mode, reply) &&
-                mode != 3 && !(mode == 1 && payload[1] == 0.toByte())) {
+                !(mode == 1 && payload[1] == 0.toByte())) {
                 // Keep the actual negative response in the scan log; the
                 // read decoder treats the requested service as unavailable.
                 reply.toHex()

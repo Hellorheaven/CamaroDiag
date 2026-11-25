@@ -653,6 +653,16 @@ class BluetoothObdManager(context: Context) {
     fun isStandardObdReadAvailable(): Boolean =
         isObdCommandChannelAvailable || isJ2534StandardObdAvailable()
 
+    /** Only a correlated physical J2534 channel has a known single responder.
+     * Headerless functional ELM DTC records cannot be assigned to an ECM. */
+    fun standardObdDtcModule(): String {
+        if (isSimulationActive) return "ECM"
+        if (!isJ2534StandardObdAvailable()) return "OBD"
+        val address = j2534BridgeResponseCanId ?: return "OBD"
+        val width = if (j2534BridgeProtocolNumber in setOf(34,36)) 8 else 3
+        return "OBD 0x" + address.toString(16).uppercase(java.util.Locale.ROOT).padStart(width, '0')
+    }
+
     private suspend fun readJ2534PidIfSupported(pid: Int): String? {
         require(pid in 1..255)
         val epoch = transportSessionEpoch.capture()
