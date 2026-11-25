@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 from typing import Sequence
 
 from .doip import (Session, discover, discover_unique_vin, discover_ipv4, discover_ipv6, gateway_key, status,
-                   DoIpError, InventoryTraceError, valid_vin, parse_commands, confirm_commands, parse_did_layout, parse_stored_did_lengths, validate_monitor_layout, parse_ecu_inventory, inventory_ecus)
+                   DoIpError, InventoryTraceError, valid_vin, parse_commands, confirm_commands, parse_did_layout, parse_stored_did_lengths, parse_extended_record_lengths, extended_records_request, validate_monitor_layout, parse_ecu_inventory, inventory_ecus)
 from .doip_archive import load_scope
 from .doip_capture import capture_region, save_capture
 
@@ -165,6 +165,11 @@ def _run(argv: Sequence[str] | None, resources: ExitStack) -> dict:
         p = sub.add_parser(action, help=tr("Verified DTC record read", "Lecture d'enregistrement DTC vérifiée"))
         p.add_argument("--dtc", required=True, type=lambda x: hex_value(x, 6))
         p.add_argument("--record", required=True, type=lambda x: hex_value(x, 2))
+    for action in ("extended-decoded", "obd-extended-decoded"):
+        p = sub.add_parser(action, help=tr("Decode extended DTC records", "Décoder les données DTC étendues"))
+        p.add_argument("--dtc", required=True, type=lambda x: hex_value(x, 6))
+        p.add_argument("--record", required=True, type=lambda x: hex_value(x, 2))
+        p.add_argument("--record-lengths", required=True, help=tr("Documented record:length catalog", "Catalogue numéro:longueur documenté"))
     for action in ("snapshot-decoded", "obd-snapshot-decoded"):
         p = sub.add_parser(action, help=tr("Decode snapshot records using documented DID lengths",
                                           "Décoder les snapshots avec les longueurs DID documentées"))
@@ -221,6 +226,10 @@ def _run(argv: Sequence[str] | None, resources: ExitStack) -> dict:
     if multi_monitor:
         layout = validate_monitor_layout(layout)
     stored_lengths = parse_stored_did_lengths(o.did_lengths) if o.action in ("stored-records", "snapshot-decoded", "obd-snapshot-decoded") else None
+    extended_lengths = None
+    if o.action in ("extended-decoded", "obd-extended-decoded"):
+        extended_lengths = parse_extended_record_lengths(o.record_lengths)
+        extended_records_request(o.dtc, o.record, extended_lengths)
     if o.action in ("obd-dids", "obd-monitor-dids") and any(not 0xF400 <= did <= 0xF8FF for did, _ in layout):
         parser.error(tr("Legislated DIDs F400..F8FF required", "DID réglementaires F400..F8FF requis"))
     if o.action == "mirror-extended" and (o.record == 0 or 0xF0 <= o.record <= 0xFD):
@@ -385,6 +394,11 @@ def _run(argv: Sequence[str] | None, resources: ExitStack) -> dict:
                                               status_mask=getattr(o, "mask", 255), dtc=getattr(o, "dtc", None))
             return result | {"vin": o.vin, "ecu": o.ecu, "tester": o.tester, "tls": not o.tcp,
                              "service_protocol": "UDS"} | report
+        if o.action in ("extended-decoded", "obd-extended-decoded"):
+            obd = o.action.startswith("obd-")
+            report = session.read_extended_records(o.vin, o.dtc, o.record, extended_lengths, obd=obd)
+            return result | {"vin": o.vin, "ecu": o.ecu, "tester": o.tester, "tls": not o.tcp,
+                             "service_protocol": "OBDonUDS" if obd else "UDS"} | report
         if o.action in ("snapshot-decoded", "obd-snapshot-decoded"):
             obd = o.action.startswith("obd-")
             report = session.read_snapshot_records(o.vin, o.dtc, o.record, stored_lengths, obd=obd)
