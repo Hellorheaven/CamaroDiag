@@ -1111,4 +1111,6 @@
     <string name="cal_doip_recent_failed">Most recent failed DTC</string>
     <string name="cal_doip_recent_confirmed">Most recent confirmed DTC</string>
     <string name="cal_doip_no_historical_dtc">No matching historical DTC</string>
+    <string name="cal_doip_fault_counters">Fault detection counters</string>
+    <string name="cal_doip_fault_counters_result">Fault detection counters: %1$d records</string>
 </resources>

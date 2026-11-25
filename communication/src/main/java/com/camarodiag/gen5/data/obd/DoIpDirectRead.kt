@@ -26,7 +26,7 @@ import kotlin.coroutines.resumeWithException
  * A socket is owned by one operation and is never retained after failure.
  */
 object DoIpDirectRead {
-    enum class Operation { VIN, DID, DTC, DTC_COUNT, DTC_SNAPSHOT, DTC_EXTENDED, MONITOR, BACKUP, EXCHANGE, OBD_IDENTIFY, OBD_DID, OBD_MONITOR, OBD_WWH_MASK, OBD_WWH_PERMANENT, OBD_WWH_READINESS, MULTI_DID, OBD_MULTI_DID, SCALING_DID, OBD_DTC, OBD_DTC_COUNT, OBD_DTC_SNAPSHOT, OBD_DTC_EXTENDED, SUPPORTED_DTCS, SNAPSHOT_INDEX, MULTI_MONITOR, OBD_MULTI_MONITOR, FIRST_FAILED_DTC, FIRST_CONFIRMED_DTC, RECENT_FAILED_DTC, RECENT_CONFIRMED_DTC }
+    enum class Operation { VIN, DID, DTC, DTC_COUNT, DTC_SNAPSHOT, DTC_EXTENDED, MONITOR, BACKUP, EXCHANGE, OBD_IDENTIFY, OBD_DID, OBD_MONITOR, OBD_WWH_MASK, OBD_WWH_PERMANENT, OBD_WWH_READINESS, MULTI_DID, OBD_MULTI_DID, SCALING_DID, OBD_DTC, OBD_DTC_COUNT, OBD_DTC_SNAPSHOT, OBD_DTC_EXTENDED, SUPPORTED_DTCS, SNAPSHOT_INDEX, MULTI_MONITOR, OBD_MULTI_MONITOR, FIRST_FAILED_DTC, FIRST_CONFIRMED_DTC, RECENT_FAILED_DTC, RECENT_CONFIRMED_DTC, FAULT_COUNTERS }
     /** Immutable optional parameters. Defaults retain the original global deadline. */
     data class SessionOptions(val timeoutMs: Int = 5000, val p2Ms: Int = timeoutMs,
         val p2StarMs: Int = timeoutMs, val routingType: Int = 0, val routingOemHex: String = "") {
@@ -133,7 +133,7 @@ object DoIpDirectRead {
             0x19 -> {
                 require(request.size >= 2 && reply.size >= 2 && reply[1].u8() == (request[1].u8() and 0x7F))
                 val subfunction = request[1].u8() and 0x7F
-                if (subfunction == 0x03) {
+                if (subfunction in setOf(0x03, 0x14)) {
                     require(request.size == 2 && (reply.size - 2) % 4 == 0)
                 } else {
                     require(reply.size >= 3)
@@ -253,7 +253,8 @@ object DoIpDirectRead {
         val commandReplies: List<ByteArray> = emptyList(), val obdProtocolValue: Int? = null,
         val wwhReport: DoIpWwhDtc.Report? = null,
         val multiValues: List<DoIpMultiDid.Value> = emptyList(),
-        val snapshotIndex: List<UdsSnapshotReference>? = null)
+        val snapshotIndex: List<UdsSnapshotReference>? = null,
+        val faultCounters: List<UdsFaultCounter>? = null)
     data class Sample(val index: Int, val elapsedMs: Long, val data: ByteArray,
         val values: List<DoIpMultiDid.Value> = emptyList())
 
@@ -893,6 +894,10 @@ object DoIpDirectRead {
                                 onCommandReply(index + 1, reply.copyOf())
                             }
                             Outcome(gateway, target.ecu, vin, replies.last(), null, trace.toList(), commandReplies = replies.toList())
+                        } else if (operation == Operation.FAULT_COUNTERS) {
+                            val rows = UdsDtcDecoder.decodeFaultCounters(session.exchange(byteArrayOf(0x19, 0x14), timeoutMs))
+                            require(readVin() == vin)
+                            Outcome(gateway, target.ecu, vin, null, null, trace.toList(), faultCounters = rows)
                         } else if (historicalSubfunction != null) {
                             val report = UdsDtcDecoder.decodeHistoricalDtc(historicalSubfunction,
                                 session.exchange(byteArrayOf(0x19, historicalSubfunction.toByte()), timeoutMs))

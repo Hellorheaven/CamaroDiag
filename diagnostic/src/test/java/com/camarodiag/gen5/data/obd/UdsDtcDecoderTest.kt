@@ -8,6 +8,15 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class UdsDtcDecoderTest {
+    @Test fun faultCountersPreserveSignedByteWithoutStatusInference() {
+        assertTrue(UdsDtcDecoder.decodeFaultCounters(byteArrayOf(0x59, 0x14)).isEmpty())
+        val report = UdsDtcDecoder.decodeFaultCounters(byteArrayOf(0x59, 0x14,
+            1, 2, 3, 127, 1, 2, 4, 0x80.toByte(), 1, 2, 5, 0xFF.toByte()))
+        assertEquals(listOf(127, -128, -1), report.map { it.counter })
+        assertTrue(runCatching { UdsDtcDecoder.decodeFaultCounters(byteArrayOf(0x59, 0x14, 1)) }.isFailure)
+        assertTrue(runCatching { UdsDtcDecoder.decodeFaultCounters(byteArrayOf(0x59, 0x14, 1, 2, 3, 1, 1, 2, 3, 2)) }.isFailure)
+    }
+
     @Test fun supportedDtcInventoryIncludesInactiveCodes() {
         val report = UdsDtcDecoder.decodeSupportedDtcs(byteArrayOf(0x59, 0x0A, 0x08,
             0x12, 0x34, 0x56, 0, 0x12, 0x34, 0x57, 8))

@@ -298,6 +298,20 @@ class DoIpTests(unittest.TestCase):
                 Session.read_dtc_inventory(fake, VIN, snapshot_index=snapshot)
             fake.close.assert_called_once()
 
+    def test_fault_counters_are_signed_and_separate_from_status(self):
+        for payload, counters in (("5914", []), ("59140102037F01020480010205FF", [127, -128, -1])):
+            fake = unittest.mock.Mock(spec=Session)
+            fake.exchange.return_value = bytes.fromhex(payload)
+            self.assertEqual([r["counter"] for r in Session.read_fault_counters(fake, VIN)["fault_counters"]], counters)
+            fake.exchange.assert_called_once_with(bytes.fromhex("1914"))
+            self.assertEqual(fake.verify_vin.call_count, 2)
+        for payload in ("591401", "59140102030101020302", "5903"):
+            fake = unittest.mock.Mock(spec=Session)
+            fake.exchange.return_value = bytes.fromhex(payload)
+            with self.assertRaises(DoIpError):
+                Session.read_fault_counters(fake, VIN)
+            fake.close.assert_called_once()
+
     def test_historical_dtc_reports_zero_or_one_record(self):
         for sub in range(0x0B, 0x0F):
             for payload, expected in ((bytes((0x59, sub, 8)), None),

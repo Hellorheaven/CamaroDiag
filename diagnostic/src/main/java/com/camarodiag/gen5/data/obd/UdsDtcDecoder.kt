@@ -85,8 +85,23 @@ data class UdsDtcCountReport(val availabilityMask: Int, val formatIdentifier: In
 data class UdsDtcDetail(val dtc: Int, val status: Int, val records: ByteArray)
 
 data class UdsSnapshotReference(val dtc: Int, val record: Int)
+data class UdsFaultCounter(val dtc: Int, val counter: Int)
 
 object UdsDtcDecoder {
+    /** 19/14 contains DTC/FDC pairs, no availability mask or status byte.
+     * Keep the signed ECU value even when it is nonpositive; do not infer a confirmed fault. */
+    fun decodeFaultCounters(reply: ByteArray): List<UdsFaultCounter> {
+        require(reply.size >= 2 && reply[0] == 0x59.toByte() && reply[1] == 0x14.toByte() &&
+            (reply.size - 2) % 4 == 0)
+        val rows = (2 until reply.size step 4).map { offset ->
+            val dtc = ((reply[offset].toInt() and 255) shl 16) or
+                ((reply[offset + 1].toInt() and 255) shl 8) or (reply[offset + 2].toInt() and 255)
+            UdsFaultCounter(dtc, reply[offset + 3].toInt())
+        }
+        require(rows.map { it.dtc }.distinct().size == rows.size)
+        return rows
+    }
+
     /** 19/0A lists supported DTCs, including zero-status entries. */
     fun decodeSupportedDtcs(reply: ByteArray): UdsDtcReport {
         require(reply.size >= 3 && reply[0] == 0x59.toByte() && reply[1] == 0x0A.toByte() &&

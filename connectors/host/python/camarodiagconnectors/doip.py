@@ -401,9 +401,9 @@ def positive(request: bytes, reply: bytes) -> bytes:
         if len(request) < 2 or len(reply) < 2 or reply[1] != request[1] & 0x7F:
             raise DoIpError("UDS DTC subfunction mismatch")
         subfunction = request[1] & 0x7F
-        if subfunction == 3:
+        if subfunction in (3, 0x14):
             if len(request) != 2 or (len(reply) - 2) % 4:
-                raise DoIpError("Malformed DTC snapshot index")
+                raise DoIpError("Malformed DTC index or fault counter report")
         elif len(reply) < 3 or (subfunction == 10 and (len(request) != 2 or (len(reply) - 3) % 4)):
             raise DoIpError("Malformed DTC report")
         if subfunction in (0x04, 0x06):
@@ -823,6 +823,26 @@ class Session:
                 result = self.dtc_detail(dtc, record, action == "extended")
             verify()
             return result
+        except BaseException:
+            self.close()
+            raise
+
+    def read_fault_counters(self, expected: str) -> dict:
+        """Preserve raw signed FDCs; they are not confirmed DTC status records."""
+        try:
+            self.verify_vin(expected)
+            reply = self.exchange(b"\x19\x14")
+            if len(reply) < 2 or reply[:2] != b"\x59\x14" or (len(reply) - 2) % 4:
+                raise DoIpError("Malformed fault counter report")
+            rows, seen = [], set()
+            for offset in range(2, len(reply), 4):
+                dtc = reply[offset:offset+3].hex().upper()
+                if dtc in seen:
+                    raise DoIpError("Duplicate fault counter DTC")
+                seen.add(dtc)
+                rows.append({"dtc": dtc, "counter": int.from_bytes(reply[offset+3:offset+4], "big", signed=True)})
+            self.verify_vin(expected)
+            return {"fault_counters": rows}
         except BaseException:
             self.close()
             raise

@@ -1114,4 +1114,6 @@
     <string name="cal_doip_recent_failed">Dernier DTC détecté</string>
     <string name="cal_doip_recent_confirmed">Dernier DTC confirmé</string>
     <string name="cal_doip_no_historical_dtc">Aucun DTC historique correspondant</string>
+    <string name="cal_doip_fault_counters">Compteurs de détection des défauts</string>
+    <string name="cal_doip_fault_counters_result">Compteurs de détection : %1$d enregistrements</string>
 </resources>

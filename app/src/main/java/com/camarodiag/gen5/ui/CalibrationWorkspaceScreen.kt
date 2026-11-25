@@ -780,6 +780,11 @@ fun CalibrationWorkspaceScreen(
                             }
                         }
                     }
+                    OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu, "", doIpTls,
+                        DoIpDirectRead.Operation.FAULT_COUNTERS, doIpCertificate, requireNotNull(doIpOptions)) },
+                        enabled = targetReady && vinReady, modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(R.string.cal_doip_fault_counters))
+                    }
                     OutlinedTextField(doIpCommand, { doIpCommand = it.take(12288) },
                         enabled = idle, singleLine = true, modifier = Modifier.fillMaxWidth(),
                         label = { Text(stringResource(R.string.cal_doip_command_payload)) })

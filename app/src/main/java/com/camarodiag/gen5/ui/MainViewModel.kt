@@ -1594,6 +1594,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             report.records.joinToString(separator = "\n", prefix = "\n") {
                                 "0x%06X — 0x%02X".format(it.rawDtc, it.statusByte)
                             }
+                    result.faultCounters != null -> requireNotNull(result.faultCounters).let { rows ->
+                        localizedContext.getString(R.string.cal_doip_fault_counters_result, rows.size) +
+                            rows.joinToString(separator = "\n", prefix = "\n") {
+                                "0x%06X — %d".format(it.dtc, it.counter)
+                            }
+                    }
                     result.snapshotIndex != null -> requireNotNull(result.snapshotIndex).let { rows ->
                         localizedContext.getString(R.string.cal_doip_snapshot_index_result, rows.size) +
                             rows.joinToString(separator = "\n", prefix = "\n") { "0x%06X — 0x%02X".format(it.dtc, it.record) }
