@@ -665,6 +665,30 @@ internal static class StandardVehicleProtocolsSelfTests
                 typed.Target.Request, [responseSid, 0xF4, 0x0C]), "Empty DID rejected.");
         }
 
+        foreach (var (selection, expected) in new (string[], byte[])[]
+        {
+            (["--uds-dtc-mask", "0x08"], [0x19, 0x02, 0x08]),
+            (["--uds-dtc-count-mask", "0x08"], [0x19, 0x01, 0x08]),
+            (["--uds-snapshot", "0x123456", "--uds-snapshot-record", "1"], [0x19, 4, 0x12, 0x34, 0x56, 1]),
+            (["--uds-extended-dtc", "0x123456", "--uds-extended-record", "2"], [0x19, 6, 0x12, 0x34, 0x56, 2])
+        })
+        {
+            string[] target = ["--host", "127.0.0.1", "--tester", "0E80", "--ecu", "1234"];
+            var read = StandardProtocolCli.ParseVerifiedDoIpRead(
+                [..target, "--expected-vin", "1G1FA1RX0J0100001", ..selection]);
+            Check(!read.Obd && read.Target.UseTls && read.Target.Request.SequenceEqual(expected),
+                "Generic typed UDS DTC uses F190 and preserves requested parameters.");
+            Reject<ArgumentException>(() => StandardProtocolCli.ParseDoIp([..target, ..selection]),
+                "Generic typed DTC requires expected VIN.");
+            Reject<ArgumentException>(() => StandardProtocolCli.ParseVerifiedDoIpRead(
+                [..target, "--expected-vin", "1G1FA1RX0J0100001", ..selection, "--obd-dtc-mask", "0xFF"]),
+                "Generic and legislated DTC selectors cannot be combined.");
+        }
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseVerifiedDoIpRead([
+            "--host", "127.0.0.1", "--tester", "0E80", "--ecu", "1234",
+            "--expected-vin", "1G1FA1RX0J0100001", "--uds-snapshot", "0x123456"]),
+            "Generic snapshot requires explicit record.");
+
         var verifiedMulti = StandardProtocolCli.ParseVerifiedDoIpRead([
             "--host", "127.0.0.1", "--tester", "0E80", "--ecu", "1234",
             "--expected-vin", "1G1FA1RX0J0100001", "--uds-dids", "0xF40C:2,0xF40D:1",

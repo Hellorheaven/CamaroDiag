@@ -75,6 +75,10 @@ Exemples :
                               --uds-did F187 ou --uds-scaling-did F40C avec
                               --expected-vin VIN vérifie F190 avant/après.
                               Octets ECU bruts, sans coefficients supposés.
+                              DTC UDS génériques avec le même VIN vérifié : --uds-dtc-mask 0xFF,
+                              --uds-dtc-count-mask 0xFF, --uds-snapshot 0x123456
+                              --uds-snapshot-record 1 ou --uds-extended-dtc 0x123456
+                              --uds-extended-record 2.
                               Ni contournement OEM ni flash ou récupération qualifiés.
 
 Chaque commande nécessite ses paramètres exacts. Utiliser --help seul :

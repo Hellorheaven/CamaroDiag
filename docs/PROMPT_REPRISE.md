@@ -1,3 +1,7 @@
+## PR117 — parité CLI Windows DTC UDS génériques (25/11/2026)
+
+- Services 19/01, 19/02, 19/04, 19/06 accessibles via sélecteurs UDS génériques distincts des commandes OBDonUDS. VIN F190 avant/après, TLS par défaut, choix exclusif, DTC et enregistrement explicites. Aide FR/EN et tests parseur. Le checkpoint 45556023009 valide le parent fc4270f754e509d2409acb14eb0787a712c2d63b, pas ce complément ; prochaine validation groupée nécessaire. Pas de qualification matérielle ni clôture C6/DoIP.
+
 ## PR117 — parité CLI Windows UDS DID et scaling (25/11/2026)
 
 - Checkpoint 45553393453 sur ba811a855c781d93471a8adc8a02213a28ac2e07 : succès des 12 jobs techniques (revue ignorée PR draft). CLI Windows ajoute les sélecteurs exclusifs --uds-did et --uds-scaling-did (SID 22/24), VIN obligatoire, F190 avant/après, TLS par défaut, validation SID/DID/données non vides, JSON brut et aide FR/EN. Tests de parseur et décodage ajoutés. Ce nouveau lot nécessite validation ; aucune qualification physique ni clôture C6/DoIP.

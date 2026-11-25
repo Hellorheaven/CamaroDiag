@@ -1239,6 +1239,19 @@ internal static class StandardProtocolCli
         var obdDid = Optional(args, "--obd-did");
         var obdDtcMask = Optional(args, "--obd-dtc-mask");
         var obdDtcCountMask = Optional(args, "--obd-dtc-count-mask");
+        var udsDtcMask = Optional(args, "--uds-dtc-mask");
+        var udsDtcCountMask = Optional(args, "--uds-dtc-count-mask");
+        var udsSnapshot = Optional(args, "--uds-snapshot");
+        var udsSnapshotRecord = Optional(args, "--uds-snapshot-record");
+        var udsExtended = Optional(args, "--uds-extended-dtc");
+        var udsExtendedRecord = Optional(args, "--uds-extended-record");
+        if ((udsDtcMask is not null || udsDtcCountMask is not null ||
+             udsSnapshot is not null || udsExtended is not null) &&
+            Optional(args, "--expected-vin") is null)
+            throw new ArgumentException("Typed UDS DTC reads require --expected-vin.");
+        if ((udsSnapshotRecord is not null) != (udsSnapshot is not null) ||
+            (udsExtendedRecord is not null) != (udsExtended is not null))
+            throw new ArgumentException("Generic DTC details require an explicit DTC and record.");
         var wwhStatus = Optional(args, "--obd-wwh-status");
         var wwhReadiness = Optional(args, "--obd-readiness-group");
         var snapshotDtc = Optional(args, "--obd-snapshot");
@@ -1267,6 +1280,10 @@ internal static class StandardProtocolCli
             (obdDid is null ? 0 : 1) +
             (obdDtcMask is null ? 0 : 1) +
             (obdDtcCountMask is null ? 0 : 1) +
+            (udsDtcMask is null ? 0 : 1) +
+            (udsDtcCountMask is null ? 0 : 1) +
+            (udsSnapshot is null ? 0 : 1) +
+            (udsExtended is null ? 0 : 1) +
             (wwhStatus is null ? 0 : 1) +
             (wwhReadiness is null ? 0 : 1) +
             (snapshotDtc is null ? 0 : 1) +
@@ -1289,6 +1306,14 @@ internal static class StandardProtocolCli
                     obdDid.StartsWith("0x", StringComparison.OrdinalIgnoreCase) ?
                         obdDid[2..] : obdDid,
                     NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture))) :
+            udsDtcMask is not null ? ObdOnUdsServices.ReadDtcByStatusMask(
+                checked((byte)Number(udsDtcMask))) :
+            udsDtcCountMask is not null ? ObdOnUdsServices.ReadDtcCountByStatusMask(
+                checked((byte)Number(udsDtcCountMask))) :
+            udsSnapshot is not null ? ObdOnUdsServices.ReadDtcSnapshot(
+                Number(udsSnapshot), checked((byte)Number(udsSnapshotRecord!))) :
+            udsExtended is not null ? ObdOnUdsServices.ReadDtcExtendedData(
+                Number(udsExtended), checked((byte)Number(udsExtendedRecord!))) :
             obdDtcMask is not null ? ObdOnUdsServices.ReadDtcByStatusMask(
                 checked((byte)Number(obdDtcMask))) :
             obdDtcCountMask is not null ? ObdOnUdsServices.ReadDtcCountByStatusMask(
@@ -1652,9 +1677,10 @@ internal static class StandardProtocolCli
         if (Optional(args, "--payload") is not null || Optional(args, "--payload-file") is not null)
             throw new ArgumentException("For arbitrary UDS commands use the verified --sequence path.");
         var multi = Optional(args, "--uds-dids");
-        var genericDid = Optional(args, "--uds-did") is not null ||
-            Optional(args, "--uds-scaling-did") is not null;
-        var obd = !genericDid && (multi is null || bool.Parse(Optional(args, "--obd-verified") ?? "false"));
+        var genericRead = new[] { "--uds-did", "--uds-scaling-did", "--uds-dtc-mask",
+            "--uds-dtc-count-mask", "--uds-snapshot", "--uds-extended-dtc" }
+            .Any(selector => Optional(args, selector) is not null);
+        var obd = !genericRead && (multi is null || bool.Parse(Optional(args, "--obd-verified") ?? "false"));
         if (Optional(args, "--obd-verified") is not null && multi is null)
             throw new ArgumentException("--obd-verified is only needed with --uds-dids.");
         if (obd && multi is not null && UdsMultiDidCli.Parse(multi).Any(e =>
@@ -1730,7 +1756,7 @@ internal static class StandardProtocolCli
             await VerifyAsync();
             stop.Token.ThrowIfCancellationRequested();
             PrintMultiDidResponse(args, o.Request, reply);
-            if (verified.Obd) PrintObdOnUdsResponse(o.Request, reply);
+            if (verified.Obd || o.Request[0] == 0x19) PrintObdOnUdsResponse(o.Request, reply);
             if (o.ReceiveFile is not null) await SaveDoIpReplyAsync(o.ReceiveFile, reply);
             Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(new
             {
