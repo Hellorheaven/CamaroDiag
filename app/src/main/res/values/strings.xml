@@ -1113,6 +1113,9 @@
     <string name="cal_doip_stored_record">Read stored DTC data by record</string>
     <string name="cal_doip_stored_record_result">Stored record 0x%1$02X</string>
     <string name="cal_doip_stored_record_count">Declared DID count : %1$d</string>
+    <string name="cal_doip_all_stored_records">Read all stored records</string>
+    <string name="cal_doip_stored_catalog">Documented DID lengths (e.g. F40C:2,F40D:1)</string>
+    <string name="cal_doip_all_stored_result">Stored records: %1$d</string>
     <string name="cal_doip_stored_record_empty">No stored data for this record</string>
     <string name="cal_doip_extended_record_support">DTCs supporting the extended record</string>
     <string name="cal_doip_extended_record_size">Uniform documented record length (bytes)</string>
