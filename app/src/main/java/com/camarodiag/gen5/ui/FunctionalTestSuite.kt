@@ -96,6 +96,16 @@ object FunctionalTestPlanner {
                 "Réponse physique au mode 01 PID 00 ; identité constructeur du calculateur non établie.")
         }
 
+    fun withDtcModeEvidence(rows: List<FunctionalTestCheck>, counts: Map<Int, Int?>): List<FunctionalTestCheck> =
+        rows.filterNot { it.key.startsWith("service:dtc-mode:") } + counts.entries.sortedBy { it.key }.map { (mode, count) ->
+            val hex = "%02X".format(java.util.Locale.ROOT, mode)
+            FunctionalTestCheck("service:dtc-mode:$hex", "service",
+                "OBD DTC mode $hex", "Mode DTC OBD $hex",
+                if (count == null) FunctionalTestOutcome.NOT_TESTED else FunctionalTestOutcome.PASSED,
+                if (count == null) "No valid positive response; support unconfirmed." else "Positive physical response: $count codes.",
+                if (count == null) "Aucune réponse positive valide ; prise en charge non confirmée." else "Réponse physique positive : $count défauts.")
+        }
+
     fun updated(
         rows: List<FunctionalTestCheck>, key: String, outcome: FunctionalTestOutcome,
         detailEn: String, detailFr: String
