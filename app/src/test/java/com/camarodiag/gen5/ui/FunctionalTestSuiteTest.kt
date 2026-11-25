@@ -58,7 +58,7 @@ class FunctionalTestSuiteTest {
 
     @Test fun foreignVinIsNotCamaroCandidate() {
         val matcher = com.camarodiag.gen5.domain.model.VehicleVinMatcher
-        assertTrue(matcher.isCamaroCandidate("2G1FF3D36C9104199"))
+        assertTrue(matcher.isCamaroCandidate("2G1FF3D30C9000001"))
         assertTrue(matcher.isCamaroCandidate("1G1FA1RXXR0123456"))
         assertTrue(!matcher.isCamaroCandidate("3FMTK3SU0PMA00001"))
         assertTrue(!matcher.isCamaroCandidate(null))
