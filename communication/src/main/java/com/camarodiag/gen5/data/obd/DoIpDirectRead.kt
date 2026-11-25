@@ -26,7 +26,7 @@ import kotlin.coroutines.resumeWithException
  * A socket is owned by one operation and is never retained after failure.
  */
 object DoIpDirectRead {
-    enum class Operation { VIN, DID, DTC, DTC_COUNT, DTC_SNAPSHOT, DTC_EXTENDED, MONITOR, BACKUP, EXCHANGE, OBD_IDENTIFY, OBD_DID, OBD_MONITOR, OBD_WWH_MASK, OBD_WWH_PERMANENT, OBD_WWH_READINESS, MULTI_DID, OBD_MULTI_DID, SCALING_DID, OBD_DTC, OBD_DTC_COUNT, OBD_DTC_SNAPSHOT, OBD_DTC_EXTENDED, SUPPORTED_DTCS, SNAPSHOT_INDEX, MULTI_MONITOR, OBD_MULTI_MONITOR }
+    enum class Operation { VIN, DID, DTC, DTC_COUNT, DTC_SNAPSHOT, DTC_EXTENDED, MONITOR, BACKUP, EXCHANGE, OBD_IDENTIFY, OBD_DID, OBD_MONITOR, OBD_WWH_MASK, OBD_WWH_PERMANENT, OBD_WWH_READINESS, MULTI_DID, OBD_MULTI_DID, SCALING_DID, OBD_DTC, OBD_DTC_COUNT, OBD_DTC_SNAPSHOT, OBD_DTC_EXTENDED, SUPPORTED_DTCS, SNAPSHOT_INDEX, MULTI_MONITOR, OBD_MULTI_MONITOR, FIRST_FAILED_DTC, FIRST_CONFIRMED_DTC, RECENT_FAILED_DTC, RECENT_CONFIRMED_DTC }
     /** Immutable optional parameters. Defaults retain the original global deadline. */
     data class SessionOptions(val timeoutMs: Int = 5000, val p2Ms: Int = timeoutMs,
         val p2StarMs: Int = timeoutMs, val routingType: Int = 0, val routingOemHex: String = "") {
@@ -714,6 +714,13 @@ object DoIpDirectRead {
         val wwhRequest = wwhKind?.let { DoIpWwhDtc.request(it, mask, wwhSeverity, wwhReadinessGroup) }
         val obdDtc = operation in setOf(Operation.OBD_DTC, Operation.OBD_DTC_COUNT,
             Operation.OBD_DTC_SNAPSHOT, Operation.OBD_DTC_EXTENDED)
+        val historicalSubfunction = when (operation) {
+            Operation.FIRST_FAILED_DTC -> 0x0B
+            Operation.FIRST_CONFIRMED_DTC -> 0x0C
+            Operation.RECENT_FAILED_DTC -> 0x0D
+            Operation.RECENT_CONFIRMED_DTC -> 0x0E
+            else -> null
+        }
         val detailRequest = when (operation) {
             Operation.DTC_SNAPSHOT, Operation.OBD_DTC_SNAPSHOT -> UdsDtcDecoder.readDetailRequest(4, dtc, record)
             Operation.DTC_EXTENDED, Operation.OBD_DTC_EXTENDED -> UdsDtcDecoder.readDetailRequest(6, dtc, record)
@@ -886,6 +893,11 @@ object DoIpDirectRead {
                                 onCommandReply(index + 1, reply.copyOf())
                             }
                             Outcome(gateway, target.ecu, vin, replies.last(), null, trace.toList(), commandReplies = replies.toList())
+                        } else if (historicalSubfunction != null) {
+                            val report = UdsDtcDecoder.decodeHistoricalDtc(historicalSubfunction,
+                                session.exchange(byteArrayOf(0x19, historicalSubfunction.toByte()), timeoutMs))
+                            require(readVin() == vin)
+                            Outcome(gateway, target.ecu, vin, null, report, trace.toList())
                         } else if (operation == Operation.SUPPORTED_DTCS) {
                             val report = UdsDtcDecoder.decodeSupportedDtcs(session.exchange(byteArrayOf(0x19, 0x0A), timeoutMs))
                             require(readVin() == vin)

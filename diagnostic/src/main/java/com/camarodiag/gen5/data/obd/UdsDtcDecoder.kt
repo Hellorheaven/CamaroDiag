@@ -98,6 +98,17 @@ object UdsDtcDecoder {
         return report
     }
 
+    /** 19/0B..0E returns at most one historical DTC, not a complete active fault list.
+     * Its current status can differ from the event that selected it. */
+    fun decodeHistoricalDtc(subfunction: Int, reply: ByteArray): UdsDtcReport {
+        require(subfunction in 0x0B..0x0E && reply.size in setOf(3, 7) &&
+            reply[0] == 0x59.toByte() && reply[1] == subfunction.toByte())
+        val availability = reply[2].toInt() and 255
+        val report = decodeRecords(availability, null, reply.copyOfRange(3, reply.size))
+        require(report.records.all { (it.statusByte and availability.inv() and 255) == 0 })
+        return report
+    }
+
     /** 19/03 lists DTC and snapshot record pairs, not snapshot contents. */
     fun decodeSnapshotIndex(reply: ByteArray): List<UdsSnapshotReference> {
         require(reply.size >= 2 && reply[0] == 0x59.toByte() && reply[1] == 3.toByte() &&

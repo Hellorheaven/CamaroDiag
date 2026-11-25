@@ -765,6 +765,21 @@ fun CalibrationWorkspaceScreen(
                             Text(stringResource(R.string.cal_doip_snapshot_index))
                         }
                     }
+                    for (pair in listOf(
+                        listOf(DoIpDirectRead.Operation.FIRST_FAILED_DTC to R.string.cal_doip_first_failed,
+                            DoIpDirectRead.Operation.FIRST_CONFIRMED_DTC to R.string.cal_doip_first_confirmed),
+                        listOf(DoIpDirectRead.Operation.RECENT_FAILED_DTC to R.string.cal_doip_recent_failed,
+                            DoIpDirectRead.Operation.RECENT_CONFIRMED_DTC to R.string.cal_doip_recent_confirmed))) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            for ((operation, label) in pair) {
+                                OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu, "", doIpTls,
+                                    operation, doIpCertificate, requireNotNull(doIpOptions)) },
+                                    enabled = targetReady && vinReady, modifier = Modifier.weight(1f)) {
+                                    Text(stringResource(label))
+                                }
+                            }
+                        }
+                    }
                     OutlinedTextField(doIpCommand, { doIpCommand = it.take(12288) },
                         enabled = idle, singleLine = true, modifier = Modifier.fillMaxWidth(),
                         label = { Text(stringResource(R.string.cal_doip_command_payload)) })

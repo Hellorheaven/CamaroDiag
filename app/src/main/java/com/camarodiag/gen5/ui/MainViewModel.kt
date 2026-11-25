@@ -1577,6 +1577,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     count != null -> localizedContext.getString(R.string.cal_doip_count_result,
                         count.count, mask, count.availabilityMask, count.formatIdentifier)
                     result.samples.isNotEmpty() -> localizedContext.getString(R.string.cal_doip_monitor_complete, result.samples.size)
+                    operation in setOf(DoIpDirectRead.Operation.FIRST_FAILED_DTC, DoIpDirectRead.Operation.FIRST_CONFIRMED_DTC,
+                        DoIpDirectRead.Operation.RECENT_FAILED_DTC, DoIpDirectRead.Operation.RECENT_CONFIRMED_DTC) && report != null -> {
+                        val title = localizedContext.getString(when (operation) {
+                            DoIpDirectRead.Operation.FIRST_FAILED_DTC -> R.string.cal_doip_first_failed
+                            DoIpDirectRead.Operation.FIRST_CONFIRMED_DTC -> R.string.cal_doip_first_confirmed
+                            DoIpDirectRead.Operation.RECENT_FAILED_DTC -> R.string.cal_doip_recent_failed
+                            else -> R.string.cal_doip_recent_confirmed
+                        })
+                        title + ": " + (report.records.singleOrNull()?.let {
+                            "0x%06X — 0x%02X".format(it.rawDtc, it.statusByte)
+                        } ?: localizedContext.getString(R.string.cal_doip_no_historical_dtc))
+                    }
                     operation == DoIpDirectRead.Operation.SUPPORTED_DTCS && report != null ->
                         localizedContext.getString(R.string.cal_doip_supported_result, report.records.size, report.statusAvailabilityMask) +
                             report.records.joinToString(separator = "\n", prefix = "\n") {

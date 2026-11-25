@@ -17,6 +17,18 @@ class UdsDtcDecoderTest {
         assertTrue(runCatching { UdsDtcDecoder.decodeSupportedDtcs(byteArrayOf(0x59, 2, 8)) }.isFailure)
     }
 
+    @Test fun historicalDtcCanBeAbsentOrHaveCurrentStatusZero() {
+        for (sub in 0x0B..0x0E) {
+            assertTrue(UdsDtcDecoder.decodeHistoricalDtc(sub, byteArrayOf(0x59, sub.toByte(), 8)).records.isEmpty())
+            val report = UdsDtcDecoder.decodeHistoricalDtc(sub, byteArrayOf(0x59, sub.toByte(), 8, 1, 2, 3, 0))
+            assertEquals(0x010203, report.records.single().rawDtc)
+            assertEquals(0, report.records.single().statusByte)
+            assertTrue(runCatching { UdsDtcDecoder.decodeHistoricalDtc(sub, byteArrayOf(0x59, sub.toByte(), 8, 1)) }.isFailure)
+            assertTrue(runCatching { UdsDtcDecoder.decodeHistoricalDtc(sub, byteArrayOf(0x59, sub.toByte(), 8, 1, 2, 3, 1)) }.isFailure)
+        }
+        assertTrue(runCatching { UdsDtcDecoder.decodeHistoricalDtc(0x0B, byteArrayOf(0x59, 0x0C, 8)) }.isFailure)
+    }
+
     @Test fun snapshotIndexPreservesDistinctRecordsPerDtc() {
         assertEquals(listOf(UdsSnapshotReference(0x123456, 1), UdsSnapshotReference(0x123456, 2)),
             UdsDtcDecoder.decodeSnapshotIndex(byteArrayOf(0x59, 3, 0x12, 0x34, 0x56, 1, 0x12, 0x34, 0x56, 2)))

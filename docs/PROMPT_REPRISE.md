@@ -1,3 +1,7 @@
+## PR117 — DTC historiques UDS 19/0B à 19/0E Android (25/11/2026)
+
+- Premier/dernier DTC détecté et premier/dernier confirmé : quatre actions de lecture, résultat absent ou unique, statut courant brut, F190 avant/après, pas de modification de la liste de défauts actifs. Android FR/EN et tests écrits. Windows et Connectors à raccorder. Référence : https://udsoncan.readthedocs.io/en/latest/udsoncan/client.html (ReadDTCInformation). Aucune CI lancée.
+
 ## PR117 — identité des mesures DID simples (25/11/2026)
 
 - Windows GUI/CLI : monitoring DID simple vérifie chaque VIN F190/F802 et protocole F810 demandé avant publication, comme le multi-DID. Connectors : lecture DID simple via méthode vérifiée ; F190 renvoie le VIN observé sans seconde lecture contradictoire, autres DID revalidation sur la même session. Tests de régression écrits, non lancés. DoIP reste actif, aucune CI intermédiaire.

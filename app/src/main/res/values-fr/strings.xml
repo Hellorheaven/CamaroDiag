@@ -1109,4 +1109,9 @@
     <string name="cal_doip_snapshot_index_result">Enregistrements snapshot disponibles : %1$d</string>
     <string name="cal_doip_multi_monitor">Monitoring multi-DID UDS</string>
     <string name="cal_doip_obd_multi_monitor">Monitoring multi-DID OBDonUDS</string>
+    <string name="cal_doip_first_failed">Premier DTC détecté</string>
+    <string name="cal_doip_first_confirmed">Premier DTC confirmé</string>
+    <string name="cal_doip_recent_failed">Dernier DTC détecté</string>
+    <string name="cal_doip_recent_confirmed">Dernier DTC confirmé</string>
+    <string name="cal_doip_no_historical_dtc">Aucun DTC historique correspondant</string>
 </resources>
