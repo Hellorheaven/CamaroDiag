@@ -478,6 +478,50 @@ internal static class ObdOnUdsServices
         return catalog;
     }
 
+    internal sealed record SnapshotRecords(uint Dtc, byte Status, byte RequestedRecord,
+        IReadOnlyList<StoredRecordEntry> Records, byte[] RawResponse);
+
+    internal static byte[] ReadDecodedSnapshot(uint dtc, byte record)
+    {
+        if (dtc > 0xFFFFFF) throw new ArgumentOutOfRangeException(nameof(dtc));
+        return UdsStandardServices.ReadDtc(4, [(byte)(dtc >> 16), (byte)(dtc >> 8), (byte)dtc, record]);
+    }
+
+    internal static SnapshotRecords DecodeSnapshotRecords(uint dtc, byte record, ReadOnlySpan<byte> reply,
+        IReadOnlyDictionary<ushort, int> lengths)
+    {
+        if (lengths.Count is < 1 or > 255 || lengths.Any(p => p.Value is < 1 or > 4096))
+            throw new ArgumentException("Invalid DID length catalog.");
+        _ = UdsStandardServices.RequireResponse(ReadDecodedSnapshot(dtc, record), reply);
+        if (reply.Length < 6) throw new InvalidDataException("Truncated snapshot status.");
+        var records = new List<StoredRecordEntry>();
+        var seen = new HashSet<byte>();
+        byte status = reply[5];
+        int offset = 6;
+        while (offset < reply.Length)
+        {
+            int start = offset;
+            if (reply.Length - offset < 2) throw new InvalidDataException("Truncated snapshot header.");
+            byte number = reply[offset], count = reply[offset + 1];
+            if (number == 255 || !seen.Add(number) || (record != 255 && number != record))
+                throw new InvalidDataException("Invalid, duplicate or unexpected snapshot record.");
+            offset += 2;
+            var dids = new List<StoredDid>();
+            for (int i = 0; i < count; i++)
+            {
+                if (reply.Length - offset < 2) throw new InvalidDataException("Truncated snapshot DID.");
+                ushort did = BinaryPrimitives.ReadUInt16BigEndian(reply[offset..]);
+                offset += 2;
+                if (!lengths.TryGetValue(did, out var size) || reply.Length - offset < size)
+                    throw new InvalidDataException("Unknown DID length or truncated snapshot data.");
+                dids.Add(new(did, reply.Slice(offset, size).ToArray()));
+                offset += size;
+            }
+            records.Add(new(number, dtc, status, dids, reply[start..offset].ToArray()));
+        }
+        return new(dtc, status, record, records, reply.ToArray());
+    }
+
     internal static byte[] ReadAllStoredRecords() => UdsStandardServices.ReadDtc(5, [255]);
 
     internal static AllStoredRecords DecodeAllStoredRecords(ReadOnlySpan<byte> reply, IReadOnlyDictionary<ushort, int> lengths)
