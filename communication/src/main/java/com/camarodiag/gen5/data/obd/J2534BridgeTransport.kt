@@ -362,8 +362,8 @@ class J2534BridgeTransport(
         check(isStandardObdPhysicalReadEnabled)
         // An absent/refused read is not equivalent to a confirmed empty list.
         suspend fun read(mode: Int): List<ObdDtc>? =
-            J2534StandardObd.optionalDtcs(mode, exchange(byteArrayOf(mode.toByte()), 2500))
-        return PhysicalObdDtcSnapshot(requireNotNull(read(3)), read(7), read(10))
+            J2534StandardObd.evidenceDtcs(mode, exchange(byteArrayOf(mode.toByte()), 2500))
+        return PhysicalObdDtcSnapshot(read(3), read(7), read(10))
     }
 
     /** Physical scan uses only exact read payloads, never AT commands. */
@@ -401,7 +401,7 @@ class J2534BridgeTransport(
             }
         })
         return engine.fullPhysicalCanScan(responder, standardObdAdapterInfo) { mode, raw ->
-            J2534StandardObd.optionalDtcs(mode, raw.hexToBytes())
+            J2534StandardObd.evidenceDtcs(mode, raw.hexToBytes())
         }
     }
 

@@ -5205,17 +5205,35 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     if (obdManager.isJ2534StandardObdAvailable()) {
                         checkRead("service:pids") {
                             val pids = obdManager.probeJ2534StandardPids()
-                            require(pids.isNotEmpty()) { "No supported physical PIDs" }
+                            // A successfully decoded empty bitmap is still a physical reply.
                             ("Physical J2534 PID bitmap: " + pids.size + " supported PIDs.") to
                                 ("Bitmap physique J2534 : " + pids.size + " PID pris en charge.")
                         }
+                        var partialJ2534Dtcs = false
                         checkRead("service:dtcs") {
                             val snapshot = obdManager.readJ2534StandardDtcs()
-                            require(snapshot.unavailableModes.isEmpty()) {
-                                "Complete standard DTC coverage not confirmed"
+                            if (!current()) throw CancellationException("Account or run changed")
+                            val state = _functionalTestState.value
+                            _functionalTestState.value = state.copy(checks =
+                                FunctionalTestPlanner.withDtcModeEvidence(state.checks, snapshot.modeCounts))
+                            require(snapshot.modeCounts.values.any { it != null }) {
+                                "No positive physical DTC service response"
                             }
-                            ("Physical J2534 DTC reads verified: " + snapshot.records.size + " codes, no clearing.") to
-                                ("Lectures physiques J2534 vérifiées : " + snapshot.records.size + " défauts, sans effacement.")
+                            partialJ2534Dtcs = snapshot.unavailableModes.isNotEmpty()
+                            if (partialJ2534Dtcs) {
+                                val missing = snapshot.unavailableModes.sorted().joinToString("/") {
+                                    "%02X".format(java.util.Locale.ROOT, it)
+                                }
+                                ("Partial physical J2534 DTC response: " + snapshot.records.size + " codes; modes $missing not confirmed.") to
+                                    ("Réponse DTC J2534 physique partielle : " + snapshot.records.size + " défauts ; modes $missing non confirmés.")
+                            } else {
+                                ("Physical J2534 DTC reads verified: " + snapshot.records.size + " codes, no clearing.") to
+                                    ("Lectures physiques J2534 vérifiées : " + snapshot.records.size + " défauts, sans effacement.")
+                            }
+                        }
+                        if (partialJ2534Dtcs && current()) {
+                            val partial = _functionalTestState.value.checks.first { it.key == "service:dtcs" }
+                            mark("service:dtcs", FunctionalTestOutcome.NOT_TESTED, partial.detailEn, partial.detailFr)
                         }
                         checkRead("service:readiness") {
                             obdManager.probeJ2534StandardReadiness()

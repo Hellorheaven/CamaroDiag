@@ -85,11 +85,51 @@ class Obd2FeatureEngineTest {
         val report = engine.fullReadOnlyScan()
 
         assertTrue(report.supportedPids.isEmpty())
-        assertTrue(commands.containsAll(listOf("ATZ", "ATSP6", "ATI", "AT@1", "03", "07", "0A", "0902", "0904", "0906", "090A", "0600")))
+        assertTrue(commands.containsAll(listOf("ATI", "AT@1", "03", "07", "0A", "0902", "0904", "0906", "090A", "0600")))
+        assertTrue(commands.none { it == "ATZ" || it.startsWith("ATSP") || it.startsWith("ATTP") })
+        assertEquals(setOf(3, 7, 10), report.unavailableDtcModes)
         assertTrue(commands.none { command ->
             command == "04" || command.startsWith("2E") || command.startsWith("31") ||
                 command.startsWith("34") || command.startsWith("36") || command.startsWith("11")
         })
+    }
+
+    @Test
+    fun fullScanKeepsPartialDtcEvidenceAndExistingProtocol() = runBlocking {
+        val commands = mutableListOf<String>()
+        val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+            commands += command
+            when (command) {
+                "ATDP" -> "ISO 15765-4 CAN (29 bit ID, 250 kbaud)"
+                "0100" -> "410000000000"
+                "03" -> "NO DATA"
+                "07" -> "47010100"
+                "0A" -> "4A00"
+                else -> "NO DATA"
+            }
+        })
+        val report = engine.fullReadOnlyScan()
+        assertEquals(setOf(3), report.unavailableDtcModes)
+        assertEquals(listOf(ObdDtc("P0100", "pending")), report.pendingDtcs)
+        assertTrue(report.confirmedDtcs.isEmpty())
+        assertTrue(report.adapterInfo.getValue("PROTOCOL").contains("29 bit"))
+        assertTrue(commands.none { it == "ATZ" || it.startsWith("ATSP") })
+    }
+
+    @Test
+    fun physicalScanKeepsOtherModesWhenConfirmedIsExplicitlyUnavailable() = runBlocking {
+        val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+            if (command == "0100") "410000000000" else "NO DATA"
+        })
+        val report = engine.fullPhysicalCanScan("7E8", emptyMap()) { mode, _ ->
+            when (mode) {
+                3 -> null
+                7 -> listOf(ObdDtc("P0100", "pending"))
+                else -> emptyList()
+            }
+        }
+        assertEquals(setOf(3), report.unavailableDtcModes)
+        assertEquals("P0100", report.pendingDtcs.single().code)
     }
 
     @Test

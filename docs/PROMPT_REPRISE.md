@@ -1,3 +1,7 @@
+## PR117 — scan OBD complet sans changement de protocole et parité DTC J2534 (25/11/2026)
+
+- C6 : le scan complet interroge les métadonnées du connecteur déjà configuré, sans ATZ/ATSP imposant CAN 11 bits 500 kbit/s. Les trois modes DTC conservent leur preuve indépendante ; un mode 03 non confirmé n'efface ni les défauts antérieurs ni les résultats 07/0A. J2534 accepte l'indisponibilité explicite de chacun des trois modes en inventaire, tout en rejetant les réponses malformées. Rapport propriétaire J2534 avec lignes par mode, statut partiel et bitmap vide valide. Tests de régression écrits, non exécutés. Le choix initial du protocole et les restaurations après capture restent à auditer ; aucun checkpoint CI, C6/DoIP restent actifs.
+
 ## PR117 — preuves OBD réelles dans le rapport fonctionnel (25/11/2026)
 
 - Rapport propriétaire Android : conservation bornée des véritables commandes/réponses OBD de VIN, répondants, bitmaps, DTC et readiness, y compris réponses négatives et NO DATA. Pas de données J2534 synthétiques. Le JSON peut contenir VIN et informations ECU : partage volontaire uniquement. Régressions écrites, non exécutées. Aucun checkpoint, C6/DoIP restent actifs.

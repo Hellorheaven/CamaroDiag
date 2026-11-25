@@ -103,6 +103,13 @@ internal object J2534StandardObd {
         if (mode in setOf(7,10) && isExplicitlyUnsupported(mode,reply)) null
         else dtcs(mode,reply)
 
+    /** Inventory all three modes independently. Explicit refusal is unavailable,
+     * while malformed replies and other NRCs remain errors. */
+    fun evidenceDtcs(mode: Int, reply: ByteArray): List<ObdDtc>? {
+        require(mode in setOf(3, 7, 10))
+        return if (isExplicitlyUnsupported(mode, reply)) null else dtcs(mode, reply)
+    }
+
     fun isExplicitlyUnsupported(mode: Int, reply: ByteArray): Boolean =
         reply.size == 3 && reply.u(0) == 0x7F && reply.u(1) == mode &&
             reply.u(2) in setOf(0x11, 0x12, 0x31)

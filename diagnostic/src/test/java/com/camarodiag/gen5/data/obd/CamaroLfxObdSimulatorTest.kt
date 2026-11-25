@@ -61,7 +61,8 @@ class CamaroLfxObdSimulatorTest {
         assertEquals(listOf(0x0B, 0xB8), report.freezeFrame[0x0C])
         assertEquals(listOf(0x7F), report.freezeFrame[0x05])
         assertEquals(setOf("P0133", "P0171"), report.confirmedDtcs.map { it.code }.toSet())
-        assertTrue(report.rawLog.any { it.contains("ATZ") })
+        assertTrue(report.rawLog.any { it.contains("ATI") })
+        assertTrue(report.rawLog.none { it.startsWith("> ATZ") || it.startsWith("> ATSP") })
     }
 
     @Test

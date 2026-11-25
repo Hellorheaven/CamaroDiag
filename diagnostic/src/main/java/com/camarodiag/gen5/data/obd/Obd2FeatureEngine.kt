@@ -18,17 +18,19 @@ data class ObdValue(
 
 data class ObdDtc(val code: String, val status: String)
 
-/** Null means the ECU explicitly refused that read; it never means zero DTCs. */
+/** Null means no verified positive read; it never means zero DTCs. */
 data class PhysicalObdDtcSnapshot(
-    val confirmed: List<ObdDtc>,
+    val confirmed: List<ObdDtc>?,
     val pending: List<ObdDtc>?,
     val permanent: List<ObdDtc>?
 ) {
     val unavailableModes: Set<Int> get() = buildSet {
+        if (confirmed == null) add(3)
         if (pending == null) add(7)
         if (permanent == null) add(10)
     }
-    val records: List<ObdDtc> get() = confirmed + pending.orEmpty() + permanent.orEmpty()
+    val records: List<ObdDtc> get() = confirmed.orEmpty() + pending.orEmpty() + permanent.orEmpty()
+    val modeCounts: Map<Int, Int?> get() = linkedMapOf(3 to confirmed?.size, 7 to pending?.size, 10 to permanent?.size)
 }
 
 data class ObdEcuIdentification(
@@ -84,12 +86,17 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
         listOf("ATZ", "ATE0", "ATL0", "ATS0", "ATH0", "ATSP6").forEach {
             result[it] = ask(it, 2500L)
         }
-        result["IDENTIFICATION"] = ask("ATI")
-        result["DESCRIPTION"] = ask("AT@1")
-        result["PROTOCOL"] = ask("ATDP")
-        result["VOLTAGE"] = ask("ATRV")
+        result.putAll(inspectAdapter())
         return result
     }
+
+    /** Read adapter metadata without resetting its negotiated vehicle protocol. */
+    private suspend fun inspectAdapter(): Map<String, String> = linkedMapOf(
+        "IDENTIFICATION" to ask("ATI"),
+        "DESCRIPTION" to ask("AT@1"),
+        "PROTOCOL" to ask("ATDP"),
+        "VOLTAGE" to ask("ATRV")
+    )
 
     /**
      * Detects 11-bit CAN response identifiers returned to the standard OBD
@@ -339,11 +346,13 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
 
     suspend fun fullReadOnlyScan(): ObdScanReport {
         log.clear()
-        val adapter = initialize()
+        // The live adapter is already configured by its transport. Resetting it
+        // here would silently switch 29-bit/250 kbit/s/legacy OBD to CAN 11-bit.
+        val adapter = inspectAdapter()
         val respondingEcus = discoverFunctionalObdResponders()
         return collectReadOnlyScan(adapter, respondingEcus, readDtcRecords = {
-            val (confirmed,pending,permanent) = readDtcs()
-            PhysicalObdDtcSnapshot(confirmed,pending,permanent)
+            val modes = readDtcModeEvidence()
+            PhysicalObdDtcSnapshot(modes[3], modes[7], modes[10])
         })
     }
 
@@ -362,7 +371,7 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
         return collectReadOnlyScan(adapterInfo, listOf(responderCanId),
             physicalCanResponder = responderCanId, readDtcRecords = {
                 PhysicalObdDtcSnapshot(
-                    requireNotNull(decodeDtcPayload(3, ask("03"))) { "Confirmed DTC read is unavailable." },
+                    decodeDtcPayload(3, ask("03")),
                     decodeDtcPayload(7, ask("07")), decodeDtcPayload(10, ask("0A")))
             })
     }
@@ -390,7 +399,7 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
         return ObdScanReport(
             supportedPids = supported,
             liveData = live,
-            confirmedDtcs = dtcSnapshot.confirmed,
+            confirmedDtcs = dtcSnapshot.confirmed.orEmpty(),
             pendingDtcs = dtcSnapshot.pending.orEmpty(),
             permanentDtcs = dtcSnapshot.permanent.orEmpty(),
             vin = vin,

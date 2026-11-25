@@ -67,6 +67,18 @@ class J2534StandardObdTest {
         assertEquals(setOf(7),snapshot.unavailableModes)
         assertEquals(listOf(ObdDtc("P0300","confirmed")),snapshot.records)
     }
+    @Test fun inventoryRetainsOtherModesWhenMode03IsRefused() {
+        assertNull(J2534StandardObd.evidenceDtcs(3, bytes(0x7F, 3, 0x11)))
+        val pending = J2534StandardObd.evidenceDtcs(7, bytes(0x47, 1, 0x01, 0x00))
+        val snapshot = PhysicalObdDtcSnapshot(null, pending, emptyList())
+        assertEquals(setOf(3), snapshot.unavailableModes)
+        assertEquals(mapOf(3 to null, 7 to 1, 10 to 0), snapshot.modeCounts)
+        assertEquals(listOf(ObdDtc("P0100", "pending")), snapshot.records)
+        assertThrows(IllegalArgumentException::class.java) {
+            J2534StandardObd.evidenceDtcs(3, bytes(0x43, 1, 0x01))
+        }
+    }
+
     @Test fun fuelAndEthanolTelemetryRejectsShortOrPaddedPayloads() {
         assertArrayEquals(bytes(0),J2534StandardObd.pidData(0x52,bytes(0x41,0x52,0)))
         assertArrayEquals(bytes(255),J2534StandardObd.pidData(0x52,bytes(0x41,0x52,255)))
