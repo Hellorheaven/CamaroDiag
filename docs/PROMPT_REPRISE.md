@@ -1,3 +1,7 @@
+## PR117 — preuves OBD réelles dans le rapport fonctionnel (25/11/2026)
+
+- Rapport propriétaire Android : conservation bornée des véritables commandes/réponses OBD de VIN, répondants, bitmaps, DTC et readiness, y compris réponses négatives et NO DATA. Pas de données J2534 synthétiques. Le JSON peut contenir VIN et informations ECU : partage volontaire uniquement. Régressions écrites, non exécutées. Aucun checkpoint, C6/DoIP restent actifs.
+
 ## PR117 — fiabilité découverte PID (25/11/2026)
 
 - C6 : cache Mode 01 ELM/J2534 lié à une génération ; découverte incomplète renouvelée après 10 s même non vide, bitmap complet valide même vide conservé, horloge monotone et rejet des opérations obsolètes. Le parseur accepte le remplissage d'une trame CAN physique complète avec PCI cohérent et longueur SAE exacte, et le DLC explicite. Réponses tronquées refusées. Régressions écrites non exécutées ; aucun checkpoint. C6/DoIP restent actifs.

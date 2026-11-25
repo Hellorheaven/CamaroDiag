@@ -95,6 +95,18 @@ class FunctionalTestSuiteTest {
         }
     }
 
+    @Test fun reportKeepsBoundedActualObdEvidenceAcrossCheckUpdates() {
+        val initial = FunctionalTestState()
+        val evidence = FunctionalTestPlanner.appendRawObdExchanges(initial,
+            listOf("> 03 -> NO DATA", "> 07 -> 47 00"))
+        assertEquals(listOf("> 03 -> NO DATA", "> 07 -> 47 00"), evidence.rawObdExchanges)
+        val limited = FunctionalTestPlanner.appendRawObdExchanges(evidence,
+            List(200) { "A".repeat(9000) })
+        assertEquals(128, limited.rawObdExchanges.size)
+        assertTrue(limited.rawObdExchanges.all { it.length <= 8192 })
+        assertEquals(evidence.rawObdExchanges, evidence.copy(running = false).rawObdExchanges)
+    }
+
     @Test fun updateChangesOnlyTheTarget() {
         val rows = FunctionalTestPlanner.initial(modules, "BLE", true)
         val updated = FunctionalTestPlanner.updated(

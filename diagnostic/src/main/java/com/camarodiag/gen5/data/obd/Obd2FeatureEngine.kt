@@ -70,6 +70,9 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
 
     private val log = mutableListOf<String>()
 
+    /** Actual command/response evidence; callers decide whether to export it. */
+    fun rawExchangeLog(): List<String> = log.toList()
+
     private suspend fun ask(command: String, timeoutMs: Long = 1800L): String {
         val response = channel.command(command, timeoutMs).trim()
         log += "> $command -> $response"

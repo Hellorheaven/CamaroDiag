@@ -20,6 +20,7 @@ import com.camarodiag.gen5.auth.LicenseLevel
 import com.camarodiag.gen5.auth.LicenseRolloutConfig
 import com.camarodiag.gen5.auth.AccountStorageKeys
 import com.camarodiag.gen5.data.obd.CamaroUdsProtocol
+import com.camarodiag.gen5.data.obd.Obd2FeatureEngine
 import com.camarodiag.gen5.data.obd.CalibrationFileInspector
 import com.camarodiag.gen5.data.obd.CalibrationFileFormat
 import com.camarodiag.gen5.data.obd.CalibrationFileInspection
@@ -5086,6 +5087,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     )
                 }
             }
+            suspend fun <T> withRecordedObd(read: suspend (Obd2FeatureEngine) -> T): T =
+                obdManager.withObdCommandSession { engine ->
+                    try {
+                        read(engine)
+                    } finally {
+                        if (current()) {
+                            _functionalTestState.value = FunctionalTestPlanner.appendRawObdExchanges(
+                                _functionalTestState.value, engine.rawExchangeLog())
+                        }
+                    }
+                }
             suspend fun checkRead(
                 key: String, read: suspend () -> Pair<String, String>
             ) {
@@ -5113,7 +5125,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     // A generic OBD reply is never an OEM module identity. Read VIN first
                     // and retain the physical observation independently of the saved profile.
                     checkRead("service:vin") {
-                        val vin = obdManager.withObdCommandSession { it.readVinForVerification() }
+                        val vin = withRecordedObd { it.readVinForVerification() }
                             ?.trim()?.uppercase(java.util.Locale.ROOT)
                             ?.takeIf { it.matches(Regex("[A-HJ-NPR-Z0-9]{17}")) }
                             ?: error("VIN missing from physical response")
@@ -5126,7 +5138,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         if (_functionalTestState.value.context?.observedVin == null)
                             _functionalTestState.value = FunctionalTestPlanner.withObservedIdentity(_functionalTestState.value, null)
                         try {
-                            val responders = obdManager.withObdCommandSession { it.discoverFunctionalObdResponders() }
+                            val responders = withRecordedObd { it.discoverFunctionalObdResponders() }
                             if (!current()) throw CancellationException("Account or run changed")
                             _functionalTestState.value = _functionalTestState.value.copy(
                                 checks = FunctionalTestPlanner.withStandardResponders(_functionalTestState.value.checks, responders)
@@ -5135,7 +5147,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         catch (_: Exception) { /* No responder evidence is not a pass. */ }
                     }
                     checkRead("service:pids") {
-                        val discovery = obdManager.withObdCommandSession { it.discoverPidAvailability() }
+                        val discovery = withRecordedObd { it.discoverPidAvailability() }
                         require(discovery.firstUnresolvedPid != 1) { "No positive PID 00 response" }
                         require(discovery.firstUnresolvedPid == null) { "Incomplete supported PID bitmap" }
                         ("ECU responded with " + discovery.supported.size + " supported PIDs.") to
@@ -5143,7 +5155,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     }
                     var partialDtcEvidence = false
                     checkRead("service:dtcs") {
-                        val modes = obdManager.withObdCommandSession { it.readDtcModeEvidence() }
+                        val modes = withRecordedObd { it.readDtcModeEvidence() }
                         if (!current()) throw CancellationException("Account or run changed")
                         val state = _functionalTestState.value
                         _functionalTestState.value = state.copy(checks =
@@ -5166,7 +5178,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         mark("service:dtcs", FunctionalTestOutcome.NOT_TESTED, partial.detailEn, partial.detailFr)
                     }
                     checkRead("service:readiness") {
-                        val response = obdManager.withObdCommandSession { it.readReadiness() }
+                        val response = withRecordedObd { it.readReadiness() }
                         require(!response.isNullOrBlank()) { "Readiness response missing" }
                         "Physical emissions readiness response received." to
                             "Réponse physique des moniteurs antipollution reçue."
@@ -5276,6 +5288,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 )
             }
             json.put("checks", checks)
+            json.put("rawObdExchanges", JSONArray(snapshot.rawObdExchanges))
             try {
                 val savedPath = CamaroDiagExportStorage.write(getApplication<Application>(), fileName, "application/json",
                     category = CamaroDiagExportStorage.Category.TESTS, beforePublish = { check(isCurrentAccountGeneration(sessionGeneration) &&

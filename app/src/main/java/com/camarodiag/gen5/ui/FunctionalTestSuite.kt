@@ -30,7 +30,8 @@ data class FunctionalTestState(
     val finishedAtMillis: Long? = null,
     val checks: List<FunctionalTestCheck> = emptyList(),
     val error: String? = null,
-    val context: FunctionalTestContext? = null
+    val context: FunctionalTestContext? = null,
+    val rawObdExchanges: List<String> = emptyList()
 ) {
     val canExport: Boolean get() = !running && finishedAtMillis != null && context != null && checks.isNotEmpty()
 }
@@ -85,6 +86,10 @@ object FunctionalTestPlanner {
         }
         return connectorRows + moduleRows + services
     }
+
+    /** Bound owner-only diagnostic evidence, without creating synthetic replies. */
+    fun appendRawObdExchanges(state: FunctionalTestState, actual: List<String>): FunctionalTestState =
+        state.copy(rawObdExchanges = (state.rawObdExchanges + actual.map { it.take(8192) }).take(128))
 
     /** A physical VIN read and matching the selected profile are separate evidence. */
     fun withObservedIdentity(state: FunctionalTestState, observedVin: String?): FunctionalTestState {
