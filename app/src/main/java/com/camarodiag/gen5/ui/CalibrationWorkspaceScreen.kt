@@ -345,6 +345,7 @@ fun CalibrationWorkspaceScreen(
     var doIpWwhReadiness by remember(vehicle) { mutableStateOf("") }
     var doIpDetailDtc by remember(vehicle) { mutableStateOf("") }
     var doIpDetailRecord by remember(vehicle) { mutableStateOf("01") }
+    var doIpStoredCatalog by remember(vehicle) { mutableStateOf("") }
     var doIpDtcMemory by remember(vehicle) { mutableStateOf("") }
     var doIpExtendedRecordSize by remember(vehicle) { mutableStateOf("") }
     var doIpCommand by remember(vehicle) { mutableStateOf("") }
@@ -835,6 +836,16 @@ fun CalibrationWorkspaceScreen(
                         enabled = targetReady && vinReady && doIpDetailRecord.length == 2 &&
                             (doIpDetailRecord.toIntOrNull(16) ?: 255) in 0..254,
                         modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.cal_doip_stored_record)) }
+                    OutlinedTextField(doIpStoredCatalog, { doIpStoredCatalog = it.uppercase().filter { c -> c in "0123456789ABCDEF:," }.take(2549) },
+                        modifier = Modifier.fillMaxWidth(), singleLine = true,
+                        label = { Text(stringResource(R.string.cal_doip_stored_catalog)) })
+                    val storedCatalogReady = remember(doIpStoredCatalog) {
+                        runCatching { com.camarodiag.gen5.data.obd.UdsDtcDecoder.parseStoredDidLengths(doIpStoredCatalog) }.isSuccess
+                    }
+                    OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu,
+                        doIpStoredCatalog, doIpTls, DoIpDirectRead.Operation.ALL_STORED_RECORDS, doIpCertificate, requireNotNull(doIpOptions)) },
+                        enabled = targetReady && vinReady && storedCatalogReady,
+                        modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.cal_doip_all_stored_records)) }
                     val extendedRecordReady = targetReady && vinReady && doIpDetailRecord.length == 2 &&
                         (doIpDetailRecord.toIntOrNull(16) ?: 0) in 1..0xEF
                     OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu,
