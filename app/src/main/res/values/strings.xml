@@ -1168,4 +1168,5 @@
     <string name="cal_doip_obd_inventory">OBDonUDS ECU inventory</string>
     <string name="cal_doip_inventory_obd_supported">ECU 0x%1$04X: OBDonUDS identified (0x%2$02X)</string>
     <string name="cal_doip_inventory_obd_unknown">ECU 0x%1$04X: OBDonUDS not identified (F810 = 0x%2$02X)</string>
+    <string name="auth_startup_validation_timeout">Session verification timed out. Check your internet connection and retry.</string>
 </resources>

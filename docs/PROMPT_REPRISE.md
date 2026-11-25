@@ -1,3 +1,7 @@
+## PR117 — démarrage Android avec ELM Bluetooth déjà connecté (25/11/2026)
+
+- Retour propriétaire : chargement en boucle si Bluetooth ELM connecté avant ouverture. Cause exacte non reproduite. C6 : accès au service Bluetooth différé ; connexion RFCOMM bornée à 12 s avec fermeture du socket exact sur annulation ; purge RX bornée à 500 ms/8192 octets. Authentification Firebase : attente bornée à 15 s, message FR/EN et retry, invalidation des callbacks tardifs, aucun privilège ni accès hors ligne sur timeout. Régressions écrites non exécutées. Aucun checkpoint CI, C6/DoIP restent actifs.
+
 ## PR117 — scan OBD complet sans changement de protocole et parité DTC J2534 (25/11/2026)
 
 - C6 : le scan complet interroge les métadonnées du connecteur déjà configuré, sans ATZ/ATSP imposant CAN 11 bits 500 kbit/s. Les trois modes DTC conservent leur preuve indépendante ; un mode 03 non confirmé n'efface ni les défauts antérieurs ni les résultats 07/0A. J2534 accepte l'indisponibilité explicite de chacun des trois modes en inventaire, tout en rejetant les réponses malformées. Rapport propriétaire J2534 avec lignes par mode, statut partiel et bitmap vide valide. Tests de régression écrits, non exécutés. Le choix initial du protocole et les restaurations après capture restent à auditer ; aucun checkpoint CI, C6/DoIP restent actifs.

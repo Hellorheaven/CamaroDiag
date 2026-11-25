@@ -26,8 +26,10 @@ import java.util.UUID
 
 class BluetoothObdManager(context: Context) {
 
-    private val bluetoothManager = context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
-    private val bluetoothAdapter: BluetoothAdapter? = bluetoothManager?.adapter
+    // Do not query the Bluetooth service while constructing the startup ViewModel.
+    private val bluetoothContext = context.applicationContext
+    private val bluetoothAdapter: BluetoothAdapter?
+        get() = (bluetoothContext.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager)?.adapter
     private val sppUuid: UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")
 
     private var socket: BluetoothSocket? = null
@@ -191,10 +193,11 @@ class BluetoothObdManager(context: Context) {
         val epoch = beginAdapterConnection()
         var ownClassicSocket: BluetoothSocket? = null
         try {
-            val device: BluetoothDevice = bluetoothAdapter?.getRemoteDevice(macAddress)
+            val adapter = bluetoothAdapter
                 ?: return@withContext Result.failure(IllegalStateException("Bluetooth adapter unavailable"))
+            val device: BluetoothDevice = adapter.getRemoteDevice(macAddress)
 
-            bluetoothAdapter.cancelDiscovery()
+            adapter.cancelDiscovery()
             val useBle = device.type == BluetoothDevice.DEVICE_TYPE_LE ||
                 (device.name ?: "").contains("OBDLink CX", ignoreCase = true)
             if (useBle) {
@@ -216,7 +219,10 @@ class BluetoothObdManager(context: Context) {
                     transportSessionEpoch.requireQueuedCurrent(epoch)
                     socket = btSocket
                 }
-                btSocket.connect()
+                BoundedBluetoothConnect.open(
+                    connect = { btSocket.connect() },
+                    close = { btSocket.close() }
+                )
                 val connectedInput = btSocket.inputStream
                 val connectedOutput = btSocket.outputStream
                 synchronized(adapterLifecycleLock) {
@@ -1166,9 +1172,16 @@ class BluetoothObdManager(context: Context) {
                 if (out == null || inp == null || socket?.isConnected != true) {
                     throw ObdTransportDisconnectedException("Bluetooth OBD adapter is not connected")
                 }
+                // Bound the drain if the adapter was left streaming CAN.
+                val drainStart = android.os.SystemClock.elapsedRealtime()
+                var drained = 0
                 while (inp.available() > 0) {
                     ensureSameSession()
+                    if (drained >= 8192 || android.os.SystemClock.elapsedRealtime() - drainStart >= 500L) {
+                        throw java.net.SocketTimeoutException("Bluetooth adapter continuously streaming; reconnect after stopping monitor")
+                    }
                     if (inp.read() < 0) throw java.io.EOFException("Bluetooth OBD adapter disconnected")
+                    drained++
                 }
                 ensureSameSession()
                 out.write(payload); out.flush()
