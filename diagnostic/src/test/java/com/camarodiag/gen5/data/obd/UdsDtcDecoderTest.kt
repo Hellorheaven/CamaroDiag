@@ -8,6 +8,23 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class UdsDtcDecoderTest {
+    @Test fun supportedDtcInventoryIncludesInactiveCodes() {
+        val report = UdsDtcDecoder.decodeSupportedDtcs(byteArrayOf(0x59, 0x0A, 0x08,
+            0x12, 0x34, 0x56, 0, 0x12, 0x34, 0x57, 8))
+        assertEquals(listOf(0, 8), report.records.map { it.statusByte })
+        assertTrue(runCatching { UdsDtcDecoder.decodeSupportedDtcs(byteArrayOf(0x59, 0x0A, 8, 1, 2, 3, 1)) }.isFailure)
+        assertTrue(runCatching { UdsDtcDecoder.decodeSupportedDtcs(byteArrayOf(0x59, 0x0A, 8, 1, 2, 3, 0, 1, 2, 3, 8)) }.isFailure)
+        assertTrue(runCatching { UdsDtcDecoder.decodeSupportedDtcs(byteArrayOf(0x59, 2, 8)) }.isFailure)
+    }
+
+    @Test fun snapshotIndexPreservesDistinctRecordsPerDtc() {
+        assertEquals(listOf(UdsSnapshotReference(0x123456, 1), UdsSnapshotReference(0x123456, 2)),
+            UdsDtcDecoder.decodeSnapshotIndex(byteArrayOf(0x59, 3, 0x12, 0x34, 0x56, 1, 0x12, 0x34, 0x56, 2)))
+        assertTrue(UdsDtcDecoder.decodeSnapshotIndex(byteArrayOf(0x59, 3)).isEmpty())
+        assertTrue(runCatching { UdsDtcDecoder.decodeSnapshotIndex(byteArrayOf(0x59, 3, 1, 2)) }.isFailure)
+        assertTrue(runCatching { UdsDtcDecoder.decodeSnapshotIndex(byteArrayOf(0x59, 3, 1, 2, 3, 4, 1, 2, 3, 4)) }.isFailure)
+    }
+
     @Test fun standardStatusReportAcceptsNoDtcAndRejectsInventedFormatByte() {
         val empty = UdsDtcDecoder.decodeStatusMaskReport(byteArrayOf(0x7F), 0xFF)
         assertNull(empty.formatIdentifier)

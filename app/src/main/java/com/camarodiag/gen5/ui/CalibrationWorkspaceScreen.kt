@@ -753,6 +753,18 @@ fun CalibrationWorkspaceScreen(
                             Text(stringResource(R.string.cal_doip_obd_extended))
                         }
                     }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu, "", doIpTls,
+                            DoIpDirectRead.Operation.SUPPORTED_DTCS, doIpCertificate, requireNotNull(doIpOptions)) },
+                            enabled = targetReady && vinReady, modifier = Modifier.weight(1f)) {
+                            Text(stringResource(R.string.cal_doip_supported_dtcs))
+                        }
+                        OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu, "", doIpTls,
+                            DoIpDirectRead.Operation.SNAPSHOT_INDEX, doIpCertificate, requireNotNull(doIpOptions)) },
+                            enabled = targetReady && vinReady, modifier = Modifier.weight(1f)) {
+                            Text(stringResource(R.string.cal_doip_snapshot_index))
+                        }
+                    }
                     OutlinedTextField(doIpCommand, { doIpCommand = it.take(12288) },
                         enabled = idle, singleLine = true, modifier = Modifier.fillMaxWidth(),
                         label = { Text(stringResource(R.string.cal_doip_command_payload)) })

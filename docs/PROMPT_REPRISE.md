@@ -1,3 +1,7 @@
+## PR117 — inventaire DTC et index snapshots DoIP Android/Connectors (25/11/2026)
+
+- UDS 19/0A (DTC pris en charge, y compris statut zéro) et 19/03 (paires DTC/enregistrement snapshot), Android et Connectors CLI. Même session vérifiée F190 avant/après ; résultats séparés de la liste des défauts actifs. Rejet des doublons, formats tronqués et statuts non disponibles. Ressources FR/EN et tests écrits, non exécutés. Windows reste à raccorder. Aucun marqueur CI modifié.
+
 ## PR117 — DTC OBDonUDS classiques sur DoIP (25/11/2026)
 
 - Android et Windows GUI : accès distinct aux DTC 19/01, 19/02, 19/04 et 19/06 sur ECU OBDonUDS ; vérification F802/F810 avant et après sur la même session, aucun repli implicite F190, journal et contrôle de contexte conservés. Android n'écrase pas la liste générique par le rapport réglementaire. Connectors CLI : obd-dtcs, obd-count, obd-snapshot, obd-extended ; tests Python ajoutés, aide FR/EN. Aucun lancement de tests ou compilation intermédiaire ; à valider uniquement à la fin du protocole. Aucune qualification physique.

@@ -277,6 +277,25 @@ class DoIpTests(unittest.TestCase):
                         read.assert_not_called()
                     fake.verify_vin.assert_not_called()
 
+    def test_dtc_inventory_preserves_inactive_codes_and_snapshot_pairs(self):
+        for snapshot, payload, expected in (
+                (False, "590A0801020300", [{"dtc": "010203", "status": 0}]),
+                (True, "59030102030101020302", [{"dtc": "010203", "record": 1}, {"dtc": "010203", "record": 2}])):
+            fake = unittest.mock.Mock(spec=Session)
+            fake.exchange.return_value = bytes.fromhex(payload)
+            result = Session.read_dtc_inventory(fake, VIN, snapshot_index=snapshot)
+            self.assertEqual(result["records"], expected)
+            fake.exchange.assert_called_once_with(bytes((0x19, 3 if snapshot else 10)))
+            self.assertEqual(fake.verify_vin.call_count, 2)
+            fake.close.assert_not_called()
+        for snapshot, payload in ((False, "590A0801020301"), (False, "590A080102030001020308"),
+                                  (True, "590301"), (True, "59030102030101020301")):
+            fake = unittest.mock.Mock(spec=Session)
+            fake.exchange.return_value = bytes.fromhex(payload)
+            with self.assertRaises(DoIpError):
+                Session.read_dtc_inventory(fake, VIN, snapshot_index=snapshot)
+            fake.close.assert_called_once()
+
     def test_scaling_did_identity_and_correlation(self):
         fake = unittest.mock.Mock(spec=Session)
         fake.verify_vin.return_value = VIN

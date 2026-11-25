@@ -26,7 +26,7 @@ import kotlin.coroutines.resumeWithException
  * A socket is owned by one operation and is never retained after failure.
  */
 object DoIpDirectRead {
-    enum class Operation { VIN, DID, DTC, DTC_COUNT, DTC_SNAPSHOT, DTC_EXTENDED, MONITOR, BACKUP, EXCHANGE, OBD_IDENTIFY, OBD_DID, OBD_MONITOR, OBD_WWH_MASK, OBD_WWH_PERMANENT, OBD_WWH_READINESS, MULTI_DID, OBD_MULTI_DID, SCALING_DID, OBD_DTC, OBD_DTC_COUNT, OBD_DTC_SNAPSHOT, OBD_DTC_EXTENDED }
+    enum class Operation { VIN, DID, DTC, DTC_COUNT, DTC_SNAPSHOT, DTC_EXTENDED, MONITOR, BACKUP, EXCHANGE, OBD_IDENTIFY, OBD_DID, OBD_MONITOR, OBD_WWH_MASK, OBD_WWH_PERMANENT, OBD_WWH_READINESS, MULTI_DID, OBD_MULTI_DID, SCALING_DID, OBD_DTC, OBD_DTC_COUNT, OBD_DTC_SNAPSHOT, OBD_DTC_EXTENDED, SUPPORTED_DTCS, SNAPSHOT_INDEX }
     /** Immutable optional parameters. Defaults retain the original global deadline. */
     data class SessionOptions(val timeoutMs: Int = 5000, val p2Ms: Int = timeoutMs,
         val p2StarMs: Int = timeoutMs, val routingType: Int = 0, val routingOemHex: String = "") {
@@ -244,7 +244,8 @@ object DoIpDirectRead {
         val dtcCount: UdsDtcCountReport? = null, val dtcDetail: UdsDtcDetail? = null,
         val commandReplies: List<ByteArray> = emptyList(), val obdProtocolValue: Int? = null,
         val wwhReport: DoIpWwhDtc.Report? = null,
-        val multiValues: List<DoIpMultiDid.Value> = emptyList())
+        val multiValues: List<DoIpMultiDid.Value> = emptyList(),
+        val snapshotIndex: List<UdsSnapshotReference>? = null)
     data class Sample(val index: Int, val elapsedMs: Long, val data: ByteArray)
 
     private const val MAX_PAYLOAD = 1024 * 1024
@@ -852,6 +853,14 @@ object DoIpDirectRead {
                                 onCommandReply(index + 1, reply.copyOf())
                             }
                             Outcome(gateway, target.ecu, vin, replies.last(), null, trace.toList(), commandReplies = replies.toList())
+                        } else if (operation == Operation.SUPPORTED_DTCS) {
+                            val report = UdsDtcDecoder.decodeSupportedDtcs(session.exchange(byteArrayOf(0x19, 0x0A), timeoutMs))
+                            require(readVin() == vin)
+                            Outcome(gateway, target.ecu, vin, null, report, trace.toList())
+                        } else if (operation == Operation.SNAPSHOT_INDEX) {
+                            val index = UdsDtcDecoder.decodeSnapshotIndex(session.exchange(byteArrayOf(0x19, 3), timeoutMs))
+                            require(readVin() == vin)
+                            Outcome(gateway, target.ecu, vin, null, null, trace.toList(), snapshotIndex = index)
                         } else if (operation == Operation.BACKUP) {
                             val scope = checkNotNull(backupScope)
                             fun identity() {

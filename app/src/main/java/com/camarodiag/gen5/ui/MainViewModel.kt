@@ -1564,6 +1564,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     count != null -> localizedContext.getString(R.string.cal_doip_count_result,
                         count.count, mask, count.availabilityMask, count.formatIdentifier)
                     result.samples.isNotEmpty() -> localizedContext.getString(R.string.cal_doip_monitor_complete, result.samples.size)
+                    operation == DoIpDirectRead.Operation.SUPPORTED_DTCS && report != null ->
+                        localizedContext.getString(R.string.cal_doip_supported_result, report.records.size, report.statusAvailabilityMask) +
+                            report.records.joinToString(separator = "\n", prefix = "\n") {
+                                "0x%06X — 0x%02X".format(it.rawDtc, it.statusByte)
+                            }
+                    result.snapshotIndex != null -> requireNotNull(result.snapshotIndex).let { rows ->
+                        localizedContext.getString(R.string.cal_doip_snapshot_index_result, rows.size) +
+                            rows.joinToString(separator = "\n", prefix = "\n") { "0x%06X — 0x%02X".format(it.dtc, it.record) }
+                    }
                     report != null -> localizedContext.getString(R.string.cal_doip_filtered_dtc_result,
                         report.records.size, mask, report.statusAvailabilityMask) +
                         report.records.joinToString(separator = "\n", prefix = "\n") {

@@ -84,6 +84,8 @@ def run(argv: Sequence[str] | None = None) -> dict:
         monitor.add_argument("--did", required=True, type=lambda x: hex_value(x, 4))
         monitor.add_argument("--samples", type=int, default=10)
         monitor.add_argument("--interval", type=float, default=1)
+    sub.add_parser("supported-dtcs", help=tr("List supported DTCs", "Lister les DTC pris en charge"))
+    sub.add_parser("snapshot-index", help=tr("List snapshot references", "Lister les références des snapshots"))
     for action in ("dtcs", "count", "obd-dtcs", "obd-count"):
         p = sub.add_parser(action, help=tr("Verified DTC read or count", "Lecture ou comptage DTC vérifié"))
         p.add_argument("--mask", type=lambda x: hex_value(x, 2), default=255)
@@ -219,6 +221,10 @@ def run(argv: Sequence[str] | None = None) -> dict:
                 print(json.dumps({"partial_sample": row}), file=sys.stderr)
             return result | {"ecu": o.ecu, "tester": o.tester, "tls": not o.tcp} | session.monitor(
                 o.vin, o.did, o.samples, o.interval, obd=o.action == "obd-monitor", on_sample=on_sample)
+        if o.action in ("supported-dtcs", "snapshot-index"):
+            inventory = session.read_dtc_inventory(o.vin, snapshot_index=o.action == "snapshot-index")
+            return result | {"vin": o.vin, "ecu": o.ecu, "tester": o.tester, "tls": not o.tcp,
+                             "service_protocol": "UDS"} | inventory
         if o.action in ("dtcs", "count", "snapshot", "extended",
                         "obd-dtcs", "obd-count", "obd-snapshot", "obd-extended"):
             obd = o.action.startswith("obd-")

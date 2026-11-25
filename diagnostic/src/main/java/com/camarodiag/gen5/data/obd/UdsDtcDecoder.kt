@@ -84,7 +84,33 @@ data class UdsDtcCountReport(val availabilityMask: Int, val formatIdentifier: In
 
 data class UdsDtcDetail(val dtc: Int, val status: Int, val records: ByteArray)
 
+data class UdsSnapshotReference(val dtc: Int, val record: Int)
+
 object UdsDtcDecoder {
+    /** 19/0A lists supported DTCs, including zero-status entries. */
+    fun decodeSupportedDtcs(reply: ByteArray): UdsDtcReport {
+        require(reply.size >= 3 && reply[0] == 0x59.toByte() && reply[1] == 0x0A.toByte() &&
+            (reply.size - 3) % 4 == 0)
+        val availability = reply[2].toInt() and 255
+        val report = decodeRecords(availability, null, reply.copyOfRange(3, reply.size))
+        require(report.records.map { it.rawDtc }.distinct().size == report.records.size &&
+            report.records.all { (it.statusByte and availability.inv() and 255) == 0 })
+        return report
+    }
+
+    /** 19/03 lists DTC and snapshot record pairs, not snapshot contents. */
+    fun decodeSnapshotIndex(reply: ByteArray): List<UdsSnapshotReference> {
+        require(reply.size >= 2 && reply[0] == 0x59.toByte() && reply[1] == 3.toByte() &&
+            (reply.size - 2) % 4 == 0)
+        val rows = (2 until reply.size step 4).map { offset ->
+            val dtc = ((reply[offset].toInt() and 255) shl 16) or
+                ((reply[offset + 1].toInt() and 255) shl 8) or (reply[offset + 2].toInt() and 255)
+            UdsSnapshotReference(dtc, reply[offset + 3].toInt() and 255)
+        }
+        require(rows.distinct().size == rows.size)
+        return rows
+    }
+
     fun readDetailRequest(subFunction: Int, dtc: Int, record: Int): ByteArray {
         require(subFunction in setOf(4, 6) && dtc in 0..0xFFFFFF && record in 1..255)
         return byteArrayOf(0x19, subFunction.toByte(), (dtc shr 16).toByte(),

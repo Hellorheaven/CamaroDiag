@@ -741,6 +741,32 @@ class Session:
             self.close()
             raise
 
+    def read_dtc_inventory(self, expected: str, *, snapshot_index: bool = False) -> dict:
+        """Read supported DTCs or snapshot references on one verified ECU."""
+        try:
+            self.verify_vin(expected)
+            sub = 3 if snapshot_index else 10
+            reply = self.exchange(bytes((0x19, sub)))
+            start = 2 if snapshot_index else 3
+            if len(reply) < start or reply[:2] != bytes((0x59, sub)) or (len(reply) - start) % 4:
+                raise DoIpError("Malformed DTC inventory")
+            rows = []
+            seen = set()
+            for offset in range(start, len(reply), 4):
+                dtc = reply[offset:offset + 3].hex().upper()
+                value = reply[offset + 3]
+                key = (dtc, value) if snapshot_index else dtc
+                if key in seen or (not snapshot_index and value & ~reply[2]):
+                    raise DoIpError("Duplicate DTC reference or unavailable status bit")
+                seen.add(key)
+                rows.append({"dtc": dtc, "record" if snapshot_index else "status": value})
+            self.verify_vin(expected)
+            return {"kind": "snapshot-index" if snapshot_index else "supported-dtcs",
+                    "records": rows, **({} if snapshot_index else {"availability_mask": reply[2]})}
+        except BaseException:
+            self.close()
+            raise
+
     def dtc_count(self, mask: int) -> dict:
         reply = self.exchange(bytes((0x19, 1, mask)))
         if len(reply) != 6:
