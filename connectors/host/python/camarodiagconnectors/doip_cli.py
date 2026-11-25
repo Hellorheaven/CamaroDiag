@@ -84,8 +84,8 @@ def run(argv: Sequence[str] | None = None) -> dict:
         monitor.add_argument("--did", required=True, type=lambda x: hex_value(x, 4))
         monitor.add_argument("--samples", type=int, default=10)
         monitor.add_argument("--interval", type=float, default=1)
-    for action in ("dtcs", "count"):
-        p = sub.add_parser(action)
+    for action in ("dtcs", "count", "obd-dtcs", "obd-count"):
+        p = sub.add_parser(action, help=tr("Verified DTC read or count", "Lecture ou comptage DTC vérifié"))
         p.add_argument("--mask", type=lambda x: hex_value(x, 2), default=255)
     wwh = sub.add_parser("obd-wwh-dtcs", help=tr("Verified WWH emissions DTCs", "DTC émissions WWH vérifiés"))
     wwh.add_argument("--mask", type=lambda x: hex_value(x, 2), default=255)
@@ -93,8 +93,8 @@ def run(argv: Sequence[str] | None = None) -> dict:
     sub.add_parser("obd-wwh-permanent", help=tr("Verified permanent emissions DTCs", "DTC émissions permanents vérifiés"))
     readiness = sub.add_parser("obd-wwh-readiness", help=tr("Verified readiness group DTCs", "DTC du groupe de readiness vérifié"))
     readiness.add_argument("--group", required=True, type=lambda x: hex_value(x, 2))
-    for action in ("snapshot", "extended"):
-        p = sub.add_parser(action)
+    for action in ("snapshot", "extended", "obd-snapshot", "obd-extended"):
+        p = sub.add_parser(action, help=tr("Verified DTC record read", "Lecture d'enregistrement DTC vérifiée"))
         p.add_argument("--dtc", required=True, type=lambda x: hex_value(x, 6))
         p.add_argument("--record", required=True, type=lambda x: hex_value(x, 2))
     backup = sub.add_parser("backup", help=tr("Read a documented ECU region twice", "Lire deux fois une zone ECU documentée"))
@@ -136,7 +136,7 @@ def run(argv: Sequence[str] | None = None) -> dict:
         parser.error(tr("Legislated DID F400..F8FF required", "DID réglementaire F400..F8FF requis"))
     if o.action in ("monitor", "obd-monitor") and not (1 <= o.samples <= 3600 and 0.25 <= o.interval <= 60):
         parser.error(tr("Invalid sample count or interval", "Nombre de mesures ou intervalle invalide"))
-    if o.action in ("snapshot", "extended") and o.record == 0:
+    if o.action in ("snapshot", "extended", "obd-snapshot", "obd-extended") and o.record == 0:
         parser.error(tr("Record must be nonzero", "Enregistrement non nul requis"))
     if o.tcp and (o.ca_file or o.client_cert or o.client_key):
         parser.error(tr("Certificate files require TLS", "Les certificats nécessitent TLS"))
@@ -219,10 +219,13 @@ def run(argv: Sequence[str] | None = None) -> dict:
                 print(json.dumps({"partial_sample": row}), file=sys.stderr)
             return result | {"ecu": o.ecu, "tester": o.tester, "tls": not o.tcp} | session.monitor(
                 o.vin, o.did, o.samples, o.interval, obd=o.action == "obd-monitor", on_sample=on_sample)
-        if o.action in ("dtcs", "count", "snapshot", "extended"):
-            report = session.read_verified_dtc(o.vin, o.action, mask=getattr(o, "mask", 255),
-                                               dtc=getattr(o, "dtc", None), record=getattr(o, "record", None))
-            return result | {"vin": o.vin, "ecu": o.ecu, "tester": o.tester, "tls": not o.tcp} | report
+        if o.action in ("dtcs", "count", "snapshot", "extended",
+                        "obd-dtcs", "obd-count", "obd-snapshot", "obd-extended"):
+            obd = o.action.startswith("obd-")
+            report = session.read_verified_dtc(o.vin, o.action.removeprefix("obd-"), mask=getattr(o, "mask", 255),
+                                               dtc=getattr(o, "dtc", None), record=getattr(o, "record", None), obd=obd)
+            return result | {"vin": o.vin, "ecu": o.ecu, "tester": o.tester, "tls": not o.tcp,
+                             "service_protocol": "OBDonUDS" if obd else "UDS"} | report
         vin = session.verify_vin(o.vin)
         result |= {"vin": vin, "ecu": o.ecu, "tester": o.tester, "tls": not o.tcp}
         if commands is not None:

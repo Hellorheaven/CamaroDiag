@@ -250,6 +250,33 @@ class DoIpTests(unittest.TestCase):
         fake.dtcs.assert_not_called()
         fake.close.assert_called_once()
 
+    def test_verified_obd_dtc_reads_use_legislated_identity(self):
+        for action, method, args in (
+                ("dtcs", "dtcs", (8,)), ("count", "dtc_count", (8,)),
+                ("snapshot", "dtc_detail", (0x123456, 1, False)),
+                ("extended", "dtc_detail", (0x123456, 1, True))):
+            for initial, final in ((True, True), (False, True), (True, False)):
+                with self.subTest(action=action, initial=initial, final=final):
+                    fake = unittest.mock.Mock(spec=Session)
+                    fake.read_obd.side_effect = [{"obd_on_uds": initial}, {"obd_on_uds": final}]
+                    read = getattr(fake, method)
+                    read.return_value = {"data": "test"}
+                    if initial and final:
+                        self.assertEqual(Session.read_verified_dtc(fake, VIN, action, mask=8,
+                                         dtc=0x123456, record=1, obd=True), {"data": "test"})
+                        fake.close.assert_not_called()
+                    else:
+                        with self.assertRaises(DoIpError):
+                            Session.read_verified_dtc(fake, VIN, action, mask=8,
+                                                      dtc=0x123456, record=1, obd=True)
+                        fake.close.assert_called_once()
+                    if initial:
+                        read.assert_called_once_with(*args)
+                        self.assertEqual(fake.read_obd.call_count, 2)
+                    else:
+                        read.assert_not_called()
+                    fake.verify_vin.assert_not_called()
+
     def test_scaling_did_identity_and_correlation(self):
         fake = unittest.mock.Mock(spec=Session)
         fake.verify_vin.return_value = VIN

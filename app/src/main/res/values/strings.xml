@@ -1096,4 +1096,8 @@
     <string name="cal_doip_multi_result">DID %1$04X (%2$d bytes): %3$s</string>
     <string name="cal_doip_scaling_read">Read UDS scaling data</string>
     <string name="cal_doip_scaling_result">DID %1$04X scaling data (raw): %2$s</string>
+    <string name="cal_doip_obd_dtcs">OBDonUDS DTCs</string>
+    <string name="cal_doip_obd_count">OBDonUDS count</string>
+    <string name="cal_doip_obd_snapshot">OBDonUDS snapshot</string>
+    <string name="cal_doip_obd_extended">OBDonUDS extended data</string>
 </resources>

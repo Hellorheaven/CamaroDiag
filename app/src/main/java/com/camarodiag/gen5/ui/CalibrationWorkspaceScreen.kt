@@ -698,6 +698,18 @@ fun CalibrationWorkspaceScreen(
                         }
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu, doIpDtcMask, doIpTls,
+                            DoIpDirectRead.Operation.OBD_DTC, doIpCertificate, requireNotNull(doIpOptions)) },
+                            enabled = targetReady && vinReady && doIpDtcMask.length == 2, modifier = Modifier.weight(1f)) {
+                            Text(stringResource(R.string.cal_doip_obd_dtcs))
+                        }
+                        OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu, doIpDtcMask, doIpTls,
+                            DoIpDirectRead.Operation.OBD_DTC_COUNT, doIpCertificate, requireNotNull(doIpOptions)) },
+                            enabled = targetReady && vinReady && doIpDtcMask.length == 2, modifier = Modifier.weight(1f)) {
+                            Text(stringResource(R.string.cal_doip_obd_count))
+                        }
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedTextField(doIpSampleCount, { doIpSampleCount = it.filter(Char::isDigit).take(2) },
                             enabled = idle, singleLine = true, modifier = Modifier.weight(1f),
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -727,6 +739,18 @@ fun CalibrationWorkspaceScreen(
                             doIpDetailDtc + doIpDetailRecord, doIpTls, DoIpDirectRead.Operation.DTC_EXTENDED, doIpCertificate, requireNotNull(doIpOptions)) },
                             enabled = detailReady, modifier = Modifier.weight(1f)) {
                             Text(stringResource(R.string.cal_doip_extended))
+                        }
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu,
+                            doIpDetailDtc + doIpDetailRecord, doIpTls, DoIpDirectRead.Operation.OBD_DTC_SNAPSHOT, doIpCertificate, requireNotNull(doIpOptions)) },
+                            enabled = detailReady, modifier = Modifier.weight(1f)) {
+                            Text(stringResource(R.string.cal_doip_obd_snapshot))
+                        }
+                        OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu,
+                            doIpDetailDtc + doIpDetailRecord, doIpTls, DoIpDirectRead.Operation.OBD_DTC_EXTENDED, doIpCertificate, requireNotNull(doIpOptions)) },
+                            enabled = detailReady, modifier = Modifier.weight(1f)) {
+                            Text(stringResource(R.string.cal_doip_obd_extended))
                         }
                     }
                     OutlinedTextField(doIpCommand, { doIpCommand = it.take(12288) },

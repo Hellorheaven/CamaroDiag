@@ -711,8 +711,8 @@ class Session:
             raise
 
     def read_verified_dtc(self, expected: str, action: str, *, mask: int = 255,
-                          dtc: int | None = None, record: int | None = None) -> dict:
-        """Publish typed DTC data only after same-session F190 revalidation."""
+                          dtc: int | None = None, record: int | None = None, obd: bool = False) -> dict:
+        """Publish typed DTC data after same-session UDS or OBDonUDS identity revalidation."""
         if action not in ("dtcs", "count", "snapshot", "extended"):
             raise DoIpError("Unsupported DTC read action")
         if action in ("dtcs", "count"):
@@ -721,15 +721,21 @@ class Session:
         elif (type(dtc) is not int or not 0 <= dtc <= 0xFFFFFF or
               type(record) is not int or not 1 <= record <= 255):
             raise DoIpError("Invalid DTC or record")
+        def verify():
+            if obd:
+                if not self.read_obd(expected)["obd_on_uds"]:
+                    raise DoIpError("Selected ECU did not identify as OBDonUDS")
+            else:
+                self.verify_vin(expected)
         try:
-            self.verify_vin(expected)
+            verify()
             if action == "dtcs":
                 result = self.dtcs(mask)
             elif action == "count":
                 result = self.dtc_count(mask)
             else:
                 result = self.dtc_detail(dtc, record, action == "extended")
-            self.verify_vin(expected)
+            verify()
             return result
         except BaseException:
             self.close()

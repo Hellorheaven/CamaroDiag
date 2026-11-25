@@ -333,11 +333,23 @@ internal static class DoIpVinReader
     // on the same routed session. The raw console trace remains available.
     internal static async Task<T> ReadVerifiedDtcAsync<T>(DoIpDiagnosticTransport transport,
         DoIpVehicleDiscovery.Identity gateway, TimeSpan timeout, CancellationToken token,
-        Func<Task<T>> read, Action<byte[]>? requested = null, Action<byte[]>? received = null)
+        Func<Task<T>> read, Action<byte[]>? requested = null, Action<byte[]>? received = null,
+        string? expectedObdVin = null)
     {
-        var vin = await VerifyObservedVinAsync(transport, gateway, timeout, token, requested, received);
+        async Task<string> VerifyAsync()
+        {
+            if (expectedObdVin is null)
+                return await VerifyObservedVinAsync(transport, gateway, timeout, token, requested, received);
+            if (gateway.Vin != expectedObdVin || !DoIpVehicleDiscovery.IsVehicleVin(expectedObdVin))
+                throw new ArgumentException("Explicit matching VIN required.");
+            var identity = await ReadVerifiedObdAsync(transport, expectedObdVin, null, timeout, token);
+            if (identity.ProtocolValue != 1)
+                throw new InvalidDataException("Selected ECU did not identify as OBDonUDS.");
+            return identity.Vin;
+        }
+        var vin = await VerifyAsync();
         var result = await read();
-        var finalVin = await VerifyObservedVinAsync(transport, gateway, timeout, token, requested, received);
+        var finalVin = await VerifyAsync();
         if (!string.Equals(vin, finalVin, StringComparison.Ordinal))
             throw new InvalidDataException("ECU VIN changed during DTC read.");
         token.ThrowIfCancellationRequested();
@@ -350,13 +362,13 @@ internal static class DoIpVinReader
         CancellationToken token, Action<byte[]>? requested = null,
         Action<byte[]>? received = null, string? clientCertificateThumbprint = null,
         Action<DoIpDiagnosticTransport.PduTrace>? trace = null,
-        DoIpDiagnosticTransport.SessionOptions? options = null)
+        DoIpDiagnosticTransport.SessionOptions? options = null, string? expectedObdVin = null)
     {
         await using var transport = await ConnectObservedAsync(gateway, address, tester,
             ecu, useTls, timeout, token, clientCertificateThumbprint, trace, options);
         return await ReadVerifiedDtcAsync(transport, gateway, timeout, token,
             () => ReadDtcsAsync(transport, statusMask, timeout, token, requested, received),
-            requested, received);
+            requested, received, expectedObdVin);
     }
 
     // Caller obtains consent for the exact immutable request and context.
@@ -433,7 +445,7 @@ internal static class DoIpVinReader
         DoIpVehicleDiscovery.Identity gateway, IPAddress address, ushort tester, ushort ecu,
         bool useTls, byte statusMask, TimeSpan timeout, CancellationToken token,
         string? certificate = null, Action<DoIpDiagnosticTransport.PduTrace>? trace = null,
-        DoIpDiagnosticTransport.SessionOptions? options = null)
+        DoIpDiagnosticTransport.SessionOptions? options = null, string? expectedObdVin = null)
     {
         await using var transport = await ConnectObservedAsync(gateway, address, tester,
             ecu, useTls, timeout, token, certificate, trace, options);
@@ -442,7 +454,7 @@ internal static class DoIpVinReader
             var reply = await ExchangeReadAsync(transport,
                 ObdOnUdsServices.ReadDtcCountByStatusMask(statusMask), timeout, token, null, null);
             return ObdOnUdsServices.DecodeDtcCountByStatusMask(reply);
-        });
+        }, expectedObdVin: expectedObdVin);
     }
 
     internal sealed record DtcDetail(uint Dtc, byte Status, byte[] Records);
@@ -451,7 +463,7 @@ internal static class DoIpVinReader
         DoIpVehicleDiscovery.Identity gateway, IPAddress address, ushort tester, ushort ecu,
         bool useTls, uint dtc, byte record, bool extended, TimeSpan timeout, CancellationToken token,
         string? certificate = null, Action<DoIpDiagnosticTransport.PduTrace>? trace = null,
-        DoIpDiagnosticTransport.SessionOptions? options = null)
+        DoIpDiagnosticTransport.SessionOptions? options = null, string? expectedObdVin = null)
     {
         var request = extended ? ObdOnUdsServices.ReadDtcExtendedData(dtc, record) :
             ObdOnUdsServices.ReadDtcSnapshot(dtc, record);
@@ -467,7 +479,7 @@ internal static class DoIpVinReader
             }
             var snapshot = ObdOnUdsServices.DecodeDtcSnapshot(dtc, reply);
             return new DtcDetail(snapshot.Dtc, snapshot.Status, snapshot.RawSnapshotRecords);
-        });
+        }, expectedObdVin: expectedObdVin);
     }
 
     internal static async Task<string> ReadObservedGatewayAsync(

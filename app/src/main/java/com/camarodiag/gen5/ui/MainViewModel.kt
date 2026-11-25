@@ -1480,7 +1480,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     require(didHex.matches(Regex("[0-9A-Fa-f]{4}")))
                     didHex.toInt(16)
                 } else 0xF190
-                val mask = if (operation in setOf(DoIpDirectRead.Operation.DTC, DoIpDirectRead.Operation.DTC_COUNT)) {
+                val mask = if (operation in setOf(DoIpDirectRead.Operation.DTC, DoIpDirectRead.Operation.DTC_COUNT, DoIpDirectRead.Operation.OBD_DTC, DoIpDirectRead.Operation.OBD_DTC_COUNT)) {
                     require(didHex.matches(Regex("[0-9A-Fa-f]{2}")))
                     didHex.toInt(16)
                 } else 255
@@ -1488,7 +1488,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val wwhReadiness = operation == DoIpDirectRead.Operation.OBD_WWH_READINESS
                 if (wwhMask) require(didHex.matches(Regex("[0-9A-Fa-f]{4}")))
                 if (wwhReadiness) require(didHex.matches(Regex("[0-9A-Fa-f]{2}")))
-                val isDetail = operation in setOf(DoIpDirectRead.Operation.DTC_SNAPSHOT, DoIpDirectRead.Operation.DTC_EXTENDED)
+                val isDetail = operation in setOf(DoIpDirectRead.Operation.DTC_SNAPSHOT, DoIpDirectRead.Operation.DTC_EXTENDED, DoIpDirectRead.Operation.OBD_DTC_SNAPSHOT, DoIpDirectRead.Operation.OBD_DTC_EXTENDED)
                 if (isDetail) require(didHex.matches(Regex("[0-9A-Fa-f]{8}")))
                 val detailDtc = if (isDetail) didHex.take(6).toInt(16) else 0
                 val detailRecord = if (isDetail) didHex.takeLast(2).toInt(16) else 1
@@ -1524,7 +1524,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val module = "DoIP 0x" + ecu.uppercase()
                 val report = result.dtcs
                 // A filtered report is not a complete replacement of the ECU's DTC list.
-                if (report != null && mask == 255) {
+                if (report != null && mask == 255 && operation == DoIpDirectRead.Operation.DTC) {
                     val mapped = report.records.map { it.toDiagnosticDtc(module) }
                     _dtcs.value = _dtcs.value.filterNot { it.module == module } + mapped
                 }

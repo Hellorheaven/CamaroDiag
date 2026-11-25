@@ -1,3 +1,7 @@
+## PR117 — DTC OBDonUDS classiques sur DoIP (25/11/2026)
+
+- Android et Windows GUI : accès distinct aux DTC 19/01, 19/02, 19/04 et 19/06 sur ECU OBDonUDS ; vérification F802/F810 avant et après sur la même session, aucun repli implicite F190, journal et contrôle de contexte conservés. Android n'écrase pas la liste générique par le rapport réglementaire. Connectors CLI : obd-dtcs, obd-count, obd-snapshot, obd-extended ; tests Python ajoutés, aide FR/EN. Aucun lancement de tests ou compilation intermédiaire ; à valider uniquement à la fin du protocole. Aucune qualification physique.
+
 ## PR117 — décision propriétaire du 25/11/2026 : tests uniquement en clôture
 
 - Aucun test ni build de validation pendant les développements, y compris les sous-lots et les seuils de 50 commits. Écrire les tests sans les exécuter. Une seule campagne à la fin effective du chantier ou du protocole ; corriger en bloc si échec. Gate global : nouveau marqueur .github/ci-final-checkpoint-request.txt avec scope: chantier ou scope: protocol, nom et critères de clôture. Ancien marqueur historique inactif. Pas de campagnes parallèles redondantes. C6/DoIP toujours actifs ; poursuivre les fonctionnalités sans déclencher de CI. Run 45556023009 lancé avant cette décision ; aucun nouveau run demandé ici.

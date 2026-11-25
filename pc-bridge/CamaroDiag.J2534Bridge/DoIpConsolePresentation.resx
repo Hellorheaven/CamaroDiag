@@ -115,4 +115,8 @@
   <data name="MultiResult" xml:space="preserve"><value>DID {0:X4} ({1} bytes): {2}</value></data>
   <data name="ScalingDid" xml:space="preserve"><value>Read UDS scaling data</value></data>
   <data name="ScalingResult" xml:space="preserve"><value>DID {0:X4} scaling data (raw): {1}</value></data>
+  <data name="ObdDtcs" xml:space="preserve"><value>Read OBDonUDS DTCs</value></data>
+  <data name="ObdCount" xml:space="preserve"><value>Count OBDonUDS DTCs</value></data>
+  <data name="ObdSnapshot" xml:space="preserve"><value>OBDonUDS snapshot</value></data>
+  <data name="ObdExtended" xml:space="preserve"><value>OBDonUDS extended data</value></data>
 </root>

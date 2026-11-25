@@ -115,4 +115,8 @@
   <data name="MultiResult" xml:space="preserve"><value>DID {0:X4} ({1} octets) : {2}</value></data>
   <data name="ScalingDid" xml:space="preserve"><value>Lire les données de mise à l’échelle UDS</value></data>
   <data name="ScalingResult" xml:space="preserve"><value>DID {0:X4}, données de mise à l’échelle (brutes) : {1}</value></data>
+  <data name="ObdDtcs" xml:space="preserve"><value>Lire les DTC OBDonUDS</value></data>
+  <data name="ObdCount" xml:space="preserve"><value>Compter les DTC OBDonUDS</value></data>
+  <data name="ObdSnapshot" xml:space="preserve"><value>Snapshot OBDonUDS</value></data>
+  <data name="ObdExtended" xml:space="preserve"><value>Données étendues OBDonUDS</value></data>
 </root>
