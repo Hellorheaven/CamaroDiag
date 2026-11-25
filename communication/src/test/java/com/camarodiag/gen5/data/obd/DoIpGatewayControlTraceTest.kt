@@ -283,6 +283,84 @@ class DoIpGatewayControlTraceTest {
         assertFalse(DoIpDirectRead.isObdDid(0xF190))
     }
 
+    @Test fun decodedHistoricalRecordsUseActualUdpAndTcpPipeline(): Unit = runBlocking {
+        data class Case(val operation: DoIpDirectRead.Operation, val request: String, val response: String,
+            val count: Int, val obd: Boolean = false, val memory: Int? = null)
+        val cases = listOf(
+            Case(DoIpDirectRead.Operation.ALL_STORED_RECORDS, "1905FF", "5905010102030801F40D78", 1),
+            Case(DoIpDirectRead.Operation.DECODED_SNAPSHOT, "1904010203FF", "5904010203080101F40D78", 1),
+            Case(DoIpDirectRead.Operation.DECODED_EXTENDED, "1906010203FF", "59060102030801123490AA", 2),
+            Case(DoIpDirectRead.Operation.MEMORY_DECODED_SNAPSHOT, "1918010203FF02", "591802010203080101F40D78", 1, memory = 2),
+            Case(DoIpDirectRead.Operation.MEMORY_DECODED_EXTENDED, "1919010203FF02", "5919020102030801123490AA", 2, memory = 2),
+            Case(DoIpDirectRead.Operation.OBD_DECODED_SNAPSHOT, "1904010203FF", "5904010203080101F40D78", 1, obd = true),
+            Case(DoIpDirectRead.Operation.OBD_DECODED_EXTENDED, "1906010203FF", "59060102030801123490AA", 2, obd = true))
+        fun bytes(value: String) = value.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
+        val loopback = InetAddress.getByName("127.0.0.1")
+        for (case in cases) for (finalMatches in listOf(true, false)) {
+            DatagramSocket(0, loopback).use { udp ->
+                java.net.ServerSocket(0, 1, loopback).use { tcp ->
+                    udp.soTimeout = 5000
+                    tcp.soTimeout = 5000
+                    val worker = Executors.newSingleThreadExecutor()
+                    try {
+                        val server = worker.submit {
+                            respond(udp, pdu(255, 1), identity())
+                            tcp.accept().use { socket ->
+                                socket.soTimeout = 5000
+                                val input = java.io.DataInputStream(socket.getInputStream())
+                                val output = socket.getOutputStream()
+                                fun receive(type: Int, expected: ByteArray) {
+                                    val header = ByteArray(8).also { input.readFully(it) }
+                                    val size = ByteBuffer.wrap(header).getInt(4)
+                                    assertTrue(size in 0..65536)
+                                    val payload = ByteArray(size).also { input.readFully(it) }
+                                    assertArrayEquals(pdu(2, type, expected), header + payload)
+                                }
+                                fun send(type: Int, body: ByteArray) {
+                                    output.write(pdu(2, type, body)); output.flush()
+                                }
+                                fun diagnostic(request: String, response: ByteArray) {
+                                    receive(0x8001, bytes("0E801234" + request))
+                                    send(0x8002, bytes("12340E8000"))
+                                    send(0x8001, bytes("12340E80") + response)
+                                }
+                                receive(5, bytes("0E800000000000"))
+                                send(7, byteArrayOf())
+                                receive(8, bytes("0E80"))
+                                send(6, bytes("0E8010001000000000"))
+                                val vinDid = if (case.obd) "F802" else "F190"
+                                diagnostic("22" + vinDid, bytes("62" + vinDid) + vin.toByteArray(Charsets.US_ASCII))
+                                if (case.obd) diagnostic("22F810", bytes("62F81001"))
+                                diagnostic(case.request, bytes(case.response))
+                                val finalVin = if (finalMatches) vin else vin.dropLast(1) + "2"
+                                diagnostic("22" + vinDid, bytes("62" + vinDid) + finalVin.toByteArray(Charsets.US_ASCII))
+                                if (case.obd && finalMatches) diagnostic("22F810", bytes("62F81001"))
+                            }
+                        }
+                        val target = DoIpDirectRead.Target.parse("127.0.0.1", "0E80", "1234", vin, false)
+                        val events = mutableListOf<DoIpDirectRead.Trace>()
+                        val result = runCatching { DoIpDirectRead.readAt(target, case.operation,
+                            timeoutMs = 2000, dtc = 0x010203, record = 255, memory = case.memory,
+                            storedDidLengths = if (case.request.startsWith("1906") || case.request.startsWith("1919")) null else mapOf(0xF40D to 1),
+                            extendedRecordLengths = if (case.request.startsWith("1906") || case.request.startsWith("1919")) mapOf(1 to 2, 0x90 to 1) else null,
+                            onTrace = { events.add(it) }, udpPort = udp.localPort, tcpPort = tcp.localPort) }
+                        server.get(6, TimeUnit.SECONDS)
+                        if (finalMatches) {
+                            val outcome = result.getOrThrow()
+                            assertEquals(vin, outcome.vin)
+                            assertEquals(case.memory, outcome.decodedMemory)
+                            assertEquals(case.count, outcome.decodedSnapshot?.records?.size
+                                ?: outcome.decodedExtended?.records?.size ?: outcome.allStoredReport?.records?.size)
+                            assertArrayEquals(bytes(case.response), outcome.decodedSnapshot?.rawResponse
+                                ?: outcome.decodedExtended?.rawResponse ?: outcome.allStoredReport?.rawResponse)
+                        } else assertTrue(result.isFailure)
+                        assertTrue(events.any { it.direction == "TX" && it.payloadHex == case.request })
+                    } finally { worker.shutdownNow() }
+                }
+            }
+        }
+    }
+
     @Test fun wildcardStoredRecordsUseRealRecordNumbersAndRejectTruncation() {
         fun bytes(s: String) = s.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
         val request = bytes("1905FF")
