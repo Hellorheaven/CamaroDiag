@@ -1510,6 +1510,32 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val detailRecord = if (isDetail) didHex.takeLast(2).toInt(16) else 1
                 val clientTls = certificate?.let { DoIpClientTls.open(getApplication<Application>(), it, target) }
                 check(current())
+                if (operation in setOf(DoIpDirectRead.Operation.INVENTORY, DoIpDirectRead.Operation.OBD_INVENTORY)) {
+                    val addresses = DoIpDirectRead.parseInventoryAddresses(didHex)
+                    val rows = DoIpDirectRead.inventory(target, addresses, options, clientTls,
+                        onTrace = { selected, trace ->
+                            journalDoIpTrace(selected, trace, current)
+                            check(current())
+                            _calibrationWorkspace.update { state ->
+                                if (current()) state.copy(doIpTrace = (state.doIpTrace +
+                                    ("%04X ".format(selected.ecu) + doIpTraceLine(trace))).takeLast(128)) else state
+                            }
+                        }, onControlTrace = { trace -> journalDoIpControlTrace(trace, current) }, current = current,
+                        obd = operation == DoIpDirectRead.Operation.OBD_INVENTORY)
+                    if (!current()) return@launchEnhancedUdsRead
+                    val rendered = localizedContext.getString(R.string.cal_doip_inventory_result,
+                        rows.count { it.vin != null }, rows.size) + rows.joinToString("\n", prefix = "\n") { row ->
+                        if (row.vin == null) localizedContext.getString(R.string.cal_doip_inventory_unverified, row.ecu)
+                        else localizedContext.getString(R.string.cal_doip_inventory_verified, row.ecu, row.vin) +
+                            (row.protocolValue?.let { protocol -> "\n" + localizedContext.getString(
+                                if (protocol == 1) R.string.cal_doip_inventory_obd_supported else R.string.cal_doip_inventory_obd_unknown,
+                                row.ecu, protocol) } ?: "")
+                    }
+                    _calibrationWorkspace.update { state -> if (current())
+                        state.copy(doIpReading = false, doIpResult = rendered) else state }
+                    if (current()) appendCanConsoleSystemEvent(localizedContext.getString(R.string.cal_doip_console_complete))
+                    return@launchEnhancedUdsRead
+                }
                 val result = DoIpDirectRead.read(target, operation, did, mask = if (wwhMask || severityFilter) didHex.takeLast(2).toInt(16) else mask,
                     severityMask = if (severityFilter) didHex.take(2).toInt(16) else 255,
                     wwhSeverity = if (wwhMask) didHex.take(2).toInt(16) else 255,

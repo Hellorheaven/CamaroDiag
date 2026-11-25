@@ -26,7 +26,7 @@ import kotlin.coroutines.resumeWithException
  * A socket is owned by one operation and is never retained after failure.
  */
 object DoIpDirectRead {
-    enum class Operation { VIN, DID, DTC, DTC_COUNT, DTC_SNAPSHOT, DTC_EXTENDED, MONITOR, BACKUP, EXCHANGE, OBD_IDENTIFY, OBD_DID, OBD_MONITOR, OBD_WWH_MASK, OBD_WWH_PERMANENT, OBD_WWH_READINESS, MULTI_DID, OBD_MULTI_DID, SCALING_DID, OBD_DTC, OBD_DTC_COUNT, OBD_DTC_SNAPSHOT, OBD_DTC_EXTENDED, SUPPORTED_DTCS, SNAPSHOT_INDEX, MULTI_MONITOR, OBD_MULTI_MONITOR, FIRST_FAILED_DTC, FIRST_CONFIRMED_DTC, RECENT_FAILED_DTC, RECENT_CONFIRMED_DTC, FAULT_COUNTERS, SEVERITY_COUNT, SEVERITY_LIST, SEVERITY_INFO, INVENTORY }
+    enum class Operation { VIN, DID, DTC, DTC_COUNT, DTC_SNAPSHOT, DTC_EXTENDED, MONITOR, BACKUP, EXCHANGE, OBD_IDENTIFY, OBD_DID, OBD_MONITOR, OBD_WWH_MASK, OBD_WWH_PERMANENT, OBD_WWH_READINESS, MULTI_DID, OBD_MULTI_DID, SCALING_DID, OBD_DTC, OBD_DTC_COUNT, OBD_DTC_SNAPSHOT, OBD_DTC_EXTENDED, SUPPORTED_DTCS, SNAPSHOT_INDEX, MULTI_MONITOR, OBD_MULTI_MONITOR, FIRST_FAILED_DTC, FIRST_CONFIRMED_DTC, RECENT_FAILED_DTC, RECENT_CONFIRMED_DTC, FAULT_COUNTERS, SEVERITY_COUNT, SEVERITY_LIST, SEVERITY_INFO, INVENTORY, OBD_INVENTORY }
     /** Immutable optional parameters. Defaults retain the original global deadline. */
     data class SessionOptions(val timeoutMs: Int = 5000, val p2Ms: Int = timeoutMs,
         val p2StarMs: Int = timeoutMs, val routingType: Int = 0, val routingOemHex: String = "") {
@@ -78,7 +78,8 @@ object DoIpDirectRead {
     fun isObdDid(did: Int): Boolean = did in 0xF400..0xF8FF
 
     internal fun decodeObdProtocol(reply: ByteArray): Int {
-        require(reply.size == 4 && reply[0].u8() == 0x62 && reply[1].u8() == 0xF8 && reply[2].u8() == 0x10)
+        if (reply.size != 4 || reply[0].u8() != 0x62 || reply[1].u8() != 0xF8 || reply[2].u8() != 0x10)
+            throw EcuObdIdentityMismatch()
         return reply[3].u8()
     }
 
@@ -674,8 +675,9 @@ object DoIpDirectRead {
         }
     }
 
-    data class InventoryEntry(val ecu: Int, val vin: String?)
+    data class InventoryEntry(val ecu: Int, val vin: String?, val protocolValue: Int? = null)
     private class EcuVinMismatch : IllegalArgumentException("ECU VIN differs from selected vehicle or gateway.")
+    private class EcuObdIdentityMismatch : IllegalArgumentException("Invalid or unstable ECU protocol identification.")
 
     fun parseInventoryAddresses(text: String): List<Int> {
         val fields = text.split(',')
@@ -687,7 +689,8 @@ object DoIpDirectRead {
      * owns its own session. Gateway drift or TLS failure aborts the inventory. */
     suspend fun inventory(target: Target, addresses: List<Int>, options: SessionOptions,
         clientTls: DoIpClientTls? = null, onTrace: (Target, Trace) -> Unit = { _, _ -> },
-        onControlTrace: (ControlTrace) -> Unit = {}, current: () -> Boolean = { true }): List<InventoryEntry> {
+        onControlTrace: (ControlTrace) -> Unit = {}, current: () -> Boolean = { true },
+        obd: Boolean = false): List<InventoryEntry> {
         val frozen = addresses.toList()
         require(validVin(target.expectedVin) && frozen.size in 1..16 &&
             frozen.distinct().size == frozen.size && frozen.all { it in 0..65535 && it != target.tester })
@@ -702,16 +705,18 @@ object DoIpDirectRead {
                 "%04X".format(target.tester), "%04X".format(ecu), target.expectedVin, target.tls,
                 gateway.logicalAddress, gateway)
             try {
-                val result = read(selected, Operation.VIN, timeoutMs = options.timeoutMs,
+                val result = read(selected, if (obd) Operation.OBD_IDENTIFY else Operation.VIN, timeoutMs = options.timeoutMs,
                     sessionOptions = options, clientTls = clientTls, isReadContextCurrent = current,
                     onControlTrace = onControlTrace, onTrace = { onTrace(selected, it) })
                 require(result.vin == target.expectedVin)
-                results += InventoryEntry(ecu, result.vin)
+                results += InventoryEntry(ecu, result.vin, if (obd) requireNotNull(result.obdProtocolValue) else null)
             } catch (error: javax.net.ssl.SSLException) {
                 throw error
             } catch (error: DoIpClientCertificateException) {
                 throw error
             } catch (_: EcuVinMismatch) {
+                results += InventoryEntry(ecu, null)
+            } catch (_: EcuObdIdentityMismatch) {
                 results += InventoryEntry(ecu, null)
             } catch (_: UdsNegativeResponseException) {
                 results += InventoryEntry(ecu, null)
@@ -748,7 +753,7 @@ object DoIpDirectRead {
         require(options.timeoutMs == timeoutMs)
         clientTls?.requireTarget(target)
         require(timeoutMs in 100..30_000 && did in 0..65535 && mask in 0..255)
-        require(operation != Operation.INVENTORY) { "Use inventory for multiple ECU addresses." }
+        require(operation !in setOf(Operation.INVENTORY, Operation.OBD_INVENTORY)) { "Use inventory for multiple ECU addresses." }
         require(operation == Operation.VIN || target.expectedVin.isNotEmpty())
         require(sampleCount in 1..30 && intervalMs in 250..5000)
         require(operation !in setOf(Operation.OBD_DID, Operation.OBD_MONITOR) || isObdDid(did))
@@ -875,8 +880,8 @@ object DoIpDirectRead {
                             byteArrayOf(0x22, 0xF8.toByte(), 0x10), timeoutMs))
                         if (operation == Operation.OBD_IDENTIFY) {
                             require(readVin(0xF802) == vin)
-                            require(decodeObdProtocol(session.exchange(byteArrayOf(0x22, 0xF8.toByte(), 0x10),
-                                timeoutMs)) == protocolValue) { "OBD protocol identification changed during discovery." }
+                            if (decodeObdProtocol(session.exchange(byteArrayOf(0x22, 0xF8.toByte(), 0x10),
+                                timeoutMs)) != protocolValue) throw EcuObdIdentityMismatch()
                         } else {
                             val routeOperation = if (wwhKind != null || obdDtc)
                                 DiagnosticRouteSelector.Operation.DTC else DiagnosticRouteSelector.Operation.MONITOR

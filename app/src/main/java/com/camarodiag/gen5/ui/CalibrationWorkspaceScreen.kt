@@ -328,6 +328,7 @@ fun CalibrationWorkspaceScreen(
     }
     var doIpTester by remember(vehicle) { mutableStateOf("") }
     var doIpEcu by remember(vehicle) { mutableStateOf("") }
+    var doIpInventoryAddresses by remember(vehicle) { mutableStateOf("") }
     LaunchedEffect(state.doIpBackupScope, vehicle.vin) {
         val scope = state.doIpBackupScope
         if (scope != null && scope.vin == vehicle.vin.uppercase()) {
@@ -340,6 +341,7 @@ fun CalibrationWorkspaceScreen(
     var doIpDtcMask by remember(vehicle) { mutableStateOf("FF") }
     var doIpMultiLayout by remember(vehicle) { mutableStateOf("") }
     var doIpWwhSeverity by remember(vehicle) { mutableStateOf("FF") }
+    var doIpSeverityMask by remember(vehicle) { mutableStateOf("FF") }
     var doIpWwhReadiness by remember(vehicle) { mutableStateOf("") }
     var doIpDetailDtc by remember(vehicle) { mutableStateOf("") }
     var doIpDetailRecord by remember(vehicle) { mutableStateOf("01") }
@@ -621,6 +623,31 @@ fun CalibrationWorkspaceScreen(
                         label = { Text(stringResource(R.string.cal_uds_did)) })
                     val targetReady = idle && doIpOptions != null && !doIpCertificateBusy && !doIpCertificateError && (doIpHost.isNotBlank() || vinReady) && doIpTester.length == 4 &&
                         doIpEcu.length == 4 && doIpTester != doIpEcu
+                    OutlinedTextField(doIpInventoryAddresses, { doIpInventoryAddresses =
+                        it.uppercase().filter { c -> c in "0123456789ABCDEF," }.take(79) },
+                        enabled = idle, singleLine = true, modifier = Modifier.fillMaxWidth(),
+                        label = { Text(stringResource(R.string.cal_doip_inventory_addresses)) })
+                    val inventoryAddresses = runCatching {
+                        DoIpDirectRead.parseInventoryAddresses(doIpInventoryAddresses)
+                    }.getOrNull()
+                    OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester,
+                        "%04X".format(requireNotNull(inventoryAddresses).first()), doIpInventoryAddresses, doIpTls,
+                        DoIpDirectRead.Operation.INVENTORY, doIpCertificate, requireNotNull(doIpOptions)) },
+                        enabled = idle && vinReady && doIpOptions != null && !doIpCertificateBusy &&
+                            !doIpCertificateError && doIpTester.length == 4 &&
+                            inventoryAddresses != null && doIpTester.toIntOrNull(16) !in inventoryAddresses,
+                        modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(R.string.cal_doip_inventory))
+                    }
+                    OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester,
+                        "%04X".format(requireNotNull(inventoryAddresses).first()), doIpInventoryAddresses, doIpTls,
+                        DoIpDirectRead.Operation.OBD_INVENTORY, doIpCertificate, requireNotNull(doIpOptions)) },
+                        enabled = idle && vinReady && doIpOptions != null && !doIpCertificateBusy &&
+                            !doIpCertificateError && doIpTester.length == 4 &&
+                            inventoryAddresses != null && doIpTester.toIntOrNull(16) !in inventoryAddresses,
+                        modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(R.string.cal_doip_obd_inventory))
+                    }
                     Button(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu, doIpDid, doIpTls, DoIpDirectRead.Operation.VIN, doIpCertificate, requireNotNull(doIpOptions)) },
                         enabled = targetReady, modifier = Modifier.fillMaxWidth()) {
                         Text(stringResource(R.string.cal_doip_read_vin))
@@ -667,6 +694,18 @@ fun CalibrationWorkspaceScreen(
                     OutlinedTextField(doIpDtcMask, { doIpDtcMask = it.uppercase().filter { c -> c in "0123456789ABCDEF" }.take(2) },
                         enabled = idle, singleLine = true, modifier = Modifier.fillMaxWidth(),
                         label = { Text(stringResource(R.string.cal_doip_dtc_mask)) })
+                    OutlinedTextField(doIpSeverityMask, { doIpSeverityMask = it.uppercase().filter { c -> c in "0123456789ABCDEF" }.take(2) },
+                        enabled = idle, singleLine = true, modifier = Modifier.fillMaxWidth(),
+                        label = { Text(stringResource(R.string.cal_doip_severity_mask)) })
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        for ((operation, label) in listOf(DoIpDirectRead.Operation.SEVERITY_COUNT to R.string.cal_doip_severity_count,
+                            DoIpDirectRead.Operation.SEVERITY_LIST to R.string.cal_doip_severity_list)) {
+                            OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu,
+                                doIpSeverityMask + doIpDtcMask, doIpTls, operation, doIpCertificate, requireNotNull(doIpOptions)) },
+                                enabled = targetReady && vinReady && doIpSeverityMask.length == 2 && doIpDtcMask.length == 2,
+                                modifier = Modifier.weight(1f)) { Text(stringResource(label)) }
+                        }
+                    }
                     OutlinedTextField(doIpWwhSeverity, { doIpWwhSeverity = it.uppercase().filter { c -> c in "0123456789ABCDEF" }.take(2) },
                         enabled = idle, singleLine = true, modifier = Modifier.fillMaxWidth(),
                         label = { Text(stringResource(R.string.cal_doip_wwh_severity)) })
@@ -727,6 +766,10 @@ fun CalibrationWorkspaceScreen(
                             enabled = idle, singleLine = true, modifier = Modifier.weight(1f),
                             label = { Text(stringResource(R.string.cal_doip_detail_record)) })
                     }
+                    OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu, doIpDetailDtc,
+                        doIpTls, DoIpDirectRead.Operation.SEVERITY_INFO, doIpCertificate, requireNotNull(doIpOptions)) },
+                        enabled = targetReady && vinReady && doIpDetailDtc.length == 6,
+                        modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.cal_doip_severity_info)) }
                     val detailReady = targetReady && vinReady && doIpDetailDtc.length == 6 &&
                         doIpDetailRecord.length == 2 && doIpDetailRecord != "00"
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

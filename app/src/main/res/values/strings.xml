@@ -1125,4 +1125,7 @@
     <string name="cal_doip_inventory_result">Inventory complete: %1$d/%2$d VINs verified</string>
     <string name="cal_doip_inventory_verified">ECU 0x%1$04X: VIN verified (%2$s)</string>
     <string name="cal_doip_inventory_unverified">ECU 0x%1$04X: not verified (not proof of absence)</string>
+    <string name="cal_doip_obd_inventory">OBDonUDS ECU inventory</string>
+    <string name="cal_doip_inventory_obd_supported">ECU 0x%1$04X: OBDonUDS identified (0x%2$02X)</string>
+    <string name="cal_doip_inventory_obd_unknown">ECU 0x%1$04X: OBDonUDS not identified (F810 = 0x%2$02X)</string>
 </resources>

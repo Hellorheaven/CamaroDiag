@@ -1,3 +1,8 @@
+## PR117 — inventaire OBDonUDS Android et consolidation des sources (25/11/2026)
+
+- Parité de l'inventaire OBDonUDS Android/Windows/Connectors : bouton FR/EN, F802/F810 stables par session, résultat VIN séparé du protocole brut, erreurs d'identité ECU traitées comme non vérifiées, pas de repli F190. Tests écrits sans exécution.
+- Deux doublons Kotlin sous `com/camaradiag/gen5/ui` avaient été introduits dans les lots sévérité/inventaire. Les versions récentes ont été comparées aux versions canoniques : uniquement des insertions, aucune ligne ancienne perdue. Intégration dans `com/camarodiag/gen5/ui` et suppression des chemins erronés. Aucun test/compilation ni marqueur de clôture modifié. DoIP/C6 restent ouverts.
+
 ## PR117 — inventaire OBDonUDS Windows GUI/CLI (25/11/2026)
 
 - Parité Windows/Connectors : `--obd-ecu-inventory` et bouton FR/EN, mêmes adresses explicites, F802/F810 vérifiés deux fois sur chaque session. VIN et protocole distingués, aucun repli F190, journal par ECU et annulation existants. Tests de parseur écrits, non exécutés. Android reste à raccorder. Aucun checkpoint CI.

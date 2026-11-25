@@ -333,6 +333,19 @@ class DoIpGatewayControlTraceTest {
         assertTrue(events.isEmpty())
     }
 
+    @Test fun legislatedInventoryRejectsRevokedContextAndSingleRead() = runBlocking {
+        val target = DoIpDirectRead.Target.parse("127.0.0.1", "0E80", "1234", vin, false)
+        val events = mutableListOf<DoIpDirectRead.ControlTrace>()
+        assertTrue(runCatching { DoIpDirectRead.inventory(target, listOf(0x1234),
+            DoIpDirectRead.SessionOptions(), onControlTrace = { events.add(it) },
+            current = { false }, obd = true) }.isFailure)
+        assertTrue(runCatching { DoIpDirectRead.read(target, DoIpDirectRead.Operation.OBD_INVENTORY,
+            onControlTrace = { events.add(it) }) }.isFailure)
+        assertTrue(events.isEmpty())
+        assertEquals(2, DoIpDirectRead.decodeObdProtocol(byteArrayOf(0x62, 0xF8.toByte(), 0x10, 2)))
+        assertTrue(runCatching { DoIpDirectRead.decodeObdProtocol(byteArrayOf(0x62, 0xF8.toByte(), 0x10)) }.isFailure)
+    }
+
     @Test fun revokedReadContextFailsBeforeAnyDiscovery() = runBlocking {
         val target = DoIpDirectRead.Target.parse("127.0.0.1", "0E80", "1001", vin, false)
         val events = mutableListOf<DoIpDirectRead.ControlTrace>()
