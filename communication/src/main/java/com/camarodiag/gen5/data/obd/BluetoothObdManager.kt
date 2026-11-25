@@ -513,10 +513,19 @@ class BluetoothObdManager(context: Context) {
             }
             val engine = Obd2FeatureEngine(
                 ObdCommandChannel { command, timeoutMs ->
-                    sendAtCommandInternal(command, timeoutMs, expectedEpoch = requestedEpoch)
-                }
+                    sendAtCommandInternal(command, timeoutMs, expectedEpoch = requestedEpoch, preserveLines = true)
+                },
+                physicalElmHeaders = true
             )
-            return block(engine)
+            return try {
+                block(engine)
+            } catch (formatting: ObdElmFormattingException) {
+                if (!transportSessionEpoch.isCurrent(requestedEpoch))
+                    throw ObdSupersededSessionException(formatting)
+                val transportKind = activeTransport
+                disconnectIfCurrent(requestedEpoch)
+                throw CanAdapterRestorationException(transportKind)
+            }
         } finally {
             commandSessionMutex.unlock()
         }

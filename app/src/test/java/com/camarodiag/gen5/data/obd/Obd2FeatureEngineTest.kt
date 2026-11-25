@@ -245,6 +245,46 @@ class Obd2FeatureEngineTest {
     }
 
     @Test
+    fun physicalElmRecordsRestoreHeadersAndRetainIndependentReplies() = runBlocking {
+        val commands = mutableListOf<String>()
+        val vin = "3FMTK3SU0PMA00001"
+        val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+            commands += command
+            when (command) {
+                "0902" -> "490201" + vin.toByteArray().joinToString("") { "%02X".format(it) }
+                "03" -> "43 01 03 00\r43 01 01 00"
+                "07" -> "47 00"
+                "0A" -> "NO DATA"
+                "010C" -> "7E8 04 41 0C 1A F8\r7E9 04 41 0C 00 00"
+                else -> "OK"
+            }
+        }, physicalElmHeaders = true)
+        assertEquals(vin, engine.readVinForVerification())
+        assertEquals(listOf("ATH0", "ATS0", "0902", "ATH1", "ATS0"), commands)
+        commands.clear()
+        val modes = engine.readDtcModeEvidence()
+        assertEquals(setOf("P0300", "P0100"), modes[3]?.map { it.code }?.toSet())
+        assertEquals(emptyList<ObdDtc>(), modes[7])
+        assertNull(modes[10])
+        assertEquals(listOf("ATH0", "ATS0", "03", "07", "0A", "ATH1", "ATS0"), commands)
+        assertEquals("1726.00", engine.readLiveData(setOf(0x0C)).single().value)
+    }
+
+    @Test
+    fun failedFormattingRestorationCannotBeReportedAsSuccessfulIdentity() = runBlocking {
+        val commands = mutableListOf<String>()
+        val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+            commands += command
+            if (command == "ATH1") "?" else "OK"
+        }, physicalElmHeaders = true)
+        var failed = false
+        try { engine.readVinForVerification() }
+        catch (_: ObdElmFormattingException) { failed = true }
+        assertTrue(failed)
+        assertEquals(listOf("ATH1", "ATS0"), commands.takeLast(2))
+    }
+
+    @Test
     fun verifiesFreshVinWithBoundedRetryAndNoSavedFallback() = runBlocking {
         val commands = mutableListOf<String>()
         val vin = "3FMTK3SU0PMA00001"

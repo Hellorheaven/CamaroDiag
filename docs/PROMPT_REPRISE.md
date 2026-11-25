@@ -1,3 +1,7 @@
+## PR117 — séparation des réponses ELM et restauration des en-têtes (25/11/2026)
+
+- C6 Android : les commandes du moteur OBD conservent désormais les véritables séparations de lignes ; le scan Live emploie le décodeur strict PID au lieu de concaténer plusieurs répondants. Mode 09 et inventaire DTC passent temporairement en format ELM sans en-tête pour bénéficier de l'assemblage interne, puis restaurent ATH1/ATS0 sous verrou, même en annulation. Une restauration non confirmée invalide la session physique, jamais une connexion de remplacement. Correction des imports de régression console 29 bits. Régressions écrites non exécutées ; aucun checkpoint CI. C6 et DoIP restent ouverts.
+
 ## PR117 — arrêt CAN monitor et corrélation fonctionnelle 29 bits (25/11/2026)
 
 - C6 : arrêt monitor ELM/STN par octet ESC sans CR supplémentaire ; la purge RX Bluetooth bornée ne retarde plus l'interruption d'un flux continu. Attente du prompt obligatoire, données résiduelles ignorées pendant l'arrêt. La console corrèle les réponses fonctionnelles 29 bits séparément par répondant, sans émission automatique sur l'adresse déduite ; conserve RX et ACK pour trames brutes non diagnostiques sans exception de corrélation. Régressions écrites non exécutées ; aucun checkpoint, C6/DoIP restent ouverts.

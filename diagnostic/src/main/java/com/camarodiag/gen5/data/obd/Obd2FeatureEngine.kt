@@ -2,6 +2,8 @@ package com.camarodiag.gen5.data.obd
 
 import java.util.Locale
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 
 /** A single-command OBD transport. Implement with Bluetooth/USB/Wi-Fi ELM or a documented provider. */
 fun interface ObdCommandChannel {
@@ -68,7 +70,12 @@ data class ObdScanReport(
  * It only sends standardized OBD-II read services and adapter setup commands.
  * It does not invoke UDS programming, security access, actuator control or ECU writes.
  */
-class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
+class ObdElmFormattingException : IllegalStateException("ELM response formatting could not be restored.")
+
+class Obd2FeatureEngine(
+    private val channel: ObdCommandChannel,
+    private val physicalElmHeaders: Boolean = false
+) {
 
     private val log = mutableListOf<String>()
 
@@ -79,6 +86,37 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
         val response = channel.command(command, timeoutMs).trim()
         log += "> $command -> $response"
         return response
+    }
+
+    private suspend fun formattingCommand(command: String) {
+        val lines = ask(command).lineSequence().map { it.trim().removeSuffix(">").trim() }
+            .filter { it.isNotEmpty() }.toList()
+        if (lines.lastOrNull()?.equals("OK", ignoreCase = true) != true ||
+            lines.any { it.uppercase(Locale.ROOT) in setOf("?", "ERROR", "NO DATA", "UNABLE TO CONNECT") }) {
+            throw ObdElmFormattingException()
+        }
+    }
+
+    private suspend fun restorePhysicalHeaders() = withContext(NonCancellable) {
+        var failed = false
+        for (command in listOf("ATH1", "ATS0")) {
+            if (runCatching { formattingCommand(command) }.isFailure) failed = true
+        }
+        if (failed) throw ObdElmFormattingException()
+    }
+
+    /** The ELM itself assembles multi-frame Mode 09/DTC replies in headerless
+     * automatic formatting. Restore the normal header-bearing PID channel
+     * before releasing the transport's exclusive command session. */
+    private suspend fun <T> withHeaderlessRecords(block: suspend () -> T): T {
+        if (!physicalElmHeaders) return block()
+        return try {
+            formattingCommand("ATH0")
+            formattingCommand("ATS0")
+            block()
+        } finally {
+            restorePhysicalHeaders()
+        }
     }
 
     suspend fun initialize(): Map<String, String> {
@@ -105,8 +143,13 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
      */
     suspend fun discoverFunctionalObdResponders(): List<String> {
         return try {
-            ask("ATS1")
-            ask("ATH1")
+            if (physicalElmHeaders) {
+                formattingCommand("ATS1")
+                formattingCommand("ATH1")
+            } else {
+                ask("ATS1")
+                ask("ATH1")
+            }
             val response = ask("0100", 2500L)
             val ids = response.lineSequence().flatMap { line ->
                 // Some adapters put several header-tagged CAN replies on one line.
@@ -126,8 +169,11 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
             ids
         } finally {
             // Restore normal ELM output framing regardless of the scan result.
-            runCatching { ask("ATH0") }
-            runCatching { ask("ATS0") }
+            if (physicalElmHeaders) restorePhysicalHeaders()
+            else {
+                runCatching { ask("ATH0") }
+                runCatching { ask("ATS0") }
+            }
         }
     }
 
@@ -190,7 +236,8 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
         for (pid in requested) {
             if (pid !in supportedPids) continue
             val response = ask("01%02X".format(Locale.US, pid), 1200L)
-            val data = payload(response, 0x41, pid) ?: continue
+            val data = CamaroUdsProtocol.parsePidBytes(response, "%02X".format(Locale.ROOT, pid))
+                ?.asList() ?: continue
             values += decode(pid, data)
         }
         return values
@@ -227,11 +274,13 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
     }
 
     /** Per-service observations distinguish a positive zero count from no response. */
-    suspend fun readDtcModeEvidence(): Map<Int, List<ObdDtc>?> = linkedMapOf(
-        3 to decodeDtcResponseOrNull(ask("03", 2500L), 0x43, "confirmed"),
-        7 to decodeDtcResponseOrNull(ask("07", 2500L), 0x47, "pending"),
-        10 to decodeDtcResponseOrNull(ask("0A", 2500L), 0x4A, "permanent")
-    )
+    suspend fun readDtcModeEvidence(): Map<Int, List<ObdDtc>?> = withHeaderlessRecords {
+        linkedMapOf(
+            3 to decodeDtcResponseOrNull(ask("03", 2500L), 0x43, "confirmed"),
+            7 to decodeDtcResponseOrNull(ask("07", 2500L), 0x47, "pending"),
+            10 to decodeDtcResponseOrNull(ask("0A", 2500L), 0x4A, "permanent")
+        )
+    }
 
     /** Reads the DTC that caused freeze-frame storage (Mode 02, PID 02, frame 00). */
     suspend fun readFreezeFrameDtc(): ObdDtc? {
@@ -288,30 +337,34 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
         return result
     }
 
-    suspend fun readVin(): String? =
-        decodeAsciiRecords(ask("0902", 3500L), 0x49, 0x02, 17).distinct().singleOrNull()
+    private suspend fun readVinRecord(timeoutMs: Long): String? =
+        decodeAsciiRecords(ask("0902", timeoutMs), 0x49, 0x02, 17).distinct().singleOrNull()
             ?.takeIf { it.matches(Regex("[A-HJ-NPR-Z0-9]{17}")) }
+
+    suspend fun readVin(): String? = withHeaderlessRecords { readVinRecord(3500L) }
 
     /** A fresh VIN observation with normal ELM formatting and one bounded retry.
      * Never substitutes the saved or previously displayed VIN for a new response.
      */
-    suspend fun readVinForVerification(): String? {
-        ask("ATH0")
-        ask("ATS0")
-        val first = readVin()
-        if (first != null) return first
-        return decodeAsciiRecords(ask("0902", 5000L), 0x49, 0x02, 17).distinct().singleOrNull()
-            ?.takeIf { it.matches(Regex("[A-HJ-NPR-Z0-9]{17}")) }
+    suspend fun readVinForVerification(): String? = withHeaderlessRecords {
+        if (!physicalElmHeaders) {
+            ask("ATH0")
+            ask("ATS0")
+        }
+        readVinRecord(3500L) ?: readVinRecord(5000L)
     }
 
-    suspend fun readCalibrationIds(): List<String> =
+    suspend fun readCalibrationIds(): List<String> = withHeaderlessRecords {
         decodeAsciiRecords(ask("0904"), 0x49, 0x04, 16)
+    }
 
-    suspend fun readCalibrationVerificationNumbers(): List<String> =
+    suspend fun readCalibrationVerificationNumbers(): List<String> = withHeaderlessRecords {
         decodeHexRecords(ask("0906"), 0x49, 0x06, 4)
+    }
 
-    suspend fun readEcuName(): List<String> =
+    suspend fun readEcuName(): List<String> = withHeaderlessRecords {
         decodeAsciiRecords(ask("090A"), 0x49, 0x0A, 20)
+    }
     /** Reads standardized OBD identity fields independently; unsupported optional records do not abort the read. */
     suspend fun readEcuIdentification(): ObdEcuIdentification {
         val responders = readOrDefault(emptyList()) { discoverFunctionalObdResponders() }
@@ -327,6 +380,8 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
             read()
         } catch (cancelled: CancellationException) {
             throw cancelled
+        } catch (formatting: ObdElmFormattingException) {
+            throw formatting
         } catch (_: Exception) {
             default
         }
