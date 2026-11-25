@@ -98,7 +98,26 @@ data class UdsExtendedRecordReport(val record: Int, val availability: Int?,
 data class UdsLegacyDtcReport(val subfunction: Int, val list: UdsDtcReport? = null,
     val count: UdsDtcCountReport? = null, val detail: UdsDtcDetail? = null)
 
+data class UdsStoredDtcRecord(val record: Int, val detail: UdsDtcDetail?, val rawResponse: ByteArray)
+
 object UdsDtcDecoder {
+    fun storedRecordRequest(record: Int): ByteArray {
+        require(record in 0..254)
+        return byteArrayOf(0x19, 0x05, record.toByte())
+    }
+
+    fun decodeStoredRecord(record: Int, reply: ByteArray): UdsStoredDtcRecord {
+        val request = storedRecordRequest(record)
+        require(reply.size >= 3 && reply[0] == 0x59.toByte() &&
+            reply[1] == request[1] && reply[2] == request[2])
+        if (reply.size == 3) return UdsStoredDtcRecord(record, null, reply.copyOf())
+        require(reply.size >= 8)
+        val dtc = ((reply[3].toInt() and 255) shl 16) or
+            ((reply[4].toInt() and 255) shl 8) or (reply[5].toInt() and 255)
+        return UdsStoredDtcRecord(record, UdsDtcDetail(dtc, reply[6].toInt() and 255,
+            reply.copyOfRange(7, reply.size)), reply.copyOf())
+    }
+
     fun legacyRequest(sub: Int, mask: Int, dtc: Int, record: Int): ByteArray {
         require(mask in 0..255)
         if (sub in setOf(0x0F, 0x11, 0x12, 0x13)) return byteArrayOf(0x19, sub.toByte(), mask.toByte())
