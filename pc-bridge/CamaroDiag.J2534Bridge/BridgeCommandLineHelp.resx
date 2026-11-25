@@ -108,6 +108,7 @@ Examples:
                               --uds-all-stored-records F40C:2,F40D:1 with --expected-vin VIN: documented DID catalog, all records.
                               --snapshot-did-lengths F40C:2,F40D:1 with --uds-snapshot or --obd-snapshot and explicit record: decoded snapshots.
                               --extended-record-lengths 01:2,90:1 with --uds-extended-dtc or --obd-extended-dtc and explicit record: decoded extended data.
+                              --uds-memory-snapshot or --uds-memory-extended with memory, record and corresponding length catalog: decode selected memory.
                               --uds-extended-record-support 0x01 or --uds-extended-record-data 0x01
                               with --uds-extended-record-size 2 (uniform documented byte length).
                               Both require --expected-vin VIN.
