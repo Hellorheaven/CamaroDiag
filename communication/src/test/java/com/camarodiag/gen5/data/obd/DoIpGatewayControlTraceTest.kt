@@ -361,6 +361,25 @@ class DoIpGatewayControlTraceTest {
         }
     }
 
+    @Test fun monitoringBudgetIncludesEveryIdentityExchangeAndIdleFrameTail() {
+        val uds = DoIpDirectRead.Operation.MONITOR
+        val multi = DoIpDirectRead.Operation.MULTI_MONITOR
+        val obd = DoIpDirectRead.Operation.OBD_MONITOR
+        val obdMulti = DoIpDirectRead.Operation.OBD_MULTI_MONITOR
+        // One sample has no idle interval or Alive Check tail.
+        assertEquals(9000L, DoIpDirectRead.monitoringSessionBudgetMs(uds, 1000, 1, 250))
+        assertEquals(10000L, DoIpDirectRead.monitoringSessionBudgetMs(obd, 1000, 1, 250))
+        val udsBudget = DoIpDirectRead.monitoringSessionBudgetMs(uds, 1000, 30, 250)
+        val obdBudget = DoIpDirectRead.monitoringSessionBudgetMs(obd, 1000, 30, 250)
+        assertEquals(103250L, udsBudget)
+        assertEquals(133250L, obdBudget)
+        assertEquals(udsBudget, DoIpDirectRead.monitoringSessionBudgetMs(multi, 1000, 30, 250))
+        assertEquals(obdBudget, DoIpDirectRead.monitoringSessionBudgetMs(obdMulti, 1000, 30, 250))
+        assertTrue(runCatching {
+            DoIpDirectRead.monitoringSessionBudgetMs(DoIpDirectRead.Operation.DID, 1000, 30, 250)
+        }.isFailure)
+    }
+
     @Test fun monitoringPublishesOnlySamplesWithVerifiedIdentity(): Unit = runBlocking {
         fun bytes(value: String) = value.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
         val loopback = InetAddress.getByName("127.0.0.1")

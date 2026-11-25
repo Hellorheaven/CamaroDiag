@@ -1,3 +1,7 @@
+## PR117 — délai global des acquisitions DoIP Android (25/11/2026)
+
+- C6/DoIP : le budget TCP global de capture tient compte de chaque lecture DID et de chaque contrôle d'identité supplémentaire (VIN UDS, VIN et F810 OBDonUDS), pour les parcours mono/multi-DID. Il inclut la fin d'une trame Alive Check reçue en bord de période d'attente. Les limites individuelles P2/P2* et le nombre maximal de mesures restent inchangés. Expiration avant le premier octet pendant une pause traitée comme fin normale ; changement de contexte détecté pendant la pause. Régressions déterministes écrites, non exécutées. Aucun checkpoint.
+
 ## PR117 — délais de lecture ELM multi-transport (25/11/2026)
 
 - C6 Android : horloge monotone pour la phase RX USB, BLE, Wi-Fi et Bluetooth classique ; chaque attente est limitée au temps restant. Le socket Wi-Fi applique le délai demandé sur le socket courant au lieu de bloquer systématiquement 1200 ms. Les contrôles de session et de prompt restent en place ; durée d'écriture/configuration et latence système hors budget RX. Régressions ajoutées, non exécutées. Aucun checkpoint intermédiaire.

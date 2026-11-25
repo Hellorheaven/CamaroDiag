@@ -50,6 +50,25 @@ object DoIpDirectRead {
     internal fun responseDeadline(overall: Long, now: Long, stageMs: Int): Long =
         minOf(overall, now + stageMs * 1_000_000L)
 
+    /** Overall TCP session budget, excluding UDP discovery. Each sample needs
+     * its own DID exchange and fresh ECU identity (VIN, plus F810 for OBDonUDS).
+     * An Alive Check started just before an idle interval ends may consume
+     * one further frame timeout. Keep the per-exchange P2/P2* limits intact. */
+    internal fun monitoringSessionBudgetMs(
+        operation: Operation, timeoutMs: Int, sampleCount: Int, intervalMs: Int
+    ): Long {
+        val requestsPerSample = when (operation) {
+            Operation.MONITOR, Operation.MULTI_MONITOR -> 2L
+            Operation.OBD_MONITOR, Operation.OBD_MULTI_MONITOR -> 3L
+            else -> error("Not a DoIP monitoring operation.")
+        }
+        require(timeoutMs in 100..30_000 && sampleCount in 1..30 && intervalMs in 250..5000)
+        val gaps = sampleCount - 1L
+        // Seven fixed stages leave room for connect, TLS, routing, initial
+        // identity and scheduling; no additional request is made by this budget.
+        return timeoutMs * (7L + requestsPerSample * sampleCount + gaps) + intervalMs * gaps
+    }
+
     @ConsistentCopyVisibility
     data class Target private constructor(val address: InetAddress, val tester: Int, val ecu: Int,
         val expectedVin: String, val tls: Boolean, val expectedGateway: Int? = null,
@@ -658,10 +677,17 @@ object DoIpDirectRead {
          * first header byte; partial or unsolicited diagnostic data is fatal. */
         fun waitBetweenSamples(intervalMs: Int, frameTimeoutMs: Int) {
             val end = deadline(intervalMs)
-            while (System.nanoTime() < end) {
-                socket.soTimeout = remaining(end)
+            while (true) {
+                check(isReadContextCurrent()) { "DoIP operation context changed." }
+                // Expiration before the first header byte is normal idle completion,
+                // including the race between checking the clock and setting SO_TIMEOUT.
+                socket.soTimeout = try { remaining(end) } catch (_: SocketTimeoutException) { return }
                 val first = try { socket.getInputStream().read() }
-                    catch (_: SocketTimeoutException) { return }
+                    catch (_: SocketTimeoutException) {
+                        check(isReadContextCurrent()) { "DoIP operation context changed." }
+                        return
+                    }
+                check(isReadContextCurrent()) { "DoIP operation context changed." }
                 if (first < 0) throw EOFException("DoIP socket closed between samples.")
                 val frameEnd = deadline(frameTimeoutMs)
                 val header = byteArrayOf(first.toByte()) + readExact(7, frameEnd)
@@ -900,7 +926,7 @@ object DoIpDirectRead {
         val budget = if (operation == Operation.BACKUP) 600_000L
             else if (operation == Operation.EXCHANGE) timeoutMs * (requireNotNull(fixedCommands).size + 4L)
             else if (monitoring)
-            timeoutMs * (sampleCount + 7L) + intervalMs * (sampleCount - 1L)
+                monitoringSessionBudgetMs(operation, timeoutMs, sampleCount, intervalMs)
             else if (wwhKind != null || multi || obdDtc || operation in setOf(Operation.OBD_DID, Operation.OBD_IDENTIFY)) timeoutMs * 8L else timeoutMs * 5L
         check(isReadContextCurrent()) { "DoIP operation context changed." }
         val gateway = discover(target.address, target.expectedVin, timeoutMs, onControlTrace, port = udpPort)
