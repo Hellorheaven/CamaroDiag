@@ -1703,7 +1703,8 @@ internal static class StandardProtocolCli
         finally { Console.CancelKeyPress -= cancel; }
     }
 
-    internal sealed record VerifiedDoIpRead(DoIpOptions Target, string Vin, bool Obd, bool ExplicitVersion);
+    internal sealed record VerifiedDoIpRead(DoIpOptions Target, string Vin, bool Obd, bool ExplicitVersion,
+        bool IdentityOnly = false);
 
     internal static VerifiedDoIpRead ParseVerifiedDoIpRead(string[] args)
     {
@@ -1725,10 +1726,9 @@ internal static class StandardProtocolCli
         if (obd && multi is not null && UdsMultiDidCli.Parse(multi).Any(e =>
             ObdOnUdsServices.ClassifyDid(e.Did) == ObdOnUdsServices.DataGroup.NotLegislated))
             throw new ArgumentException("Expected legislated DIDs.");
-        // Identification itself may report an unknown protocol, so leave the
-        // verified read path to the actual OBD data services.
-        if (args.Contains("--obd-identify", StringComparer.OrdinalIgnoreCase))
-            throw new ArgumentException("Use discovery/identification or the verified data-read mode.");
+        // An unknown identification is valid evidence for discovery, not permission
+        // to use an OBDonUDS data route.
+        var identityOnly = args.Contains("--obd-identify", StringComparer.OrdinalIgnoreCase);
         var tlsDefault = Optional(args, "--tls") is null;
         var target = ParseDoIp(tlsDefault ? [..args, "--tls", "true"] : args);
         if (!System.Net.IPAddress.TryParse(target.Host, out var address) ||
@@ -1741,7 +1741,7 @@ internal static class StandardProtocolCli
             (Optional(args, "--uds-p2-star-ms") is not null && target.DoIpP2StarMs > target.TimeoutMs))
             throw new ArgumentException("Expected P2 <= P2* <= total timeout.");
         return new(target with { DoIpP2Ms = p2, DoIpP2StarMs = p2Star }, vin, obd,
-            Optional(args, "--doip-version") is not null);
+            Optional(args, "--doip-version") is not null, identityOnly);
     }
 
     internal static byte[] DecodeVerifiedSingleDid(byte[] request, byte[] reply)
@@ -1777,6 +1777,20 @@ internal static class StandardProtocolCli
                 expectedGatewayAddress: gateway.LogicalAddress,
                 sessionOptions: new DoIpDiagnosticTransport.SessionOptions(o.DoIpP2Ms, o.DoIpP2StarMs,
                     o.RoutingActivationType, o.RoutingOemData is null ? "" : Convert.ToHexString(o.RoutingOemData)));
+            if (verified.IdentityOnly)
+            {
+                var identity = await DoIpVinReader.ReadStableObdIdentityAsync(link, verified.Vin, timeout, stop.Token);
+                // F810 is decoded only from an exact four-byte positive response.
+                byte[] protocolReply = [0x62, 0xF8, 0x10, identity.ProtocolValue];
+                if (o.ReceiveFile is not null) await SaveDoIpReplyAsync(o.ReceiveFile, protocolReply);
+                Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(new
+                {
+                    complete = true, vin = identity.Vin, ecu = $"{o.Ecu:X4}",
+                    protocol_value = identity.ProtocolValue, obd_on_uds = identity.ProtocolValue == 1,
+                    raw = o.ReceiveFile is null ? Convert.ToHexString(protocolReply) : null
+                }));
+                return 0;
+            }
             async Task VerifyAsync()
             {
                 if (verified.Obd)
@@ -1791,7 +1805,15 @@ internal static class StandardProtocolCli
             await VerifyAsync();
             var reply = await link.ExchangeUdsAsync(o.Request, timeout, stop.Token);
             var singleGeneric = !verified.Obd && o.Request.Length == 3 && o.Request[0] is (0x22 or 0x24);
-            var singleData = singleGeneric ? DecodeVerifiedSingleDid(o.Request, reply) : null;
+            var singleObd = verified.Obd && o.Request.Length == 3 && o.Request[0] == 0x22;
+            var singleData = singleGeneric || singleObd ? DecodeVerifiedSingleDid(o.Request, reply) : null;
+            if (singleObd && o.Request[1] == 0xF8)
+            {
+                if (o.Request[2] == 0x02 && ObdOnUdsVehicleIdentification.DecodeVin(reply) != verified.Vin)
+                    throw new InvalidDataException("Returned legislated VIN differs from selected vehicle.");
+                if (o.Request[2] == 0x10 && ObdOnUdsServices.DecodeProtocolIdentification(reply).Value != 1)
+                    throw new InvalidDataException("Returned protocol differs from verified OBDonUDS identity.");
+            }
             await VerifyAsync();
             stop.Token.ThrowIfCancellationRequested();
             PrintMultiDidResponse(args, o.Request, reply);
@@ -1802,8 +1824,8 @@ internal static class StandardProtocolCli
                 complete = true, vin = verified.Vin, ecu = $"{o.Ecu:X4}",
                 protocol = verified.Obd ? "OBDonUDS" : "UDS",
                 bytes = reply.Length, sha256 = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(reply)),
-                did = singleGeneric ? Convert.ToHexString(o.Request.AsSpan(1, 2)) : null,
-                service = singleGeneric ? o.Request[0].ToString("X2") : null,
+                did = singleGeneric || singleObd ? Convert.ToHexString(o.Request.AsSpan(1, 2)) : null,
+                service = singleGeneric || singleObd ? o.Request[0].ToString("X2") : null,
                 data = singleData is not null && o.ReceiveFile is null && singleData.Length <= 4093
                     ? Convert.ToHexString(singleData) : null,
                 raw = o.ReceiveFile is null && reply.Length <= 4096 ? Convert.ToHexString(reply) : null

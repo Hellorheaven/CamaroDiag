@@ -800,7 +800,11 @@ object DoIpDirectRead {
                         require(vin == target.expectedVin)
                         val protocolValue = decodeObdProtocol(session.exchange(
                             byteArrayOf(0x22, 0xF8.toByte(), 0x10), timeoutMs))
-                        if (operation != Operation.OBD_IDENTIFY) {
+                        if (operation == Operation.OBD_IDENTIFY) {
+                            require(readVin(0xF802) == vin)
+                            require(decodeObdProtocol(session.exchange(byteArrayOf(0x22, 0xF8.toByte(), 0x10),
+                                timeoutMs)) == protocolValue) { "OBD protocol identification changed during discovery." }
+                        } else {
                             val routeOperation = if (wwhKind != null || obdDtc)
                                 DiagnosticRouteSelector.Operation.DTC else DiagnosticRouteSelector.Operation.MONITOR
                             require(selectObdReadRoute(target, vin, protocolValue, routeOperation).routes.isNotEmpty()) {

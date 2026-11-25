@@ -47,7 +47,7 @@ internal static class BridgeCommandLineHelpSelfTests
             "--samples", "--interval-ms",
             "--uds-did", "--uds-scaling-did", "--uds-dtc-mask", "--uds-dtc-count-mask",
             "--uds-snapshot", "--uds-snapshot-record", "--uds-extended-dtc", "--uds-extended-record",
-            "--uds-supported-dtcs", "--uds-snapshot-index",
+            "--uds-supported-dtcs", "--uds-snapshot-index", "--obd-identify",
             "--tls true", "--tester", "--ecu", "--payload"
         })
         {

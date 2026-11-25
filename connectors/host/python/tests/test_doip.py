@@ -378,6 +378,21 @@ class DoIpTests(unittest.TestCase):
                 self.assertEqual(fake.requests, [0xF802, 0xF810])
                 self.assertTrue(fake.closed)
 
+    def test_obd_discovery_preserves_stable_unknown_protocol(self):
+        for first, second in ((1, 1), (2, 2), (1, 2)):
+            fake = unittest.mock.Mock(spec=Session)
+            fake.read_obd.side_effect = [
+                {"vin": VIN, "protocol_value": value, "obd_on_uds": value == 1}
+                for value in (first, second)]
+            if first == second:
+                self.assertEqual(Session.identify_obd(fake, VIN)["protocol_value"], first)
+                fake.close.assert_not_called()
+            else:
+                with self.assertRaises(DoIpError):
+                    Session.identify_obd(fake, VIN)
+                fake.close.assert_called_once()
+            self.assertEqual(fake.read_obd.call_count, 2)
+
     def test_obd_single_did_rejects_changed_protocol(self):
         fake = unittest.mock.Mock(spec=Session)
         fake.verify_vin.return_value = VIN

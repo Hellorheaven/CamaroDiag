@@ -69,6 +69,8 @@ Examples:
                               Samples are provisional until final identity verification.
                               --monitor-dids 0xF40C:2,0xF40D:1 or --obd-monitor-dids
                               0xF40C:2,0xF40D:1: same timing options, one request per sample.
+                              --obd-identify --expected-vin VIN verifies a stable F802/F810
+                              identity, even when OBDonUDS is not confirmed.
                               Typed OBD reads with --expected-vin VIN verify F802/F810
                               before and after. --uds-dids 0xF40C:2,0xF40D:1 may add
                               --obd-verified true; use actual ECU lengths.

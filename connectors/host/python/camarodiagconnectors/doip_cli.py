@@ -219,9 +219,10 @@ def run(argv: Sequence[str] | None = None) -> dict:
         if layout is not None:
             return result | {"ecu": o.ecu, "tester": o.tester, "tls": not o.tcp} | session.read_dids(
                 o.vin, layout, obd=o.action == "obd-dids")
-        if o.action in ("obd-identify", "obd-did"):
-            return result | {"ecu": o.ecu, "tester": o.tester, "tls": not o.tcp} | session.read_obd(
-                o.vin, o.did if o.action == "obd-did" else None)
+        if o.action == "obd-identify":
+            return result | {"ecu": o.ecu, "tester": o.tester, "tls": not o.tcp} | session.identify_obd(o.vin)
+        if o.action == "obd-did":
+            return result | {"ecu": o.ecu, "tester": o.tester, "tls": not o.tcp} | session.read_obd(o.vin, o.did)
         if o.action in ("obd-wwh-dtcs", "obd-wwh-permanent", "obd-wwh-readiness"):
             subfunction = {"obd-wwh-dtcs": 0x42, "obd-wwh-permanent": 0x55,
                            "obd-wwh-readiness": 0x56}[o.action]

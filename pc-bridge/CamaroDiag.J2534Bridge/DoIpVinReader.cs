@@ -117,7 +117,20 @@ internal static class DoIpVinReader
             throw new ArgumentException("Explicit matching VIN and legislated DID required.");
         await using var link = await ConnectObservedAsync(gateway, address, tester, ecu,
             tls, timeout, token, certificate, trace, options);
-        return await ReadVerifiedObdAsync(link, expectedVin, did, timeout, token);
+        return did.HasValue
+            ? await ReadVerifiedObdAsync(link, expectedVin, did, timeout, token)
+            : await ReadStableObdIdentityAsync(link, expectedVin, timeout, token);
+    }
+
+    internal static async Task<ObdRead> ReadStableObdIdentityAsync(DoIpDiagnosticTransport link,
+        string expectedVin, TimeSpan timeout, CancellationToken token)
+    {
+        var before = await ReadVerifiedObdAsync(link, expectedVin, null, timeout, token);
+        var after = await ReadVerifiedObdAsync(link, expectedVin, null, timeout, token);
+        if (before.ProtocolValue != after.ProtocolValue)
+            throw new InvalidDataException("OBD protocol identification changed during discovery.");
+        token.ThrowIfCancellationRequested();
+        return after;
     }
 
     internal static async Task<ObdRead> ReadVerifiedObdAsync(DoIpDiagnosticTransport link,

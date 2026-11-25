@@ -71,6 +71,8 @@ Exemples :
                               Mesures provisoires avant vérification finale de l’identité.
                               --monitor-dids 0xF40C:2,0xF40D:1 ou --obd-monitor-dids
                               0xF40C:2,0xF40D:1 : mêmes délais, une requête par mesure.
+                              --obd-identify --expected-vin VIN vérifie une identité F802/F810
+                              stable, même si OBDonUDS n'est pas confirmé.
                               Lectures OBD typées avec --expected-vin VIN : F802/F810
                               avant/après. --uds-dids 0xF40C:2,0xF40D:1 peut ajouter
                               --obd-verified true ; longueurs ECU réelles requises.

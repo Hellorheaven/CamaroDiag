@@ -625,6 +625,18 @@ class Session:
             self.close()
             raise
 
+    def identify_obd(self, expected: str) -> dict:
+        """Stable discovery; unknown protocol values do not authorize a data route."""
+        try:
+            first = self.read_obd(expected)
+            second = self.read_obd(expected)
+            if first != second:
+                raise DoIpError("OBD protocol identification changed during discovery")
+            return second
+        except BaseException:
+            self.close()
+            raise
+
     def monitor(self, expected: str, did: int, samples: int = 10,
                 interval: float = 1, *, obd: bool = False, on_sample=lambda _: None) -> dict:
         """Read a single DID repeatedly on the same verified ECU and revalidate identity."""

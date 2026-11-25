@@ -533,6 +533,41 @@ internal static class DoIpDiagnosticSessionSelfTests
             });
         }
 
+        // Identification can report unknown protocol values, but only stable ones.
+        foreach (var (firstProtocol, secondProtocol) in new (byte, byte)[] { (1, 1), (2, 2), (1, 2) })
+        {
+            await RunCaseAsync(async stream =>
+            {
+                foreach (var protocolValue in new[] { firstProtocol, secondProtocol })
+                {
+                    var vinRequest = await ReadAsync(stream);
+                    Check(vinRequest.Payload.SequenceEqual((byte[])[0x0E,0x80,0x12,0x34,0x22,0xF8,0x02]),
+                        "Discovery uses the legislated VIN.");
+                    await SendAsync(stream, DoIpCodec.DiagnosticMessage,
+                        FromEcu([0x62,0xF8,0x02, .. System.Text.Encoding.ASCII.GetBytes(selectedVehicleVin)]));
+                    var protocolRequest = await ReadAsync(stream);
+                    Check(protocolRequest.Payload.SequenceEqual((byte[])[0x0E,0x80,0x12,0x34,0x22,0xF8,0x10]),
+                        "Discovery reads the protocol identity, not application data.");
+                    await SendAsync(stream, DoIpCodec.DiagnosticMessage,
+                        FromEcu([0x62,0xF8,0x10,protocolValue]));
+                }
+            }, async client =>
+            {
+                if (firstProtocol == secondProtocol)
+                {
+                    var result = await DoIpVinReader.ReadStableObdIdentityAsync(client, selectedVehicleVin,
+                        TimeSpan.FromSeconds(2), CancellationToken.None);
+                    Check(result.ProtocolValue == firstProtocol && result.Data is null,
+                        "Stable unknown protocol is retained without a data-route claim.");
+                }
+                else await Expect<InvalidDataException>(async () =>
+                {
+                    _ = await DoIpVinReader.ReadStableObdIdentityAsync(client, selectedVehicleVin,
+                        TimeSpan.FromSeconds(2), CancellationToken.None);
+                }, "Unstable protocol discovery is rejected.");
+            });
+        }
+
         // Monitoring OBDonUDS verifies the legislated identity at both boundaries.
         foreach (var finalProtocol in new byte[] { 1, 2 })
         {

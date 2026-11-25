@@ -1,3 +1,7 @@
+## PR117 — identification OBDonUDS vérifiée sur DoIP (25/11/2026)
+
+- CLI Windows : --obd-identify avec --expected-vin, TLS par défaut, découverte F802/F810 répétée sur même session, résultat JSON stable y compris valeur non reconnue sans prétendre à une route OBDonUDS. Android, Windows GUI et Connectors CLI : même revalidation d'identification. CLI Windows contrôle également les données DID simples OBD, notamment VIN et valeur F810 retournés. Aide FR/EN, tests écrits, aucun lancement CI.
+
 ## PR117 — cohérence des routes et index vide DoIP (25/11/2026)
 
 - Transport Android/Python/Windows : accepte 59 03 sans enregistrement (index réellement vide), refuse les index tronqués et les inventaires 59 0A sans masque. Android : sélecteur de route OBDonUDS vérifie l'opération DTC ou monitoring selon la demande et n'admet pas la programmation sur ces capacités de lecture ; vérification de contexte avant toute émission de session et avant restitution, sauvegardes liées au profil sélectionné. Tests de régression écrits, aucune exécution ni compilation intermédiaire.

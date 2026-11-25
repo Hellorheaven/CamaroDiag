@@ -645,6 +645,16 @@ internal static class StandardVehicleProtocolsSelfTests
         Check(informationDoIp.Request.SequenceEqual(new byte[] {0x22, 0xF8, 0x10}),
             "DoIP OBDonUDS protocol information F810 can be selected.");
 
+        var verifiedIdentity = StandardProtocolCli.ParseVerifiedDoIpRead([
+            "--host", "127.0.0.1", "--tester", "0E80", "--ecu", "1234",
+            "--expected-vin", "1G1FA1RX0J0100001", "--obd-identify"]);
+        Check(verifiedIdentity.IdentityOnly && verifiedIdentity.Obd && verifiedIdentity.Target.UseTls,
+            "Verified OBD identity is a distinct discovery operation with TLS default.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseVerifiedDoIpRead([
+            "--host", "127.0.0.1", "--tester", "0E80", "--ecu", "1234",
+            "--expected-vin", "1G1FA1RX0J0100001", "--obd-identify", "--obd-did", "F40C"]),
+            "Identity and data read are exclusive.");
+
         var verifiedRead = StandardProtocolCli.ParseVerifiedDoIpRead([
             StandardProtocolCli.DoIpCommand, "--host", "127.0.0.1", "--tester", "0E80",
             "--ecu", "1234", "--expected-vin", "1G1FA1RX0J0100001", "--obd-wwh-permanent"]);
