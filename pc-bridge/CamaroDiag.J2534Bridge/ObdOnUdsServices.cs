@@ -453,6 +453,66 @@ internal static class ObdOnUdsServices
         return new(record, dtc, reply[6], reply[7..].ToArray(), reply.ToArray());
     }
 
+    internal sealed record StoredDid(ushort Did, byte[] Data);
+    internal sealed record StoredRecordEntry(byte Record, uint Dtc, byte Status,
+        IReadOnlyList<StoredDid> Dids, byte[] RawRecord);
+    internal sealed record AllStoredRecords(IReadOnlyList<StoredRecordEntry> Records, byte[] RawResponse);
+
+    internal static Dictionary<ushort, int> ParseStoredDidLengths(string text)
+    {
+        var fields = text.Split(',');
+        if (fields.Length is < 1 or > 255) throw new ArgumentException("Expected 1..255 DID:length entries.");
+        var catalog = new Dictionary<ushort, int>();
+        foreach (var field in fields)
+        {
+            var parts = field.Split(':');
+            if (parts.Length != 2 || parts[0].Length != 4 || parts[1].Length is < 1 or > 4 ||
+                !parts[0].All(Uri.IsHexDigit) || !parts[1].All(c => c is >= '0' and <= '9') ||
+                !ushort.TryParse(parts[0], System.Globalization.NumberStyles.AllowHexSpecifier,
+                    System.Globalization.CultureInfo.InvariantCulture, out var did) ||
+                !int.TryParse(parts[1], System.Globalization.NumberStyles.None,
+                    System.Globalization.CultureInfo.InvariantCulture, out var size) ||
+                size is < 1 or > 4096 || !catalog.TryAdd(did, size))
+                throw new ArgumentException("Invalid or duplicate DID length.");
+        }
+        return catalog;
+    }
+
+    internal static byte[] ReadAllStoredRecords() => UdsStandardServices.ReadDtc(5, [255]);
+
+    internal static AllStoredRecords DecodeAllStoredRecords(ReadOnlySpan<byte> reply, IReadOnlyDictionary<ushort, int> lengths)
+    {
+        if (lengths.Count is < 1 or > 255 || lengths.Any(p => p.Value is < 1 or > 4096))
+            throw new ArgumentException("Invalid DID length catalog.");
+        _ = UdsStandardServices.RequireResponse(ReadAllStoredRecords(), reply);
+        var records = new List<StoredRecordEntry>();
+        if (reply.Length == 3) return new(records, reply.ToArray());
+        var seen = new HashSet<byte>();
+        int offset = 2;
+        while (offset < reply.Length)
+        {
+            int start = offset;
+            if (reply.Length - offset < 6) throw new InvalidDataException("Truncated stored record header.");
+            byte record = reply[offset], status = reply[offset + 4], count = reply[offset + 5];
+            if (record == 255 || !seen.Add(record)) throw new InvalidDataException("Invalid or duplicate stored record.");
+            uint dtc = ((uint)reply[offset + 1] << 16) | ((uint)reply[offset + 2] << 8) | reply[offset + 3];
+            offset += 6;
+            var dids = new List<StoredDid>();
+            for (int i = 0; i < count; i++)
+            {
+                if (reply.Length - offset < 2) throw new InvalidDataException("Truncated stored DID.");
+                ushort did = BinaryPrimitives.ReadUInt16BigEndian(reply[offset..]);
+                offset += 2;
+                if (!lengths.TryGetValue(did, out var size) || reply.Length - offset < size)
+                    throw new InvalidDataException("Unknown DID length or truncated data.");
+                dids.Add(new(did, reply.Slice(offset, size).ToArray()));
+                offset += size;
+            }
+            records.Add(new(record, dtc, status, dids, reply[start..offset].ToArray()));
+        }
+        return new(records, reply.ToArray());
+    }
+
     internal sealed record ExtendedRecordEntry(uint Dtc, byte Status, byte[] Data);
     internal sealed record ExtendedRecordReport(byte Record, byte? Availability, IReadOnlyList<ExtendedRecordEntry> Entries);
 
