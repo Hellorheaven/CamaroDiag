@@ -813,6 +813,15 @@ internal sealed partial class BridgeDesktopForm
             if (Volatile.Read(ref traceOverflow) != 0)
                 throw new IOException(DoIpConsolePresentation.Text("TraceIncomplete"));
         }
+        var monitoring = operation is DoIpReadOperation.MonitorDid or DoIpReadOperation.ObdMonitor
+            or DoIpReadOperation.MultiMonitor or DoIpReadOperation.ObdMultiMonitor;
+        var capture = monitoring ? new DoIpMonitoringProgress(sampleCount) : null;
+        void RecordVerifiedSample(int index)
+        {
+            RequireCompleteTrace();
+            stop.Token.ThrowIfCancellationRequested();
+            capture!.RecordVerified(index);
+        }
         using var traceTimer = new System.Windows.Forms.Timer { Interval = 100 };
         traceTimer.Tick += (_, _) => DrainTrace();
         traceTimer.Start();
@@ -1148,7 +1157,7 @@ internal sealed partial class BridgeDesktopForm
                             ecu, useTls, expectedObdVin, did, sampleCount, interval, timeout, stop.Token,
                             (index, data) =>
                             {
-                                DrainTrace();
+                                RecordVerifiedSample(index);
                                 if (!IsDisposed && !Disposing)
                                     ConsoleLine("SYSTEM", string.Format(
                                         DoIpConsolePresentation.Text("ObdMonitorSample"), index,
@@ -1156,6 +1165,7 @@ internal sealed partial class BridgeDesktopForm
                             }, certificate, Trace, options);
                         RequireCompleteTrace();
                         stop.Token.ThrowIfCancellationRequested();
+                        capture!.MarkComplete();
                         if (!IsDisposed && !Disposing)
                             ConsoleLine("SYSTEM", string.Format(
                                 DoIpConsolePresentation.Text("ObdMonitorComplete"), sampleCount),
@@ -1167,7 +1177,7 @@ internal sealed partial class BridgeDesktopForm
                             observed, address, tester, ecu, useTls, did, sampleCount, interval,
                             timeout, stop.Token, (index, data) =>
                             {
-                                DrainTrace();
+                                RecordVerifiedSample(index);
                                 if (!IsDisposed && !Disposing)
                                     ConsoleLine("SYSTEM", string.Format(
                                         DoIpConsolePresentation.Text("MonitorSample"), index,
@@ -1175,6 +1185,7 @@ internal sealed partial class BridgeDesktopForm
                             }, clientCertificateThumbprint: certificate, trace: Trace, options: options);
                         RequireCompleteTrace();
                         stop.Token.ThrowIfCancellationRequested();
+                        capture!.MarkComplete();
                         if (!IsDisposed && !Disposing)
                             ConsoleLine("SYSTEM", string.Format(
                                 DoIpConsolePresentation.Text("MonitorComplete"), sampleCount),
@@ -1186,7 +1197,7 @@ internal sealed partial class BridgeDesktopForm
                             ecu, useTls, expectedObdVin, multiLayout!, operation == DoIpReadOperation.ObdMultiMonitor,
                             sampleCount, interval, timeout, stop.Token, (index, values) =>
                             {
-                                DrainTrace();
+                                RecordVerifiedSample(index);
                                 if (!IsDisposed && !Disposing)
                                     ConsoleLine("SYSTEM", string.Format(DoIpConsolePresentation.Text("MultiMonitorSample"),
                                         index, string.Join("  ", values.Select(v => $"{v.Did:X4}={Convert.ToHexString(v.Data)}"))),
@@ -1194,6 +1205,7 @@ internal sealed partial class BridgeDesktopForm
                             }, certificate, Trace, options);
                         RequireCompleteTrace();
                         stop.Token.ThrowIfCancellationRequested();
+                        capture!.MarkComplete();
                         if (!IsDisposed && !Disposing)
                             ConsoleLine("SYSTEM", string.Format(DoIpConsolePresentation.Text("MultiMonitorComplete"),
                                 sampleCount), Color.DarkGreen);
@@ -1293,6 +1305,9 @@ internal sealed partial class BridgeDesktopForm
         {
             traceTimer.Stop();
             DrainTrace();
+            if (capture is { Complete: false } && !IsDisposed && !Disposing)
+                ConsoleLine("SYSTEM", string.Format(DoIpConsolePresentation.Text("MonitorPartial"),
+                    capture.VerifiedSamples, capture.RequestedSamples), Color.DarkOrange);
             if (Volatile.Read(ref traceOverflow) != 0 && !IsDisposed && !Disposing)
                 ConsoleLine("SYSTEM", DoIpConsolePresentation.Text("TraceIncomplete"), Color.DarkRed);
             doIpConsoleDiscoveryCancellation = null;

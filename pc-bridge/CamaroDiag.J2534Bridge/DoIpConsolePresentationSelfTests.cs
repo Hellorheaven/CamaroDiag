@@ -96,7 +96,7 @@ internal static class DoIpConsolePresentationSelfTests
             foreach (var dtcKey in new[] { "ReadDtcs", "DtcMask", "InvalidDtcMask",
                 "DtcStarted", "DtcResult", "DtcEntry", "DtcNotice", "ReadDid", "DidLabel",
                 "InvalidDid", "DidStarted", "DidResult", "MonitorDid", "MonitorInterval", "MonitorCount",
-                "MonitorSample", "MonitorComplete", "Backup", "BackupProfile", "BackupMismatch",
+                "MonitorSample", "MonitorComplete", "MonitorPartial", "Backup", "BackupProfile", "BackupMismatch",
                 "BackupExists", "BackupConfirm", "BackupStarted", "BackupProgress", "BackupSaved",
                 "BackupVerify", "BackupVerified" })
                 Check(!string.IsNullOrWhiteSpace(DoIpConsolePresentation.Text(dtcKey, culture)),

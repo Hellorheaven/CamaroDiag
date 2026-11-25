@@ -1967,6 +1967,17 @@ internal static class StandardProtocolCli
     {
         var monitor = ParseDoIpMonitor(args);
         var o = monitor.Target;
+        var capture = new DoIpMonitoringProgress(monitor.Count);
+        ushort? observedGateway = null;
+        var elapsed = System.Diagnostics.Stopwatch.StartNew();
+        void Finish(string status) => Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(new
+        {
+            complete = capture.Complete,
+            samples = capture.VerifiedSamples, requestedSamples = capture.RequestedSamples,
+            status, vin = monitor.Vin, gateway = observedGateway?.ToString("X4"),
+            tester = $"{o.Tester:X4}", ecu = $"{o.Ecu:X4}",
+            transport = o.UseTls ? "TLS" : "TCP", protocol = monitor.Obd ? "OBDonUDS" : "UDS"
+        }));
         using var cancellation = new CancellationTokenSource();
         ConsoleCancelEventHandler cancel = (_, e) => { e.Cancel = true; cancellation.Cancel(); };
         Console.CancelKeyPress += cancel;
@@ -1991,20 +2002,33 @@ internal static class StandardProtocolCli
                 sessionOptions: new DoIpDiagnosticTransport.SessionOptions(o.DoIpP2Ms,
                     o.DoIpP2StarMs, o.RoutingActivationType,
                     o.RoutingOemData is null ? "" : Convert.ToHexString(o.RoutingOemData)));
+            observedGateway = gateway.LogicalAddress;
             var interval = TimeSpan.FromMilliseconds(monitor.IntervalMs);
-            void Sample(int index, byte[] data) => Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(
-                new { sample = index, utc = DateTimeOffset.UtcNow, vin = monitor.Vin,
-                    ecu = $"{o.Ecu:X4}", did = $"{monitor.Did:X4}", protocol = monitor.Obd ? "OBDonUDS" : "UDS",
-                    payload = Convert.ToHexString(data), partial = true }));
+            void Sample(int index, byte[] data)
+            {
+                capture.RecordVerified(index);
+                Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(
+                    new { sample = index, utc = DateTimeOffset.UtcNow, elapsedMs = elapsed.ElapsedMilliseconds,
+                        vin = monitor.Vin, gateway = $"{gateway.LogicalAddress:X4}", tester = $"{o.Tester:X4}",
+                        ecu = $"{o.Ecu:X4}", did = $"{monitor.Did:X4}", transport = o.UseTls ? "TLS" : "TCP",
+                        protocol = monitor.Obd ? "OBDonUDS" : "UDS",
+                        payload = Convert.ToHexString(data), verified = true, partial = true }));
+            }
             if (monitor.Layout is not null)
                 await DoIpVinReader.MonitorVerifiedMultiDidAsync(transport, gateway, monitor.Vin,
                     monitor.Layout, monitor.Obd, monitor.Count, interval, timeout, cancellation.Token,
-                    (index, values) => Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(new
+                    (index, values) =>
                     {
-                        sample = index, utc = DateTimeOffset.UtcNow, vin = monitor.Vin,
-                        ecu = $"{o.Ecu:X4}", protocol = monitor.Obd ? "OBDonUDS" : "UDS", partial = true,
-                        dids = values.Select(v => new { did = $"{v.Did:X4}", payload = Convert.ToHexString(v.Data) })
-                    })));
+                        capture.RecordVerified(index);
+                        Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(new
+                        {
+                            sample = index, utc = DateTimeOffset.UtcNow, elapsedMs = elapsed.ElapsedMilliseconds,
+                            vin = monitor.Vin, gateway = $"{gateway.LogicalAddress:X4}", tester = $"{o.Tester:X4}",
+                            ecu = $"{o.Ecu:X4}", transport = o.UseTls ? "TLS" : "TCP",
+                            protocol = monitor.Obd ? "OBDonUDS" : "UDS", verified = true, partial = true,
+                            dids = values.Select(v => new { did = $"{v.Did:X4}", payload = Convert.ToHexString(v.Data) })
+                        }));
+                    });
             else if (monitor.Obd)
                 await DoIpVinReader.MonitorVerifiedObdAsync(transport, monitor.Vin, monitor.Did,
                     monitor.Count, interval, timeout, cancellation.Token, Sample);
@@ -2023,12 +2047,19 @@ internal static class StandardProtocolCli
                     verifySample: VerifySampleAsync);
             }
             cancellation.Token.ThrowIfCancellationRequested();
-            Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(new
-            {
-                complete = true, samples = monitor.Count,
-                protocol = monitor.Obd ? "OBDonUDS" : "UDS", vin = monitor.Vin
-            }));
+            capture.MarkComplete();
+            Finish("complete");
             return 0;
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+            Finish("canceled");
+            throw;
+        }
+        catch
+        {
+            Finish("failed");
+            throw;
         }
         finally { Console.CancelKeyPress -= cancel; }
     }

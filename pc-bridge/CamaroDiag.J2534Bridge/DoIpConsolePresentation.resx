@@ -196,4 +196,5 @@
   <data name="ObdInventory" xml:space="preserve"><value>OBDonUDS ECU inventory</value></data>
   <data name="InventoryObdSupported" xml:space="preserve"><value>ECU 0x{0:X4}: OBDonUDS identified (0x{1:X2})</value></data>
   <data name="InventoryObdUnrecognized" xml:space="preserve"><value>ECU 0x{0:X4}: OBDonUDS not identified (F810 = 0x{1:X2})</value></data>
+  <data name="MonitorPartial" xml:space="preserve"><value>Incomplete capture: {0}/{1} verified samples.</value></data>
 </root>

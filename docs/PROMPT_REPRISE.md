@@ -1,3 +1,7 @@
+## PR117 — suivi des acquisitions DoIP interrompues Windows / CLI (25/11/2026)
+
+- C6/DoIP : CLI NDJSON publie les échantillons vérifiés avec adresse passerelle/testeur/ECU, transport et temps écoulé ; bilan final explicite même en échec ou annulation, sans transformer l'erreur en succès. Console Windows affiche le nombre réellement vérifié en cas de capture partielle (FR/EN), contrôle le journal avant chaque publication. Suivi séquentiel partagé ; aucune mesure non vérifiée déclarée complète. Régressions de ressources écrites non exécutées ; aucun checkpoint. C6/DoIP restent actifs.
+
 ## PR117 — classification console OBD des répondants CAN secondaires (25/11/2026)
 
 - C6 : la console accepte les réponses positives et négatives SAE provenant de répondants 29 bits secondaires, au même titre que les 11 bits ; support DLC explicite et bourrage d'une trame classique complète. Option d'adresse exacte pour vérification physique, sans accepter de réponse anonyme pour cette preuve. Aucune extension des commandes modifiant les ECU. Régressions écrites non exécutées. C6/DoIP restent actifs ; aucun checkpoint.
