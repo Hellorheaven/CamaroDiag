@@ -1103,6 +1103,11 @@
     <string name="cal_doip_supported_dtcs">Supported DTCs</string>
     <string name="cal_doip_permanent_dtcs">Permanent UDS DTCs</string>
     <string name="cal_doip_permanent_result">Permanent DTCs: %1$d; available status mask 0x%2$02X</string>
+    <string name="cal_doip_memory_selection">DTC memory (hex)</string>
+    <string name="cal_doip_memory_dtcs">DTCs in selected memory</string>
+    <string name="cal_doip_memory_snapshot">Snapshot in selected memory</string>
+    <string name="cal_doip_memory_extended">Extended data in selected memory</string>
+    <string name="cal_doip_memory_result">DTC memory 0x%1$02X</string>
     <string name="cal_doip_snapshot_index">Snapshot index</string>
     <string name="cal_doip_supported_result">Supported DTCs: %1$d; available status mask 0x%2$02X</string>
     <string name="cal_doip_snapshot_index_result">Available snapshot records: %1$d</string>

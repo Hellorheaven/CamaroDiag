@@ -1,3 +1,7 @@
+## PR117 — mémoire DTC sélectionnée Android (25/11/2026)
+
+- UDS 19/17–19 : décodeur commun, vérification mémoire/DTC/record, masque et octets bruts, session DoIP F190 avant/après, trois actions FR/EN et résultat distinct des défauts actifs. Tests écrits non exécutés. Windows reste à raccorder. Aucun checkpoint CI.
+
 ## PR117 — lecture DTC en mémoire sélectionnée Connectors (25/11/2026)
 
 - CLI Python : `memory-dtcs`, `memory-snapshot`, `memory-extended` (UDS 19/17–19), mémoire explicite, masque ou DTC/enregistrement explicites, vérification de l'écho mémoire/DTC/enregistrement, statut et octets OEM conservés, VIN F190 avant/après, aucun contournement de sécurité OEM. Tests écrits non exécutés. Android et Windows restent à raccorder. Référence de format https://uds.readthedocs.io/en/stable/pages/knowledge_base/service.html . Aucun checkpoint CI.

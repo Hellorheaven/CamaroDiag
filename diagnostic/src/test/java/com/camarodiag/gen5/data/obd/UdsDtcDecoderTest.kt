@@ -25,6 +25,26 @@ class UdsDtcDecoderTest {
         assertTrue(runCatching { UdsDtcDecoder.decodeSeverity(listRequest, hex("590808801212345601")) }.isFailure)
     }
 
+    @Test fun explicitUserMemoryCorrelatesListAndRawRecords() {
+        fun hex(s: String) = s.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
+        val list = UdsDtcDecoder.userMemoryRequest(0x17, 2, 8, 0, 1)
+        assertArrayEquals(hex("19170802"), list)
+        assertTrue(UdsDtcDecoder.decodeUserMemory(list, hex("59170208")).list!!.records.isEmpty())
+        assertEquals(0x010203, UdsDtcDecoder.decodeUserMemory(list, hex("5917020801020308")).list!!.records.single().rawDtc)
+        for (bad in listOf("59170308", "5917020801020301", "5917020801", "591702080102030801020308"))
+            assertTrue(runCatching { UdsDtcDecoder.decodeUserMemory(list, hex(bad)) }.isFailure)
+        for (sub in 0x18..0x19) {
+            val request = UdsDtcDecoder.userMemoryRequest(sub, 2, 255, 0x010203, 1)
+            assertArrayEquals(hex("19%02X0102030102".format(sub)), request)
+            val result = UdsDtcDecoder.decodeUserMemory(request, hex("59%02X020102030801AABB".format(sub)))
+            assertEquals(2, result.memory)
+            assertArrayEquals(hex("01AABB"), result.detail!!.records)
+            assertTrue(runCatching { UdsDtcDecoder.decodeUserMemory(request, hex("59%02X030102030801".format(sub))) }.isFailure)
+            assertTrue(runCatching { UdsDtcDecoder.decodeUserMemory(request, hex("59%02X020102030802".format(sub))) }.isFailure)
+        }
+        assertTrue(runCatching { UdsDtcDecoder.userMemoryRequest(0x19, 2, 255, 1, 0xF0) }.isFailure)
+    }
+
     @Test fun faultCountersPreserveSignedByteWithoutStatusInference() {
         assertTrue(UdsDtcDecoder.decodeFaultCounters(byteArrayOf(0x59, 0x14)).isEmpty())
         val report = UdsDtcDecoder.decodeFaultCounters(byteArrayOf(0x59, 0x14,

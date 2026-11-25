@@ -90,7 +90,41 @@ data class UdsSeverityRecord(val dtc: Int, val severity: Int, val functionalUnit
 data class UdsSeverityReport(val subfunction: Int, val availabilityMask: Int,
     val records: List<UdsSeverityRecord> = emptyList(), val count: Int? = null, val formatIdentifier: Int? = null)
 
+data class UdsMemoryDtcReport(val memory: Int, val list: UdsDtcReport? = null, val detail: UdsDtcDetail? = null)
+
 object UdsDtcDecoder {
+    fun userMemoryRequest(sub: Int, memory: Int, mask: Int, dtc: Int, record: Int): ByteArray {
+        require(memory in 0..255 && mask in 0..255)
+        if (sub == 0x17) return byteArrayOf(0x19, 0x17, mask.toByte(), memory.toByte())
+        require(sub in 0x18..0x19 && dtc in 0..0xFFFFFF && record in 1..255 &&
+            (sub != 0x19 || record !in 0xF0..0xFD))
+        return byteArrayOf(0x19, sub.toByte(), (dtc shr 16).toByte(), (dtc shr 8).toByte(),
+            dtc.toByte(), record.toByte(), memory.toByte())
+    }
+
+    fun decodeUserMemory(request: ByteArray, reply: ByteArray): UdsMemoryDtcReport {
+        fun Byte.u8() = toInt() and 255
+        require(request.size >= 2 && request[0] == 0x19.toByte() &&
+            reply.size >= 3 && reply[0] == 0x59.toByte() && reply[1] == request[1])
+        val sub = request[1].u8()
+        require(sub in 0x17..0x19 && request.size == if (sub == 0x17) 4 else 7)
+        val memory = request.last().u8()
+        require(reply[2].u8() == memory)
+        if (sub == 0x17) {
+            require(reply.size >= 4)
+            return UdsMemoryDtcReport(memory,
+                list = decodeStatusMaskReport(reply.copyOfRange(3, reply.size), request[2].u8()))
+        }
+        require(reply.size >= 7 && reply.copyOfRange(3, 6).contentEquals(request.copyOfRange(2, 5)))
+        val record = request[5].u8()
+        require(record in 1..255 && (sub != 0x19 || record !in 0xF0..0xFD))
+        if (reply.size > 7 && record != 0xFF && (sub != 0x19 || record != 0xFE))
+            require(reply[7].u8() == record)
+        val dtc = (reply[3].u8() shl 16) or (reply[4].u8() shl 8) or reply[5].u8()
+        return UdsMemoryDtcReport(memory, detail = UdsDtcDetail(dtc, reply[6].u8(),
+            reply.copyOfRange(7, reply.size)))
+    }
+
     fun severityRequest(subfunction: Int, severityMask: Int, statusMask: Int, dtc: Int): ByteArray {
         require(subfunction in 7..9 && severityMask in 0..255 && statusMask in 0..255 && dtc in 0..0xFFFFFF)
         return if (subfunction == 9) byteArrayOf(0x19, 9, (dtc shr 16).toByte(), (dtc shr 8).toByte(), dtc.toByte())

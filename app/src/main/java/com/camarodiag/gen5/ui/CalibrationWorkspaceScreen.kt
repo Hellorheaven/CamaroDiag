@@ -345,6 +345,7 @@ fun CalibrationWorkspaceScreen(
     var doIpWwhReadiness by remember(vehicle) { mutableStateOf("") }
     var doIpDetailDtc by remember(vehicle) { mutableStateOf("") }
     var doIpDetailRecord by remember(vehicle) { mutableStateOf("01") }
+    var doIpDtcMemory by remember(vehicle) { mutableStateOf("") }
     var doIpCommand by remember(vehicle) { mutableStateOf("") }
     var pendingDoIpCommand by remember(vehicle, doIpContextGeneration) { mutableStateOf<DoIpConsoleCommand?>(null) }
     var doIpConsentStep by remember(vehicle, doIpContextGeneration) { mutableStateOf(EcuWriteConsentFlow.Step.WARNING) }
@@ -812,6 +813,21 @@ fun CalibrationWorkspaceScreen(
                         DoIpDirectRead.Operation.PERMANENT_DTCS, doIpCertificate, requireNotNull(doIpOptions)) },
                         enabled = targetReady && vinReady, modifier = Modifier.fillMaxWidth()) {
                         Text(stringResource(R.string.cal_doip_permanent_dtcs))
+                    }
+                    OutlinedTextField(doIpDtcMemory, { doIpDtcMemory = it.uppercase().filter { c -> c in "0123456789ABCDEF" }.take(2) },
+                        enabled = idle, singleLine = true, modifier = Modifier.fillMaxWidth(),
+                        label = { Text(stringResource(R.string.cal_doip_memory_selection)) })
+                    OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu,
+                        doIpDtcMask + doIpDtcMemory, doIpTls, DoIpDirectRead.Operation.MEMORY_DTCS, doIpCertificate, requireNotNull(doIpOptions)) },
+                        enabled = targetReady && vinReady && doIpDtcMemory.length == 2 && doIpDtcMask.length == 2,
+                        modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.cal_doip_memory_dtcs)) }
+                    for ((op, label) in listOf(DoIpDirectRead.Operation.MEMORY_SNAPSHOT to R.string.cal_doip_memory_snapshot,
+                        DoIpDirectRead.Operation.MEMORY_EXTENDED to R.string.cal_doip_memory_extended)) {
+                        OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu,
+                            doIpDetailDtc + doIpDetailRecord + doIpDtcMemory, doIpTls, op, doIpCertificate, requireNotNull(doIpOptions)) },
+                            enabled = detailReady && doIpDtcMemory.length == 2 &&
+                                (op != DoIpDirectRead.Operation.MEMORY_EXTENDED || (doIpDetailRecord.toIntOrNull(16) ?: 0) !in 0xF0..0xFD),
+                            modifier = Modifier.fillMaxWidth()) { Text(stringResource(label)) }
                     }
                     for (pair in listOf(
                         listOf(DoIpDirectRead.Operation.FIRST_FAILED_DTC to R.string.cal_doip_first_failed,

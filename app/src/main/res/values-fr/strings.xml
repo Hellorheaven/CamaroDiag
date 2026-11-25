@@ -1106,6 +1106,11 @@
     <string name="cal_doip_supported_dtcs">DTC pris en charge</string>
     <string name="cal_doip_permanent_dtcs">DTC permanents UDS</string>
     <string name="cal_doip_permanent_result">DTC permanents : %1$d ; masque disponible 0x%2$02X</string>
+    <string name="cal_doip_memory_selection">Mémoire DTC (hex)</string>
+    <string name="cal_doip_memory_dtcs">DTC de la mémoire sélectionnée</string>
+    <string name="cal_doip_memory_snapshot">Snapshot de la mémoire sélectionnée</string>
+    <string name="cal_doip_memory_extended">Données étendues de la mémoire sélectionnée</string>
+    <string name="cal_doip_memory_result">Mémoire DTC 0x%1$02X</string>
     <string name="cal_doip_snapshot_index">Index des snapshots</string>
     <string name="cal_doip_supported_result">DTC pris en charge : %1$d ; masque disponible 0x%2$02X</string>
     <string name="cal_doip_snapshot_index_result">Enregistrements snapshot disponibles : %1$d</string>

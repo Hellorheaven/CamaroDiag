@@ -1485,6 +1485,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 if (multiMonitor) com.camarodiag.gen5.data.obd.DoIpMultiDid.validateMonitor(requireNotNull(layout))
                 require(operation !in setOf(DoIpDirectRead.Operation.OBD_MULTI_DID, DoIpDirectRead.Operation.OBD_MULTI_MONITOR) ||
                     requireNotNull(layout).all { DoIpDirectRead.isObdDid(it.did) })
+                val memoryList = operation == DoIpDirectRead.Operation.MEMORY_DTCS
+                val memoryDetail = operation in setOf(DoIpDirectRead.Operation.MEMORY_SNAPSHOT, DoIpDirectRead.Operation.MEMORY_EXTENDED)
+                if (memoryList || memoryDetail) require(didHex.matches(Regex(if (memoryList) "[0-9A-Fa-f]{4}" else "[0-9A-Fa-f]{10}")))
+                val memory = if (memoryList || memoryDetail) didHex.takeLast(2).toInt(16) else null
+                if (memoryDetail) {
+                    val record = didHex.substring(6, 8).toInt(16)
+                    require(record != 0 && (operation != DoIpDirectRead.Operation.MEMORY_EXTENDED || record !in 0xF0..0xFD))
+                }
                 val target = resolveSelectedDoIpTarget(host, tester, ecu, _vehicle.value.vin, tls,
                     onTrace = { trace -> journalDoIpControlTrace(trace, current) })
                 check(current())
@@ -1506,8 +1514,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 if (wwhReadiness) require(didHex.matches(Regex("[0-9A-Fa-f]{2}")))
                 val isDetail = operation in setOf(DoIpDirectRead.Operation.DTC_SNAPSHOT, DoIpDirectRead.Operation.DTC_EXTENDED, DoIpDirectRead.Operation.OBD_DTC_SNAPSHOT, DoIpDirectRead.Operation.OBD_DTC_EXTENDED)
                 if (isDetail) require(didHex.matches(Regex("[0-9A-Fa-f]{8}")))
-                val detailDtc = if (isDetail || severityInfo) didHex.take(6).toInt(16) else 0
-                val detailRecord = if (isDetail) didHex.takeLast(2).toInt(16) else 1
+                val detailDtc = if (isDetail || severityInfo || memoryDetail) didHex.take(6).toInt(16) else 0
+                val detailRecord = if (memoryDetail) didHex.substring(6, 8).toInt(16) else if (isDetail) didHex.takeLast(2).toInt(16) else 1
                 val clientTls = certificate?.let { DoIpClientTls.open(getApplication<Application>(), it, target) }
                 check(current())
                 if (operation in setOf(DoIpDirectRead.Operation.INVENTORY, DoIpDirectRead.Operation.OBD_INVENTORY)) {
@@ -1536,7 +1544,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     if (current()) appendCanConsoleSystemEvent(localizedContext.getString(R.string.cal_doip_console_complete))
                     return@launchEnhancedUdsRead
                 }
-                val result = DoIpDirectRead.read(target, operation, did, mask = if (wwhMask || severityFilter) didHex.takeLast(2).toInt(16) else mask,
+                val result = DoIpDirectRead.read(target, operation, did, mask = if (memoryList) didHex.take(2).toInt(16) else if (wwhMask || severityFilter) didHex.takeLast(2).toInt(16) else mask,
+                    memory = memory,
                     severityMask = if (severityFilter) didHex.take(2).toInt(16) else 255,
                     wwhSeverity = if (wwhMask) didHex.take(2).toInt(16) else 255,
                     wwhReadinessGroup = if (wwhReadiness) didHex.toInt(16) else null, multiLayout = layout,
@@ -1603,6 +1612,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         localizedContext.getString(R.string.cal_doip_sequence_reply, index + 1,
                             reply.joinToString(" ") { "%02X".format(it.toInt() and 255) })
                     }.joinToString("\n")
+                    result.memoryReport != null -> requireNotNull(result.memoryReport).let { memoryReport ->
+                        val heading = localizedContext.getString(R.string.cal_doip_memory_result, memoryReport.memory)
+                        val list = memoryReport.list
+                        val memoryDetailResult = memoryReport.detail
+                        heading + "\n" + when {
+                            list != null -> localizedContext.getString(R.string.cal_doip_supported_result,
+                                list.records.size, list.statusAvailabilityMask) + list.records.joinToString("\n", prefix = "\n") {
+                                "0x%06X — 0x%02X".format(it.rawDtc, it.statusByte)
+                            }
+                            memoryDetailResult != null -> localizedContext.getString(R.string.cal_doip_detail_result,
+                                memoryDetailResult.dtc, memoryDetailResult.status,
+                                memoryDetailResult.records.joinToString(" ") { "%02X".format(it.toInt() and 255) })
+                            else -> error("Missing memory DTC result")
+                        }
+                    }
                     detail != null -> localizedContext.getString(R.string.cal_doip_detail_result,
                         detail.dtc, detail.status, detail.records.joinToString(" ") { "%02X".format(it.toInt() and 255) })
                     count != null -> localizedContext.getString(R.string.cal_doip_count_result,
