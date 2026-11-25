@@ -443,8 +443,10 @@ def inventory_ecus(gateway: Gateway, expected: str, tester: int, targets: tuple[
                    *, tls: bool = True, timeout: float = 3, trace: Trace | None = None,
                    context: ssl.SSLContext | None = None, p2: float | None = None,
                    p2_star: float | None = None, routing_type: int = 0,
-                   routing_oem_data: bytes | None = None) -> dict:
-    """Identify explicit ECU addresses independently; no capability or topology inference."""
+                   routing_oem_data: bytes | None = None, obd: bool = False) -> dict:
+    """Identify explicit ECU addresses independently using the requested diagnostic operation."""
+    if type(obd) is not bool:
+        raise DoIpError("Invalid ECU inventory identification mode")
     targets = tuple(targets)
     logical(tester)
     for ecu in targets:
@@ -464,10 +466,17 @@ def inventory_ecus(gateway: Gateway, expected: str, tester: int, targets: tuple[
             with Session(gateway, tester, ecu, tls=tls, timeout=timeout, trace=trace, context=context,
                          p2=p2, p2_star=p2_star, routing_type=routing_type,
                          routing_oem_data=routing_oem_data) as session:
-                vin = session.verify_vin(expected)
+                if obd:
+                    identity = session.identify_obd(expected)
+                    vin = identity["vin"]
+                    protocol = identity["protocol_value"]
+                    details = {"protocol_value": protocol, "obd_on_uds": identity["obd_on_uds"]}
+                else:
+                    vin = session.verify_vin(expected)
+                    details = {}
                 if vin != expected:
                     raise DoIpError("ECU VIN does not match selected vehicle")
-                rows.append({"ecu": f"{ecu:04X}", "status": "vin_verified", "vin": vin})
+                rows.append({"ecu": f"{ecu:04X}", "status": "vin_verified", "vin": vin} | details)
         except ssl.SSLError:
             # Never continue or downgrade a failed TLS authentication.
             raise
@@ -479,7 +488,9 @@ def inventory_ecus(gateway: Gateway, expected: str, tester: int, targets: tuple[
                          "reason": "communication_or_identity_failure"})
     require_gateway()
     return {"vin": expected, "complete": True, "targets": rows,
+            "identification": "F802/F810" if obd else "F190",
             "verified_count": sum(row["status"] == "vin_verified" for row in rows),
+            **({"obd_on_uds_count": sum(row.get("obd_on_uds") is True for row in rows)} if obd else {}),
             "physical_qualification": False}
 
 
@@ -786,7 +797,10 @@ class Session:
             if vin_did not in (0xF190, 0xF802):
                 raise DoIpError("Invalid VIN DID")
             reply = self.exchange(b"\x22" + logical(vin_did))
-            vin = reply[3:].decode("ascii")
+            try:
+                vin = reply[3:].decode("ascii")
+            except UnicodeDecodeError as error:
+                raise DoIpError("Malformed ECU VIN encoding") from error
             if vin != expected:
                 raise DoIpError("ECU VIN mismatch")
             return vin

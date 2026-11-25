@@ -1,3 +1,7 @@
+## PR117 — inventaire OBDonUDS explicite Connectors (25/11/2026)
+
+- Nouvelle opération `obd-ecu-inventory --ecus 1234,1235` : identité réglementaire F802/F810 vérifiée deux fois sur chaque session, VIN vérifié distingué de la prise en charge OBDonUDS ; valeur F810 inconnue conservée, aucune bascule F190. Échec TLS interrompt l'inventaire, VIN non ASCII traité comme erreur de protocole. CLI FR/EN et tests écrits, non exécutés. Android et Windows restent à raccorder pour cette variante. Aucun checkpoint CI.
+
 ## PR117 — inventaire explicite des ECU DoIP Android (25/11/2026)
 
 - Parité Android/Windows/Connectors : liste d'adresses explicites (1–16), session F190 par ECU, sélection et revalidation de passerelle, arrêt si contexte révoqué ou TLS échoue. Résultat vérifié/non vérifié distinct, journal par adresse, UI FR/EN, aucune topologie ni capacité OEM déduite. Tests parseur et contexte écrits, non exécutés. Aucun checkpoint CI. Récupération des blobs Git du HEAD après réponses 404 intermittentes de l'API Contents.

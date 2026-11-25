@@ -55,6 +55,52 @@ class DoIpTests(unittest.TestCase):
             self.assertEqual([call.args[2] for call in session.call_args_list], [0x1234, 0x1235])
             self.assertTrue(all(call.kwargs["tls"] for call in session.call_args_list))
 
+    def test_obd_inventory_distinguishes_vin_and_protocol_support(self):
+        with patch("camarodiagconnectors.doip.discover", return_value=GATEWAY) as discover_mock, \
+             patch("camarodiagconnectors.doip.Session") as session:
+            active = session.return_value.__enter__.return_value
+            active.identify_obd.side_effect = [
+                {"vin": VIN, "protocol_value": 1, "obd_on_uds": True},
+                {"vin": VIN, "protocol_value": 2, "obd_on_uds": False},
+                NegativeResponse(0x22, 0x31)]
+            result = inventory_ecus(GATEWAY, VIN, 0x0E80, (0x1234, 0x1235, 0x1236), obd=True)
+            self.assertEqual(result["identification"], "F802/F810")
+            self.assertEqual(result["verified_count"], 2)
+            self.assertEqual(result["obd_on_uds_count"], 1)
+            self.assertEqual(result["targets"][1]["protocol_value"], 2)
+            self.assertFalse(result["targets"][1]["obd_on_uds"])
+            self.assertEqual(result["targets"][2]["status"], "unverified")
+            self.assertNotIn("obd_on_uds", result["targets"][2])
+            self.assertEqual(discover_mock.call_count, 4)
+            active.verify_vin.assert_not_called()
+
+    def test_obd_inventory_cli_selects_legislated_operation(self):
+        with patch("camarodiagconnectors.doip_cli.discover", return_value=GATEWAY), \
+             patch("camarodiagconnectors.doip_cli.inventory_ecus", return_value={"complete": True}) as inventory:
+            result = run(["--host", GATEWAY.host, "--vin", VIN, "--tester", "0E80",
+                          "obd-ecu-inventory", "--ecus", "1234,1235"])
+            self.assertTrue(result["complete"])
+            self.assertTrue(inventory.call_args.kwargs["obd"])
+            self.assertTrue(inventory.call_args.kwargs["tls"])
+            self.assertEqual(inventory.call_args.args[3], (0x1234, 0x1235))
+
+    def test_inventory_tls_error_stops_all_remaining_targets(self):
+        import ssl
+        with patch("camarodiagconnectors.doip.discover", return_value=GATEWAY), \
+             patch("camarodiagconnectors.doip.Session") as session:
+            session.return_value.__enter__.side_effect = ssl.SSLCertVerificationError("untrusted")
+            with self.assertRaises(ssl.SSLCertVerificationError):
+                inventory_ecus(GATEWAY, VIN, 0x0E80, (0x1234, 0x1235), obd=True)
+            self.assertEqual(session.call_count, 1)
+
+    def test_non_ascii_vin_is_a_protocol_error(self):
+        fake = unittest.mock.Mock(spec=Session)
+        fake.gateway = GATEWAY
+        fake.exchange.return_value = bytes.fromhex("62F190FF")
+        with self.assertRaises(DoIpError):
+            Session.verify_vin(fake, VIN)
+        fake.close.assert_called_once()
+
     def test_inventory_stops_if_gateway_changes(self):
         from dataclasses import replace
         with patch("camarodiagconnectors.doip.discover", side_effect=[GATEWAY, replace(GATEWAY, logical_address=0x1235)]), \
