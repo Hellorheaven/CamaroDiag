@@ -120,3 +120,15 @@ python -m camarodiagconnectors.doip_cli --host 192.0.2.10 --vin 1G1FA1RXXR012345
 ```
 
 Adresses, VIN, mémoire et DTC fictifs / Example addresses, VIN, memory and DTC are illustrative.
+
+
+### Données étendues par numéro / Extended data by record number
+
+`extended-record-support` liste les DTC qui prennent en charge un enregistrement (UDS 19/1A). `extended-record-data` lit cet enregistrement (UDS 19/16) en utilisant la longueur uniforme fournie par la documentation ECU, sans interpréter les octets. / List supporting DTCs, or read their data with an explicitly documented uniform byte length. A different or unknown layout must not be decoded using a guessed size.
+
+```bash
+python -m camarodiagconnectors.doip_cli --host 192.0.2.10 --vin 1G1FA1RXXR0123456 --tester 0E80 --ecu 1234 extended-record-support --record 01
+python -m camarodiagconnectors.doip_cli --host 192.0.2.10 --vin 1G1FA1RXXR0123456 --tester 0E80 --ecu 1234 extended-record-data --record 01 --size 2
+```
+
+Exemples fictifs / Illustrative parameters only.

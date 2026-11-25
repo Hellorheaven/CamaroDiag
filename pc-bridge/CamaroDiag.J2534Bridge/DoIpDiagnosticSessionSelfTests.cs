@@ -405,6 +405,49 @@ internal static class DoIpDiagnosticSessionSelfTests
             });
         }
 
+        // Extended records: typed data is only published after the second VIN check.
+        foreach (var sub in new byte[] { 0x16, 0x1A })
+        foreach (var finalMatches in new[] { true, false })
+        {
+            await RunCaseAsync(async stream =>
+            {
+                _ = await RequireRequestAsync(stream);
+                await SendAsync(stream, DoIpCodec.DiagnosticMessage,
+                    FromEcu([0x62, 0xF1, 0x90, .. System.Text.Encoding.ASCII.GetBytes(selectedVehicleVin)]));
+                var query = await ReadAsync(stream);
+                Check(query.Payload.SequenceEqual(new byte[] { 0x0E, 0x80, 0x12, 0x34, 0x19, sub, 1 }),
+                    "Extended record query preserves the selected record.");
+                byte[] reply = sub == 0x16 ? [0x59, sub, 1, 1, 2, 3, 8, 0xAA, 0xBB] :
+                    [0x59, sub, 8, 1, 1, 2, 3, 0];
+                await SendAsync(stream, DoIpCodec.DiagnosticMessage, FromEcu(reply));
+                _ = await RequireRequestAsync(stream);
+                await SendAsync(stream, DoIpCodec.DiagnosticMessage,
+                    FromEcu([0x62, 0xF1, 0x90, .. System.Text.Encoding.ASCII.GetBytes(
+                        finalMatches ? selectedVehicleVin : otherVehicleVin)]));
+            }, async client =>
+            {
+                var timeout = TimeSpan.FromSeconds(2);
+                var token = CancellationToken.None;
+                int? size = sub == 0x16 ? 2 : null;
+                var request = ObdOnUdsServices.ReadExtendedRecord(1, size);
+                Task<ObdOnUdsServices.ExtendedRecordReport> Read() =>
+                    DoIpVinReader.ReadVerifiedDtcAsync(client, observedForVin, timeout, token, async () =>
+                        ObdOnUdsServices.DecodeExtendedRecord(1, size, await client.ExchangeUdsAsync(request, timeout, token)));
+                if (finalMatches)
+                {
+                    var result = await Read();
+                    Check(result.Record == 1 && result.Entries.Single().Dtc == 0x010203 &&
+                        (sub != 0x16 || result.Entries.Single().Data.SequenceEqual(new byte[] { 0xAA, 0xBB })),
+                        "Verified extended record is published.");
+                }
+                else
+                {
+                    await Expect<InvalidDataException>(async () => { _ = await Read(); },
+                        "Changed final VIN prevents extended record publication.");
+                }
+            });
+        }
+
         // User-defined memory: retain the explicit memory and reject an identity change.
         foreach (var finalMatches in new[] { true, false })
         {

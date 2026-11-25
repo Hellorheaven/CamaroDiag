@@ -1,3 +1,7 @@
+## PR117 — parcours applicatifs des données étendues (25/11/2026)
+
+- Tests loopback Windows pour 19/16 et 19/1A avec contrôle VIN final et conservation des octets, exemples utilisateur Connectors FR/EN. Tests écrits non exécutés. Aucun checkpoint CI. Taille uniforme documentée indispensable ; les dispositions variables OEM restent à fournir. DoIP/C6 actifs.
+
 ## PR117 — données étendues par numéro Windows (25/11/2026)
 
 - Parité UDS 19/1A et 19/16 Android/Windows/Connectors : GUI/CLI FR/EN, numéro explicite et taille uniforme documentée pour les données, VIN F190 avant/après, corrélation écho/longueur/statut/doublons. Tests écrits non exécutés ; aucun checkpoint CI. DoIP/C6 restent actifs.
