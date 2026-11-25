@@ -1,3 +1,7 @@
+## PR117 — classification console OBD des répondants CAN secondaires (25/11/2026)
+
+- C6 : la console accepte les réponses positives et négatives SAE provenant de répondants 29 bits secondaires, au même titre que les 11 bits ; support DLC explicite et bourrage d'une trame classique complète. Option d'adresse exacte pour vérification physique, sans accepter de réponse anonyme pour cette preuve. Aucune extension des commandes modifiant les ECU. Régressions écrites non exécutées. C6/DoIP restent actifs ; aucun checkpoint.
+
 ## PR117 — attribution des DTC et sélection télémétrie par ECU (25/11/2026)
 
 - C6 : les DTC SAE sur canal J2534 physique sont identifiés par adresse CAN, les DTC ELM fonctionnels restent OBD sans attribution ECM inventée. Les listes standard et UDS sont distinctes ; un rescan ne remplace que les modes confirmés du répondant courant. Effacement J2534 ne retire que les défauts standard non permanents du canal confirmé ; ACK fonctionnel ELM ne prouve pas l'effacement de tous les répondants, conserve le snapshot jusqu'à rescan. La télémétrie générique accepte les ECU secondaires même sur Camaro, restriction FlexFuel primaire maintenue. Mode 03 explicitement non supporté toléré dans le scan J2534 partiel. Tests écrits non exécutés. Aucun checkpoint C6/DoIP.
