@@ -605,6 +605,29 @@ internal static class StandardVehicleProtocolsSelfTests
         Check(parsed.Request.SequenceEqual(new byte[] { 0x2E, 0xF1, 0x90, 1 }),
             "DoIP bidirectional CLI accepts WDBI service.");
 
+        var strictArgs = new[] { "--host", "127.0.0.1", "--tester", "0E80", "--ecu", "1234",
+            "--payload", "22F190" };
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseDoIp([..strictArgs, "--host", "192.0.2.1"]),
+            "Duplicate target is not silently ignored.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseDoIp([..strictArgs, "--tls", "true", "--TLS", "false"]),
+            "Conflicting TLS options are rejected.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseDoIp([..strictArgs, "--unknown", "x"]),
+            "Unknown diagnostic options are rejected.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseDoIp([..strictArgs, "--timeout-ms"]),
+            "Missing value is rejected before network I/O.");
+        Check(StandardProtocolCli.ParseDoIp(strictArgs.Select(x => x == "1234" ? "0000" : x).ToArray()).Ecu == 0,
+            "Zero logical address parses without stripping hex digits.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseDoIp(
+            strictArgs.Select(x => x == "1234" ? "00001234" : x).ToArray()),
+            "Oversized logical address rejected.");
+        var existingReply = Path.GetTempFileName();
+        try
+        {
+            Reject<ArgumentException>(() => StandardProtocolCli.ParseDoIp([..strictArgs, "--rx-file", existingReply]),
+                "An existing reply file is rejected before transmitting.");
+        }
+        finally { File.Delete(existingReply); }
+
         var sequence = StandardProtocolCli.ParseDoIpSequence([
             StandardProtocolCli.DoIpCommand, "--host", "127.0.0.1",
             "--tester", "0E80", "--ecu", "1234", "--expected-vin", "1G1FA1RXXR0123456",

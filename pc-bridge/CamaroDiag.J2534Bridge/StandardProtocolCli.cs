@@ -246,6 +246,8 @@ internal static class StandardProtocolCli
     {
         try
         {
+            ValidateDoIpArguments(args, "--doip-status",
+                ["--host", "--power-mode", "--timeout-ms", "--doip-version", "--trace-file"], []);
             var host = Required(args, "--host");
             var power = bool.Parse(Optional(args, "--power-mode") ?? "false");
             var timeoutMs = int.Parse(Optional(args, "--timeout-ms") ?? "2000",
@@ -274,6 +276,9 @@ internal static class StandardProtocolCli
     {
         try
         {
+            ValidateDoIpArguments(args, "--doip-discover", ["--host", "--broadcast-ip",
+                "--listen", "--listen-ipv6-ifindex", "--multicast-ipv6-ifindex", "--timeout-ms",
+                "--vin", "--eid", "--trace-file"], []);
             var host = Optional(args, "--host");
             var broadcastIp = Optional(args, "--broadcast-ip");
             var passiveListen = bool.Parse(Optional(args, "--listen") ?? "false");
@@ -1250,7 +1255,8 @@ internal static class StandardProtocolCli
     private static ushort Address(string value)
     {
         // DoIP logical tester/ECU addresses are conventionally displayed in hex.
-        if (!ushort.TryParse(value.TrimStart('0', 'x', 'X'),
+        var hex = value.StartsWith("0x", StringComparison.OrdinalIgnoreCase) ? value[2..] : value;
+        if (hex.Length is < 1 or > 4 || !ushort.TryParse(hex,
             NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture, out var number))
             throw new ArgumentException("DoIP logical address must be a 16-bit hex value.");
         return number;
@@ -1270,8 +1276,43 @@ internal static class StandardProtocolCli
         return DoIpVinReader.ParseLogicalAddress(hex);
     }
 
+    internal static void ValidateDoIpArguments(string[] args, string command,
+        IReadOnlyCollection<string> valueOptions, IReadOnlyCollection<string> flagOptions)
+    {
+        var values = new HashSet<string>(valueOptions, StringComparer.OrdinalIgnoreCase);
+        var flags = new HashSet<string>(flagOptions, StringComparer.OrdinalIgnoreCase);
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        for (var i = args.Length > 0 && args[0].Equals(command, StringComparison.OrdinalIgnoreCase) ? 1 : 0;
+            i < args.Length; i++)
+        {
+            var option = args[i];
+            if (!seen.Add(option))
+                throw new ArgumentException("Repeated DoIP option: " + option);
+            if (flags.Contains(option)) continue;
+            if (!values.Contains(option))
+                throw new ArgumentException("Unknown DoIP option: " + option);
+            if (i + 1 == args.Length || string.IsNullOrWhiteSpace(args[i + 1]) ||
+                args[i + 1].StartsWith("--", StringComparison.Ordinal))
+                throw new ArgumentException("Missing DoIP option value: " + option);
+            i++;
+        }
+    }
+
     internal static DoIpOptions ParseDoIp(string[] args)
     {
+        ValidateDoIpArguments(args, DoIpCommand, [
+            "--host", "--tester", "--ecu", "--payload", "--payload-file", "--expected-vin",
+            "--uds-dids", "--uds-did", "--uds-scaling-did", "--obd-verified", "--obd-did",
+            "--obd-dtc-mask", "--obd-dtc-count-mask", "--uds-historical-dtc",
+            "--uds-severity-count", "--uds-severity-list", "--uds-severity-info", "--uds-severity-status",
+            "--uds-dtc-mask", "--uds-dtc-count-mask", "--uds-snapshot", "--uds-snapshot-record",
+            "--uds-extended-dtc", "--uds-extended-record", "--obd-wwh-status", "--obd-readiness-group",
+            "--obd-snapshot", "--obd-snapshot-record", "--obd-extended-dtc", "--obd-extended-record",
+            "--obd-wwh-severity", "--timeout-ms", "--uds-p2-ms", "--uds-p2-star-ms", "--tls",
+            "--doip-version", "--routing-activation-type", "--routing-oem-data", "--rx-file",
+            "--client-cert-thumbprint", "--trace-file"
+        ], ["--uds-supported-dtcs", "--uds-snapshot-index", "--uds-fault-counters",
+            "--obd-wwh-permanent", "--obd-identify"]);
         var host = Required(args, "--host");
         var tester = Address(Required(args, "--tester"));
         var ecu = Address(Required(args, "--ecu"));
@@ -1424,6 +1465,13 @@ internal static class StandardProtocolCli
             throw new ArgumentException(
                 "DoIP OEM routing-activation data must be exactly four bytes.");
         var receiveFile = Optional(args, "--rx-file");
+        if (receiveFile is not null)
+        {
+            receiveFile = Path.GetFullPath(receiveFile);
+            if (File.Exists(receiveFile) || Directory.Exists(receiveFile) ||
+                !Directory.Exists(Path.GetDirectoryName(receiveFile)))
+                throw new ArgumentException("Choose a new DoIP reply file in an existing directory.");
+        }
         var traceFile = ParseDoIpTracePath(args, receiveFile);
         var clientCert = Optional(args, "--client-cert-thumbprint");
         if (clientCert is not null &&

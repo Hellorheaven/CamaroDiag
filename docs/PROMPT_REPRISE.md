@@ -1,3 +1,7 @@
+## PR117 — validation stricte des paramètres CLI DoIP Windows (25/11/2026)
+
+- Refus avant réseau des options inconnues, doublons, valeurs manquantes et sorties RX déjà présentes ; découverte/statut et échanges typés/bruts concernés. Adresse logique hexadécimale validée sans suppression incorrecte des zéros initiaux. Les commandes brutes restent bidirectionnelles. Tests de régression écrits non exécutés, aucune CI.
+
 ## PR117 — lectures sévérité DTC Windows (25/11/2026)
 
 - Parité UDS 19/07–09 Android/Windows/Connectors : masques sévérité/statut, sévérité et unité fonctionnelle brutes, sélection DTC 24 bits, compte/format, validation réponse et F190 avant/après. Console FR/EN et CLI --uds-severity-count/list/status/info. Tests écrits non exécutés, aucun checkpoint CI. Sources de format : py-uds et udsoncan ReadDTCInformation.
