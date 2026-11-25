@@ -86,6 +86,40 @@ object FunctionalTestPlanner {
         return connectorRows + moduleRows + services
     }
 
+    /** A physical VIN read and matching the selected profile are separate evidence. */
+    fun withObservedIdentity(state: FunctionalTestState, observedVin: String?): FunctionalTestState {
+        val matcher = com.camarodiag.gen5.domain.model.VehicleVinMatcher
+        val context = state.context ?: return state
+        val comparison = matcher.compare(context.selectedVin, observedVin)
+        val compatible = comparison?.matches == true && matcher.isCamaroCandidate(comparison.ecuVin)
+        val rows = state.checks.filterNot {
+            it.key == "service:vin-profile-match" || (!compatible && it.group == "ecu")
+        }
+        val match = comparison?.matches
+        val identity = if (matcher.normalize(context.selectedVin) != null) listOf(
+            FunctionalTestCheck(
+                "service:vin-profile-match", "service",
+                "Selected vehicle matches physical VIN", "Véhicule sélectionné conforme au VIN physique",
+                when (match) {
+                    true -> FunctionalTestOutcome.PASSED
+                    false -> FunctionalTestOutcome.FAILED
+                    null -> FunctionalTestOutcome.NOT_TESTED
+                },
+                when (match) {
+                    true -> "Physical VIN matches the selected profile."
+                    false -> "Physical VIN differs from the selected profile; OEM topology omitted."
+                    null -> "Physical VIN not verified; OEM topology omitted."
+                },
+                when (match) {
+                    true -> "Le VIN physique correspond au profil sélectionné."
+                    false -> "VIN physique différent du profil sélectionné ; topologie constructeur omise."
+                    null -> "VIN physique non vérifié ; topologie constructeur omise."
+                }
+            )
+        ) else emptyList()
+        return state.copy(context = context.copy(observedVin = comparison?.ecuVin), checks = rows + identity)
+    }
+
     /** An OBD response ID is not proof of a particular OEM ECU. */
     fun withStandardResponders(rows: List<FunctionalTestCheck>, addresses: Collection<String>): List<FunctionalTestCheck> =
         rows.filterNot { it.group == "obd_responder" } + addresses.distinct().sorted().map { address ->

@@ -67,6 +67,34 @@ class FunctionalTestSuiteTest {
         assertEquals("3FMTK3SU0PMA00001", context.observedVin)
     }
 
+    @Test fun physicalVinAndProfileMatchAreIndependentForEveryTransport() {
+        val camaro = "2G1FF3D30C9000001"
+        val ford = "3FMTK3SU0PMA00001"
+        for (transport in listOf("BLUETOOTH", "J2534_BRIDGE")) {
+            val state = FunctionalTestState(
+                context = FunctionalTestContext(camaro, "Adapter", transport, 1),
+                checks = FunctionalTestPlanner.initial(modules, transport, true)
+            )
+            val foreign = FunctionalTestPlanner.withObservedIdentity(state, ford)
+            assertEquals(ford, foreign.context?.observedVin)
+            assertTrue(foreign.checks.none { it.group == "ecu" })
+            assertEquals(FunctionalTestOutcome.FAILED,
+                foreign.checks.first { it.key == "service:vin-profile-match" }.outcome)
+            val missing = FunctionalTestPlanner.withObservedIdentity(state, null)
+            assertTrue(missing.checks.none { it.group == "ecu" })
+            assertEquals(FunctionalTestOutcome.NOT_TESTED,
+                missing.checks.first { it.key == "service:vin-profile-match" }.outcome)
+            val matched = FunctionalTestPlanner.withObservedIdentity(state, camaro)
+            assertEquals(modules.size, matched.checks.count { it.group == "ecu" })
+            assertEquals(FunctionalTestOutcome.PASSED,
+                matched.checks.first { it.key == "service:vin-profile-match" }.outcome)
+            val unselected = FunctionalTestPlanner.withObservedIdentity(
+                state.copy(context = state.context?.copy(selectedVin = "")), ford)
+            assertTrue(unselected.checks.none { it.group == "ecu" || it.key == "service:vin-profile-match" })
+            assertEquals(ford, unselected.context?.observedVin)
+        }
+    }
+
     @Test fun updateChangesOnlyTheTarget() {
         val rows = FunctionalTestPlanner.initial(modules, "BLE", true)
         val updated = FunctionalTestPlanner.updated(

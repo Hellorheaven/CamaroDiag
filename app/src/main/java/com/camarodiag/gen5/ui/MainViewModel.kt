@@ -5094,22 +5094,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             ?.takeIf { it.matches(Regex("[A-HJ-NPR-Z0-9]{17}")) }
                             ?: error("VIN missing from physical response")
                         if (!current()) throw CancellationException("Account or run changed")
-                        val state = _functionalTestState.value
-                        val compatible = com.camarodiag.gen5.domain.model.VehicleVinMatcher.isCamaroCandidate(vin) &&
-                            com.camarodiag.gen5.domain.model.VehicleVinMatcher.normalize(selectedVin) == vin
-                        _functionalTestState.value = state.copy(
-                            context = state.context?.copy(observedVin = vin),
-                            checks = if (compatible) state.checks else state.checks.filterNot { it.group == "ecu" }
-                        )
-                        val chosen = com.camarodiag.gen5.domain.model.VehicleVinMatcher.normalize(selectedVin)
-                        require(chosen == null || chosen == vin) { "VIN mismatch" }
+                        _functionalTestState.value = FunctionalTestPlanner.withObservedIdentity(_functionalTestState.value, vin)
                         "Physical vehicle VIN received: $vin" to "VIN physique reçu : $vin"
                     }
                     if (current()) {
                         // Without verified Camaro identity, omit model-specific topology entirely.
                         if (_functionalTestState.value.context?.observedVin == null)
-                            _functionalTestState.value = _functionalTestState.value.copy(
-                                checks = _functionalTestState.value.checks.filterNot { it.group == "ecu" })
+                            _functionalTestState.value = FunctionalTestPlanner.withObservedIdentity(_functionalTestState.value, null)
                         try {
                             val responders = obdManager.withObdCommandSession { it.discoverFunctionalObdResponders() }
                             if (!current()) throw CancellationException("Account or run changed")
@@ -5166,11 +5157,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             ?.takeIf { it.matches(Regex("[A-HJ-NPR-Z0-9]{17}")) }
                             ?: error("J2534 ECU VIN missing")
                         if (!current()) throw CancellationException("Account or run changed")
-                        _functionalTestState.value = _functionalTestState.value.copy(context = _functionalTestState.value.context?.copy(observedVin = vin))
-                        val chosen = selectedVin.trim().uppercase(java.util.Locale.ROOT)
-                        require(chosen.isEmpty() || chosen == vin) { "VIN mismatch" }
+                        _functionalTestState.value = FunctionalTestPlanner.withObservedIdentity(_functionalTestState.value, vin)
                         "ECU VIN received over the selected physical J2534 UDS profile." to
                             "VIN reçu via le profil UDS J2534 physique sélectionné."
+                    }
+                    if (current() && _functionalTestState.value.context?.observedVin == null) {
+                        _functionalTestState.value = FunctionalTestPlanner.withObservedIdentity(_functionalTestState.value, null)
                     }
                     // A capable bridge now offers standard OBD payloads without
                     // an ELM command channel. Test each service independently.
@@ -5241,7 +5233,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 .put("vin", evidenceContext.observedVin ?: "")
                 .put("selectedVin", evidenceContext.selectedVin)
                 .put("observedVin", evidenceContext.observedVin ?: JSONObject.NULL)
-                .put("allChecksPassed", snapshot.checks.all { it.outcome == FunctionalTestOutcome.PASSED })
+                .put("allChecksPassed", snapshot.error == null && snapshot.checks.all { it.outcome == FunctionalTestOutcome.PASSED })
                 .put("failedChecks", snapshot.checks.count { it.outcome == FunctionalTestOutcome.FAILED })
                 .put("adapter", evidenceContext.adapterName)
                 .put("transport", evidenceContext.transport)

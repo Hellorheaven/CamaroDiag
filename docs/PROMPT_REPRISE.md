@@ -1,3 +1,7 @@
+## PR117 — séparation lecture VIN et concordance profil (25/11/2026)
+
+- C6 Android : lecture VIN physique et concordance du profil sont deux preuves distinctes ; un VIN Ford valide reste une lecture réussie mais une discordance avec le profil Camaro est signalée séparément. Même filtrage de topologie pour OBD et J2534, y compris VIN absent. Export : un rapport interrompu ne peut être entièrement réussi. Tests écrits, non exécutés ; aucun checkpoint CI. DoIP/C6 restent actifs, aucune qualification matérielle supplémentaire.
+
 ## PR117 — retour matériel Mustang Mach-E 2023, diagnostic OBD générique (25/11/2026)
 
 - Rapport physique fourni par le propriétaire : Bluetooth Classic connecté, réponse OBD 7E8 à 0100 et réponse readiness ; VIN exporté vide, lecture VIN/PID/DTC déclarée échouée. Le propriétaire confirme séparément avoir vu le VIN exact de sa Ford à l'écran lors de la connexion. Aucun VIN Ford réel ni contenu brut de réponse n'a été fourni ; pas de preuve matérielle DoIP.
