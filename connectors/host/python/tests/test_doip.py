@@ -1,4 +1,7 @@
 import socket
+import json
+import tempfile
+from pathlib import Path
 import threading
 import unittest
 from unittest.mock import patch
@@ -33,6 +36,69 @@ def receive(sock):
 
 
 class DoIpTests(unittest.TestCase):
+    def test_trace_file_records_observed_discovery_and_never_overwrites(self):
+        def observed(host, vin, timeout, trace):
+            trace("TX", "UDP", host, "FF00000100000000")
+            trace("RX", "UDP", host, "02FD000400000000")
+            return GATEWAY
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "trace.jsonl"
+            args = ["--host", GATEWAY.host, "--trace-file", str(path), "discover"]
+            with patch("camarodiagconnectors.doip_cli.discover", side_effect=observed) as discovery:
+                result = run(args)
+                self.assertEqual(result["gateway"]["host"], GATEWAY.host)
+                original = path.read_text(encoding="utf-8")
+                rows = [json.loads(line) for line in original.splitlines()]
+                self.assertEqual([(r["direction"], r["transport"], r["pdu"]) for r in rows],
+                                 [("TX", "UDP", "FF00000100000000"), ("RX", "UDP", "02FD000400000000")])
+                self.assertTrue(all(r["utc"].endswith("+00:00") for r in rows))
+                with self.assertRaises(FileExistsError):
+                    run(args)
+                self.assertEqual(discovery.call_count, 1)
+                self.assertEqual(path.read_text(encoding="utf-8"), original)
+
+    def test_trace_file_preserves_partial_evidence_after_network_failure(self):
+        def failed(host, vin, timeout, trace):
+            trace("TX", "UDP", host, "FF00000100000000")
+            raise TimeoutError("No response")
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "trace.jsonl"
+            with patch("camarodiagconnectors.doip_cli.discover", side_effect=failed):
+                with self.assertRaises(TimeoutError):
+                    run(["--host", GATEWAY.host, "--trace-file", str(path), "discover"])
+            rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
+            self.assertEqual(len(rows), 1)
+            self.assertEqual(rows[0]["direction"], "TX")
+            path.rename(path.with_suffix(".saved"))
+
+    def test_trace_file_inventory_attribution_without_stderr_flag(self):
+        def inventory(gateway, expected, tester, targets, **kwargs):
+            kwargs["target_trace"](targets[0], "RX", "TLS", gateway.host, "02FD800100000000")
+            kwargs["trace"]("RX", "UDP", gateway.host, "02FD000400000000")
+            return {"verified_count": 1}
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "inventory.jsonl"
+            with patch("camarodiagconnectors.doip_cli.discover", return_value=GATEWAY), \
+                 patch("camarodiagconnectors.doip_cli.inventory_ecus", side_effect=inventory):
+                run(["--host", GATEWAY.host, "--vin", VIN, "--tester", "0E80",
+                     "--trace-file", str(path), "ecu-inventory", "--ecus", "1234"])
+            rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
+            self.assertEqual(rows[0]["inventory_target"], "1234")
+            self.assertNotIn("inventory_target", rows[1])
+
+    def test_trace_file_refuses_backup_output_collision_before_network(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "backup.zip"
+            profile = Path(directory) / "profile.json"
+            scope = {"Vin": VIN, "Tester": 0x0E80, "Ecu": 0x1234, "Length": 8, "BlockSize": 4}
+            with patch("camarodiagconnectors.doip_cli.load_scope", return_value=scope), \
+                 patch("camarodiagconnectors.doip_cli.discover") as discovery:
+                with self.assertRaises(SystemExit):
+                    run(["--host", GATEWAY.host, "--trace-file", str(path),
+                         "backup", "--profile", str(profile), "--output", str(path)])
+                discovery.assert_not_called()
+                self.assertFalse(path.exists())
+
     def test_explicit_inventory_rejects_ranges_and_duplicates(self):
         self.assertEqual(parse_ecu_inventory("1234,1235"), (0x1234, 0x1235))
         for invalid in ("", "1234-1235", "1234,1234", "123", ",".join(f"{n:04X}" for n in range(17))):

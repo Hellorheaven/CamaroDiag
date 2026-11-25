@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import argparse
+from contextlib import ExitStack
+import os
 from dataclasses import asdict
 import json
 import ssl
@@ -11,7 +13,7 @@ from datetime import datetime, timezone
 from typing import Sequence
 
 from .doip import (Session, discover, discover_unique_vin, discover_ipv4, discover_ipv6, gateway_key, status,
-                   DoIpError, valid_vin, parse_commands, confirm_commands, parse_did_layout, validate_monitor_layout, parse_ecu_inventory, inventory_ecus)
+                   DoIpError, InventoryTraceError, valid_vin, parse_commands, confirm_commands, parse_did_layout, validate_monitor_layout, parse_ecu_inventory, inventory_ecus)
 from .doip_archive import load_scope
 from .doip_capture import capture_region, save_capture
 
@@ -22,17 +24,39 @@ def hex_value(value: str, digits: int) -> int:
     return int(value, 16)
 
 
-def _trace(direction, transport, host, pdu, *, ecu=None):
-    print(json.dumps({"direction": direction, "transport": transport, "host": host,
-                      "utc": datetime.now(timezone.utc).isoformat(), "pdu": pdu,
-                      **({"inventory_target": f"{ecu:04X}"} if ecu is not None else {})}), file=sys.stderr)
+class TraceWriteError(RuntimeError):
+    """A failed evidence sink must abort the operation, not silently lose PDUs."""
 
 
-def _inventory_trace(ecu, direction, transport, host, pdu):
-    _trace(direction, transport, host, pdu, ecu=ecu)
+def _trace_record(direction, transport, host, pdu, *, ecu=None):
+    return json.dumps({"direction": direction, "transport": transport, "host": host,
+                       "utc": datetime.now(timezone.utc).isoformat(), "pdu": pdu,
+                       **({"inventory_target": f"{ecu:04X}"} if ecu is not None else {})})
+
+
+def _trace_sinks(stderr, file):
+    def emit(direction, transport, host, pdu, *, ecu=None):
+        line = _trace_record(direction, transport, host, pdu, ecu=ecu)
+        try:
+            if file is not None:
+                file.write(line + "\n")
+                file.flush()
+            if stderr:
+                print(line, file=sys.stderr, flush=True)
+        except (OSError, ValueError) as error:
+            raise TraceWriteError("Cannot write DoIP trace") from error
+
+    if not stderr and file is None:
+        return None, None
+    return emit, lambda ecu, *event: emit(*event, ecu=ecu)
 
 
 def run(argv: Sequence[str] | None = None) -> dict:
+    with ExitStack() as resources:
+        return _run(argv, resources)
+
+
+def _run(argv: Sequence[str] | None, resources: ExitStack) -> dict:
     argv = list(sys.argv[1:] if argv is None else argv)
     fr = "--fr" in argv
     def tr(en, french):
@@ -70,6 +94,9 @@ def run(argv: Sequence[str] | None = None) -> dict:
     parser.add_argument("--routing-oem-data", type=lambda x: hex_value(x, 8).to_bytes(4, "big"),
                         help=tr("Optional four OEM bytes, eight hex digits", "Quatre octets OEM facultatifs, huit chiffres hexadécimaux"))
     parser.add_argument("--trace", action="store_true", help=tr("Write observed PDUs to stderr", "Journal PDU vers stderr"))
+    parser.add_argument("--trace-file", type=Path,
+                        help=tr("New JSONL file of observed PDUs; never overwritten",
+                                "Nouveau journal JSONL des PDU observés ; jamais écrasé"))
     sub = parser.add_subparsers(dest="action", required=True)
     for action in ("discover", "status", "power", "vin", "obd-identify"):
         sub.add_parser(action)
@@ -152,7 +179,6 @@ def run(argv: Sequence[str] | None = None) -> dict:
             parser.error(tr("Choose a new output in an existing directory", "Choisir un nouveau fichier dans un dossier existant"))
         if (scope["Length"] + scope["BlockSize"] - 1) // scope["BlockSize"] > 8192:
             parser.error(tr("Profile exceeds 8192 blocks per pass", "Le profil dépasse 8192 blocs par passe"))
-    trace = _trace if o.trace else None
     network_only = o.action in ("discover", "status", "power")
     p2 = o.timeout if o.p2_ms is None else o.p2_ms / 1000
     p2_star = o.timeout if o.p2_star_ms is None else o.p2_star_ms / 1000
@@ -192,6 +218,23 @@ def run(argv: Sequence[str] | None = None) -> dict:
         parser.error(tr("Choose unicast, broadcast or passive discovery", "Choisir unicast, diffusion ou écoute passive"))
     if o.listen_host != "0.0.0.0" and not (o.broadcast_ip is not None or o.listen):
         parser.error(tr("Local bind address requires broadcast or passive discovery", "Adresse locale réservée à la diffusion ou écoute passive"))
+    if not (o.broadcast_ip is not None or o.listen or ipv6_index is not None):
+        if not o.host and (o.vin is None or not valid_vin(o.vin)):
+            parser.error(tr("Host or valid expected VIN required", "IP ou VIN attendu valide requis"))
+    if commands is not None and not sys.stdin.isatty():
+        parser.error(tr("Interactive terminal required for confirmation", "Terminal interactif requis pour la confirmation"))
+    trace_file = None
+    if o.trace_file is not None:
+        target = o.trace_file.resolve()
+        protected = (getattr(o, "profile", None), getattr(o, "output", None),
+                     o.ca_file, o.client_cert, o.client_key)
+        if any(value is not None and target == Path(value).resolve() for value in protected):
+            parser.error(tr("Trace file must differ from profile, backup and certificates",
+                            "Journal distinct du profil, de la sauvegarde et des certificats requis"))
+        # Exclusive create, including concurrent invocations. Restrict access on POSIX.
+        trace_file = resources.enter_context(open(o.trace_file, "x", encoding="utf-8",
+            newline="\n", opener=lambda path, flags: os.open(path, flags, 0o600)))
+    trace, target_trace = _trace_sinks(o.trace, trace_file)
     if ipv6_index is not None:
         found = discover_ipv6(ipv6_index, o.timeout, trace, passive=o.listen_ipv6_ifindex is not None,
                               vin=o.vin, eid=o.eid)
@@ -202,10 +245,6 @@ def run(argv: Sequence[str] | None = None) -> dict:
                               listen_host=o.listen_host)
         return {"gateways": [asdict(item) for item in found], "ecu_authenticated": False,
                 "physical_qualification": False}
-    if not o.host and (o.vin is None or not valid_vin(o.vin)):
-        parser.error(tr("Host or valid expected VIN required", "IP ou VIN attendu valide requis"))
-    if commands is not None and not sys.stdin.isatty():
-        parser.error(tr("Interactive terminal required for confirmation", "Terminal interactif requis pour la confirmation"))
     if o.host:
         gateway = (discover(o.host, o.vin, o.timeout, trace, eid=o.eid) if o.eid is not None
                    else discover(o.host, o.vin, o.timeout, trace))
@@ -229,7 +268,7 @@ def run(argv: Sequence[str] | None = None) -> dict:
         return result | inventory_ecus(gateway, o.vin, o.tester, targets, tls=not o.tcp,
             timeout=o.timeout, trace=trace, context=context, p2=p2, p2_star=p2_star,
             routing_type=o.routing_activation_type or 0, routing_oem_data=o.routing_oem_data,
-            obd=o.action == "obd-ecu-inventory", target_trace=_inventory_trace if o.trace else None)
+            obd=o.action == "obd-ecu-inventory", target_trace=target_trace)
     if commands is not None and not confirm_commands(commands, gateway, o.tester, o.ecu,
             not o.tcp, input, lambda line: print(line, file=sys.stderr), fr):
         return result | {"cancelled": True, "commands_sent": 0}
@@ -319,7 +358,7 @@ def run(argv: Sequence[str] | None = None) -> dict:
 def main():
     try:
         print(json.dumps(run(), indent=2))
-    except (OSError, EOFError, ValueError) as exc:
+    except (OSError, EOFError, ValueError, TraceWriteError, InventoryTraceError) as exc:
         print(f"DoIP: {exc}", file=sys.stderr)
         raise SystemExit(2)
 

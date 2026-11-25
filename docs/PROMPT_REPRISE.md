@@ -1,3 +1,7 @@
+## PR117 — journal JSONL DoIP Connectors (25/11/2026)
+
+- Parité CLI Windows : `--trace-file` conserve les PDU UDP/TCP/TLS réels, horodatés UTC, avec attribution des événements d'inventaire à l'ECU concerné. Création exclusive, permissions POSIX restrictives, fichier distinct des sauvegardes/profils/certificats, fermeture et traces partielles conservées lors d'un échec. Les erreurs de journal interrompent le parcours. Aide et exemple FR/EN ; tests écrits non exécutés. Aucun checkpoint CI.
+
 ## PR117 — parcours applicatifs DTC permanents (25/11/2026)
 
 - Tests loopback Windows F190 → 19/15 → F190 avec rejet du VIN final différent, sélection CLI Connectors TLS/UDS et exemple utilisateur FR/EN. Tests écrits, non exécutés ; aucune campagne CI.

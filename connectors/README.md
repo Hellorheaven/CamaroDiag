@@ -73,7 +73,10 @@ cd host/python
 python -m camarodiagconnectors.doip_cli --host 192.0.2.10 discover
 python -m camarodiagconnectors.doip_cli --fr --host 192.0.2.10 --vin 1G1FA1RXXR0123456 --tester 0E80 --ecu 1234 did --did F190
 python -m camarodiagconnectors.doip_cli --host 192.0.2.10 --vin 1G1FA1RXXR0123456 --tester 0E80 --ecu 1234 --trace monitor --did 1235 --samples 5
+python -m camarodiagconnectors.doip_cli --host 192.0.2.10 --trace-file doip-discovery.jsonl discover
 ```
+
+`--trace-file` crée un nouveau journal JSONL, conserve les PDU UDP/TCP/TLS observés et les traces partielles même en cas d'erreur. Il peut être utilisé seul ou avec `--trace` (affichage terminal). Un fichier existant n'est jamais écrasé. Les journaux peuvent contenir un VIN et des données ECU : à conserver localement et à ne partager qu'après vérification. / `--trace-file` creates a new JSONL log of observed UDP/TCP/TLS PDUs, retaining partial traces on failure; combine with `--trace` for terminal output. Existing files are never overwritten. Logs may contain VIN and ECU data; keep private and review before sharing.
 
 Exemples fictifs, à remplacer par les données de la passerelle et du calculateur réellement sélectionnés. Services disponibles : découverte, statut, alimentation, VIN, DID, comptage/liste DTC, instantanés/données étendues et monitoring. Les données constructeur sans définition restent brutes ; aucun flash ni qualification physique. / The host connects directly over IP, not through the USB prototype. Use real verified logical addresses; no physical qualification or programming is implied.
 
