@@ -419,6 +419,19 @@ def validate_stored_did_lengths(lengths: dict[int, int]) -> dict[int, int]:
     return dict(lengths)
 
 
+def decode_stored_records(record: int, reply: bytes, lengths: dict[int, int]) -> list[dict]:
+    if type(record) is not int or not 0 <= record <= 255:
+        raise DoIpError("Invalid stored record selector")
+    catalog = validate_stored_did_lengths(lengths)
+    positive(bytes((0x19, 5, record)), reply)
+    if len(reply) == 3:
+        return []
+    rows = decode_all_stored_records(reply, catalog)
+    if record != 255 and (len(rows) != 1 or rows[0]["record"] != record):
+        raise DoIpError("Unexpected stored record")
+    return rows
+
+
 def decode_all_stored_records(reply: bytes, lengths: dict[int, int]) -> list[dict]:
     """19/05 FF: parse successive records only with documented DID lengths."""
     catalog = validate_stored_did_lengths(lengths)
@@ -1273,14 +1286,19 @@ class Session:
             raise
 
     def read_all_stored_dtc_records(self, expected: str, lengths: dict[int, int]) -> dict:
+        return self.read_decoded_stored_dtc_records(expected, 255, lengths)
+
+    def read_decoded_stored_dtc_records(self, expected: str, record: int, lengths: dict[int, int]) -> dict:
+        if type(record) is not int or not 0 <= record <= 255:
+            raise DoIpError("Invalid stored record selector")
         catalog = validate_stored_did_lengths(lengths)
-        request = b"\x19\x05\xff"
+        request = bytes((0x19, 5, record))
         try:
             self.verify_vin(expected)
             reply = positive(request, self.exchange(request))
-            rows = decode_all_stored_records(reply, catalog)
+            rows = decode_stored_records(record, reply, catalog)
             self.verify_vin(expected)
-            return {"subfunction": 5, "record": 255, "records": rows,
+            return {"subfunction": 5, "record": record, "records": rows,
                     "raw_response": reply.hex().upper()}
         except BaseException:
             self.close()
