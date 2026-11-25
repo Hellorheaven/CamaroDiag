@@ -1116,6 +1116,9 @@
     <string name="cal_doip_stored_record">Lire les données DTC mémorisées par numéro</string>
     <string name="cal_doip_stored_record_result">Enregistrement mémorisé 0x%1$02X</string>
     <string name="cal_doip_stored_record_count">Nombre de DID annoncé : %1$d</string>
+    <string name="cal_doip_all_stored_records">Lire tous les enregistrements mémorisés</string>
+    <string name="cal_doip_stored_catalog">Longueurs DID documentées (ex. F40C:2,F40D:1)</string>
+    <string name="cal_doip_all_stored_result">Enregistrements mémorisés : %1$d</string>
     <string name="cal_doip_stored_record_empty">Aucune donnée mémorisée pour cet enregistrement</string>
     <string name="cal_doip_extended_record_support">DTC prenant en charge cet enregistrement</string>
     <string name="cal_doip_extended_record_size">Longueur uniforme documentée (octets)</string>
