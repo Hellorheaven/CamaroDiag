@@ -29,3 +29,21 @@ internal object ElmResponseCompletion {
         }
     }
 }
+
+/** Monotonic deadline for the response phase of one ELM command.
+ * A final USB/BLE/TCP read must not exceed the remaining poll budget;
+ * zero milliseconds must never be passed to a blocking socket read. */
+internal class ElmCommandReadBudget(
+    private val timeoutMs: Long,
+    private val clockMs: () -> Long = { System.nanoTime() / 1_000_000L }
+) {
+    private val started = clockMs()
+
+    fun remainingMs(): Long = (timeoutMs - (clockMs() - started)).coerceAtLeast(0L)
+
+    fun pollTimeoutMs(maxMs: Int): Int? {
+        require(maxMs > 0)
+        val remaining = remainingMs()
+        return if (remaining == 0L) null else minOf(remaining, maxMs.toLong()).toInt()
+    }
+}

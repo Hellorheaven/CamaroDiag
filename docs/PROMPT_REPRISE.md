@@ -1,3 +1,7 @@
+## PR117 — délais de lecture ELM multi-transport (25/11/2026)
+
+- C6 Android : horloge monotone pour la phase RX USB, BLE, Wi-Fi et Bluetooth classique ; chaque attente est limitée au temps restant. Le socket Wi-Fi applique le délai demandé sur le socket courant au lieu de bloquer systématiquement 1200 ms. Les contrôles de session et de prompt restent en place ; durée d'écriture/configuration et latence système hors budget RX. Régressions ajoutées, non exécutées. Aucun checkpoint intermédiaire.
+
 ## PR117 — budget commun de lecture Mode 06 (25/11/2026)
 
 - C6 Android : budget monotone de 20 s pour les requêtes Mode 06 (configuration/restauration ELM hors budget), délai de chaque commande limité au temps restant, aucune nouvelle émission après expiration. Les résultats vérifiés sont conservés ; les MID annoncés non interrogés sont explicitement distingués des réponses manquantes et le rapport est partiel. Un bitmap vide valide est distingué d'une absence de réponse ; continuation impossible après E0 rejetée. Le respect temporel dépend du canal sous-jacent. Régressions déterministes écrites, non exécutées ; C6/DoIP restent ouverts, aucun checkpoint ni Release.

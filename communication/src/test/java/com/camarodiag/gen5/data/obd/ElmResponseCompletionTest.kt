@@ -61,4 +61,17 @@ class ElmResponseCompletionTest {
     fun allowsStreamingCaptureWithoutNormalPrompt() {
         ElmResponseCompletion.requirePrompt("ATMA", streaming = true, promptReceived = false)
     }
+
+    @Test fun responseDeadlineClampsFinalReadAndNeverReturnsAnInfiniteTimeout() {
+        var time = 1000L
+        val budget = ElmCommandReadBudget(250L) { time }
+        org.junit.Assert.assertEquals(100, budget.pollTimeoutMs(100))
+        time = 1249L
+        org.junit.Assert.assertEquals(1, budget.pollTimeoutMs(100))
+        time = 1250L
+        org.junit.Assert.assertNull(budget.pollTimeoutMs(100))
+        time = 1500L
+        org.junit.Assert.assertEquals(0L, budget.remainingMs())
+    }
+
 }

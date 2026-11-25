@@ -1117,11 +1117,11 @@ class BluetoothObdManager(context: Context) {
             try {
             if (sessionTransport == "USB") {
                 usbTransport.write(payload)
-                val buffer = StringBuilder(); val bytes = ByteArray(256); val start = System.currentTimeMillis()
+                val buffer = StringBuilder(); val bytes = ByteArray(256); val budget = ElmCommandReadBudget(timeoutMs)
                 var promptReceived = false
-                while (System.currentTimeMillis() - start < timeoutMs) {
+                while (budget.remainingMs() > 0) {
                     ensureSameSession()
-                    val n = usbTransport.read(bytes, 100)
+                    val n = usbTransport.read(bytes, budget.pollTimeoutMs(100) ?: break)
                     ensureSameSession()
                     if (n > 0) {
                         val chunk = String(bytes, 0, n, Charsets.US_ASCII)
@@ -1133,7 +1133,7 @@ class BluetoothObdManager(context: Context) {
                         if (chunk.contains('>')) { promptReceived = true; break }
                     } else if (n < 0) {
                         throw java.io.EOFException("USB OBD adapter disconnected while reading")
-                    } else delay(10)
+                    } else delay(minOf(10L, budget.remainingMs()))
                 }
                 ensureSameSession()
                 ElmResponseCompletion.requirePrompt(
@@ -1145,11 +1145,11 @@ class BluetoothObdManager(context: Context) {
                 normalizeElmReply(buffer.toString(), command, preserveLines)
             } else if (sessionTransport == "BLE") {
                 bleTransport.write(payload)
-                val buffer = StringBuilder(); val bytes = ByteArray(512); val start = System.currentTimeMillis()
+                val buffer = StringBuilder(); val bytes = ByteArray(512); val budget = ElmCommandReadBudget(timeoutMs)
                 var promptReceived = false
-                while (System.currentTimeMillis() - start < timeoutMs) {
+                while (budget.remainingMs() > 0) {
                     ensureSameSession()
-                    val n = bleTransport.read(bytes, 100)
+                    val n = bleTransport.read(bytes, budget.pollTimeoutMs(100) ?: break)
                     ensureSameSession()
                     if (n > 0) {
                         val chunk = String(bytes, 0, n, Charsets.US_ASCII)
@@ -1159,7 +1159,7 @@ class BluetoothObdManager(context: Context) {
                         }
                         if (payloadChunk.isNotEmpty()) onChunk?.invoke(payloadChunk)
                         if (chunk.contains('>')) { promptReceived = true; break }
-                    } else delay(10)
+                    } else delay(minOf(10L, budget.remainingMs()))
                 }
                 ensureSameSession()
                 ElmResponseCompletion.requirePrompt(
@@ -1171,12 +1171,12 @@ class BluetoothObdManager(context: Context) {
                 normalizeElmReply(buffer.toString(), command, preserveLines)
             } else if (sessionTransport == "WIFI") {
                 wifiTransport.write(payload)
-                val buffer = StringBuilder(); val bytes = ByteArray(256); val start = System.currentTimeMillis()
+                val buffer = StringBuilder(); val bytes = ByteArray(256); val budget = ElmCommandReadBudget(timeoutMs)
                 var promptReceived = false
-                while (System.currentTimeMillis() - start < timeoutMs) {
+                while (budget.remainingMs() > 0) {
                     ensureSameSession()
                     try {
-                        val n = wifiTransport.read(bytes)
+                        val n = wifiTransport.read(bytes, budget.pollTimeoutMs(100) ?: break)
                         ensureSameSession()
                         if (n > 0) {
                             val chunk = String(bytes, 0, n, Charsets.US_ASCII)
@@ -1190,7 +1190,7 @@ class BluetoothObdManager(context: Context) {
                             throw java.io.EOFException("Wi-Fi OBD adapter closed the connection")
                         }
                     } catch (_: java.net.SocketTimeoutException) { }
-                    delay(10)
+                    delay(minOf(10L, budget.remainingMs()))
                 }
                 ensureSameSession()
                 ElmResponseCompletion.requirePrompt(
@@ -1223,9 +1223,9 @@ class BluetoothObdManager(context: Context) {
                 out.write(payload); out.flush()
                 val buffer = StringBuilder()
                 val callbackBuffer = StringBuilder()
-                val start = System.currentTimeMillis()
+                val budget = ElmCommandReadBudget(timeoutMs)
                 var promptReceived = false
-                while (System.currentTimeMillis() - start < timeoutMs) {
+                while (budget.remainingMs() > 0) {
                     ensureSameSession()
                     if (inp.available() > 0) {
                         val received = inp.read()
@@ -1243,7 +1243,7 @@ class BluetoothObdManager(context: Context) {
                             onChunk?.invoke(callbackBuffer.toString())
                             callbackBuffer.clear()
                         }
-                    } else delay(15)
+                    } else delay(minOf(15L, budget.remainingMs()))
                 }
                 if (callbackBuffer.isNotEmpty()) onChunk?.invoke(callbackBuffer.toString())
                 ensureSameSession()

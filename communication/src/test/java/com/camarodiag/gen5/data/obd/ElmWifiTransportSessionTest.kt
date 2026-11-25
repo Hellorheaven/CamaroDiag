@@ -41,7 +41,8 @@ class ElmWifiTransportSessionTest {
             connected = true
         }
         override fun setTcpNoDelay(on: Boolean) {}
-        override fun setSoTimeout(timeout: Int) {}
+        @Volatile var lastReadTimeout = 0
+        override fun setSoTimeout(timeout: Int) { lastReadTimeout = timeout }
         override fun getInputStream(): InputStream = object : InputStream() {
             override fun read(): Int {
                 readEntered.countDown()
@@ -202,4 +203,21 @@ class ElmWifiTransportSessionTest {
         }
         Unit
     }
+
+    @Test fun wifiReadUsesRemainingCommandTimeoutOnTheCurrentSocket() = runBlocking {
+        val active = FakeSocket()
+        val transport = ElmWifiTransport { active }
+        try {
+            assertTrue(transport.connect("192.168.0.10").isSuccess)
+            org.junit.Assert.assertEquals(1, transport.read(ByteArray(8), 7))
+            org.junit.Assert.assertEquals(7, active.lastReadTimeout)
+            org.junit.Assert.assertEquals(1, transport.read(ByteArray(8)))
+            org.junit.Assert.assertEquals(1200, active.lastReadTimeout)
+            assertTrue(transport.isConnected)
+        } finally {
+            transport.close()
+        }
+        Unit
+    }
+
 }
