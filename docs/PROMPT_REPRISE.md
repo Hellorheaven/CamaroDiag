@@ -1,3 +1,9 @@
+## PR117 — consolidation 19/05 (25/11/2026)
+
+- Implémentation Windows concurrente GUI/CLI conservée ; les deux méthodes redondantes et la validation dupliquée ajoutées pendant cette reprise ont été retirées. Un seul parcours typé Windows demeure.
+- Le nombre de DID annoncé par l'ECU est désormais exposé séparément dans le JSON des CLI Python/Windows et les écrans Android/Windows (FR/EN), sans prétendre déduire les longueurs des DID constructeur. La réponse brute est préservée ; absence de donnée distincte.
+- Aucun test, compilation ou checkpoint CI lancé. DoIP/C6 restent ouverts ; 19/05 FF et les autres intégrations DoIP restent à examiner avec définitions réelles et validation de clôture.
+
 ## PR117 — UDS 19/05 Windows GUI/CLI (25/11/2026)
 
 - Parité Android/Windows/Connectors : numéro explicite, interface FR/EN, CLI --uds-stored-record avec VIN obligatoire, F190 avant/après, validation de l'écho et des bornes minimales DID, préservation brute et absence de données distincte. Tests parseur, codec, aide et loopback écrits, non exécutés. FF multi-record reste non proposé sans définition OEM. Aucun checkpoint CI ; DoIP/C6 restent ouverts.
