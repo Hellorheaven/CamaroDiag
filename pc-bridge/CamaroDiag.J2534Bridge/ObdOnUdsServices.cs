@@ -654,6 +654,22 @@ internal static class ObdOnUdsServices
             (byte)dtc, record, memory]);
     }
 
+    internal static SnapshotRecords DecodeUserMemorySnapshot(byte memory, uint dtc, byte record,
+        ReadOnlySpan<byte> reply, IReadOnlyDictionary<ushort, int> lengths)
+    {
+        _ = UdsStandardServices.RequireResponse(ReadUserMemory(0x18, memory, 0, dtc, record), reply);
+        byte[] normalized = [0x59, 4, .. reply[3..].ToArray()];
+        return DecodeSnapshotRecords(dtc, record, normalized, lengths) with { RawResponse = reply.ToArray() };
+    }
+
+    internal static DecodedExtendedRecords DecodeUserMemoryExtended(byte memory, uint dtc, byte record,
+        ReadOnlySpan<byte> reply, IReadOnlyDictionary<byte, int> lengths)
+    {
+        _ = UdsStandardServices.RequireResponse(ReadUserMemory(0x19, memory, 0, dtc, record), reply);
+        byte[] normalized = [0x59, 6, .. reply[3..].ToArray()];
+        return DecodeExtendedRecords(dtc, record, normalized, lengths) with { RawResponse = reply.ToArray() };
+    }
+
     internal static UserMemoryReport DecodeUserMemory(ReadOnlySpan<byte> request, ReadOnlySpan<byte> reply)
     {
         if (request.Length < 2 || request[0] != 0x19 || request[1] is < 0x17 or > 0x19)
