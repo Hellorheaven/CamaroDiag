@@ -20,7 +20,9 @@ data class FunctionalTestContext(
     val selectedVin: String,
     val adapterName: String,
     val transport: String,
-    val connectionGeneration: Long
+    val connectionGeneration: Long,
+    val observedVin: String? = null,
+    val priorConnectionVin: String? = null
 )
 
 data class FunctionalTestState(
@@ -84,6 +86,16 @@ object FunctionalTestPlanner {
         }
         return connectorRows + moduleRows + services
     }
+
+    /** An OBD response ID is not proof of a particular OEM ECU. */
+    fun withStandardResponders(rows: List<FunctionalTestCheck>, addresses: Collection<String>): List<FunctionalTestCheck> =
+        rows.filterNot { it.group == "obd_responder" } + addresses.distinct().sorted().map { address ->
+            FunctionalTestCheck("obd_responder:$address", "obd_responder",
+                "Standard OBD responder $address", "Répondant OBD standard $address",
+                FunctionalTestOutcome.PASSED,
+                "Physical response to Mode 01 PID 00; OEM ECU identity not established.",
+                "Réponse physique au mode 01 PID 00 ; identité constructeur du calculateur non établie.")
+        }
 
     fun updated(
         rows: List<FunctionalTestCheck>, key: String, outcome: FunctionalTestOutcome,
