@@ -1725,6 +1725,34 @@ internal static class DoIpDiagnosticSessionSelfTests
                 "Truncated TCP diagnostic response retires DoIP connection.");
         });
 
+        // Closing in the middle of the next header must never allow
+        // another diagnostic operation on the same socket.
+        await RunCaseAsync(async stream =>
+        {
+            await RequireRequestAsync(stream);
+            var complete = DoIpCodec.Encode(DoIpCodec.DiagnosticMessage, FromEcu(Positive));
+            var burst = complete.Concat(new byte[] { 0x02, 0xFD, 0x80 }).ToArray();
+            await stream.WriteAsync(burst);
+            await stream.FlushAsync();
+        }, async client =>
+        {
+            try
+            {
+                var reply = await client.ExchangeUdsAsync(Request, TimeSpan.FromSeconds(1),
+                    CancellationToken.None);
+                Check(reply.SequenceEqual(Positive), "Only the complete first PDU may be returned.");
+            }
+            catch (EndOfStreamException)
+            {
+                // The pump observed the truncated next PDU before returning.
+                Check(true, "Known truncated next PDU rejects the exchange.");
+            }
+            await Task.Delay(60);
+            await Expect<InvalidOperationException>(() =>
+                client.ExchangeUdsAsync(Request, TimeSpan.FromSeconds(1), CancellationToken.None),
+                "Truncated next PDU retires the connection.");
+        });
+
         // Multiple consecutive NRC 0x78 packets renew P2* only; they are
         // not themselves positive completion or authorization to write.
         await RunCaseAsync(async stream =>

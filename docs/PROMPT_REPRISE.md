@@ -1,3 +1,7 @@
+## PR117 — DoIP : distinction fermeture TCP et trame tronquée (25/11/2026)
+
+- Windows DoIP : une fermeture propre entre deux PDU peut conserver la dernière réponse finale déjà validée ; une trame tronquée, invalide ou un débordement constaté avant retour de l'échange interdit le succès et retire le socket. Aucune réémission automatique. Scénario loopback ajouté, non exécuté ; une anomalie arrivant après le retour ne peut pas invalider rétroactivement une réponse. C6/DoIP ouverts, aucun checkpoint.
+
 ## PR117 — décodage commun des DTC ELM numérotés (25/11/2026)
 
 - C6 : console et scan utilisent le même assemblage des blocs DTC CAN auto-formatés ELM (longueur, lignes 0..F, découpage, nombre de DTC et absence de code nul déclaré). Plusieurs réponses sont traitées séparément, sans joindre des fragments d'ECU distincts ; réponse incomplète ou compteur incohérent non validés. Les NRC finaux restent distincts d'une lecture réussie. Un bloc anonyme ne prouve pas l'adresse physique. Tests ajoutés non exécutés ; aucun checkpoint C6/DoIP.

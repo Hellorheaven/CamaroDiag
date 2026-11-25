@@ -85,6 +85,11 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
     private readonly CancellationTokenSource lifetime = new();
     private Task? receiveTask;
     private Exception? receiveFailure;
+    // A clean EOF between PDUs is not equivalent to a truncated PDU.
+    private sealed class PeerClosedAtBoundaryException : EndOfStreamException
+    {
+        internal PeerClosedAtBoundaryException() : base("DoIP peer closed at a PDU boundary.") { }
+    }
 
     private DoIpDiagnosticTransport(TcpClient socket, Stream dataStream,
         ushort tester, ushort ecu, byte version, Action<PduTrace>? trace, SessionOptions? sessionOptions)
@@ -362,8 +367,11 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
             if (inbound.Reader.TryPeek(out _))
                 throw new InvalidDataException(
                     "DoIP stale queued diagnostic response after final UDS reply; reconnect.");
-            // EOF after a valid final reply retires the connection without
-            // retroactively invalidating that reply.
+            // Only a clean EOF between frames may follow a valid final
+            // reply. A malformed, truncated or overflowing receive stream
+            // already detected by the pump cannot establish success.
+            if (receiveFailure is not null && receiveFailure is not PeerClosedAtBoundaryException)
+                ExceptionDispatchInfo.Capture(receiveFailure).Throw();
             exchangeState = receiveFailure is null ? 0 : 2;
         }
         return response;
@@ -448,8 +456,10 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
             {
                 receiveFailure = error;
                 inbound.Writer.TryComplete(error);
-                // A valid final reply already queued for an active exchange
-                // may complete; no new exchange may start after failure.
+                // If an exchange is active, the waiter owns final failure
+                // handling. Only an orderly close may preserve a queued
+                // valid final reply; all other failures are checked before
+                // the exchange can return success.
                 close = exchangeState != 1;
                 if (close) exchangeState = 2;
             }
@@ -474,7 +484,12 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
     private async Task<DoIpCodec.Message> ReceiveAsync(CancellationToken token)
     {
         var header = new byte[8];
-        await stream.ReadExactlyAsync(header, token);
+        // Distinguish no next PDU from a peer closing in the middle of
+        // its header or payload. ReadExactly on the whole header cannot
+        // distinguish these conditions.
+        if (await stream.ReadAsync(header.AsMemory(0, 1), token) == 0)
+            throw new PeerClosedAtBoundaryException();
+        await stream.ReadExactlyAsync(header.AsMemory(1), token);
         var length = DoIpCodec.ReadPayloadLength(header);
         var message = new byte[8 + length];
         header.CopyTo(message, 0);
