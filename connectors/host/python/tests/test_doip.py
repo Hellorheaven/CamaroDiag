@@ -702,12 +702,30 @@ class DoIpTests(unittest.TestCase):
         fake.exchange.return_value = bytes.fromhex("590401020308")
         self.assertEqual(Session.read_snapshot_records(fake, VIN, 0x010203, 0, lengths)["records"], [])
 
+    def test_individual_decoded_stored_record_rejects_other_records(self):
+        lengths = {0xF40D: 1}
+        for response, count in (("5905010102030801F40D78", 1), ("590501", 0)):
+            fake = unittest.mock.Mock(spec=Session)
+            fake.exchange.return_value = bytes.fromhex(response)
+            report = Session.read_decoded_stored_dtc_records(fake, VIN, 1, lengths)
+            self.assertEqual(report["record"], 1)
+            self.assertEqual(len(report["records"]), count)
+            self.assertEqual(report["raw_response"], response)
+            self.assertEqual(fake.verify_vin.call_count, 2)
+            fake.exchange.assert_called_once_with(bytes.fromhex("190501"))
+        for invalid in ("590502", "5905010102030801F40D", "5905010102030801F40D78020405060801F40D79"):
+            fake = unittest.mock.Mock(spec=Session)
+            fake.exchange.return_value = bytes.fromhex(invalid)
+            with self.assertRaises(DoIpError):
+                Session.read_decoded_stored_dtc_records(fake, VIN, 1, lengths)
+            fake.close.assert_called_once()
+
     def test_all_stored_records_use_explicit_lengths_and_verify_identity(self):
         lengths = parse_stored_did_lengths("F40C:2,F40D:1")
         response = bytes.fromhex("5905010102030802F40C1234F40D56020405060001F40D78")
         fake = unittest.mock.Mock(spec=Session)
         fake.exchange.return_value = response
-        result = Session.read_all_stored_dtc_records(fake, VIN, lengths)
+        result = Session.read_decoded_stored_dtc_records(fake, VIN, 255, lengths)
         self.assertEqual(result["records"][0]["dids"][0]["data"], "1234")
         self.assertEqual(result["records"][1]["record"], 2)
         self.assertEqual(result["records"][1]["dids"][0]["data"], "78")
@@ -725,7 +743,7 @@ class DoIpTests(unittest.TestCase):
                 parse_stored_did_lengths(invalid)
         fake.verify_vin.side_effect = [VIN, DoIpError("VIN changed")]
         with self.assertRaises(DoIpError):
-            Session.read_all_stored_dtc_records(fake, VIN, lengths)
+            Session.read_decoded_stored_dtc_records(fake, VIN, 255, lengths)
         fake.close.assert_called_once()
 
     def test_all_stored_records_cli_requires_documented_lengths(self):
