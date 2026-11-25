@@ -689,6 +689,29 @@ internal static class StandardVehicleProtocolsSelfTests
             "--expected-vin", "1G1FA1RX0J0100001", "--uds-snapshot", "0x123456"]),
             "Generic snapshot requires explicit record.");
 
+        foreach (var (selector, subfunction) in new[] {
+            ("--uds-supported-dtcs", (byte)0x0A), ("--uds-snapshot-index", (byte)0x03) })
+        {
+            string[] target = ["--host", "127.0.0.1", "--tester", "0E80", "--ecu", "1234"];
+            var inventory = StandardProtocolCli.ParseVerifiedDoIpRead(
+                [..target, "--expected-vin", "1G1FA1RX0J0100001", selector]);
+            Check(!inventory.Obd && inventory.Target.Request.SequenceEqual(new byte[] { 0x19, subfunction }),
+                "DTC inventory uses generic verified UDS.");
+            Reject<ArgumentException>(() => StandardProtocolCli.ParseDoIp([..target, selector]),
+                "DTC inventory requires VIN.");
+        }
+        var supported = ObdOnUdsServices.DecodeSupportedDtcs([0x59, 0x0A, 8, 1, 2, 3, 0]);
+        Check(supported.Codes.Count == 1 && supported.Codes[0].Status == 0, "Inactive supported DTC retained.");
+        Reject<InvalidDataException>(() => ObdOnUdsServices.DecodeSupportedDtcs(
+            [0x59, 0x0A, 8, 1, 2, 3, 1]), "Unavailable status rejected.");
+        Reject<InvalidDataException>(() => ObdOnUdsServices.DecodeSupportedDtcs(
+            [0x59, 0x0A, 8, 1, 2, 3, 0, 1, 2, 3, 8]), "Duplicate DTC rejected.");
+        var index = ObdOnUdsServices.DecodeSnapshotIndex([0x59, 3, 1, 2, 3, 1, 1, 2, 3, 2]);
+        Check(index.Count == 2 && index[1].Record == 2, "Distinct snapshot records retained.");
+        Reject<InvalidDataException>(() => ObdOnUdsServices.DecodeSnapshotIndex([0x59, 3, 1]), "Truncated snapshot index rejected.");
+        Reject<InvalidDataException>(() => ObdOnUdsServices.DecodeSnapshotIndex(
+            [0x59, 3, 1, 2, 3, 1, 1, 2, 3, 1]), "Duplicate snapshot reference rejected.");
+
         var verifiedMulti = StandardProtocolCli.ParseVerifiedDoIpRead([
             "--host", "127.0.0.1", "--tester", "0E80", "--ecu", "1234",
             "--expected-vin", "1G1FA1RX0J0100001", "--uds-dids", "0xF40C:2,0xF40D:1",

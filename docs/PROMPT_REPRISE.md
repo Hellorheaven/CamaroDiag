@@ -1,3 +1,7 @@
+## PR117 — inventaire DTC et index snapshots DoIP Windows (25/11/2026)
+
+- Parité Windows GUI/CLI avec Android et Connectors : UDS 19/0A et 19/03, F190 avant/après, résultats séparés des défauts actifs. Ressources FR/EN, sélecteurs CLI exclusifs avec VIN, tests écrits. Aucun test ni compilation lancé. Référence de comportement : documentation udsoncan ReadDTCInformation (ISO 14229), sans revendication de conformité normative complète.
+
 ## PR117 — inventaire DTC et index snapshots DoIP Android/Connectors (25/11/2026)
 
 - UDS 19/0A (DTC pris en charge, y compris statut zéro) et 19/03 (paires DTC/enregistrement snapshot), Android et Connectors CLI. Même session vérifiée F190 avant/après ; résultats séparés de la liste des défauts actifs. Rejet des doublons, formats tronqués et statuts non disponibles. Ressources FR/EN et tests écrits, non exécutés. Windows reste à raccorder. Aucun marqueur CI modifié.

@@ -77,6 +77,8 @@ Examples:
                               --uds-dtc-count-mask 0xFF, --uds-snapshot 0x123456
                               --uds-snapshot-record 1, or --uds-extended-dtc 0x123456
                               --uds-extended-record 2.
+                              --uds-supported-dtcs or --uds-snapshot-index with
+                              --expected-vin VIN lists supported codes or snapshot references.
                               No OEM security bypass, flash recovery or vehicle tests.
 
 Use each option with the exact arguments described above. --help must be alone:

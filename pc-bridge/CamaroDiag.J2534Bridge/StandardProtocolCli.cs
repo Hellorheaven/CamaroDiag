@@ -383,6 +383,20 @@ internal static class StandardProtocolCli
                     "(physical units and availability require SAE J1979DA).");
             }
         }
+        else if (request.SequenceEqual(ObdOnUdsServices.ReadSupportedDtcs()))
+        {
+            var report = ObdOnUdsServices.DecodeSupportedDtcs(response);
+            Console.WriteLine($"Supported DTCs={report.Codes.Count} available-mask=0x{report.AvailabilityMask:X2}");
+            foreach (var code in report.Codes)
+                Console.WriteLine($"DTC=0x{code.Code:X6} status=0x{code.Status:X2}");
+        }
+        else if (request.SequenceEqual(ObdOnUdsServices.ReadSnapshotIndex()))
+        {
+            var rows = ObdOnUdsServices.DecodeSnapshotIndex(response);
+            Console.WriteLine($"Snapshot references={rows.Count}");
+            foreach (var row in rows)
+                Console.WriteLine($"DTC=0x{row.Dtc:X6} record=0x{row.Record:X2}");
+        }
         else if (request.Length == 5 && request[0] == 0x19 &&
             request[1] == 0x42 && response.Length > 0 && response[0] == 0x59)
         {
@@ -1239,6 +1253,10 @@ internal static class StandardProtocolCli
         var obdDid = Optional(args, "--obd-did");
         var obdDtcMask = Optional(args, "--obd-dtc-mask");
         var obdDtcCountMask = Optional(args, "--obd-dtc-count-mask");
+        var supportedDtcs = args.Contains("--uds-supported-dtcs", StringComparer.OrdinalIgnoreCase);
+        var snapshotIndex = args.Contains("--uds-snapshot-index", StringComparer.OrdinalIgnoreCase);
+        if ((supportedDtcs || snapshotIndex) && Optional(args, "--expected-vin") is null)
+            throw new ArgumentException("DTC inventory requires --expected-vin.");
         var udsDtcMask = Optional(args, "--uds-dtc-mask");
         var udsDtcCountMask = Optional(args, "--uds-dtc-count-mask");
         var udsSnapshot = Optional(args, "--uds-snapshot");
@@ -1280,6 +1298,8 @@ internal static class StandardProtocolCli
             (obdDid is null ? 0 : 1) +
             (obdDtcMask is null ? 0 : 1) +
             (obdDtcCountMask is null ? 0 : 1) +
+            (supportedDtcs ? 1 : 0) +
+            (snapshotIndex ? 1 : 0) +
             (udsDtcMask is null ? 0 : 1) +
             (udsDtcCountMask is null ? 0 : 1) +
             (udsSnapshot is null ? 0 : 1) +
@@ -1306,6 +1326,8 @@ internal static class StandardProtocolCli
                     obdDid.StartsWith("0x", StringComparison.OrdinalIgnoreCase) ?
                         obdDid[2..] : obdDid,
                     NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture))) :
+            supportedDtcs ? ObdOnUdsServices.ReadSupportedDtcs() :
+            snapshotIndex ? ObdOnUdsServices.ReadSnapshotIndex() :
             udsDtcMask is not null ? ObdOnUdsServices.ReadDtcByStatusMask(
                 checked((byte)Number(udsDtcMask))) :
             udsDtcCountMask is not null ? ObdOnUdsServices.ReadDtcCountByStatusMask(
@@ -1680,6 +1702,8 @@ internal static class StandardProtocolCli
         var genericRead = new[] { "--uds-did", "--uds-scaling-did", "--uds-dtc-mask",
             "--uds-dtc-count-mask", "--uds-snapshot", "--uds-extended-dtc" }
             .Any(selector => Optional(args, selector) is not null);
+        genericRead |= args.Contains("--uds-supported-dtcs", StringComparer.OrdinalIgnoreCase) ||
+            args.Contains("--uds-snapshot-index", StringComparer.OrdinalIgnoreCase);
         var obd = !genericRead && (multi is null || bool.Parse(Optional(args, "--obd-verified") ?? "false"));
         if (Optional(args, "--obd-verified") is not null && multi is null)
             throw new ArgumentException("--obd-verified is only needed with --uds-dids.");

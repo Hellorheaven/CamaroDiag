@@ -356,6 +356,30 @@ internal static class DoIpVinReader
         return result;
     }
 
+    internal static async Task<ObdOnUdsServices.DtcStatusReport> ReadObservedSupportedDtcsAsync(
+        DoIpVehicleDiscovery.Identity gateway, IPAddress address, ushort tester, ushort ecu,
+        bool tls, TimeSpan timeout, CancellationToken token, string? certificate,
+        Action<DoIpDiagnosticTransport.PduTrace>? trace, DoIpDiagnosticTransport.SessionOptions? options)
+    {
+        await using var link = await ConnectObservedAsync(gateway, address, tester, ecu,
+            tls, timeout, token, certificate, trace, options);
+        return await ReadVerifiedDtcAsync(link, gateway, timeout, token, async () =>
+            ObdOnUdsServices.DecodeSupportedDtcs(await link.ExchangeUdsAsync(
+                ObdOnUdsServices.ReadSupportedDtcs(), timeout, token)));
+    }
+
+    internal static async Task<IReadOnlyList<ObdOnUdsServices.SnapshotReference>> ReadObservedSnapshotIndexAsync(
+        DoIpVehicleDiscovery.Identity gateway, IPAddress address, ushort tester, ushort ecu,
+        bool tls, TimeSpan timeout, CancellationToken token, string? certificate,
+        Action<DoIpDiagnosticTransport.PduTrace>? trace, DoIpDiagnosticTransport.SessionOptions? options)
+    {
+        await using var link = await ConnectObservedAsync(gateway, address, tester, ecu,
+            tls, timeout, token, certificate, trace, options);
+        return await ReadVerifiedDtcAsync(link, gateway, timeout, token, async () =>
+            ObdOnUdsServices.DecodeSnapshotIndex(await link.ExchangeUdsAsync(
+                ObdOnUdsServices.ReadSnapshotIndex(), timeout, token)));
+    }
+
     internal static async Task<ObdOnUdsServices.DtcStatusReport> ReadObservedGatewayDtcsAsync(
         DoIpVehicleDiscovery.Identity gateway, IPAddress address, ushort tester,
         ushort ecu, bool useTls, byte statusMask, TimeSpan timeout,

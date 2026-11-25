@@ -281,6 +281,43 @@ internal static class ObdOnUdsServices
         return new(reply[2], reply[3], count);
     }
 
+    internal static byte[] ReadSupportedDtcs() => UdsStandardServices.ReadDtc(0x0A, []);
+    internal static byte[] ReadSnapshotIndex() => UdsStandardServices.ReadDtc(0x03, []);
+
+    internal static DtcStatusReport DecodeSupportedDtcs(ReadOnlySpan<byte> reply)
+    {
+        if (reply.Length < 3 || reply[0] != 0x59 || reply[1] != 0x0A || (reply.Length - 3) % 4 != 0)
+            throw new InvalidDataException("Malformed supported DTC inventory.");
+        var codes = new List<DiagnosticTroubleCode>();
+        var seen = new HashSet<uint>();
+        for (var offset = 3; offset < reply.Length; offset += 4)
+        {
+            var code = ((uint)reply[offset] << 16) | ((uint)reply[offset + 1] << 8) | reply[offset + 2];
+            var status = reply[offset + 3];
+            if (!seen.Add(code) || (status & ~reply[2]) != 0)
+                throw new InvalidDataException("Duplicate DTC or unavailable status bit.");
+            codes.Add(new(code, status));
+        }
+        return new(reply[2], codes);
+    }
+
+    internal sealed record SnapshotReference(uint Dtc, byte Record);
+    internal static IReadOnlyList<SnapshotReference> DecodeSnapshotIndex(ReadOnlySpan<byte> reply)
+    {
+        if (reply.Length < 2 || reply[0] != 0x59 || reply[1] != 0x03 || (reply.Length - 2) % 4 != 0)
+            throw new InvalidDataException("Malformed snapshot index.");
+        var rows = new List<SnapshotReference>();
+        var seen = new HashSet<SnapshotReference>();
+        for (var offset = 2; offset < reply.Length; offset += 4)
+        {
+            var row = new SnapshotReference(((uint)reply[offset] << 16) |
+                ((uint)reply[offset + 1] << 8) | reply[offset + 2], reply[offset + 3]);
+            if (!seen.Add(row)) throw new InvalidDataException("Duplicate snapshot reference.");
+            rows.Add(row);
+        }
+        return rows;
+    }
+
     internal static byte[] ReadDtcByStatusMask(byte statusMask) =>
         UdsStandardServices.ReadDtc(0x02, [statusMask]);
 

@@ -119,4 +119,9 @@
   <data name="ObdCount" xml:space="preserve"><value>Count OBDonUDS DTCs</value></data>
   <data name="ObdSnapshot" xml:space="preserve"><value>OBDonUDS snapshot</value></data>
   <data name="ObdExtended" xml:space="preserve"><value>OBDonUDS extended data</value></data>
+  <data name="SupportedDtcs" xml:space="preserve"><value>Supported DTCs</value></data>
+  <data name="SnapshotIndex" xml:space="preserve"><value>Snapshot index</value></data>
+  <data name="SupportedResult" xml:space="preserve"><value>Supported DTCs: {0}; available status mask 0x{1:X2}</value></data>
+  <data name="SnapshotIndexResult" xml:space="preserve"><value>Available snapshot records: {0}</value></data>
+  <data name="SnapshotIndexEntry" xml:space="preserve"><value>DTC 0x{0:X6}, record 0x{1:X2}</value></data>
 </root>
