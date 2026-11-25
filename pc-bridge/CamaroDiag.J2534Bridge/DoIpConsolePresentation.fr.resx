@@ -135,6 +135,12 @@
   <data name="StoredCatalog" xml:space="preserve"><value>Longueurs DID documentées (F40C:2,F40D:1)</value></data>
   <data name="InvalidStoredCatalog" xml:space="preserve"><value>Renseigner les longueurs DID documentées.</value></data>
   <data name="AllStoredResult" xml:space="preserve"><value>Enregistrements mémorisés : {0}</value></data>
+  <data name="DecodedExtended" xml:space="preserve"><value>Données étendues UDS décodées</value></data>
+  <data name="ObdDecodedExtended" xml:space="preserve"><value>Données étendues OBDonUDS décodées</value></data>
+  <data name="ExtendedCatalog" xml:space="preserve"><value>Longueurs documentées des enregistrements (01:2,90:1)</value></data>
+  <data name="InvalidExtendedCatalog" xml:space="preserve"><value>Renseigner les longueurs documentées et un numéro valide.</value></data>
+  <data name="DecodedExtendedResult" xml:space="preserve"><value>DTC {0:X6} — statut {1:X2} — enregistrements : {2}</value></data>
+  <data name="DecodedExtendedEntry" xml:space="preserve"><value>Enregistrement 0x{0:X2} : {1}</value></data>
   <data name="DecodedSnapshot" xml:space="preserve"><value>Snapshots UDS décodés</value></data>
   <data name="ObdDecodedSnapshot" xml:space="preserve"><value>Snapshots OBDonUDS décodés</value></data>
   <data name="DecodedSnapshotResult" xml:space="preserve"><value>DTC {0:X6} — statut {1:X2} — snapshots : {2}</value></data>
