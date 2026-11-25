@@ -1110,6 +1110,7 @@
     <string name="cal_doip_legacy_emissions_count">Legacy emissions DTC count</string>
     <string name="cal_doip_legacy_mirror_result">Legacy UDS mirror memory</string>
     <string name="cal_doip_legacy_emissions_result">Legacy UDS emissions</string>
+    <string name="cal_doip_decoded_stored_record">Decoded stored record</string>
     <string name="cal_doip_stored_record">Read stored DTC data by record</string>
     <string name="cal_doip_stored_record_result">Stored record 0x%1$02X</string>
     <string name="cal_doip_stored_record_count">Declared DID count : %1$d</string>
