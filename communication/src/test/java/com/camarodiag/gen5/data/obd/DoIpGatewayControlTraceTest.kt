@@ -283,6 +283,22 @@ class DoIpGatewayControlTraceTest {
         assertFalse(DoIpDirectRead.isObdDid(0xF190))
     }
 
+    @Test fun wildcardStoredRecordsUseRealRecordNumbersAndRejectTruncation() {
+        fun bytes(s: String) = s.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
+        val request = bytes("1905FF")
+        val reply = bytes("5905010102030802F40C1234F40D56020405060001F40D78")
+        DoIpDirectRead.requirePositiveResponse(request, reply)
+        DoIpDirectRead.requirePositiveResponse(request, bytes("5905FF"))
+        val report = UdsDtcDecoder.decodeAllStoredRecords(reply,
+            UdsDtcDecoder.parseStoredDidLengths("F40C:2,F40D:1"))
+        assertEquals(2, report.records.size)
+        assertArrayEquals(bytes("1234"), report.records.first().dids.first().data)
+        assertArrayEquals(bytes("78"), report.records.last().dids.single().data)
+        for (bad in listOf("590501", "5905FF0102030800", "5905010102030802F40C"))
+            assertTrue(runCatching { DoIpDirectRead.requirePositiveResponse(request, bytes(bad)) }.isFailure)
+        assertTrue(runCatching { DoIpDirectRead.requirePositiveResponse(bytes("190502"), reply) }.isFailure)
+    }
+
     @Test fun rawDtcResponsesMustCorrelateRecordAndFunctionalGroup() {
         fun hex(s: String) = s.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
         val valid = listOf("1903" to "5903", "190A" to "590A08",
