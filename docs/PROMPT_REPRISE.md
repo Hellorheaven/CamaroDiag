@@ -1,3 +1,7 @@
+## PR117 — DTC historiques Connectors (25/11/2026)
+
+- CLI Python : first-failed-dtc, first-confirmed-dtc, recent-failed-dtc et recent-confirmed-dtc ; VIN F190 vérifié avant/après, résultat JSON nul ou unique, statut courant brut et détection des réponses incohérentes. Tests écrits non exécutés. Windows reste à raccorder. Aucun checkpoint CI.
+
 ## PR117 — DTC historiques UDS 19/0B à 19/0E Android (25/11/2026)
 
 - Premier/dernier DTC détecté et premier/dernier confirmé : quatre actions de lecture, résultat absent ou unique, statut courant brut, F190 avant/après, pas de modification de la liste de défauts actifs. Android FR/EN et tests écrits. Windows et Connectors à raccorder. Référence : https://udsoncan.readthedocs.io/en/latest/udsoncan/client.html (ReadDTCInformation). Aucune CI lancée.

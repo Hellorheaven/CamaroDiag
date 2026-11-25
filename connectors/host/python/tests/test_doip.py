@@ -298,6 +298,23 @@ class DoIpTests(unittest.TestCase):
                 Session.read_dtc_inventory(fake, VIN, snapshot_index=snapshot)
             fake.close.assert_called_once()
 
+    def test_historical_dtc_reports_zero_or_one_record(self):
+        for sub in range(0x0B, 0x0F):
+            for payload, expected in ((bytes((0x59, sub, 8)), None),
+                                       (bytes((0x59, sub, 8, 1, 2, 3, 0)), {"dtc": "010203", "status": 0})):
+                fake = unittest.mock.Mock(spec=Session)
+                fake.exchange.return_value = payload
+                self.assertEqual(Session.read_historical_dtc(fake, VIN, sub)["record"], expected)
+                fake.exchange.assert_called_once_with(bytes((0x19, sub)))
+                self.assertEqual(fake.verify_vin.call_count, 2)
+            for payload in (bytes((0x59, sub, 8, 1)), bytes((0x59, sub, 8, 1, 2, 3, 1)),
+                            bytes((0x59, sub, 8, 1, 2, 3, 0, 4, 5, 6, 0))):
+                fake = unittest.mock.Mock(spec=Session)
+                fake.exchange.return_value = payload
+                with self.assertRaises(DoIpError):
+                    Session.read_historical_dtc(fake, VIN, sub)
+                fake.close.assert_called_once()
+
     def test_multi_monitor_rejects_contradictory_sample_identity(self):
         fake = unittest.mock.Mock(spec=Session)
         fake.read_obd.return_value = {"obd_on_uds": True}

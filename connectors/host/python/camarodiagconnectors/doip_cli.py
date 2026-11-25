@@ -90,6 +90,10 @@ def run(argv: Sequence[str] | None = None) -> dict:
         monitor.add_argument("--interval", type=float, default=1)
     sub.add_parser("supported-dtcs", help=tr("List supported DTCs", "Lister les DTC pris en charge"))
     sub.add_parser("snapshot-index", help=tr("List snapshot references", "Lister les références des snapshots"))
+    historical_actions = {"first-failed-dtc": 0x0B, "first-confirmed-dtc": 0x0C,
+                          "recent-failed-dtc": 0x0D, "recent-confirmed-dtc": 0x0E}
+    for action in historical_actions:
+        sub.add_parser(action, help=tr("Read a historical DTC", "Lire un DTC historique"))
     for action in ("dtcs", "count", "obd-dtcs", "obd-count"):
         p = sub.add_parser(action, help=tr("Verified DTC read or count", "Lecture ou comptage DTC vérifié"))
         p.add_argument("--mask", type=lambda x: hex_value(x, 2), default=255)
@@ -234,6 +238,10 @@ def run(argv: Sequence[str] | None = None) -> dict:
                 print(json.dumps({"partial_sample": row}), file=sys.stderr)
             return result | {"ecu": o.ecu, "tester": o.tester, "tls": not o.tcp} | session.monitor(
                 o.vin, o.did, o.samples, o.interval, obd=o.action == "obd-monitor", on_sample=on_sample)
+        if o.action in historical_actions:
+            report = session.read_historical_dtc(o.vin, historical_actions[o.action])
+            return result | {"vin": o.vin, "ecu": o.ecu, "tester": o.tester, "tls": not o.tcp,
+                             "service_protocol": "UDS"} | report
         if o.action in ("supported-dtcs", "snapshot-index"):
             inventory = session.read_dtc_inventory(o.vin, snapshot_index=o.action == "snapshot-index")
             return result | {"vin": o.vin, "ecu": o.ecu, "tester": o.tester, "tls": not o.tcp,

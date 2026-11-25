@@ -827,6 +827,24 @@ class Session:
             self.close()
             raise
 
+    def read_historical_dtc(self, expected: str, subfunction: int) -> dict:
+        """Retrieve a single first/most recent failed/confirmed DTC or an empty result."""
+        if type(subfunction) is not int or not 0x0B <= subfunction <= 0x0E:
+            raise DoIpError("Invalid historical DTC selector")
+        try:
+            self.verify_vin(expected)
+            reply = self.exchange(bytes((0x19, subfunction)))
+            if len(reply) not in (3, 7) or reply[:2] != bytes((0x59, subfunction)):
+                raise DoIpError("Malformed historical DTC report")
+            if len(reply) == 7 and reply[6] & ~reply[2]:
+                raise DoIpError("Historical DTC uses unavailable status bits")
+            record = None if len(reply) == 3 else {"dtc": reply[3:6].hex().upper(), "status": reply[6]}
+            self.verify_vin(expected)
+            return {"subfunction": subfunction, "availability_mask": reply[2], "record": record}
+        except BaseException:
+            self.close()
+            raise
+
     def read_dtc_inventory(self, expected: str, *, snapshot_index: bool = False) -> dict:
         """Read supported DTCs or snapshot references on one verified ECU."""
         try:
