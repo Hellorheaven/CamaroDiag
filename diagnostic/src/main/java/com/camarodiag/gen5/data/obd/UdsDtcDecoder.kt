@@ -100,7 +100,63 @@ data class UdsLegacyDtcReport(val subfunction: Int, val list: UdsDtcReport? = nu
 
 data class UdsStoredDtcRecord(val record: Int, val detail: UdsDtcDetail?, val rawResponse: ByteArray)
 
+data class UdsStoredDid(val did: Int, val data: ByteArray)
+data class UdsStoredRecordEntry(val record: Int, val dtc: Int, val status: Int,
+    val dids: List<UdsStoredDid>, val rawRecord: ByteArray)
+data class UdsAllStoredRecords(val records: List<UdsStoredRecordEntry>, val rawResponse: ByteArray)
+
 object UdsDtcDecoder {
+    fun parseStoredDidLengths(text: String): Map<Int, Int> {
+        val fields = text.split(',')
+        require(fields.size in 1..255)
+        val catalog = linkedMapOf<Int, Int>()
+        for (field in fields) {
+            val parts = field.split(':')
+            require(parts.size == 2 && parts[0].matches(Regex("[0-9a-fA-F]{4}")) &&
+                parts[1].matches(Regex("[0-9]{1,4}")))
+            val did = parts[0].toInt(16)
+            val size = parts[1].toInt()
+            require(size in 1..4096 && catalog.put(did, size) == null)
+        }
+        return catalog.toMap()
+    }
+
+    fun allStoredRecordsRequest(): ByteArray = byteArrayOf(0x19, 0x05, 0xFF.toByte())
+
+    fun decodeAllStoredRecords(reply: ByteArray, lengths: Map<Int, Int>): UdsAllStoredRecords {
+        val catalog = lengths.toMap()
+        require(catalog.size in 1..255 && catalog.all { (did, size) -> did in 0..65535 && size in 1..4096 })
+        require(reply.size >= 3 && reply[0] == 0x59.toByte() && reply[1] == 5.toByte())
+        if (reply.contentEquals(byteArrayOf(0x59, 5, 0xFF.toByte())))
+            return UdsAllStoredRecords(emptyList(), reply.copyOf())
+        val records = mutableListOf<UdsStoredRecordEntry>()
+        val seen = mutableSetOf<Int>()
+        var offset = 2
+        fun octet(index: Int) = reply[index].toInt() and 255
+        while (offset < reply.size) {
+            val start = offset
+            require(reply.size - offset >= 6)
+            val record = octet(offset)
+            require(record != 255 && seen.add(record))
+            val dtc = (octet(offset + 1) shl 16) or (octet(offset + 2) shl 8) or octet(offset + 3)
+            val status = octet(offset + 4)
+            val count = octet(offset + 5)
+            offset += 6
+            val dids = mutableListOf<UdsStoredDid>()
+            repeat(count) {
+                require(reply.size - offset >= 2)
+                val did = (octet(offset) shl 8) or octet(offset + 1)
+                val size = requireNotNull(catalog[did])
+                offset += 2
+                require(reply.size - offset >= size)
+                dids += UdsStoredDid(did, reply.copyOfRange(offset, offset + size))
+                offset += size
+            }
+            records += UdsStoredRecordEntry(record, dtc, status, dids.toList(), reply.copyOfRange(start, offset))
+        }
+        return UdsAllStoredRecords(records.toList(), reply.copyOf())
+    }
+
     fun storedRecordRequest(record: Int): ByteArray {
         require(record in 0..254)
         return byteArrayOf(0x19, 0x05, record.toByte())
