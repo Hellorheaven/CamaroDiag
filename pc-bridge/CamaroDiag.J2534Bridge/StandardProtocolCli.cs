@@ -1360,7 +1360,7 @@ internal static class StandardProtocolCli
             "--obd-dtc-mask", "--obd-dtc-count-mask", "--uds-historical-dtc",
             "--uds-severity-count", "--uds-severity-list", "--uds-severity-info", "--uds-severity-status",
             "--uds-memory", "--uds-memory-mask", "--uds-memory-snapshot", "--uds-memory-extended", "--uds-memory-record",
-            "--uds-stored-record", "--uds-all-stored-records", "--uds-extended-record-support", "--uds-extended-record-data", "--uds-extended-record-size",
+            "--uds-stored-record", "--uds-all-stored-records", "--stored-did-lengths", "--uds-extended-record-support", "--uds-extended-record-data", "--uds-extended-record-size",
             "--uds-mirror-mask", "--uds-mirror-count", "--uds-mirror-extended", "--uds-mirror-record",
             "--uds-legacy-emissions-mask", "--uds-legacy-emissions-count",
             "--uds-dtc-mask", "--uds-dtc-count-mask", "--uds-snapshot", "--uds-snapshot-record", "--snapshot-did-lengths", "--extended-record-lengths",
@@ -1415,6 +1415,12 @@ internal static class StandardProtocolCli
             _ = ObdOnUdsServices.ParseStoredDidLengths(allStoredRecords);
         }
         var storedRecord = Optional(args, "--uds-stored-record");
+        var singleStoredCatalog = Optional(args, "--stored-did-lengths");
+        if (singleStoredCatalog is not null)
+        {
+            if (storedRecord is null) throw new ArgumentException("Stored DID lengths require an individual stored record selector.");
+            _ = ObdOnUdsServices.ParseStoredDidLengths(singleStoredCatalog);
+        }
         if (storedRecord is not null && Optional(args, "--expected-vin") is null)
             throw new ArgumentException("Stored DTC record requires explicit VIN.");
         var extendedRecordSupport = Optional(args, "--uds-extended-record-support");
@@ -2157,7 +2163,7 @@ internal static class StandardProtocolCli
             stop.Token.ThrowIfCancellationRequested();
             PrintMultiDidResponse(args, o.Request, reply);
             var sizeText = Optional(args, "--uds-extended-record-size");
-            var storedCatalog = Optional(args, "--uds-all-stored-records");
+            var storedCatalog = Optional(args, "--uds-all-stored-records") ?? Optional(args, "--stored-did-lengths");
             var snapshotCatalog = Optional(args, "--snapshot-did-lengths");
             var extendedCatalog = Optional(args, "--extended-record-lengths");
             if (extendedCatalog is not null)
@@ -2200,10 +2206,10 @@ internal static class StandardProtocolCli
             }
             else if (storedCatalog is not null)
             {
-                var report = ObdOnUdsServices.DecodeAllStoredRecords(reply, ObdOnUdsServices.ParseStoredDidLengths(storedCatalog));
+                var report = ObdOnUdsServices.DecodeStoredRecords(o.Request[2], reply, ObdOnUdsServices.ParseStoredDidLengths(storedCatalog));
                 Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(new
                 {
-                    subfunction = 5, record = 255, raw_response = Convert.ToHexString(report.RawResponse),
+                    subfunction = 5, record = o.Request[2], raw_response = Convert.ToHexString(report.RawResponse),
                     records = report.Records.Select(row => new
                     {
                         record = row.Record, dtc = row.Dtc.ToString("X6"), status = row.Status,
