@@ -565,6 +565,21 @@ internal static class DoIpVinReader
             ObdOnUdsServices.DecodeStoredRecord(record, await link.ExchangeUdsAsync(request, timeout, token)));
     }
 
+    internal static async Task<ObdOnUdsServices.DecodedExtendedRecords> ReadObservedDecodedExtendedAsync(
+        DoIpVehicleDiscovery.Identity gateway, IPAddress address, ushort tester, ushort ecu,
+        bool tls, uint dtc, byte record, IReadOnlyDictionary<byte, int> lengths,
+        TimeSpan timeout, CancellationToken token, string? certificate,
+        Action<DoIpDiagnosticTransport.PduTrace>? trace, DoIpDiagnosticTransport.SessionOptions? options,
+        string? expectedObdVin = null)
+    {
+        var catalog = lengths.ToDictionary(p => p.Key, p => p.Value);
+        var request = ObdOnUdsServices.ReadDecodedExtended(dtc, record, catalog);
+        await using var link = await ConnectObservedAsync(gateway, address, tester, ecu, tls, timeout, token, certificate, trace, options);
+        return await ReadVerifiedDtcAsync(link, gateway, timeout, token, async () =>
+            ObdOnUdsServices.DecodeExtendedRecords(dtc, record, await link.ExchangeUdsAsync(request, timeout, token), catalog),
+            expectedObdVin: expectedObdVin);
+    }
+
     internal static async Task<ObdOnUdsServices.SnapshotRecords> ReadObservedDecodedSnapshotAsync(
         DoIpVehicleDiscovery.Identity gateway, IPAddress address, ushort tester, ushort ecu,
         bool tls, uint dtc, byte record, IReadOnlyDictionary<ushort, int> lengths,
