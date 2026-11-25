@@ -4759,12 +4759,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         replaceStandardDtcRecords(snapshot.records, snapshot.unavailableModes)
                         _connectionMessage.value = unavailableDtcNotice(snapshot.unavailableModes)
                     } else {
-                        val (confirmed, pending, permanent) = obdManager.withObdCommandSession { engine ->
-                            engine.readDtcs()
-                        }
+                        val modes = obdManager.withObdCommandSession { engine -> engine.readDtcModeEvidence() }
                         if (!isCurrentAccountGeneration(startedGeneration)) return@launch
-                        replaceStandardDtcRecords(confirmed + pending + permanent, emptySet())
-                        _connectionMessage.value = null
+                        val unavailable = modes.filterValues { it == null }.keys
+                        replaceStandardDtcRecords(modes.values.filterNotNull().flatten(), unavailable)
+                        _connectionMessage.value = unavailableDtcNotice(unavailable)
                     }
                 }
             } catch (cancelled: CancellationException) {
@@ -4784,6 +4783,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private fun replaceStandardDtcRecords(records: List<ObdDtc>, unavailableModes: Set<Int>) {
         _dtcs.value = _dtcs.value.filter { previous ->
             (!previous.module.equals("ECM", ignoreCase = true) && !previous.module.equals("OBD", ignoreCase = true)) ||
+                (3 in unavailableModes && previous.statusEn.equals("Confirmed", ignoreCase = true)) ||
                 (7 in unavailableModes && previous.statusEn.equals("Pending", ignoreCase = true)) ||
                 (10 in unavailableModes && previous.statusEn.equals("Permanent", ignoreCase = true))
         } + mapObdDtcs(records)
@@ -5307,7 +5307,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _obdScanReport.value = report
                 if (!obdManager.isSimulationActive && report.vin != null && !VehicleVinMatcher.isCamaroCandidate(report.vin)) {
                     _modules.value = emptyList()
-                    _calibrationWorkspace.value = _calibrationWorkspace.value.copy(ecuVinResponse = report.vin,
+                    _calibrationWorkspace.value = _calibrationWorkspace.value.copy(ecuVinResponse = report.vin.orEmpty(),
                         ecuIdentityFromSimulation = false, vinComparison = VehicleVinMatcher.compare(selectedVin, report.vin),
                         vinModelYear = VehicleVinMatcher.modelYearFromVin(report.vin))
                 }
