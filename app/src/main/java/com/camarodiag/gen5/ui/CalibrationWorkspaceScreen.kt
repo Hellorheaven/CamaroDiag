@@ -847,6 +847,12 @@ fun CalibrationWorkspaceScreen(
                         doIpStoredCatalog, doIpTls, DoIpDirectRead.Operation.ALL_STORED_RECORDS, doIpCertificate, requireNotNull(doIpOptions)) },
                         enabled = targetReady && vinReady && storedCatalogReady,
                         modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.cal_doip_all_stored_records)) }
+                    OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu,
+                        doIpDetailRecord + "|" + doIpStoredCatalog, doIpTls, DoIpDirectRead.Operation.DECODED_STORED_RECORD,
+                        doIpCertificate, requireNotNull(doIpOptions)) },
+                        enabled = targetReady && vinReady && storedCatalogReady && doIpDetailRecord.length == 2 &&
+                            (doIpDetailRecord.toIntOrNull(16) ?: 255) in 0..254,
+                        modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.cal_doip_decoded_stored_record)) }
                     for ((op, label) in listOf(
                         DoIpDirectRead.Operation.DECODED_SNAPSHOT to R.string.cal_doip_decoded_snapshot,
                         DoIpDirectRead.Operation.OBD_DECODED_SNAPSHOT to R.string.cal_doip_obd_decoded_snapshot)) {
