@@ -102,9 +102,20 @@ object SafeObdRequestPolicy {
      * of a successful physical read. Works with spaced and compact ELM/J2534
      * payloads, optionally prefixed by a supported CAN responder header.
      */
-    fun hasPositiveResponse(request: SafeObdRequest, response: String): Boolean {
+    fun hasPositiveResponse(request: SafeObdRequest, response: String,
+        expectedResponder: String? = null): Boolean {
         if (parse(request.elmCommand) != request || hasAdapterFailure(response)) return false
+        if (request.service in setOf(0x03, 0x07, 0x0A) && ':' in response) {
+            if (expectedResponder != null) return false
+            val records = ObdNumberedDtcRecords.parse(response) ?: return false
+            val positiveService = request.service + 0x40
+            val positive = records.filter { it.firstOrNull() == positiveService }
+            return positive.isNotEmpty() && positive.all {
+                ObdNumberedDtcRecords.validPositive(it, positiveService)
+            }
+        }
         if (request.service == 0x09 && ':' in response) {
+            if (expectedResponder != null) return false
             val assembled = ObdNumberedIdentityFrames.parse(response) ?: return false
             return hasPositiveResponse(request, assembled.joinToString("") {
                 "%02X".format(java.util.Locale.ROOT, it)
@@ -123,14 +134,8 @@ object SafeObdRequestPolicy {
             if (trimmed.isEmpty() || trimmed.any {
                     it !in '0'..'9' && it !in 'A'..'F' && !it.isWhitespace()
                 }) continue
-            var bytes = trimmed.filterNot(Char::isWhitespace)
-            // Only known OBD physical response headers are stripped.
-            if (bytes.startsWith("18DAF110") && bytes.length >= 8) {
-                bytes = bytes.drop(8)
-            } else if (bytes.length >= 3 && bytes.startsWith("7E") &&
-                bytes[2] in '8'..'F') {
-                bytes = bytes.drop(3)
-            }
+            val frame = parseResponseLine(trimmed, expectedResponder) ?: continue
+            var bytes = frame.payload
             // ELM's optional single-frame PCI may precede the positive service.
             val declaredLength = bytes.take(2).toIntOrNull(16)
             if (declaredLength != null && declaredLength in 1..7 &&
@@ -139,7 +144,7 @@ object SafeObdRequestPolicy {
                 val trailing = bytes.drop(2 + declaredLength * 2)
                 // A short DLC, or arbitrary bytes masquerading as CAN padding,
                 // must not turn a truncated reply into successful ECU evidence.
-                if (trailing.length % 2 != 0 || trailing.any { it != '0' }) continue
+                if (!validPadding(frame, bytes, trailing)) continue
                 bytes = bytes.substring(2, 2 + declaredLength * 2)
             }
             if (bytes.startsWith(expected) && bytes.length > expected.length &&
@@ -201,8 +206,16 @@ object SafeObdRequestPolicy {
      * A negative response is still real ECU RX traffic, not an adapter
      * acknowledgement. It must echo the requested service and include one NRC.
      */
-    fun hasNegativeResponse(request: SafeObdRequest, response: String): Boolean {
+    fun hasNegativeResponse(request: SafeObdRequest, response: String,
+        expectedResponder: String? = null): Boolean {
         if (parse(request.elmCommand) != request || hasAdapterFailure(response)) return false
+        if (request.service in setOf(0x03, 0x07, 0x0A) && ':' in response) {
+            if (expectedResponder != null) return false
+            return ObdNumberedDtcRecords.parse(response)?.any {
+                it.size == 3 && it[0] == 0x7F && it[1] == request.service &&
+                    it[2] !in setOf(0, 0x78)
+            } == true
+        }
         val serviceHex = "%02X".format(java.util.Locale.ROOT, request.service)
         val expectedPrefix = "7F" + serviceHex
         for (line in response.lineSequence()) {
@@ -210,12 +223,10 @@ object SafeObdRequestPolicy {
             if (trimmed.isEmpty() || trimmed.any {
                     it !in '0'..'9' && it !in 'A'..'F' && !it.isWhitespace()
                 }) continue
-            var bytes = trimmed.filterNot(Char::isWhitespace)
-            if (bytes.startsWith("18DAF110") && bytes.length >= 8) bytes = bytes.drop(8)
-            else if (bytes.length >= 3 && bytes.startsWith("7E") &&
-                bytes[2] in '8'..'F') bytes = bytes.drop(3)
+            val frame = parseResponseLine(trimmed, expectedResponder) ?: continue
+            var bytes = frame.payload
             if (bytes.startsWith("03" + expectedPrefix) && bytes.length >= 8 &&
-                (bytes.length - 8) % 2 == 0 && bytes.drop(8).all { it == '0' }) {
+                validPadding(frame, bytes, bytes.drop(8))) {
                 bytes = bytes.substring(2, 8)
             }
             if (bytes.length == 6 && bytes.startsWith(expectedPrefix)) {
@@ -243,6 +254,46 @@ object SafeObdRequestPolicy {
     /** Conflicting ECU results are not proof of a successful single read. */
     fun hasUnambiguousPositiveResponse(request: SafeObdRequest, response: String): Boolean =
         hasPositiveResponse(request, response) && !hasNegativeResponse(request, response)
+
+    private data class ResponseLine(val responder: String?, val payload: String)
+
+    /** Generic console traffic may originate from any standard OBD responder.
+     * A caller validating an explicit physical address can require that exact
+     * header; anonymous records then cannot establish the requested source. */
+    private fun parseResponseLine(line: String, expectedResponder: String?): ResponseLine? {
+        val compact = line.filterNot(Char::isWhitespace)
+        val responder = when {
+            compact.length >= 8 && compact.take(8).matches(Regex("18DAF1[0-9A-F]{2}")) ->
+                compact.take(8)
+            compact.length >= 3 && compact.take(3).matches(Regex("7E[8-F]")) ->
+                compact.take(3)
+            else -> null
+        }
+        if (expectedResponder != null && !expectedResponder.equals(responder, ignoreCase = true)) return null
+        var body = compact.drop(responder?.length ?: 0)
+        // Optional spaced DLC must match the actual frame size and must
+        // precede a single-frame PCI. Do not reinterpret arbitrary data.
+        if (responder != null) {
+            val tokens = line.split(Regex("\\s+"))
+            if (tokens.firstOrNull() == responder && tokens.size >= 4) {
+                val dlc = tokens[1].takeIf { it.length in 1..2 }?.toIntOrNull(16)
+                val pci = tokens[2].takeIf { it.length == 2 }?.toIntOrNull(16)
+                if (dlc != null && dlc in 1..8 && pci != null && pci in 1..7 &&
+                    tokens.drop(2).all { it.length == 2 } &&
+                    tokens.drop(2).size == dlc &&
+                    tokens[3].toIntOrNull(16) in setOf(0x41, 0x43, 0x47, 0x49, 0x4A, 0x7F)) {
+                    body = tokens.drop(2).joinToString("")
+                }
+            }
+        }
+        return ResponseLine(responder, body)
+    }
+
+    private fun validPadding(frame: ResponseLine, body: String, trailing: String): Boolean {
+        if (trailing.length % 2 != 0) return false
+        if (frame.responder != null && body.length == 16) return true
+        return trailing.all { it == '0' }
+    }
 
     private fun normalizeHexToken(token: String, expectedLength: Int): String? {
         val value = if (token.startsWith("0x", ignoreCase = true)) token.substring(2) else token

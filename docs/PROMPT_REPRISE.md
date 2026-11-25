@@ -1,3 +1,7 @@
+## PR117 — décodage commun des DTC ELM numérotés (25/11/2026)
+
+- C6 : console et scan utilisent le même assemblage des blocs DTC CAN auto-formatés ELM (longueur, lignes 0..F, découpage, nombre de DTC et absence de code nul déclaré). Plusieurs réponses sont traitées séparément, sans joindre des fragments d'ECU distincts ; réponse incomplète ou compteur incohérent non validés. Les NRC finaux restent distincts d'une lecture réussie. Un bloc anonyme ne prouve pas l'adresse physique. Tests ajoutés non exécutés ; aucun checkpoint C6/DoIP.
+
 ## PR117 — intégration console OBD des formats ELM/J2534 (25/11/2026)
 
 - C6 : console opérateur ELM conserve les lignes physiques pour PID ; Mode 09 et DTC utilisent temporairement le format sans en-tête pour l'assemblage natif, puis restaurent ATH1/ATS0 sous verrou et invalident la session en cas d'échec. La console J2534 conserve l'adresse du répondant physique déjà vérifiée avec la réponse assemblée. Tests de régression ELM et progression DoIP Windows écrits non exécutés. Aucun checkpoint C6/DoIP.
