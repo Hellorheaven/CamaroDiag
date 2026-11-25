@@ -1,3 +1,7 @@
+## PR117 — consolidation du parcours mémoire DTC (25/11/2026)
+
+- Libellé Android corrigé pour distinguer liste filtrée et inventaire, test loopback Windows de relecture VIN après 19/17, exemple Connectors FR/EN. Tests écrits, non exécutés ; aucun checkpoint CI. DoIP/C6 toujours en cours.
+
 ## PR117 — mémoire DTC sélectionnée Windows GUI/CLI (25/11/2026)
 
 - Parité UDS 19/17–19 Android/Windows/Connectors : mémoire explicite, trois actions FR/EN, CLI avec VIN et sélecteur exclusif, F190 avant/après sur même session, corrélation mémoire/DTC/record, résultats bruts séparés de la liste active. Tests de codec/CLI/aide écrits non exécutés ; aucun checkpoint CI. DoIP/C6 restent ouverts.

@@ -405,6 +405,44 @@ internal static class DoIpDiagnosticSessionSelfTests
             });
         }
 
+        // User-defined memory: retain the explicit memory and reject an identity change.
+        foreach (var finalMatches in new[] { true, false })
+        {
+            await RunCaseAsync(async stream =>
+            {
+                _ = await RequireRequestAsync(stream);
+                await SendAsync(stream, DoIpCodec.DiagnosticMessage,
+                    FromEcu([0x62, 0xF1, 0x90, .. System.Text.Encoding.ASCII.GetBytes(selectedVehicleVin)]));
+                var query = await ReadAsync(stream);
+                Check(query.Payload.SequenceEqual(new byte[] { 0x0E, 0x80, 0x12, 0x34, 0x19, 0x17, 8, 2 }),
+                    "User-memory DTC query preserves status and memory.");
+                await SendAsync(stream, DoIpCodec.DiagnosticMessage, FromEcu([0x59, 0x17, 2, 8, 1, 2, 3, 8]));
+                _ = await RequireRequestAsync(stream);
+                await SendAsync(stream, DoIpCodec.DiagnosticMessage,
+                    FromEcu([0x62, 0xF1, 0x90, .. System.Text.Encoding.ASCII.GetBytes(
+                        finalMatches ? selectedVehicleVin : otherVehicleVin)]));
+            }, async client =>
+            {
+                var timeout = TimeSpan.FromSeconds(2);
+                var token = CancellationToken.None;
+                var request = ObdOnUdsServices.ReadUserMemory(0x17, 2, 8);
+                Task<ObdOnUdsServices.UserMemoryReport> Read() =>
+                    DoIpVinReader.ReadVerifiedDtcAsync(client, observedForVin, timeout, token, async () =>
+                        ObdOnUdsServices.DecodeUserMemory(request, await client.ExchangeUdsAsync(request, timeout, token)));
+                if (finalMatches)
+                {
+                    var report = await Read();
+                    Check(report.Memory == 2 && report.List!.Codes.Single().Code == 0x010203,
+                        "User-memory report published after identity revalidation.");
+                }
+                else
+                {
+                    await Expect<InvalidDataException>(async () => { _ = await Read(); },
+                        "Changed VIN prevents user-memory report publication.");
+                }
+            });
+        }
+
         // Multi-DID polling: one request per sample, no complete result before final VIN.
         foreach (var finalIdentityMatches in new[] { true, false })
         {

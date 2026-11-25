@@ -1617,8 +1617,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         val list = memoryReport.list
                         val memoryDetailResult = memoryReport.detail
                         heading + "\n" + when {
-                            list != null -> localizedContext.getString(R.string.cal_doip_supported_result,
-                                list.records.size, list.statusAvailabilityMask) + list.records.joinToString("\n", prefix = "\n") {
+                            list != null -> localizedContext.getString(R.string.cal_doip_filtered_dtc_result,
+                                list.records.size, didHex.take(2).toInt(16), list.statusAvailabilityMask) + list.records.joinToString("\n", prefix = "\n") {
                                 "0x%06X — 0x%02X".format(it.rawDtc, it.statusByte)
                             }
                             memoryDetailResult != null -> localizedContext.getString(R.string.cal_doip_detail_result,

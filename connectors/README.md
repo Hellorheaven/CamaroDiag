@@ -108,3 +108,15 @@ Les adresses et le VIN proviennent du profil d'origine, contrôlé avant chaque 
 La découverte par VIN fonctionne également sans `--host` sur le réseau IPv4 sélectionné par le système ; plusieurs identités concurrentes sont refusées. TLS accepte `--ca-file`, `--client-cert` et `--client-key` (certificats légitimement fournis, vérification serveur maintenue).
 
 `sequence --commands "22F190;1901FF"` envoie au maximum 16 commandes sur une seule session après deux confirmations distinctes, uniquement depuis un terminal interactif. Les exemples sont des lectures, pas des procédures de programmation ECU. Arrêt sur la première erreur, aucune répétition automatique.
+
+
+### Mémoire DTC sélectionnée / Selected DTC memory
+
+Les commandes `memory-dtcs`, `memory-snapshot` et `memory-extended` lisent uniquement la mémoire explicitement documentée par le constructeur, sans modifier les DTC. Utilisez le sélecteur réel de votre ECU. Les enregistrements sans définition constructeur restent bruts. / These commands read the documented user-defined DTC memory without clearing faults; use the actual ECU memory selector. Unknown record layouts remain raw.
+
+```bash
+python -m camarodiagconnectors.doip_cli --host 192.0.2.10 --vin 1G1FA1RXXR0123456 --tester 0E80 --ecu 1234 memory-dtcs --memory 02 --mask 08
+python -m camarodiagconnectors.doip_cli --host 192.0.2.10 --vin 1G1FA1RXXR0123456 --tester 0E80 --ecu 1234 memory-snapshot --memory 02 --dtc 010203 --record 01
+```
+
+Adresses, VIN, mémoire et DTC fictifs / Example addresses, VIN, memory and DTC are illustrative.
