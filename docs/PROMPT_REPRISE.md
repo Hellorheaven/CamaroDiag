@@ -1,3 +1,7 @@
+## PR117 — parité Android des canaux J2534 secondaires (25/11/2026)
+
+- C6 Android : même politique de paires physiques que le pont Windows ; lecture sur ECU secondaire explicitement sélectionné, pas d'effacement ni de FlexFuel sur ces canaux. Adresse réelle du répondant conservée en télémétrie ; longueurs strictes pour PID 5B, E0 et sondes large bande supplémentaires. Tests ajoutés non exécutés. Accès aux fichiers rétabli après correction du chemin. C6/DoIP restent ouverts, aucun checkpoint.
+
 ## PR117 — extension des canaux OBD J2534 physiques (25/11/2026)
 
 - C6 pont Windows : lecture SAE J1979 sur paires physiques ISO 15765-4 11 bits 7E0..7E7 / 7E8..7EF et 29 bits 18DAxxF1 / 18DAF1xx corrélées strictement. Aucun broadcast ou changement d'ECU ; effacement réservé au canal primaire avec autorisations et contrôle de vitesse/régime existants. Régressions Windows écrites non exécutées. Parité Android à réaliser (accès GitHub à certains fichiers intermittent). C6/DoIP restent ouverts, aucun checkpoint.

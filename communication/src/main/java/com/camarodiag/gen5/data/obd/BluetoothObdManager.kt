@@ -580,8 +580,10 @@ class BluetoothObdManager(context: Context) {
             }
             return commandSessionMutex.withLock {
                 transportSessionEpoch.requireQueuedCurrent(epoch)
-                check(isJ2534StandardObdAvailable()) {
-                    "The connected J2534 channel cannot read standard OBD fuel PIDs."
+                check(isJ2534StandardObdAvailable() && J2534StandardObd.supportsPrimaryChannel(
+                    checkNotNull(j2534BridgeRequestCanId), checkNotNull(j2534BridgeResponseCanId),
+                    checkNotNull(j2534BridgeProtocolNumber))) {
+                    "The connected J2534 channel is not the primary powertrain fuel channel."
                 }
                 val bridge = checkNotNull(j2534BridgeTransport)
                 val supported = bridge.discoverStandardObdPids()
@@ -671,7 +673,11 @@ class BluetoothObdManager(context: Context) {
                 val result = bridge.readStandardObdPid(pid)
                 transportSessionEpoch.requireQueuedCurrent(epoch)
                 mode01SupportCache.requireCurrent(generation)
-                result
+                val responseId = checkNotNull(j2534BridgeResponseCanId)
+                val width = if (checkNotNull(j2534BridgeProtocolNumber) in setOf(34, 36)) 8 else 3
+                // The bridge already validated the physical responder; expose
+                // its exact configured ID to the shared live source selector.
+                responseId.toString(16).uppercase(java.util.Locale.ROOT).padStart(width, '0') + " " + result
             }
         }
     }

@@ -8,7 +8,14 @@ import java.util.Locale
  * The caller supplies a physical channel and must correlate its CAN ID.
  */
 internal object J2534StandardObd {
-    fun supportsChannel(request: Int, response: Int, protocol: Int): Boolean =
+    fun supportsChannel(request: Int, response: Int, protocol: Int): Boolean {
+        if (protocol in setOf(33, 35)) return request in 0x7E0..0x7E7 && response == request + 8
+        if (protocol !in setOf(34, 36) || (request and 0xFF00.inv()) != 0x18DA00F1) return false
+        val address = (request shr 8) and 0xFF
+        return address !in setOf(0xF1, 0xFE, 0xFF) && response == (0x18DAF100 or address)
+    }
+
+    fun supportsPrimaryChannel(request: Int, response: Int, protocol: Int): Boolean =
         (protocol in setOf(33, 35) && request == 0x7E0 && response == 0x7E8) ||
             (protocol in setOf(34, 36) && request == 0x18DA10F1 && response == 0x18DAF110)
 
@@ -51,12 +58,12 @@ internal object J2534StandardObd {
         // Enforce exact data length for the standard signals used by the
         // fuel/ethanol monitor. ISO-TP padding is not part of a J2534 payload.
         val expected = when (pid) {
-            0x00, 0x20, 0x40, 0x60, 0x80, 0xA0, 0xC0, 0x01,
-            0x24, 0x25, 0x34, 0x35, 0xA6 -> 4
+            0x00, 0x20, 0x40, 0x60, 0x80, 0xA0, 0xC0, 0xE0, 0x01,
+            0x24, 0x25, 0x28, 0x29, 0x34, 0x35, 0x38, 0x39, 0xA6 -> 4
             0x0C, 0x10, 0x14, 0x15, 0x16, 0x17, 0x1F, 0x42, 0x43, 0x44 -> 2
             0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B,
             0x0D, 0x0E, 0x0F, 0x11, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4A,
-            0x4B, 0x4C, 0x52 -> 1
+            0x4B, 0x4C, 0x52, 0x5B -> 1
             else -> null // unknown/nonstandard PIDs require their own decoder
         }
         require(expected == null || reply.size == expected + 2) {

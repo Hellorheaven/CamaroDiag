@@ -95,6 +95,27 @@ class J2534StandardObdTest {
             J2534StandardObd.pidData(0x34,bytes(0x41,0x34,0x80,0,0,0)))
     }
 
+    @Test fun secondaryPhysicalPairsAreAcceptedWithoutAuthorizingPrimaryOnlyOperations() {
+        for (protocol in listOf(33,35)) for (id in 0x7E0..0x7E7) {
+            assertTrue(J2534StandardObd.supportsChannel(id,id+8,protocol))
+            assertEquals(id == 0x7E0, J2534StandardObd.supportsPrimaryChannel(id,id+8,protocol))
+            assertFalse(J2534StandardObd.supportsChannel(id,id+9,protocol))
+        }
+        for (protocol in listOf(34,36)) {
+            assertTrue(J2534StandardObd.supportsChannel(0x18DA11F1,0x18DAF111,protocol))
+            assertFalse(J2534StandardObd.supportsPrimaryChannel(0x18DA11F1,0x18DAF111,protocol))
+            assertFalse(J2534StandardObd.supportsChannel(0x18DA11F1,0x18DAF110,protocol))
+            assertFalse(J2534StandardObd.supportsChannel(0x18DB33F1,0x18DAF110,protocol))
+            assertFalse(J2534StandardObd.supportsChannel(0x18DAF1F1,0x18DAF1F1,protocol))
+        }
+    }
+
+    @Test fun extendedPidAndBitmapLengthsRemainExact() {
+        assertArrayEquals(bytes(0x80), J2534StandardObd.pidData(0x5B, bytes(0x41,0x5B,0x80)))
+        assertTrue(runCatching { J2534StandardObd.pidData(0x5B, bytes(0x41,0x5B,0x80,0)) }.isFailure)
+        assertTrue(runCatching { J2534StandardObd.pidData(0xE0, bytes(0x41,0xE0,0)) }.isFailure)
+    }
+
     @Test fun noFunctionalOrSwCanChannel() {
         assertTrue(J2534StandardObd.supportsChannel(0x7E0,0x7E8,33))
         assertTrue(J2534StandardObd.supportsChannel(0x18DA10F1,0x18DAF110,34))

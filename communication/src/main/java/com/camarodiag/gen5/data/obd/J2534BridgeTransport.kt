@@ -169,7 +169,9 @@ class J2534BridgeTransport(
                 scopedMemoryReadEnabled = approvedMemoryReadScope != null
                 standardObdPhysicalReadEnabled = response.opt("standardObdPhysicalRead") == true &&
                     J2534StandardObd.supportsChannel(requestCanId, responseCanId, protocolNumber)
-                standardObdClearEnabled = standardObdPhysicalReadEnabled && response.opt("standardObdClear") == true
+                standardObdClearEnabled = standardObdPhysicalReadEnabled &&
+                    J2534StandardObd.supportsPrimaryChannel(requestCanId, responseCanId, protocolNumber) &&
+                    response.opt("standardObdClear") == true
                 opened = true
                 val adapter = response.optString("adapter", "J2534")
                 val voltage = response.optLong("batteryMillivolts", -1L)
