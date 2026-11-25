@@ -412,7 +412,8 @@ internal static class DoIpDiagnosticSessionSelfTests
         }
 
         // A legislated OBD route uses F802 and F810, not generic F190.
-        foreach (var protocolValue in new byte[] { 1, 2 })
+        // Check both an unknown initial protocol and a changed final protocol.
+        foreach (var (protocolValue, finalProtocol) in new (byte, byte)[] { (1, 1), (2, 2), (1, 2) })
         {
             await RunCaseAsync(async stream =>
             {
@@ -431,10 +432,19 @@ internal static class DoIpDiagnosticSessionSelfTests
                     Check(data.Payload.SequenceEqual(new byte[] {0x0E,0x80,0x12,0x34,0x22,0xF4,0x0C}),
                         "Legislated DID sent after identification.");
                     await SendAsync(stream, DoIpCodec.DiagnosticMessage, FromEcu([0x62,0xF4,0x0C,0xAB]));
+                    var finalVin = await ReadAsync(stream);
+                    Check(finalVin.Payload.SequenceEqual((byte[])[0x0E,0x80,0x12,0x34,0x22,0xF8,0x02]),
+                        "OBD single DID rechecks legislated VIN on the same connection.");
+                    await SendAsync(stream, DoIpCodec.DiagnosticMessage,
+                        FromEcu([0x62,0xF8,0x02, .. System.Text.Encoding.ASCII.GetBytes(selectedVehicleVin)]));
+                    var finalIdentification = await ReadAsync(stream);
+                    Check(finalIdentification.Payload.SequenceEqual((byte[])[0x0E,0x80,0x12,0x34,0x22,0xF8,0x10]),
+                        "OBD single DID rechecks protocol before returning the data.");
+                    await SendAsync(stream, DoIpCodec.DiagnosticMessage, FromEcu([0x62,0xF8,0x10,finalProtocol]));
                 }
             }, async client =>
             {
-                if (protocolValue == 1)
+                if (protocolValue == 1 && finalProtocol == 1)
                 {
                     var obd = await DoIpVinReader.ReadVerifiedObdAsync(client, selectedVehicleVin,
                         0xF40C, TimeSpan.FromSeconds(2), CancellationToken.None);
@@ -445,7 +455,7 @@ internal static class DoIpDiagnosticSessionSelfTests
                 {
                     _ = await DoIpVinReader.ReadVerifiedObdAsync(client, selectedVehicleVin,
                         0xF40C, TimeSpan.FromSeconds(2), CancellationToken.None);
-                }, "Unknown protocol value cannot authorize the legislated DID.");
+                }, "Unknown or changed protocol value cannot authorize the legislated DID result.");
             });
         }
 

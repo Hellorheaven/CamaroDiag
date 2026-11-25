@@ -1,3 +1,7 @@
+## PR117 — correction du simulateur Windows (25/11/2026)
+
+- Checkpoint 45548303381 : compilation Windows 0 erreur/0 avertissement, autotest interrompu car serveur simulé ne répondait pas aux nouvelles vérifications F802/F810 de fin de lecture. Scénario ajusté au véritable dialogue, cas de protocole changé ajouté. Aucun retrait de test ni de contrôle de production. Nouvelle validation nécessaire.
+
 ## PR117 — service UDS 24 DoIP (25/11/2026)
 
 - Lecture réelle ReadScalingDataByIdentifier sur Android, console Windows et CLI Connectors (`scaling-did --did F40C`). Contrôle du DID, données non vides, VIN relu avant/après même session, retour brut sans coefficients inventés. Interface FR/EN et tests Python. Postérieur au checkpoint 45548303381 ; pas encore validé par CI.
