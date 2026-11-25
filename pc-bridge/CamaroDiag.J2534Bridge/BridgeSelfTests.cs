@@ -419,7 +419,10 @@ internal static class BridgeSelfTests
         Assert(StandardObdPhysicalPolicy.AllowsRead([2,2,0]), "Standard freeze-frame DTC request");
         Assert(StandardObdPhysicalPolicy.AllowsRead([6,0]), "Standard Mode 06 supported monitor query");
         Assert(!StandardObdPhysicalPolicy.AllowsRead([2,2,1]), "Only freeze frame 00 is scoped");
-        Assert(!StandardObdPhysicalPolicy.AllowsRead([6,1]), "Unimplemented monitor read scope rejected");
+        Assert(StandardObdPhysicalPolicy.AllowsRead([6,1]), "Standard monitor read supported");
+        Assert(StandardObdPhysicalPolicy.AllowsRead([6,0xE0]), "Monitor continuation bitmap supported");
+        Assert(!StandardObdPhysicalPolicy.AllowsRead([6]), "Missing monitor identifier rejected");
+        Assert(!StandardObdPhysicalPolicy.AllowsRead([6,1,0]), "Extra monitor request parameter rejected");
         Assert(J2534Device.DecodeReceivedPayload(6,0,9,0,[0,0,7,0xE8,0x42,2,1,3,0],6,0x7E8,[2,2,0]) is null,
             "Wrong freeze-frame number rejected");
         Assert(J2534Device.DecodeReceivedPayload(6,0,7,0,[0,0,7,0xE8,0x46,1,0],6,0x7E8,[6,0]) is null,

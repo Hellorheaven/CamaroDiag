@@ -1,3 +1,7 @@
+## PR117 — alignement des régressions Windows Mode 06 (25/11/2026)
+
+- Les assertions J2534 couvrent les lectures MID et les pages suivantes, tout en refusant les requêtes incomplètes ou trop longues. Tests non exécutés. Le budget temporel global Mode 06 reste à intégrer : récupération du moteur Android et de certains diffs à nouveau intermittente ; ne pas considérer cette limitation comme publiée. C6/DoIP ouverts, aucun checkpoint.
+
 ## PR117 — lecture des moniteurs CAN OBD Mode 06 (25/11/2026)
 
 - C6 : parcours borné des bitmaps Mode 06, lecture des MID effectivement annoncés et décodage de leurs enregistrements CAN de 9 octets (MID/TID/UASID, valeur et seuils bruts). Aucun calcul d'unités ni verdict inventé sans table SAE J1979-DA ; résultats partiels explicitement marqués. J2534 Windows/Android autorise ces lectures normalisées (pas d'écriture). Le rapport existant présente les résultats, pas le bitmap comme mesure. Sources : SAE J1979 / ISO 15031-5, https://phprell.github.io/obd-diag/en/technik/dienste.html. Fichiers Android reconstitués depuis blobs et diffs vérifiés, lecture classique 404. Tests écrits non exécutés ; aucun checkpoint C6/DoIP.
