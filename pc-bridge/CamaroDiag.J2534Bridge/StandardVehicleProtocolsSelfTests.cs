@@ -605,6 +605,19 @@ internal static class StandardVehicleProtocolsSelfTests
         Check(parsed.Request.SequenceEqual(new byte[] { 0x2E, 0xF1, 0x90, 1 }),
             "DoIP bidirectional CLI accepts WDBI service.");
 
+        var inventoryArgs = new[] { "--host", "127.0.0.1", "--tester", "0E80",
+            "--expected-vin", "1G1FA1RXXR0123456", "--ecu-inventory", "1234,1235" };
+        var ecuInventory = StandardProtocolCli.ParseDoIpInventory(inventoryArgs);
+        Check(ecuInventory.Target.UseTls && ecuInventory.Ecus.SequenceEqual(new ushort[] {0x1234, 0x1235}) &&
+            ecuInventory.Target.Request.SequenceEqual(new byte[] {0x22, 0xF1, 0x90}),
+            "Explicit ECU inventory uses TLS and only F190.");
+        foreach (var invalid in new[] {"1234,1234", "1234-1235", "0E80", "123", ""})
+            Reject<ArgumentException>(() => StandardProtocolCli.ParseDoIpInventory([..inventoryArgs[..^1], invalid]),
+                "Invalid or ambiguous ECU inventory rejected.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseDoIpInventory([..inventoryArgs, "--ecu", "1234"]),
+            "Inventory cannot include a separate ECU selector.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseDoIpInventory([..inventoryArgs, "--payload", "22F190"]),
+            "Inventory cannot include arbitrary payload.");
         var strictArgs = new[] { "--host", "127.0.0.1", "--tester", "0E80", "--ecu", "1234",
             "--payload", "22F190" };
         Reject<ArgumentException>(() => StandardProtocolCli.ParseDoIp([..strictArgs, "--host", "192.0.2.1"]),

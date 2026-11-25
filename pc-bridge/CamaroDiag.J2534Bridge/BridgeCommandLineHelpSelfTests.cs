@@ -45,7 +45,7 @@ internal static class BridgeCommandLineHelpSelfTests
             "--power-mode true", "--broadcast-ip", "--vin", "--eid",
             "--trace-file", "--routing-activation-type", "--routing-oem-data",
             "--monitor-did", "--obd-monitor-did", "--monitor-dids", "--obd-monitor-dids",
-            "--samples", "--interval-ms",
+            "--samples", "--interval-ms", "--ecu-inventory",
             "--uds-did", "--uds-scaling-did", "--uds-dtc-mask", "--uds-dtc-count-mask",
             "--uds-snapshot", "--uds-snapshot-record", "--uds-extended-dtc", "--uds-extended-record",
             "--uds-supported-dtcs", "--uds-snapshot-index", "--uds-historical-dtc", "--uds-fault-counters", "--obd-identify",

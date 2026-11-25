@@ -68,6 +68,9 @@ Examples:
                               --sequence "22F190;1901FF" --expected-vin VIN
                               sends 1–16 ordered commands on one verified session,
                               TLS by default, stops at first error; interactive consent.
+                              --ecu-inventory 1234,1235 with --expected-vin VIN:
+                              verifies 1–16 explicit logical addresses instead of --ecu,
+                              read-only, no implicit scan; unverified is not absent.
                               --monitor-did F190 or --obd-monitor-did F40C
                               with --expected-vin VIN, --samples 10, --interval-ms 1000.
                               Read-only monitoring on one verified ECU, TLS by default.

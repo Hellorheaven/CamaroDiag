@@ -1649,6 +1649,8 @@ internal static class StandardProtocolCli
         }
         internal void Record(DoIpDiagnosticTransport.PduTrace frame) =>
             Write(FormatDoIpTrace(target ?? throw new InvalidOperationException("TCP trace target missing."), frame));
+        internal void RecordForEcu(ushort ecu, DoIpDiagnosticTransport.PduTrace frame) =>
+            Write(FormatDoIpTrace((target ?? throw new InvalidOperationException("TCP trace target missing.")) with { Ecu = ecu }, frame));
         internal void RecordDatagram(string direction, System.Net.IPEndPoint endpoint, byte[] data) =>
             Write(FormatDoIpDatagramTrace(direction, endpoint, data, DateTimeOffset.UtcNow));
         private void Write(string line)
@@ -1656,7 +1658,8 @@ internal static class StandardProtocolCli
             lock (gate)
             {
                 if (disposed) throw new ObjectDisposedException(nameof(DoIpTraceJournal));
-                writer.WriteLine(line);
+                try { writer.WriteLine(line); }
+                catch (IOException error) { throw new InvalidOperationException("DoIP trace journal write failed.", error); }
             }
         }
         public void Dispose()
@@ -2030,10 +2033,83 @@ internal static class StandardProtocolCli
         finally { Console.CancelKeyPress -= cancel; }
     }
 
+    internal sealed record DoIpInventoryOptions(DoIpOptions Target, string Vin, ushort[] Ecus,
+        bool ExplicitVersion);
+
+    internal static DoIpInventoryOptions ParseDoIpInventory(string[] args)
+    {
+        ValidateDoIpArguments(args, DoIpCommand, ["--host", "--tester", "--expected-vin",
+            "--ecu-inventory", "--timeout-ms", "--tls", "--doip-version", "--client-cert-thumbprint",
+            "--uds-p2-ms", "--uds-p2-star-ms", "--routing-activation-type", "--routing-oem-data", "--trace-file"], []);
+        var vin = Required(args, "--expected-vin");
+        if (!DoIpVehicleDiscovery.IsVehicleVin(vin))
+            throw new ArgumentException("Explicit valid VIN required.");
+        var ecus = DoIpVinReader.ParseInventoryAddresses(Required(args, "--ecu-inventory"));
+        var tester = Address(Required(args, "--tester"));
+        if (ecus.Contains(tester)) throw new ArgumentException("Tester must differ from every ECU.");
+        var forwarded = new List<string>();
+        for (var i = args.Length > 0 && args[0].Equals(DoIpCommand, StringComparison.OrdinalIgnoreCase) ? 1 : 0;
+            i < args.Length; i += 2)
+            if (!args[i].Equals("--ecu-inventory", StringComparison.OrdinalIgnoreCase) &&
+                !args[i].Equals("--expected-vin", StringComparison.OrdinalIgnoreCase))
+            {
+                forwarded.Add(args[i]);
+                forwarded.Add(args[i+1]);
+            }
+        forwarded.AddRange(["--ecu", $"{ecus[0]:X4}", "--payload", "22F190"]);
+        if (Optional(args, "--tls") is null) forwarded.AddRange(["--tls", "true"]);
+        var target = ParseDoIp(forwarded.ToArray());
+        if (!System.Net.IPAddress.TryParse(target.Host, out var address) ||
+            !DoIpVehicleDiscovery.IsExplicitUnicast(address))
+            throw new ArgumentException("ECU inventory requires a numeric unicast IP.");
+        var timing = DoIpDiagnosticTransport.SessionOptions.Parse(target.TimeoutMs,
+            Optional(args, "--uds-p2-ms") ?? "", Optional(args, "--uds-p2-star-ms") ?? "",
+            target.RoutingActivationType.ToString("X2"),
+            target.RoutingOemData is null ? "" : Convert.ToHexString(target.RoutingOemData));
+        return new(target with { DoIpP2Ms = timing.P2Ms, DoIpP2StarMs = timing.P2StarMs },
+            vin, ecus, Optional(args, "--doip-version") is not null);
+    }
+
+    private static async Task<int> RunDoIpInventoryAsync(string[] args)
+    {
+        var inventory = ParseDoIpInventory(args);
+        var o = inventory.Target;
+        using var stop = new CancellationTokenSource();
+        ConsoleCancelEventHandler cancel = (_, e) => { e.Cancel = true; stop.Cancel(); };
+        Console.CancelKeyPress += cancel;
+        try
+        {
+            var timeout = TimeSpan.FromMilliseconds(o.TimeoutMs);
+            using var journal = OpenDoIpTrace(o);
+            var gateway = await DoIpVehicleDiscovery.DiscoverAsync(o.Host, timeout, stop.Token, vin: inventory.Vin,
+                trace: journal is null ? null : journal.RecordDatagram);
+            if (gateway.Vin != inventory.Vin || gateway.LogicalAddress == o.Tester ||
+                (inventory.ExplicitVersion && gateway.ProtocolVersion != o.Version))
+                throw new InvalidDataException("Observed gateway differs from the selected inventory target.");
+            var rows = await DoIpVinReader.InventoryObservedAsync(gateway, inventory.Vin, o.Tester,
+                inventory.Ecus, o.UseTls, timeout, stop.Token, o.ClientCertificateThumbprint,
+                new DoIpDiagnosticTransport.SessionOptions(o.DoIpP2Ms, o.DoIpP2StarMs, o.RoutingActivationType,
+                    o.RoutingOemData is null ? "" : Convert.ToHexString(o.RoutingOemData)),
+                journal is null ? null : journal.RecordDatagram,
+                journal is null ? null : journal.RecordForEcu);
+            Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(new
+            {
+                complete = true, vin = inventory.Vin, verified_count = rows.Count(row => row.Vin is not null),
+                targets = rows.Select(row => new { ecu = $"{row.Ecu:X4}", vin = row.Vin,
+                    status = row.Vin is null ? "unverified" : "vin_verified", reason = row.Reason }),
+                physical_qualification = false
+            }));
+            return 0;
+        }
+        finally { Console.CancelKeyPress -= cancel; }
+    }
+
     internal static async Task<int> RunDoIpAsync(string[] args)
     {
         try
         {
+            if (args.Contains("--ecu-inventory", StringComparer.OrdinalIgnoreCase))
+                return await RunDoIpInventoryAsync(args);
             if (args.Contains("--monitor-did", StringComparer.OrdinalIgnoreCase) ||
                 args.Contains("--obd-monitor-did", StringComparer.OrdinalIgnoreCase) ||
                 args.Contains("--monitor-dids", StringComparer.OrdinalIgnoreCase) ||

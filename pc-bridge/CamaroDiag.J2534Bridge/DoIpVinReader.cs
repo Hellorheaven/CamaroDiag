@@ -16,6 +16,62 @@ internal static class DoIpVinReader
         return address;
     }
 
+    internal static ushort[] ParseInventoryAddresses(string text)
+    {
+        var addresses = text.Split(',');
+        if (addresses.Length is < 1 or > 16)
+            throw new ArgumentException("Supply 1..16 explicit logical ECU addresses.");
+        var targets = addresses.Select(ParseLogicalAddress).ToArray();
+        if (targets.Distinct().Count() != targets.Length)
+            throw new ArgumentException("Duplicate logical ECU address.");
+        return targets;
+    }
+
+    internal sealed record InventoryEntry(ushort Ecu, string? Vin, string? Reason);
+
+    internal static async Task<IReadOnlyList<InventoryEntry>> InventoryObservedAsync(
+        DoIpVehicleDiscovery.Identity gateway, string expectedVin, ushort tester,
+        IReadOnlyList<ushort> targets, bool tls, TimeSpan timeout, CancellationToken token,
+        string? certificate = null, DoIpDiagnosticTransport.SessionOptions? options = null,
+        DoIpVehicleDiscovery.DatagramTrace? udpTrace = null,
+        Action<ushort, DoIpDiagnosticTransport.PduTrace>? pduTrace = null)
+    {
+        var frozen = targets.ToArray();
+        if (!DoIpVehicleDiscovery.IsVehicleVin(expectedVin) || gateway.Vin != expectedVin ||
+            tester == gateway.LogicalAddress || frozen.Length is < 1 or > 16 ||
+            frozen.Distinct().Count() != frozen.Length || frozen.Contains(tester))
+            throw new ArgumentException("Invalid ECU inventory targets or gateway identity.");
+        options?.Validate(timeout);
+        var rows = new List<InventoryEntry>();
+        foreach (var ecu in frozen)
+        {
+            token.ThrowIfCancellationRequested();
+            await DoIpVehicleDiscovery.RequireCurrentIdentityAsync(gateway, timeout, token, udpTrace);
+            try
+            {
+                await using var link = await ConnectObservedAsync(gateway, gateway.Source, tester, ecu,
+                    tls, timeout, token, certificate, pduTrace is null ? null : frame => pduTrace(ecu, frame), options);
+                var vin = await VerifyObservedVinAsync(link, gateway, timeout, token, null, null);
+                if (vin != expectedVin) throw new InvalidDataException("ECU VIN mismatch.");
+                rows.Add(new(ecu, vin, null));
+            }
+            catch (OperationCanceledException) when (!token.IsCancellationRequested)
+            {
+                rows.Add(new(ecu, null, "timeout"));
+            }
+            catch (Exception error) when (error is IOException or InvalidDataException or
+                System.Net.Sockets.SocketException or TimeoutException)
+            {
+                // A failed read cannot establish that an ECU does not exist.
+                rows.Add(new(ecu, null, "communication_or_identity_failure"));
+            }
+            // AuthenticationException and caller/trace errors are deliberately fatal.
+        }
+        await DoIpVehicleDiscovery.RequireCurrentIdentityAsync(gateway, timeout, token, udpTrace);
+        token.ThrowIfCancellationRequested();
+        return rows;
+    }
+
     internal static string ParseVin(byte[] reply)
     {
         ArgumentNullException.ThrowIfNull(reply);

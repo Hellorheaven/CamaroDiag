@@ -1,3 +1,7 @@
+## PR117 — inventaire explicite ECU DoIP Windows CLI (25/11/2026)
+
+- Parité Connectors/Windows CLI : --ecu-inventory 1234,1235 remplace --ecu, 1–16 adresses connues, F190 par session, revalidation passerelle à chaque étape et en fin, TLS sans repli, résultat vérifié/non vérifié. Journal PDU attribué à l'adresse réellement interrogée. Annulation et refus des arguments concurrents. Moteur réutilisable pour GUI Windows. Tests écrits sans exécution ; Android et GUI Windows restent à raccorder. Aucun checkpoint CI.
+
 ## PR117 — inventaire explicite des ECU DoIP Connectors (25/11/2026)
 
 - CLI ecu-inventory --ecus 1234,1235 (1 à 16 adresses explicites, aucun balayage implicite), VIN/testeur obligatoires, TLS par défaut, sessions séparées, F190 et revalidation de passerelle avant chaque ECU et après inventaire. Distinction VIN vérifié/non vérifié ; NRC conservé, échec TLS bloque sans repli, aucune capacité de programmation déduite. Tests écrits non exécutés. Android et Windows à raccorder. Aucun checkpoint CI.
