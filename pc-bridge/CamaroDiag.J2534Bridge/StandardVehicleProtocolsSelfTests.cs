@@ -858,6 +858,25 @@ internal static class StandardVehicleProtocolsSelfTests
         Reject<InvalidDataException>(() => ObdOnUdsServices.DecodeStoredRecord(1, [0x59, 5, 2]), "Wrong record rejected.");
         Reject<InvalidDataException>(() => ObdOnUdsServices.DecodeStoredRecord(1, [0x59, 5, 1, 1, 2, 3, 8, 2, 0xF1, 0x90]), "Missing DID rejected.");
         Reject<ArgumentException>(() => StandardProtocolCli.ParseVerifiedDoIpRead([..recordArgs, "--uds-stored-record", "0xFF"]), "Wildcard requires OEM layout.");
+        var decodedExtended = StandardProtocolCli.ParseVerifiedDoIpRead([..recordArgs, "--uds-extended-dtc", "0x010203",
+            "--uds-extended-record", "0xFF", "--extended-record-lengths", "01:2,90:1,91:2"]);
+        Check(!decodedExtended.Obd && decodedExtended.Target.Request.SequenceEqual(new byte[] { 0x19, 6, 1, 2, 3, 255 }),
+            "Decoded extended data uses generic verified UDS.");
+        var extendedCatalog = ObdOnUdsServices.ParseExtendedRecordLengths("01:2,90:1,91:2");
+        var extendedResponse = Convert.FromHexString("59060102030801123490AA91BBCC");
+        var extendedReport = ObdOnUdsServices.DecodeExtendedRecords(0x010203, 255, extendedResponse, extendedCatalog);
+        Check(extendedReport.Records.Count == 3 && extendedReport.Records[2].Number == 0x91 &&
+            extendedReport.Records[2].Data.SequenceEqual(new byte[] { 0xBB, 0xCC }) &&
+            extendedReport.RawResponse.SequenceEqual(extendedResponse), "Extended data retains record boundaries.");
+        Check(ObdOnUdsServices.DecodeExtendedRecords(0x010203, 0xFE,
+            Convert.FromHexString("59060102030890AA91BBCC"), extendedCatalog).Records.Count == 2, "FE limits to regulated OBD records.");
+        foreach (var (selector, invalid) in new (byte, string)[] { (0xFE, "590601020308011234"),
+            (1, "59060102030801123490AA"), (255, "59060102030890AA90BB"),
+            (255, "5906010203080112"), (255, "59060102030802AA"), (255, "59060102040890AA") })
+            Reject<InvalidDataException>(() => ObdOnUdsServices.DecodeExtendedRecords(0x010203, selector,
+                Convert.FromHexString(invalid), extendedCatalog), "Malformed extended record response rejected.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseVerifiedDoIpRead([..recordArgs, "--uds-did", "F190",
+            "--extended-record-lengths", "01:2"]), "Extended data lengths require the correct selector.");
         var decodedSnapshot = StandardProtocolCli.ParseVerifiedDoIpRead([..recordArgs, "--uds-snapshot", "0x010203",
             "--uds-snapshot-record", "0xFF", "--snapshot-did-lengths", "F40C:2,F40D:1"]);
         Check(!decodedSnapshot.Obd && decodedSnapshot.Target.Request.SequenceEqual(new byte[] { 0x19, 4, 1, 2, 3, 255 }),
