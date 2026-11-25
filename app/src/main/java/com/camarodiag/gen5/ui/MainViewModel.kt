@@ -1498,15 +1498,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     require(didHex.matches(Regex("[0-9A-Fa-f]{2}")))
                     didHex.toInt(16).also { require(it in 0..254) }
                 } else null
-                val decodedSnapshot = operation in setOf(DoIpDirectRead.Operation.DECODED_SNAPSHOT, DoIpDirectRead.Operation.OBD_DECODED_SNAPSHOT)
-                val decodedExtended = operation in setOf(DoIpDirectRead.Operation.DECODED_EXTENDED, DoIpDirectRead.Operation.OBD_DECODED_EXTENDED)
+                val decodedMemory = operation in setOf(DoIpDirectRead.Operation.MEMORY_DECODED_SNAPSHOT, DoIpDirectRead.Operation.MEMORY_DECODED_EXTENDED)
+                val decodedSnapshot = operation in setOf(DoIpDirectRead.Operation.DECODED_SNAPSHOT, DoIpDirectRead.Operation.OBD_DECODED_SNAPSHOT, DoIpDirectRead.Operation.MEMORY_DECODED_SNAPSHOT)
+                val decodedExtended = operation in setOf(DoIpDirectRead.Operation.DECODED_EXTENDED, DoIpDirectRead.Operation.OBD_DECODED_EXTENDED, DoIpDirectRead.Operation.MEMORY_DECODED_EXTENDED)
                 val snapshotParts = if (decodedSnapshot || decodedExtended) didHex.split('|').also {
-                    require(it.size == 2 && it[0].matches(Regex("[0-9A-Fa-f]{8}")))
+                    require(it.size == 2 && it[0].matches(Regex(if (decodedMemory) "[0-9A-Fa-f]{10}" else "[0-9A-Fa-f]{8}")))
                 } else emptyList()
                 val extendedCatalog = if (decodedExtended)
                     com.camarodiag.gen5.data.obd.UdsDtcDecoder.parseExtendedRecordLengths(snapshotParts[1]).also {
                         com.camarodiag.gen5.data.obd.UdsDtcDecoder.extendedRecordsRequest(
-                            snapshotParts[0].take(6).toInt(16), snapshotParts[0].takeLast(2).toInt(16), it)
+                            snapshotParts[0].take(6).toInt(16), snapshotParts[0].substring(6, 8).toInt(16), it)
                     } else null
                 val storedCatalog = when {
                     decodedSnapshot -> com.camarodiag.gen5.data.obd.UdsDtcDecoder.parseStoredDidLengths(snapshotParts[1])
@@ -1528,7 +1529,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val memoryList = operation == DoIpDirectRead.Operation.MEMORY_DTCS
                 val memoryDetail = operation in setOf(DoIpDirectRead.Operation.MEMORY_SNAPSHOT, DoIpDirectRead.Operation.MEMORY_EXTENDED)
                 if (memoryList || memoryDetail) require(didHex.matches(Regex(if (memoryList) "[0-9A-Fa-f]{4}" else "[0-9A-Fa-f]{10}")))
-                val memory = if (memoryList || memoryDetail) didHex.takeLast(2).toInt(16) else null
+                val memory = if (decodedMemory) snapshotParts[0].takeLast(2).toInt(16) else if (memoryList || memoryDetail) didHex.takeLast(2).toInt(16) else null
                 if (memoryDetail) {
                     val record = didHex.substring(6, 8).toInt(16)
                     require(record != 0 && (operation != DoIpDirectRead.Operation.MEMORY_EXTENDED || record !in 0xF0..0xFD))
@@ -1555,7 +1556,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val isDetail = operation in setOf(DoIpDirectRead.Operation.DTC_SNAPSHOT, DoIpDirectRead.Operation.DTC_EXTENDED, DoIpDirectRead.Operation.OBD_DTC_SNAPSHOT, DoIpDirectRead.Operation.OBD_DTC_EXTENDED)
                 if (isDetail) require(didHex.matches(Regex("[0-9A-Fa-f]{8}")))
                 val detailDtc = if (decodedSnapshot || decodedExtended) snapshotParts[0].take(6).toInt(16) else if (isDetail || severityInfo || memoryDetail || legacyDetail) didHex.take(6).toInt(16) else 0
-                val detailRecord = if (decodedSnapshot || decodedExtended) snapshotParts[0].takeLast(2).toInt(16) else if (memoryDetail) didHex.substring(6, 8).toInt(16) else if (isDetail || legacyDetail) didHex.takeLast(2).toInt(16) else 1
+                val detailRecord = if (decodedSnapshot || decodedExtended) snapshotParts[0].substring(6, 8).toInt(16) else if (memoryDetail) didHex.substring(6, 8).toInt(16) else if (isDetail || legacyDetail) didHex.takeLast(2).toInt(16) else 1
                 val clientTls = certificate?.let { DoIpClientTls.open(getApplication<Application>(), it, target) }
                 check(current())
                 if (operation in setOf(DoIpDirectRead.Operation.INVENTORY, DoIpDirectRead.Operation.OBD_INVENTORY)) {
@@ -1653,15 +1654,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             reply.joinToString(" ") { "%02X".format(it.toInt() and 255) })
                     }.joinToString("\n")
                     result.decodedExtended != null -> requireNotNull(result.decodedExtended).let { report ->
-                        val heading = localizedContext.getString(R.string.cal_doip_decoded_extended_result,
-                            report.dtc, report.status, report.records.size)
+                        val heading = (result.decodedMemory?.let { localizedContext.getString(R.string.cal_doip_decoded_memory, it) + "\n" } ?: "") +
+                            localizedContext.getString(R.string.cal_doip_decoded_extended_result, report.dtc, report.status, report.records.size)
                         (listOf(heading) + report.records.map { row ->
                             localizedContext.getString(R.string.cal_doip_extended_record_result, row.number,
                                 row.data.joinToString(" ") { "%02X".format(it.toInt() and 255) })
                         }).joinToString("\n")
                     }
                     result.decodedSnapshot != null -> requireNotNull(result.decodedSnapshot).let { report ->
-                        val heading = localizedContext.getString(R.string.cal_doip_decoded_snapshot_result, report.dtc, report.status, report.records.size)
+                        val heading = (result.decodedMemory?.let { localizedContext.getString(R.string.cal_doip_decoded_memory, it) + "\n" } ?: "") +
+                            localizedContext.getString(R.string.cal_doip_decoded_snapshot_result, report.dtc, report.status, report.records.size)
                         (listOf(heading) + report.records.flatMap { row ->
                             listOf(localizedContext.getString(R.string.cal_doip_snapshot_record_result, row.record)) +
                                 row.dids.map { item -> localizedContext.getString(R.string.cal_doip_multi_result,
