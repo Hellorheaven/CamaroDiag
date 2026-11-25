@@ -213,9 +213,17 @@ object CamaroUdsProtocol {
         response: String,
         pid: String,
         primaryPowertrainResponderOnly: Boolean = false
-    ): IntArray? {
+    ): IntArray? = parsePidObservations(response, pid, primaryPowertrainResponderOnly)
+        .firstOrNull()?.bytes?.toIntArray()
+
+    data class PidObservation(val responder: String?, val bytes: List<Int>)
+
+    /** Keep each validated Mode 01 response attached to its actual responder. */
+    fun parsePidObservations(response: String, pid: String,
+        primaryPowertrainResponderOnly: Boolean = false): List<PidObservation> {
         val pidHex = pid.trim().uppercase(Locale.ROOT).padStart(2, '0')
-        if (!Regex("[0-9A-F]{2}").matches(pidHex)) return null
+        if (!Regex("[0-9A-F]{2}").matches(pidHex)) return emptyList()
+        val observations = mutableListOf<PidObservation>()
         val expectedPid = pidHex.toInt(16)
         val hexPairData = Regex("(?:[0-9A-F]{2}){3,10}")
         // A Mode 01 reply must use a documented OBD responder header, not
@@ -278,9 +286,9 @@ object CamaroUdsProtocol {
             // malformed live sensor frame into an apparently valid reading.
             val expectedLength = SafeObdRequestPolicy.expectedMode01DataBytes(expectedPid)
             if (expectedLength != null && bytes.size != expectedLength + 2) continue
-            return bytes.drop(2).toIntArray()
+            observations += PidObservation(responder, bytes.drop(2))
         }
-        return null
+        return observations
     }
 
     /**

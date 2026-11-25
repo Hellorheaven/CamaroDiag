@@ -1,3 +1,7 @@
+## PR117 — découverte PID multicalculateur et télémétrie générique (25/11/2026)
+
+- C6 : collecte des bitmaps SAE Mode 01 par répondant réel avec suivi indépendant des pages, rejet des doublons contradictoires et conservation du statut incomplet lorsqu'une page manque. Télémétrie standard générique : source stable par PID, pas de substitution silencieuse si le répondant disparaît, identifiant CAN dans les libellés des mesures/CSV ; restriction ECM conservée pour Camaro confirmé. Ajout du PID 5B lorsque réellement annoncé et lu (durée de vie batterie hybride, pas état de charge ni capacité EV propriétaire). Tests écrits non exécutés ; aucune CI. C6/DoIP restent actifs.
+
 ## PR117 — export des mesures DoIP partielles vérifiées (25/11/2026)
 
 - C6/DoIP Android : chaque échantillon validé porte le VIN et l'adresse logique de passerelle observés ; un rapport partiel est constitué immédiatement et reste exportable après annulation ou erreur ultérieure, exclusivement pour le contexte véhicule/compte courant. CSV avec capture_complete, requested_samples et verified_samples ; statut partiel visible en FR/EN. Aucun résultat non vérifié ajouté ; changement de contexte efface toujours les données. Régressions écrites non exécutées, aucun checkpoint. C6/DoIP restent actifs.

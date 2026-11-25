@@ -5575,8 +5575,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             var sensorRecency = LiveSignalRecency()
             var lastEvidenceGeneration = -1L
             var batchEvidenceGeneration = -1L
+            var liveSources = com.camarodiag.gen5.data.obd.StableLivePidSources()
+            var lastReadResponder: String? = null
+            val signalSources = mutableMapOf<String, String>()
 
             fun push(id: String, value: Double): List<Double> {
+                lastReadResponder?.let { signalSources[id] = it }
                 val queue = histories.getOrPut(id) { ArrayDeque() }
                 if (queue.size >= 24) queue.removeFirst()
                 queue.addLast(value)
@@ -5596,9 +5600,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     response.contains("UNABLE TO CONNECT", ignoreCase = true)) {
                     throw ObdTransportDisconnectedException("Live OBD transport is disconnected")
                 }
-                return CamaroUdsProtocol.parsePidBytes(
-                    response, pid, primaryPowertrainResponderOnly = true
-                )
+                val observedVin = _calibrationWorkspace.value.ecuVinResponse
+                val confirmedCamaro = VehicleVinMatcher.isCamaroCandidate(observedVin) &&
+                    VehicleVinMatcher.normalize(_vehicle.value.vin) == observedVin
+                val observation = liveSources.select(pidValue, CamaroUdsProtocol.parsePidObservations(
+                    response, pid, primaryPowertrainResponderOnly = confirmedCamaro))
+                lastReadResponder = observation?.responder
+                return observation?.bytes?.toIntArray()
             }
 
             while (currentCoroutineContext().isActive) {
@@ -5607,6 +5615,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     if (lastEvidenceGeneration != batchEvidenceGeneration) {
                         histories.clear()
                         sensorRecency = LiveSignalRecency()
+                        liveSources = com.camarodiag.gen5.data.obd.StableLivePidSources()
+                        signalSources.clear()
+                        lastReadResponder = null
                         lastEvidenceGeneration = batchEvidenceGeneration
                     }
                     activeTelemetryBatch = (activeTelemetryBatch + 1) % 4
@@ -5794,17 +5805,30 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                                     val v = (b[0] * 256 + b[1]) / 1000.0
                                     values += LivePidValue("BAT", "Control Module Voltage", "Tension calculateur", v, "V", v, "V", 9.0, 16.0, push("BAT", v))
                                 }
+                                read("5B")?.singleOrNull()?.let { b ->
+                                    val v = b * 100.0 / 255.0
+                                    values += LivePidValue("HYBRID_BAT_LIFE",
+                                        "Hybrid battery pack remaining life (PID 5B)",
+                                        "Durée de vie restante batterie hybride (PID 5B)",
+                                        v, "%", v, "%", 0.0, 100.0, push("HYBRID_BAT_LIFE", v))
+                                }
                                 if (batchEvidenceGeneration != liveEvidenceGeneration) continue
+                                val attributedValues = values.map { value ->
+                                    val source = signalSources[value.id]
+                                    if (source == null) value else value.copy(
+                                        labelEn = "${value.labelEn} [${source}]",
+                                        labelFr = "${value.labelFr} [${source}]")
+                                }
                                 val mergedValues = _livePids.value.associateBy { it.id }.toMutableMap()
                                 val now = System.currentTimeMillis()
-                                values.forEach {
+                                attributedValues.forEach {
                                     mergedValues[it.id] = it
                                     sensorRecency.record(it.id, now)
                                 }
                                 _livePids.value = mergedValues.values.filter {
                                     sensorRecency.isRecent(it.id, now)
                                 }
-                                valuesForRecording = values
+                                valuesForRecording = attributedValues
                                 _liveTelemetryMessage.value = if (_livePids.value.isEmpty()) {
                                     localizedContext.getString(R.string.msg_live_no_pid_response)
                                 } else {

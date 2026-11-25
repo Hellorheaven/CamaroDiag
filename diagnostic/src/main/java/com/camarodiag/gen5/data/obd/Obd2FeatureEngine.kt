@@ -184,30 +184,39 @@ class Obd2FeatureEngine(
 
     suspend fun discoverPidAvailability(primaryPowertrainResponderOnly: Boolean = false): PidDiscovery {
         val supported = linkedSetOf<Int>()
+        var expectedResponders: Set<String?>? = null
+        var firstUnresolved: Int? = null
         var basePid = 0x00
         repeat(8) {
             val pidHex = "%02X".format(Locale.US, basePid)
             val response = ask("01$pidHex")
-            val bytes = if (primaryPowertrainResponderOnly) {
-                CamaroUdsProtocol.parsePidBytes(response, pidHex, primaryPowertrainResponderOnly = true)
-                    ?.takeIf { it.size == 4 }?.asList()
-            } else CamaroUdsProtocol.parsePidBytes(response, pidHex)?.takeIf { it.size == 4 }?.asList()
-            if (bytes == null || bytes.size != 4) return PidDiscovery(supported, basePid + 1)
-
-            for (bit in 0 until 32) {
-                val mask = 1 shl (7 - (bit % 8))
-                if ((bytes[bit / 8] and mask) != 0 && bit != 31) {
-                    // Bit 31 is the continuation flag for the next bitmap page,
-                    // not a queryable Mode 01 PID (0x20, 0x40, ...).
-                    supported += basePid + bit + 1
-                }
+            val grouped = CamaroUdsProtocol.parsePidObservations(response, pidHex,
+                primaryPowertrainResponderOnly).filter { it.bytes.size == 4 }
+                .groupBy { it.responder }
+            val candidates = if (grouped.keys.any { it != null }) grouped.filterKeys { it != null } else grouped
+            val valid = candidates.mapNotNull { (address, rows) ->
+                rows.map { it.bytes }.distinct().singleOrNull()?.let { address to it }
+            }.toMap()
+            val expected = expectedResponders
+            val accepted = if (expected == null) valid else valid.filterKeys { it in expected }
+            if (accepted.isEmpty() || (expected != null && !accepted.keys.containsAll(expected)) ||
+                (expected == null && accepted.size != candidates.size)) {
+                if (firstUnresolved == null) firstUnresolved = basePid + 1
             }
-
-            val hasNextPage = (bytes[3] and 0x01) != 0
-            if (!hasNextPage) return PidDiscovery(supported, null)
+            if (accepted.isEmpty()) return PidDiscovery(supported, firstUnresolved)
+            val next = linkedSetOf<String?>()
+            for ((address, bytes) in accepted) {
+                for (bit in 0 until 31) {
+                    val mask = 1 shl (7 - (bit % 8))
+                    if ((bytes[bit / 8] and mask) != 0) supported += basePid + bit + 1
+                }
+                if ((bytes[3] and 0x01) != 0) next += address
+            }
+            if (next.isEmpty()) return PidDiscovery(supported, firstUnresolved)
+            expectedResponders = next
             basePid += 0x20
         }
-        return PidDiscovery(supported, null)
+        return PidDiscovery(supported, firstUnresolved)
     }
 
     /**
