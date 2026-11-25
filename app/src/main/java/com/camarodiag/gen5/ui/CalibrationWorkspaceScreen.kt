@@ -346,6 +346,7 @@ fun CalibrationWorkspaceScreen(
     var doIpDetailDtc by remember(vehicle) { mutableStateOf("") }
     var doIpDetailRecord by remember(vehicle) { mutableStateOf("01") }
     var doIpStoredCatalog by remember(vehicle) { mutableStateOf("") }
+    var doIpExtendedCatalog by remember(vehicle) { mutableStateOf("") }
     var doIpDtcMemory by remember(vehicle) { mutableStateOf("") }
     var doIpExtendedRecordSize by remember(vehicle) { mutableStateOf("") }
     var doIpCommand by remember(vehicle) { mutableStateOf("") }
@@ -853,6 +854,25 @@ fun CalibrationWorkspaceScreen(
                             doIpDetailDtc + doIpDetailRecord + "|" + doIpStoredCatalog, doIpTls, op,
                             doIpCertificate, requireNotNull(doIpOptions)) },
                             enabled = targetReady && vinReady && storedCatalogReady &&
+                                doIpDetailDtc.length == 6 && doIpDetailRecord.length == 2,
+                            modifier = Modifier.fillMaxWidth()) { Text(stringResource(label)) }
+                    }
+                    OutlinedTextField(doIpExtendedCatalog, { doIpExtendedCatalog = it.uppercase().filter { c -> c in "0123456789ABCDEF:," }.take(1911) },
+                        enabled = idle, modifier = Modifier.fillMaxWidth(), singleLine = true,
+                        label = { Text(stringResource(R.string.cal_doip_extended_catalog)) })
+                    val extendedCatalogReady = remember(doIpExtendedCatalog, doIpDetailRecord) {
+                        runCatching {
+                            val catalog = com.camarodiag.gen5.data.obd.UdsDtcDecoder.parseExtendedRecordLengths(doIpExtendedCatalog)
+                            com.camarodiag.gen5.data.obd.UdsDtcDecoder.extendedRecordsRequest(0, doIpDetailRecord.toInt(16), catalog)
+                        }.isSuccess
+                    }
+                    for ((op, label) in listOf(
+                        DoIpDirectRead.Operation.DECODED_EXTENDED to R.string.cal_doip_decoded_extended,
+                        DoIpDirectRead.Operation.OBD_DECODED_EXTENDED to R.string.cal_doip_obd_decoded_extended)) {
+                        OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu,
+                            doIpDetailDtc + doIpDetailRecord + "|" + doIpExtendedCatalog, doIpTls, op,
+                            doIpCertificate, requireNotNull(doIpOptions)) },
+                            enabled = targetReady && vinReady && extendedCatalogReady &&
                                 doIpDetailDtc.length == 6 && doIpDetailRecord.length == 2,
                             modifier = Modifier.fillMaxWidth()) { Text(stringResource(label)) }
                     }
