@@ -1494,7 +1494,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     val selected = didHex.takeLast(2).toInt(16)
                     require(selected != 0 && selected !in 0xF0..0xFD)
                 }
-                val storedRecord = if (operation == DoIpDirectRead.Operation.STORED_RECORD) {
+                val decodedStored = operation == DoIpDirectRead.Operation.DECODED_STORED_RECORD
+                val storedParts = if (decodedStored) didHex.split('|').also { require(it.size == 2) } else emptyList()
+                val storedRecord = if (decodedStored) {
+                    require(storedParts[0].matches(Regex("[0-9A-Fa-f]{2}")))
+                    storedParts[0].toInt(16).also { require(it in 0..254) }
+                } else if (operation == DoIpDirectRead.Operation.STORED_RECORD) {
                     require(didHex.matches(Regex("[0-9A-Fa-f]{2}")))
                     didHex.toInt(16).also { require(it in 0..254) }
                 } else null
@@ -1510,6 +1515,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             snapshotParts[0].take(6).toInt(16), snapshotParts[0].substring(6, 8).toInt(16), it)
                     } else null
                 val storedCatalog = when {
+                    decodedStored -> com.camarodiag.gen5.data.obd.UdsDtcDecoder.parseStoredDidLengths(storedParts[1])
                     decodedSnapshot -> com.camarodiag.gen5.data.obd.UdsDtcDecoder.parseStoredDidLengths(snapshotParts[1])
                     operation == DoIpDirectRead.Operation.ALL_STORED_RECORDS ->
                         com.camarodiag.gen5.data.obd.UdsDtcDecoder.parseStoredDidLengths(didHex)
@@ -1671,7 +1677,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         }).joinToString("\n")
                     }
                     result.allStoredReport != null -> requireNotNull(result.allStoredReport).let { report ->
-                        val heading = localizedContext.getString(R.string.cal_doip_all_stored_result, report.records.size)
+                        val heading = (result.requestedStoredRecord?.takeIf { it != 255 }?.let {
+                            localizedContext.getString(R.string.cal_doip_stored_record_result, it) + "\n"
+                        } ?: "") + localizedContext.getString(R.string.cal_doip_all_stored_result, report.records.size)
                         (listOf(heading) + report.records.flatMap { row ->
                             listOf(localizedContext.getString(R.string.cal_doip_stored_record_result, row.record),
                                 localizedContext.getString(R.string.cal_doip_detail_result, row.dtc, row.status,
