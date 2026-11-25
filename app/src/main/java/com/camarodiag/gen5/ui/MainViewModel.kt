@@ -776,6 +776,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _connectionMessage.value = localizedContext.getString(R.string.msg_vehicle_ecu_vin_invalid)
             return
         }
+        if (!VehicleVinMatcher.isCamaroCandidate(normalizedVin)) {
+            _connectionMessage.value = localizedContext.getString(R.string.msg_vehicle_non_camaro_vin)
+            return
+        }
         val selectedId = _selectedSavedVehicleId.value
         updateVin(normalizedVin)
         if (selectedId != null) {
@@ -793,6 +797,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val normalizedVin = VehicleVinMatcher.normalize(ecuVin)
         if (normalizedVin == null) {
             _connectionMessage.value = localizedContext.getString(R.string.msg_vehicle_ecu_vin_invalid)
+            return
+        }
+        if (!VehicleVinMatcher.isCamaroCandidate(normalizedVin)) {
+            _connectionMessage.value = localizedContext.getString(R.string.msg_vehicle_non_camaro_vin)
             return
         }
         val vehicleFromEcu = _vehicle.value.copy(vin = normalizedVin)
@@ -5030,9 +5038,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val connected = !obdManager.isDemoMode && !obdManager.isSimulationActive &&
                 (obdManager.isObdCommandChannelAvailable || obdManager.isJ2534BridgeConnected())
             val transport = obdManager.currentTransportKind
-            val topology = _modules.value.ifEmpty {
-                CamaroUdsProtocol.buildTopology(_vehicle.value, _adapter.value)
-            }
+            val topology = if (com.camarodiag.gen5.domain.model.VehicleVinMatcher.isCamaroCandidate(selectedVin))
+                _modules.value.ifEmpty { CamaroUdsProtocol.buildTopology(selectedProfile, _adapter.value) }
+            else emptyList()
             _functionalTestState.value = FunctionalTestState(
                 running = true, startedAtMillis = System.currentTimeMillis(),
                 checks = FunctionalTestPlanner.initial(topology, transport, connected),
@@ -5080,7 +5088,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     // A generic OBD reply is never an OEM module identity. Read VIN first
                     // and retain the physical observation independently of the saved profile.
                     checkRead("service:vin") {
-                        val vin = obdManager.withObdCommandSession { it.readVin() }
+                        val vin = obdManager.withObdCommandSession { it.readVinForVerification() }
                             ?.trim()?.uppercase(java.util.Locale.ROOT)
                             ?.takeIf { it.matches(Regex("[A-HJ-NPR-Z0-9]{17}")) }
                             ?: error("VIN missing from physical response")
@@ -5118,13 +5126,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             ("Réponse OBD physique : " + discovery.supported.size + " PID pris en charge.")
                     }
                     checkRead("service:dtcs") {
-                        val (dtcResults, positiveResponse) =
-                            obdManager.withObdCommandSession { it.readDtcsWithPositiveResponseProof() }
-                        require(positiveResponse) { "No positive physical DTC service response" }
-                        val (confirmed, pending, permanent) = dtcResults
-                        val count = confirmed.size + pending.size + permanent.size
-                        ("Physical DTC response verified: " + count + " codes, no clearing.") to
-                            ("Réponse physique DTC vérifiée : " + count + " défauts, sans effacement.")
+                        val modes = obdManager.withObdCommandSession { it.readDtcModeEvidence() }
+                        if (!current()) throw CancellationException("Account or run changed")
+                        val state = _functionalTestState.value
+                        _functionalTestState.value = state.copy(checks =
+                            FunctionalTestPlanner.withDtcModeEvidence(state.checks, modes.mapValues { it.value?.size }))
+                        require(modes.values.any { it != null }) { "No positive physical DTC service response" }
+                        val count = modes.values.filterNotNull().sumOf { it.size }
+                        val unavailable = modes.filterValues { it == null }.keys
+                        if (unavailable.isNotEmpty()) {
+                            val missing = unavailable.joinToString("/") { "%02X".format(it) }
+                            ("Partial physical DTC response: $count codes; modes $missing not confirmed, no clearing.") to
+                                ("Réponse DTC physique partielle : $count défauts ; modes $missing non confirmés, sans effacement.")
+                        } else {
+                            "Physical DTC response verified: $count codes, no clearing." to
+                                "Réponse physique DTC vérifiée : $count défauts, sans effacement."
+                        }
                     }
                     checkRead("service:readiness") {
                         val response = obdManager.withObdCommandSession { it.readReadiness() }
