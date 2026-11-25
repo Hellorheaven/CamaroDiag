@@ -1620,8 +1620,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             "0x%06X — 0x%02X".format(it.rawDtc, it.statusByte)
                         } ?: localizedContext.getString(R.string.cal_doip_no_historical_dtc))
                     }
-                    operation == DoIpDirectRead.Operation.SUPPORTED_DTCS && report != null ->
-                        localizedContext.getString(R.string.cal_doip_supported_result, report.records.size, report.statusAvailabilityMask) +
+                    operation in setOf(DoIpDirectRead.Operation.SUPPORTED_DTCS, DoIpDirectRead.Operation.PERMANENT_DTCS) && report != null ->
+                        localizedContext.getString(if (operation == DoIpDirectRead.Operation.PERMANENT_DTCS)
+                            R.string.cal_doip_permanent_result else R.string.cal_doip_supported_result,
+                            report.records.size, report.statusAvailabilityMask) +
                             report.records.joinToString(separator = "\n", prefix = "\n") {
                                 "0x%06X — 0x%02X".format(it.rawDtc, it.statusByte)
                             }

@@ -808,6 +808,11 @@ fun CalibrationWorkspaceScreen(
                             Text(stringResource(R.string.cal_doip_snapshot_index))
                         }
                     }
+                    OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu, "", doIpTls,
+                        DoIpDirectRead.Operation.PERMANENT_DTCS, doIpCertificate, requireNotNull(doIpOptions)) },
+                        enabled = targetReady && vinReady, modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(R.string.cal_doip_permanent_dtcs))
+                    }
                     for (pair in listOf(
                         listOf(DoIpDirectRead.Operation.FIRST_FAILED_DTC to R.string.cal_doip_first_failed,
                             DoIpDirectRead.Operation.FIRST_CONFIRMED_DTC to R.string.cal_doip_first_confirmed),

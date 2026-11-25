@@ -139,8 +139,13 @@ object UdsDtcDecoder {
     }
 
     /** 19/0A lists supported DTCs, including zero-status entries. */
-    fun decodeSupportedDtcs(reply: ByteArray): UdsDtcReport {
-        require(reply.size >= 3 && reply[0] == 0x59.toByte() && reply[1] == 0x0A.toByte() &&
+    fun decodeSupportedDtcs(reply: ByteArray): UdsDtcReport = decodeDtcInventory(0x0A, reply)
+
+    /** 19/15 selects permanent DTCs independently of their current status. */
+    fun decodePermanentDtcs(reply: ByteArray): UdsDtcReport = decodeDtcInventory(0x15, reply)
+
+    private fun decodeDtcInventory(subfunction: Int, reply: ByteArray): UdsDtcReport {
+        require(reply.size >= 3 && reply[0] == 0x59.toByte() && reply[1] == subfunction.toByte() &&
             (reply.size - 3) % 4 == 0)
         val availability = reply[2].toInt() and 255
         val report = decodeRecords(availability, null, reply.copyOfRange(3, reply.size))

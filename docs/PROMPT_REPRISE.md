@@ -1,3 +1,7 @@
+## PR117 — DTC permanents UDS Android (25/11/2026)
+
+- Bouton FR/EN distinct, émission 19/15 sur session DoIP F190 vérifiée avant/après, statut courant brut et masque disponibles, liste active inchangée. Tests du décodeur écrits sans exécution. Windows reste à raccorder. Aucun checkpoint CI.
+
 ## PR117 — DTC permanents UDS Connectors (25/11/2026)
 
 - CLI Python `permanent-dtcs` : lecture 19/15 distincte de 19/0A et WWH 19/55, VIN F190 avant/après, statut brut et masque de disponibilité, liste vide possible, refus des réponses tronquées, doublons et bits non disponibles. Tests écrits non exécutés. Référence de format : https://udsoncan.readthedocs.io/en/latest/_modules/udsoncan/services/ReadDTCInformation.html . Android et Windows restent à raccorder. Aucun checkpoint CI.

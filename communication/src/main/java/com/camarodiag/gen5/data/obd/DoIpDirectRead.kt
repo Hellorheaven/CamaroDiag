@@ -26,7 +26,7 @@ import kotlin.coroutines.resumeWithException
  * A socket is owned by one operation and is never retained after failure.
  */
 object DoIpDirectRead {
-    enum class Operation { VIN, DID, DTC, DTC_COUNT, DTC_SNAPSHOT, DTC_EXTENDED, MONITOR, BACKUP, EXCHANGE, OBD_IDENTIFY, OBD_DID, OBD_MONITOR, OBD_WWH_MASK, OBD_WWH_PERMANENT, OBD_WWH_READINESS, MULTI_DID, OBD_MULTI_DID, SCALING_DID, OBD_DTC, OBD_DTC_COUNT, OBD_DTC_SNAPSHOT, OBD_DTC_EXTENDED, SUPPORTED_DTCS, SNAPSHOT_INDEX, MULTI_MONITOR, OBD_MULTI_MONITOR, FIRST_FAILED_DTC, FIRST_CONFIRMED_DTC, RECENT_FAILED_DTC, RECENT_CONFIRMED_DTC, FAULT_COUNTERS, SEVERITY_COUNT, SEVERITY_LIST, SEVERITY_INFO, INVENTORY, OBD_INVENTORY }
+    enum class Operation { VIN, DID, DTC, DTC_COUNT, DTC_SNAPSHOT, DTC_EXTENDED, MONITOR, BACKUP, EXCHANGE, OBD_IDENTIFY, OBD_DID, OBD_MONITOR, OBD_WWH_MASK, OBD_WWH_PERMANENT, OBD_WWH_READINESS, MULTI_DID, OBD_MULTI_DID, SCALING_DID, OBD_DTC, OBD_DTC_COUNT, OBD_DTC_SNAPSHOT, OBD_DTC_EXTENDED, SUPPORTED_DTCS, PERMANENT_DTCS, SNAPSHOT_INDEX, MULTI_MONITOR, OBD_MULTI_MONITOR, FIRST_FAILED_DTC, FIRST_CONFIRMED_DTC, RECENT_FAILED_DTC, RECENT_CONFIRMED_DTC, FAULT_COUNTERS, SEVERITY_COUNT, SEVERITY_LIST, SEVERITY_INFO, INVENTORY, OBD_INVENTORY }
     /** Immutable optional parameters. Defaults retain the original global deadline. */
     data class SessionOptions(val timeoutMs: Int = 5000, val p2Ms: Int = timeoutMs,
         val p2StarMs: Int = timeoutMs, val routingType: Int = 0, val routingOemHex: String = "") {
@@ -138,7 +138,7 @@ object DoIpDirectRead {
                     require(request.size == 2 && (reply.size - 2) % 4 == 0)
                 } else {
                     require(reply.size >= 3)
-                    if (subfunction == 0x0A) require(request.size == 2 && (reply.size - 3) % 4 == 0)
+                    if (subfunction in setOf(0x0A, 0x15)) require(request.size == 2 && (reply.size - 3) % 4 == 0)
                 }
                 if (subfunction == 9) {
                     require(request.size == 5 && reply.size in setOf(3, 9) &&
@@ -977,6 +977,10 @@ object DoIpDirectRead {
                             Outcome(gateway, target.ecu, vin, null, report, trace.toList())
                         } else if (operation == Operation.SUPPORTED_DTCS) {
                             val report = UdsDtcDecoder.decodeSupportedDtcs(session.exchange(byteArrayOf(0x19, 0x0A), timeoutMs))
+                            require(readVin() == vin)
+                            Outcome(gateway, target.ecu, vin, null, report, trace.toList())
+                        } else if (operation == Operation.PERMANENT_DTCS) {
+                            val report = UdsDtcDecoder.decodePermanentDtcs(session.exchange(byteArrayOf(0x19, 0x15), timeoutMs))
                             require(readVin() == vin)
                             Outcome(gateway, target.ecu, vin, null, report, trace.toList())
                         } else if (operation == Operation.SNAPSHOT_INDEX) {

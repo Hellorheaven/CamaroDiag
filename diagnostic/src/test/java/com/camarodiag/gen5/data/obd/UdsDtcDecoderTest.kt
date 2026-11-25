@@ -43,6 +43,18 @@ class UdsDtcDecoderTest {
         assertTrue(runCatching { UdsDtcDecoder.decodeSupportedDtcs(byteArrayOf(0x59, 2, 8)) }.isFailure)
     }
 
+    @Test fun permanentDtcsPreserveCurrentStatusAndRejectWrongReports() {
+        assertTrue(UdsDtcDecoder.decodePermanentDtcs(byteArrayOf(0x59, 0x15, 8)).records.isEmpty())
+        val report = UdsDtcDecoder.decodePermanentDtcs(byteArrayOf(0x59, 0x15, 8, 1, 2, 3, 0, 1, 2, 4, 8))
+        assertEquals(listOf(0, 8), report.records.map { it.statusByte })
+        assertEquals(listOf(0x010203, 0x010204), report.records.map { it.rawDtc })
+        for (reply in listOf(byteArrayOf(0x59, 0x0A, 8), byteArrayOf(0x59, 0x15),
+            byteArrayOf(0x59, 0x15, 8, 1), byteArrayOf(0x59, 0x15, 8, 1, 2, 3, 1),
+            byteArrayOf(0x59, 0x15, 8, 1, 2, 3, 0, 1, 2, 3, 8))) {
+            assertTrue(runCatching { UdsDtcDecoder.decodePermanentDtcs(reply) }.isFailure)
+        }
+    }
+
     @Test fun historicalDtcCanBeAbsentOrHaveCurrentStatusZero() {
         for (sub in 0x0B..0x0E) {
             assertTrue(UdsDtcDecoder.decodeHistoricalDtc(sub, byteArrayOf(0x59, sub.toByte(), 8)).records.isEmpty())

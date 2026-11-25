@@ -1104,6 +1104,8 @@
     <string name="cal_doip_obd_snapshot">Snapshot OBDonUDS</string>
     <string name="cal_doip_obd_extended">Données étendues OBDonUDS</string>
     <string name="cal_doip_supported_dtcs">DTC pris en charge</string>
+    <string name="cal_doip_permanent_dtcs">DTC permanents UDS</string>
+    <string name="cal_doip_permanent_result">DTC permanents : %1$d ; masque disponible 0x%2$02X</string>
     <string name="cal_doip_snapshot_index">Index des snapshots</string>
     <string name="cal_doip_supported_result">DTC pris en charge : %1$d ; masque disponible 0x%2$02X</string>
     <string name="cal_doip_snapshot_index_result">Enregistrements snapshot disponibles : %1$d</string>
