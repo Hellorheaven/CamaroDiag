@@ -18,6 +18,12 @@ from .doip_archive import load_scope
 from .doip_capture import capture_region, save_capture
 
 
+class ExactArgumentParser(argparse.ArgumentParser):
+    def __init__(self, *args, **kwargs):
+        kwargs["allow_abbrev"] = False
+        super().__init__(*args, **kwargs)
+
+
 def hex_value(value: str, digits: int) -> int:
     if len(value) != digits or any(c not in "0123456789abcdefABCDEF" for c in value):
         raise argparse.ArgumentTypeError(f"Expected {digits} hexadecimal digits")
@@ -61,7 +67,7 @@ def _run(argv: Sequence[str] | None, resources: ExitStack) -> dict:
     fr = "--fr" in argv
     def tr(en, french):
         return french if fr else en
-    parser = argparse.ArgumentParser(description=tr("Live DoIP host diagnostics", "Diagnostic DoIP réseau du PC"))
+    parser = ExactArgumentParser(description=tr("Live DoIP host diagnostics", "Diagnostic DoIP réseau du PC"))
     parser.add_argument("--fr", action="store_true", help="Français")
     parser.add_argument("--host", help=tr("Numeric gateway IP; omit for VIN discovery", "IP numérique ; laisser vide pour découverte VIN"))
     parser.add_argument("--vin", help=tr("Expected vehicle VIN", "VIN attendu"))
@@ -159,6 +165,13 @@ def _run(argv: Sequence[str] | None, resources: ExitStack) -> dict:
     sequence = sub.add_parser("sequence", help=tr("Send confirmed ordered UDS commands", "Envoyer une séquence UDS confirmée"))
     sequence.add_argument("--commands", required=True,
                           help=tr("Hexadecimal commands separated by semicolons", "Commandes hexadécimales séparées par des points-virgules"))
+    seen_options = set()
+    for token in argv:
+        if token.startswith("--") and token != "--":
+            option = token.split("=", 1)[0]
+            if option in seen_options:
+                parser.error(tr("Duplicate option: ", "Option répétée : ") + option)
+            seen_options.add(option)
     o = parser.parse_args(argv)
     targets = parse_ecu_inventory(o.ecus) if o.action in ("ecu-inventory", "obd-ecu-inventory") else None
     commands = parse_commands(o.commands) if o.action == "sequence" else None
@@ -205,6 +218,10 @@ def _run(argv: Sequence[str] | None, resources: ExitStack) -> dict:
         parser.error(tr("Certificate files require TLS", "Les certificats nécessitent TLS"))
     if o.client_key and not o.client_cert:
         parser.error(tr("Client key requires a certificate", "La clé client nécessite un certificat"))
+    if network_only and (o.tcp or o.ca_file or o.client_cert or o.client_key or
+                         o.tester is not None or o.ecu is not None):
+        parser.error(tr("Session options require a diagnostic action",
+                        "Les options de session nécessitent une action de diagnostic"))
     if o.vin is not None and not valid_vin(o.vin):
         parser.error(tr("Invalid VIN", "VIN invalide"))
     if o.eid is not None and o.vin is not None:
@@ -223,6 +240,10 @@ def _run(argv: Sequence[str] | None, resources: ExitStack) -> dict:
             parser.error(tr("Host or valid expected VIN required", "IP ou VIN attendu valide requis"))
     if commands is not None and not sys.stdin.isatty():
         parser.error(tr("Interactive terminal required for confirmation", "Terminal interactif requis pour la confirmation"))
+    # Validate TLS files before sending even a discovery datagram.
+    context = ssl.create_default_context(cafile=o.ca_file) if (o.ca_file or o.client_cert) else None
+    if o.client_cert:
+        context.load_cert_chain(o.client_cert, o.client_key)
     trace_file = None
     if o.trace_file is not None:
         target = o.trace_file.resolve()
@@ -261,9 +282,6 @@ def _run(argv: Sequence[str] | None, resources: ExitStack) -> dict:
         return result | status(gateway, o.action == "power", o.timeout, trace)
     if scope is not None and gateway.logical_address != scope["Gateway"]:
         raise DoIpError(tr("Observed gateway differs from profile", "La passerelle observée diffère du profil"))
-    context = ssl.create_default_context(cafile=o.ca_file) if (o.ca_file or o.client_cert) else None
-    if o.client_cert:
-        context.load_cert_chain(o.client_cert, o.client_key)
     if targets is not None:
         return result | inventory_ecus(gateway, o.vin, o.tester, targets, tls=not o.tcp,
             timeout=o.timeout, trace=trace, context=context, p2=p2, p2_star=p2_star,
@@ -272,10 +290,13 @@ def _run(argv: Sequence[str] | None, resources: ExitStack) -> dict:
     if commands is not None and not confirm_commands(commands, gateway, o.tester, o.ecu,
             not o.tcp, input, lambda line: print(line, file=sys.stderr), fr):
         return result | {"cancelled": True, "commands_sent": 0}
-    if commands is not None:
+    def verify_gateway():
         current = discover(gateway.host, o.vin, o.timeout, trace)
         if gateway_key(current) != gateway_key(gateway):
-            raise DoIpError(tr("Gateway changed after confirmation", "La passerelle a changé après confirmation"))
+            raise DoIpError(tr("Gateway identity changed", "L'identité de la passerelle a changé"))
+
+    # Recheck the selected endpoint after preparation (and consent for raw sequences).
+    verify_gateway()
     with Session(gateway, o.tester, o.ecu, tls=not o.tcp, timeout=o.timeout,
                  trace=trace, context=context, p2=p2, p2_star=p2_star,
                  routing_type=o.routing_activation_type or 0,
@@ -349,6 +370,7 @@ def _run(argv: Sequence[str] | None, resources: ExitStack) -> dict:
             def progress(index, offset, length):
                 print(tr("Pass", "Passe") + f" {index}/2: {offset}/{length}", file=sys.stderr)
             first, second = capture_region(session, scope, progress)
+            verify_gateway()
             return result | save_capture(o.output, o.profile, scope, first, second)
         if o.action == "vin":
             return result

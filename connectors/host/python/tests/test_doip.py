@@ -359,6 +359,60 @@ class DoIpTests(unittest.TestCase):
             sock.sendto.assert_not_called()
             sock.send.assert_not_called()
 
+    def test_diagnostic_options_are_exact_and_not_repeatable(self):
+        with patch("camarodiagconnectors.doip_cli.discover") as discovery:
+            for args in (
+                ["--host", "127.0.0.1", "--host=127.0.0.2", "discover"],
+                ["--hos", "127.0.0.1", "discover"],
+                ["--host", "127.0.0.1", "--tcp", "discover"],
+                ["--host", "127.0.0.1", "--tester", "0E80", "status"],
+                ["--host", "127.0.0.1", "--vin", VIN, "--tester", "0E80", "--ecu", "1234",
+                 "did", "--di", "F190"],
+                ["--host", "127.0.0.1", "--vin", VIN, "--tester", "0E80", "--ecu", "1234",
+                 "did", "--did", "F190", "--did=F187"],
+            ):
+                with self.subTest(args=args), self.assertRaises(SystemExit):
+                    run(args)
+            discovery.assert_not_called()
+
+    def test_read_operations_revalidate_gateway_before_routing(self):
+        from dataclasses import replace
+        for action in (["vin"], ["did", "--did", "F190"], ["permanent-dtcs"]):
+            with patch("camarodiagconnectors.doip_cli.discover",
+                       side_effect=[GATEWAY, replace(GATEWAY, eid="010203040506")]) as discovery, \
+                 patch("camarodiagconnectors.doip_cli.Session") as session:
+                with self.assertRaises(DoIpError):
+                    run(["--host", GATEWAY.host, "--vin", VIN, "--tester", "0E80", "--ecu", "1234", *action])
+                self.assertEqual(discovery.call_count, 2)
+                session.assert_not_called()
+
+    def test_invalid_tls_files_fail_before_discovery(self):
+        with patch("camarodiagconnectors.doip_cli.ssl.create_default_context",
+                   side_effect=OSError("Certificate missing")), \
+             patch("camarodiagconnectors.doip_cli.discover") as discovery:
+            with self.assertRaises(OSError):
+                run(["--host", GATEWAY.host, "--vin", VIN, "--tester", "0E80", "--ecu", "1234",
+                     "--ca-file", "missing.pem", "vin"])
+            discovery.assert_not_called()
+
+    def test_backup_refuses_gateway_substitution_after_acquisition(self):
+        from dataclasses import replace
+        with tempfile.TemporaryDirectory() as directory:
+            profile = Path(directory) / "profile.json"
+            output = Path(directory) / "backup.zip"
+            scope = {"Vin": VIN, "Gateway": GATEWAY.logical_address, "Tester": 0x0E80,
+                     "Ecu": 0x1234, "Length": 4, "BlockSize": 2}
+            with patch("camarodiagconnectors.doip_cli.load_scope", return_value=scope), \
+                 patch("camarodiagconnectors.doip_cli.discover",
+                       side_effect=[GATEWAY, GATEWAY, replace(GATEWAY, gid="010203040506")]), \
+                 patch("camarodiagconnectors.doip_cli.Session"), \
+                 patch("camarodiagconnectors.doip_cli.capture_region", return_value=(b"ABCD", b"ABCD")), \
+                 patch("camarodiagconnectors.doip_cli.save_capture") as save:
+                with self.assertRaises(DoIpError):
+                    run(["--host", GATEWAY.host, "backup", "--profile", str(profile), "--output", str(output)])
+                save.assert_not_called()
+                self.assertFalse(output.exists())
+
     def test_confirmed_sequence_revalidates_gateway_before_connect(self):
         from dataclasses import replace
         with (patch("camarodiagconnectors.doip_cli.discover",
