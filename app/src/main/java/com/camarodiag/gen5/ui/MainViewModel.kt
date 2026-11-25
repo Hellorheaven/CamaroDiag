@@ -1476,7 +1476,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val target = resolveSelectedDoIpTarget(host, tester, ecu, _vehicle.value.vin, tls,
                     onTrace = { trace -> journalDoIpControlTrace(trace, current) })
                 check(current())
-                val did = if (operation in setOf(DoIpDirectRead.Operation.DID, DoIpDirectRead.Operation.MONITOR, DoIpDirectRead.Operation.OBD_DID, DoIpDirectRead.Operation.OBD_MONITOR)) {
+                val did = if (operation in setOf(DoIpDirectRead.Operation.DID, DoIpDirectRead.Operation.SCALING_DID, DoIpDirectRead.Operation.MONITOR, DoIpDirectRead.Operation.OBD_DID, DoIpDirectRead.Operation.OBD_MONITOR)) {
                     require(didHex.matches(Regex("[0-9A-Fa-f]{4}")))
                     didHex.toInt(16)
                 } else 0xF190
@@ -1536,6 +1536,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         result.obdProtocolValue ?: 0, result.vin.orEmpty())
                     operation == DoIpDirectRead.Operation.OBD_DID -> localizedContext.getString(R.string.cal_doip_obd_data,
                         did, result.data?.joinToString(" ") { "%02X".format(it.toInt() and 255) }.orEmpty())
+                    operation == DoIpDirectRead.Operation.SCALING_DID -> localizedContext.getString(
+                        R.string.cal_doip_scaling_result, did,
+                        result.data?.joinToString(" ") { "%02X".format(it.toInt() and 255) }.orEmpty())
                     result.multiValues.isNotEmpty() -> result.multiValues.joinToString("\n") { row ->
                         localizedContext.getString(R.string.cal_doip_multi_result, row.did, row.data.size,
                             row.data.joinToString(" ") { "%02X".format(it.toInt() and 255) })

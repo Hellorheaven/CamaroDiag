@@ -629,6 +629,11 @@ fun CalibrationWorkspaceScreen(
                         enabled = targetReady && vinReady && doIpDid.length == 4, modifier = Modifier.fillMaxWidth()) {
                         Text(stringResource(R.string.cal_read_uds_did))
                     }
+                    OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu, doIpDid,
+                        doIpTls, DoIpDirectRead.Operation.SCALING_DID, doIpCertificate, requireNotNull(doIpOptions)) },
+                        enabled = targetReady && vinReady && doIpDid.length == 4, modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(R.string.cal_doip_scaling_read))
+                    }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu, "F810", doIpTls,
                             DoIpDirectRead.Operation.OBD_IDENTIFY, doIpCertificate, requireNotNull(doIpOptions)) },

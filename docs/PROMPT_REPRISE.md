@@ -1,3 +1,7 @@
+## PR117 — service UDS 24 DoIP (25/11/2026)
+
+- Lecture réelle ReadScalingDataByIdentifier sur Android, console Windows et CLI Connectors (`scaling-did --did F40C`). Contrôle du DID, données non vides, VIN relu avant/après même session, retour brut sans coefficients inventés. Interface FR/EN et tests Python. Postérieur au checkpoint 45548303381 ; pas encore validé par CI.
+
 ## PR117 — checkpoint multi-DID et contrôle d'identité (25/11/2026)
 
 - Connectors CLI : revalidation F190 après la lecture simple UDS, avant retour JSON. Validation groupée demandée pour la parité multi-DID Android/Windows/Python, CLI Windows vérifiée, corrélation SID/DTC/WWH et lectures simples. Checkpoint précédent 45501625699 vert 12/12. Aucune fusion ni qualification matérielle.

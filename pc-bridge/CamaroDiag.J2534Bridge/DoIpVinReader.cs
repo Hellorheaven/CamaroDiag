@@ -235,6 +235,23 @@ internal static class DoIpVinReader
         return data;
     }
 
+    internal static async Task<byte[]> ReadObservedScalingDidAsync(
+        DoIpVehicleDiscovery.Identity gateway, IPAddress address, ushort tester,
+        ushort ecu, bool useTls, ushort did, TimeSpan timeout, CancellationToken token,
+        string? certificate = null, Action<DoIpDiagnosticTransport.PduTrace>? trace = null,
+        DoIpDiagnosticTransport.SessionOptions? options = null)
+    {
+        await using var link = await ConnectObservedAsync(gateway, address, tester, ecu,
+            useTls, timeout, token, certificate, trace, options);
+        var vin = await VerifyObservedVinAsync(link, gateway, timeout, token, null, null);
+        var reply = await link.ExchangeUdsAsync(UdsStandardServices.ReadScalingDid(did), timeout, token);
+        if (reply.Length < 4 || reply[0] != 0x64 || reply[1] != (byte)(did >> 8) || reply[2] != (byte)did)
+            throw new InvalidDataException("Invalid scaling DID response.");
+        if (await VerifyObservedVinAsync(link, gateway, timeout, token, null, null) != vin)
+            throw new InvalidDataException("ECU VIN changed during scaling data read.");
+        return reply[3..];
+    }
+
     internal static async Task MonitorDidAsync(
         DoIpDiagnosticTransport transport, ushort did, int sampleCount, TimeSpan interval,
         TimeSpan timeout, CancellationToken token, Action<int, byte[]> sample,

@@ -674,6 +674,20 @@ class Session:
             raise DoIpError("Missing DID data")
         return reply[3:]
 
+    def read_scaling_did(self, expected: str, did: int) -> bytes:
+        """Read ISO 14229 SID 24 metadata; retain raw ECU-provided scaling records."""
+        request = b"\x24" + logical(did)
+        try:
+            self.verify_vin(expected)
+            reply = self.exchange(request)
+            if len(reply) < 4 or reply[:3] != b"\x64" + request[1:]:
+                raise DoIpError("Invalid scaling DID response")
+            self.verify_vin(expected)
+            return reply[3:]
+        except BaseException:
+            self.close()
+            raise
+
     def read_dids(self, expected: str, layout: tuple[tuple[int, int], ...], *, obd: bool = False) -> dict:
         layout = validate_did_layout(layout)
         if obd and any(not 0xF400 <= did <= 0xF8FF for did, _ in layout):

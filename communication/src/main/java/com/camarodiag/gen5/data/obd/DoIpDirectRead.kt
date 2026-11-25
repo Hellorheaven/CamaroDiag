@@ -26,7 +26,7 @@ import kotlin.coroutines.resumeWithException
  * A socket is owned by one operation and is never retained after failure.
  */
 object DoIpDirectRead {
-    enum class Operation { VIN, DID, DTC, DTC_COUNT, DTC_SNAPSHOT, DTC_EXTENDED, MONITOR, BACKUP, EXCHANGE, OBD_IDENTIFY, OBD_DID, OBD_MONITOR, OBD_WWH_MASK, OBD_WWH_PERMANENT, OBD_WWH_READINESS, MULTI_DID, OBD_MULTI_DID }
+    enum class Operation { VIN, DID, DTC, DTC_COUNT, DTC_SNAPSHOT, DTC_EXTENDED, MONITOR, BACKUP, EXCHANGE, OBD_IDENTIFY, OBD_DID, OBD_MONITOR, OBD_WWH_MASK, OBD_WWH_PERMANENT, OBD_WWH_READINESS, MULTI_DID, OBD_MULTI_DID, SCALING_DID }
     /** Immutable optional parameters. Defaults retain the original global deadline. */
     data class SessionOptions(val timeoutMs: Int = 5000, val p2Ms: Int = timeoutMs,
         val p2StarMs: Int = timeoutMs, val routingType: Int = 0, val routingOemHex: String = "") {
@@ -878,8 +878,9 @@ object DoIpDirectRead {
                                 session.exchange(requireNotNull(multiRequest), timeoutMs))
                             require(readVin() == vin)
                             Outcome(gateway, target.ecu, vin, null, null, trace.toList(), multiValues = values)
-                        } else if (operation == Operation.DID) {
-                            val reply = session.exchange(byteArrayOf(0x22, (did shr 8).toByte(), did.toByte()), timeoutMs)
+                        } else if (operation in setOf(Operation.DID, Operation.SCALING_DID)) {
+                            val sid = if (operation == Operation.SCALING_DID) 0x24.toByte() else 0x22.toByte()
+                            val reply = session.exchange(byteArrayOf(sid, (did shr 8).toByte(), did.toByte()), timeoutMs)
                             require(reply.size > 3) { "Missing DID data." }
                             require(readVin() == vin)
                             Outcome(gateway, target.ecu, vin, reply.copyOfRange(3, reply.size), null, trace.toList())

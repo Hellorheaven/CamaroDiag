@@ -1097,4 +1097,6 @@
     <string name="cal_doip_multi_read">Lire plusieurs DID UDS</string>
     <string name="cal_doip_multi_obd_read">Lire plusieurs DID OBD</string>
     <string name="cal_doip_multi_result">DID %1$04X (%2$d octets) : %3$s</string>
+    <string name="cal_doip_scaling_read">Lire les données de mise à l’échelle UDS</string>
+    <string name="cal_doip_scaling_result">DID %1$04X, données de mise à l’échelle (brutes) : %2$s</string>
 </resources>

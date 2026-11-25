@@ -113,4 +113,6 @@
   <data name="ObdMultiRead" xml:space="preserve"><value>Read multiple OBD DIDs</value></data>
   <data name="InvalidMultiLayout" xml:space="preserve"><value>Invalid DID layout or non-legislated OBD DID.</value></data>
   <data name="MultiResult" xml:space="preserve"><value>DID {0:X4} ({1} bytes): {2}</value></data>
+  <data name="ScalingDid" xml:space="preserve"><value>Read UDS scaling data</value></data>
+  <data name="ScalingResult" xml:space="preserve"><value>DID {0:X4} scaling data (raw): {1}</value></data>
 </root>

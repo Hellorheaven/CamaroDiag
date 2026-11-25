@@ -70,6 +70,8 @@ def run(argv: Sequence[str] | None = None) -> dict:
         sub.add_parser(action)
     did = sub.add_parser("did")
     did.add_argument("--did", required=True, type=lambda x: hex_value(x, 4))
+    scaling = sub.add_parser("scaling-did", help=tr("Read raw UDS scaling metadata", "Lire les données brutes de mise à l’échelle UDS"))
+    scaling.add_argument("--did", required=True, type=lambda x: hex_value(x, 4))
     obd_did = sub.add_parser("obd-did", help=tr("Read legislated DID after ECU identification", "Lire un DID réglementaire après identification ECU"))
     obd_did.add_argument("--did", required=True, type=lambda x: hex_value(x, 4))
     for action in ("dids", "obd-dids"):
@@ -197,6 +199,9 @@ def run(argv: Sequence[str] | None = None) -> dict:
                  trace=trace, context=context, p2=p2, p2_star=p2_star,
                  routing_type=o.routing_activation_type or 0,
                  routing_oem_data=o.routing_oem_data) as session:
+        if o.action == "scaling-did":
+            return result | {"vin": o.vin, "ecu": o.ecu, "tester": o.tester, "tls": not o.tcp,
+                             "did": o.did, "scaling_data": session.read_scaling_did(o.vin, o.did).hex().upper()}
         if layout is not None:
             return result | {"ecu": o.ecu, "tester": o.tester, "tls": not o.tcp} | session.read_dids(
                 o.vin, layout, obd=o.action == "obd-dids")

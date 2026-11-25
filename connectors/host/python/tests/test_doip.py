@@ -219,6 +219,19 @@ class DoIpTests(unittest.TestCase):
             with self.assertRaises(DoIpError):
                 positive(bytes.fromhex(request), bytes.fromhex(reply))
 
+    def test_scaling_did_identity_and_correlation(self):
+        fake = unittest.mock.Mock(spec=Session)
+        fake.verify_vin.return_value = VIN
+        fake.exchange.return_value = bytes.fromhex("64F40C0102")
+        self.assertEqual(Session.read_scaling_did(fake, VIN, 0xF40C), b"\x01\x02")
+        fake.exchange.assert_called_once_with(bytes.fromhex("24F40C"))
+        self.assertEqual(fake.verify_vin.call_count, 2)
+        for reply in ("64F40D0102", "64F40C", "62F40C0102"):
+            fake.exchange.return_value = bytes.fromhex(reply)
+            with self.assertRaises(DoIpError):
+                Session.read_scaling_did(fake, VIN, 0xF40C)
+        self.assertEqual(fake.close.call_count, 3)
+
     def test_multi_did_layout_and_same_session(self):
         layout = parse_did_layout("F40C:2,F40D:1")
         reply = bytes.fromhex("62F40C1234F40D56")
