@@ -11,7 +11,7 @@ from camarodiagconnectors.doip import (
     Gateway, Session, DoIpError, NegativeResponse, decode, encode, parse_identity, positive,
     discover, discover_ipv4, discover_ipv6, discovery_request, discover_unique_vin, parse_commands, confirm_commands,
     endpoint, tls_server_name, status, parse_did_layout, decode_did_layout,
-    parse_ecu_inventory, inventory_ecus
+    parse_ecu_inventory, inventory_ecus, parse_stored_did_lengths, decode_all_stored_records
 )
 
 VIN = "1G1FA1RXXR0123456"
@@ -633,6 +633,41 @@ class DoIpTests(unittest.TestCase):
         with self.assertRaises(DoIpError):
             Session.read_legacy_dtc(fake, VIN, 0x10, dtc=1, record=0xF0)
         fake.verify_vin.assert_not_called()
+
+    def test_all_stored_records_use_explicit_lengths_and_verify_identity(self):
+        lengths = parse_stored_did_lengths("F40C:2,F40D:1")
+        response = bytes.fromhex("5905010102030802F40C1234F40D56020405060001F40D78")
+        fake = unittest.mock.Mock(spec=Session)
+        fake.exchange.return_value = response
+        result = Session.read_all_stored_dtc_records(fake, VIN, lengths)
+        self.assertEqual(result["records"][0]["dids"][0]["data"], "1234")
+        self.assertEqual(result["records"][1]["record"], 2)
+        self.assertEqual(result["records"][1]["dids"][0]["data"], "78")
+        self.assertEqual(result["raw_response"], response.hex().upper())
+        fake.exchange.assert_called_once_with(bytes.fromhex("1905FF"))
+        self.assertEqual(fake.verify_vin.call_count, 2)
+        self.assertEqual(decode_all_stored_records(bytes.fromhex("5905FF"), lengths), [])
+        for invalid in ("590501", "5905010102030801F40C12",
+                        "5905010102030801FFFFAA", "5905010102030800010405060000",
+                        "590501010203080000"):
+            with self.assertRaises(DoIpError):
+                decode_all_stored_records(bytes.fromhex(invalid), lengths)
+        for invalid in ("F40D:0", "F40D:1,F40D:2", "F40D:4097", "F40G:1"):
+            with self.assertRaises(DoIpError):
+                parse_stored_did_lengths(invalid)
+        fake.verify_vin.side_effect = [VIN, DoIpError("VIN changed")]
+        with self.assertRaises(DoIpError):
+            Session.read_all_stored_dtc_records(fake, VIN, lengths)
+        fake.close.assert_called_once()
+
+    def test_all_stored_records_cli_requires_documented_lengths(self):
+        with patch("camarodiagconnectors.doip_cli.discover", return_value=GATEWAY), \
+             patch("camarodiagconnectors.doip_cli.Session") as session:
+            opened = session.return_value.__enter__.return_value
+            opened.read_all_stored_dtc_records.return_value = {"records": []}
+            run(["--host", GATEWAY.host, "--vin", VIN, "--tester", "0E80", "--ecu", "1234",
+                 "stored-records", "--did-lengths", "F40D:1"])
+            opened.read_all_stored_dtc_records.assert_called_once_with(VIN, {0xF40D: 1})
 
     def test_stored_record_preserves_data_and_validates_echo(self):
         for response, present in (("590501", False), ("5905010102030801F190AA", True)):
