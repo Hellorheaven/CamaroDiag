@@ -100,6 +100,7 @@ Examples:
                               with --expected-vin VIN: first/recent failed/confirmed DTC.
                               --uds-supported-dtcs or --uds-snapshot-index with
                               --expected-vin VIN lists supported codes or snapshot references.
+                              --uds-permanent-dtcs with --expected-vin VIN lists permanent UDS DTCs.
                               No OEM security bypass, flash recovery or vehicle tests.
 
 Use each option with the exact arguments described above. --help must be alone:

@@ -427,6 +427,15 @@ internal static class StandardProtocolCli
             foreach (var code in report.Codes)
                 Console.WriteLine($"DTC=0x{code.Code:X6} status=0x{code.Status:X2}");
         }
+        else if (request.SequenceEqual(ObdOnUdsServices.ReadPermanentDtcs()))
+        {
+            var report = ObdOnUdsServices.DecodePermanentDtcs(response);
+            Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(new
+            {
+                kind = "permanent-dtcs", availability_mask = report.AvailabilityMask,
+                records = report.Codes.Select(c => new { dtc = $"{c.Code:X6}", status = c.Status })
+            }));
+        }
         else if (request.SequenceEqual(ObdOnUdsServices.ReadSnapshotIndex()))
         {
             var rows = ObdOnUdsServices.DecodeSnapshotIndex(response);
@@ -1311,7 +1320,7 @@ internal static class StandardProtocolCli
             "--obd-wwh-severity", "--timeout-ms", "--uds-p2-ms", "--uds-p2-star-ms", "--tls",
             "--doip-version", "--routing-activation-type", "--routing-oem-data", "--rx-file",
             "--client-cert-thumbprint", "--trace-file"
-        ], ["--uds-supported-dtcs", "--uds-snapshot-index", "--uds-fault-counters",
+        ], ["--uds-supported-dtcs", "--uds-permanent-dtcs", "--uds-snapshot-index", "--uds-fault-counters",
             "--obd-wwh-permanent", "--obd-identify"]);
         var host = Required(args, "--host");
         var tester = Address(Required(args, "--tester"));
@@ -1327,6 +1336,7 @@ internal static class StandardProtocolCli
         var obdDtcMask = Optional(args, "--obd-dtc-mask");
         var obdDtcCountMask = Optional(args, "--obd-dtc-count-mask");
         var supportedDtcs = args.Contains("--uds-supported-dtcs", StringComparer.OrdinalIgnoreCase);
+        var permanentDtcs = args.Contains("--uds-permanent-dtcs", StringComparer.OrdinalIgnoreCase);
         var snapshotIndex = args.Contains("--uds-snapshot-index", StringComparer.OrdinalIgnoreCase);
         var historicalDtc = Optional(args, "--uds-historical-dtc");
         var faultCounters = args.Contains("--uds-fault-counters", StringComparer.OrdinalIgnoreCase);
@@ -1336,7 +1346,7 @@ internal static class StandardProtocolCli
         var severityStatus = Optional(args, "--uds-severity-status");
         if ((severityStatus is not null) != (severityCount is not null || severityList is not null))
             throw new ArgumentException("Severity filters require explicit status mask.");
-        if ((supportedDtcs || snapshotIndex || faultCounters || historicalDtc is not null ||
+        if ((supportedDtcs || permanentDtcs || snapshotIndex || faultCounters || historicalDtc is not null ||
             severityCount is not null || severityList is not null || severityInfo is not null) && Optional(args, "--expected-vin") is null)
             throw new ArgumentException("DTC inventory requires --expected-vin.");
         var udsDtcMask = Optional(args, "--uds-dtc-mask");
@@ -1381,6 +1391,7 @@ internal static class StandardProtocolCli
             (obdDtcMask is null ? 0 : 1) +
             (obdDtcCountMask is null ? 0 : 1) +
             (supportedDtcs ? 1 : 0) +
+            (permanentDtcs ? 1 : 0) +
             (snapshotIndex ? 1 : 0) +
             (historicalDtc is null ? 0 : 1) +
             (faultCounters ? 1 : 0) +
@@ -1412,6 +1423,7 @@ internal static class StandardProtocolCli
                         obdDid[2..] : obdDid,
                     NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture))) :
             supportedDtcs ? ObdOnUdsServices.ReadSupportedDtcs() :
+            permanentDtcs ? ObdOnUdsServices.ReadPermanentDtcs() :
             snapshotIndex ? ObdOnUdsServices.ReadSnapshotIndex() :
             faultCounters ? ObdOnUdsServices.ReadFaultCounters() :
             severityCount is not null ? ObdOnUdsServices.ReadSeverity(7, checked((byte)Number(severityCount)), checked((byte)Number(severityStatus!))) :
@@ -1902,6 +1914,7 @@ internal static class StandardProtocolCli
             "--uds-dtc-count-mask", "--uds-snapshot", "--uds-extended-dtc" }
             .Any(selector => Optional(args, selector) is not null);
         genericRead |= args.Contains("--uds-supported-dtcs", StringComparer.OrdinalIgnoreCase) ||
+            args.Contains("--uds-permanent-dtcs", StringComparer.OrdinalIgnoreCase) ||
             args.Contains("--uds-snapshot-index", StringComparer.OrdinalIgnoreCase) ||
             Optional(args, "--uds-historical-dtc") is not null ||
             Optional(args, "--uds-severity-count") is not null || Optional(args, "--uds-severity-list") is not null ||

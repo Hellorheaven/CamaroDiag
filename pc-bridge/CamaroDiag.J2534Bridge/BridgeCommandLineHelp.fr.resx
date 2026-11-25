@@ -102,6 +102,7 @@ Exemples :
                               avec --expected-vin VIN : premier/dernier DTC détecté/confirmé.
                               --uds-supported-dtcs ou --uds-snapshot-index avec
                               --expected-vin VIN : inventaire des DTC ou index des snapshots.
+                              --uds-permanent-dtcs avec --expected-vin VIN : DTC permanents UDS.
                               Ni contournement OEM ni flash ou récupération qualifiés.
 
 Chaque commande nécessite ses paramètres exacts. Utiliser --help seul :

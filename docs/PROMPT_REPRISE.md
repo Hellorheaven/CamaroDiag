@@ -1,3 +1,7 @@
+## PR117 — DTC permanents UDS Windows GUI/CLI (25/11/2026)
+
+- Parité Android/Windows/Connectors : lecture 19/15, bouton FR/EN et CLI --uds-permanent-dtcs avec VIN obligatoire, vérification F190 avant/après, résultat distinct du WWH et de la liste active. Tests parseur, transport et aide écrits sans exécution. Aucun checkpoint CI ; DoIP/C6 restent ouverts.
+
 ## PR117 — DTC permanents UDS Android (25/11/2026)
 
 - Bouton FR/EN distinct, émission 19/15 sur session DoIP F190 vérifiée avant/après, statut courant brut et masque disponibles, liste active inchangée. Tests du décodeur écrits sans exécution. Windows reste à raccorder. Aucun checkpoint CI.

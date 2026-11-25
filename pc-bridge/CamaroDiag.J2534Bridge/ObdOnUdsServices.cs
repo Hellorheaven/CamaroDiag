@@ -363,12 +363,16 @@ internal static class ObdOnUdsServices
     }
 
     internal static byte[] ReadSupportedDtcs() => UdsStandardServices.ReadDtc(0x0A, []);
+    internal static byte[] ReadPermanentDtcs() => UdsStandardServices.ReadDtc(0x15, []);
     internal static byte[] ReadSnapshotIndex() => UdsStandardServices.ReadDtc(0x03, []);
 
-    internal static DtcStatusReport DecodeSupportedDtcs(ReadOnlySpan<byte> reply)
+    internal static DtcStatusReport DecodeSupportedDtcs(ReadOnlySpan<byte> reply) => DecodeDtcInventory(0x0A, reply);
+    internal static DtcStatusReport DecodePermanentDtcs(ReadOnlySpan<byte> reply) => DecodeDtcInventory(0x15, reply);
+
+    private static DtcStatusReport DecodeDtcInventory(byte subfunction, ReadOnlySpan<byte> reply)
     {
-        if (reply.Length < 3 || reply[0] != 0x59 || reply[1] != 0x0A || (reply.Length - 3) % 4 != 0)
-            throw new InvalidDataException("Malformed supported DTC inventory.");
+        if (reply.Length < 3 || reply[0] != 0x59 || reply[1] != subfunction || (reply.Length - 3) % 4 != 0)
+            throw new InvalidDataException("Malformed DTC inventory.");
         var codes = new List<DiagnosticTroubleCode>();
         var seen = new HashSet<uint>();
         for (var offset = 3; offset < reply.Length; offset += 4)

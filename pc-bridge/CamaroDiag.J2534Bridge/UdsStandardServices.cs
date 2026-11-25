@@ -397,7 +397,7 @@ internal static class UdsStandardServices
             var subfunction = request[1] & 0x7F;
             if (subfunction is 0x03 or 0x14 && (request.Length != 2 || (response.Length - 2) % 4 != 0))
                 throw new InvalidDataException("Malformed DTC index or fault counter report.");
-            if (subfunction == 0x0A && (request.Length != 2 || response.Length < 3 || (response.Length - 3) % 4 != 0))
+            if ((subfunction is 0x0A or 0x15) && (request.Length != 2 || response.Length < 3 || (response.Length - 3) % 4 != 0))
                 throw new InvalidDataException("Malformed supported DTC inventory.");
             if (subfunction == 9 && (request.Length != 5 || response.Length is not (3 or 9) ||
                 (response.Length == 9 && !response.Slice(5, 3).SequenceEqual(request.Slice(2, 3)))))

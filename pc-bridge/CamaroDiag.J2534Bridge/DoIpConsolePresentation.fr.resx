@@ -120,6 +120,8 @@
   <data name="ObdSnapshot" xml:space="preserve"><value>Snapshot OBDonUDS</value></data>
   <data name="ObdExtended" xml:space="preserve"><value>Données étendues OBDonUDS</value></data>
   <data name="SupportedDtcs" xml:space="preserve"><value>DTC pris en charge</value></data>
+  <data name="PermanentDtcs" xml:space="preserve"><value>DTC permanents UDS</value></data>
+  <data name="PermanentResult" xml:space="preserve"><value>DTC permanents : {0} ; masque disponible 0x{1:X2}</value></data>
   <data name="SnapshotIndex" xml:space="preserve"><value>Index des snapshots</value></data>
   <data name="SupportedResult" xml:space="preserve"><value>DTC pris en charge : {0} ; masque disponible 0x{1:X2}</value></data>
   <data name="SnapshotIndexResult" xml:space="preserve"><value>Enregistrements snapshot disponibles : {0}</value></data>

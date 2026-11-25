@@ -809,7 +809,7 @@ internal static class StandardVehicleProtocolsSelfTests
             "Generic snapshot requires explicit record.");
 
         foreach (var (selector, subfunction) in new[] {
-            ("--uds-supported-dtcs", (byte)0x0A), ("--uds-snapshot-index", (byte)0x03) })
+            ("--uds-supported-dtcs", (byte)0x0A), ("--uds-permanent-dtcs", (byte)0x15), ("--uds-snapshot-index", (byte)0x03) })
         {
             string[] target = ["--host", "127.0.0.1", "--tester", "0E80", "--ecu", "1234"];
             var inventory = StandardProtocolCli.ParseVerifiedDoIpRead(
@@ -877,6 +877,13 @@ internal static class StandardVehicleProtocolsSelfTests
             [0x59, 0x0A, 8, 1, 2, 3, 1]), "Unavailable status rejected.");
         Reject<InvalidDataException>(() => ObdOnUdsServices.DecodeSupportedDtcs(
             [0x59, 0x0A, 8, 1, 2, 3, 0, 1, 2, 3, 8]), "Duplicate DTC rejected.");
+        var permanent = ObdOnUdsServices.DecodePermanentDtcs([0x59, 0x15, 8, 1, 2, 3, 0, 1, 2, 4, 8]);
+        Check(permanent.Codes.Count == 2 && permanent.Codes[0].Status == 0, "Permanent DTC with zero current status retained.");
+        Check(ObdOnUdsServices.DecodePermanentDtcs([0x59, 0x15, 8]).Codes.Count == 0, "Empty permanent DTC report retained.");
+        Reject<InvalidDataException>(() => ObdOnUdsServices.DecodePermanentDtcs([0x59, 0x0A, 8]), "Wrong report rejected.");
+        Reject<InvalidDataException>(() => ObdOnUdsServices.DecodePermanentDtcs([0x59, 0x15, 8, 1, 2, 3, 1]), "Unavailable status rejected.");
+        Reject<InvalidDataException>(() => ObdOnUdsServices.DecodePermanentDtcs([0x59, 0x15, 8, 1, 2, 3, 0, 1, 2, 3, 8]), "Duplicate rejected.");
+        Reject<InvalidDataException>(() => UdsStandardServices.RequireResponse([0x19, 0x15], [0x59, 0x15, 8, 1]), "Truncated permanent DTC report rejected.");
         var index = ObdOnUdsServices.DecodeSnapshotIndex([0x59, 3, 1, 2, 3, 1, 1, 2, 3, 2]);
         Check(index.Count == 2 && index[1].Record == 2, "Distinct snapshot records retained.");
         Reject<InvalidDataException>(() => ObdOnUdsServices.DecodeSnapshotIndex([0x59, 3, 1]), "Truncated snapshot index rejected.");
