@@ -1,3 +1,11 @@
+## PR117 — snapshots UDS 19/04 décodés et consolidation 19/05 FF (25/11/2026)
+
+- Nouveau parcours 19 04 pour un DTC et un numéro explicite (00 réglementaire si applicable, 01..FE individuel, FF multiple), avec catalogue DID:longueur documenté. Android et Windows GUI/CLI, Connectors Python. Modes UDS (F190) et OBDonUDS (F802/F810) vérifiés avant/après sur la même session. Les valeurs historiques sont conservées en octets, sans extrapolation physique ni conversion en live data.
+- Connectors : `snapshot-decoded --dtc 010203 --record FF --did-lengths F40C:2,F40D:1` et `obd-snapshot-decoded`. Windows : `--uds-snapshot 0x010203 --uds-snapshot-record 0xFF --snapshot-did-lengths F40C:2,F40D:1` avec VIN attendu, ou variantes `--obd-snapshot` et `--obd-snapshot-record`. Exemples de syntaxe : longueurs à confirmer pour chaque ECU. FR/EN.
+- Refus des DTC/records inattendus, doublons, DID inconnus et troncatures. Pas de basculement automatique UDS vers OBDonUDS. Conservation du parcours brut existant.
+- Régressions codec/CLI des snapshots écrites sur les trois plateformes, et scénarios 19/05 FF Windows loopback avec contrôle VIN et Android validation transport écrits. Aucun test ou build exécuté. Le loopback complet Android et les scénarios d'intégration des snapshots restent à compléter à la clôture. C6/DoIP restent actifs ; aucune CI intermédiaire, aucune fusion, Release ou qualification physique.
+- Format de référence : https://uds.readthedocs.io/en/stable/pages/knowledge_base/service.html (19/04, 19/05).
+
 ## PR117 — lecture multiple UDS 19/05 FF (25/11/2026)
 
 - Android, Windows GUI/CLI et Connectors CLI Python : requête 19 05 FF, catalogue DID:longueur explicite issu de la documentation ECU, vérification F190 avant/après sur la même session, découpage des enregistrements et DID, conservation des réponses brutes, refus des enregistrements dupliqués, DID inconnus et troncatures. Aucun calcul de longueur OEM par heuristique.
