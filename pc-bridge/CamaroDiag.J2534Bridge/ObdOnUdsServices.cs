@@ -281,6 +281,23 @@ internal static class ObdOnUdsServices
         return new(reply[2], reply[3], count);
     }
 
+    internal sealed record FaultCounter(uint Dtc, sbyte Counter);
+    internal static byte[] ReadFaultCounters() => UdsStandardServices.ReadDtc(0x14, []);
+    internal static IReadOnlyList<FaultCounter> DecodeFaultCounters(ReadOnlySpan<byte> reply)
+    {
+        if (reply.Length < 2 || reply[0] != 0x59 || reply[1] != 0x14 || (reply.Length - 2) % 4 != 0)
+            throw new InvalidDataException("Malformed fault counter report.");
+        var rows = new List<FaultCounter>();
+        var seen = new HashSet<uint>();
+        for (var offset = 2; offset < reply.Length; offset += 4)
+        {
+            var dtc = ((uint)reply[offset] << 16) | ((uint)reply[offset+1] << 8) | reply[offset+2];
+            if (!seen.Add(dtc)) throw new InvalidDataException("Duplicate fault counter DTC.");
+            rows.Add(new(dtc, unchecked((sbyte)reply[offset+3])));
+        }
+        return rows;
+    }
+
     internal static byte[] ReadHistoricalDtc(byte subfunction)
     {
         if (subfunction is < 0x0B or > 0x0E) throw new ArgumentOutOfRangeException(nameof(subfunction));

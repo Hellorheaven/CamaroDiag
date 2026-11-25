@@ -434,6 +434,18 @@ internal static class DoIpVinReader
         return result;
     }
 
+    internal static async Task<IReadOnlyList<ObdOnUdsServices.FaultCounter>> ReadObservedFaultCountersAsync(
+        DoIpVehicleDiscovery.Identity gateway, IPAddress address, ushort tester, ushort ecu,
+        bool tls, TimeSpan timeout, CancellationToken token, string? certificate,
+        Action<DoIpDiagnosticTransport.PduTrace>? trace, DoIpDiagnosticTransport.SessionOptions? options)
+    {
+        await using var link = await ConnectObservedAsync(gateway, address, tester, ecu,
+            tls, timeout, token, certificate, trace, options);
+        return await ReadVerifiedDtcAsync(link, gateway, timeout, token, async () =>
+            ObdOnUdsServices.DecodeFaultCounters(await link.ExchangeUdsAsync(
+                ObdOnUdsServices.ReadFaultCounters(), timeout, token)));
+    }
+
     internal static async Task<ObdOnUdsServices.DtcStatusReport> ReadObservedHistoricalDtcAsync(
         DoIpVehicleDiscovery.Identity gateway, IPAddress address, ushort tester, ushort ecu,
         bool tls, byte subfunction, TimeSpan timeout, CancellationToken token, string? certificate,

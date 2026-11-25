@@ -737,6 +737,18 @@ internal static class StandardVehicleProtocolsSelfTests
             [0x19, 3], [0x59, 3, 1]), "Truncated snapshot index rejected at transport.");
         Reject<InvalidDataException>(() => UdsStandardServices.RequireResponse(
             [0x19, 0x0A], [0x59, 0x0A]), "Supported DTC response requires availability mask.");
+        var counters = StandardProtocolCli.ParseVerifiedDoIpRead([
+            "--host", "127.0.0.1", "--tester", "0E80", "--ecu", "1234",
+            "--expected-vin", "1G1FA1RX0J0100001", "--uds-fault-counters"]);
+        Check(!counters.Obd && counters.Target.Request.SequenceEqual(new byte[] { 0x19, 0x14 }),
+            "Fault counter CLI uses generic verified UDS.");
+        var fdc = ObdOnUdsServices.DecodeFaultCounters([0x59, 0x14, 1, 2, 3, 0x7F, 1, 2, 4, 0x80, 1, 2, 5, 0xFF]);
+        Check(fdc.Select(r => r.Counter).SequenceEqual(new sbyte[] { 127, -128, -1 }), "Signed counters preserved.");
+        Check(ObdOnUdsServices.DecodeFaultCounters([0x59, 0x14]).Count == 0, "Empty counter report accepted.");
+        Reject<InvalidDataException>(() => ObdOnUdsServices.DecodeFaultCounters(
+            [0x59, 0x14, 1]), "Truncated counter rejected.");
+        Reject<InvalidDataException>(() => ObdOnUdsServices.DecodeFaultCounters(
+            [0x59, 0x14, 1, 2, 3, 1, 1, 2, 3, 2]), "Duplicate counter rejected.");
         foreach (byte sub in new byte[] { 0x0B, 0x0C, 0x0D, 0x0E })
         {
             var historical = StandardProtocolCli.ParseVerifiedDoIpRead([

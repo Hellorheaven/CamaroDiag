@@ -133,4 +133,7 @@
   <data name="RecentFailed" xml:space="preserve"><value>Most recent failed DTC</value></data>
   <data name="RecentConfirmed" xml:space="preserve"><value>Most recent confirmed DTC</value></data>
   <data name="NoHistoricalDtc" xml:space="preserve"><value>No matching historical DTC</value></data>
+  <data name="FaultCounters" xml:space="preserve"><value>Fault detection counters</value></data>
+  <data name="FaultCountersResult" xml:space="preserve"><value>Fault detection counters: {0} records</value></data>
+  <data name="FaultCounterEntry" xml:space="preserve"><value>DTC 0x{0:X6}, counter {1}</value></data>
 </root>

@@ -1,3 +1,7 @@
+## PR117 — UDS 19/14 Windows GUI/CLI (25/11/2026)
+
+- Parité FDC Android/Windows/Connectors : compteurs signés, aucune confusion avec statut DTC, réponse vide valide, rejet des doublons et longueurs incohérentes, F190 avant/après. Bouton FR/EN et --uds-fault-counters. Tests écrits sans exécution. Aucun checkpoint ni clôture DoIP.
+
 ## PR117 — UDS 19/14 compteurs FDC Android/Connectors (25/11/2026)
 
 - Lecture des compteurs de détection FDC, distincts des statuts DTC ; octet signé préservé y compris valeur nonpositive atypique, aucun défaut confirmé inféré, réponse vide possible, doublons et troncatures refusés. F190 avant/après, UI FR/EN et CLI fault-counters. Références : https://uds.readthedocs.io/en/stable/pages/knowledge_base/service.html#reportdtcfaultdetectioncounter-0x14 et documentation DTC py-uds. Tests écrits non exécutés. Windows reste à raccorder.
