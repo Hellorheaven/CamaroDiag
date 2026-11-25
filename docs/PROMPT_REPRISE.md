@@ -1,3 +1,7 @@
+## PR117 — budget commun de lecture Mode 06 (25/11/2026)
+
+- C6 Android : budget monotone de 20 s pour les requêtes Mode 06 (configuration/restauration ELM hors budget), délai de chaque commande limité au temps restant, aucune nouvelle émission après expiration. Les résultats vérifiés sont conservés ; les MID annoncés non interrogés sont explicitement distingués des réponses manquantes et le rapport est partiel. Un bitmap vide valide est distingué d'une absence de réponse ; continuation impossible après E0 rejetée. Le respect temporel dépend du canal sous-jacent. Régressions déterministes écrites, non exécutées ; C6/DoIP restent ouverts, aucun checkpoint ni Release.
+
 ## PR117 — alignement des régressions Windows Mode 06 (25/11/2026)
 
 - Les assertions J2534 couvrent les lectures MID et les pages suivantes, tout en refusant les requêtes incomplètes ou trop longues. Tests non exécutés. Le budget temporel global Mode 06 reste à intégrer : récupération du moteur Android et de certains diffs à nouveau intermittente ; ne pas considérer cette limitation comme publiée. C6/DoIP ouverts, aucun checkpoint.

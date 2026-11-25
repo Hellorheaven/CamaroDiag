@@ -27,6 +27,8 @@ internal object ObdCanMonitorRecords {
         if (base !in 0..0xE0 || base % 32 != 0) return null
         val records = messages(response, base) ?: return null
         if (records.any { it.size != 6 || it[1] != base }) return null
+        // E0 is the last representable page: continuation would require MID 0x100.
+        if (base == 0xE0 && records.any { it[5] and 1 != 0 }) return null
         val mids = linkedSetOf<Int>()
         for (r in records) for (bit in 0 until 31) {
             if ((r[2 + bit / 8] and (1 shl (7 - bit % 8))) != 0)
