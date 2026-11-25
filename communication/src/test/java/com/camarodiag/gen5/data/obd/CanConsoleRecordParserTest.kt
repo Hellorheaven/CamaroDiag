@@ -339,11 +339,11 @@ class CanConsoleRecordParserTest {
             CanMonitorProtocolPolicy.setupCommands(can29Bit = false, stn = true)
         )
         assertEquals(
-            listOf("ATSP6", "ATE0", "ATL0", "ATH1", "ATS0", "ATCAF1"),
+            listOf("ATSP6", "ATSH 7DF", "ATE0", "ATL0", "ATH1", "ATS0", "ATCAF1"),
             CanMonitorProtocolPolicy.restoreCommands(stn = false)
         )
         assertEquals(
-            listOf("ATAR", "ATSP6", "ATE0", "ATL0", "ATH1", "ATS0", "ATCAF1"),
+            listOf("ATAR", "ATSP6", "ATSH 7DF", "ATE0", "ATL0", "ATH1", "ATS0", "ATCAF1"),
             CanMonitorProtocolPolicy.restoreCommands(stn = true)
         )
     }

@@ -120,7 +120,10 @@ internal class ElmUdsPayloadTransport(
             return bytes.toByteArray()
         }
 
-        val restoreCommands = listOf("ATFCSM0", "ATCRA", "ATSP6", "ATSH 7DF",
-            "ATCAF1", "ATCFC1", "ATH1", "ATS0", "ATD0")
+        fun restoreCommandsFor(protocol: Int): List<String> =
+            listOf("ATFCSM0", "ATCRA", "ATCFC1", "ATD0") +
+                ElmObdSessionProfile(protocol).restoreCommands()
+
+        val restoreCommands = restoreCommandsFor(6)
     }
 }

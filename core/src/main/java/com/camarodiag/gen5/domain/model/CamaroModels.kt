@@ -119,7 +119,9 @@ data class AdapterCapabilities(
     val hardwareId: String = "",
     /** Accepted configuration commands only; neither wiring nor ECU support is implied. */
     val acceptedElmProtocols: Set<Int> = emptySet(),
-    val acceptedStnProtocols: Set<Int> = emptySet()
+    val acceptedStnProtocols: Set<Int> = emptySet(),
+    /** ELM ATDPN reports the active protocol; this alone does not prove ECU access. */
+    val reportedElmProtocol: Int? = null
 )
 
 enum class ModuleStatus { ACCESSIBLE, REQUIRES_SWCAN, UNSUPPORTED_BY_ADAPTER, NOT_EQUIPPED, DISCOVERY_REQUIRED }

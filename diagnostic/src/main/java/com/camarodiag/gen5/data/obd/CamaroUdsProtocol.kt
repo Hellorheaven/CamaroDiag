@@ -19,8 +19,19 @@ object CamaroUdsProtocol {
         transmitProbeResp: String = "",
         hardwareResp: String = "",
         elmProtocolProbe: Map<Int, String> = emptyMap(),
-        stnProtocolProbe: Map<Int, String> = emptyMap()
+        stnProtocolProbe: Map<Int, String> = emptyMap(),
+        selectedElmProtocol: Int = 6,
+        reportedElmProtocol: Int? = selectedElmProtocol.takeIf { it in 1..10 },
+        protocolNumberResponse: String = ""
     ): AdapterCapabilities {
+        require(selectedElmProtocol in 0..10)
+        require(reportedElmProtocol == null || reportedElmProtocol in 1..10)
+        val acceptedElm = elmProtocolProbe.filter { (number, answer) ->
+            number in 1..10 && hasStandaloneOk(answer)
+        }.keys.toSet() + (if (selectedElmProtocol != 0 && hasStandaloneOk(protocolResp))
+            setOf(selectedElmProtocol) else emptySet())
+        val verifiedCan = reportedElmProtocol in 6..9 &&
+            hasPositiveMode01Pid00Response(transmitProbeResp)
         val logs = listOf(
             "> ATZ  -> $atzResp",
             "> STI  -> $stiResp",
@@ -28,8 +39,9 @@ object CamaroUdsProtocol {
             "> ATAL -> $atalResp",
             "> STP 61 -> $stp61Resp",
             "> ATH1 -> $headersResp",
-            "> ATSP 6 -> $protocolResp",
-            "> 0100 (physical TX verification) -> $transmitProbeResp"
+            "> ATSP ${selectedElmProtocol.toString(16).uppercase(Locale.ROOT)} -> $protocolResp",
+            "> 0100 (physical TX verification) -> $transmitProbeResp",
+            "> ATDPN -> $protocolNumberResponse"
         ) + elmProtocolProbe.toSortedMap().map { (number, answer) ->
             "> ATTP${number.toString(16).uppercase(Locale.ROOT)} -> $answer"
         } + stnProtocolProbe.toSortedMap().map { (number, answer) -> "> STP $number -> $answer" }
@@ -62,13 +74,12 @@ object CamaroUdsProtocol {
             supportsLongFrames = supportsLong,
             supportsSwCan = supportsSwCan,
             supportsCanHeaders = hasStandaloneOk(headersResp) &&
-                hasStandaloneOk(protocolResp),
+                (acceptedElm.any { it in 6..9 } || verifiedCan),
             rawProbeLog = logs,
-            supportsCanTransmit = hasPositiveMode01Pid00Response(transmitProbeResp),
+            supportsCanTransmit = verifiedCan,
             hardwareId = hardwareResp.trim(),
-            acceptedElmProtocols = elmProtocolProbe.filter { (number, answer) ->
-                number in 1..10 && hasStandaloneOk(answer)
-            }.keys.toSet() + (if (hasStandaloneOk(protocolResp)) setOf(6) else emptySet()),
+            reportedElmProtocol = reportedElmProtocol,
+            acceptedElmProtocols = acceptedElm + (if (verifiedCan) setOfNotNull(reportedElmProtocol) else emptySet()),
             acceptedStnProtocols = if (isStn) stnProtocolProbe.filter { (number, answer) ->
                 number in setOf(61, 62) && supportsSwCan && hasStandaloneOk(answer)
             }.keys.toSet() + (if (supportsSwCan) setOf(61) else emptySet()) else emptySet()
@@ -105,13 +116,7 @@ object CamaroUdsProtocol {
      * must never enable raw CAN transmission.
      */
     private fun hasPositiveMode01Pid00Response(response: String): Boolean {
-        val responseLine = Regex(
-            "^(?:(?:7E[8-F]|18DAF1[0-9A-F]{2}))?(?:06)?4100[0-9A-F]{8}$"
-        )
-        return response.lineSequence().any { line ->
-            val compact = line.uppercase(Locale.ROOT).replace(Regex("[^0-9A-F]"), "")
-            responseLine.matches(compact)
-        }
+        return parsePidBytes(response, "00")?.size == 4
     }
 
     fun buildTopology(vehicle: VehicleProfile, adapter: AdapterCapabilities): List<EcuModule> {

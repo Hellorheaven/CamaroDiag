@@ -217,9 +217,9 @@ object CanMonitorProtocolPolicy {
         }
     }
 
-    fun restoreCommands(stn: Boolean): List<String> = buildList {
+    fun restoreCommands(stn: Boolean, protocol: Int = 6): List<String> = buildList {
         if (stn) add("ATAR")
-        addAll(listOf("ATSP6", "ATE0", "ATL0", "ATH1", "ATS0", "ATCAF1"))
+        addAll(ElmObdSessionProfile(protocol).restoreCommands())
     }
 }
 

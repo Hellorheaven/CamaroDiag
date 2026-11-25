@@ -67,6 +67,7 @@ class BluetoothObdManager(context: Context) {
     /** Atomic, testable identity for transport work across disconnect/reconnect. */
     private val transportSessionEpoch = ObdTransportSessionEpoch()
     private var activeAdapterCapabilities: AdapterCapabilities? = null
+    @Volatile private var standardElmProfile = ElmObdSessionProfile.AUTO
 
     /** Capture the active transport before disconnect() resets its identity. */
     val currentTransportKind: String
@@ -411,10 +412,16 @@ class BluetoothObdManager(context: Context) {
             for (number in 1..10) {
                 protocolProbe[number] = probeCommand("ATTP" + number.toString(16).uppercase(java.util.Locale.ROOT))
             }
-            val protocolResp = probeCommand("ATSP 6")
-            // A real 0100 response proves that the connected physical command path
-            // transmitted a request and received an ECU reply; AT header support alone does not.
-            val transmitProbeResp = probeCommand("0100", 2_500L)
+            // Let the adapter discover the vehicle protocol instead of assuming HS-CAN.
+            val protocolResp = probeCommand("ATSP 0")
+            check(CanConsoleAdapterRestorationPolicy.accepted(protocolResp)) {
+                "The adapter did not accept automatic OBD protocol selection."
+            }
+            val transmitProbeResp = probeCommand("0100", 12_000L)
+            val protocolNumberResponse = probeCommand("ATDPN")
+            val reportedProtocol = ElmObdSessionProfile.parseProtocolNumber(protocolNumberResponse)
+            val selectedProfile = ElmObdSessionProfile.fromObservation(reportedProtocol,
+                CamaroUdsProtocol.parsePidBytes(transmitProbeResp, "00")?.size == 4)
 
             val capabilities = CamaroUdsProtocol.evaluateAdapterProbe(
                 deviceName = deviceName,
@@ -428,11 +435,15 @@ class BluetoothObdManager(context: Context) {
                 transmitProbeResp = transmitProbeResp,
                 hardwareResp = hardware,
                 elmProtocolProbe = protocolProbe,
-                stnProtocolProbe = mapOf(61 to stp61, 62 to stp62)
+                stnProtocolProbe = mapOf(61 to stp61, 62 to stp62),
+                selectedElmProtocol = 0,
+                reportedElmProtocol = reportedProtocol,
+                protocolNumberResponse = protocolNumberResponse
             )
             synchronized(adapterLifecycleLock) {
                 transportSessionEpoch.requireQueuedCurrent(expectedEpoch)
                 isDemoMode = false
+                standardElmProfile = selectedProfile
                 activeAdapterCapabilities = capabilities
             }
             Result.success(capabilities)
@@ -787,6 +798,7 @@ class BluetoothObdManager(context: Context) {
             suspend fun boundCommand(command: String, timeoutMs: Long, onChunk: ((String) -> Unit)? = null): String =
                 sendAtCommandInternal(command, timeoutMs, expectedEpoch = requestedEpoch, onChunk = onChunk)
             val isStnAdapter = capabilities.tier == AdapterTier.PRO_STN
+            val originalProfile = standardElmProfile
             // STMA emits ISO-15765 OBD messages on STN devices; STM is required for raw CAN frames.
             // STM uses the current filter table, so clear it for this session and restore
             // automatic OBD filtering after the capture.
@@ -818,7 +830,7 @@ class BluetoothObdManager(context: Context) {
                     // ESC may return only a prompt. A failed ESC still requires a
                     // fail-closed session even if later configuration commands respond.
                     var restored = runCatching { boundCommand("\u001B", 1_000L) }.isSuccess
-                    val commands = CanMonitorProtocolPolicy.restoreCommands(isStnAdapter)
+                    val commands = CanMonitorProtocolPolicy.restoreCommands(isStnAdapter, originalProfile.protocol)
                     // Restore the command-channel formatting established at probe time.
                     for (command in commands) {
                         val answer = runCatching { boundCommand(command, 1_000L) }.getOrNull()
@@ -902,6 +914,7 @@ class BluetoothObdManager(context: Context) {
             } else {
                 frame.canId.toString(16).uppercase().padStart(3, '0')
             }
+            val originalProfile = standardElmProfile
             val timedCorrelation = CanConsoleLiveDiagnosticCorrelation(
                 frame, requireExplicitStart = true
             )
@@ -995,21 +1008,17 @@ class BluetoothObdManager(context: Context) {
                     timedCorrelation.recentReceivedRecords(), error
                 )
             } finally {
-                // Return to the app's configured 11-bit HS-CAN / automatic-format state.
+                // Restore the original negotiated functional OBD profile.
                 withContext(NonCancellable) {
                     // A successful TX is not permission to keep using an adapter whose
                     // CAN protocol/header could not be restored. Try every cleanup step,
                     // then close the physical session if *any* step was unconfirmed.
                     var restored = true
-                    for ((command, timeout) in listOf(
-                        "ATSP6" to 1_500L,
-                        "ATSH 7DF" to 1_500L,
-                        "ATCAF1" to 1_500L,
-                        CanConsoleIsotpFlowControlPolicy.RESTORE_AUTOMATIC_MODE to 1_500L,
-                        CanConsoleIsotpFlowControlPolicy.ENABLE_AUTOMATIC to 1_500L,
-                        "ATH1" to 1_000L,
-                        "ATS0" to 1_000L
-                    )) {
+                    for (command in listOf(
+                        CanConsoleIsotpFlowControlPolicy.RESTORE_AUTOMATIC_MODE,
+                        CanConsoleIsotpFlowControlPolicy.ENABLE_AUTOMATIC
+                    ) + originalProfile.restoreCommands()) {
+                        val timeout = 1_500L
                         val answer = runCatching { boundCommand(command, timeout) }.getOrNull()
                         if (answer == null || !CanConsoleAdapterRestorationPolicy.accepted(answer))
                             restored = false
@@ -1355,6 +1364,7 @@ class BluetoothObdManager(context: Context) {
         transportSessionEpoch.requireQueuedCurrent(epoch)
         check(isElmUdsReadCandidate && protocolNumber in
             availableUdsReadProfiles(requestCanId, responseCanId))
+        val originalProfile = standardElmProfile
         val transport = ElmUdsPayloadTransport(requestCanId, responseCanId, protocolNumber) { command, timeout ->
             sendAtCommandInternal(command, timeout, expectedEpoch = epoch, preserveLines = true)
         }
@@ -1364,7 +1374,7 @@ class BluetoothObdManager(context: Context) {
             withContext(NonCancellable) {
                 if (transportSessionEpoch.isCurrent(epoch)) {
                     var restored = true
-                    for (command in ElmUdsPayloadTransport.restoreCommands) {
+                    for (command in ElmUdsPayloadTransport.restoreCommandsFor(originalProfile.protocol)) {
                         val response = runCatching {
                             sendAtCommandInternal(command, 1_500L, expectedEpoch = epoch)
                         }.getOrNull()
@@ -1613,6 +1623,7 @@ class BluetoothObdManager(context: Context) {
         return commandSessionMutex.withLock {
             transportSessionEpoch.requireQueuedCurrent(requestedEpoch)
             check(admitted()) { "The physical STN adapter disconnected while waiting for the UDS session." }
+            val originalProfile = standardElmProfile
             val transport = StnUdsPayloadTransport(
                 requestCanId = requestCanId,
                 responseCanId = responseCanId,
@@ -1629,7 +1640,7 @@ class BluetoothObdManager(context: Context) {
                 // A replaced connection must NEVER be touched by old cleanup.
                 withContext(NonCancellable) {
                     if (transportSessionEpoch.isCurrent(requestedEpoch)) {
-                        val restore = StnUdsAdapterRestoration.restore { command ->
+                        val restore = StnUdsAdapterRestoration.restore(originalProfile.protocol) { command ->
                             sendAtCommandInternal(command, 1_500L, expectedEpoch = requestedEpoch)
                         }
                         if (!restore.succeeded && transportSessionEpoch.isCurrent(requestedEpoch)) {
@@ -1712,6 +1723,7 @@ class BluetoothObdManager(context: Context) {
             isDemoMode = true
             isSimulationActive = false
             activeAdapterCapabilities = null
+            standardElmProfile = ElmObdSessionProfile.AUTO
         }
     }
 }

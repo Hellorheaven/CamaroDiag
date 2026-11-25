@@ -1,3 +1,7 @@
+## PR117 — négociation ELM et restauration du protocole (25/11/2026)
+
+- C6 Android : sélection initiale automatique ATSP0 et relevé ATDPN, preuve ECU 0100 séparée des capacités annoncées ; aucune preuve CAN issue d'un protocole non CAN, aucun ajout artificiel du protocole 6. Le profil CAN 6/7/8/9 n'est conservé que sur réponse positive ; à défaut retour automatique. Console capture/TX, ELM UDS et STN UDS restaurent le profil et l'en-tête fonctionnel correspondant, sans basculement systématique vers 11 bits/500 kbit/s. En cas de nettoyage incomplet, fermeture de la session selon politique existante. Tests écrits non exécutés. Les protocoles legacy annoncés ne constituent pas une validation des décodeurs K-Line/J1850 ; DoIP et C6 restent ouverts. Aucun checkpoint CI.
+
 ## PR117 — démarrage Android avec ELM Bluetooth déjà connecté (25/11/2026)
 
 - Retour propriétaire : chargement en boucle si Bluetooth ELM connecté avant ouverture. Cause exacte non reproduite. C6 : accès au service Bluetooth différé ; connexion RFCOMM bornée à 12 s avec fermeture du socket exact sur annulation ; purge RX bornée à 500 ms/8192 octets. Authentification Firebase : attente bornée à 15 s, message FR/EN et retry, invalidation des callbacks tardifs, aucun privilège ni accès hors ligne sur timeout. Régressions écrites non exécutées. Aucun checkpoint CI, C6/DoIP restent actifs.

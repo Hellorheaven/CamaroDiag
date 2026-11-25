@@ -291,6 +291,22 @@ class CamaroUdsProtocolTest {
     }
 
     @Test
+    fun automaticSelectionDoesNotInventCanCapabilityOrProtocolSix() {
+        fun probe(protocol: Int?, reply: String) = CamaroUdsProtocol.evaluateAdapterProbe(
+            deviceName = "ELM", macAddress = "test", atzResp = "ELM327",
+            stiResp = "?", atalResp = "OK", stp61Resp = "?",
+            selectedElmProtocol = 0, reportedElmProtocol = protocol,
+            elmProtocolProbe = mapOf(7 to "OK"), transmitProbeResp = reply)
+        val can = probe(7, "18DAF110 06 41 00 BE 3E B8 13")
+        assertEquals(setOf(7), can.acceptedElmProtocols)
+        assertEquals(7, can.reportedElmProtocol)
+        assertTrue(can.supportsCanTransmit)
+        assertFalse(probe(3, "4100BE3EB813").supportsCanTransmit)
+        assertFalse(probe(null, "4100BE3EB813").supportsCanTransmit)
+        assertFalse(probe(7, "NO DATA").supportsCanTransmit)
+    }
+
+    @Test
     fun genericElmCloneCanUseStandardCanWithoutClaimingUdsCapabilities() {
         val capabilities = CamaroUdsProtocol.evaluateAdapterProbe(
             deviceName = "ELM327 Bluetooth",
