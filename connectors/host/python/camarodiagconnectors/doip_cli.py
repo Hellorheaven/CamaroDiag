@@ -165,6 +165,12 @@ def _run(argv: Sequence[str] | None, resources: ExitStack) -> dict:
         p = sub.add_parser(action, help=tr("Verified DTC record read", "Lecture d'enregistrement DTC vérifiée"))
         p.add_argument("--dtc", required=True, type=lambda x: hex_value(x, 6))
         p.add_argument("--record", required=True, type=lambda x: hex_value(x, 2))
+    for action in ("snapshot-decoded", "obd-snapshot-decoded"):
+        p = sub.add_parser(action, help=tr("Decode snapshot records using documented DID lengths",
+                                          "Décoder les snapshots avec les longueurs DID documentées"))
+        p.add_argument("--dtc", required=True, type=lambda x: hex_value(x, 6))
+        p.add_argument("--record", required=True, type=lambda x: hex_value(x, 2))
+        p.add_argument("--did-lengths", required=True, help=tr("DID:length catalog", "Catalogue DID:longueur"))
     for action, description in (
             ("memory-dtcs", tr("Read DTCs in a selected memory", "Lire les DTC d'une mémoire sélectionnée")),
             ("memory-snapshot", tr("Read a snapshot in a selected memory", "Lire un snapshot d'une mémoire sélectionnée")),
@@ -214,7 +220,7 @@ def _run(argv: Sequence[str] | None, resources: ExitStack) -> dict:
     layout = parse_did_layout(o.layout) if multi_monitor or o.action in ("dids", "obd-dids") else None
     if multi_monitor:
         layout = validate_monitor_layout(layout)
-    stored_lengths = parse_stored_did_lengths(o.did_lengths) if o.action == "stored-records" else None
+    stored_lengths = parse_stored_did_lengths(o.did_lengths) if o.action in ("stored-records", "snapshot-decoded", "obd-snapshot-decoded") else None
     if o.action in ("obd-dids", "obd-monitor-dids") and any(not 0xF400 <= did <= 0xF8FF for did, _ in layout):
         parser.error(tr("Legislated DIDs F400..F8FF required", "DID réglementaires F400..F8FF requis"))
     if o.action == "mirror-extended" and (o.record == 0 or 0xF0 <= o.record <= 0xFD):
@@ -379,6 +385,11 @@ def _run(argv: Sequence[str] | None, resources: ExitStack) -> dict:
                                               status_mask=getattr(o, "mask", 255), dtc=getattr(o, "dtc", None))
             return result | {"vin": o.vin, "ecu": o.ecu, "tester": o.tester, "tls": not o.tcp,
                              "service_protocol": "UDS"} | report
+        if o.action in ("snapshot-decoded", "obd-snapshot-decoded"):
+            obd = o.action.startswith("obd-")
+            report = session.read_snapshot_records(o.vin, o.dtc, o.record, stored_lengths, obd=obd)
+            return result | {"vin": o.vin, "ecu": o.ecu, "tester": o.tester, "tls": not o.tcp,
+                             "service_protocol": "OBDonUDS" if obd else "UDS"} | report
         if o.action == "stored-records":
             report = session.read_all_stored_dtc_records(o.vin, stored_lengths)
             return result | {"vin": o.vin, "ecu": o.ecu, "tester": o.tester, "tls": not o.tcp,
