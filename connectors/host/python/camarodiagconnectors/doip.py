@@ -409,7 +409,7 @@ def positive(request: bytes, reply: bytes) -> bytes:
         if subfunction in (3, 0x14):
             if len(request) != 2 or (len(reply) - 2) % 4:
                 raise DoIpError("Malformed DTC index or fault counter report")
-        elif len(reply) < 3 or (subfunction == 10 and (len(request) != 2 or (len(reply) - 3) % 4)):
+        elif len(reply) < 3 or (subfunction in (0x0A, 0x15) and (len(request) != 2 or (len(reply) - 3) % 4)):
             raise DoIpError("Malformed DTC report")
         if subfunction == 9:
             if len(request) != 5 or len(reply) not in (3, 9) or (len(reply) == 9 and reply[5:8] != request[2:5]):
@@ -1010,11 +1010,13 @@ class Session:
             self.close()
             raise
 
-    def read_dtc_inventory(self, expected: str, *, snapshot_index: bool = False) -> dict:
-        """Read supported DTCs or snapshot references on one verified ECU."""
+    def read_dtc_inventory(self, expected: str, *, snapshot_index: bool = False, permanent: bool = False) -> dict:
+        """Read supported or permanent DTCs, or snapshot references, on one verified ECU."""
+        if snapshot_index and permanent:
+            raise DoIpError("Conflicting DTC inventory selectors")
         try:
             self.verify_vin(expected)
-            sub = 3 if snapshot_index else 10
+            sub = 3 if snapshot_index else (0x15 if permanent else 0x0A)
             reply = self.exchange(bytes((0x19, sub)))
             start = 2 if snapshot_index else 3
             if len(reply) < start or reply[:2] != bytes((0x59, sub)) or (len(reply) - start) % 4:
@@ -1030,7 +1032,7 @@ class Session:
                 seen.add(key)
                 rows.append({"dtc": dtc, "record" if snapshot_index else "status": value})
             self.verify_vin(expected)
-            return {"kind": "snapshot-index" if snapshot_index else "supported-dtcs",
+            return {"kind": "snapshot-index" if snapshot_index else ("permanent-dtcs" if permanent else "supported-dtcs"),
                     "records": rows, **({} if snapshot_index else {"availability_mask": reply[2]})}
         except BaseException:
             self.close()

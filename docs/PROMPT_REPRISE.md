@@ -1,3 +1,7 @@
+## PR117 — DTC permanents UDS Connectors (25/11/2026)
+
+- CLI Python `permanent-dtcs` : lecture 19/15 distincte de 19/0A et WWH 19/55, VIN F190 avant/après, statut brut et masque de disponibilité, liste vide possible, refus des réponses tronquées, doublons et bits non disponibles. Tests écrits non exécutés. Référence de format : https://udsoncan.readthedocs.io/en/latest/_modules/udsoncan/services/ReadDTCInformation.html . Android et Windows restent à raccorder. Aucun checkpoint CI.
+
 ## PR117 — attribution des traces d'inventaire Connectors (25/11/2026)
 
 - Parité des journaux multi-ECU avec Android/Windows : `--trace` ajoute inventory_target sur les échanges réels de découverte et de session associés à chaque adresse, sans attribuer la découverte finale à un ECU. Une erreur du collecteur de trace interrompt l'inventaire au lieu de simuler un ECU non vérifié. Tests écrits, non exécutés. Aucun checkpoint CI.

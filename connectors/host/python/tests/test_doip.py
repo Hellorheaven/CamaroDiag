@@ -409,6 +409,35 @@ class DoIpTests(unittest.TestCase):
                 Session.read_dtc_inventory(fake, VIN, snapshot_index=snapshot)
             fake.close.assert_called_once()
 
+    def test_permanent_dtc_inventory_is_distinct_from_supported_and_wwh(self):
+        for payload, expected in (("591508", []), ("5915080102030001020408",
+                                   [{"dtc": "010203", "status": 0}, {"dtc": "010204", "status": 8}])):
+            fake = unittest.mock.Mock(spec=Session)
+            fake.exchange.return_value = bytes.fromhex(payload)
+            result = Session.read_dtc_inventory(fake, VIN, permanent=True)
+            self.assertEqual(result, {"kind": "permanent-dtcs", "records": expected, "availability_mask": 8})
+            fake.exchange.assert_called_once_with(bytes.fromhex("1915"))
+            self.assertEqual(fake.verify_vin.call_count, 2)
+            fake.close.assert_not_called()
+        for payload in ("590A08", "5915", "59150801", "59150801020301",
+                        "5915080102030001020308"):
+            fake = unittest.mock.Mock(spec=Session)
+            fake.exchange.return_value = bytes.fromhex(payload)
+            with self.assertRaises(DoIpError):
+                Session.read_dtc_inventory(fake, VIN, permanent=True)
+            fake.close.assert_called_once()
+        fake = unittest.mock.Mock(spec=Session)
+        with self.assertRaises(DoIpError):
+            Session.read_dtc_inventory(fake, VIN, snapshot_index=True, permanent=True)
+        fake.exchange.assert_not_called()
+        fake.verify_vin.assert_not_called()
+        fake = unittest.mock.Mock(spec=Session)
+        fake.exchange.return_value = bytes.fromhex("591508")
+        fake.verify_vin.side_effect = [VIN, DoIpError("VIN changed")]
+        with self.assertRaises(DoIpError):
+            Session.read_dtc_inventory(fake, VIN, permanent=True)
+        fake.close.assert_called_once()
+
     def test_dtc_severity_queries_preserve_raw_fields_and_identity(self):
         for sub, data, options, request in (
                 (7, "590708010002", {"severity_mask": 0x80, "status_mask": 8}, "19078008"),

@@ -101,6 +101,7 @@ def run(argv: Sequence[str] | None = None) -> dict:
         monitor.add_argument("--interval", type=float, default=1)
     sub.add_parser("supported-dtcs", help=tr("List supported DTCs", "Lister les DTC pris en charge"))
     sub.add_parser("snapshot-index", help=tr("List snapshot references", "Lister les références des snapshots"))
+    sub.add_parser("permanent-dtcs", help=tr("Read permanent UDS DTCs", "Lire les DTC permanents UDS"))
     for action in ("severity-count", "severity-dtcs"):
         severity = sub.add_parser(action, help=tr("Filter DTCs by severity and status", "Filtrer les DTC par sévérité et statut"))
         severity.add_argument("--severity-mask", required=True, type=lambda x: hex_value(x, 2))
@@ -280,8 +281,9 @@ def run(argv: Sequence[str] | None = None) -> dict:
             report = session.read_historical_dtc(o.vin, historical_actions[o.action])
             return result | {"vin": o.vin, "ecu": o.ecu, "tester": o.tester, "tls": not o.tcp,
                              "service_protocol": "UDS"} | report
-        if o.action in ("supported-dtcs", "snapshot-index"):
-            inventory = session.read_dtc_inventory(o.vin, snapshot_index=o.action == "snapshot-index")
+        if o.action in ("supported-dtcs", "snapshot-index", "permanent-dtcs"):
+            inventory = session.read_dtc_inventory(o.vin, snapshot_index=o.action == "snapshot-index",
+                                                   permanent=o.action == "permanent-dtcs")
             return result | {"vin": o.vin, "ecu": o.ecu, "tester": o.tester, "tls": not o.tcp,
                              "service_protocol": "UDS"} | inventory
         if o.action in ("dtcs", "count", "snapshot", "extended",
