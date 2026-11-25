@@ -147,6 +147,7 @@
   <data name="ObdDecodedSnapshot" xml:space="preserve"><value>Snapshots OBDonUDS décodés</value></data>
   <data name="DecodedSnapshotResult" xml:space="preserve"><value>DTC {0:X6} — statut {1:X2} — snapshots : {2}</value></data>
   <data name="SnapshotRecordResult" xml:space="preserve"><value>Snapshot 0x{0:X2}</value></data>
+  <data name="DecodedStoredRecord" xml:space="preserve"><value>Enregistrement mémorisé décodé</value></data>
   <data name="StoredRecordEmpty" xml:space="preserve"><value>Aucune donnée mémorisée pour cet enregistrement</value></data>
   <data name="ExtendedRecordSupport" xml:space="preserve"><value>DTC prenant en charge cet enregistrement</value></data>
   <data name="ExtendedRecordSize" xml:space="preserve"><value>Longueur uniforme documentée (octets)</value></data>
