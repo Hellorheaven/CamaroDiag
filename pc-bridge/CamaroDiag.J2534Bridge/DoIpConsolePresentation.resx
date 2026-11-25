@@ -130,6 +130,7 @@
   <data name="StoredRecord" xml:space="preserve"><value>Read stored DTC data by record</value></data>
   <data name="InvalidStoredRecord" xml:space="preserve"><value>Select one stored record 00..FE.</value></data>
   <data name="StoredRecordResult" xml:space="preserve"><value>Stored record 0x{0:X2}</value></data>
+  <data name="StoredRecordCount" xml:space="preserve"><value>Declared DID count: {0}</value></data>
   <data name="StoredRecordEmpty" xml:space="preserve"><value>No stored data for this record</value></data>
   <data name="ExtendedRecordSupport" xml:space="preserve"><value>DTCs supporting extended record</value></data>
   <data name="ExtendedRecordSize" xml:space="preserve"><value>Uniform documented record length (bytes)</value></data>
