@@ -1331,7 +1331,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 check(current())
                 val result = DoIpDirectRead.read(target, DoIpDirectRead.Operation.BACKUP,
                     timeoutMs = options.timeoutMs, sessionOptions = options,
-                    clientTls = clientTls, backupScope = scope, onBackupProgress = { pass, offset ->
+                    clientTls = clientTls, backupScope = scope,
+                    isReadContextCurrent = { current() && _calibrationWorkspace.value.doIpBackupScope == scope },
+                    onBackupProgress = { pass, offset ->
                         check(current())
                         _calibrationWorkspace.update { if (current()) it.copy(doIpBackupBytes = (pass - 1) * scope.length + offset) else it }
                     }, onTrace = { trace ->
@@ -1523,6 +1525,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         }
                     }, onControlTrace = { trace -> journalDoIpControlTrace(trace, current) },
                     commands = fixedCommands, approval = approval, isContextCurrent = current,
+                    isReadContextCurrent = current,
                     dtc = detailDtc, record = detailRecord, onCommandReply = { index, reply ->
                         check(current())
                         val line = localizedContext.getString(R.string.cal_doip_sequence_reply, index,

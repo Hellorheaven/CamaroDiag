@@ -272,6 +272,9 @@ class DoIpGatewayControlTraceTest {
         val target = DoIpDirectRead.Target.parse("127.0.0.1", "0E80", "1001", vin, true)
         assertEquals(1, DoIpDirectRead.decodeObdProtocol(byteArrayOf(0x62, 0xF8.toByte(), 0x10, 1)))
         assertTrue(DoIpDirectRead.selectObdReadRoute(target, vin, 1).routes.isNotEmpty())
+        assertTrue(DoIpDirectRead.selectObdReadRoute(target, vin, 1, DiagnosticRouteSelector.Operation.DTC).routes.isNotEmpty())
+        assertTrue(DoIpDirectRead.selectObdReadRoute(target, vin, 2, DiagnosticRouteSelector.Operation.DTC).routes.isEmpty())
+        assertTrue(DoIpDirectRead.selectObdReadRoute(target, vin, 1, DiagnosticRouteSelector.Operation.PROGRAM).routes.isEmpty())
         assertTrue(DoIpDirectRead.selectObdReadRoute(target, vin, 2).routes.isEmpty())
         assertTrue(DoIpDirectRead.selectObdReadRoute(target, "1G1FA1RX0J0100002", 1).routes.isEmpty())
         assertTrue(runCatching { DoIpDirectRead.decodeObdProtocol(byteArrayOf(0x62, 0xF8.toByte(), 0x11, 1)) }.isFailure)
@@ -282,12 +285,14 @@ class DoIpGatewayControlTraceTest {
 
     @Test fun rawDtcResponsesMustCorrelateRecordAndFunctionalGroup() {
         fun hex(s: String) = s.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
-        val valid = listOf("190412345601" to "5904123456080100",
+        val valid = listOf("1903" to "5903", "190A" to "590A08",
+            "190412345601" to "5904123456080100",
             "1906123456FE" to "5906123456089001",
             "19563307" to "595633FF0407",
             "241234" to "64123400")
         valid.forEach { (tx, rx) -> DoIpDirectRead.requirePositiveResponse(hex(tx), hex(rx)) }
-        val invalid = listOf("190412345601" to "5904123456080200",
+        val invalid = listOf("1903" to "590301", "190A" to "590A",
+            "190A" to "590A0801", "190412345601" to "5904123456080200",
             "190612345690" to "5906123457089001",
             "195533" to "595534FF04",
             "19563307" to "595633FF0408",
@@ -312,6 +317,14 @@ class DoIpGatewayControlTraceTest {
             byteArrayOf(0x76, 2)) }.isFailure)
         for (invalid in listOf("", "0x22", "A", "GG", "AA".repeat(4092)))
             assertTrue(runCatching { DoIpDirectRead.parseCommand(invalid) }.isFailure)
+    }
+
+    @Test fun revokedReadContextFailsBeforeAnyDiscovery() = runBlocking {
+        val target = DoIpDirectRead.Target.parse("127.0.0.1", "0E80", "1001", vin, false)
+        val events = mutableListOf<DoIpDirectRead.ControlTrace>()
+        assertTrue(runCatching { DoIpDirectRead.read(target, DoIpDirectRead.Operation.DTC,
+            isReadContextCurrent = { false }, onControlTrace = { events.add(it) }) }.isFailure)
+        assertTrue(events.isEmpty())
     }
 
     @Test fun unconfirmedExchangeFailsBeforeAnyDiscovery() = runBlocking {

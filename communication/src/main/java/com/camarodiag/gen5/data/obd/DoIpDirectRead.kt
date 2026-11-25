@@ -85,7 +85,8 @@ object DoIpDirectRead {
     /** The common selector only exposes an OBD service route after the selected ECU
      * returned both the legislated VIN and the OBDonUDS identification value.
      * A DID on that route can still be unsupported; its reply remains authoritative. */
-    internal fun selectObdReadRoute(target: Target, ecuVin: String, protocolValue: Int): DiagnosticRouteSelector.Selection {
+    internal fun selectObdReadRoute(target: Target, ecuVin: String, protocolValue: Int,
+        requested: DiagnosticRouteSelector.Operation = DiagnosticRouteSelector.Operation.MONITOR): DiagnosticRouteSelector.Selection {
         val selector = DiagnosticRouteSelector
         val protocol = DiagnosticRouteSelector.Protocol(DiagnosticRouteSelector.Link.ETHERNET,
             DiagnosticRouteSelector.Framing.DOIP, DiagnosticRouteSelector.Service.OBD)
@@ -93,12 +94,13 @@ object DoIpDirectRead {
         val verified = sameVin && protocolValue == 1
         return selector.select(listOf(DiagnosticRouteSelector.Capability(protocol,
             if (verified) DiagnosticRouteSelector.Evidence.VERIFIED else DiagnosticRouteSelector.Evidence.UNKNOWN,
-            true, setOf(DiagnosticRouteSelector.Operation.IDENTIFY, DiagnosticRouteSelector.Operation.MONITOR))),
+            true, setOf(DiagnosticRouteSelector.Operation.IDENTIFY, DiagnosticRouteSelector.Operation.MONITOR,
+                DiagnosticRouteSelector.Operation.DTC))),
             DiagnosticRouteSelector.Target(target.expectedVin.ifEmpty { "unknown" },
                 "%04X".format(target.ecu),
                 if (sameVin) setOf(DiagnosticRouteSelector.Link.ETHERNET) else emptySet(),
                 if (verified) setOf(protocol) else emptySet(), sameVin),
-            DiagnosticRouteSelector.Operation.MONITOR)
+            requested)
     }
 
     fun parseCommand(text: String): ByteArray {
@@ -129,8 +131,14 @@ object DoIpDirectRead {
             0x22 -> { echo(2); require(reply.size >= 4) }
             0x24, 0x2E, 0x2F -> echo(2)
             0x19 -> {
-                require(request.size >= 2 && reply.size >= 3 && reply[1].u8() == (request[1].u8() and 0x7F))
+                require(request.size >= 2 && reply.size >= 2 && reply[1].u8() == (request[1].u8() and 0x7F))
                 val subfunction = request[1].u8() and 0x7F
+                if (subfunction == 0x03) {
+                    require(request.size == 2 && (reply.size - 2) % 4 == 0)
+                } else {
+                    require(reply.size >= 3)
+                    if (subfunction == 0x0A) require(request.size == 2 && (reply.size - 3) % 4 == 0)
+                }
                 if (subfunction in setOf(0x04, 0x06)) {
                     require(request.size == 6 && reply.size >= 6 &&
                         request.copyOfRange(2, 5).contentEquals(reply.copyOfRange(2, 5)))
@@ -541,7 +549,8 @@ object DoIpDirectRead {
         private val target: Target, private val trace: MutableList<Trace>,
         private val rollingTrace: Boolean = false, private val onTrace: (Trace) -> Unit = {},
         private val onControlTrace: (ControlTrace) -> Unit = {},
-        private val options: SessionOptions = SessionOptions()) {
+        private val options: SessionOptions = SessionOptions(),
+        private val isReadContextCurrent: () -> Boolean = { true }) {
         private fun recordControl(direction: String, bytes: ByteArray) =
             controlTrace(direction, if (target.tls) "TLS" else "TCP", target.address, bytes, onControlTrace)
         private fun record(direction: String, payload: ByteArray) {
@@ -566,6 +575,7 @@ object DoIpDirectRead {
             return output
         }
         private fun send(type: Int, body: ByteArray, deadline: Long) {
+            check(isReadContextCurrent()) { "DoIP operation context changed." }
             remaining(deadline)
             val pdu = encode(gateway.version, type, body)
             socket.getOutputStream().apply { write(pdu); flush() }
@@ -652,6 +662,7 @@ object DoIpDirectRead {
                     throw UdsNegativeResponseException(reply[1].u8(), reply[2].u8())
                 }
                 requirePositiveResponse(request, reply)
+                check(isReadContextCurrent()) { "DoIP operation context changed." }
                 return reply
             }
         }
@@ -672,7 +683,9 @@ object DoIpDirectRead {
         commands: List<ByteArray>? = null, onCommandReply: (Int, ByteArray) -> Unit = { _, _ -> },
         clientTls: DoIpClientTls? = null, sessionOptions: SessionOptions? = null,
         wwhSeverity: Int = 255, wwhReadinessGroup: Int? = null,
-        multiLayout: List<DoIpMultiDid.Field>? = null): Outcome {
+        multiLayout: List<DoIpMultiDid.Field>? = null,
+        isReadContextCurrent: () -> Boolean = { true }): Outcome {
+        check(isReadContextCurrent()) { "DoIP operation context changed." }
         val options = sessionOptions ?: SessionOptions(timeoutMs)
         require(options.timeoutMs == timeoutMs)
         clientTls?.requireTarget(target)
@@ -720,7 +733,9 @@ object DoIpDirectRead {
             else if (monitoring)
             timeoutMs * (sampleCount + 7L) + intervalMs * (sampleCount - 1L)
             else if (wwhKind != null || multi || obdDtc || operation == Operation.OBD_DID) timeoutMs * 8L else timeoutMs * 5L
+        check(isReadContextCurrent()) { "DoIP operation context changed." }
         val gateway = discover(target.address, target.expectedVin, timeoutMs, onControlTrace)
+        check(isReadContextCurrent()) { "DoIP operation context changed." }
         requireGatewayIdentity(target, gateway)
         if (operation == Operation.EXCHANGE) require(gateway.vin == target.expectedVin)
         if (backupScope != null) require(gateway.logicalAddress == backupScope.gateway)
@@ -746,7 +761,8 @@ object DoIpDirectRead {
                 } else base
                 wire.use {
                     val session = Session(wire, gateway, target, trace, rollingTrace = operation == Operation.BACKUP || monitoring,
-                        onTrace = onTrace, onControlTrace = onControlTrace, options = options)
+                        onTrace = onTrace, onControlTrace = onControlTrace, options = options,
+                        isReadContextCurrent = isReadContextCurrent)
                     session.activate(timeoutMs)
                     fun readVin(vinDid: Int = 0xF190): String {
                         val reply = session.exchange(byteArrayOf(0x22, (vinDid shr 8).toByte(), vinDid.toByte()), timeoutMs)
@@ -785,7 +801,9 @@ object DoIpDirectRead {
                         val protocolValue = decodeObdProtocol(session.exchange(
                             byteArrayOf(0x22, 0xF8.toByte(), 0x10), timeoutMs))
                         if (operation != Operation.OBD_IDENTIFY) {
-                            require(selectObdReadRoute(target, vin, protocolValue).routes.isNotEmpty()) {
+                            val routeOperation = if (wwhKind != null || obdDtc)
+                                DiagnosticRouteSelector.Operation.DTC else DiagnosticRouteSelector.Operation.MONITOR
+                            require(selectObdReadRoute(target, vin, protocolValue, routeOperation).routes.isNotEmpty()) {
                                 "Selected ECU did not identify as OBDonUDS."
                             }
                         }

@@ -712,6 +712,12 @@ internal static class StandardVehicleProtocolsSelfTests
             Reject<ArgumentException>(() => StandardProtocolCli.ParseDoIp([..target, selector]),
                 "DTC inventory requires VIN.");
         }
+        Check(UdsStandardServices.RequireResponse([0x19, 3], [0x59, 3]).Length == 2,
+            "Empty snapshot index is a valid correlated response.");
+        Reject<InvalidDataException>(() => UdsStandardServices.RequireResponse(
+            [0x19, 3], [0x59, 3, 1]), "Truncated snapshot index rejected at transport.");
+        Reject<InvalidDataException>(() => UdsStandardServices.RequireResponse(
+            [0x19, 0x0A], [0x59, 0x0A]), "Supported DTC response requires availability mask.");
         var supported = ObdOnUdsServices.DecodeSupportedDtcs([0x59, 0x0A, 8, 1, 2, 3, 0]);
         Check(supported.Codes.Count == 1 && supported.Codes[0].Status == 0, "Inactive supported DTC retained.");
         Reject<InvalidDataException>(() => ObdOnUdsServices.DecodeSupportedDtcs(

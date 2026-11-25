@@ -1,3 +1,7 @@
+## PR117 — cohérence des routes et index vide DoIP (25/11/2026)
+
+- Transport Android/Python/Windows : accepte 59 03 sans enregistrement (index réellement vide), refuse les index tronqués et les inventaires 59 0A sans masque. Android : sélecteur de route OBDonUDS vérifie l'opération DTC ou monitoring selon la demande et n'admet pas la programmation sur ces capacités de lecture ; vérification de contexte avant toute émission de session et avant restitution, sauvegardes liées au profil sélectionné. Tests de régression écrits, aucune exécution ni compilation intermédiaire.
+
 ## PR117 — monitoring multi-DID DoIP Windows (25/11/2026)
 
 - Parité GUI et CLI Windows : --monitor-dids / --obd-monitor-dids, une requête 22 par échantillon, géométrie explicite et limitée à 4096 octets, F190 ou F802/F810 avant/après même connexion, annulation, mesures provisoires puis verdict final, journal existant. Aide FR/EN, tests parseur et loopback écrits. Aucun build/test lancé ni marqueur de clôture modifié.

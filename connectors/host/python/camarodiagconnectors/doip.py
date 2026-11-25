@@ -388,9 +388,14 @@ def positive(request: bytes, reply: bytes) -> bytes:
     if request[0] == 0x23 and len(reply) < 2:
         raise DoIpError("Missing memory data")
     if request[0] == 0x19:
-        if len(request) < 2 or len(reply) < 3 or reply[1] != request[1] & 0x7F:
+        if len(request) < 2 or len(reply) < 2 or reply[1] != request[1] & 0x7F:
             raise DoIpError("UDS DTC subfunction mismatch")
         subfunction = request[1] & 0x7F
+        if subfunction == 3:
+            if len(request) != 2 or (len(reply) - 2) % 4:
+                raise DoIpError("Malformed DTC snapshot index")
+        elif len(reply) < 3 or (subfunction == 10 and (len(request) != 2 or (len(reply) - 3) % 4)):
+            raise DoIpError("Malformed DTC report")
         if subfunction in (0x04, 0x06):
             if len(request) != 6 or len(reply) < 6 or reply[2:5] != request[2:5]:
                 raise DoIpError("UDS DTC identity mismatch")

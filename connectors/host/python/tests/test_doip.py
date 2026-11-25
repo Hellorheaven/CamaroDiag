@@ -208,11 +208,13 @@ class DoIpTests(unittest.TestCase):
                 lambda: next(values), lambda _: None, french), expected)
 
     def test_raw_dtc_responses_correlate_record_and_functional_group(self):
-        for request, reply in (("190412345601", "5904123456080100"),
+        for request, reply in (("1903", "5903"), ("190A", "590A08"),
+                               ("190412345601", "5904123456080100"),
                                ("1906123456FE", "5906123456089001"),
                                ("19563307", "595633FF0407"), ("241234", "64123400")):
             self.assertEqual(positive(bytes.fromhex(request), bytes.fromhex(reply)), bytes.fromhex(reply))
-        for request, reply in (("190412345601", "5904123456080200"),
+        for request, reply in (("1903", "590301"), ("190A", "590A"), ("190A", "590A0801"),
+                               ("190412345601", "5904123456080200"),
                                ("190612345690", "5906123457089001"),
                                ("195533", "595534FF04"), ("19563307", "595633FF0408"),
                                ("241234", "64123500")):

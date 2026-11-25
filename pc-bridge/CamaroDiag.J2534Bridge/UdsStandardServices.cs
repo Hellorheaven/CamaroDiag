@@ -394,6 +394,11 @@ internal static class UdsStandardServices
             _ = DecodeTransferParameters(request[0], response);
         if (request[0] == 0x19)
         {
+            var subfunction = request[1] & 0x7F;
+            if (subfunction == 0x03 && (request.Length != 2 || (response.Length - 2) % 4 != 0))
+                throw new InvalidDataException("Malformed DTC snapshot index.");
+            if (subfunction == 0x0A && (request.Length != 2 || response.Length < 3 || (response.Length - 3) % 4 != 0))
+                throw new InvalidDataException("Malformed supported DTC inventory.");
             // ISO 14229 WWH-OBD subfunctions echo the functional group
             // immediately after the subfunction. Ignoring it can attribute
             // a safety/legislated group DTC to an emissions request.
