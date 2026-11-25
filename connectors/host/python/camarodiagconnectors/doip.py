@@ -391,6 +391,68 @@ def require_sample_identity(rows: list[dict], expected: str, obd: bool) -> None:
             raise DoIpError("Sample protocol differs from verified OBDonUDS")
 
 
+def parse_stored_did_lengths(text: str) -> dict[int, int]:
+    """A DID length catalog, not an assumed ordering of stored data."""
+    fields = text.split(",")
+    if not 1 <= len(fields) <= 255:
+        raise DoIpError("Expected 1..255 DID:length entries")
+    result = {}
+    for field in fields:
+        parts = field.split(":")
+        if (len(parts) != 2 or len(parts[0]) != 4 or
+                any(c not in "0123456789abcdefABCDEF" for c in parts[0]) or
+                not parts[1].isascii() or not parts[1].isdigit() or len(parts[1]) > 4):
+            raise DoIpError("Expected hexadecimal DID and decimal byte length")
+        did, length = int(parts[0], 16), int(parts[1])
+        if did in result or not 1 <= length <= 4096:
+            raise DoIpError("Duplicate DID or invalid stored DID length")
+        result[did] = length
+    return result
+
+
+def validate_stored_did_lengths(lengths: dict[int, int]) -> dict[int, int]:
+    if (not isinstance(lengths, dict) or not 1 <= len(lengths) <= 255 or
+            any(type(did) is not int or not 0 <= did <= 65535 or
+                type(size) is not int or not 1 <= size <= 4096
+                for did, size in lengths.items())):
+        raise DoIpError("Invalid stored DID length catalog")
+    return dict(lengths)
+
+
+def decode_all_stored_records(reply: bytes, lengths: dict[int, int]) -> list[dict]:
+    """19/05 FF: parse successive records only with documented DID lengths."""
+    catalog = validate_stored_did_lengths(lengths)
+    if len(reply) < 3 or reply[:2] != b"\x59\x05":
+        raise DoIpError("Invalid stored record response")
+    if reply == b"\x59\x05\xff":
+        return []
+    offset, rows, seen = 2, [], set()
+    while offset < len(reply):
+        start = offset
+        if len(reply) - offset < 6:
+            raise DoIpError("Truncated stored record header")
+        record, dtc, status, count = (reply[offset], reply[offset+1:offset+4].hex().upper(),
+                                      reply[offset+4], reply[offset+5])
+        if record == 255 or record in seen:
+            raise DoIpError("Invalid or duplicate stored record number")
+        seen.add(record)
+        offset += 6
+        dids = []
+        for _ in range(count):
+            if len(reply) - offset < 2:
+                raise DoIpError("Truncated stored DID")
+            did = int.from_bytes(reply[offset:offset+2], "big")
+            size = catalog.get(did)
+            if size is None or len(reply) - offset - 2 < size:
+                raise DoIpError("Unknown DID length or truncated stored data")
+            offset += 2
+            dids.append({"did": f"{did:04X}", "length": size, "data": reply[offset:offset+size].hex().upper()})
+            offset += size
+        rows.append({"record": record, "dtc": dtc, "status": status, "did_count": count,
+                     "dids": dids, "raw_record": reply[start:offset].hex().upper()})
+    return rows
+
+
 def positive(request: bytes, reply: bytes) -> bytes:
     if not request or not reply or reply[0] != (request[0] + 0x40) & 0xFF:
         raise DoIpError("UDS response service mismatch")
@@ -412,11 +474,13 @@ def positive(request: bytes, reply: bytes) -> bytes:
         elif len(reply) < 3 or (subfunction in (0x0A, 0x15) and (len(request) != 2 or (len(reply) - 3) % 4)):
             raise DoIpError("Malformed DTC report")
         if subfunction == 5:
-            if len(request) != 3 or len(reply) < 3 or reply[2] != request[2]:
+            if len(request) != 3 or len(reply) < 3 or (request[2] != 255 and reply[2] != request[2]):
                 raise DoIpError("Stored DTC record response mismatch")
-            if 3 < len(reply) < 8:
-                raise DoIpError("Truncated stored DTC record")
-            if len(reply) >= 8 and (len(reply) - 8 < reply[7] * 2 or (reply[7] == 0 and len(reply) != 8)):
+            if 3 < len(reply) < 8 or (request[2] == 255 and
+                    ((len(reply) == 3 and reply[2] != 255) or (len(reply) > 3 and reply[2] == 255))):
+                raise DoIpError("Truncated or invalid stored DTC record")
+            if len(reply) >= 8 and (len(reply) - 8 < reply[7] * 2 or
+                    (request[2] != 255 and reply[7] == 0 and len(reply) != 8)):
                 raise DoIpError("Truncated or inconsistent stored DTC DID count")
         if subfunction in (0x16, 0x1A):
             offset = 2 if subfunction == 0x16 else 3
@@ -1079,6 +1143,20 @@ class Session:
                               raw_stored_data=reply[7:].hex().upper())
             self.verify_vin(expected)
             return result
+        except BaseException:
+            self.close()
+            raise
+
+    def read_all_stored_dtc_records(self, expected: str, lengths: dict[int, int]) -> dict:
+        catalog = validate_stored_did_lengths(lengths)
+        request = b"\x19\x05\xff"
+        try:
+            self.verify_vin(expected)
+            reply = positive(request, self.exchange(request))
+            rows = decode_all_stored_records(reply, catalog)
+            self.verify_vin(expected)
+            return {"subfunction": 5, "record": 255, "records": rows,
+                    "raw_response": reply.hex().upper()}
         except BaseException:
             self.close()
             raise
