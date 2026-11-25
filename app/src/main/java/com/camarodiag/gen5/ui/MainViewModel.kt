@@ -1499,9 +1499,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     didHex.toInt(16).also { require(it in 0..254) }
                 } else null
                 val decodedSnapshot = operation in setOf(DoIpDirectRead.Operation.DECODED_SNAPSHOT, DoIpDirectRead.Operation.OBD_DECODED_SNAPSHOT)
-                val snapshotParts = if (decodedSnapshot) didHex.split('|').also {
+                val decodedExtended = operation in setOf(DoIpDirectRead.Operation.DECODED_EXTENDED, DoIpDirectRead.Operation.OBD_DECODED_EXTENDED)
+                val snapshotParts = if (decodedSnapshot || decodedExtended) didHex.split('|').also {
                     require(it.size == 2 && it[0].matches(Regex("[0-9A-Fa-f]{8}")))
                 } else emptyList()
+                val extendedCatalog = if (decodedExtended)
+                    com.camarodiag.gen5.data.obd.UdsDtcDecoder.parseExtendedRecordLengths(snapshotParts[1]).also {
+                        com.camarodiag.gen5.data.obd.UdsDtcDecoder.extendedRecordsRequest(
+                            snapshotParts[0].take(6).toInt(16), snapshotParts[0].takeLast(2).toInt(16), it)
+                    } else null
                 val storedCatalog = when {
                     decodedSnapshot -> com.camarodiag.gen5.data.obd.UdsDtcDecoder.parseStoredDidLengths(snapshotParts[1])
                     operation == DoIpDirectRead.Operation.ALL_STORED_RECORDS ->
@@ -1548,8 +1554,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 if (wwhReadiness) require(didHex.matches(Regex("[0-9A-Fa-f]{2}")))
                 val isDetail = operation in setOf(DoIpDirectRead.Operation.DTC_SNAPSHOT, DoIpDirectRead.Operation.DTC_EXTENDED, DoIpDirectRead.Operation.OBD_DTC_SNAPSHOT, DoIpDirectRead.Operation.OBD_DTC_EXTENDED)
                 if (isDetail) require(didHex.matches(Regex("[0-9A-Fa-f]{8}")))
-                val detailDtc = if (decodedSnapshot) snapshotParts[0].take(6).toInt(16) else if (isDetail || severityInfo || memoryDetail || legacyDetail) didHex.take(6).toInt(16) else 0
-                val detailRecord = if (decodedSnapshot) snapshotParts[0].takeLast(2).toInt(16) else if (memoryDetail) didHex.substring(6, 8).toInt(16) else if (isDetail || legacyDetail) didHex.takeLast(2).toInt(16) else 1
+                val detailDtc = if (decodedSnapshot || decodedExtended) snapshotParts[0].take(6).toInt(16) else if (isDetail || severityInfo || memoryDetail || legacyDetail) didHex.take(6).toInt(16) else 0
+                val detailRecord = if (decodedSnapshot || decodedExtended) snapshotParts[0].takeLast(2).toInt(16) else if (memoryDetail) didHex.substring(6, 8).toInt(16) else if (isDetail || legacyDetail) didHex.takeLast(2).toInt(16) else 1
                 val clientTls = certificate?.let { DoIpClientTls.open(getApplication<Application>(), it, target) }
                 check(current())
                 if (operation in setOf(DoIpDirectRead.Operation.INVENTORY, DoIpDirectRead.Operation.OBD_INVENTORY)) {
@@ -1579,7 +1585,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     return@launchEnhancedUdsRead
                 }
                 val result = DoIpDirectRead.read(target, operation, did, mask = if (memoryList) didHex.take(2).toInt(16) else if (wwhMask || severityFilter) didHex.takeLast(2).toInt(16) else mask,
-                    memory = memory, extendedRecordSize = extendedRecordSize, storedDidLengths = storedCatalog,
+                    memory = memory, extendedRecordSize = extendedRecordSize, storedDidLengths = storedCatalog, extendedRecordLengths = extendedCatalog,
                     severityMask = if (severityFilter) didHex.take(2).toInt(16) else 255,
                     wwhSeverity = if (wwhMask) didHex.take(2).toInt(16) else 255,
                     wwhReadinessGroup = if (wwhReadiness) didHex.toInt(16) else null, multiLayout = layout,
@@ -1646,6 +1652,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         localizedContext.getString(R.string.cal_doip_sequence_reply, index + 1,
                             reply.joinToString(" ") { "%02X".format(it.toInt() and 255) })
                     }.joinToString("\n")
+                    result.decodedExtended != null -> requireNotNull(result.decodedExtended).let { report ->
+                        val heading = localizedContext.getString(R.string.cal_doip_decoded_extended_result,
+                            report.dtc, report.status, report.records.size)
+                        (listOf(heading) + report.records.map { row ->
+                            localizedContext.getString(R.string.cal_doip_extended_record_result, row.number,
+                                row.data.joinToString(" ") { "%02X".format(it.toInt() and 255) })
+                        }).joinToString("\n")
+                    }
                     result.decodedSnapshot != null -> requireNotNull(result.decodedSnapshot).let { report ->
                         val heading = localizedContext.getString(R.string.cal_doip_decoded_snapshot_result, report.dtc, report.status, report.records.size)
                         (listOf(heading) + report.records.flatMap { row ->
