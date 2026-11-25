@@ -21,8 +21,7 @@ data class FunctionalTestContext(
     val adapterName: String,
     val transport: String,
     val connectionGeneration: Long,
-    val observedVin: String? = null,
-    val priorConnectionVin: String? = null
+    val observedVin: String? = null
 )
 
 data class FunctionalTestState(
