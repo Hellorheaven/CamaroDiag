@@ -660,6 +660,53 @@ internal static class DoIpDiagnosticSessionSelfTests
             });
         }
 
+        // Decoded user memory records must remain scoped to the requested memory and VIN.
+        foreach (var sub in new byte[] { 0x18, 0x19 })
+        foreach (var finalMatches in new[] { true, false })
+        {
+            var payload = Convert.FromHexString(sub == 0x18
+                ? "591802010203080101F40D78" : "5919020102030801123490AA");
+            await RunCaseAsync(async stream =>
+            {
+                _ = await RequireRequestAsync(stream);
+                await SendAsync(stream, DoIpCodec.DiagnosticMessage,
+                    FromEcu([0x62, 0xF1, 0x90, .. System.Text.Encoding.ASCII.GetBytes(selectedVehicleVin)]));
+                var query = await ReadAsync(stream);
+                Check(query.Payload.SequenceEqual(new byte[] { 0x0E, 0x80, 0x12, 0x34, 0x19, sub, 1, 2, 3, 255, 2 }),
+                    "Decoded memory read preserves exact memory selection.");
+                await SendAsync(stream, DoIpCodec.DiagnosticMessage, FromEcu(payload));
+                _ = await RequireRequestAsync(stream);
+                await SendAsync(stream, DoIpCodec.DiagnosticMessage,
+                    FromEcu([0x62, 0xF1, 0x90, .. System.Text.Encoding.ASCII.GetBytes(
+                        finalMatches ? selectedVehicleVin : otherVehicleVin)]));
+            }, async client =>
+            {
+                var timeout = TimeSpan.FromSeconds(2);
+                var token = CancellationToken.None;
+                var request = ObdOnUdsServices.ReadUserMemory(sub, 2, 0, 0x010203, 255);
+                Task<int> Read() => DoIpVinReader.ReadVerifiedDtcAsync(client, observedForVin, timeout, token, async () =>
+                {
+                    var reply = await client.ExchangeUdsAsync(request, timeout, token);
+                    if (sub == 0x18)
+                    {
+                        var report = ObdOnUdsServices.DecodeUserMemorySnapshot(2, 0x010203, 255, reply,
+                            ObdOnUdsServices.ParseStoredDidLengths("F40D:1"));
+                        Check(report.RawResponse.SequenceEqual(payload), "Memory snapshot raw bytes retained.");
+                        return report.Records.Count;
+                    }
+                    var extended = ObdOnUdsServices.DecodeUserMemoryExtended(2, 0x010203, 255, reply,
+                        ObdOnUdsServices.ParseExtendedRecordLengths("01:2,90:1"));
+                    Check(extended.RawResponse.SequenceEqual(payload), "Memory extended raw bytes retained.");
+                    return extended.Records.Count;
+                });
+                if (finalMatches)
+                    Check(await Read() == (sub == 0x18 ? 1 : 2), "Memory records published after VIN revalidation.");
+                else
+                    await Expect<InvalidDataException>(async () => { _ = await Read(); },
+                        "Changed VIN prevents user memory result publication.");
+            });
+        }
+
         // Multi-DID polling: one request per sample, no complete result before final VIN.
         foreach (var finalIdentityMatches in new[] { true, false })
         {
