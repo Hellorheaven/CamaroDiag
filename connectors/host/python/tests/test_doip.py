@@ -601,6 +601,39 @@ class DoIpTests(unittest.TestCase):
                 Session.read_dtc_severity(fake, VIN, sub, **options)
             fake.close.assert_called_once()
 
+    def test_legacy_mirror_and_emissions_reads(self):
+        for sub in (0x0F, 0x11, 0x12, 0x13):
+            fake = unittest.mock.Mock(spec=Session)
+            count = sub in (0x11, 0x12)
+            fake.exchange.return_value = bytes((0x59, sub, 8)) + (bytes((1, 0, 2)) if count else bytes((1, 2, 3, 8)))
+            result = Session.read_legacy_dtc(fake, VIN, sub, mask=8)
+            self.assertEqual(result["scope"], "mirror" if sub in (0x0F, 0x11) else "emissions")
+            self.assertTrue(result["legacy"])
+            self.assertEqual(result["count"] if count else result["records"][0]["dtc"], 2 if count else "010203")
+            fake.exchange.assert_called_once_with(bytes((0x19, sub, 8)))
+            self.assertEqual(fake.verify_vin.call_count, 2)
+        for sub, payload in ((0x0F, "590F0801020301"), (0x13, "5913080102030801020308"),
+                             (0x11, "5911080100"), (0x12, "59120801000200")):
+            fake = unittest.mock.Mock(spec=Session)
+            fake.exchange.return_value = bytes.fromhex(payload)
+            with self.assertRaises(DoIpError):
+                Session.read_legacy_dtc(fake, VIN, sub, mask=8)
+            fake.close.assert_called_once()
+        fake = unittest.mock.Mock(spec=Session)
+        fake.exchange.return_value = bytes.fromhex("59100102030801AABB")
+        result = Session.read_legacy_dtc(fake, VIN, 0x10, dtc=0x010203, record=1)
+        self.assertEqual(result["raw_records"], "01AABB")
+        fake.exchange.assert_called_once_with(bytes.fromhex("191001020301"))
+        for payload in ("59100102040801", "59100102030802"):
+            fake = unittest.mock.Mock(spec=Session)
+            fake.exchange.return_value = bytes.fromhex(payload)
+            with self.assertRaises(DoIpError):
+                Session.read_legacy_dtc(fake, VIN, 0x10, dtc=0x010203, record=1)
+        fake = unittest.mock.Mock(spec=Session)
+        with self.assertRaises(DoIpError):
+            Session.read_legacy_dtc(fake, VIN, 0x10, dtc=1, record=0xF0)
+        fake.verify_vin.assert_not_called()
+
     def test_extended_record_support_and_data(self):
         for size, payload, expected in (
             (None, "591A0801", []),

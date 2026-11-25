@@ -1,3 +1,7 @@
+## PR117 — lectures UDS historiques Connectors (25/11/2026)
+
+- 19/0F, 10, 11 (mémoire miroir) et 19/12, 13 (émissions historiques) : commandes explicites, F190 avant/après, résultats distincts des DTC actifs et OBDonUDS, contrôles masque/longueur/écho/doublons, conservation brute des détails. Ces variantes retirées en ISO 14229-1:2020 restent utiles uniquement pour ECU compatibles, aucun repli automatique. Référence https://uds.readthedocs.io/en/stable/pages/knowledge_base/service.html . Tests écrits non exécutés ; Android/Windows à raccorder. Aucun checkpoint CI.
+
 ## PR117 — parcours applicatifs des données étendues (25/11/2026)
 
 - Tests loopback Windows pour 19/16 et 19/1A avec contrôle VIN final et conservation des octets, exemples utilisateur Connectors FR/EN. Tests écrits non exécutés. Aucun checkpoint CI. Taille uniforme documentée indispensable ; les dispositions variables OEM restent à fournir. DoIP/C6 actifs.

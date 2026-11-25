@@ -170,6 +170,16 @@ def _run(argv: Sequence[str] | None, resources: ExitStack) -> dict:
         else:
             memory.add_argument("--dtc", required=True, type=lambda x: hex_value(x, 6))
             memory.add_argument("--record", required=True, type=lambda x: hex_value(x, 2))
+    legacy_actions = {"mirror-dtcs": 0x0F, "mirror-extended": 0x10, "mirror-count": 0x11,
+                      "legacy-emissions-count": 0x12, "legacy-emissions-dtcs": 0x13}
+    for action, subfunction in legacy_actions.items():
+        legacy = sub.add_parser(action, help=tr("Explicit legacy UDS read (before ISO 14229-1:2020)",
+                                               "Lecture UDS historique explicite (avant ISO 14229-1:2020)"))
+        if subfunction == 0x10:
+            legacy.add_argument("--dtc", required=True, type=lambda x: hex_value(x, 6))
+            legacy.add_argument("--record", required=True, type=lambda x: hex_value(x, 2))
+        else:
+            legacy.add_argument("--mask", required=True, type=lambda x: hex_value(x, 2))
     for action, description in (
             ("extended-record-support", tr("DTCs supporting an extended record", "DTC prenant en charge un enregistrement étendu")),
             ("extended-record-data", tr("Read extended records with known size", "Lire les enregistrements étendus de taille connue"))):
@@ -200,6 +210,8 @@ def _run(argv: Sequence[str] | None, resources: ExitStack) -> dict:
         layout = validate_monitor_layout(layout)
     if o.action in ("obd-dids", "obd-monitor-dids") and any(not 0xF400 <= did <= 0xF8FF for did, _ in layout):
         parser.error(tr("Legislated DIDs F400..F8FF required", "DID réglementaires F400..F8FF requis"))
+    if o.action == "mirror-extended" and (o.record == 0 or 0xF0 <= o.record <= 0xFD):
+        parser.error(tr("Invalid mirror extended record", "Enregistrement étendu miroir invalide"))
     if o.action in ("extended-record-support", "extended-record-data"):
         if not 1 <= o.record <= 0xEF or (o.action == "extended-record-data" and not 1 <= o.size <= 4090):
             parser.error(tr("Expected record 01..EF and documented size 1..4090",
@@ -356,6 +368,11 @@ def _run(argv: Sequence[str] | None, resources: ExitStack) -> dict:
             subfunction = {"severity-count": 7, "severity-dtcs": 8, "severity-info": 9}[o.action]
             report = session.read_dtc_severity(o.vin, subfunction, severity_mask=getattr(o, "severity_mask", 255),
                                               status_mask=getattr(o, "mask", 255), dtc=getattr(o, "dtc", None))
+            return result | {"vin": o.vin, "ecu": o.ecu, "tester": o.tester, "tls": not o.tcp,
+                             "service_protocol": "UDS"} | report
+        if o.action in legacy_actions:
+            report = session.read_legacy_dtc(o.vin, legacy_actions[o.action], mask=getattr(o, "mask", 255),
+                                            dtc=getattr(o, "dtc", None), record=getattr(o, "record", None))
             return result | {"vin": o.vin, "ecu": o.ecu, "tester": o.tester, "tls": not o.tcp,
                              "service_protocol": "UDS"} | report
         if o.action in ("extended-record-support", "extended-record-data"):

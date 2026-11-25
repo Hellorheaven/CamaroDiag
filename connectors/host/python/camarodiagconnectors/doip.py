@@ -428,11 +428,15 @@ def positive(request: bytes, reply: bytes) -> bytes:
         if subfunction == 9:
             if len(request) != 5 or len(reply) not in (3, 9) or (len(reply) == 9 and reply[5:8] != request[2:5]):
                 raise DoIpError("DTC severity identity mismatch")
-        if subfunction in (0x04, 0x06):
+        if subfunction in (0x0F, 0x13) and (len(request) != 3 or (len(reply) - 3) % 4):
+            raise DoIpError("Malformed legacy DTC list")
+        if subfunction in (0x11, 0x12) and (len(request) != 3 or len(reply) != 6):
+            raise DoIpError("Malformed legacy DTC count")
+        if subfunction in (0x04, 0x06, 0x10):
             if len(request) != 6 or len(reply) < 6 or reply[2:5] != request[2:5]:
                 raise DoIpError("UDS DTC identity mismatch")
             selected = request[5]
-            if len(reply) >= 7 and selected != 0xFF and (subfunction != 0x06 or selected != 0xFE) and reply[6] != selected:
+            if len(reply) >= 7 and selected != 0xFF and (subfunction == 0x04 or selected != 0xFE) and reply[6] != selected:
                 raise DoIpError("UDS DTC record mismatch")
         if subfunction in (0x42, 0x55, 0x56):
             if len(request) < 3 or reply[2] != request[2]:
@@ -1048,6 +1052,44 @@ class Session:
             self.verify_vin(expected)
             return {"kind": "snapshot-index" if snapshot_index else ("permanent-dtcs" if permanent else "supported-dtcs"),
                     "records": rows, **({} if snapshot_index else {"availability_mask": reply[2]})}
+        except BaseException:
+            self.close()
+            raise
+
+    def read_legacy_dtc(self, expected: str, subfunction: int, *, mask: int = 255,
+                        dtc: int | None = None, record: int | None = None) -> dict:
+        """Explicit ISO 14229 legacy operations; never substitute for primary memory or OBDonUDS."""
+        if subfunction in (0x0F, 0x11, 0x12, 0x13):
+            if type(mask) is not int or not 0 <= mask <= 255 or dtc is not None or record is not None:
+                raise DoIpError("Invalid legacy DTC filter")
+            request = bytes((0x19, subfunction, mask))
+        elif subfunction == 0x10:
+            if (type(dtc) is not int or not 0 <= dtc <= 0xFFFFFF or
+                    type(record) is not int or not 1 <= record <= 255 or 0xF0 <= record <= 0xFD):
+                raise DoIpError("Invalid mirror memory DTC record")
+            request = bytes((0x19, subfunction)) + dtc.to_bytes(3, "big") + bytes((record,))
+        else:
+            raise DoIpError("Unsupported legacy DTC operation")
+        try:
+            self.verify_vin(expected)
+            reply = positive(request, self.exchange(request))
+            if subfunction in (0x11, 0x12):
+                result = {"requested_mask": mask, "availability_mask": reply[2],
+                          "format": reply[3], "count": int.from_bytes(reply[4:], "big")}
+            elif subfunction in (0x0F, 0x13):
+                available = reply[2]
+                rows = [{"dtc": reply[i:i+3].hex().upper(), "status": reply[i+3]}
+                        for i in range(3, len(reply), 4)]
+                if len({r["dtc"] for r in rows}) != len(rows) or any(
+                        not r["status"] & available & mask or r["status"] & ~available for r in rows):
+                    raise DoIpError("Uncorrelated legacy DTC status")
+                result = {"requested_mask": mask, "availability_mask": available, "records": rows}
+            else:
+                result = {"dtc": reply[2:5].hex().upper(), "status": reply[5],
+                          "requested_record": record, "raw_records": reply[6:].hex().upper()}
+            self.verify_vin(expected)
+            return {"subfunction": subfunction, "legacy": True,
+                    "scope": "mirror" if subfunction in (0x0F, 0x10, 0x11) else "emissions"} | result
         except BaseException:
             self.close()
             raise
