@@ -328,6 +328,7 @@ fun CalibrationWorkspaceScreen(
     }
     var doIpTester by remember(vehicle) { mutableStateOf("") }
     var doIpEcu by remember(vehicle) { mutableStateOf("") }
+    var doIpInventoryAddresses by remember(vehicle) { mutableStateOf("") }
     LaunchedEffect(state.doIpBackupScope, vehicle.vin) {
         val scope = state.doIpBackupScope
         if (scope != null && scope.vin == vehicle.vin.uppercase()) {
@@ -622,6 +623,22 @@ fun CalibrationWorkspaceScreen(
                         label = { Text(stringResource(R.string.cal_uds_did)) })
                     val targetReady = idle && doIpOptions != null && !doIpCertificateBusy && !doIpCertificateError && (doIpHost.isNotBlank() || vinReady) && doIpTester.length == 4 &&
                         doIpEcu.length == 4 && doIpTester != doIpEcu
+                    OutlinedTextField(doIpInventoryAddresses, { doIpInventoryAddresses =
+                        it.uppercase().filter { c -> c in "0123456789ABCDEF," }.take(79) },
+                        enabled = idle, singleLine = true, modifier = Modifier.fillMaxWidth(),
+                        label = { Text(stringResource(R.string.cal_doip_inventory_addresses)) })
+                    val inventoryAddresses = runCatching {
+                        DoIpDirectRead.parseInventoryAddresses(doIpInventoryAddresses)
+                    }.getOrNull()
+                    OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester,
+                        "%04X".format(requireNotNull(inventoryAddresses).first()), doIpInventoryAddresses, doIpTls,
+                        DoIpDirectRead.Operation.INVENTORY, doIpCertificate, requireNotNull(doIpOptions)) },
+                        enabled = idle && vinReady && doIpOptions != null && !doIpCertificateBusy &&
+                            !doIpCertificateError && doIpTester.length == 4 &&
+                            inventoryAddresses != null && doIpTester.toIntOrNull(16) !in inventoryAddresses,
+                        modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(R.string.cal_doip_inventory))
+                    }
                     Button(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu, doIpDid, doIpTls, DoIpDirectRead.Operation.VIN, doIpCertificate, requireNotNull(doIpOptions)) },
                         enabled = targetReady, modifier = Modifier.fillMaxWidth()) {
                         Text(stringResource(R.string.cal_doip_read_vin))

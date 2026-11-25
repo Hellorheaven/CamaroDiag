@@ -26,7 +26,7 @@ import kotlin.coroutines.resumeWithException
  * A socket is owned by one operation and is never retained after failure.
  */
 object DoIpDirectRead {
-    enum class Operation { VIN, DID, DTC, DTC_COUNT, DTC_SNAPSHOT, DTC_EXTENDED, MONITOR, BACKUP, EXCHANGE, OBD_IDENTIFY, OBD_DID, OBD_MONITOR, OBD_WWH_MASK, OBD_WWH_PERMANENT, OBD_WWH_READINESS, MULTI_DID, OBD_MULTI_DID, SCALING_DID, OBD_DTC, OBD_DTC_COUNT, OBD_DTC_SNAPSHOT, OBD_DTC_EXTENDED, SUPPORTED_DTCS, SNAPSHOT_INDEX, MULTI_MONITOR, OBD_MULTI_MONITOR, FIRST_FAILED_DTC, FIRST_CONFIRMED_DTC, RECENT_FAILED_DTC, RECENT_CONFIRMED_DTC, FAULT_COUNTERS, SEVERITY_COUNT, SEVERITY_LIST, SEVERITY_INFO }
+    enum class Operation { VIN, DID, DTC, DTC_COUNT, DTC_SNAPSHOT, DTC_EXTENDED, MONITOR, BACKUP, EXCHANGE, OBD_IDENTIFY, OBD_DID, OBD_MONITOR, OBD_WWH_MASK, OBD_WWH_PERMANENT, OBD_WWH_READINESS, MULTI_DID, OBD_MULTI_DID, SCALING_DID, OBD_DTC, OBD_DTC_COUNT, OBD_DTC_SNAPSHOT, OBD_DTC_EXTENDED, SUPPORTED_DTCS, SNAPSHOT_INDEX, MULTI_MONITOR, OBD_MULTI_MONITOR, FIRST_FAILED_DTC, FIRST_CONFIRMED_DTC, RECENT_FAILED_DTC, RECENT_CONFIRMED_DTC, FAULT_COUNTERS, SEVERITY_COUNT, SEVERITY_LIST, SEVERITY_INFO, INVENTORY }
     /** Immutable optional parameters. Defaults retain the original global deadline. */
     data class SessionOptions(val timeoutMs: Int = 5000, val p2Ms: Int = timeoutMs,
         val p2StarMs: Int = timeoutMs, val routingType: Int = 0, val routingOemHex: String = "") {
@@ -674,6 +674,58 @@ object DoIpDirectRead {
         }
     }
 
+    data class InventoryEntry(val ecu: Int, val vin: String?)
+    private class EcuVinMismatch : IllegalArgumentException("ECU VIN differs from selected vehicle or gateway.")
+
+    fun parseInventoryAddresses(text: String): List<Int> {
+        val fields = text.split(',')
+        require(fields.size in 1..16 && fields.all { it.matches(Regex("[0-9A-Fa-f]{4}")) })
+        return fields.map { it.toInt(16) }.also { require(it.distinct().size == it.size) }
+    }
+
+    /** Verify only explicit addresses, not an inferred ECU topology. Each ECU
+     * owns its own session. Gateway drift or TLS failure aborts the inventory. */
+    suspend fun inventory(target: Target, addresses: List<Int>, options: SessionOptions,
+        clientTls: DoIpClientTls? = null, onTrace: (Target, Trace) -> Unit = { _, _ -> },
+        onControlTrace: (ControlTrace) -> Unit = {}, current: () -> Boolean = { true }): List<InventoryEntry> {
+        val frozen = addresses.toList()
+        require(validVin(target.expectedVin) && frozen.size in 1..16 &&
+            frozen.distinct().size == frozen.size && frozen.all { it in 0..65535 && it != target.tester })
+        check(current())
+        val gateway = discover(target.address, target.expectedVin, options.timeoutMs, onControlTrace)
+        requireGatewayIdentity(target, gateway)
+        require(gateway.vin == target.expectedVin) { "Inventory requires a matching gateway VIN." }
+        val results = mutableListOf<InventoryEntry>()
+        for (ecu in frozen) {
+            check(current())
+            val selected = Target.parse(requireNotNull(target.address.hostAddress),
+                "%04X".format(target.tester), "%04X".format(ecu), target.expectedVin, target.tls,
+                gateway.logicalAddress, gateway)
+            try {
+                val result = read(selected, Operation.VIN, timeoutMs = options.timeoutMs,
+                    sessionOptions = options, clientTls = clientTls, isReadContextCurrent = current,
+                    onControlTrace = onControlTrace, onTrace = { onTrace(selected, it) })
+                require(result.vin == target.expectedVin)
+                results += InventoryEntry(ecu, result.vin)
+            } catch (error: javax.net.ssl.SSLException) {
+                throw error
+            } catch (error: DoIpClientCertificateException) {
+                throw error
+            } catch (_: EcuVinMismatch) {
+                results += InventoryEntry(ecu, null)
+            } catch (_: UdsNegativeResponseException) {
+                results += InventoryEntry(ecu, null)
+            } catch (_: IOException) {
+                results += InventoryEntry(ecu, null)
+            }
+            check(current())
+            val observed = discover(target.address, target.expectedVin, options.timeoutMs, onControlTrace)
+            require(gateway.matchesIdentity(observed)) { "Gateway changed during ECU inventory." }
+        }
+        check(current())
+        return results
+    }
+
     /** One explicitly addressed operation. Unknown vehicle VIN cannot authorize
      * manufacturer DID/DTC queries; an F190 identification can establish it.
      * A missing gateway VIN is checked with F190 on the same logical ECU.
@@ -696,6 +748,7 @@ object DoIpDirectRead {
         require(options.timeoutMs == timeoutMs)
         clientTls?.requireTarget(target)
         require(timeoutMs in 100..30_000 && did in 0..65535 && mask in 0..255)
+        require(operation != Operation.INVENTORY) { "Use inventory for multiple ECU addresses." }
         require(operation == Operation.VIN || target.expectedVin.isNotEmpty())
         require(sampleCount in 1..30 && intervalMs in 250..5000)
         require(operation !in setOf(Operation.OBD_DID, Operation.OBD_MONITOR) || isObdDid(did))
@@ -787,10 +840,9 @@ object DoIpDirectRead {
                         val reply = session.exchange(byteArrayOf(0x22, (vinDid shr 8).toByte(), vinDid.toByte()), timeoutMs)
                         require(reply.size == 20)
                         val vin = reply.copyOfRange(3,20).toString(Charsets.US_ASCII)
-                        require(validVin(vin) && (gateway.vin == null || gateway.vin == vin) &&
-                            (target.expectedVin.isEmpty() || target.expectedVin == vin)) {
-                            "ECU VIN differs from the selected vehicle or gateway."
-                        }
+                        if (!validVin(vin) || (gateway.vin != null && gateway.vin != vin) ||
+                            (target.expectedVin.isNotEmpty() && target.expectedVin != vin))
+                            throw EcuVinMismatch()
                         return vin
                     }
                     fun monitorDid(obd: Boolean = false): List<Sample> {

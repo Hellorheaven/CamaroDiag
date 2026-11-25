@@ -1,3 +1,7 @@
+## PR117 — inventaire explicite des ECU DoIP Android (25/11/2026)
+
+- Parité Android/Windows/Connectors : liste d'adresses explicites (1–16), session F190 par ECU, sélection et revalidation de passerelle, arrêt si contexte révoqué ou TLS échoue. Résultat vérifié/non vérifié distinct, journal par adresse, UI FR/EN, aucune topologie ni capacité OEM déduite. Tests parseur et contexte écrits, non exécutés. Aucun checkpoint CI. Récupération des blobs Git du HEAD après réponses 404 intermittentes de l'API Contents.
+
 ## PR117 — inventaire explicite des ECU dans la console Windows (25/11/2026)
 
 - Champ liste d'adresses logiques et bouton d'inventaire FR/EN ; utilisation du moteur partagé CLI, contrôles VIN/passerelle, résultats vérifiés/non vérifiés distincts, annulation, journal UDP et PDU attribués à chaque ECU. Le champ ECU unitaire n'est pas utilisé pour cet inventaire. Pas de modification du profil ni de découverte d'adresses supposées. Android reste à raccorder. Aucun test/compilation lancé.

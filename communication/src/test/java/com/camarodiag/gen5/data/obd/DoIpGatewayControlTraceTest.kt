@@ -319,6 +319,20 @@ class DoIpGatewayControlTraceTest {
             assertTrue(runCatching { DoIpDirectRead.parseCommand(invalid) }.isFailure)
     }
 
+    @Test fun explicitInventoryRejectsDuplicateAndImplicitRanges() = runBlocking {
+        assertEquals(listOf(0x1234, 0x1235), DoIpDirectRead.parseInventoryAddresses("1234,1235"))
+        for (invalid in listOf("", "1234,1234", "1234-1235", "123", (0..16).joinToString(",") { "%04X".format(it) })) {
+            assertTrue(runCatching { DoIpDirectRead.parseInventoryAddresses(invalid) }.isFailure)
+        }
+        val target = DoIpDirectRead.Target.parse("127.0.0.1", "0E80", "1234", vin, false)
+        val events = mutableListOf<DoIpDirectRead.ControlTrace>()
+        assertTrue(runCatching { DoIpDirectRead.inventory(target, listOf(0x0E80), DoIpDirectRead.SessionOptions(),
+            onControlTrace = { events.add(it) }) }.isFailure)
+        assertTrue(runCatching { DoIpDirectRead.inventory(target, listOf(0x1234), DoIpDirectRead.SessionOptions(),
+            onControlTrace = { events.add(it) }, current = { false }) }.isFailure)
+        assertTrue(events.isEmpty())
+    }
+
     @Test fun revokedReadContextFailsBeforeAnyDiscovery() = runBlocking {
         val target = DoIpDirectRead.Target.parse("127.0.0.1", "0E80", "1001", vin, false)
         val events = mutableListOf<DoIpDirectRead.ControlTrace>()

@@ -1123,4 +1123,9 @@
     <string name="cal_doip_severity_count_result">DTC correspondants : %1$d ; disponibilité 0x%2$02X ; format 0x%3$02X</string>
     <string name="cal_doip_severity_list_result">Enregistrements de sévérité : %1$d ; disponibilité 0x%2$02X</string>
     <string name="cal_doip_severity_record">DTC 0x%1$06X — sévérité 0x%2$02X, unité 0x%3$02X, statut 0x%4$02X</string>
+    <string name="cal_doip_inventory">Inventaire explicite des ECU</string>
+    <string name="cal_doip_inventory_addresses">Adresses ECU (hex, séparées par virgules)</string>
+    <string name="cal_doip_inventory_result">Inventaire terminé : %1$d/%2$d VIN vérifiés</string>
+    <string name="cal_doip_inventory_verified">ECU 0x%1$04X : VIN vérifié (%2$s)</string>
+    <string name="cal_doip_inventory_unverified">ECU 0x%1$04X : non vérifié (absence non prouvée)</string>
 </resources>

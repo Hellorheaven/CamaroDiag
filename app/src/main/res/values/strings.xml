@@ -1120,4 +1120,9 @@
     <string name="cal_doip_severity_count_result">Matching DTCs: %1$d; availability 0x%2$02X; format 0x%3$02X</string>
     <string name="cal_doip_severity_list_result">Severity records: %1$d; availability 0x%2$02X</string>
     <string name="cal_doip_severity_record">DTC 0x%1$06X — severity 0x%2$02X, unit 0x%3$02X, status 0x%4$02X</string>
+    <string name="cal_doip_inventory">Explicit ECU inventory</string>
+    <string name="cal_doip_inventory_addresses">ECU addresses (hex, comma-separated)</string>
+    <string name="cal_doip_inventory_result">Inventory complete: %1$d/%2$d VINs verified</string>
+    <string name="cal_doip_inventory_verified">ECU 0x%1$04X: VIN verified (%2$s)</string>
+    <string name="cal_doip_inventory_unverified">ECU 0x%1$04X: not verified (not proof of absence)</string>
 </resources>
