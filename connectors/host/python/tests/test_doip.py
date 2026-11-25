@@ -634,6 +634,25 @@ class DoIpTests(unittest.TestCase):
             Session.read_legacy_dtc(fake, VIN, 0x10, dtc=1, record=0xF0)
         fake.verify_vin.assert_not_called()
 
+    def test_decoded_memory_records_require_exact_memory_and_dtc(self):
+        for extended, request, response, lengths in (
+                (False, "1918010203FF02", "591802010203080101F40D78", {0xF40D: 1}),
+                (True, "1919010203FF02", "5919020102030801123490AA", {1: 2, 0x90: 1})):
+            fake = unittest.mock.Mock(spec=Session)
+            fake.exchange.return_value = bytes.fromhex(response)
+            report = Session.read_decoded_user_memory(fake, VIN, 2, 0x010203, 255, lengths, extended=extended)
+            self.assertEqual(report["memory"], 2)
+            self.assertEqual(report["raw_response"], response)
+            self.assertEqual(report["records"][0]["record"], 1)
+            fake.exchange.assert_called_once_with(bytes.fromhex(request))
+            self.assertEqual(fake.verify_vin.call_count, 2)
+            for invalid in (response[:4] + "03" + response[6:], response[:-2]):
+                fake = unittest.mock.Mock(spec=Session)
+                fake.exchange.return_value = bytes.fromhex(invalid)
+                with self.assertRaises(DoIpError):
+                    Session.read_decoded_user_memory(fake, VIN, 2, 0x010203, 255, lengths, extended=extended)
+                fake.close.assert_called_once()
+
     def test_decoded_extended_data_respects_record_scope_and_identity(self):
         lengths = {1: 2, 0x90: 1, 0x91: 2}
         for obd in (False, True):
