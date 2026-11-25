@@ -131,6 +131,10 @@
   <data name="InvalidStoredRecord" xml:space="preserve"><value>Select one stored record 00..FE.</value></data>
   <data name="StoredRecordResult" xml:space="preserve"><value>Stored record 0x{0:X2}</value></data>
   <data name="StoredRecordCount" xml:space="preserve"><value>Declared DID count: {0}</value></data>
+  <data name="AllStoredRecords" xml:space="preserve"><value>Read all stored records</value></data>
+  <data name="StoredCatalog" xml:space="preserve"><value>Documented DID lengths (F40C:2,F40D:1)</value></data>
+  <data name="InvalidStoredCatalog" xml:space="preserve"><value>Enter documented DID lengths.</value></data>
+  <data name="AllStoredResult" xml:space="preserve"><value>Stored records: {0}</value></data>
   <data name="StoredRecordEmpty" xml:space="preserve"><value>No stored data for this record</value></data>
   <data name="ExtendedRecordSupport" xml:space="preserve"><value>DTCs supporting extended record</value></data>
   <data name="ExtendedRecordSize" xml:space="preserve"><value>Uniform documented record length (bytes)</value></data>
