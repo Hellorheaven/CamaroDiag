@@ -205,6 +205,42 @@ class Obd2FeatureEngineTest {
     }
 
     @Test
+    fun verifiesFreshVinWithBoundedRetryAndNoSavedFallback() = runBlocking {
+        val commands = mutableListOf<String>()
+        val vin = "3FMTK3SU0PMA00001"
+        var reads = 0
+        val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+            commands += command
+            when (command) {
+                "0902" -> if (++reads == 1) "NO DATA" else "490201" + vin.toByteArray().joinToString("") { "%02X".format(it) }
+                else -> "OK"
+            }
+        })
+        assertEquals(vin, engine.readVinForVerification())
+        assertEquals(listOf("ATH0", "ATS0", "0902", "0902"), commands)
+    }
+
+    @Test
+    fun distinguishesZeroPidBitmapAndZeroDtcResponseFromNoResponse() = runBlocking {
+        val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+            when (command) {
+                "0100" -> "410000000000"
+                "03" -> "4300"
+                "07" -> "NO DATA"
+                "0A" -> "4A00"
+                else -> "NO DATA"
+            }
+        })
+        val bitmap = engine.discoverPidAvailability()
+        assertTrue(bitmap.supported.isEmpty())
+        assertNull(bitmap.firstUnresolvedPid)
+        val modes = engine.readDtcModeEvidence()
+        assertEquals(emptyList<ObdDtc>(), modes[3])
+        assertNull(modes[7])
+        assertEquals(emptyList<ObdDtc>(), modes[10])
+    }
+
+    @Test
     fun doesNotTreatFunctionalObdRequestIdAsAnEcuResponse() = runBlocking {
         val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
             if (command == "0100") "7DF 06 41 00 FF FF FF FF" else "OK"
