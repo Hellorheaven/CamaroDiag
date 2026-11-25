@@ -38,6 +38,6 @@ internal static class StandardObdPhysicalPolicy
     internal static bool AllowsRead(ReadOnlySpan<byte> payload) =>
         payload.Length == 2 && payload[0] == 0x01 ||
         payload.Length == 3 && payload[0] == 0x02 && payload[2] == 0x00 ||
-        payload.Length == 2 && payload[0] == 0x06 && payload[1] == 0x00 ||
+        payload.Length == 2 && payload[0] == 0x06 ||
         payload.Length == 1 && payload[0] is 0x03 or 0x07 or 0x0A;
 }

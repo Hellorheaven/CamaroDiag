@@ -1,3 +1,7 @@
+## PR117 — lecture des moniteurs CAN OBD Mode 06 (25/11/2026)
+
+- C6 : parcours borné des bitmaps Mode 06, lecture des MID effectivement annoncés et décodage de leurs enregistrements CAN de 9 octets (MID/TID/UASID, valeur et seuils bruts). Aucun calcul d'unités ni verdict inventé sans table SAE J1979-DA ; résultats partiels explicitement marqués. J2534 Windows/Android autorise ces lectures normalisées (pas d'écriture). Le rapport existant présente les résultats, pas le bitmap comme mesure. Sources : SAE J1979 / ISO 15031-5, https://phprell.github.io/obd-diag/en/technik/dienste.html. Fichiers Android reconstitués depuis blobs et diffs vérifiés, lecture classique 404. Tests écrits non exécutés ; aucun checkpoint C6/DoIP.
+
 ## PR117 — cohérence des freeze frames OBD Mode 02 (25/11/2026)
 
 - C6 : contrôle strict service/PID/numéro de trame/longueur Mode 02, avec provenance CAN 11/29 bits. Une image figée sélectionne un seul répondant pour le DTC déclencheur, ses bitmaps et ses valeurs ; un autre ECU ne remplace pas silencieusement un PID absent. Réponses contradictoires du même ECU rejetées. Régressions écrites non exécutées ; aucun checkpoint C6/DoIP.

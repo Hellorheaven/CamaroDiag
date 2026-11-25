@@ -429,10 +429,39 @@ class Obd2FeatureEngine(
         return "MIL=${if (mil) "ON" else "OFF"}; DTC_COUNT=$dtcCount; RAW=${data.joinToString(" ") { "%02X".format(Locale.US, it) }}"
     }
 
-    suspend fun readMonitorTests(): String? =
-        ask("0600", 2500L).takeUnless {
-            it.contains("NO DATA", true) || it.contains("?", true) || it.contains("UNABLE TO CONNECT", true)
+    /** CAN Mode 06 is a separate namespace from Mode 01 PIDs.
+     * Query only MIDs actually advertised by a valid support bitmap.
+     * Report encoded words and UASID; do not invent engineering units or pass/fail. */
+    suspend fun readMonitorTests(): String? = withHeaderlessRecords {
+        val supported = linkedSetOf<Int>()
+        var baseMid = 0
+        var discovered = false
+        var incomplete = false
+        for (pageIndex in 0 until 8) {
+            val response = ask("06%02X".format(Locale.ROOT, baseMid), 2500L)
+            val page = ObdCanMonitorRecords.support(response, baseMid)
+            if (page == null) {
+                if (discovered) incomplete = true
+                break
+            }
+            discovered = true
+            supported += page.mids
+            if (!page.more || baseMid == 0xE0) break
+            baseMid += 0x20
         }
+        if (!discovered) return@withHeaderlessRecords null
+        val result = mutableListOf<String>()
+        for (mid in supported) {
+            val records = ObdCanMonitorRecords.results(ask("06%02X".format(Locale.ROOT, mid), 2500L), mid)
+            if (records.isNullOrEmpty()) {
+                incomplete = true
+                result += "MID=%02X: N/A".format(Locale.ROOT, mid)
+            } else result += records.map { it.rawText() }
+        }
+        if (result.isEmpty()) return@withHeaderlessRecords null
+        if (incomplete) result += "PARTIAL"
+        result.joinToString("\n")
+    }
 
     suspend fun fullReadOnlyScan(): ObdScanReport {
         log.clear()
@@ -483,9 +512,7 @@ class Obd2FeatureEngine(
         val cvns = readCalibrationVerificationNumbers()
         val ecuNames = readEcuName()
         val readiness = readReadiness()
-        val mode06 = readMonitorTests()?.takeIf {
-            physicalCanResponder == null || payload(it, 0x46, 0x00) != null
-        }
+        val mode06 = readMonitorTests()
         return ObdScanReport(
             supportedPids = supported,
             liveData = live,
