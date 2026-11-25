@@ -1,3 +1,7 @@
+## PR117 — DTC historiques Windows GUI/CLI (25/11/2026)
+
+- Parité avec Android et Connectors : quatre boutons FR/EN, --uds-historical-dtc 0x0B..0x0E, VIN F190 avant/après, statut courant brut, zéro ou un DTC. Aucun remplacement de la liste active ni interprétation OEM inventée. Tests écrits non exécutés ; aucun marqueur CI.
+
 ## PR117 — DTC historiques Connectors (25/11/2026)
 
 - CLI Python : first-failed-dtc, first-confirmed-dtc, recent-failed-dtc et recent-confirmed-dtc ; VIN F190 vérifié avant/après, résultat JSON nul ou unique, statut courant brut et détection des réponses incohérentes. Tests écrits non exécutés. Windows reste à raccorder. Aucun checkpoint CI.

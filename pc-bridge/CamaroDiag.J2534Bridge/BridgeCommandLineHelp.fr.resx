@@ -83,6 +83,8 @@ Exemples :
                               --uds-dtc-count-mask 0xFF, --uds-snapshot 0x123456
                               --uds-snapshot-record 1 ou --uds-extended-dtc 0x123456
                               --uds-extended-record 2.
+                              --uds-historical-dtc 0x0B/0x0C/0x0D/0x0E (un seul choix)
+                              avec --expected-vin VIN : premier/dernier DTC détecté/confirmé.
                               --uds-supported-dtcs ou --uds-snapshot-index avec
                               --expected-vin VIN : inventaire des DTC ou index des snapshots.
                               Ni contournement OEM ni flash ou récupération qualifiés.

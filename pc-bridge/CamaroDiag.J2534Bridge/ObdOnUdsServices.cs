@@ -281,6 +281,24 @@ internal static class ObdOnUdsServices
         return new(reply[2], reply[3], count);
     }
 
+    internal static byte[] ReadHistoricalDtc(byte subfunction)
+    {
+        if (subfunction is < 0x0B or > 0x0E) throw new ArgumentOutOfRangeException(nameof(subfunction));
+        return UdsStandardServices.ReadDtc(subfunction, []);
+    }
+
+    internal static DtcStatusReport DecodeHistoricalDtc(byte subfunction, ReadOnlySpan<byte> reply)
+    {
+        if (subfunction is < 0x0B or > 0x0E || reply.Length is not (3 or 7) ||
+            reply[0] != 0x59 || reply[1] != subfunction)
+            throw new InvalidDataException("Malformed historical DTC report.");
+        if (reply.Length == 3) return new(reply[2], Array.Empty<DiagnosticTroubleCode>());
+        if ((reply[6] & ~reply[2]) != 0)
+            throw new InvalidDataException("Historical DTC uses unavailable status bits.");
+        var code = ((uint)reply[3] << 16) | ((uint)reply[4] << 8) | reply[5];
+        return new(reply[2], new[] { new DiagnosticTroubleCode(code, reply[6]) });
+    }
+
     internal static byte[] ReadSupportedDtcs() => UdsStandardServices.ReadDtc(0x0A, []);
     internal static byte[] ReadSnapshotIndex() => UdsStandardServices.ReadDtc(0x03, []);
 

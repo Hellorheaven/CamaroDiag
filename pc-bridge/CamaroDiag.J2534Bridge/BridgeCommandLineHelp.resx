@@ -81,6 +81,8 @@ Examples:
                               --uds-dtc-count-mask 0xFF, --uds-snapshot 0x123456
                               --uds-snapshot-record 1, or --uds-extended-dtc 0x123456
                               --uds-extended-record 2.
+                              --uds-historical-dtc 0x0B/0x0C/0x0D/0x0E (choose one)
+                              with --expected-vin VIN: first/recent failed/confirmed DTC.
                               --uds-supported-dtcs or --uds-snapshot-index with
                               --expected-vin VIN lists supported codes or snapshot references.
                               No OEM security bypass, flash recovery or vehicle tests.

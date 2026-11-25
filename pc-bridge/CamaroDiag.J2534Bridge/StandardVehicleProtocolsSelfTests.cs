@@ -737,6 +737,22 @@ internal static class StandardVehicleProtocolsSelfTests
             [0x19, 3], [0x59, 3, 1]), "Truncated snapshot index rejected at transport.");
         Reject<InvalidDataException>(() => UdsStandardServices.RequireResponse(
             [0x19, 0x0A], [0x59, 0x0A]), "Supported DTC response requires availability mask.");
+        foreach (byte sub in new byte[] { 0x0B, 0x0C, 0x0D, 0x0E })
+        {
+            var historical = StandardProtocolCli.ParseVerifiedDoIpRead([
+                "--host", "127.0.0.1", "--tester", "0E80", "--ecu", "1234",
+                "--expected-vin", "1G1FA1RX0J0100001", "--uds-historical-dtc", $"0x{sub:X2}"]);
+            Check(!historical.Obd && historical.Target.Request.SequenceEqual(new byte[] { 0x19, sub }),
+                "Historical DTC CLI is a verified generic read.");
+            Check(ObdOnUdsServices.DecodeHistoricalDtc(sub, [0x59, sub, 8]).Codes.Count == 0,
+                "No matching DTC is not a transport failure.");
+            Check(ObdOnUdsServices.DecodeHistoricalDtc(sub, [0x59, sub, 8, 1, 2, 3, 0]).Codes[0].Code == 0x010203,
+                "Historical record can have inactive current status.");
+            Reject<InvalidDataException>(() => ObdOnUdsServices.DecodeHistoricalDtc(sub, [0x59, sub, 8, 1]),
+                "Truncated historical record rejected.");
+            Reject<InvalidDataException>(() => ObdOnUdsServices.DecodeHistoricalDtc(sub, [0x59, sub, 8, 1, 2, 3, 1]),
+                "Unavailable current status bit rejected.");
+        }
         var supported = ObdOnUdsServices.DecodeSupportedDtcs([0x59, 0x0A, 8, 1, 2, 3, 0]);
         Check(supported.Codes.Count == 1 && supported.Codes[0].Status == 0, "Inactive supported DTC retained.");
         Reject<InvalidDataException>(() => ObdOnUdsServices.DecodeSupportedDtcs(

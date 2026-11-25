@@ -128,4 +128,9 @@
   <data name="ObdMultiMonitor" xml:space="preserve"><value>Monitoring multi-DID OBDonUDS</value></data>
   <data name="MultiMonitorSample" xml:space="preserve"><value>Échantillon provisoire {0} : {1}</value></data>
   <data name="MultiMonitorComplete" xml:space="preserve"><value>Échantillons multi-DID vérifiés : {0}</value></data>
+  <data name="FirstFailed" xml:space="preserve"><value>Premier DTC détecté</value></data>
+  <data name="FirstConfirmed" xml:space="preserve"><value>Premier DTC confirmé</value></data>
+  <data name="RecentFailed" xml:space="preserve"><value>Dernier DTC détecté</value></data>
+  <data name="RecentConfirmed" xml:space="preserve"><value>Dernier DTC confirmé</value></data>
+  <data name="NoHistoricalDtc" xml:space="preserve"><value>Aucun DTC historique correspondant</value></data>
 </root>
