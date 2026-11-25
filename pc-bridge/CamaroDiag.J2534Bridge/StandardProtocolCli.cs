@@ -1462,18 +1462,18 @@ internal static class StandardProtocolCli
         var extendedCatalog = Optional(args, "--extended-record-lengths");
         if (extendedCatalog is not null)
         {
-            if ((udsExtended is null) == (extendedDtc is null) ||
+            if ((udsExtended is null ? 0 : 1) + (extendedDtc is null ? 0 : 1) + (memoryExtended is null ? 0 : 1) != 1 ||
                 Optional(args, "--expected-vin") is null ||
                 (extendedDtc is not null && extendedRecord is null))
                 throw new ArgumentException("Decoded extended data requires VIN, one DTC selector and explicit record.");
-            _ = ObdOnUdsServices.ReadDecodedExtended(Number(udsExtended ?? extendedDtc!),
-                checked((byte)Number(udsExtendedRecord ?? extendedRecord!)),
+            _ = ObdOnUdsServices.ReadDecodedExtended(Number(udsExtended ?? extendedDtc ?? memoryExtended!),
+                checked((byte)Number(udsExtendedRecord ?? extendedRecord ?? memoryRecord!)),
                 ObdOnUdsServices.ParseExtendedRecordLengths(extendedCatalog));
         }
         var snapshotCatalog = Optional(args, "--snapshot-did-lengths");
         if (snapshotCatalog is not null)
         {
-            if ((udsSnapshot is null) == (snapshotDtc is null) ||
+            if ((udsSnapshot is null ? 0 : 1) + (snapshotDtc is null ? 0 : 1) + (memorySnapshot is null ? 0 : 1) != 1 ||
                 Optional(args, "--expected-vin") is null ||
                 (snapshotDtc is not null && snapshotRecord is null))
                 throw new ArgumentException("Decoded snapshots require VIN, one DTC selector and explicit record.");
@@ -2163,12 +2163,15 @@ internal static class StandardProtocolCli
             if (extendedCatalog is not null)
             {
                 uint dtc = ((uint)o.Request[2] << 16) | ((uint)o.Request[3] << 8) | o.Request[4];
-                var report = ObdOnUdsServices.DecodeExtendedRecords(dtc, o.Request[5], reply,
-                    ObdOnUdsServices.ParseExtendedRecordLengths(extendedCatalog));
+                var lengths = ObdOnUdsServices.ParseExtendedRecordLengths(extendedCatalog);
+                var report = o.Request[1] == 0x19
+                    ? ObdOnUdsServices.DecodeUserMemoryExtended(o.Request[6], dtc, o.Request[5], reply, lengths)
+                    : ObdOnUdsServices.DecodeExtendedRecords(dtc, o.Request[5], reply, lengths);
                 Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(new
                 {
                     dtc = report.Dtc.ToString("X6"), status = report.Status,
-                    requested_record = report.RequestedRecord, raw_response = Convert.ToHexString(report.RawResponse),
+                    requested_record = report.RequestedRecord, memory = o.Request.Length == 7 ? (int?)o.Request[6] : null,
+                    raw_response = Convert.ToHexString(report.RawResponse),
                     records = report.Records.Select(row => new
                     {
                         record = row.Number, length = row.Data.Length, data = Convert.ToHexString(row.Data)
@@ -2178,12 +2181,15 @@ internal static class StandardProtocolCli
             else if (snapshotCatalog is not null)
             {
                 uint dtc = ((uint)o.Request[2] << 16) | ((uint)o.Request[3] << 8) | o.Request[4];
-                var report = ObdOnUdsServices.DecodeSnapshotRecords(dtc, o.Request[5], reply,
-                    ObdOnUdsServices.ParseStoredDidLengths(snapshotCatalog));
+                var lengths = ObdOnUdsServices.ParseStoredDidLengths(snapshotCatalog);
+                var report = o.Request[1] == 0x18
+                    ? ObdOnUdsServices.DecodeUserMemorySnapshot(o.Request[6], dtc, o.Request[5], reply, lengths)
+                    : ObdOnUdsServices.DecodeSnapshotRecords(dtc, o.Request[5], reply, lengths);
                 Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(new
                 {
                     dtc = report.Dtc.ToString("X6"), status = report.Status,
-                    requested_record = report.RequestedRecord, raw_response = Convert.ToHexString(report.RawResponse),
+                    requested_record = report.RequestedRecord, memory = o.Request.Length == 7 ? (int?)o.Request[6] : null,
+                    raw_response = Convert.ToHexString(report.RawResponse),
                     records = report.Records.Select(row => new
                     {
                         record = row.Record, did_count = row.Dids.Count, raw_record = Convert.ToHexString(row.RawRecord),
