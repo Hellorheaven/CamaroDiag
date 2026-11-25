@@ -1120,6 +1120,9 @@
     <string name="cal_doip_extended_catalog">Documented record lengths (e.g. 01:2,90:1)</string>
     <string name="cal_doip_decoded_extended_result">DTC %1$06X — status %2$02X — records: %3$d</string>
     <string name="cal_doip_extended_record_result">Record 0x%1$02X: %2$s</string>
+    <string name="cal_doip_memory_decoded_snapshot">Decoded memory snapshots</string>
+    <string name="cal_doip_memory_decoded_extended">Decoded memory extended data</string>
+    <string name="cal_doip_decoded_memory">Memory 0x%1$02X</string>
     <string name="cal_doip_decoded_snapshot">Decoded UDS snapshots</string>
     <string name="cal_doip_obd_decoded_snapshot">Decoded OBDonUDS snapshots</string>
     <string name="cal_doip_decoded_snapshot_result">DTC %1$06X — status %2$02X — snapshots: %3$d</string>
