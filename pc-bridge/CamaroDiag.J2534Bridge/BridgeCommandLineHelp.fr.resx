@@ -109,6 +109,10 @@ Exemples :
                               --uds-extended-record-support 0x01 ou --uds-extended-record-data 0x01
                               avec --uds-extended-record-size 2 (longueur uniforme documentée).
                               Les deux exigent --expected-vin VIN.
+                              UDS historique : --uds-mirror-mask 0x08 ou --uds-mirror-count 0x08 ;
+                              --uds-mirror-extended 0x010203 avec --uds-mirror-record 1 ;
+                              --uds-legacy-emissions-mask 0x08 ou --uds-legacy-emissions-count 0x08.
+                              --expected-vin VIN explicite ; aucun repli automatique.
                               Ni contournement OEM ni flash ou récupération qualifiés.
 
 Chaque commande nécessite ses paramètres exacts. Utiliser --help seul :

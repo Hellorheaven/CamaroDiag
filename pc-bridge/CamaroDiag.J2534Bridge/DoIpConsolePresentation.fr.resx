@@ -120,6 +120,13 @@
   <data name="ObdSnapshot" xml:space="preserve"><value>Snapshot OBDonUDS</value></data>
   <data name="ObdExtended" xml:space="preserve"><value>Données étendues OBDonUDS</value></data>
   <data name="SupportedDtcs" xml:space="preserve"><value>DTC pris en charge</value></data>
+  <data name="LegacyMirrorDtcs" xml:space="preserve"><value>DTC miroir historiques</value></data>
+  <data name="LegacyMirrorCount" xml:space="preserve"><value>Comptage DTC miroir historiques</value></data>
+  <data name="LegacyMirrorExtended" xml:space="preserve"><value>Données étendues miroir historiques</value></data>
+  <data name="LegacyEmissionsDtcs" xml:space="preserve"><value>DTC émissions UDS historiques</value></data>
+  <data name="LegacyEmissionsCount" xml:space="preserve"><value>Comptage DTC émissions historiques</value></data>
+  <data name="LegacyMirrorResult" xml:space="preserve"><value>Mémoire miroir UDS historique</value></data>
+  <data name="LegacyEmissionsResult" xml:space="preserve"><value>Émissions UDS historiques</value></data>
   <data name="ExtendedRecordSupport" xml:space="preserve"><value>DTC prenant en charge cet enregistrement</value></data>
   <data name="ExtendedRecordSize" xml:space="preserve"><value>Longueur uniforme documentée (octets)</value></data>
   <data name="ExtendedRecordData" xml:space="preserve"><value>Lire les données étendues</value></data>

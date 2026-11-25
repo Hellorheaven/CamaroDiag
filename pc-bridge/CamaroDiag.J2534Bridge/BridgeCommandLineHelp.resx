@@ -107,6 +107,10 @@ Examples:
                               --uds-extended-record-support 0x01 or --uds-extended-record-data 0x01
                               with --uds-extended-record-size 2 (uniform documented byte length).
                               Both require --expected-vin VIN.
+                              Legacy UDS only: --uds-mirror-mask 0x08 or --uds-mirror-count 0x08;
+                              --uds-mirror-extended 0x010203 with --uds-mirror-record 1;
+                              --uds-legacy-emissions-mask 0x08 or --uds-legacy-emissions-count 0x08.
+                              Explicit --expected-vin VIN required; no automatic fallback.
                               No OEM security bypass, flash recovery or vehicle tests.
 
 Use each option with the exact arguments described above. --help must be alone:

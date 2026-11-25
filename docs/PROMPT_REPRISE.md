@@ -1,3 +1,7 @@
+## PR117 — lectures UDS historiques Windows (25/11/2026)
+
+- Parité 19/0F–13 sur les trois plateformes : cinq actions GUI FR/EN, CLI explicite, contrôles identité, masque, longueur, écho et données brutes, scope miroir ou émissions historiques sans repli vers OBDonUDS. Tests écrits non exécutés, aucun checkpoint CI. DoIP/C6 toujours actifs.
+
 ## PR117 — lectures historiques Android (25/11/2026)
 
 - UDS 19/0F–13 : cinq actions FR/EN distinctes, validation des paramètres avant réseau, rapport historique séparé de la liste active, F190 avant/après et contrôles des réponses. Tests écrits non exécutés. Windows reste à raccorder ; aucun checkpoint CI.

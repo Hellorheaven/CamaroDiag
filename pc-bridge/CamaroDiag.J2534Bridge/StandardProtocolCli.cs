@@ -427,6 +427,19 @@ internal static class StandardProtocolCli
             foreach (var code in report.Codes)
                 Console.WriteLine($"DTC=0x{code.Code:X6} status=0x{code.Status:X2}");
         }
+        else if (request.Length >= 2 && request[0] == 0x19 && request[1] is >= 0x0F and <= 0x13)
+        {
+            var report = ObdOnUdsServices.DecodeLegacyDtc(request, response);
+            Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(new
+            {
+                subfunction = report.Subfunction, legacy = true, scope = report.Subfunction <= 0x11 ? "mirror" : "emissions",
+                availability_mask = report.List?.AvailabilityMask ?? report.Count?.StatusAvailabilityMask,
+                format = report.Count?.DtcFormatIdentifier, count = report.Count?.Count,
+                records = report.List?.Codes.Select(r => new { dtc = $"{r.Code:X6}", status = r.Status }),
+                dtc = report.Detail?.Dtc.ToString("X6"), status = report.Detail?.Status,
+                raw_records = report.Detail is null ? null : Convert.ToHexString(report.Detail.RawExtendedDataRecords)
+            }));
+        }
         else if (request.Length == 3 && request[0] == 0x19 &&
             (request[1] == 0x1A || (request[1] == 0x16 && extendedRecordSize.HasValue)))
         {
@@ -1338,6 +1351,8 @@ internal static class StandardProtocolCli
             "--uds-severity-count", "--uds-severity-list", "--uds-severity-info", "--uds-severity-status",
             "--uds-memory", "--uds-memory-mask", "--uds-memory-snapshot", "--uds-memory-extended", "--uds-memory-record",
             "--uds-extended-record-support", "--uds-extended-record-data", "--uds-extended-record-size",
+            "--uds-mirror-mask", "--uds-mirror-count", "--uds-mirror-extended", "--uds-mirror-record",
+            "--uds-legacy-emissions-mask", "--uds-legacy-emissions-count",
             "--uds-dtc-mask", "--uds-dtc-count-mask", "--uds-snapshot", "--uds-snapshot-record",
             "--uds-extended-dtc", "--uds-extended-record", "--obd-wwh-status", "--obd-readiness-group",
             "--obd-snapshot", "--obd-snapshot-record", "--obd-extended-dtc", "--obd-extended-record",
@@ -1373,6 +1388,16 @@ internal static class StandardProtocolCli
         if ((supportedDtcs || permanentDtcs || snapshotIndex || faultCounters || historicalDtc is not null ||
             severityCount is not null || severityList is not null || severityInfo is not null) && Optional(args, "--expected-vin") is null)
             throw new ArgumentException("DTC inventory requires --expected-vin.");
+        var mirrorMask = Optional(args, "--uds-mirror-mask");
+        var mirrorCount = Optional(args, "--uds-mirror-count");
+        var mirrorExtended = Optional(args, "--uds-mirror-extended");
+        var mirrorRecord = Optional(args, "--uds-mirror-record");
+        var legacyEmissionsMask = Optional(args, "--uds-legacy-emissions-mask");
+        var legacyEmissionsCount = Optional(args, "--uds-legacy-emissions-count");
+        var legacySelectors = new[] { mirrorMask, mirrorCount, mirrorExtended, legacyEmissionsMask, legacyEmissionsCount }.Count(v => v is not null);
+        if (legacySelectors > 1 || (mirrorRecord is not null) != (mirrorExtended is not null) ||
+            (legacySelectors == 1 && Optional(args, "--expected-vin") is null))
+            throw new ArgumentException("Legacy DTC reads require VIN, one selector and explicit mirror record for detail.");
         var extendedRecordSupport = Optional(args, "--uds-extended-record-support");
         var extendedRecordData = Optional(args, "--uds-extended-record-data");
         var extendedRecordSize = Optional(args, "--uds-extended-record-size");
@@ -1432,7 +1457,7 @@ internal static class StandardProtocolCli
             (obdDtcMask is null ? 0 : 1) +
             (obdDtcCountMask is null ? 0 : 1) +
             (supportedDtcs ? 1 : 0) +
-            (permanentDtcs ? 1 : 0) + memorySelectors + extendedRecordSelectors +
+            (permanentDtcs ? 1 : 0) + memorySelectors + extendedRecordSelectors + legacySelectors +
             (snapshotIndex ? 1 : 0) +
             (historicalDtc is null ? 0 : 1) +
             (faultCounters ? 1 : 0) +
@@ -1465,6 +1490,11 @@ internal static class StandardProtocolCli
                     NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture))) :
             supportedDtcs ? ObdOnUdsServices.ReadSupportedDtcs() :
             permanentDtcs ? ObdOnUdsServices.ReadPermanentDtcs() :
+            mirrorMask is not null ? ObdOnUdsServices.ReadLegacyDtc(0x0F, checked((byte)Number(mirrorMask))) :
+            mirrorCount is not null ? ObdOnUdsServices.ReadLegacyDtc(0x11, checked((byte)Number(mirrorCount))) :
+            legacyEmissionsMask is not null ? ObdOnUdsServices.ReadLegacyDtc(0x13, checked((byte)Number(legacyEmissionsMask))) :
+            legacyEmissionsCount is not null ? ObdOnUdsServices.ReadLegacyDtc(0x12, checked((byte)Number(legacyEmissionsCount))) :
+            mirrorExtended is not null ? ObdOnUdsServices.ReadLegacyDtc(0x10, 0, Number(mirrorExtended), checked((byte)Number(mirrorRecord!))) :
             extendedRecordSupport is not null ? ObdOnUdsServices.ReadExtendedRecord(checked((byte)Number(extendedRecordSupport)), null) :
             extendedRecordData is not null ? ObdOnUdsServices.ReadExtendedRecord(checked((byte)Number(extendedRecordData)),
                 int.Parse(extendedRecordSize!, NumberStyles.None, CultureInfo.InvariantCulture)) :
@@ -1962,7 +1992,8 @@ internal static class StandardProtocolCli
         var genericRead = new[] { "--uds-did", "--uds-scaling-did", "--uds-dtc-mask",
             "--uds-dtc-count-mask", "--uds-snapshot", "--uds-extended-dtc",
             "--uds-memory-mask", "--uds-memory-snapshot", "--uds-memory-extended",
-            "--uds-extended-record-support", "--uds-extended-record-data" }
+            "--uds-extended-record-support", "--uds-extended-record-data", "--uds-mirror-mask", "--uds-mirror-count",
+            "--uds-mirror-extended", "--uds-legacy-emissions-mask", "--uds-legacy-emissions-count" }
             .Any(selector => Optional(args, selector) is not null);
         genericRead |= args.Contains("--uds-supported-dtcs", StringComparer.OrdinalIgnoreCase) ||
             args.Contains("--uds-permanent-dtcs", StringComparer.OrdinalIgnoreCase) ||

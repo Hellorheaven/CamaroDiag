@@ -403,6 +403,40 @@ internal static class ObdOnUdsServices
         return rows;
     }
 
+    internal sealed record LegacyDtcReport(byte Subfunction, DtcStatusReport? List,
+        DtcCountReport? Count, ExtendedDataReply? Detail);
+
+    internal static byte[] ReadLegacyDtc(byte sub, byte mask, uint dtc = 0, byte record = 1)
+    {
+        if (sub is 0x0F or 0x11 or 0x12 or 0x13) return UdsStandardServices.ReadDtc(sub, [mask]);
+        if (sub != 0x10 || dtc > 0xFFFFFF || record == 0 || record is >= 0xF0 and <= 0xFD)
+            throw new ArgumentException("Invalid legacy mirror-memory request.");
+        return UdsStandardServices.ReadDtc(sub, [(byte)(dtc >> 16), (byte)(dtc >> 8), (byte)dtc, record]);
+    }
+
+    internal static LegacyDtcReport DecodeLegacyDtc(ReadOnlySpan<byte> request, ReadOnlySpan<byte> reply)
+    {
+        if (request.Length < 2 || request[0] != 0x19 || request[1] is < 0x0F or > 0x13)
+            throw new ArgumentException("Expected explicit legacy DTC request.");
+        _ = UdsStandardServices.RequireResponse(request, reply);
+        byte sub = request[1];
+        var normalized = reply.ToArray();
+        if (sub is 0x0F or 0x13)
+        {
+            normalized[1] = 2;
+            return new(sub, DecodeDtcByStatusMask(request[2], normalized), null, null);
+        }
+        if (sub is 0x11 or 0x12)
+        {
+            normalized[1] = 1;
+            return new(sub, null, DecodeDtcCountByStatusMask(normalized), null);
+        }
+        uint dtc = ((uint)request[2] << 16) | ((uint)request[3] << 8) | request[4];
+        _ = ReadLegacyDtc(sub, 0, dtc, request[5]);
+        normalized[1] = 6;
+        return new(sub, null, null, DecodeDtcExtendedData(dtc, normalized));
+    }
+
     internal sealed record ExtendedRecordEntry(uint Dtc, byte Status, byte[] Data);
     internal sealed record ExtendedRecordReport(byte Record, byte? Availability, IReadOnlyList<ExtendedRecordEntry> Entries);
 

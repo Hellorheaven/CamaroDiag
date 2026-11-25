@@ -825,6 +825,28 @@ internal static class StandardVehicleProtocolsSelfTests
             [0x19, 3], [0x59, 3, 1]), "Truncated snapshot index rejected at transport.");
         Reject<InvalidDataException>(() => UdsStandardServices.RequireResponse(
             [0x19, 0x0A], [0x59, 0x0A]), "Supported DTC response requires availability mask.");
+        string[] legacyArgs = ["--host", "127.0.0.1", "--tester", "0E80", "--ecu", "1234",
+            "--expected-vin", "1G1FA1RX0J0100001"];
+        foreach (var (option, sub) in new[] { ("--uds-mirror-mask", (byte)0x0F), ("--uds-mirror-count", (byte)0x11),
+            ("--uds-legacy-emissions-count", (byte)0x12), ("--uds-legacy-emissions-mask", (byte)0x13) })
+        {
+            var read = StandardProtocolCli.ParseVerifiedDoIpRead([..legacyArgs, option, "0x08"]);
+            Check(!read.Obd && read.Target.Request.SequenceEqual(new byte[] { 0x19, sub, 8 }), "Legacy scope uses explicit UDS.");
+            byte[] reply = sub is 0x11 or 0x12 ? [0x59, sub, 8, 1, 0, 2] : [0x59, sub, 8, 1, 2, 3, 8];
+            var result = ObdOnUdsServices.DecodeLegacyDtc(read.Target.Request, reply);
+            Check(result.Subfunction == sub && (sub is 0x11 or 0x12 ? result.Count?.Count == 2 :
+                result.List?.Codes.Single().Code == 0x010203), "Legacy count or list preserved.");
+            Reject<InvalidDataException>(() => ObdOnUdsServices.DecodeLegacyDtc(read.Target.Request,
+                [0x59, sub, 8, 1]), "Truncated legacy report rejected.");
+        }
+        var mirrorRead = StandardProtocolCli.ParseVerifiedDoIpRead([..legacyArgs, "--uds-mirror-extended", "0x010203", "--uds-mirror-record", "1"]);
+        Check(!mirrorRead.Obd && mirrorRead.Target.Request.SequenceEqual(new byte[] { 0x19, 0x10, 1, 2, 3, 1 }), "Mirror detail selector.");
+        Check(ObdOnUdsServices.DecodeLegacyDtc(mirrorRead.Target.Request, [0x59, 0x10, 1, 2, 3, 8, 1, 0xAA])
+            .Detail!.RawExtendedDataRecords.SequenceEqual(new byte[] { 1, 0xAA }), "Mirror data preserved.");
+        Reject<InvalidDataException>(() => ObdOnUdsServices.DecodeLegacyDtc(mirrorRead.Target.Request,
+            [0x59, 0x10, 1, 2, 3, 8, 2]), "Wrong mirror record rejected.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseVerifiedDoIpRead([..legacyArgs, "--uds-mirror-extended", "0x010203"]),
+            "Explicit mirror record required.");
         string[] recordArgs = ["--host", "127.0.0.1", "--tester", "0E80", "--ecu", "1234",
             "--expected-vin", "1G1FA1RX0J0100001"];
         var recordSupport = StandardProtocolCli.ParseVerifiedDoIpRead([..recordArgs, "--uds-extended-record-support", "0x01"]);

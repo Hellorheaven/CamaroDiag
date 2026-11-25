@@ -399,6 +399,15 @@ internal static class UdsStandardServices
                 throw new InvalidDataException("Malformed DTC index or fault counter report.");
             if ((subfunction is 0x0A or 0x15) && (request.Length != 2 || response.Length < 3 || (response.Length - 3) % 4 != 0))
                 throw new InvalidDataException("Malformed supported DTC inventory.");
+            if ((subfunction is 0x0F or 0x13) && (request.Length != 3 || response.Length < 3 ||
+                (response.Length - 3) % 4 != 0))
+                throw new InvalidDataException("Malformed legacy DTC list.");
+            if ((subfunction is 0x11 or 0x12) && (request.Length != 3 || response.Length != 6))
+                throw new InvalidDataException("Malformed legacy DTC count.");
+            if (subfunction == 0x10 && (request.Length != 6 || response.Length < 6 ||
+                !response.Slice(2, 3).SequenceEqual(request.Slice(2, 3)) ||
+                (response.Length >= 7 && request[5] is not (0xFE or 0xFF) && response[6] != request[5])))
+                throw new InvalidDataException("Wrong legacy mirror-memory DTC detail.");
             if (subfunction == 0x16 && (request.Length != 3 || response.Length < 3 || response[2] != request[2]))
                 throw new InvalidDataException("Wrong extended record response.");
             if (subfunction == 0x1A && (request.Length != 3 || response.Length < 4 ||
