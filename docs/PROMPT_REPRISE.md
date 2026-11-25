@@ -1,3 +1,7 @@
+## PR117 — cohérence des freeze frames OBD Mode 02 (25/11/2026)
+
+- C6 : contrôle strict service/PID/numéro de trame/longueur Mode 02, avec provenance CAN 11/29 bits. Une image figée sélectionne un seul répondant pour le DTC déclencheur, ses bitmaps et ses valeurs ; un autre ECU ne remplace pas silencieusement un PID absent. Réponses contradictoires du même ECU rejetées. Régressions écrites non exécutées ; aucun checkpoint C6/DoIP.
+
 ## PR117 — identité OBD multicalculateur (25/11/2026)
 
 - C6 : les lectures Mode 09 décodent séparément les blocs ELM numérotés et les réponses complètes anonymes, sans concaténer plusieurs ECU. VIN identiques acceptés, VIN divergents ou enregistrement tronqué refusés ; identifiants de calibration et CVN conservés par enregistrement. Console compatible avec plusieurs blocs valides. Aucun changement de droits d'écriture. Lecture des fichiers confirmée par SHA/blob avant modification. Régressions ajoutées non exécutées, aucun checkpoint C6/DoIP.

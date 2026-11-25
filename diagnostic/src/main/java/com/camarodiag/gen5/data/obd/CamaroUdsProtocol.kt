@@ -220,7 +220,17 @@ object CamaroUdsProtocol {
 
     /** Keep each validated Mode 01 response attached to its actual responder. */
     fun parsePidObservations(response: String, pid: String,
-        primaryPowertrainResponderOnly: Boolean = false): List<PidObservation> {
+        primaryPowertrainResponderOnly: Boolean = false): List<PidObservation> =
+        parseStandardPidRecords(response, pid, 0x41, null, primaryPowertrainResponderOnly)
+
+    /** Mode 02 echoes a frame number after the PID, before the data. */
+    fun parseFreezeFrameObservations(response: String, pid: Int, frame: Int = 0): List<PidObservation> {
+        if (pid !in 0..255 || frame !in 0..255) return emptyList()
+        return parseStandardPidRecords(response, "%02X".format(Locale.ROOT, pid), 0x42, frame, false)
+    }
+
+    private fun parseStandardPidRecords(response: String, pid: String, service: Int,
+        frame: Int?, primaryPowertrainResponderOnly: Boolean): List<PidObservation> {
         val pidHex = pid.trim().uppercase(Locale.ROOT).padStart(2, '0')
         if (!Regex("[0-9A-F]{2}").matches(pidHex)) return emptyList()
         val observations = mutableListOf<PidObservation>()
@@ -267,8 +277,8 @@ object CamaroUdsProtocol {
             // Explicit DLC before a PCI byte must exactly describe the frame.
             if (responder != null && bytes.size in 4..9 &&
                 bytes.first() == bytes.size - 1 && bytes[1] in 1..7 &&
-                bytes[2] == 0x41) bytes = bytes.drop(1)
-            if (bytes.first() != 0x41) {
+                bytes[2] == service) bytes = bytes.drop(1)
+            if (bytes.first() != service) {
                 val declared = bytes.first()
                 if (declared !in 1..8) continue
                 bytes = when {
@@ -276,17 +286,19 @@ object CamaroUdsProtocol {
                     // Only an entire physical classic CAN frame can carry
                     // padding beyond its explicit ISO-TP single-frame length.
                     responder != null && bytes.size == 8 && declared in 1..7 &&
-                        bytes[1] == 0x41 -> bytes.drop(1).take(declared)
+                        bytes[1] == service -> bytes.drop(1).take(declared)
                     else -> continue
                 }
             }
-            if (bytes.size < 3 || bytes[0] != 0x41 || bytes[1] != expectedPid) continue
-            // Apply the same exact SAE lengths as the read-only console and
-            // the physical J2534 bridge. An extra byte must never turn a
-            // malformed live sensor frame into an apparently valid reading.
-            val expectedLength = SafeObdRequestPolicy.expectedMode01DataBytes(expectedPid)
-            if (expectedLength != null && bytes.size != expectedLength + 2) continue
-            observations += PidObservation(responder, bytes.drop(2))
+            if (bytes.size < 3 || bytes[0] != service || bytes[1] != expectedPid) continue
+            val prefix = if (frame == null) 2 else 3
+            if (frame != null && bytes.getOrNull(2) != frame) continue
+            // Mode 02 PID 02 is the triggering DTC; PID 03 is fuel-system status.
+            val expectedLength = if (frame != null && expectedPid in setOf(0x02, 0x03)) 2
+                else SafeObdRequestPolicy.expectedMode01DataBytes(expectedPid)
+            if (frame != null && expectedLength == null) continue
+            if (expectedLength != null && bytes.size != expectedLength + prefix) continue
+            observations += PidObservation(responder, bytes.drop(prefix))
         }
         return observations
     }

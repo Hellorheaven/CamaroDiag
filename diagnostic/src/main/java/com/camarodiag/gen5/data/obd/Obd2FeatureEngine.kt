@@ -78,6 +78,28 @@ class Obd2FeatureEngine(
 ) {
 
     private val log = mutableListOf<String>()
+    private var freezeFrameSourcePinned = false
+    private var freezeFrameSource: String? = null
+
+    /** An entire freeze-frame record belongs to one responding ECU.
+     * Do not switch to another responder when a later PID is unavailable. */
+    private fun freezeFrameValue(response: String, pid: Int, nonzeroDtc: Boolean = false): List<Int>? {
+        val observations = CamaroUdsProtocol.parseFreezeFrameObservations(response, pid)
+        val grouped = observations.groupBy { it.responder }
+        val valid = grouped.mapNotNull { (source, rows) ->
+            val unique = rows.map { it.bytes }.distinct().singleOrNull() ?: return@mapNotNull null
+            if (nonzeroDtc && unique.all { it == 0 }) return@mapNotNull null
+            source to unique
+        }.toMap()
+        if (freezeFrameSourcePinned) return valid[freezeFrameSource]
+        val physical = valid.keys.filterNotNull().sorted()
+        val selected = physical.firstOrNull { it == "7E8" || it == "18DAF110" }
+            ?: physical.firstOrNull()
+        if (selected == null && !valid.containsKey(null)) return null
+        freezeFrameSource = selected
+        freezeFrameSourcePinned = true
+        return valid[selected]
+    }
 
     /** Actual command/response evidence; callers decide whether to export it. */
     fun rawExchangeLog(): List<String> = log.toList()
@@ -302,10 +324,10 @@ class Obd2FeatureEngine(
 
     /** Reads the DTC that caused freeze-frame storage (Mode 02, PID 02, frame 00). */
     suspend fun readFreezeFrameDtc(): ObdDtc? {
-        val data = payload(ask("020200"), 0x42, 0x02) ?: return null
-        // Mode 02 payload begins with the frame number, followed by the two DTC bytes.
-        if (data.size < 3 || data[0] != 0x00) return null
-        val raw = (data[1] shl 8) or data[2]
+        freezeFrameSourcePinned = false
+        freezeFrameSource = null
+        val data = freezeFrameValue(ask("020200"), 0x02, nonzeroDtc = true) ?: return null
+        val raw = (data[0] shl 8) or data[1]
         if (raw == 0) return null
         val prefix = "PCBU"[(raw shr 14) and 0x03]
         val digit = (raw shr 12) and 0x03
@@ -321,10 +343,7 @@ class Obd2FeatureEngine(
         var basePid = 0x00
         repeat(8) {
             val response = ask("02%02X00".format(Locale.US, basePid))
-            val data = payload(response, 0x42, basePid) ?: return supported
-            // Mode 02 echoes the requested frame number before the four bitmap bytes.
-            if (data.size < 5 || data[0] != 0x00) return supported
-            val bitmap = data.drop(1).take(4)
+            val bitmap = freezeFrameValue(response, basePid) ?: return supported
             for (bit in 0 until 32) {
                 val mask = 1 shl (7 - (bit % 8))
                 if ((bitmap[bit / 8] and mask) != 0 && bit != 31) {
@@ -347,10 +366,8 @@ class Obd2FeatureEngine(
         val pids = listOf(0x03, 0x04, 0x05, 0x06, 0x07, 0x0C, 0x0D, 0x0F, 0x10, 0x11, 0x42)
         for (pid in pids) {
             if (supportedPids != null && pid !in supportedPids) continue
-            val data = payload(ask("02%02X00".format(Locale.US, pid)), 0x42, pid) ?: continue
-            if (data.isEmpty() || data[0] != 0x00) continue
-            val valueBytes = data.drop(1) // Drop only the echoed frame number.
-            if (valueBytes.isNotEmpty()) result[pid] = valueBytes
+            val data = freezeFrameValue(ask("02%02X00".format(Locale.US, pid)), pid) ?: continue
+            result[pid] = data
         }
         return result
     }
