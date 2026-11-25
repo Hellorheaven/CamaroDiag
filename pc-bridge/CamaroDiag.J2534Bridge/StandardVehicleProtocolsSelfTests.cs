@@ -919,6 +919,24 @@ internal static class StandardVehicleProtocolsSelfTests
             "Individual snapshot query rejects multiple records.");
         Reject<ArgumentException>(() => StandardProtocolCli.ParseVerifiedDoIpRead([..recordArgs, "--uds-did", "F190",
             "--snapshot-did-lengths", "F40D:1"]), "Snapshot lengths cannot be applied to other selectors.");
+        var decodedSingleStored = StandardProtocolCli.ParseVerifiedDoIpRead([..recordArgs,
+            "--uds-stored-record", "0x01", "--stored-did-lengths", "F40D:1"]);
+        Check(!decodedSingleStored.Obd && decodedSingleStored.Target.Request.SequenceEqual(new byte[] { 0x19, 5, 1 }),
+            "Individual stored data retains selector.");
+        var individualLengths = ObdOnUdsServices.ParseStoredDidLengths("F40D:1");
+        var individualReply = Convert.FromHexString("5905010102030801F40D78");
+        var individualReport = ObdOnUdsServices.DecodeStoredRecords(1, individualReply, individualLengths);
+        Check(individualReport.RawResponse.SequenceEqual(individualReply) &&
+            individualReport.Records.Single().Dids.Single().Data.SequenceEqual(new byte[] { 0x78 }),
+            "Individual decoded stored data retains original response.");
+        Check(ObdOnUdsServices.DecodeStoredRecords(1, [0x59, 5, 1], individualLengths).Records.Count == 0,
+            "Absent individual record distinguished from data.");
+        foreach (var invalid in new[] { "590502", "5905010102030801F40D",
+            "5905010102030801F40D78020405060801F40D79" })
+            Reject<InvalidDataException>(() => ObdOnUdsServices.DecodeStoredRecords(1,
+                Convert.FromHexString(invalid), individualLengths), "Wrong or incomplete individual stored data rejected.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseVerifiedDoIpRead([..recordArgs, "--uds-did", "F190",
+            "--stored-did-lengths", "F40D:1"]), "Stored DID lengths require a stored record selector.");
         var allStored = StandardProtocolCli.ParseVerifiedDoIpRead([..recordArgs, "--uds-all-stored-records", "F40C:2,F40D:1"]);
         Check(!allStored.Obd && allStored.Target.Request.SequenceEqual(new byte[] { 0x19, 5, 255 }), "All stored records use verified UDS.");
         var catalog = ObdOnUdsServices.ParseStoredDidLengths("F40C:2,F40D:1");
