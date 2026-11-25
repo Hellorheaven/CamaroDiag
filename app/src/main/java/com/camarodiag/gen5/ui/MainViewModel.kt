@@ -5010,7 +5010,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val accountUid = authenticatedAccountUid ?: return
         val sessionGeneration = accountSessionGeneration
         val connection = connectionAttemptGeneration
-        val selectedVin = _vehicle.value.vin
+        val selectedProfile = _vehicle.value
+        val selectedVin = selectedProfile.vin
         val adapterName = _adapter.value.deviceName
         val execution = ++functionalTestGeneration
         functionalTestJob = viewModelScope.launch {
@@ -5023,7 +5024,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 return@launch
             }
             if (!isCurrentAccountGeneration(sessionGeneration) || execution != functionalTestGeneration ||
-                connection != connectionAttemptGeneration || selectedVin != _vehicle.value.vin) {
+                connection != connectionAttemptGeneration || selectedProfile != _vehicle.value) {
                 return@launch
             }
             val connected = !obdManager.isDemoMode && !obdManager.isSimulationActive &&
@@ -5039,7 +5040,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             )
             fun current(): Boolean = execution == functionalTestGeneration &&
                 isCurrentAccountGeneration(sessionGeneration) &&
-                connection == connectionAttemptGeneration && selectedVin == _vehicle.value.vin
+                connection == connectionAttemptGeneration && selectedProfile == _vehicle.value
             fun mark(
                 key: String, outcome: FunctionalTestOutcome,
                 english: String, french: String
@@ -5076,54 +5077,45 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         error = localizedContext.getString(R.string.functional_tests_not_connected)
                     )
                 } else if (obdManager.isObdCommandChannelAvailable) {
-                    // Only a physically observed 7E8 reply to SAE 0100 permits
-                    // confirmation of the standard 11-bit powertrain OBD responder.
-                    // It does not certify GM enhanced addressing or ECU programming.
-                    if (current()) {
-                        try {
-                            val responders = obdManager.withObdCommandSession {
-                                it.discoverFunctionalObdResponders()
-                            }
-                            if ("7E8" in responders) {
-                                mark(
-                                    "module:ECM", FunctionalTestOutcome.PASSED,
-                                    "Physical 7E8 reply to standard 0100 observed; standard OBD only.",
-                                    "Réponse physique 7E8 à 0100 observée ; OBD standard uniquement."
-                                )
-                            } else {
-                                mark(
-                                    "module:ECM", FunctionalTestOutcome.NOT_TESTED,
-                                    "No verified 7E8 response; enhanced ECM access not tested.",
-                                    "Aucune réponse 7E8 confirmée ; accès ECM étendu non testé."
-                                )
-                            }
-                        } catch (cancelled: CancellationException) {
-                            throw cancelled
-                        } catch (_: Exception) {
-                            mark(
-                                "module:ECM", FunctionalTestOutcome.FAILED,
-                                "Physical OBD responder discovery failed.",
-                                "Échec de la découverte des réponses OBD physiques."
-                            )
-                        }
-                    }
+                    // A generic OBD reply is never an OEM module identity. Read VIN first
+                    // and retain the physical observation independently of the saved profile.
                     checkRead("service:vin") {
                         val vin = obdManager.withObdCommandSession { it.readVin() }
                             ?.trim()?.uppercase(java.util.Locale.ROOT)
                             ?.takeIf { it.matches(Regex("[A-HJ-NPR-Z0-9]{17}")) }
                             ?: error("VIN missing from physical response")
-                        val chosen = _vehicle.value.vin.trim().uppercase(java.util.Locale.ROOT)
-                        require(chosen.isEmpty() || chosen == vin) {
-                            "VIN mismatch"
-                        }
-                        "Vehicle VIN read and checked against selected profile." to
-                            "VIN physique lu et comparé au véhicule sélectionné."
+                        if (!current()) throw CancellationException("Account or run changed")
+                        val state = _functionalTestState.value
+                        val compatible = com.camarodiag.gen5.domain.model.VehicleVinMatcher.isCamaroCandidate(vin) &&
+                            com.camarodiag.gen5.domain.model.VehicleVinMatcher.normalize(selectedVin) == vin
+                        _functionalTestState.value = state.copy(
+                            context = state.context?.copy(observedVin = vin),
+                            checks = if (compatible) state.checks else state.checks.filterNot { it.group == "ecu" }
+                        )
+                        val chosen = com.camarodiag.gen5.domain.model.VehicleVinMatcher.normalize(selectedVin)
+                        require(chosen == null || chosen == vin) { "VIN mismatch" }
+                        "Physical vehicle VIN received: $vin" to "VIN physique reçu : $vin"
+                    }
+                    if (current()) {
+                        // Without verified Camaro identity, omit model-specific topology entirely.
+                        if (_functionalTestState.value.context?.observedVin == null)
+                            _functionalTestState.value = _functionalTestState.value.copy(
+                                checks = _functionalTestState.value.checks.filterNot { it.group == "ecu" })
+                        try {
+                            val responders = obdManager.withObdCommandSession { it.discoverFunctionalObdResponders() }
+                            if (!current()) throw CancellationException("Account or run changed")
+                            _functionalTestState.value = _functionalTestState.value.copy(
+                                checks = FunctionalTestPlanner.withStandardResponders(_functionalTestState.value.checks, responders)
+                            )
+                        } catch (cancelled: CancellationException) { throw cancelled }
+                        catch (_: Exception) { /* No responder evidence is not a pass. */ }
                     }
                     checkRead("service:pids") {
-                        val pids = obdManager.withObdCommandSession { it.discoverSupportedPids() }
-                        require(pids.isNotEmpty()) { "No supported PID response" }
-                        ("ECU responded with " + pids.size + " supported PIDs.") to
-                            ("Réponse OBD physique : " + pids.size + " PID pris en charge.")
+                        val discovery = obdManager.withObdCommandSession { it.discoverPidAvailability() }
+                        require(discovery.firstUnresolvedPid != 1) { "No positive PID 00 response" }
+                        require(discovery.firstUnresolvedPid == null) { "Incomplete supported PID bitmap" }
+                        ("ECU responded with " + discovery.supported.size + " supported PIDs.") to
+                            ("Réponse OBD physique : " + discovery.supported.size + " PID pris en charge.")
                     }
                     checkRead("service:dtcs") {
                         val (dtcResults, positiveResponse) =
@@ -5149,7 +5141,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         val vin = identity.vin?.trim()?.uppercase(java.util.Locale.ROOT)
                             ?.takeIf { it.matches(Regex("[A-HJ-NPR-Z0-9]{17}")) }
                             ?: error("J2534 ECU VIN missing")
-                        val chosen = _vehicle.value.vin.trim().uppercase(java.util.Locale.ROOT)
+                        if (!current()) throw CancellationException("Account or run changed")
+                        _functionalTestState.value = _functionalTestState.value.copy(context = _functionalTestState.value.context?.copy(observedVin = vin))
+                        val chosen = selectedVin.trim().uppercase(java.util.Locale.ROOT)
                         require(chosen.isEmpty() || chosen == vin) { "VIN mismatch" }
                         "ECU VIN received over the selected physical J2534 UDS profile." to
                             "VIN reçu via le profil UDS J2534 physique sélectionné."
@@ -5220,7 +5214,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 .put("schema", "camarodiag-functional-test-v1")
                 .put("startedAtMillis", snapshot.startedAtMillis)
                 .put("finishedAtMillis", snapshot.finishedAtMillis)
-                .put("vin", evidenceContext.selectedVin)
+                .put("vin", evidenceContext.observedVin ?: "")
+                .put("selectedVin", evidenceContext.selectedVin)
+                .put("observedVin", evidenceContext.observedVin ?: JSONObject.NULL)
+                .put("allChecksPassed", snapshot.checks.all { it.outcome == FunctionalTestOutcome.PASSED })
+                .put("failedChecks", snapshot.checks.count { it.outcome == FunctionalTestOutcome.FAILED })
                 .put("adapter", evidenceContext.adapterName)
                 .put("transport", evidenceContext.transport)
                 .put("connectionGeneration", evidenceContext.connectionGeneration)
@@ -5289,7 +5287,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 if (!current()) return@launch
                 _obdScanReport.value = report
-                if (report.physicalCanResponder == null) {
+                if (report.physicalCanResponder == null &&
+                    com.camarodiag.gen5.domain.model.VehicleVinMatcher.isCamaroCandidate(report.vin) &&
+                    com.camarodiag.gen5.domain.model.VehicleVinMatcher.normalize(selectedVin) == report.vin) {
                     _modules.value = CamaroUdsProtocol.applyStandardObdDiscovery(
                         topology = _modules.value,
                         respondingAddresses = report.respondingEcuAddresses
@@ -5432,7 +5432,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     )
                     // Do not automatically interpret or audit data against the wrong saved vehicle.
                     // The user can resolve the mismatch first, then start diagnostics explicitly.
-                    if (comparison?.matches != false) {
+                    if (comparison?.matches == true && com.camarodiag.gen5.domain.model.VehicleVinMatcher.isCamaroCandidate(identity.vin)) {
                         scanDtcs()
                         runMileageAudit()
                     }
@@ -5452,10 +5452,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         calibrationIdResponse = "",
                         cvnResponse = ""
                     )
-                    if (!connectionLost) {
-                        scanDtcs()
-                        runMileageAudit()
-                    }
+                    // Identification failed: do not automatically run Camaro-specific scans.
                 }
             }
         }
