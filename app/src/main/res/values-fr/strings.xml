@@ -1118,6 +1118,10 @@
     <string name="cal_doip_stored_record_count">Nombre de DID annoncé : %1$d</string>
     <string name="cal_doip_all_stored_records">Lire tous les enregistrements mémorisés</string>
     <string name="cal_doip_stored_catalog">Longueurs DID documentées (ex. F40C:2,F40D:1)</string>
+    <string name="cal_doip_decoded_snapshot">Snapshots UDS décodés</string>
+    <string name="cal_doip_obd_decoded_snapshot">Snapshots OBDonUDS décodés</string>
+    <string name="cal_doip_decoded_snapshot_result">DTC %1$06X — statut %2$02X — snapshots : %3$d</string>
+    <string name="cal_doip_snapshot_record_result">Snapshot 0x%1$02X</string>
     <string name="cal_doip_all_stored_result">Enregistrements mémorisés : %1$d</string>
     <string name="cal_doip_stored_record_empty">Aucune donnée mémorisée pour cet enregistrement</string>
     <string name="cal_doip_extended_record_support">DTC prenant en charge cet enregistrement</string>
