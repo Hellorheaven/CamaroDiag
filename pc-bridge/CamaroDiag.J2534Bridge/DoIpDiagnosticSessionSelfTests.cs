@@ -367,6 +367,44 @@ internal static class DoIpDiagnosticSessionSelfTests
             });
         }
 
+        // Permanent DTCs use 19/15, even if the current status is zero.
+        foreach (var finalMatches in new[] { true, false })
+        {
+            await RunCaseAsync(async stream =>
+            {
+                _ = await RequireRequestAsync(stream);
+                await SendAsync(stream, DoIpCodec.DiagnosticMessage,
+                    FromEcu([0x62, 0xF1, 0x90, .. System.Text.Encoding.ASCII.GetBytes(selectedVehicleVin)]));
+                var query = await ReadAsync(stream);
+                Check(query.Payload.SequenceEqual(new byte[] { 0x0E, 0x80, 0x12, 0x34, 0x19, 0x15 }),
+                    "Permanent DTC query uses its dedicated subfunction without a mask.");
+                await SendAsync(stream, DoIpCodec.DiagnosticMessage, FromEcu([0x59, 0x15, 8, 1, 2, 3, 0]));
+                _ = await RequireRequestAsync(stream);
+                await SendAsync(stream, DoIpCodec.DiagnosticMessage,
+                    FromEcu([0x62, 0xF1, 0x90, .. System.Text.Encoding.ASCII.GetBytes(
+                        finalMatches ? selectedVehicleVin : otherVehicleVin)]));
+            }, async client =>
+            {
+                var timeout = TimeSpan.FromSeconds(2);
+                var token = CancellationToken.None;
+                Task<ObdOnUdsServices.DtcStatusReport> Read() =>
+                    DoIpVinReader.ReadVerifiedDtcAsync(client, observedForVin, timeout, token, async () =>
+                        ObdOnUdsServices.DecodePermanentDtcs(await client.ExchangeUdsAsync(
+                            ObdOnUdsServices.ReadPermanentDtcs(), timeout, token)));
+                if (finalMatches)
+                {
+                    var report = await Read();
+                    Check(report.Codes.Count == 1 && report.Codes[0].Status == 0,
+                        "Permanent code is retained independently of current status.");
+                }
+                else
+                {
+                    await Expect<InvalidDataException>(async () => { _ = await Read(); },
+                        "Changed final VIN prevents permanent DTC publication.");
+                }
+            });
+        }
+
         // Multi-DID polling: one request per sample, no complete result before final VIN.
         foreach (var finalIdentityMatches in new[] { true, false })
         {

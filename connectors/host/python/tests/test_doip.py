@@ -438,6 +438,18 @@ class DoIpTests(unittest.TestCase):
             Session.read_dtc_inventory(fake, VIN, permanent=True)
         fake.close.assert_called_once()
 
+    def test_permanent_dtc_cli_uses_verified_generic_uds(self):
+        with patch("camarodiagconnectors.doip_cli.discover", return_value=GATEWAY), \
+             patch("camarodiagconnectors.doip_cli.Session") as session:
+            opened = session.return_value.__enter__.return_value
+            opened.read_dtc_inventory.return_value = {"kind": "permanent-dtcs", "records": [], "availability_mask": 8}
+            result = run(["--host", GATEWAY.host, "--vin", VIN, "--tester", "0E80",
+                          "--ecu", "1234", "permanent-dtcs"])
+            self.assertEqual(result["service_protocol"], "UDS")
+            self.assertEqual(result["kind"], "permanent-dtcs")
+            self.assertTrue(session.call_args.kwargs["tls"])
+            opened.read_dtc_inventory.assert_called_once_with(VIN, snapshot_index=False, permanent=True)
+
     def test_dtc_severity_queries_preserve_raw_fields_and_identity(self):
         for sub, data, options, request in (
                 (7, "590708010002", {"severity_mask": 0x80, "status_mask": 8}, "19078008"),

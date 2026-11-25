@@ -81,6 +81,7 @@ Exemples fictifs, à remplacer par les données de la passerelle et du calculate
 
 ```bash
 python -m camarodiagconnectors.doip_cli --host 192.0.2.10 --vin 1G1FA1RXXR0123456 --tester 0E80 --ecu 1234 supported-dtcs
+python -m camarodiagconnectors.doip_cli --host 192.0.2.10 --vin 1G1FA1RXXR0123456 --tester 0E80 --ecu 1234 permanent-dtcs
 python -m camarodiagconnectors.doip_cli --host 192.0.2.10 --vin 1G1FA1RXXR0123456 --tester 0E80 --ecu 1234 snapshot-index
 python -m camarodiagconnectors.doip_cli --host 192.0.2.10 --vin 1G1FA1RXXR0123456 --tester 0E80 --ecu 1234 obd-identify
 python -m camarodiagconnectors.doip_cli --host 192.0.2.10 --vin 1G1FA1RXXR0123456 --tester 0E80 ecu-inventory --ecus 1234,1235
@@ -88,9 +89,9 @@ python -m camarodiagconnectors.doip_cli --host 192.0.2.10 --vin 1G1FA1RXXR012345
 python -m camarodiagconnectors.doip_cli --host 192.0.2.10 --vin 1G1FA1RXXR0123456 --tester 0E80 --ecu 1234 monitor-dids --layout F190:17,F187:4 --samples 5
 ```
 
-L'inventaire des DTC n'est pas une liste de défauts actifs. L'index snapshot donne les références à lire avec `snapshot --dtc ... --record ...`. Pour le monitoring, indiquer les longueurs réelles de chaque DID ; `obd-monitor-dids` requiert un ECU ayant confirmé OBDonUDS. Les exemples sont illustratifs, pas des définitions ECU. Les échantillons restent provisoires jusqu'à la vérification finale.
+L'inventaire des DTC n'est pas une liste de défauts actifs. `permanent-dtcs` lit les défauts permanents UDS si le calculateur prend en charge ce service ; un défaut permanent peut ne plus être actif. L'index snapshot donne les références à lire avec `snapshot --dtc ... --record ...`. Pour le monitoring, indiquer les longueurs réelles de chaque DID ; `obd-monitor-dids` requiert un ECU ayant confirmé OBDonUDS. Les exemples sont illustratifs, pas des définitions ECU. Les échantillons restent provisoires jusqu'à la vérification finale.
 
-The supported-DTC inventory is not an active fault list. The snapshot index gives references for the `snapshot` action. Supply actual DID lengths for monitoring; `obd-monitor-dids` requires confirmed OBDonUDS. Examples do not establish ECU definitions. Samples remain provisional until final verification.
+The supported-DTC inventory is not an active fault list. `permanent-dtcs` reads permanent UDS DTCs if supported by the ECU; a permanent DTC need not be currently active. The snapshot index gives references for the `snapshot` action. Supply actual DID lengths for monitoring; `obd-monitor-dids` requires confirmed OBDonUDS. Examples do not establish ECU definitions. Samples remain provisional until final verification.
 
 ### Acquisition mémoire DoIP / DoIP memory capture
 

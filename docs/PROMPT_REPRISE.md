@@ -1,3 +1,7 @@
+## PR117 — parcours applicatifs DTC permanents (25/11/2026)
+
+- Tests loopback Windows F190 → 19/15 → F190 avec rejet du VIN final différent, sélection CLI Connectors TLS/UDS et exemple utilisateur FR/EN. Tests écrits, non exécutés ; aucune campagne CI.
+
 ## PR117 — DTC permanents UDS Windows GUI/CLI (25/11/2026)
 
 - Parité Android/Windows/Connectors : lecture 19/15, bouton FR/EN et CLI --uds-permanent-dtcs avec VIN obligatoire, vérification F190 avant/après, résultat distinct du WWH et de la liste active. Tests parseur, transport et aide écrits sans exécution. Aucun checkpoint CI ; DoIP/C6 restent ouverts.
