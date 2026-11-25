@@ -707,7 +707,7 @@ internal static class DoIpDiagnosticSessionSelfTests
             });
         }
 
-        // Multi-DID polling: one request per sample, no complete result before final VIN.
+        // Multi-DID polling: each sample must be verified before publication.
         foreach (var finalIdentityMatches in new[] { true, false })
         {
             var samples = new List<int>();
@@ -723,11 +723,11 @@ internal static class DoIpDiagnosticSessionSelfTests
                         "Multi-DID monitoring transmits one request per sample.");
                     await SendAsync(stream, DoIpCodec.DiagnosticMessage,
                         FromEcu([0x62, 0xF4, 0x0C, 0x12, (byte)i, 0xF4, 0x0D, 0x56]));
+                    _ = await RequireRequestAsync(stream);
+                    await SendAsync(stream, DoIpCodec.DiagnosticMessage,
+                        FromEcu([0x62, 0xF1, 0x90, .. System.Text.Encoding.ASCII.GetBytes(
+                            i == 0 || finalIdentityMatches ? selectedVehicleVin : otherVehicleVin)]));
                 }
-                _ = await RequireRequestAsync(stream);
-                await SendAsync(stream, DoIpCodec.DiagnosticMessage,
-                    FromEcu([0x62, 0xF1, 0x90, .. System.Text.Encoding.ASCII.GetBytes(
-                        finalIdentityMatches ? selectedVehicleVin : otherVehicleVin)]));
             }, async client =>
             {
                 Task Monitor() => DoIpVinReader.MonitorVerifiedMultiDidAsync(client, observedForVin, selectedVehicleVin,
@@ -741,7 +741,8 @@ internal static class DoIpDiagnosticSessionSelfTests
                 if (finalIdentityMatches) await Monitor();
                 else await Expect<InvalidDataException>(Monitor, "Changed final VIN invalidates multi-DID monitor.");
             });
-            Check(samples.SequenceEqual(new[] {1, 2}), "Both provisional samples observed.");
+            Check(samples.SequenceEqual(finalIdentityMatches ? new[] {1, 2} : new[] {1}),
+                "Only identity-verified samples are published.");
         }
 
         // Explicit console request follows the same-session VIN read, not
@@ -908,7 +909,7 @@ internal static class DoIpDiagnosticSessionSelfTests
             });
         }
 
-        // Monitoring OBDonUDS verifies the legislated identity at both boundaries.
+        // Monitoring OBDonUDS verifies the legislated identity before publication of each sample.
         foreach (var finalProtocol in new byte[] { 1, 2 })
         {
             await RunCaseAsync(async stream =>
@@ -932,8 +933,8 @@ internal static class DoIpDiagnosticSessionSelfTests
                     Check(request.Payload.SequenceEqual((byte[])[0x0E,0x80,0x12,0x34,0x22,0xF4,0x0C]),
                         "Same ECU and legislated DID on every sample.");
                     await SendAsync(stream, DoIpCodec.DiagnosticMessage, FromEcu([0x62,0xF4,0x0C,index]));
+                    await Identify(index == 1 ? (byte)1 : finalProtocol);
                 }
-                await Identify(finalProtocol);
             }, async client =>
             {
                 var samples = new List<byte>();
@@ -942,7 +943,8 @@ internal static class DoIpDiagnosticSessionSelfTests
                     TimeSpan.FromSeconds(2), CancellationToken.None, (_, data) => samples.Add(data[0]));
                 if (finalProtocol == 1) await Monitor();
                 else await Expect<InvalidDataException>(Monitor, "A changed protocol invalidates monitoring completion.");
-                Check(samples.SequenceEqual((byte[])[1,2]), "Observed samples remain available even if final identity differs.");
+                Check(samples.SequenceEqual(finalProtocol == 1 ? new byte[] {1,2} : new byte[] {1}),
+                    "The sample with unverified protocol identity is not published.");
             });
         }
 

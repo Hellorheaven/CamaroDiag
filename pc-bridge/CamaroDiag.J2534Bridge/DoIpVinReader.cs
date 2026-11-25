@@ -327,7 +327,8 @@ internal static class DoIpVinReader
         DoIpDiagnosticTransport transport, ushort did, int sampleCount, TimeSpan interval,
         TimeSpan timeout, CancellationToken token, Action<int, byte[]> sample,
         Action<byte[]>? requested = null, Action<byte[]>? received = null,
-        string? expectedVin = null, bool obd = false)
+        string? expectedVin = null, bool obd = false,
+        Func<Task>? verifySample = null)
     {
         ArgumentNullException.ThrowIfNull(sample);
         if (expectedVin is not null && !DoIpVehicleDiscovery.IsVehicleVin(expectedVin))
@@ -344,6 +345,9 @@ internal static class DoIpVinReader
                 throw new InvalidDataException("Missing or oversized monitoring sample.");
             if (expectedVin is not null)
                 UdsMultiDidCli.RequireIdentity(new (ushort Did, byte[] Data)[] { (did, data) }, expectedVin, obd);
+            // Never publish a sample before the associated identity check.
+            if (verifySample is not null) await verifySample();
+            token.ThrowIfCancellationRequested();
             sample(index, data);
             token.ThrowIfCancellationRequested();
             if (index < sampleCount) await Task.Delay(interval, token);
@@ -382,12 +386,12 @@ internal static class DoIpVinReader
             var reply = await transport.ExchangeUdsAsync(request, timeout, token);
             var values = UdsMultiDidCli.Decode(frozen, request, reply);
             UdsMultiDidCli.RequireIdentity(values, expectedVin, obd);
+            await VerifyAsync();
             token.ThrowIfCancellationRequested();
             sample(index, values);
             token.ThrowIfCancellationRequested();
             if (index < sampleCount) await Task.Delay(interval, token);
         }
-        await VerifyAsync();
         token.ThrowIfCancellationRequested();
     }
 
@@ -422,11 +426,14 @@ internal static class DoIpVinReader
         var before = await ReadVerifiedObdAsync(transport, expectedVin, null, timeout, token);
         if (before.ProtocolValue != 1)
             throw new InvalidDataException("Selected ECU did not identify as OBDonUDS.");
+        async Task VerifySampleAsync()
+        {
+            var after = await ReadVerifiedObdAsync(transport, expectedVin, null, timeout, token);
+            if (after.ProtocolValue != before.ProtocolValue)
+                throw new InvalidDataException("OBDonUDS identification changed during monitoring.");
+        }
         await MonitorDidAsync(transport, did, sampleCount, interval, timeout, token, sample,
-            expectedVin: expectedVin, obd: true);
-        var after = await ReadVerifiedObdAsync(transport, expectedVin, null, timeout, token);
-        if (after.ProtocolValue != before.ProtocolValue)
-            throw new InvalidDataException("OBDonUDS identification changed during monitoring.");
+            expectedVin: expectedVin, obd: true, verifySample: VerifySampleAsync);
     }
 
     internal static async Task MonitorObservedObdAsync(
@@ -457,11 +464,14 @@ internal static class DoIpVinReader
         await using var transport = await ConnectObservedAsync(gateway, address, tester,
             ecu, useTls, timeout, token, clientCertificateThumbprint, trace, options);
         var vin = await VerifyObservedVinAsync(transport, gateway, timeout, token, requested, received);
+        async Task VerifySampleAsync()
+        {
+            var currentVin = await VerifyObservedVinAsync(transport, gateway, timeout, token, requested, received);
+            if (!string.Equals(vin, currentVin, StringComparison.Ordinal))
+                throw new InvalidDataException("UDS VIN changed during DoIP monitoring.");
+        }
         await MonitorDidAsync(transport, did, sampleCount, interval, timeout, token,
-            sample, requested, received, expectedVin: vin);
-        var finalVin = await VerifyObservedVinAsync(transport, gateway, timeout, token, requested, received);
-        if (!string.Equals(vin, finalVin, StringComparison.Ordinal))
-            throw new InvalidDataException("UDS VIN changed during DoIP monitoring.");
+            sample, requested, received, expectedVin: vin, verifySample: VerifySampleAsync);
     }
 
     // Do not publish decoded read-only DTC data until F190 is verified again

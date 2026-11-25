@@ -1,3 +1,7 @@
+## PR117 — DoIP temps réel vérifié avant publication (25/11/2026)
+
+- Windows C6/DoIP : monitoring DID simple, multi-DID et OBDonUDS vérifie désormais l'identité après chaque échantillon avant de le transmettre au callback UI/CLI/export, au lieu de publier des mesures provisoires et vérifier seulement en fin de session. Le premier échantillon vérifié reste disponible si le suivant échoue ; le nouvel échantillon incohérent n'est jamais publié. Aucun replay ou changement d'ECU. Tests loopback adaptés aux lectures d'identité supplémentaires, non exécutés. Coût réseau accru et cadence réelle dépendante du temps de réponse ECU. Aucun checkpoint CI ; C6/DoIP restent ouverts.
+
 ## PR117 — séparation des réponses ELM et restauration des en-têtes (25/11/2026)
 
 - C6 Android : les commandes du moteur OBD conservent désormais les véritables séparations de lignes ; le scan Live emploie le décodeur strict PID au lieu de concaténer plusieurs répondants. Mode 09 et inventaire DTC passent temporairement en format ELM sans en-tête pour bénéficier de l'assemblage interne, puis restaurent ATH1/ATS0 sous verrou, même en annulation. Une restauration non confirmée invalide la session physique, jamais une connexion de remplacement. Correction des imports de régression console 29 bits. Régressions écrites non exécutées ; aucun checkpoint CI. C6 et DoIP restent ouverts.
