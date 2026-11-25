@@ -7,7 +7,6 @@ on:
   push:
     branches: [chore/unified-ci]
     paths:
-      - '.github/workflows/c1-console-acceptance.yml'
       - '.github/c1-console-checkpoint.txt'
 
 permissions:
