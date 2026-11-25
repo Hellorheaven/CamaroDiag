@@ -23,6 +23,16 @@ object VehicleVinMatcher {
         return normalized.takeIf(vinPattern::matches)
     }
 
+    /** Conservative candidate check for supported fifth/sixth generation Camaro VINs.
+     * A candidate is not proof of the fitted ECU, engine or calibration.
+     */
+    fun isCamaroCandidate(vin: String?): Boolean {
+        val normalized = normalize(vin) ?: return false
+        val year = modelYearFromVin(normalized) ?: return false
+        return (normalized.startsWith("2G1F") && year in 2010..2015) ||
+            (normalized.startsWith("1G1F") && year in 2016..2024)
+    }
+
     fun compare(selectedVehicleVin: String?, ecuVin: String?): VehicleVinComparison? {
         val normalizedEcuVin = normalize(ecuVin) ?: return null
         val normalizedSelectedVin = normalize(selectedVehicleVin)
