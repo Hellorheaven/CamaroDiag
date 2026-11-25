@@ -1,3 +1,7 @@
+## PR117 — UDS 19/05 Connectors et Android (25/11/2026)
+
+- Lecture d'un enregistrement mémorisé explicite 00..FE, sans FF (découpage multi-record OEM non défini), F190 avant/après, réponse vide distinguée, écho et structure DID minimale contrôlés, données brutes conservées. Actions CLI Python/Android FR/EN ; 00 réservé au cas réglementaire compatible. Tests écrits non exécutés. Windows reste à raccorder. Référence https://uds.readthedocs.io/en/stable/pages/knowledge_base/service.html . Aucun checkpoint CI.
+
 ## PR117 — consolidation des lectures UDS historiques (25/11/2026)
 
 - Loopback Windows 19/0F–13 : contrôle des requêtes physiques exactes, du résultat séparé et de la revalidation du VIN avant publication. Exemples CLI Connectors FR/EN. Tests écrits non exécutés ; aucun checkpoint CI. DoIP/C6 restent ouverts, prochaine analyse 19/05 et intégrations restantes.

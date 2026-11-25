@@ -416,6 +416,8 @@ def positive(request: bytes, reply: bytes) -> bytes:
                 raise DoIpError("Stored DTC record response mismatch")
             if 3 < len(reply) < 8:
                 raise DoIpError("Truncated stored DTC record")
+            if len(reply) >= 8 and (len(reply) - 8 < reply[7] * 2 or (reply[7] == 0 and len(reply) != 8)):
+                raise DoIpError("Truncated or inconsistent stored DTC DID count")
         if subfunction in (0x16, 0x1A):
             offset = 2 if subfunction == 0x16 else 3
             if (len(request) != 3 or len(reply) <= offset or reply[offset] != request[2] or

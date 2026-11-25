@@ -1110,6 +1110,9 @@
     <string name="cal_doip_legacy_emissions_count">Legacy emissions DTC count</string>
     <string name="cal_doip_legacy_mirror_result">Legacy UDS mirror memory</string>
     <string name="cal_doip_legacy_emissions_result">Legacy UDS emissions</string>
+    <string name="cal_doip_stored_record">Read stored DTC data by record</string>
+    <string name="cal_doip_stored_record_result">Stored record 0x%1$02X</string>
+    <string name="cal_doip_stored_record_empty">No stored data for this record</string>
     <string name="cal_doip_extended_record_support">DTCs supporting the extended record</string>
     <string name="cal_doip_extended_record_size">Uniform documented record length (bytes)</string>
     <string name="cal_doip_extended_record_data">Read extended data by record</string>

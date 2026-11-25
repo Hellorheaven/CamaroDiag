@@ -47,6 +47,18 @@ class UdsDtcDecoderTest {
         assertTrue(runCatching { UdsDtcDecoder.decodeLegacy(detail, hex("59100102030802")) }.isFailure)
     }
 
+    @Test fun storedRecordChecksEchoAndMinimumDidStructure() {
+        fun hex(s: String) = s.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
+        assertArrayEquals(hex("190501"), UdsDtcDecoder.storedRecordRequest(1))
+        assertEquals(null, UdsDtcDecoder.decodeStoredRecord(1, hex("590501")).detail)
+        val result = UdsDtcDecoder.decodeStoredRecord(1, hex("5905010102030801F190AA"))
+        assertEquals(0x010203, result.detail!!.dtc)
+        assertArrayEquals(hex("01F190AA"), result.detail!!.records)
+        for (bad in listOf("590502", "590501010203", "5905010102030802F190", "5905010102030800AA"))
+            assertTrue(runCatching { UdsDtcDecoder.decodeStoredRecord(1, hex(bad)) }.isFailure)
+        assertTrue(runCatching { UdsDtcDecoder.storedRecordRequest(255) }.isFailure)
+    }
+
     @Test fun extendedRecordUsesDocumentedWidthAndEcho() {
         fun hex(s: String) = s.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
         assertArrayEquals(hex("191A01"), UdsDtcDecoder.extendedRecordRequest(1, null))

@@ -112,6 +112,8 @@ object UdsDtcDecoder {
             reply[1] == request[1] && reply[2] == request[2])
         if (reply.size == 3) return UdsStoredDtcRecord(record, null, reply.copyOf())
         require(reply.size >= 8)
+        val didCount = reply[7].toInt() and 255
+        require(reply.size - 8 >= didCount * 2 && (didCount != 0 || reply.size == 8))
         val dtc = ((reply[3].toInt() and 255) shl 16) or
             ((reply[4].toInt() and 255) shl 8) or (reply[5].toInt() and 255)
         return UdsStoredDtcRecord(record, UdsDtcDetail(dtc, reply[6].toInt() and 255,

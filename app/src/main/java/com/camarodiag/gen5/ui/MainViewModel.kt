@@ -1494,6 +1494,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     val selected = didHex.takeLast(2).toInt(16)
                     require(selected != 0 && selected !in 0xF0..0xFD)
                 }
+                val storedRecord = if (operation == DoIpDirectRead.Operation.STORED_RECORD) {
+                    require(didHex.matches(Regex("[0-9A-Fa-f]{2}")))
+                    didHex.toInt(16).also { require(it in 0..254) }
+                } else null
                 val extendedSupport = operation == DoIpDirectRead.Operation.EXTENDED_RECORD_SUPPORT
                 val extendedData = operation == DoIpDirectRead.Operation.EXTENDED_RECORD_DATA
                 val extendedParts = if (extendedData) didHex.split(':') else listOf(didHex)
@@ -1586,7 +1590,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     }, onControlTrace = { trace -> journalDoIpControlTrace(trace, current) },
                     commands = fixedCommands, approval = approval, isContextCurrent = current,
                     isReadContextCurrent = current,
-                    dtc = detailDtc, record = extendedRecord ?: detailRecord, onCommandReply = { index, reply ->
+                    dtc = detailDtc, record = storedRecord ?: extendedRecord ?: detailRecord, onCommandReply = { index, reply ->
                         check(current())
                         val line = localizedContext.getString(R.string.cal_doip_sequence_reply, index,
                             reply.joinToString(" ") { "%02X".format(it.toInt() and 255) })
@@ -1632,6 +1636,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         localizedContext.getString(R.string.cal_doip_sequence_reply, index + 1,
                             reply.joinToString(" ") { "%02X".format(it.toInt() and 255) })
                     }.joinToString("\n")
+                    result.storedReport != null -> requireNotNull(result.storedReport).let { stored ->
+                        val heading = localizedContext.getString(R.string.cal_doip_stored_record_result, stored.record)
+                        val detail = stored.detail
+                        heading + "\n" + if (detail == null) localizedContext.getString(R.string.cal_doip_stored_record_empty)
+                        else localizedContext.getString(R.string.cal_doip_detail_result, detail.dtc, detail.status,
+                            detail.records.joinToString(" ") { "%02X".format(it.toInt() and 255) })
+                    }
                     result.legacyReport != null -> requireNotNull(result.legacyReport).let { legacy ->
                         val heading = localizedContext.getString(if (legacy.subfunction in 0x0F..0x11)
                             R.string.cal_doip_legacy_mirror_result else R.string.cal_doip_legacy_emissions_result)

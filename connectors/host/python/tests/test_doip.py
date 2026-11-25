@@ -634,6 +634,29 @@ class DoIpTests(unittest.TestCase):
             Session.read_legacy_dtc(fake, VIN, 0x10, dtc=1, record=0xF0)
         fake.verify_vin.assert_not_called()
 
+    def test_stored_record_preserves_data_and_validates_echo(self):
+        for response, present in (("590501", False), ("5905010102030801F190AA", True)):
+            fake = unittest.mock.Mock(spec=Session)
+            fake.exchange.return_value = bytes.fromhex(response)
+            result = Session.read_stored_dtc_record(fake, VIN, 1)
+            self.assertEqual(result["present"], present)
+            self.assertEqual(result["raw_response"], response)
+            fake.exchange.assert_called_once_with(bytes.fromhex("190501"))
+            self.assertEqual(fake.verify_vin.call_count, 2)
+        for response in ("590502", "590501010203", "5905010102030802F190", "5905010102030800AA"):
+            fake = unittest.mock.Mock(spec=Session)
+            fake.exchange.return_value = bytes.fromhex(response)
+            with self.assertRaises(DoIpError):
+                Session.read_stored_dtc_record(fake, VIN, 1)
+            fake.close.assert_called_once()
+        with patch("camarodiagconnectors.doip_cli.discover", return_value=GATEWAY), \
+             patch("camarodiagconnectors.doip_cli.Session") as session:
+            opened = session.return_value.__enter__.return_value
+            opened.read_stored_dtc_record.return_value = {"present": False}
+            run(["--host", GATEWAY.host, "--vin", VIN, "--tester", "0E80", "--ecu", "1234",
+                 "stored-record", "--record", "01"])
+            opened.read_stored_dtc_record.assert_called_once_with(VIN, 1)
+
     def test_extended_record_support_and_data(self):
         for size, payload, expected in (
             (None, "591A0801", []),

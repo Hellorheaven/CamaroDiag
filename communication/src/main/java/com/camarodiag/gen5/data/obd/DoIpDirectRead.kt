@@ -26,7 +26,7 @@ import kotlin.coroutines.resumeWithException
  * A socket is owned by one operation and is never retained after failure.
  */
 object DoIpDirectRead {
-    enum class Operation { VIN, DID, DTC, DTC_COUNT, DTC_SNAPSHOT, DTC_EXTENDED, MONITOR, BACKUP, EXCHANGE, OBD_IDENTIFY, OBD_DID, OBD_MONITOR, OBD_WWH_MASK, OBD_WWH_PERMANENT, OBD_WWH_READINESS, MULTI_DID, OBD_MULTI_DID, SCALING_DID, OBD_DTC, OBD_DTC_COUNT, OBD_DTC_SNAPSHOT, OBD_DTC_EXTENDED, SUPPORTED_DTCS, PERMANENT_DTCS, SNAPSHOT_INDEX, MULTI_MONITOR, OBD_MULTI_MONITOR, FIRST_FAILED_DTC, FIRST_CONFIRMED_DTC, RECENT_FAILED_DTC, RECENT_CONFIRMED_DTC, FAULT_COUNTERS, SEVERITY_COUNT, SEVERITY_LIST, SEVERITY_INFO, INVENTORY, OBD_INVENTORY, MEMORY_DTCS, MEMORY_SNAPSHOT, MEMORY_EXTENDED, EXTENDED_RECORD_SUPPORT, EXTENDED_RECORD_DATA, MIRROR_DTCS, MIRROR_EXTENDED, MIRROR_COUNT, LEGACY_EMISSIONS_COUNT, LEGACY_EMISSIONS_DTCS }
+    enum class Operation { VIN, DID, DTC, DTC_COUNT, DTC_SNAPSHOT, DTC_EXTENDED, MONITOR, BACKUP, EXCHANGE, OBD_IDENTIFY, OBD_DID, OBD_MONITOR, OBD_WWH_MASK, OBD_WWH_PERMANENT, OBD_WWH_READINESS, MULTI_DID, OBD_MULTI_DID, SCALING_DID, OBD_DTC, OBD_DTC_COUNT, OBD_DTC_SNAPSHOT, OBD_DTC_EXTENDED, SUPPORTED_DTCS, PERMANENT_DTCS, SNAPSHOT_INDEX, MULTI_MONITOR, OBD_MULTI_MONITOR, FIRST_FAILED_DTC, FIRST_CONFIRMED_DTC, RECENT_FAILED_DTC, RECENT_CONFIRMED_DTC, FAULT_COUNTERS, SEVERITY_COUNT, SEVERITY_LIST, SEVERITY_INFO, INVENTORY, OBD_INVENTORY, MEMORY_DTCS, MEMORY_SNAPSHOT, MEMORY_EXTENDED, EXTENDED_RECORD_SUPPORT, EXTENDED_RECORD_DATA, MIRROR_DTCS, MIRROR_EXTENDED, MIRROR_COUNT, LEGACY_EMISSIONS_COUNT, LEGACY_EMISSIONS_DTCS, STORED_RECORD }
     /** Immutable optional parameters. Defaults retain the original global deadline. */
     data class SessionOptions(val timeoutMs: Int = 5000, val p2Ms: Int = timeoutMs,
         val p2StarMs: Int = timeoutMs, val routingType: Int = 0, val routingOemHex: String = "") {
@@ -139,6 +139,14 @@ object DoIpDirectRead {
                 } else {
                     require(reply.size >= 3)
                     if (subfunction in setOf(0x0A, 0x15)) require(request.size == 2 && (reply.size - 3) % 4 == 0)
+                }
+                if (subfunction == 5) {
+                    require(request.size == 3 && reply.size >= 3 && reply[2] == request[2])
+                    if (reply.size != 3) {
+                        require(reply.size >= 8)
+                        val didCount = reply[7].u8()
+                        require(reply.size - 8 >= didCount * 2 && (didCount != 0 || reply.size == 8))
+                    }
                 }
                 if (subfunction == 0x16) require(request.size == 3 && reply.size >= 3 && reply[2] == request[2])
                 if (subfunction == 0x1A) require(request.size == 3 && reply.size >= 4 &&
@@ -279,7 +287,8 @@ object DoIpDirectRead {
         val severityReport: UdsSeverityReport? = null,
         val memoryReport: UdsMemoryDtcReport? = null,
         val extendedRecordReport: UdsExtendedRecordReport? = null,
-        val legacyReport: UdsLegacyDtcReport? = null)
+        val legacyReport: UdsLegacyDtcReport? = null,
+        val storedReport: UdsStoredDtcRecord? = null)
     data class Sample(val index: Int, val elapsedMs: Long, val data: ByteArray,
         val values: List<DoIpMultiDid.Value> = emptyList())
 
@@ -806,6 +815,8 @@ object DoIpDirectRead {
         require((operation == Operation.EXTENDED_RECORD_DATA) == (extendedRecordSize != null))
         val extendedRecordRequest = if (operation in setOf(Operation.EXTENDED_RECORD_SUPPORT, Operation.EXTENDED_RECORD_DATA))
             UdsDtcDecoder.extendedRecordRequest(record, extendedRecordSize) else null
+        val storedRequest = if (operation == Operation.STORED_RECORD)
+            UdsDtcDecoder.storedRecordRequest(record) else null
         val legacySub = when (operation) {
             Operation.MIRROR_DTCS -> 0x0F
             Operation.MIRROR_EXTENDED -> 0x10
@@ -1001,6 +1012,10 @@ object DoIpDirectRead {
                                 onCommandReply(index + 1, reply.copyOf())
                             }
                             Outcome(gateway, target.ecu, vin, replies.last(), null, trace.toList(), commandReplies = replies.toList())
+                        } else if (storedRequest != null) {
+                            val report = UdsDtcDecoder.decodeStoredRecord(record, session.exchange(storedRequest, timeoutMs))
+                            require(readVin() == vin)
+                            Outcome(gateway, target.ecu, vin, null, null, trace.toList(), storedReport = report)
                         } else if (legacyRequest != null) {
                             val report = UdsDtcDecoder.decodeLegacy(legacyRequest, session.exchange(legacyRequest, timeoutMs))
                             require(readVin() == vin)

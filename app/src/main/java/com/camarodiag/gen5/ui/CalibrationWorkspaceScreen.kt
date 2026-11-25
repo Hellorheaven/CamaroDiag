@@ -830,6 +830,11 @@ fun CalibrationWorkspaceScreen(
                         doIpCertificate, requireNotNull(doIpOptions)) },
                         enabled = detailReady && (doIpDetailRecord.toIntOrNull(16) ?: 0) !in 0xF0..0xFD,
                         modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.cal_doip_legacy_mirror_extended)) }
+                    OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu,
+                        doIpDetailRecord, doIpTls, DoIpDirectRead.Operation.STORED_RECORD, doIpCertificate, requireNotNull(doIpOptions)) },
+                        enabled = targetReady && vinReady && doIpDetailRecord.length == 2 &&
+                            (doIpDetailRecord.toIntOrNull(16) ?: 255) in 0..254,
+                        modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.cal_doip_stored_record)) }
                     val extendedRecordReady = targetReady && vinReady && doIpDetailRecord.length == 2 &&
                         (doIpDetailRecord.toIntOrNull(16) ?: 0) in 1..0xEF
                     OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu,
