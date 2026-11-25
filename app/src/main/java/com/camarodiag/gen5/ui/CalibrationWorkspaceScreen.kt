@@ -898,6 +898,16 @@ fun CalibrationWorkspaceScreen(
                         doIpDtcMask + doIpDtcMemory, doIpTls, DoIpDirectRead.Operation.MEMORY_DTCS, doIpCertificate, requireNotNull(doIpOptions)) },
                         enabled = targetReady && vinReady && doIpDtcMemory.length == 2 && doIpDtcMask.length == 2,
                         modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.cal_doip_memory_dtcs)) }
+                    for ((op, label, catalog) in listOf(
+                        Triple(DoIpDirectRead.Operation.MEMORY_DECODED_SNAPSHOT, R.string.cal_doip_memory_decoded_snapshot, doIpStoredCatalog),
+                        Triple(DoIpDirectRead.Operation.MEMORY_DECODED_EXTENDED, R.string.cal_doip_memory_decoded_extended, doIpExtendedCatalog))) {
+                        val catalogReady = if (op == DoIpDirectRead.Operation.MEMORY_DECODED_SNAPSHOT) storedCatalogReady else extendedCatalogReady
+                        OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu,
+                            doIpDetailDtc + doIpDetailRecord + doIpDtcMemory + "|" + catalog, doIpTls, op,
+                            doIpCertificate, requireNotNull(doIpOptions)) },
+                            enabled = detailReady && doIpDtcMemory.length == 2 && catalogReady,
+                            modifier = Modifier.fillMaxWidth()) { Text(stringResource(label)) }
+                    }
                     for ((op, label) in listOf(DoIpDirectRead.Operation.MEMORY_SNAPSHOT to R.string.cal_doip_memory_snapshot,
                         DoIpDirectRead.Operation.MEMORY_EXTENDED to R.string.cal_doip_memory_extended)) {
                         OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu,
