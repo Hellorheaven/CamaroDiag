@@ -959,6 +959,9 @@ internal sealed partial class BridgeDesktopForm
                         stop.Token.ThrowIfCancellationRequested();
                         if (IsDisposed || Disposing) return;
                         ConsoleLine("SYSTEM", string.Format(DoIpConsolePresentation.Text("StoredRecordResult"), report.Record), Color.DarkGreen);
+                        if (report.Dtc.HasValue)
+                            ConsoleLine("SYSTEM", string.Format(DoIpConsolePresentation.Text("StoredRecordCount"),
+                                report.RawData[0]), Color.DarkSlateGray);
                         ConsoleLine("SYSTEM", report.Dtc.HasValue
                             ? string.Format(DoIpConsolePresentation.Text("MemoryDetailResult"), report.Dtc.Value,
                                 report.Status!.Value, Convert.ToHexString(report.RawData))
