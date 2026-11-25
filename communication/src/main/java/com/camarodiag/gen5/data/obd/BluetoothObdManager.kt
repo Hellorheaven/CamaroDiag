@@ -1080,7 +1080,8 @@ class BluetoothObdManager(context: Context) {
                     throw ObdTransportDisconnectedException("OBD connection changed during command")
                 }
             }
-            val payload = (command.trim() + "\r").toByteArray(Charsets.US_ASCII)
+            val payload = ElmResponseCompletion.wireBytes(command)
+            val interruptingMonitor = ElmResponseCompletion.isMonitorInterrupt(command)
             ensureSameSession()
             // Check the operator's account, vehicle and connection consent
             // at the physical command boundary, not only at queue admission.
@@ -1099,7 +1100,7 @@ class BluetoothObdManager(context: Context) {
                     if (n > 0) {
                         val chunk = String(bytes, 0, n, Charsets.US_ASCII)
                         val payloadChunk = chunk.substringBefore('>')
-                        if (buffer.length < 1024 || onChunk == null) {
+                        if (!interruptingMonitor && (buffer.length < 1024 || onChunk == null)) {
                             buffer.append(if (onChunk == null) payloadChunk else payloadChunk.take(1024 - buffer.length))
                         }
                         if (payloadChunk.isNotEmpty()) onChunk?.invoke(payloadChunk)
@@ -1127,7 +1128,7 @@ class BluetoothObdManager(context: Context) {
                     if (n > 0) {
                         val chunk = String(bytes, 0, n, Charsets.US_ASCII)
                         val payloadChunk = chunk.substringBefore('>')
-                        if (buffer.length < 1024 || onChunk == null) {
+                        if (!interruptingMonitor && (buffer.length < 1024 || onChunk == null)) {
                             buffer.append(if (onChunk == null) payloadChunk else payloadChunk.take(1024 - buffer.length))
                         }
                         if (payloadChunk.isNotEmpty()) onChunk?.invoke(payloadChunk)
@@ -1154,7 +1155,7 @@ class BluetoothObdManager(context: Context) {
                         if (n > 0) {
                             val chunk = String(bytes, 0, n, Charsets.US_ASCII)
                             val payloadChunk = chunk.substringBefore('>')
-                            if (buffer.length < 1024 || onChunk == null) {
+                            if (!interruptingMonitor && (buffer.length < 1024 || onChunk == null)) {
                             buffer.append(if (onChunk == null) payloadChunk else payloadChunk.take(1024 - buffer.length))
                         }
                             if (payloadChunk.isNotEmpty()) onChunk?.invoke(payloadChunk)
@@ -1184,7 +1185,7 @@ class BluetoothObdManager(context: Context) {
                 // Bound the drain if the adapter was left streaming CAN.
                 val drainStart = android.os.SystemClock.elapsedRealtime()
                 var drained = 0
-                while (inp.available() > 0) {
+                while (!interruptingMonitor && inp.available() > 0) {
                     ensureSameSession()
                     if (drained >= 8192 || android.os.SystemClock.elapsedRealtime() - drainStart >= 500L) {
                         throw java.net.SocketTimeoutException("Bluetooth adapter continuously streaming; reconnect after stopping monitor")
@@ -1210,7 +1211,7 @@ class BluetoothObdManager(context: Context) {
                             if (callbackBuffer.isNotEmpty()) onChunk?.invoke(callbackBuffer.toString())
                             break
                         }
-                        if (buffer.length < 1024 || onChunk == null) buffer.append(char)
+                        if (!interruptingMonitor && (buffer.length < 1024 || onChunk == null)) buffer.append(char)
                         callbackBuffer.append(char)
                         if (char == '\r' || char == '\n' || callbackBuffer.length >= 128) {
                             onChunk?.invoke(callbackBuffer.toString())

@@ -41,13 +41,13 @@ object CanConsoleAdapterReplyPolicy {
             if ((payload[0].toInt() and 0xFF) == 0x7F)
                 negativeSeen = true
         }
-        if (!request.isExtended && request.canId == 0x7DFL) {
+        if (CanConsoleEcuRouting.isFunctional(request)) {
             val responders = mutableMapOf<Long, CanConsoleDiagnosticCorrelation>()
             for (frame in frames) {
-                if (frame.isExtended || frame.canId !in 0x7E8L..0x7EFL) continue
-                val matcher = responders.getOrPut(frame.canId) {
-                    CanConsoleDiagnosticCorrelation(request.copy(canId = frame.canId - 8L))
-                }
+                val physical = CanConsoleEcuRouting.physicalRequestForResponse(request, frame) ?: continue
+                val matcher = responders[frame.canId] ?: runCatching {
+                    CanConsoleDiagnosticCorrelation(physical)
+                }.getOrNull()?.also { responders[frame.canId] = it } ?: continue
                 val payload = matcher.accept(frame, 0L) ?: continue
                 if ((payload[0].toInt() and 0xFF) != 0x7F)
                     return CanConsoleDiagnosticStatus.POSITIVE
@@ -90,10 +90,26 @@ object CanConsoleEcuRouting {
 
     /** SAE J1979 functional request is a broadcast, not one selected ECU.
      * The console retains each responder's CAN ID and never coalesces payloads. */
+    fun isFunctional(request: RawCanFrame): Boolean =
+        (!request.isExtended && request.canId == 0x7DFL) ||
+            (request.isExtended && request.canId == 0x18DB33F1L)
+
+    /** Correlate functional replies per responder, never by mixing CAN IDs.
+     * The derived physical address is used ONLY for RX correlation, not TX. */
+    fun physicalRequestForResponse(request: RawCanFrame, response: RawCanFrame): RawCanFrame? {
+        if (!isFunctional(request) || request.isExtended != response.isExtended) return null
+        val physicalId = when {
+            !request.isExtended && response.canId in 0x7E8L..0x7EFL -> response.canId - 8L
+            request.isExtended && response.canId in 0x18DAF100L..0x18DAF1FFL ->
+                0x18DA00F1L or ((response.canId and 0xFFL) shl 8)
+            else -> return null
+        }
+        return request.copy(canId = physicalId)
+    }
+
     fun isExpectedResponse(request: RawCanFrame, response: RawCanFrame): Boolean =
-        if (!request.isExtended && request.canId == 0x7DFL) {
-            !response.isExtended && response.canId in 0x7E8L..0x7EFL
-        } else isSelectedResponder(request, response)
+        if (isFunctional(request)) physicalRequestForResponse(request, response) != null
+        else isSelectedResponder(request, response)
 }
 
 /** Presentation has no diagnostic ownership: every valid bus frame is RX.

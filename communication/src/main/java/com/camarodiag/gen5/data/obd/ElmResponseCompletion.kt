@@ -8,6 +8,14 @@ import java.net.SocketTimeoutException
  * through an explicit stop command rather than the normal ELM prompt.
  */
 internal object ElmResponseCompletion {
+    fun isMonitorInterrupt(command: String): Boolean = command == "\u001B"
+
+    /** Interrupt streaming with one byte, never an additional CR that could
+     * repeat the previous monitor command. Ordinary commands still need CR. */
+    fun wireBytes(command: String): ByteArray =
+        (if (isMonitorInterrupt(command)) command else command.trim() + "\r")
+            .toByteArray(Charsets.US_ASCII)
+
     /** Only true monitor commands may terminate without the normal ELM prompt.
      * A receive callback on a one-shot CAN transmission is NOT monitor mode. */
     fun isUnterminatedMonitorCommand(command: String, hasChunkConsumer: Boolean): Boolean =

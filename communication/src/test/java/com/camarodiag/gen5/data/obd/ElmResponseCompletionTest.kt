@@ -12,6 +12,18 @@ class ElmResponseCompletionTest {
     }
 
     @Test
+    fun monitorInterruptIsOneByteWithoutCommandRepeat() {
+        org.junit.Assert.assertArrayEquals(byteArrayOf(0x1B), ElmResponseCompletion.wireBytes("\u001B"))
+        org.junit.Assert.assertArrayEquals("0100\r".toByteArray(Charsets.US_ASCII),
+            ElmResponseCompletion.wireBytes(" 0100 "))
+        org.junit.Assert.assertTrue(ElmResponseCompletion.isMonitorInterrupt("\u001B"))
+        org.junit.Assert.assertFalse(ElmResponseCompletion.isMonitorInterrupt("ATMA"))
+        assertThrows(SocketTimeoutException::class.java) {
+            ElmResponseCompletion.requirePrompt("\u001B", streaming = false, promptReceived = false)
+        }
+    }
+
+    @Test
     fun acceptsOrdinaryCommandWhenPromptWasReceived() {
         ElmResponseCompletion.requirePrompt("010C", streaming = false, promptReceived = true)
     }

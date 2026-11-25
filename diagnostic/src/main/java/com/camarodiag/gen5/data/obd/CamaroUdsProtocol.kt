@@ -30,7 +30,7 @@ object CamaroUdsProtocol {
             number in 1..10 && hasStandaloneOk(answer)
         }.keys.toSet() + (if (selectedElmProtocol != 0 && hasStandaloneOk(protocolResp))
             setOf(selectedElmProtocol) else emptySet())
-        val verifiedCan = reportedElmProtocol in 6..9 &&
+        val verifiedCan = reportedElmProtocol != null && reportedElmProtocol in 6..9 &&
             hasPositiveMode01Pid00Response(transmitProbeResp)
         val logs = listOf(
             "> ATZ  -> $atzResp",

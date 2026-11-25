@@ -1,3 +1,7 @@
+## PR117 — arrêt CAN monitor et corrélation fonctionnelle 29 bits (25/11/2026)
+
+- C6 : arrêt monitor ELM/STN par octet ESC sans CR supplémentaire ; la purge RX Bluetooth bornée ne retarde plus l'interruption d'un flux continu. Attente du prompt obligatoire, données résiduelles ignorées pendant l'arrêt. La console corrèle les réponses fonctionnelles 29 bits séparément par répondant, sans émission automatique sur l'adresse déduite ; conserve RX et ACK pour trames brutes non diagnostiques sans exception de corrélation. Régressions écrites non exécutées ; aucun checkpoint, C6/DoIP restent ouverts.
+
 ## PR117 — négociation ELM et restauration du protocole (25/11/2026)
 
 - C6 Android : sélection initiale automatique ATSP0 et relevé ATDPN, preuve ECU 0100 séparée des capacités annoncées ; aucune preuve CAN issue d'un protocole non CAN, aucun ajout artificiel du protocole 6. Le profil CAN 6/7/8/9 n'est conservé que sur réponse positive ; à défaut retour automatique. Console capture/TX, ELM UDS et STN UDS restaurent le profil et l'en-tête fonctionnel correspondant, sans basculement systématique vers 11 bits/500 kbit/s. En cas de nettoyage incomplet, fermeture de la session selon politique existante. Tests écrits non exécutés. Les protocoles legacy annoncés ne constituent pas une validation des décodeurs K-Line/J1850 ; DoIP et C6 restent ouverts. Aucun checkpoint CI.

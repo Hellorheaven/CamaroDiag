@@ -171,19 +171,18 @@ class CanConsoleLiveDiagnosticCorrelation(
             // frames remain in recentRecords above, but never complete a
             // physical request after its bounded transport session expires.
             if (!withinRequestSession(receivedAtMs)) continue
-            val matcher = if (!request.isExtended && request.canId == 0x7DFL) {
-                if (frame.isExtended || frame.canId !in 0x7E8L..0x7EFL) continue
-                perResponder.getOrPut(frame.canId) {
-                    CanConsoleDiagnosticCorrelation(
-                        request.copy(canId = frame.canId - 8L), timeoutMs
-                    )
-                }
+            val physicalRequest = if (CanConsoleEcuRouting.isFunctional(request)) {
+                CanConsoleEcuRouting.physicalRequestForResponse(request, frame) ?: continue
             } else {
                 if (!CanConsoleEcuRouting.isSelectedResponder(request, frame)) continue
-                perResponder.getOrPut(frame.canId) {
-                    CanConsoleDiagnosticCorrelation(request, timeoutMs)
-                }
+                request
             }
+            // The console also accepts arbitrary raw wire frames, not only
+            // ISO-TP single-frame diagnostic requests. Preserve their RX and
+            // adapter ACK without inventing a diagnostic match or throwing.
+            val matcher = perResponder[frame.canId] ?: runCatching {
+                CanConsoleDiagnosticCorrelation(physicalRequest, timeoutMs)
+            }.getOrNull()?.also { perResponder[frame.canId] = it } ?: continue
             val response = matcher.accept(frame, receivedAtMs) ?: continue
             if ((response[0].toInt() and 0xFF) == 0x7F) {
                 if (diagnosticStatus == CanConsoleDiagnosticStatus.NONE)
