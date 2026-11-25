@@ -403,6 +403,37 @@ internal static class ObdOnUdsServices
         return rows;
     }
 
+    internal sealed record ExtendedRecordEntry(uint Dtc, byte Status, byte[] Data);
+    internal sealed record ExtendedRecordReport(byte Record, byte? Availability, IReadOnlyList<ExtendedRecordEntry> Entries);
+
+    internal static byte[] ReadExtendedRecord(byte record, int? size)
+    {
+        if (record is 0 or > 0xEF || size is < 1 or > 4090)
+            throw new ArgumentException("Expected specific record 01..EF and documented size 1..4090.");
+        return UdsStandardServices.ReadDtc(size is null ? (byte)0x1A : (byte)0x16, [record]);
+    }
+
+    internal static ExtendedRecordReport DecodeExtendedRecord(byte record, int? size, ReadOnlySpan<byte> reply)
+    {
+        var request = ReadExtendedRecord(record, size);
+        _ = UdsStandardServices.RequireResponse(request, reply);
+        int start = size is null ? 4 : 3, width = 4 + (size ?? 0);
+        if ((reply.Length - start) % width != 0)
+            throw new InvalidDataException("Extended data does not match documented length.");
+        byte? available = size is null ? reply[2] : null;
+        var seen = new HashSet<uint>();
+        var rows = new List<ExtendedRecordEntry>();
+        for (var offset = start; offset < reply.Length; offset += width)
+        {
+            uint dtc = ((uint)reply[offset] << 16) | ((uint)reply[offset + 1] << 8) | reply[offset + 2];
+            var status = reply[offset + 3];
+            if (!seen.Add(dtc) || (available.HasValue && (status & ~available.Value) != 0))
+                throw new InvalidDataException("Duplicate DTC or unavailable status bit.");
+            rows.Add(new(dtc, status, reply.Slice(offset + 4, width - 4).ToArray()));
+        }
+        return new(record, available, rows);
+    }
+
     internal sealed record UserMemoryReport(byte Memory, DtcStatusReport? List, uint? Dtc, byte? Status, byte[]? RawRecords);
 
     internal static byte[] ReadUserMemory(byte sub, byte memory, byte mask, uint dtc = 0, byte record = 1)

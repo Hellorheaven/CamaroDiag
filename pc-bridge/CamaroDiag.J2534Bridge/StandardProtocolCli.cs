@@ -362,7 +362,7 @@ internal static class StandardProtocolCli
                 "(scaling and meaning require vehicle/ODX metadata).");
     }
 
-    private static void PrintObdOnUdsResponse(byte[] request, byte[] response)
+    private static void PrintObdOnUdsResponse(byte[] request, byte[] response, int? extendedRecordSize = null)
     {
         if (request.Length == 3 && request[0] == 0x22)
         {
@@ -426,6 +426,17 @@ internal static class StandardProtocolCli
             Console.WriteLine($"Supported DTCs={report.Codes.Count} available-mask=0x{report.AvailabilityMask:X2}");
             foreach (var code in report.Codes)
                 Console.WriteLine($"DTC=0x{code.Code:X6} status=0x{code.Status:X2}");
+        }
+        else if (request.Length == 3 && request[0] == 0x19 &&
+            (request[1] == 0x1A || (request[1] == 0x16 && extendedRecordSize.HasValue)))
+        {
+            var report = ObdOnUdsServices.DecodeExtendedRecord(request[2], extendedRecordSize, response);
+            Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(new
+            {
+                subfunction = request[1], record = report.Record, availability_mask = report.Availability,
+                record_size = extendedRecordSize, records = report.Entries.Select(r => new
+                { dtc = $"{r.Dtc:X6}", status = r.Status, data = extendedRecordSize.HasValue ? Convert.ToHexString(r.Data) : null })
+            }));
         }
         else if (request.Length >= 2 && request[0] == 0x19 && request[1] is >= 0x17 and <= 0x19)
         {
@@ -1326,6 +1337,7 @@ internal static class StandardProtocolCli
             "--obd-dtc-mask", "--obd-dtc-count-mask", "--uds-historical-dtc",
             "--uds-severity-count", "--uds-severity-list", "--uds-severity-info", "--uds-severity-status",
             "--uds-memory", "--uds-memory-mask", "--uds-memory-snapshot", "--uds-memory-extended", "--uds-memory-record",
+            "--uds-extended-record-support", "--uds-extended-record-data", "--uds-extended-record-size",
             "--uds-dtc-mask", "--uds-dtc-count-mask", "--uds-snapshot", "--uds-snapshot-record",
             "--uds-extended-dtc", "--uds-extended-record", "--obd-wwh-status", "--obd-readiness-group",
             "--obd-snapshot", "--obd-snapshot-record", "--obd-extended-dtc", "--obd-extended-record",
@@ -1361,6 +1373,13 @@ internal static class StandardProtocolCli
         if ((supportedDtcs || permanentDtcs || snapshotIndex || faultCounters || historicalDtc is not null ||
             severityCount is not null || severityList is not null || severityInfo is not null) && Optional(args, "--expected-vin") is null)
             throw new ArgumentException("DTC inventory requires --expected-vin.");
+        var extendedRecordSupport = Optional(args, "--uds-extended-record-support");
+        var extendedRecordData = Optional(args, "--uds-extended-record-data");
+        var extendedRecordSize = Optional(args, "--uds-extended-record-size");
+        var extendedRecordSelectors = (extendedRecordSupport is null ? 0 : 1) + (extendedRecordData is null ? 0 : 1);
+        if (extendedRecordSelectors > 1 || (extendedRecordSize is not null) != (extendedRecordData is not null) ||
+            (extendedRecordSelectors == 1 && Optional(args, "--expected-vin") is null))
+            throw new ArgumentException("Extended record reads require VIN, one selector and size for data.");
         var memory = Optional(args, "--uds-memory");
         var memoryMask = Optional(args, "--uds-memory-mask");
         var memorySnapshot = Optional(args, "--uds-memory-snapshot");
@@ -1413,7 +1432,7 @@ internal static class StandardProtocolCli
             (obdDtcMask is null ? 0 : 1) +
             (obdDtcCountMask is null ? 0 : 1) +
             (supportedDtcs ? 1 : 0) +
-            (permanentDtcs ? 1 : 0) + memorySelectors +
+            (permanentDtcs ? 1 : 0) + memorySelectors + extendedRecordSelectors +
             (snapshotIndex ? 1 : 0) +
             (historicalDtc is null ? 0 : 1) +
             (faultCounters ? 1 : 0) +
@@ -1446,6 +1465,9 @@ internal static class StandardProtocolCli
                     NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture))) :
             supportedDtcs ? ObdOnUdsServices.ReadSupportedDtcs() :
             permanentDtcs ? ObdOnUdsServices.ReadPermanentDtcs() :
+            extendedRecordSupport is not null ? ObdOnUdsServices.ReadExtendedRecord(checked((byte)Number(extendedRecordSupport)), null) :
+            extendedRecordData is not null ? ObdOnUdsServices.ReadExtendedRecord(checked((byte)Number(extendedRecordData)),
+                int.Parse(extendedRecordSize!, NumberStyles.None, CultureInfo.InvariantCulture)) :
             memoryMask is not null ? ObdOnUdsServices.ReadUserMemory(0x17, checked((byte)Number(memory!)), checked((byte)Number(memoryMask))) :
             memorySnapshot is not null ? ObdOnUdsServices.ReadUserMemory(0x18, checked((byte)Number(memory!)), 0,
                 Number(memorySnapshot), checked((byte)Number(memoryRecord!))) :
@@ -1939,7 +1961,8 @@ internal static class StandardProtocolCli
         var multi = Optional(args, "--uds-dids");
         var genericRead = new[] { "--uds-did", "--uds-scaling-did", "--uds-dtc-mask",
             "--uds-dtc-count-mask", "--uds-snapshot", "--uds-extended-dtc",
-            "--uds-memory-mask", "--uds-memory-snapshot", "--uds-memory-extended" }
+            "--uds-memory-mask", "--uds-memory-snapshot", "--uds-memory-extended",
+            "--uds-extended-record-support", "--uds-extended-record-data" }
             .Any(selector => Optional(args, selector) is not null);
         genericRead |= args.Contains("--uds-supported-dtcs", StringComparer.OrdinalIgnoreCase) ||
             args.Contains("--uds-permanent-dtcs", StringComparer.OrdinalIgnoreCase) ||
@@ -2056,7 +2079,9 @@ internal static class StandardProtocolCli
             await VerifyAsync();
             stop.Token.ThrowIfCancellationRequested();
             PrintMultiDidResponse(args, o.Request, reply);
-            if (verified.Obd || o.Request[0] == 0x19) PrintObdOnUdsResponse(o.Request, reply);
+            var sizeText = Optional(args, "--uds-extended-record-size");
+            if (verified.Obd || o.Request[0] == 0x19) PrintObdOnUdsResponse(o.Request, reply,
+                sizeText is null ? null : int.Parse(sizeText, NumberStyles.None, CultureInfo.InvariantCulture));
             if (o.ReceiveFile is not null) await SaveDoIpReplyAsync(o.ReceiveFile, reply);
             Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(new
             {

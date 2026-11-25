@@ -106,6 +106,9 @@ Exemples :
                               --uds-memory 0x02 avec --uds-memory-mask 0x08, ou
                               --uds-memory-snapshot 0x123456 / --uds-memory-extended 0x123456
                               avec --uds-memory-record 1. --expected-vin explicite requis.
+                              --uds-extended-record-support 0x01 ou --uds-extended-record-data 0x01
+                              avec --uds-extended-record-size 2 (longueur uniforme documentée).
+                              Les deux exigent --expected-vin VIN.
                               Ni contournement OEM ni flash ou récupération qualifiés.
 
 Chaque commande nécessite ses paramètres exacts. Utiliser --help seul :

@@ -120,6 +120,12 @@
   <data name="ObdSnapshot" xml:space="preserve"><value>Snapshot OBDonUDS</value></data>
   <data name="ObdExtended" xml:space="preserve"><value>Données étendues OBDonUDS</value></data>
   <data name="SupportedDtcs" xml:space="preserve"><value>DTC pris en charge</value></data>
+  <data name="ExtendedRecordSupport" xml:space="preserve"><value>DTC prenant en charge cet enregistrement</value></data>
+  <data name="ExtendedRecordSize" xml:space="preserve"><value>Longueur uniforme documentée (octets)</value></data>
+  <data name="ExtendedRecordData" xml:space="preserve"><value>Lire les données étendues</value></data>
+  <data name="InvalidExtendedRecord" xml:space="preserve"><value>Sélectionner un enregistrement 01..EF et une longueur documentée valide.</value></data>
+  <data name="ExtendedRecordResult" xml:space="preserve"><value>Enregistrement 0x{0:X2} : {1} DTC</value></data>
+  <data name="ExtendedRecordMask" xml:space="preserve"><value>Masque de statut disponible 0x{0:X2}</value></data>
   <data name="MemorySelection" xml:space="preserve"><value>Mémoire DTC (hex)</value></data>
   <data name="MemoryDtcs" xml:space="preserve"><value>Lire les DTC de la mémoire</value></data>
   <data name="MemorySnapshot" xml:space="preserve"><value>Snapshot de la mémoire</value></data>

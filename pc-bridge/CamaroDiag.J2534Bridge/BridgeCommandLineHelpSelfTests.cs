@@ -51,6 +51,7 @@ internal static class BridgeCommandLineHelpSelfTests
             "--uds-supported-dtcs", "--uds-permanent-dtcs", "--uds-snapshot-index", "--uds-historical-dtc", "--uds-fault-counters", "--obd-identify",
             "--uds-severity-count", "--uds-severity-list", "--uds-severity-status", "--uds-severity-info",
             "--uds-memory", "--uds-memory-mask", "--uds-memory-snapshot", "--uds-memory-extended", "--uds-memory-record",
+            "--uds-extended-record-support", "--uds-extended-record-data", "--uds-extended-record-size",
             "--tls true", "--tester", "--ecu", "--payload"
         })
         {

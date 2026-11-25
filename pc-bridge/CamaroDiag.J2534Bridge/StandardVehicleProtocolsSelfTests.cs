@@ -825,6 +825,28 @@ internal static class StandardVehicleProtocolsSelfTests
             [0x19, 3], [0x59, 3, 1]), "Truncated snapshot index rejected at transport.");
         Reject<InvalidDataException>(() => UdsStandardServices.RequireResponse(
             [0x19, 0x0A], [0x59, 0x0A]), "Supported DTC response requires availability mask.");
+        string[] recordArgs = ["--host", "127.0.0.1", "--tester", "0E80", "--ecu", "1234",
+            "--expected-vin", "1G1FA1RX0J0100001"];
+        var recordSupport = StandardProtocolCli.ParseVerifiedDoIpRead([..recordArgs, "--uds-extended-record-support", "0x01"]);
+        Check(!recordSupport.Obd && recordSupport.Target.Request.SequenceEqual(new byte[] { 0x19, 0x1A, 1 }),
+            "Support query is verified UDS.");
+        var supportReport = ObdOnUdsServices.DecodeExtendedRecord(1, null, [0x59, 0x1A, 8, 1, 1, 2, 3, 0]);
+        Check(supportReport.Availability == 8 && supportReport.Entries.Single().Status == 0, "Inactive supported DTC retained.");
+        var recordRead = StandardProtocolCli.ParseVerifiedDoIpRead([..recordArgs, "--uds-extended-record-data", "0x01", "--uds-extended-record-size", "2"]);
+        Check(!recordRead.Obd && recordRead.Target.Request.SequenceEqual(new byte[] { 0x19, 0x16, 1 }), "Extended record read.");
+        var recordReport = ObdOnUdsServices.DecodeExtendedRecord(1, 2,
+            [0x59, 0x16, 1, 1, 2, 3, 8, 0xAA, 0xBB, 1, 2, 4, 0, 0xCC, 0xDD]);
+        Check(recordReport.Entries.Count == 2 && recordReport.Entries[1].Data.SequenceEqual(new byte[] { 0xCC, 0xDD }),
+            "Explicit size separates raw records.");
+        Reject<InvalidDataException>(() => ObdOnUdsServices.DecodeExtendedRecord(1, 2, [0x59, 0x16, 1, 1, 2, 3, 8, 0xAA]),
+            "Truncated extended record rejected.");
+        Reject<InvalidDataException>(() => ObdOnUdsServices.DecodeExtendedRecord(1, null, [0x59, 0x1A, 8, 2]), "Wrong record rejected.");
+        Reject<InvalidDataException>(() => ObdOnUdsServices.DecodeExtendedRecord(1, null,
+            [0x59, 0x1A, 8, 1, 1, 2, 3, 8, 1, 2, 3, 0]), "Duplicate DTC rejected.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseVerifiedDoIpRead([..recordArgs, "--uds-extended-record-data", "1"]),
+            "Data requires explicit size.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseVerifiedDoIpRead([..recordArgs, "--uds-extended-record-support", "0xFF"]),
+            "Reserved record rejected.");
         string[] memoryArgs = ["--host", "127.0.0.1", "--tester", "0E80", "--ecu", "1234",
             "--expected-vin", "1G1FA1RX0J0100001", "--uds-memory", "0x02"];
         var memoryRead = StandardProtocolCli.ParseVerifiedDoIpRead([..memoryArgs, "--uds-memory-mask", "0x08"]);

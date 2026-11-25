@@ -1,3 +1,7 @@
+## PR117 — données étendues par numéro Windows (25/11/2026)
+
+- Parité UDS 19/1A et 19/16 Android/Windows/Connectors : GUI/CLI FR/EN, numéro explicite et taille uniforme documentée pour les données, VIN F190 avant/après, corrélation écho/longueur/statut/doublons. Tests écrits non exécutés ; aucun checkpoint CI. DoIP/C6 restent actifs.
+
 ## PR117 — données étendues par numéro Android (25/11/2026)
 
 - UDS 19/1A et 19/16 : deux actions FR/EN, numéro explicite et taille uniforme documentée pour 19/16, vérification écho/longueur/doublons/masque, F190 avant/après, résultat distinct de la liste active. Tests écrits non exécutés. Windows reste à raccorder, aucun checkpoint CI.

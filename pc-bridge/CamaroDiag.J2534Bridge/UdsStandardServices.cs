@@ -399,6 +399,11 @@ internal static class UdsStandardServices
                 throw new InvalidDataException("Malformed DTC index or fault counter report.");
             if ((subfunction is 0x0A or 0x15) && (request.Length != 2 || response.Length < 3 || (response.Length - 3) % 4 != 0))
                 throw new InvalidDataException("Malformed supported DTC inventory.");
+            if (subfunction == 0x16 && (request.Length != 3 || response.Length < 3 || response[2] != request[2]))
+                throw new InvalidDataException("Wrong extended record response.");
+            if (subfunction == 0x1A && (request.Length != 3 || response.Length < 4 ||
+                response[3] != request[2] || (response.Length - 4) % 4 != 0))
+                throw new InvalidDataException("Wrong supported extended record response.");
             if (subfunction == 0x17 && (request.Length != 4 || response.Length < 4 ||
                 response[2] != request[3] || (response.Length - 4) % 4 != 0))
                 throw new InvalidDataException("Malformed or misdirected user-memory DTC list.");
