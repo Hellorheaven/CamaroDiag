@@ -361,6 +361,69 @@ class DoIpGatewayControlTraceTest {
         }
     }
 
+    @Test fun monitoringPublishesOnlySamplesWithVerifiedIdentity(): Unit = runBlocking {
+        fun bytes(value: String) = value.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
+        val loopback = InetAddress.getByName("127.0.0.1")
+        for (obd in listOf(false, true)) for (lastMatches in listOf(false, true)) {
+            DatagramSocket(0, loopback).use { udp ->
+                java.net.ServerSocket(0, 1, loopback).use { tcp ->
+                    udp.soTimeout = 5000
+                    tcp.soTimeout = 5000
+                    val worker = Executors.newSingleThreadExecutor()
+                    try {
+                        val server = worker.submit {
+                            respond(udp, pdu(255, 1), identity())
+                            tcp.accept().use { socket ->
+                                socket.soTimeout = 5000
+                                val input = java.io.DataInputStream(socket.getInputStream())
+                                val output = socket.getOutputStream()
+                                fun receive(type: Int, expected: ByteArray) {
+                                    val header = ByteArray(8).also { input.readFully(it) }
+                                    val size = ByteBuffer.wrap(header).getInt(4)
+                                    assertTrue(size in 0..65536)
+                                    val payload = ByteArray(size).also { input.readFully(it) }
+                                    assertArrayEquals(pdu(2, type, expected), header + payload)
+                                }
+                                fun send(type: Int, body: ByteArray) {
+                                    output.write(pdu(2, type, body)); output.flush()
+                                }
+                                fun diagnostic(request: String, response: ByteArray) {
+                                    receive(0x8001, bytes("0E801234" + request))
+                                    send(0x8002, bytes("12340E8000"))
+                                    send(0x8001, bytes("12340E80") + response)
+                                }
+                                receive(5, bytes("0E800000000000"))
+                                send(6, bytes("0E8010001000000000"))
+                                fun identify(matches: Boolean) {
+                                    val did = if (obd) "F802" else "F190"
+                                    val observed = if (matches || obd) vin else vin.dropLast(1) + "2"
+                                    diagnostic("22" + did, bytes("62" + did) + observed.toByteArray(Charsets.US_ASCII))
+                                    if (obd) diagnostic("22F810", bytes(if (matches) "62F81001" else "62F81002"))
+                                }
+                                identify(true)
+                                for (index in 1..2) {
+                                    diagnostic("22F40D", byteArrayOf(0x62, 0xF4.toByte(), 0x0D, index.toByte()))
+                                    identify(index == 1 || lastMatches)
+                                }
+                            }
+                        }
+                        val target = DoIpDirectRead.Target.parse("127.0.0.1", "0E80", "1234", vin, false)
+                        val samples = mutableListOf<Int>()
+                        val result = runCatching {
+                            DoIpDirectRead.readAt(target,
+                                if (obd) DoIpDirectRead.Operation.OBD_MONITOR else DoIpDirectRead.Operation.MONITOR,
+                                did = 0xF40D, timeoutMs = 2000, sampleCount = 2, intervalMs = 250,
+                                onSample = { samples += it.index }, udpPort = udp.localPort, tcpPort = tcp.localPort)
+                        }
+                        server.get(6, TimeUnit.SECONDS)
+                        assertEquals(lastMatches, result.isSuccess)
+                        assertEquals(if (lastMatches) listOf(1, 2) else listOf(1), samples)
+                    } finally { worker.shutdownNow() }
+                }
+            }
+        }
+    }
+
     @Test fun wildcardStoredRecordsUseRealRecordNumbersAndRejectTruncation() {
         fun bytes(s: String) = s.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
         val request = bytes("1905FF")

@@ -1,3 +1,7 @@
+## PR117 — parité Android / CLI des échantillons DoIP (25/11/2026)
+
+- C6/DoIP : Android mono/multi-DID et OBDonUDS, CLI Windows DID simple : chaque mesure est vérifiée sur la même connexion avant publication. Recontrôle du contexte Android après la vérification ; résultats déjà confirmés conservés en cas d'échec ultérieur. Régression Android UDP/TCP loopback écrite pour deux mesures, VIN ou protocole divergent sur la deuxième ; aucune exécution. Cadence dépendante des temps ECU supplémentaires, pas de promesse de temps réel déterministe. Aucun checkpoint CI. C6 et DoIP restent actifs.
+
 ## PR117 — DoIP temps réel vérifié avant publication (25/11/2026)
 
 - Windows C6/DoIP : monitoring DID simple, multi-DID et OBDonUDS vérifie désormais l'identité après chaque échantillon avant de le transmettre au callback UI/CLI/export, au lieu de publier des mesures provisoires et vérifier seulement en fin de session. Le premier échantillon vérifié reste disponible si le suivant échoue ; le nouvel échantillon incohérent n'est jamais publié. Aucun replay ou changement d'ECU. Tests loopback adaptés aux lectures d'identité supplémentaires, non exécutés. Coût réseau accru et cadence réelle dépendante du temps de réponse ECU. Aucun checkpoint CI ; C6/DoIP restent ouverts.

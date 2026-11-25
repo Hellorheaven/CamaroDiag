@@ -2012,11 +2012,15 @@ internal static class StandardProtocolCli
             {
                 var vin = await DoIpVinReader.VerifyObservedVinAsync(transport, gateway,
                     timeout, cancellation.Token, null, null);
+                async Task VerifySampleAsync()
+                {
+                    var after = await DoIpVinReader.VerifyObservedVinAsync(transport, gateway,
+                        timeout, cancellation.Token, null, null);
+                    if (vin != after) throw new InvalidDataException("ECU VIN changed during monitoring.");
+                }
                 await DoIpVinReader.MonitorDidAsync(transport, monitor.Did, monitor.Count,
-                    interval, timeout, cancellation.Token, Sample, expectedVin: vin);
-                var after = await DoIpVinReader.VerifyObservedVinAsync(transport, gateway,
-                    timeout, cancellation.Token, null, null);
-                if (vin != after) throw new InvalidDataException("ECU VIN changed during monitoring.");
+                    interval, timeout, cancellation.Token, Sample, expectedVin: vin,
+                    verifySample: VerifySampleAsync);
             }
             cancellation.Token.ThrowIfCancellationRequested();
             Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(new

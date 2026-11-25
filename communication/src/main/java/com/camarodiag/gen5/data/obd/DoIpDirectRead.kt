@@ -941,7 +941,7 @@ object DoIpDirectRead {
                             throw EcuVinMismatch()
                         return vin
                     }
-                    fun monitorDid(obd: Boolean = false): List<Sample> {
+                    fun monitorDid(obd: Boolean = false, verifySample: () -> Unit): List<Sample> {
                         val samples = mutableListOf<Sample>()
                         val start = System.nanoTime()
                         for (index in 1..sampleCount) {
@@ -954,6 +954,8 @@ object DoIpDirectRead {
                                 listOf(DoIpMultiDid.Value(did, reply.copyOfRange(3, reply.size))), target.expectedVin, obd)
                             val sample = Sample(index, (System.nanoTime() - start) / 1_000_000,
                                 if (multiMonitor) reply.copyOf() else reply.copyOfRange(3, reply.size), values)
+                            verifySample()
+                            check(isReadContextCurrent()) { "DoIP operation context changed." }
                             samples += sample
                             onSample(sample.copy(data = sample.data.copyOf(),
                                 values = values.map { it.copy(data = it.data.copyOf()) }))
@@ -995,11 +997,11 @@ object DoIpDirectRead {
                                 timeoutMs)) == protocolValue) { "OBDonUDS identity changed during DID read." }
                         }
                         val samples = if (operation in setOf(Operation.OBD_MONITOR, Operation.OBD_MULTI_MONITOR)) {
-                            val measured = monitorDid(obd = true)
-                            require(readVin(0xF802) == vin)
-                            require(decodeObdProtocol(session.exchange(byteArrayOf(0x22, 0xF8.toByte(), 0x10),
-                                timeoutMs)) == protocolValue) { "OBDonUDS identity changed during monitoring." }
-                            measured
+                            monitorDid(obd = true) {
+                                require(readVin(0xF802) == vin)
+                                require(decodeObdProtocol(session.exchange(byteArrayOf(0x22, 0xF8.toByte(), 0x10),
+                                    timeoutMs)) == protocolValue) { "OBDonUDS identity changed during monitoring." }
+                            }
                         } else emptyList()
                         val wwhReport = wwhKind?.let {
                             val report = DoIpWwhDtc.decode(it,
@@ -1164,8 +1166,7 @@ object DoIpDirectRead {
                             val capture = DoIpMemoryBackup.createCapture(scope, first, second)
                             Outcome(gateway, target.ecu, vin, null, null, trace.toList(), capture = capture)
                         } else if (operation in setOf(Operation.MONITOR, Operation.MULTI_MONITOR)) {
-                            val samples = monitorDid()
-                            require(readVin() == vin)
+                            val samples = monitorDid { require(readVin() == vin) }
                             Outcome(gateway, target.ecu, vin, null, null, trace.toList(), samples)
                         } else if (operation == Operation.MULTI_DID) {
                             val values = DoIpMultiDid.decode(requireNotNull(layout),
