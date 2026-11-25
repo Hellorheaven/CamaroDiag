@@ -411,6 +411,15 @@ def positive(request: bytes, reply: bytes) -> bytes:
                 raise DoIpError("Malformed DTC index or fault counter report")
         elif len(reply) < 3 or (subfunction in (0x0A, 0x15) and (len(request) != 2 or (len(reply) - 3) % 4)):
             raise DoIpError("Malformed DTC report")
+        if subfunction == 0x17:
+            if len(request) != 4 or len(reply) < 4 or reply[2] != request[3] or (len(reply) - 4) % 4:
+                raise DoIpError("User-defined DTC memory response mismatch")
+        if subfunction in (0x18, 0x19):
+            if len(request) != 7 or len(reply) < 7 or reply[2] != request[6] or reply[3:6] != request[2:5]:
+                raise DoIpError("User-defined DTC detail identity mismatch")
+            selected = request[5]
+            if len(reply) >= 8 and selected != 0xFF and (subfunction != 0x19 or selected != 0xFE) and reply[7] != selected:
+                raise DoIpError("User-defined DTC record mismatch")
         if subfunction == 9:
             if len(request) != 5 or len(reply) not in (3, 9) or (len(reply) == 9 and reply[5:8] != request[2:5]):
                 raise DoIpError("DTC severity identity mismatch")
@@ -1034,6 +1043,44 @@ class Session:
             self.verify_vin(expected)
             return {"kind": "snapshot-index" if snapshot_index else ("permanent-dtcs" if permanent else "supported-dtcs"),
                     "records": rows, **({} if snapshot_index else {"availability_mask": reply[2]})}
+        except BaseException:
+            self.close()
+            raise
+
+    def read_user_memory_dtc(self, expected: str, memory: int, *, subfunction: int = 0x17,
+                             mask: int = 255, dtc: int | None = None, record: int | None = None) -> dict:
+        """Read an explicitly selected DTC memory, never infer an OEM memory mapping."""
+        if type(memory) is not int or not 0 <= memory <= 255:
+            raise DoIpError("Invalid DTC memory selection")
+        if subfunction == 0x17:
+            if type(mask) is not int or not 0 <= mask <= 255 or dtc is not None or record is not None:
+                raise DoIpError("Invalid user-memory DTC filter")
+            request = bytes((0x19, subfunction, mask, memory))
+        elif subfunction in (0x18, 0x19):
+            if (type(dtc) is not int or not 0 <= dtc <= 0xFFFFFF or
+                type(record) is not int or not 1 <= record <= 255 or
+                (subfunction == 0x19 and 0xF0 <= record <= 0xFD)):
+                raise DoIpError("Invalid user-memory DTC record")
+            request = bytes((0x19, subfunction)) + dtc.to_bytes(3, "big") + bytes((record, memory))
+        else:
+            raise DoIpError("Unsupported user-memory DTC action")
+        try:
+            self.verify_vin(expected)
+            reply = positive(request, self.exchange(request))
+            if subfunction == 0x17:
+                available = reply[3]
+                rows = [{"dtc": reply[i:i+3].hex().upper(), "status": reply[i+3]}
+                        for i in range(4, len(reply), 4)]
+                if len({r["dtc"] for r in rows}) != len(rows) or any(
+                        not r["status"] & available & mask or r["status"] & ~available for r in rows):
+                    raise DoIpError("Uncorrelated user-memory DTC status")
+                result = {"requested_mask": mask, "availability_mask": available, "records": rows}
+            else:
+                # Record boundaries and DID lengths are OEM-specific. Preserve raw bytes.
+                result = {"dtc": reply[3:6].hex().upper(), "status": reply[6],
+                          "requested_record": record, "raw_records": reply[7:].hex().upper()}
+            self.verify_vin(expected)
+            return {"subfunction": subfunction, "memory": memory} | result
         except BaseException:
             self.close()
             raise

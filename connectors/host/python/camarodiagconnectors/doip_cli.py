@@ -159,6 +159,17 @@ def _run(argv: Sequence[str] | None, resources: ExitStack) -> dict:
         p = sub.add_parser(action, help=tr("Verified DTC record read", "Lecture d'enregistrement DTC vérifiée"))
         p.add_argument("--dtc", required=True, type=lambda x: hex_value(x, 6))
         p.add_argument("--record", required=True, type=lambda x: hex_value(x, 2))
+    for action, description in (
+            ("memory-dtcs", tr("Read DTCs in a selected memory", "Lire les DTC d'une mémoire sélectionnée")),
+            ("memory-snapshot", tr("Read a snapshot in a selected memory", "Lire un snapshot d'une mémoire sélectionnée")),
+            ("memory-extended", tr("Read extended data in a selected memory", "Lire les données étendues d'une mémoire sélectionnée"))):
+        memory = sub.add_parser(action, help=description)
+        memory.add_argument("--memory", required=True, type=lambda x: hex_value(x, 2))
+        if action == "memory-dtcs":
+            memory.add_argument("--mask", required=True, type=lambda x: hex_value(x, 2))
+        else:
+            memory.add_argument("--dtc", required=True, type=lambda x: hex_value(x, 6))
+            memory.add_argument("--record", required=True, type=lambda x: hex_value(x, 2))
     backup = sub.add_parser("backup", help=tr("Read a documented ECU region twice", "Lire deux fois une zone ECU documentée"))
     backup.add_argument("--profile", required=True, type=Path)
     backup.add_argument("--output", required=True, type=Path)
@@ -212,8 +223,10 @@ def _run(argv: Sequence[str] | None, resources: ExitStack) -> dict:
         parser.error(tr("Legislated DID F400..F8FF required", "DID réglementaire F400..F8FF requis"))
     if (multi_monitor or o.action in ("monitor", "obd-monitor")) and not (1 <= o.samples <= 3600 and 0.25 <= o.interval <= 60):
         parser.error(tr("Invalid sample count or interval", "Nombre de mesures ou intervalle invalide"))
-    if o.action in ("snapshot", "extended", "obd-snapshot", "obd-extended") and o.record == 0:
+    if o.action in ("snapshot", "extended", "obd-snapshot", "obd-extended", "memory-snapshot", "memory-extended") and o.record == 0:
         parser.error(tr("Record must be nonzero", "Enregistrement non nul requis"))
+    if o.action == "memory-extended" and 0xF0 <= o.record <= 0xFD:
+        parser.error(tr("Reserved extended record number", "Numéro d'enregistrement étendu réservé"))
     if o.tcp and (o.ca_file or o.client_cert or o.client_key):
         parser.error(tr("Certificate files require TLS", "Les certificats nécessitent TLS"))
     if o.client_key and not o.client_cert:
@@ -331,6 +344,12 @@ def _run(argv: Sequence[str] | None, resources: ExitStack) -> dict:
             subfunction = {"severity-count": 7, "severity-dtcs": 8, "severity-info": 9}[o.action]
             report = session.read_dtc_severity(o.vin, subfunction, severity_mask=getattr(o, "severity_mask", 255),
                                               status_mask=getattr(o, "mask", 255), dtc=getattr(o, "dtc", None))
+            return result | {"vin": o.vin, "ecu": o.ecu, "tester": o.tester, "tls": not o.tcp,
+                             "service_protocol": "UDS"} | report
+        if o.action in ("memory-dtcs", "memory-snapshot", "memory-extended"):
+            subfunction = {"memory-dtcs": 0x17, "memory-snapshot": 0x18, "memory-extended": 0x19}[o.action]
+            report = session.read_user_memory_dtc(o.vin, o.memory, subfunction=subfunction,
+                mask=getattr(o, "mask", 255), dtc=getattr(o, "dtc", None), record=getattr(o, "record", None))
             return result | {"vin": o.vin, "ecu": o.ecu, "tester": o.tester, "tls": not o.tcp,
                              "service_protocol": "UDS"} | report
         if o.action == "fault-counters":

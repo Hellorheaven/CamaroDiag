@@ -1,3 +1,7 @@
+## PR117 — lecture DTC en mémoire sélectionnée Connectors (25/11/2026)
+
+- CLI Python : `memory-dtcs`, `memory-snapshot`, `memory-extended` (UDS 19/17–19), mémoire explicite, masque ou DTC/enregistrement explicites, vérification de l'écho mémoire/DTC/enregistrement, statut et octets OEM conservés, VIN F190 avant/après, aucun contournement de sécurité OEM. Tests écrits non exécutés. Android et Windows restent à raccorder. Référence de format https://uds.readthedocs.io/en/stable/pages/knowledge_base/service.html . Aucun checkpoint CI.
+
 ## PR117 — journal JSONL DoIP Connectors (25/11/2026)
 
 - Parité CLI Windows : `--trace-file` conserve les PDU UDP/TCP/TLS réels, horodatés UTC, avec attribution des événements d'inventaire à l'ECU concerné. Création exclusive, permissions POSIX restrictives, fichier distinct des sauvegardes/profils/certificats, fermeture et traces partielles conservées lors d'un échec. Les erreurs de journal interrompent le parcours. Aide et exemple FR/EN ; tests écrits non exécutés. Aucun checkpoint CI.

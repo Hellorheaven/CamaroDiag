@@ -601,6 +601,54 @@ class DoIpTests(unittest.TestCase):
                 Session.read_dtc_severity(fake, VIN, sub, **options)
             fake.close.assert_called_once()
 
+    def test_user_memory_dtc_operations_validate_memory_and_record(self):
+        for sub, payload, options, request in (
+            (0x17, "59170208", {"mask": 8}, "19170802"),
+            (0x17, "5917020801020308", {"mask": 8}, "19170802"),
+            (0x18, "591802010203080102F190", {"dtc": 0x010203, "record": 1}, "19180102030102"),
+            (0x19, "5919020102030801AABB", {"dtc": 0x010203, "record": 1}, "19190102030102"),
+        ):
+            fake = unittest.mock.Mock(spec=Session)
+            fake.exchange.return_value = bytes.fromhex(payload)
+            result = Session.read_user_memory_dtc(fake, VIN, 2, subfunction=sub, **options)
+            self.assertEqual(result["memory"], 2)
+            self.assertEqual(result["subfunction"], sub)
+            fake.exchange.assert_called_once_with(bytes.fromhex(request))
+            self.assertEqual(fake.verify_vin.call_count, 2)
+            if sub == 0x19:
+                self.assertEqual(result["raw_records"], "01AABB")
+            fake.close.assert_not_called()
+        for sub, payload, options in (
+            (0x17, "59170308", {"mask": 8}),
+            (0x17, "5917020801020301", {"mask": 8}),
+            (0x17, "591702080102030801020308", {"mask": 8}),
+            (0x17, "5917020801", {"mask": 8}),
+            (0x18, "5918020102040801", {"dtc": 0x010203, "record": 1}),
+            (0x19, "5919020102030802", {"dtc": 0x010203, "record": 1}),
+        ):
+            fake = unittest.mock.Mock(spec=Session)
+            fake.exchange.return_value = bytes.fromhex(payload)
+            with self.assertRaises(DoIpError):
+                Session.read_user_memory_dtc(fake, VIN, 2, subfunction=sub, **options)
+            fake.close.assert_called_once()
+        fake = unittest.mock.Mock(spec=Session)
+        with self.assertRaises(DoIpError):
+            Session.read_user_memory_dtc(fake, VIN, 2, subfunction=0x19, dtc=1, record=0xF0)
+        fake.exchange.assert_not_called()
+        fake.verify_vin.assert_not_called()
+
+    def test_user_memory_cli_uses_explicit_memory_and_tls(self):
+        with patch("camarodiagconnectors.doip_cli.discover", return_value=GATEWAY), \
+             patch("camarodiagconnectors.doip_cli.Session") as session:
+            opened = session.return_value.__enter__.return_value
+            opened.read_user_memory_dtc.return_value = {"memory": 2, "records": []}
+            result = run(["--host", GATEWAY.host, "--vin", VIN, "--tester", "0E80",
+                          "--ecu", "1234", "memory-dtcs", "--memory", "02", "--mask", "08"])
+            self.assertEqual(result["memory"], 2)
+            self.assertTrue(session.call_args.kwargs["tls"])
+            opened.read_user_memory_dtc.assert_called_once_with(VIN, 2, subfunction=0x17,
+                                                                mask=8, dtc=None, record=None)
+
     def test_fault_counters_are_signed_and_separate_from_status(self):
         for payload, counters in (("5914", []), ("59140102037F01020480010205FF", [127, -128, -1])):
             fake = unittest.mock.Mock(spec=Session)
