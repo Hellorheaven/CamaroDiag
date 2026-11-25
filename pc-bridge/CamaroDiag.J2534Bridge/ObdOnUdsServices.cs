@@ -478,6 +478,60 @@ internal static class ObdOnUdsServices
         return catalog;
     }
 
+    internal sealed record DecodedExtendedEntry(byte Number, byte[] Data);
+    internal sealed record DecodedExtendedRecords(uint Dtc, byte Status, byte RequestedRecord,
+        IReadOnlyList<DecodedExtendedEntry> Records, byte[] RawResponse);
+
+    internal static Dictionary<byte, int> ParseExtendedRecordLengths(string text)
+    {
+        var fields = text.Split(',');
+        if (fields.Length is < 1 or > 239) throw new ArgumentException("Expected 1..239 record:length entries.");
+        var catalog = new Dictionary<byte, int>();
+        foreach (var field in fields)
+        {
+            var parts = field.Split(':');
+            if (parts.Length != 2 || parts[0].Length != 2 || parts[1].Length is < 1 or > 4 ||
+                !parts[0].All(Uri.IsHexDigit) || !parts[1].All(c => c is >= '0' and <= '9') ||
+                !byte.TryParse(parts[0], System.Globalization.NumberStyles.AllowHexSpecifier,
+                    System.Globalization.CultureInfo.InvariantCulture, out var record) ||
+                !int.TryParse(parts[1], System.Globalization.NumberStyles.None,
+                    System.Globalization.CultureInfo.InvariantCulture, out var size) ||
+                record is 0 or > 0xEF || size is < 1 or > 4090 || !catalog.TryAdd(record, size))
+                throw new ArgumentException("Invalid or duplicate extended record length.");
+        }
+        return catalog;
+    }
+
+    internal static byte[] ReadDecodedExtended(uint dtc, byte record, IReadOnlyDictionary<byte, int> lengths)
+    {
+        if (dtc > 0xFFFFFF || record is 0 or (>= 0xF0 and <= 0xFD) ||
+            lengths.Count is < 1 or > 239 || lengths.Any(p => p.Key is 0 or > 0xEF || p.Value is < 1 or > 4090) ||
+            (record <= 0xEF && !lengths.ContainsKey(record)))
+            throw new ArgumentException("Invalid extended data selector or length catalog.");
+        return UdsStandardServices.ReadDtc(6, [(byte)(dtc >> 16), (byte)(dtc >> 8), (byte)dtc, record]);
+    }
+
+    internal static DecodedExtendedRecords DecodeExtendedRecords(uint dtc, byte record, ReadOnlySpan<byte> reply,
+        IReadOnlyDictionary<byte, int> lengths)
+    {
+        _ = UdsStandardServices.RequireResponse(ReadDecodedExtended(dtc, record, lengths), reply);
+        if (reply.Length < 6) throw new InvalidDataException("Truncated extended data status.");
+        var records = new List<DecodedExtendedEntry>();
+        var seen = new HashSet<byte>();
+        int offset = 6;
+        while (offset < reply.Length)
+        {
+            byte number = reply[offset++];
+            if (!lengths.TryGetValue(number, out var size) || !seen.Add(number) ||
+                (record == 0xFE && number is not (>= 0x90 and <= 0x9F)) ||
+                (record <= 0xEF && number != record) || reply.Length - offset < size)
+                throw new InvalidDataException("Unexpected, duplicate, unknown or truncated extended record.");
+            records.Add(new(number, reply.Slice(offset, size).ToArray()));
+            offset += size;
+        }
+        return new(dtc, reply[5], record, records, reply.ToArray());
+    }
+
     internal sealed record SnapshotRecords(uint Dtc, byte Status, byte RequestedRecord,
         IReadOnlyList<StoredRecordEntry> Records, byte[] RawResponse);
 
