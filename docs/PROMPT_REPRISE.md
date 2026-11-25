@@ -1,3 +1,7 @@
+## PR117 — monitoring multi-DID DoIP Windows (25/11/2026)
+
+- Parité GUI et CLI Windows : --monitor-dids / --obd-monitor-dids, une requête 22 par échantillon, géométrie explicite et limitée à 4096 octets, F190 ou F802/F810 avant/après même connexion, annulation, mesures provisoires puis verdict final, journal existant. Aide FR/EN, tests parseur et loopback écrits. Aucun build/test lancé ni marqueur de clôture modifié.
+
 ## PR117 — monitoring multi-DID DoIP Android et Connectors (25/11/2026)
 
 - Monitoring UDS/OBDonUDS de plusieurs DID dans chaque requête 22, disposition explicite, plafond 4096 octets par échantillon, validation de chaque réponse et identité avant/après sur le même socket. Android : UI FR/EN, rendu par DID, export CSV avec une ligne par DID et même index d'échantillon ; journal complet et fenêtre récente glissante. Connectors CLI : monitor-dids et obd-monitor-dids avec --layout, mesures provisoires sur stderr et résultat complet uniquement après revalidation. Tests écrits, non exécutés. Windows reste à raccorder. Aucun marqueur CI modifié.

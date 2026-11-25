@@ -124,4 +124,8 @@
   <data name="SupportedResult" xml:space="preserve"><value>DTC pris en charge : {0} ; masque disponible 0x{1:X2}</value></data>
   <data name="SnapshotIndexResult" xml:space="preserve"><value>Enregistrements snapshot disponibles : {0}</value></data>
   <data name="SnapshotIndexEntry" xml:space="preserve"><value>DTC 0x{0:X6}, enregistrement 0x{1:X2}</value></data>
+  <data name="MultiMonitor" xml:space="preserve"><value>Monitoring multi-DID UDS</value></data>
+  <data name="ObdMultiMonitor" xml:space="preserve"><value>Monitoring multi-DID OBDonUDS</value></data>
+  <data name="MultiMonitorSample" xml:space="preserve"><value>Échantillon provisoire {0} : {1}</value></data>
+  <data name="MultiMonitorComplete" xml:space="preserve"><value>Échantillons multi-DID vérifiés : {0}</value></data>
 </root>

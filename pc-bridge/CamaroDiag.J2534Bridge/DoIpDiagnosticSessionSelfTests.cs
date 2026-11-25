@@ -367,6 +367,43 @@ internal static class DoIpDiagnosticSessionSelfTests
             });
         }
 
+        // Multi-DID polling: one request per sample, no complete result before final VIN.
+        foreach (var finalIdentityMatches in new[] { true, false })
+        {
+            var samples = new List<int>();
+            await RunCaseAsync(async stream =>
+            {
+                _ = await RequireRequestAsync(stream);
+                await SendAsync(stream, DoIpCodec.DiagnosticMessage,
+                    FromEcu([0x62, 0xF1, 0x90, .. System.Text.Encoding.ASCII.GetBytes(selectedVehicleVin)]));
+                for (var i = 0; i < 2; i++)
+                {
+                    var query = await ReadAsync(stream);
+                    Check(query.Payload.SequenceEqual(new byte[] {0x0E,0x80,0x12,0x34,0x22,0xF4,0x0C,0xF4,0x0D}),
+                        "Multi-DID monitoring transmits one request per sample.");
+                    await SendAsync(stream, DoIpCodec.DiagnosticMessage,
+                        FromEcu([0x62, 0xF4, 0x0C, 0x12, (byte)i, 0xF4, 0x0D, 0x56]));
+                }
+                _ = await RequireRequestAsync(stream);
+                await SendAsync(stream, DoIpCodec.DiagnosticMessage,
+                    FromEcu([0x62, 0xF1, 0x90, .. System.Text.Encoding.ASCII.GetBytes(
+                        finalIdentityMatches ? selectedVehicleVin : otherVehicleVin)]));
+            }, async client =>
+            {
+                Task Monitor() => DoIpVinReader.MonitorVerifiedMultiDidAsync(client, observedForVin, selectedVehicleVin,
+                    UdsMultiDidCli.Parse("0xF40C:2,0xF40D:1"), false, 2, TimeSpan.FromMilliseconds(250),
+                    TimeSpan.FromSeconds(2), CancellationToken.None, (index, values) =>
+                    {
+                        Check(values.Count == 2 && values[0].Data[1] == index - 1 &&
+                            values[1].Data.SequenceEqual(new byte[] { 0x56 }), "Multi-DID sample decoded in order.");
+                        samples.Add(index);
+                    });
+                if (finalIdentityMatches) await Monitor();
+                else await Expect<InvalidDataException>(Monitor, "Changed final VIN invalidates multi-DID monitor.");
+            });
+            Check(samples.SequenceEqual(new[] {1, 2}), "Both provisional samples observed.");
+        }
+
         // Explicit console request follows the same-session VIN read, not
         // a stale discovery. A mismatch never reaches the requested service.
         foreach (var vinMatches in new[] { true, false })

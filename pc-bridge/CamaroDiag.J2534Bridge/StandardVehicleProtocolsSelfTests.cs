@@ -534,6 +534,18 @@ internal static class StandardVehicleProtocolsSelfTests
         Reject<ArgumentException>(() => StandardProtocolCli.ParseDoIpMonitor(
             monitorArgs.Select(x => x == "F40C" ? "1234" : x).ToArray()),
             "Legislated monitoring rejects non-regulatory DID.");
+        var multiMonitorArgs = new[] { "--host", "127.0.0.1", "--tester", "0E80", "--ecu", "1234",
+            "--expected-vin", "1G1FA1RXXR0123456", "--obd-monitor-dids", "0xF40C:2,0xF40D:1" };
+        var multiMonitor = StandardProtocolCli.ParseDoIpMonitor(multiMonitorArgs);
+        Check(multiMonitor.Obd && multiMonitor.Target.UseTls && multiMonitor.Layout?.Count == 2 &&
+            multiMonitor.Target.Request.SequenceEqual(new byte[] { 0x22, 0xF4, 0x0C, 0xF4, 0x0D }),
+            "Multi-DID monitoring builds one verified UDS request.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseDoIpMonitor(
+            [..multiMonitorArgs[..^1], "0xF40C:4095,0xF40D:1"]), "Oversized multi-DID monitor sample rejected.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseDoIpMonitor(
+            [..multiMonitorArgs[..^1], "0x1234:2,0xF40D:1"]), "OBDonUDS multi-monitor rejects non-legislated DID.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseDoIpMonitor(
+            [..multiMonitorArgs, "--monitor-did", "F190"]), "Multi-monitor and single-monitor are exclusive.");
         var parsed = StandardProtocolCli.ParseDoIp([
             StandardProtocolCli.DoIpCommand, "--host", "127.0.0.1",
             "--tester", "0E80", "--ecu", "1234",

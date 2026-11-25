@@ -274,6 +274,63 @@ internal static class DoIpVinReader
         }
     }
 
+    internal static async Task MonitorVerifiedMultiDidAsync(DoIpDiagnosticTransport transport,
+        DoIpVehicleDiscovery.Identity gateway, string expectedVin, IReadOnlyList<UdsMultiDidCli.Entry> layout,
+        bool obd, int sampleCount, TimeSpan interval, TimeSpan timeout, CancellationToken token,
+        Action<int, IReadOnlyList<(ushort Did, byte[] Data)>> sample)
+    {
+        ArgumentNullException.ThrowIfNull(sample);
+        var frozen = UdsMultiDidCli.ValidateMonitor(layout);
+        if (!DoIpVehicleDiscovery.IsVehicleVin(expectedVin) || gateway.Vin != expectedVin ||
+            (obd && frozen.Any(e => ObdOnUdsServices.ClassifyDid(e.Did) == ObdOnUdsServices.DataGroup.NotLegislated)))
+            throw new ArgumentException("Invalid multi-DID monitoring target.");
+        if (sampleCount is < 1 or > 3600 || interval < TimeSpan.FromMilliseconds(250) ||
+            interval > TimeSpan.FromMinutes(1))
+            throw new ArgumentOutOfRangeException(nameof(sampleCount));
+        var request = UdsMultiDidCli.BuildRequest(frozen);
+        async Task VerifyAsync()
+        {
+            if (obd)
+            {
+                var identity = await ReadVerifiedObdAsync(transport, expectedVin, null, timeout, token);
+                if (identity.ProtocolValue != 1)
+                    throw new InvalidDataException("Selected ECU did not identify as OBDonUDS.");
+            }
+            else if (await VerifyObservedVinAsync(transport, gateway, timeout, token, null, null) != expectedVin)
+                throw new InvalidDataException("ECU VIN mismatch.");
+        }
+        await VerifyAsync();
+        for (var index = 1; index <= sampleCount; index++)
+        {
+            token.ThrowIfCancellationRequested();
+            var reply = await transport.ExchangeUdsAsync(request, timeout, token);
+            var values = UdsMultiDidCli.Decode(frozen, request, reply);
+            token.ThrowIfCancellationRequested();
+            sample(index, values);
+            token.ThrowIfCancellationRequested();
+            if (index < sampleCount) await Task.Delay(interval, token);
+        }
+        await VerifyAsync();
+        token.ThrowIfCancellationRequested();
+    }
+
+    internal static async Task MonitorObservedMultiDidAsync(DoIpVehicleDiscovery.Identity gateway,
+        IPAddress address, ushort tester, ushort ecu, bool tls, string expectedVin,
+        IReadOnlyList<UdsMultiDidCli.Entry> layout, bool obd, int sampleCount, TimeSpan interval,
+        TimeSpan timeout, CancellationToken token, Action<int, IReadOnlyList<(ushort Did, byte[] Data)>> sample,
+        string? certificate = null, Action<DoIpDiagnosticTransport.PduTrace>? trace = null,
+        DoIpDiagnosticTransport.SessionOptions? options = null)
+    {
+        var frozen = UdsMultiDidCli.ValidateMonitor(layout);
+        if (!DoIpVehicleDiscovery.IsVehicleVin(expectedVin) || gateway.Vin != expectedVin ||
+            (obd && frozen.Any(e => ObdOnUdsServices.ClassifyDid(e.Did) == ObdOnUdsServices.DataGroup.NotLegislated)))
+            throw new ArgumentException("Invalid multi-DID monitoring target.");
+        await using var link = await ConnectObservedAsync(gateway, address, tester, ecu,
+            tls, timeout, token, certificate, trace, options);
+        await MonitorVerifiedMultiDidAsync(link, gateway, expectedVin, frozen, obd, sampleCount,
+            interval, timeout, token, sample);
+    }
+
     internal static async Task MonitorVerifiedObdAsync(
         DoIpDiagnosticTransport transport, string expectedVin, ushort did, int sampleCount,
         TimeSpan interval, TimeSpan timeout, CancellationToken token, Action<int, byte[]> sample)

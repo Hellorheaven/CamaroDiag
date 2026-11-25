@@ -1585,14 +1585,14 @@ internal static class StandardProtocolCli
     }
 
     internal sealed record DoIpMonitorOptions(DoIpOptions Target, string Vin, ushort Did,
-        int Count, int IntervalMs, bool Obd, bool ExplicitVersion);
+        int Count, int IntervalMs, bool Obd, bool ExplicitVersion, IReadOnlyList<UdsMultiDidCli.Entry>? Layout = null);
 
     internal static DoIpMonitorOptions ParseDoIpMonitor(string[] args)
     {
         var allowed = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
             "--host", "--tester", "--ecu", "--expected-vin", "--monitor-did", "--obd-monitor-did",
-            "--samples", "--interval-ms", "--timeout-ms", "--tls", "--doip-version",
+            "--monitor-dids", "--obd-monitor-dids", "--samples", "--interval-ms", "--timeout-ms", "--tls", "--doip-version",
             "--client-cert-thumbprint", "--routing-activation-type", "--routing-oem-data",
             "--uds-p2-ms", "--uds-p2-star-ms"
         };
@@ -1605,13 +1605,19 @@ internal static class StandardProtocolCli
                 !values.TryAdd(args[i], args[i + 1]))
                 throw new ArgumentException("Unexpected or repeated DoIP monitoring option.");
         }
-        var obd = values.TryGetValue("--obd-monitor-did", out var obdDid);
-        var generic = values.TryGetValue("--monitor-did", out var genericDid);
-        if (obd == generic || !values.TryGetValue("--expected-vin", out var vin) ||
-            !DoIpVehicleDiscovery.IsVehicleVin(vin))
-            throw new ArgumentException("One monitoring DID and an explicit expected VIN required.");
-        var did = Address(obd ? obdDid! : genericDid!);
-        if (obd && ObdOnUdsServices.ClassifyDid(did) == ObdOnUdsServices.DataGroup.NotLegislated)
+        var obdSingle = values.TryGetValue("--obd-monitor-did", out var obdDid);
+        var genericSingle = values.TryGetValue("--monitor-did", out var genericDid);
+        var obdMulti = values.TryGetValue("--obd-monitor-dids", out var obdLayout);
+        var genericMulti = values.TryGetValue("--monitor-dids", out var genericLayout);
+        if (new[] { obdSingle, genericSingle, obdMulti, genericMulti }.Count(x => x) != 1 ||
+            !values.TryGetValue("--expected-vin", out var vin) || !DoIpVehicleDiscovery.IsVehicleVin(vin))
+            throw new ArgumentException("One monitoring selection and an explicit expected VIN required.");
+        var obd = obdSingle || obdMulti;
+        var layout = obdMulti || genericMulti ? UdsMultiDidCli.ValidateMonitor(
+            UdsMultiDidCli.Parse(obdMulti ? obdLayout! : genericLayout!)) : null;
+        var did = layout is null ? Address(obdSingle ? obdDid! : genericDid!) : layout[0].Did;
+        if (obd && (layout is null ? ObdOnUdsServices.ClassifyDid(did) == ObdOnUdsServices.DataGroup.NotLegislated :
+            layout.Any(e => ObdOnUdsServices.ClassifyDid(e.Did) == ObdOnUdsServices.DataGroup.NotLegislated)))
             throw new ArgumentException("Legislated OBDonUDS DID required.");
         var count = int.Parse(values.GetValueOrDefault("--samples", "10"), CultureInfo.InvariantCulture);
         var interval = int.Parse(values.GetValueOrDefault("--interval-ms", "1000"), CultureInfo.InvariantCulture);
@@ -1624,15 +1630,15 @@ internal static class StandardProtocolCli
         var timing = DoIpDiagnosticTransport.SessionOptions.Parse(totalMs, p2, p2Star, "00", "");
         values["--uds-p2-ms"] = timing.P2Ms.ToString(CultureInfo.InvariantCulture);
         values["--uds-p2-star-ms"] = timing.P2StarMs.ToString(CultureInfo.InvariantCulture);
-        foreach (var key in new[] { "--monitor-did", "--obd-monitor-did", "--samples",
-            "--interval-ms", "--expected-vin" }) values.Remove(key);
-        values["--payload"] = $"22{did:X4}";
+        foreach (var key in new[] { "--monitor-did", "--obd-monitor-did", "--monitor-dids",
+            "--obd-monitor-dids", "--samples", "--interval-ms", "--expected-vin" }) values.Remove(key);
+        values["--payload"] = layout is null ? $"22{did:X4}" : Convert.ToHexString(UdsMultiDidCli.BuildRequest(layout));
         if (!values.ContainsKey("--tls")) values["--tls"] = "true";
         var target = ParseDoIp(values.SelectMany(x => new[] { x.Key, x.Value }).ToArray());
         if (!System.Net.IPAddress.TryParse(target.Host, out var address) ||
             !DoIpVehicleDiscovery.IsExplicitUnicast(address))
             throw new ArgumentException("DoIP monitoring requires a numeric unicast IP.");
-        return new DoIpMonitorOptions(target, vin, did, count, interval, obd, explicitVersion);
+        return new DoIpMonitorOptions(target, vin, did, count, interval, obd, explicitVersion, layout);
     }
 
     private static async Task<int> RunDoIpMonitorAsync(string[] args)
@@ -1664,7 +1670,16 @@ internal static class StandardProtocolCli
                 new { sample = index, utc = DateTimeOffset.UtcNow, vin = monitor.Vin,
                     ecu = $"{o.Ecu:X4}", did = $"{monitor.Did:X4}", protocol = monitor.Obd ? "OBDonUDS" : "UDS",
                     payload = Convert.ToHexString(data), partial = true }));
-            if (monitor.Obd)
+            if (monitor.Layout is not null)
+                await DoIpVinReader.MonitorVerifiedMultiDidAsync(transport, gateway, monitor.Vin,
+                    monitor.Layout, monitor.Obd, monitor.Count, interval, timeout, cancellation.Token,
+                    (index, values) => Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(new
+                    {
+                        sample = index, utc = DateTimeOffset.UtcNow, vin = monitor.Vin,
+                        ecu = $"{o.Ecu:X4}", protocol = monitor.Obd ? "OBDonUDS" : "UDS", partial = true,
+                        dids = values.Select(v => new { did = $"{v.Did:X4}", payload = Convert.ToHexString(v.Data) })
+                    })));
+            else if (monitor.Obd)
                 await DoIpVinReader.MonitorVerifiedObdAsync(transport, monitor.Vin, monitor.Did,
                     monitor.Count, interval, timeout, cancellation.Token, Sample);
             else
@@ -1803,7 +1818,9 @@ internal static class StandardProtocolCli
         try
         {
             if (args.Contains("--monitor-did", StringComparer.OrdinalIgnoreCase) ||
-                args.Contains("--obd-monitor-did", StringComparer.OrdinalIgnoreCase))
+                args.Contains("--obd-monitor-did", StringComparer.OrdinalIgnoreCase) ||
+                args.Contains("--monitor-dids", StringComparer.OrdinalIgnoreCase) ||
+                args.Contains("--obd-monitor-dids", StringComparer.OrdinalIgnoreCase))
                 return await RunDoIpMonitorAsync(args);
             if (args.Contains("--sequence", StringComparer.OrdinalIgnoreCase))
                 return await RunDoIpSequenceAsync(args);
