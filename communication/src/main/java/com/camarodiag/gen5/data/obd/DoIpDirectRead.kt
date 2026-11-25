@@ -365,28 +365,41 @@ object DoIpDirectRead {
             }
         } ?: throw SocketTimeoutException("DoIP operation timed out.")
 
+    private fun requireIoCurrent(active: () -> Boolean, current: () -> Boolean = { true }) {
+        if (!active()) throw kotlinx.coroutines.CancellationException("DoIP operation cancelled.")
+        check(current()) { "DoIP operation context changed." }
+    }
+
     private suspend fun discover(address: InetAddress, expectedVin: String, timeoutMs: Int,
-        onControlTrace: (ControlTrace) -> Unit, port: Int = DOIP_UDP_PORT, eid: String? = null): Gateway {
+        onControlTrace: (ControlTrace) -> Unit, port: Int = DOIP_UDP_PORT, eid: String? = null,
+        current: () -> Boolean = { true }): Gateway {
         require(eid == null || eid.matches(Regex("[0-9A-Fa-f]{12}")))
         val requestedEid = eid?.uppercase(Locale.ROOT)
         val socket = DatagramSocket()
         try {
-            return io(timeoutMs.toLong(), socket::close) {
+            return io(timeoutMs.toLong(), socket::close) { active ->
+                requireIoCurrent(active)
                 socket.connect(address, port)
+                requireIoCurrent(active, current)
                 val packet = if (requestedEid == null) encode(255, 0x0001, byteArrayOf())
                     else encode(255, 0x0002, parseCommand(requestedEid))
+                requireIoCurrent(active, current)
                 socket.send(DatagramPacket(packet, packet.size, address, port))
+                requireIoCurrent(active, current)
                 controlTrace("TX", "UDP", address, packet, onControlTrace)
                 val deadline = deadline(timeoutMs)
                 val buffer = ByteArray(1024)
                 var found: Gateway? = null
                 while (found == null) {
+                    requireIoCurrent(active, current)
                     socket.soTimeout = remaining(deadline)
                     val received = DatagramPacket(buffer, buffer.size)
                     socket.receive(received)
+                    requireIoCurrent(active, current)
                     remaining(deadline)
                     if (received.address != address || received.port != port || received.length < 8) continue
                     controlTrace("RX", "UDP", address, buffer.copyOf(received.length), onControlTrace)
+                    requireIoCurrent(active, current)
                     val frame = parseFrame(buffer.copyOfRange(0, 8), buffer.copyOfRange(8, received.length))
                     if (frame.type == 0) throw IOException("DoIP gateway rejected identification.")
                     if (frame.type != 0x0004) continue
@@ -403,6 +416,7 @@ object DoIpDirectRead {
                         observedEid, hex(frame.data.copyOfRange(25, 31)), frame.data[31].u8(),
                         frame.data.getOrNull(32)?.u8())
                 }
+                requireIoCurrent(active, current)
                 found
             }
         } finally { socket.close() }
@@ -423,12 +437,15 @@ object DoIpDirectRead {
         require(!destination.isAnyLocalAddress && !destination.isMulticastAddress)
         val socket = DatagramSocket()
         try {
-            return io(timeoutMs.toLong() + 1000, socket::close) {
+            return io(timeoutMs.toLong() + 1000, socket::close) { active ->
+                requireIoCurrent(active)
                 socket.broadcast = true
                 val request = encode(255, 0x0003, expected.toByteArray(Charsets.US_ASCII))
+                requireIoCurrent(active)
                 socket.send(DatagramPacket(request, request.size, destination, port))
+                requireIoCurrent(active)
                 controlTrace("TX", "UDP", destination, request, onControlTrace)
-                collectSelectedGateway(socket, expected, timeoutMs, port, null, onControlTrace)
+                collectSelectedGateway(socket, expected, timeoutMs, port, null, onControlTrace, active)
             }
         } finally { socket.close() }
     }
@@ -444,19 +461,23 @@ object DoIpDirectRead {
 
     /** No diagnostic traffic, collect the entire window to detect ambiguity. */
     private fun collectSelectedGateway(socket: DatagramSocket, expected: String, timeoutMs: Int,
-        port: Int, interfaceIndex: Int?, onControlTrace: (ControlTrace) -> Unit): GatewayResult {
+        port: Int, interfaceIndex: Int?, onControlTrace: (ControlTrace) -> Unit,
+        active: () -> Boolean): GatewayResult {
         val end = deadline(timeoutMs)
         val matches = linkedMapOf<Pair<String, Gateway>, Gateway>()
         val buffer = ByteArray(1024)
         while (System.nanoTime() < end) {
+            requireIoCurrent(active)
             val wait = try { remaining(end) } catch (_: SocketTimeoutException) { break }
             socket.soTimeout = wait
             val packet = DatagramPacket(buffer, buffer.size)
             try { socket.receive(packet) } catch (_: SocketTimeoutException) { break }
+            requireIoCurrent(active)
             if (System.nanoTime() >= end) break
             if (packet.port != port || packet.length < 8) continue
             val host = scopedDiscoverySource(packet.address, interfaceIndex) ?: continue
             controlTrace("RX", "UDP", packet.address, buffer.copyOf(packet.length), onControlTrace)
+            requireIoCurrent(active)
             val frame = try {
                 parseFrame(buffer.copyOfRange(0, 8), buffer.copyOfRange(8, packet.length))
             } catch (_: IllegalArgumentException) { continue }
@@ -472,6 +493,7 @@ object DoIpDirectRead {
             matches[key] = gateway
             require(matches.size <= 16) { "Too many DoIP gateways for the selected VIN." }
         }
+        requireIoCurrent(active)
         require(matches.size == 1) { "DoIP gateway not found or ambiguous for the selected VIN." }
         val selected = matches.entries.single()
         return GatewayResult(selected.value, host = selected.key.first)
@@ -484,8 +506,9 @@ object DoIpDirectRead {
         val socket = DatagramSocket(null)
         try {
             socket.bind(InetSocketAddress("0.0.0.0", port))
-            return io(timeoutMs.toLong() + 1000, socket::close) {
-                collectSelectedGateway(socket, expected, timeoutMs, port, null, onControlTrace)
+            return io(timeoutMs.toLong() + 1000, socket::close) { active ->
+                requireIoCurrent(active)
+                collectSelectedGateway(socket, expected, timeoutMs, port, null, onControlTrace, active)
             }
         } finally { socket.close() }
     }
@@ -517,14 +540,17 @@ object DoIpDirectRead {
             socket.bind(InetSocketAddress("::", if (passive) DOIP_UDP_PORT else 0))
             socket.networkInterface = network
             if (passive) socket.joinGroup(InetSocketAddress(group, DOIP_UDP_PORT), network)
-            return io(timeoutMs.toLong() + 1000, socket::close) {
+            return io(timeoutMs.toLong() + 1000, socket::close) { active ->
+                requireIoCurrent(active)
                 if (!passive) {
                     socket.timeToLive = 1
                     val request = encode(255, 0x0003, expected.toByteArray(Charsets.US_ASCII))
+                    requireIoCurrent(active)
                     socket.send(DatagramPacket(request, request.size, group, DOIP_UDP_PORT))
+                    requireIoCurrent(active)
                     controlTrace("TX", "UDP", group, request, onControlTrace)
                 }
-                collectSelectedGateway(socket, expected, timeoutMs, DOIP_UDP_PORT, interfaceIndex, onControlTrace)
+                collectSelectedGateway(socket, expected, timeoutMs, DOIP_UDP_PORT, interfaceIndex, onControlTrace, active)
             }
         } finally { socket.close() }
     }
@@ -570,22 +596,28 @@ object DoIpDirectRead {
         }
         val socket = DatagramSocket()
         try {
-            return io(timeoutMs.toLong(), socket::close) {
+            return io(timeoutMs.toLong(), socket::close) { active ->
+                requireIoCurrent(active)
                 socket.connect(address, port)
                 val power = operation == GatewayOperation.POWER
                 val request = encode(gateway.version, if (power) 0x4003 else 0x4001, byteArrayOf())
+                requireIoCurrent(active)
                 socket.send(DatagramPacket(request, request.size, address, port))
+                requireIoCurrent(active)
                 controlTrace("TX", "UDP", address, request, onControlTrace)
                 val end = deadline(timeoutMs)
                 val buffer = ByteArray(1024)
                 var result: GatewayResult? = null
                 while (result == null) {
+                    requireIoCurrent(active)
                     socket.soTimeout = remaining(end)
                     val packet = DatagramPacket(buffer, buffer.size)
                     socket.receive(packet)
+                    requireIoCurrent(active)
                     remaining(end)
                     if (packet.address != address || packet.port != port || packet.length < 8) continue
                     controlTrace("RX", "UDP", address, buffer.copyOf(packet.length), onControlTrace)
+                    requireIoCurrent(active)
                     val frame = parseFrame(buffer.copyOfRange(0, 8), buffer.copyOfRange(8, packet.length))
                     require(frame.version == gateway.version)
                     if (frame.type == 0) throw IOException("DoIP gateway rejected control query.")
@@ -602,6 +634,7 @@ object DoIpDirectRead {
                             frame.data[1].u8(), frame.data[2].u8(), size))
                     }
                 }
+                requireIoCurrent(active)
                 result
             }
         } finally { socket.close() }
@@ -757,7 +790,7 @@ object DoIpDirectRead {
         require(validVin(target.expectedVin) && frozen.size in 1..16 &&
             frozen.distinct().size == frozen.size && frozen.all { it in 0..65535 && it != target.tester })
         check(current())
-        val gateway = discover(target.address, target.expectedVin, options.timeoutMs, onControlTrace)
+        val gateway = discover(target.address, target.expectedVin, options.timeoutMs, onControlTrace, current = current)
         requireGatewayIdentity(target, gateway)
         require(gateway.vin == target.expectedVin) { "Inventory requires a matching gateway VIN." }
         val results = mutableListOf<InventoryEntry>()
@@ -786,7 +819,7 @@ object DoIpDirectRead {
                 results += InventoryEntry(ecu, null)
             }
             check(current())
-            val observed = discover(target.address, target.expectedVin, options.timeoutMs, onControlTrace)
+            val observed = discover(target.address, target.expectedVin, options.timeoutMs, onControlTrace, current = current)
             require(gateway.matchesIdentity(observed)) { "Gateway changed during ECU inventory." }
         }
         check(current())
@@ -930,7 +963,8 @@ object DoIpDirectRead {
                 monitoringSessionBudgetMs(operation, timeoutMs, sampleCount, intervalMs)
             else if (wwhKind != null || multi || obdDtc || operation in setOf(Operation.OBD_DID, Operation.OBD_IDENTIFY)) timeoutMs * 8L else timeoutMs * 5L
         check(isReadContextCurrent()) { "DoIP operation context changed." }
-        val gateway = discover(target.address, target.expectedVin, timeoutMs, onControlTrace, port = udpPort)
+        val gateway = discover(target.address, target.expectedVin, timeoutMs, onControlTrace, port = udpPort,
+            current = isReadContextCurrent)
         check(isReadContextCurrent()) { "DoIP operation context changed." }
         requireGatewayIdentity(target, gateway)
         if (operation == Operation.EXCHANGE) require(gateway.vin == target.expectedVin)

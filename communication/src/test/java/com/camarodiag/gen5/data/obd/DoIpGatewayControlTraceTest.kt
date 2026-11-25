@@ -364,6 +364,37 @@ class DoIpGatewayControlTraceTest {
         }
     }
 
+    @Test fun discoveryContextInvalidatedByAnnouncementNeverOpensTcp(): Unit = runBlocking {
+        val loopback = InetAddress.getByName("127.0.0.1")
+        DatagramSocket(0, loopback).use { udp ->
+            java.net.ServerSocket(0, 1, loopback).use { tcp ->
+                udp.soTimeout = 3000
+                tcp.soTimeout = 500
+                val worker = Executors.newSingleThreadExecutor()
+                try {
+                    val server = worker.submit { respond(udp, pdu(255, 1), identity()) }
+                    val target = DoIpDirectRead.Target.parse("127.0.0.1", "0E80", "1234", vin, false)
+                    val current = java.util.concurrent.atomic.AtomicBoolean(true)
+                    val result = runCatching {
+                        DoIpDirectRead.readAt(target, DoIpDirectRead.Operation.VIN,
+                            timeoutMs = 2000, isReadContextCurrent = current::get,
+                            onControlTrace = { if (it.direction == "RX") current.set(false) },
+                            udpPort = udp.localPort, tcpPort = tcp.localPort)
+                    }
+                    server.get(4, TimeUnit.SECONDS)
+                    assertFalse(current.get())
+                    assertTrue(result.isFailure)
+                    assertTrue(result.exceptionOrNull() is IllegalStateException)
+                    try {
+                        tcp.accept().use { fail("Obsolete discovery opened a diagnostic TCP session.") }
+                    } catch (_: java.net.SocketTimeoutException) {
+                        // Expected: cancellation happens before any TCP connection.
+                    }
+                } finally { worker.shutdownNow() }
+            }
+        }
+    }
+
     @Test fun monitoringBudgetIncludesEveryIdentityExchangeAndIdleFrameTail() {
         val uds = DoIpDirectRead.Operation.MONITOR
         val multi = DoIpDirectRead.Operation.MULTI_MONITOR
@@ -433,9 +464,9 @@ class DoIpGatewayControlTraceTest {
                         val target = DoIpDirectRead.Target.parse("127.0.0.1", "0E80", "1234", vin, false)
                         val samples = mutableListOf<Int>()
                         var identities = 0
-                        lateinit var task: Deferred<DoIpDirectRead.Outcome>
+                        lateinit var task: Deferred<Result<DoIpDirectRead.Outcome>>
                         task = async(start = CoroutineStart.LAZY) {
-                            DoIpDirectRead.readAt(target,
+                            runCatching { DoIpDirectRead.readAt(target,
                                 if (obd) DoIpDirectRead.Operation.OBD_MONITOR else DoIpDirectRead.Operation.MONITOR,
                                 did = 0xF40D, timeoutMs = 2000, sampleCount = 2, intervalMs = 250,
                                 onTrace = { trace ->
@@ -451,9 +482,9 @@ class DoIpGatewayControlTraceTest {
                                     assertEquals(vin, it.verifiedVin)
                                     assertEquals(0x1000, it.gatewayLogicalAddress)
                                     samples += it.index
-                                }, udpPort = udp.localPort, tcpPort = tcp.localPort)
+                                }, udpPort = udp.localPort, tcpPort = tcp.localPort) }
                         }
-                        val result = runCatching { task.await() }
+                        val result = runCatching { task.await().getOrThrow() }
                         server.get(6, TimeUnit.SECONDS)
                         assertEquals(lastMatches && !cancelAfterIdentity, result.isSuccess)
                         if (cancelAfterIdentity) assertTrue(task.isCancelled)

@@ -1,3 +1,7 @@
+## PR117 — invalidation de la découverte DoIP UDP Android (25/11/2026)
+
+- C6/DoIP : le contrôle d'activité s'applique maintenant aux datagrammes de découverte directe, broadcast, multicast, écoute et requêtes d'état/alimentation. La découverte liée à une opération ou un inventaire vérifie en plus le contexte véhicule avant transmission et après observation. Une annonce reçue après invalidation ne peut pas ouvrir une session TCP. Régression loopback ajoutée ; isolation des échecs attendus dans la coroutine du test de monitoring. Aucun test exécuté, aucun checkpoint.
+
 ## PR117 — annulation DoIP Android à la frontière de publication (25/11/2026)
 
 - C6/DoIP : l'activité de la continuation réseau est désormais intégrée au contrôle du contexte de session TCP. Une annulation détectée empêche les nouvelles émissions et la publication tardive des mesures vérifiées, réponses de commandes et progressions de sauvegarde ; les traces TCP ne sont plus transmises à un observateur devenu obsolète. Fermeture du socket existante conservée, pas de réémission automatique. Une callback déjà commencée ne peut pas être annulée rétroactivement. Le test loopback existant couvre désormais annulation au dernier RX d'identité UDS et OBDonUDS. Tests écrits, non exécutés ; aucun checkpoint.
