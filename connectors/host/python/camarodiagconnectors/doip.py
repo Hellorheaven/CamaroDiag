@@ -1072,6 +1072,7 @@ class Session:
             self.verify_vin(expected)
             reply = positive(request, self.exchange(request))
             result = {"subfunction": 5, "record": record, "present": len(reply) > 3,
+                      "did_count": reply[7] if len(reply) > 3 else None,
                       "raw_response": reply.hex().upper()}
             if len(reply) > 3:
                 result.update(dtc=reply[3:6].hex().upper(), status=reply[6],
