@@ -1,3 +1,10 @@
+## PR117 — décodage des mémoires DTC utilisateur (25/11/2026)
+
+- UDS 19/18 et 19/19 : parcours structurés Connectors Python, Android et Windows GUI/CLI. Sélection mémoire explicite, écho mémoire/DTC vérifié, longueurs documentées, VIN F190 avant/après et réponse brute originale conservée. Aucun repli vers la mémoire principale.
+- CLI Connectors : memory-snapshot-decoded / memory-extended-decoded avec --memory, --dtc, --record et --did-lengths / --record-lengths. Windows : sélecteurs --uds-memory-snapshot / --uds-memory-extended et catalogues existants --snapshot-did-lengths / --extended-record-lengths. Ressources FR/EN.
+- Régressions écrites sur trois plateformes et loopback Windows 19/18–19 avec VIN divergent. Aucun test ni build lancé. Restent simulation TCP Android et validation de clôture, autres intégrations DoIP applicables ; C6/DoIP restent actifs. Aucun merge ou Release.
+- Référence : https://uds.readthedocs.io/en/stable/pages/knowledge_base/service.html (19/18 et 19/19).
+
 ## PR117 — données DTC étendues UDS 19/06 décodées (25/11/2026)
 
 - Nouveau parcours 19/06 structuré sur Connectors Python, Android, Windows GUI et CLI : DTC et sélecteur explicites, catalogue numéro d'enregistrement:longueur documenté, découpage exact et conservation brute. 01..EF individuel, FE réglementaire OBD (90..9F), FF tous. Refus des numéros réservés, doublons, longueur inconnue, troncatures et réponses hors du sélecteur.
