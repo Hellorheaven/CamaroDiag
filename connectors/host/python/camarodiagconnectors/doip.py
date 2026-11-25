@@ -453,6 +453,57 @@ def decode_all_stored_records(reply: bytes, lengths: dict[int, int]) -> list[dic
     return rows
 
 
+def parse_extended_record_lengths(text: str) -> dict[int, int]:
+    """Documented extended-record number and payload length (not DID length)."""
+    catalog = {}
+    fields = text.split(",")
+    if not 1 <= len(fields) <= 239:
+        raise DoIpError("Expected 1..239 record:length entries")
+    for field in fields:
+        parts = field.split(":")
+        if (len(parts) != 2 or not re.fullmatch(r"[0-9A-Fa-f]{2}", parts[0]) or
+                not re.fullmatch(r"[0-9]{1,4}", parts[1])):
+            raise DoIpError("Expected hexadecimal record and decimal length")
+        number, size = int(parts[0], 16), int(parts[1])
+        if number in catalog or not 1 <= number <= 0xEF or not 1 <= size <= 4090:
+            raise DoIpError("Invalid or duplicate extended record length")
+        catalog[number] = size
+    return catalog
+
+
+def extended_records_request(dtc: int, record: int, lengths: dict[int, int]) -> bytes:
+    if (type(dtc) is not int or not 0 <= dtc <= 0xFFFFFF or type(record) is not int or
+            not (1 <= record <= 0xEF or record in (0xFE, 0xFF))):
+        raise DoIpError("Invalid extended data selector")
+    if (not isinstance(lengths, dict) or not 1 <= len(lengths) <= 239 or
+            any(type(n) is not int or not 1 <= n <= 0xEF or type(size) is not int or
+                not 1 <= size <= 4090 for n, size in lengths.items())):
+        raise DoIpError("Invalid extended record length catalog")
+    if record <= 0xEF and record not in lengths:
+        raise DoIpError("Selected record length is undocumented")
+    return b"\x19\x06" + dtc.to_bytes(3, "big") + bytes((record,))
+
+
+def decode_extended_records(dtc: int, record: int, reply: bytes, lengths: dict[int, int]) -> dict:
+    catalog = dict(lengths)
+    request = extended_records_request(dtc, record, catalog)
+    positive(request, reply)
+    rows, seen, offset = [], set(), 6
+    while offset < len(reply):
+        number = reply[offset]
+        size = catalog.get(number)
+        if (size is None or number in seen or
+                (record == 0xFE and not 0x90 <= number <= 0x9F) or
+                (record <= 0xEF and number != record) or len(reply) - offset - 1 < size):
+            raise DoIpError("Unexpected, duplicate, unknown or truncated extended record")
+        seen.add(number)
+        end = offset + 1 + size
+        rows.append({"record": number, "length": size, "data": reply[offset+1:end].hex().upper()})
+        offset = end
+    return {"dtc": f"{dtc:06X}", "status": reply[5], "requested_record": record,
+            "records": rows, "raw_response": reply.hex().upper()}
+
+
 def decode_snapshot_records(dtc: int, record: int, reply: bytes, lengths: dict[int, int]) -> dict:
     """Decode 19/04 with documented DID lengths; retain historical values as bytes."""
     catalog = validate_stored_did_lengths(lengths)
@@ -1176,6 +1227,25 @@ class Session:
                 result.update(dtc=reply[3:6].hex().upper(), status=reply[6],
                               raw_stored_data=reply[7:].hex().upper())
             self.verify_vin(expected)
+            return result
+        except BaseException:
+            self.close()
+            raise
+
+    def read_extended_records(self, expected: str, dtc: int, record: int,
+                              lengths: dict[int, int], *, obd: bool = False) -> dict:
+        request = extended_records_request(dtc, record, lengths)
+        catalog = dict(lengths)
+        def verify():
+            if obd:
+                if not self.read_obd(expected)["obd_on_uds"]:
+                    raise DoIpError("Selected ECU did not identify as OBDonUDS")
+            else:
+                self.verify_vin(expected)
+        try:
+            verify()
+            result = decode_extended_records(dtc, record, self.exchange(request), catalog)
+            verify()
             return result
         except BaseException:
             self.close()
