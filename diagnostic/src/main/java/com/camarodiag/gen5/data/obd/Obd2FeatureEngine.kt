@@ -98,7 +98,10 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
             ask("ATS1")
             ask("ATH1")
             val response = ask("0100", 2500L)
-            val ids = response.lineSequence().mapNotNull { raw ->
+            val ids = response.lineSequence().flatMap { line ->
+                // Some adapters put several header-tagged CAN replies on one line.
+                line.split(Regex("(?i)\\s+(?=(?:7E[0-9A-F]|7DF|18DAF1[0-9A-F]{2})\\s+)" )).asSequence()
+            }.mapNotNull { raw ->
                 val line = raw.trim().removeSuffix(">").trim().uppercase(Locale.ROOT)
                 val spaced = Regex("^(7E[8-F]|18DAF1[0-9A-F]{2})\\s+").find(line)
                 val id = spaced?.groupValues?.get(1) ?: when {
@@ -213,6 +216,13 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
         ) to proved
     }
 
+    /** Per-service observations distinguish a positive zero count from no response. */
+    suspend fun readDtcModeEvidence(): Map<Int, List<ObdDtc>?> = linkedMapOf(
+        3 to decodeDtcResponseOrNull(ask("03", 2500L), 0x43, "confirmed"),
+        7 to decodeDtcResponseOrNull(ask("07", 2500L), 0x47, "pending"),
+        10 to decodeDtcResponseOrNull(ask("0A", 2500L), 0x4A, "permanent")
+    )
+
     /** Reads the DTC that caused freeze-frame storage (Mode 02, PID 02, frame 00). */
     suspend fun readFreezeFrameDtc(): ObdDtc? {
         val data = payload(ask("020200"), 0x42, 0x02) ?: return null
@@ -269,8 +279,20 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
     }
 
     suspend fun readVin(): String? =
-        decodeAsciiRecords(ask("0902"), 0x49, 0x02, 17).singleOrNull()
+        decodeAsciiRecords(ask("0902", 3500L), 0x49, 0x02, 17).distinct().singleOrNull()
             ?.takeIf { it.matches(Regex("[A-HJ-NPR-Z0-9]{17}")) }
+
+    /** A fresh VIN observation with normal ELM formatting and one bounded retry.
+     * Never substitutes the saved or previously displayed VIN for a new response.
+     */
+    suspend fun readVinForVerification(): String? {
+        ask("ATH0")
+        ask("ATS0")
+        val first = readVin()
+        if (first != null) return first
+        return decodeAsciiRecords(ask("0902", 5000L), 0x49, 0x02, 17).distinct().singleOrNull()
+            ?.takeIf { it.matches(Regex("[A-HJ-NPR-Z0-9]{17}")) }
+    }
 
     suspend fun readCalibrationIds(): List<String> =
         decodeAsciiRecords(ask("0904"), 0x49, 0x04, 16)
@@ -300,8 +322,8 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
         }
 
     suspend fun readReadiness(): String? {
-        val data = payload(ask("0101"), 0x41, 0x01) ?: return null
-        if (data.size < 4) return null
+        val data = CamaroUdsProtocol.parsePidBytes(ask("0101"), "01")?.asList() ?: return null
+        if (data.size != 4) return null
         val mil = (data[0] and 0x80) != 0
         val dtcCount = data[0] and 0x7F
         return "MIL=${if (mil) "ON" else "OFF"}; DTC_COUNT=$dtcCount; RAW=${data.joinToString(" ") { "%02X".format(Locale.US, it) }}"
