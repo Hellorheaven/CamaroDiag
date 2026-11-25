@@ -858,6 +858,31 @@ internal static class StandardVehicleProtocolsSelfTests
         Reject<InvalidDataException>(() => ObdOnUdsServices.DecodeStoredRecord(1, [0x59, 5, 2]), "Wrong record rejected.");
         Reject<InvalidDataException>(() => ObdOnUdsServices.DecodeStoredRecord(1, [0x59, 5, 1, 1, 2, 3, 8, 2, 0xF1, 0x90]), "Missing DID rejected.");
         Reject<ArgumentException>(() => StandardProtocolCli.ParseVerifiedDoIpRead([..recordArgs, "--uds-stored-record", "0xFF"]), "Wildcard requires OEM layout.");
+        var decodedSnapshot = StandardProtocolCli.ParseVerifiedDoIpRead([..recordArgs, "--uds-snapshot", "0x010203",
+            "--uds-snapshot-record", "0xFF", "--snapshot-did-lengths", "F40C:2,F40D:1"]);
+        Check(!decodedSnapshot.Obd && decodedSnapshot.Target.Request.SequenceEqual(new byte[] { 0x19, 4, 1, 2, 3, 255 }),
+            "Decoded snapshots use generic verified UDS.");
+        var obdSnapshot = StandardProtocolCli.ParseVerifiedDoIpRead([..recordArgs, "--obd-snapshot", "0x010203",
+            "--obd-snapshot-record", "0x00", "--snapshot-did-lengths", "F40D:1"]);
+        Check(obdSnapshot.Obd && obdSnapshot.Target.Request.SequenceEqual(new byte[] { 0x19, 4, 1, 2, 3, 0 }),
+            "Decoded OBD snapshots allow explicit regulated record zero.");
+        var snapshotLengths = ObdOnUdsServices.ParseStoredDidLengths("F40C:2,F40D:1");
+        var snapshotResponse = Convert.FromHexString("5904010203080102F40C1234F40D560201F40D78");
+        var snapshots = ObdOnUdsServices.DecodeSnapshotRecords(0x010203, 255, snapshotResponse, snapshotLengths);
+        Check(snapshots.Status == 8 && snapshots.Records.Count == 2 && snapshots.Records[1].Record == 2 &&
+            snapshots.Records[0].Dids[0].Data.SequenceEqual(new byte[] { 0x12, 0x34 }) &&
+            snapshots.Records[1].Dids[0].Data.SequenceEqual(new byte[] { 0x78 }) &&
+            snapshots.RawResponse.SequenceEqual(snapshotResponse), "Snapshot records preserve historical DID bytes.");
+        Check(ObdOnUdsServices.DecodeSnapshotRecords(0x010203, 0, Convert.FromHexString("590401020308"), snapshotLengths)
+            .Records.Count == 0, "Absent snapshot data remains distinct.");
+        foreach (var invalid in new[] { "59040102030801", "5904010203080101F40C12",
+            "5904010203080101FFFFAA", "59040102030801000100", "5904010204080100" })
+            Reject<InvalidDataException>(() => ObdOnUdsServices.DecodeSnapshotRecords(0x010203, 255,
+                Convert.FromHexString(invalid), snapshotLengths), "Malformed snapshot response rejected.");
+        Reject<InvalidDataException>(() => ObdOnUdsServices.DecodeSnapshotRecords(0x010203, 1, snapshotResponse, snapshotLengths),
+            "Individual snapshot query rejects multiple records.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseVerifiedDoIpRead([..recordArgs, "--uds-did", "F190",
+            "--snapshot-did-lengths", "F40D:1"]), "Snapshot lengths cannot be applied to other selectors.");
         var allStored = StandardProtocolCli.ParseVerifiedDoIpRead([..recordArgs, "--uds-all-stored-records", "F40C:2,F40D:1"]);
         Check(!allStored.Obd && allStored.Target.Request.SequenceEqual(new byte[] { 0x19, 5, 255 }), "All stored records use verified UDS.");
         var catalog = ObdOnUdsServices.ParseStoredDidLengths("F40C:2,F40D:1");
