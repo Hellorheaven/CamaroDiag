@@ -1,3 +1,7 @@
+PR117 — grouped Debug validation of multi-DID and verified DoIP reads
+Implementation parent: cfccf02cbb9efc21b219aa4755f5e4e17a9e6aa6
+Previous full Debug run 45501625699 passed all 12 technical jobs. Validate multi-DID Android Windows Python, Windows verified CLI, DTC record and WWH correlation, single DID identity revalidation and Python CLI generic DID revalidation in this checkpoint. No merge, release or physical qualification.
+
 PR117 — grouped Debug validation of WWH OBDonUDS over DoIP on Android Windows Connectors
 Implementation parent: 81013db5c12775018c1c8b397f959e76cdce8275
 Previous full Debug run 45498873150 succeeded. Validate WWH 19/42 19/55 19/56, same-socket VIN/protocol revalidation, Android and Windows localized UI. No physical qualification, merge or Release.

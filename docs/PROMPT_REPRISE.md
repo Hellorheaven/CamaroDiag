@@ -1,3 +1,7 @@
+## PR117 — checkpoint multi-DID et contrôle d'identité (25/11/2026)
+
+- Connectors CLI : revalidation F190 après la lecture simple UDS, avant retour JSON. Validation groupée demandée pour la parité multi-DID Android/Windows/Python, CLI Windows vérifiée, corrélation SID/DTC/WWH et lectures simples. Checkpoint précédent 45501625699 vert 12/12. Aucune fusion ni qualification matérielle.
+
 ## PR117 — vérification après lecture DID (25/11/2026)
 
 - Lecture simple DoIP Android/Windows : rejet des données vides et relecture de l'identité avant publication du résultat (F190 pour UDS, F802/F810 pour OBDonUDS). Connectors : même protection OBDonUDS, test de changement du protocole en cours de session. Checkpoint WWH 45501625699 terminé avec 12/12 jobs techniques réussis ; lot multi-DID et durcissement suivants à valider.

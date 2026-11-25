@@ -231,7 +231,9 @@ def run(argv: Sequence[str] | None = None) -> dict:
         if o.action == "vin":
             return result
         if o.action == "did":
-            return result | {"did": o.did, "data": session.read_did(o.did).hex().upper()}
+            data = session.read_did(o.did)
+            session.verify_vin(o.vin)
+            return result | {"did": o.did, "data": data.hex().upper()}
         if o.action == "dtcs":
             return result | session.dtcs(o.mask)
         if o.action == "count":
