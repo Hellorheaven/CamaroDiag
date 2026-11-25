@@ -43,6 +43,7 @@ internal static class BridgeCommandLineHelpSelfTests
             "--listen-ipv6-ifindex", "--multicast-ipv6-ifindex",
             "--doip-version", "--uds-p2-ms", "--uds-p2-star-ms", "--sequence", "--expected-vin",
             "--power-mode true", "--broadcast-ip", "--vin", "--eid",
+            "--trace-file", "--routing-activation-type", "--routing-oem-data",
             "--monitor-did", "--obd-monitor-did", "--monitor-dids", "--obd-monitor-dids",
             "--samples", "--interval-ms",
             "--uds-did", "--uds-scaling-did", "--uds-dtc-mask", "--uds-dtc-count-mask",

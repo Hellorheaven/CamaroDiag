@@ -1,3 +1,7 @@
+## PR117 — trace et paramètres de session sauvegarde DoIP Windows (25/11/2026)
+
+- CLI --doip-backup : --trace-file distinct du ZIP, conserve découverte et deux lectures réelles même en cas d'interruption ; options P2/P2*, routage ISO 13400 et quatre octets OEM explicites. Contrôle VIN/passerelle au départ et revalidation avant ouverture du socket, identité ECU et double lecture inchangées. Vérification offline reste sans réseau. Aide FR/EN et tests écrits non exécutés, aucune CI. Ne pas partager les traces contenant des données ECU ou VIN sans autorisation.
+
 ## PR117 — journal UDP DoIP Windows (25/11/2026)
 
 - Extension de --trace-file aux découvertes unicast/broadcast/multicast IPv6, écoute passive IPv4/IPv6, état/alimentation, et identification UDP des sessions vérifiées. JSONL conserve endpoint, port, direction, données réelles, UTC. Les opérations de découverte peuvent être journalisées avant consentement ; aucun PDU diagnostique mutateur avant consentement. Monitoring revalide l'identité de passerelle avant connexion. Tests écrits non exécutés. Aucun checkpoint CI.

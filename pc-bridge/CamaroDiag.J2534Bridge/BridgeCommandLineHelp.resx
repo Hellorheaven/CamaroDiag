@@ -53,6 +53,9 @@ Examples:
   --doip-backup               Two reads of the ECU region defined by the JSON --profile;
                               --host, --archive ZIP, --confirm-read true required.
                               TLS default; explicit --tls false; optional --certificate.
+                              --trace-file NEW.jsonl retains both acquisition passes.
+                              Optional --uds-p2-ms, --uds-p2-star-ms,
+                              --routing-activation-type, --routing-oem-data.
   --doip-verify-backup        Offline ZIP/profile integrity check; no network access.
   --doip-exchange             TCP/TLS UDS diagnostic exchange: user-selected --host,
                               --tester, --ecu and hex --payload; --tls true selects

@@ -545,6 +545,21 @@ internal static class StandardVehicleProtocolsSelfTests
                 datagram.RootElement.GetProperty("pdu").GetString() == "02FD000400000000",
                 "UDP journal preserves endpoint and complete datagram.");
         }
+        string[] backupArgs = ["--doip-backup", "--host", "127.0.0.1", "--profile", "profile.json",
+            "--archive", Path.Combine(Path.GetTempPath(), "doip-capture.zip"), "--confirm-read", "true"];
+        var backupOptions = DoIpBackupCli.Parse([..backupArgs, "--trace-file", tracePath,
+            "--uds-p2-ms", "100", "--uds-p2-star-ms", "2000", "--routing-activation-type", "0x01",
+            "--routing-oem-data", "01020304"]);
+        Check(backupOptions.Tls && backupOptions.TraceFile == Path.GetFullPath(tracePath) &&
+            backupOptions.Session is { P2Ms: 100, P2StarMs: 2000, RoutingType: 1, OemHex: "01020304" },
+            "Scoped DoIP backup parses trace and explicit session configuration.");
+        Reject<ArgumentException>(() => DoIpBackupCli.Parse([..backupArgs, "--uds-p2-ms", "2000",
+            "--uds-p2-star-ms", "100"]), "Backup rejects reversed P2 timing.");
+        Reject<ArgumentException>(() => DoIpBackupCli.Parse([..backupArgs, "--routing-oem-data", "0102"]),
+            "Backup rejects partial OEM routing data.");
+        Reject<ArgumentException>(() => DoIpBackupCli.Parse(["--doip-verify-backup", "--profile",
+            "profile.json", "--archive", "capture.zip", "--trace-file", tracePath]),
+            "Offline archive verification does not open a network trace.");
         var monitorArgs = new[] { StandardProtocolCli.DoIpCommand, "--host", "192.0.2.10",
             "--tester", "0E80", "--ecu", "1234", "--expected-vin", "1G1FA1RXXR0123456",
             "--obd-monitor-did", "F40C" };

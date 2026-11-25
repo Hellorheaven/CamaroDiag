@@ -9,7 +9,8 @@ internal static class DoIpBackupCli
     internal const string BackupCommand = "--doip-backup";
     internal const string VerifyCommand = "--doip-verify-backup";
     internal sealed record Options(bool VerifyOnly, string Profile, string Archive,
-        string? Host, bool Tls, string? Certificate, int TimeoutMs);
+        string? Host, bool Tls, string? Certificate, int TimeoutMs,
+        DoIpDiagnosticTransport.SessionOptions? Session = null, string? TraceFile = null);
 
     internal static Options Parse(string[] args)
     {
@@ -19,7 +20,8 @@ internal static class DoIpBackupCli
         var allowed = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
             { "--profile", "--archive" };
         if (backup == 1) allowed.UnionWith(new[] { "--host", "--tls", "--certificate",
-            "--timeout-ms", "--confirm-read" });
+            "--timeout-ms", "--confirm-read", "--trace-file", "--uds-p2-ms",
+            "--uds-p2-star-ms", "--routing-activation-type", "--routing-oem-data" });
         var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         for (var i = 0; i < args.Length; i++)
         {
@@ -57,7 +59,14 @@ internal static class DoIpBackupCli
             (!int.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out timeout) ||
                 timeout is < 100 or > 30000))
             throw new ArgumentException("Timeout must be 100..30000 milliseconds.");
-        return new Options(false, profile, archive, address.ToString(), tls, certificate, timeout);
+        var routing = values.GetValueOrDefault("--routing-activation-type", "00");
+        if (routing.StartsWith("0x", StringComparison.OrdinalIgnoreCase)) routing = routing[2..];
+        var session = DoIpDiagnosticTransport.SessionOptions.Parse(timeout,
+            values.GetValueOrDefault("--uds-p2-ms", ""), values.GetValueOrDefault("--uds-p2-star-ms", ""),
+            routing, values.GetValueOrDefault("--routing-oem-data", ""));
+        var tracePath = StandardProtocolCli.ParseDoIpTracePath(args, archive);
+        return new Options(false, profile, archive, address.ToString(), tls, certificate, timeout,
+            session, tracePath);
     }
 
     internal static async Task<int> RunAsync(string[] args)
@@ -85,11 +94,21 @@ internal static class DoIpBackupCli
             var host = options.Host ?? throw new InvalidOperationException();
             var address = IPAddress.Parse(host);
             var timeout = TimeSpan.FromMilliseconds(options.TimeoutMs);
-            var gateway = await DoIpVehicleDiscovery.DiscoverAsync(host, timeout, cancellation.Token);
+            var target = new StandardProtocolCli.DoIpOptions(host, scope.Tester, scope.Ecu,
+                Array.Empty<byte>(), options.TimeoutMs, options.Tls);
+            using var journal = options.TraceFile is null ? null :
+                new StandardProtocolCli.DoIpTraceJournal(options.TraceFile, target);
+            var gateway = await DoIpVehicleDiscovery.DiscoverAsync(host, timeout, cancellation.Token,
+                vin: scope.Vin, trace: journal is null ? null : journal.RecordDatagram);
+            if (gateway.Vin != scope.Vin || gateway.LogicalAddress != scope.Gateway)
+                throw new UnauthorizedAccessException("DoIP gateway differs from the approved backup profile.");
+            await DoIpVehicleDiscovery.RequireCurrentIdentityAsync(gateway, timeout, cancellation.Token,
+                trace: journal is null ? null : journal.RecordDatagram);
             var capture = await DoIpScopedBackup.ReadObservedAsync(gateway, address, scope,
                 options.Tls, timeout, cancellation.Token, (pass, count) =>
                     Console.WriteLine(string.Format(DoIpConsolePresentation.Text("BackupProgress"),
-                        pass, count, scope.Length)), options.Certificate);
+                        pass, count, scope.Length)), options.Certificate,
+                trace: journal is null ? null : journal.Record, options: options.Session);
             DoIpScopedBackup.SaveNew(options.Archive, capture, cancellation.Token);
             Console.WriteLine(string.Format(DoIpConsolePresentation.Text("BackupSaved"),
                 scope.Length, capture.Sha256, options.Archive));
