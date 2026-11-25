@@ -131,6 +131,10 @@
   <data name="InvalidStoredRecord" xml:space="preserve"><value>Choisir un enregistrement 00..FE.</value></data>
   <data name="StoredRecordResult" xml:space="preserve"><value>Enregistrement mémorisé 0x{0:X2}</value></data>
   <data name="StoredRecordCount" xml:space="preserve"><value>Nombre de DID annoncé : {0}</value></data>
+  <data name="AllStoredRecords" xml:space="preserve"><value>Lire tous les enregistrements</value></data>
+  <data name="StoredCatalog" xml:space="preserve"><value>Longueurs DID documentées (F40C:2,F40D:1)</value></data>
+  <data name="InvalidStoredCatalog" xml:space="preserve"><value>Renseigner les longueurs DID documentées.</value></data>
+  <data name="AllStoredResult" xml:space="preserve"><value>Enregistrements mémorisés : {0}</value></data>
   <data name="StoredRecordEmpty" xml:space="preserve"><value>Aucune donnée mémorisée pour cet enregistrement</value></data>
   <data name="ExtendedRecordSupport" xml:space="preserve"><value>DTC prenant en charge cet enregistrement</value></data>
   <data name="ExtendedRecordSize" xml:space="preserve"><value>Longueur uniforme documentée (octets)</value></data>
