@@ -634,6 +634,30 @@ class DoIpTests(unittest.TestCase):
             Session.read_legacy_dtc(fake, VIN, 0x10, dtc=1, record=0xF0)
         fake.verify_vin.assert_not_called()
 
+    def test_decoded_extended_data_respects_record_scope_and_identity(self):
+        lengths = {1: 2, 0x90: 1, 0x91: 2}
+        for obd in (False, True):
+            fake = unittest.mock.Mock(spec=Session)
+            fake.read_obd.return_value = {"obd_on_uds": True}
+            fake.exchange.return_value = bytes.fromhex("59060102030801123490AA91BBCC")
+            report = Session.read_extended_records(fake, VIN, 0x010203, 255, lengths, obd=obd)
+            self.assertEqual([r["record"] for r in report["records"]], [1, 0x90, 0x91])
+            self.assertEqual(report["records"][2]["data"], "BBCC")
+            self.assertEqual(report["raw_response"], "59060102030801123490AA91BBCC")
+            fake.exchange.assert_called_once_with(bytes.fromhex("1906010203FF"))
+            self.assertEqual(fake.read_obd.call_count if obd else fake.verify_vin.call_count, 2)
+        for selector, payload in ((0xFE, "590601020308011234"),
+                                  (1, "59060102030801123490AA"),
+                                  (255, "59060102030890AA90BB"),
+                                  (255, "5906010203080112"),
+                                  (255, "59060102030802AA"),
+                                  (255, "59060102040890AA")):
+            fake = unittest.mock.Mock(spec=Session)
+            fake.exchange.return_value = bytes.fromhex(payload)
+            with self.assertRaises(DoIpError):
+                Session.read_extended_records(fake, VIN, 0x010203, selector, lengths)
+            fake.close.assert_called_once()
+
     def test_decoded_snapshots_preserve_historical_data(self):
         lengths = {0xF40C: 2, 0xF40D: 1}
         response = bytes.fromhex("5904010203080102F40C1234F40D560201F40D78")
