@@ -570,6 +570,45 @@ internal static class DoIpDiagnosticSessionSelfTests
             });
         }
 
+        // A wildcard stored-data response is not an individual-record echo.
+        foreach (var finalMatches in new[] { true, false })
+        {
+            await RunCaseAsync(async stream =>
+            {
+                _ = await RequireRequestAsync(stream);
+                await SendAsync(stream, DoIpCodec.DiagnosticMessage,
+                    FromEcu([0x62, 0xF1, 0x90, .. System.Text.Encoding.ASCII.GetBytes(selectedVehicleVin)]));
+                var query = await ReadAsync(stream);
+                Check(query.Payload.SequenceEqual(new byte[] { 0x0E, 0x80, 0x12, 0x34, 0x19, 5, 255 }),
+                    "All stored records use exact wildcard selector.");
+                await SendAsync(stream, DoIpCodec.DiagnosticMessage,
+                    FromEcu(Convert.FromHexString("5905010102030802F40C1234F40D56020405060001F40D78")));
+                _ = await RequireRequestAsync(stream);
+                await SendAsync(stream, DoIpCodec.DiagnosticMessage,
+                    FromEcu([0x62, 0xF1, 0x90, .. System.Text.Encoding.ASCII.GetBytes(
+                        finalMatches ? selectedVehicleVin : otherVehicleVin)]));
+            }, async client =>
+            {
+                var timeout = TimeSpan.FromSeconds(2);
+                var token = CancellationToken.None;
+                var request = ObdOnUdsServices.ReadAllStoredRecords();
+                var catalog = ObdOnUdsServices.ParseStoredDidLengths("F40C:2,F40D:1");
+                Task<ObdOnUdsServices.AllStoredRecords> Read() =>
+                    DoIpVinReader.ReadVerifiedDtcAsync(client, observedForVin, timeout, token, async () =>
+                        ObdOnUdsServices.DecodeAllStoredRecords(await client.ExchangeUdsAsync(request, timeout, token), catalog));
+                if (finalMatches)
+                {
+                    var report = await Read();
+                    Check(report.Records.Count == 2 && report.Records[1].Record == 2 &&
+                        report.Records[0].Dids[0].Data.SequenceEqual(new byte[] { 0x12, 0x34 }),
+                        "Both stored records retained after final VIN verification.");
+                }
+                else
+                    await Expect<InvalidDataException>(async () => { _ = await Read(); },
+                        "Changed VIN prevents wildcard stored data publication.");
+            });
+        }
+
         // Multi-DID polling: one request per sample, no complete result before final VIN.
         foreach (var finalIdentityMatches in new[] { true, false })
         {
