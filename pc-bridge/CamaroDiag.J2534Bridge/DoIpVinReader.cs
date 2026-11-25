@@ -565,6 +565,20 @@ internal static class DoIpVinReader
             ObdOnUdsServices.DecodeStoredRecord(record, await link.ExchangeUdsAsync(request, timeout, token)));
     }
 
+    internal static async Task<ObdOnUdsServices.AllStoredRecords> ReadObservedAllStoredRecordsAsync(
+        DoIpVehicleDiscovery.Identity gateway, IPAddress address, ushort tester, ushort ecu,
+        bool tls, IReadOnlyDictionary<ushort, int> lengths, TimeSpan timeout, CancellationToken token,
+        string? certificate, Action<DoIpDiagnosticTransport.PduTrace>? trace, DoIpDiagnosticTransport.SessionOptions? options)
+    {
+        var catalog = lengths.ToDictionary(p => p.Key, p => p.Value);
+        if (catalog.Count is < 1 or > 255 || catalog.Any(p => p.Value is < 1 or > 4096))
+            throw new ArgumentException("Invalid DID length catalog.");
+        var request = ObdOnUdsServices.ReadAllStoredRecords();
+        await using var link = await ConnectObservedAsync(gateway, address, tester, ecu, tls, timeout, token, certificate, trace, options);
+        return await ReadVerifiedDtcAsync(link, gateway, timeout, token, async () =>
+            ObdOnUdsServices.DecodeAllStoredRecords(await link.ExchangeUdsAsync(request, timeout, token), catalog));
+    }
+
     internal static async Task<ObdOnUdsServices.ExtendedRecordReport> ReadObservedExtendedRecordAsync(
         DoIpVehicleDiscovery.Identity gateway, IPAddress address, ushort tester, ushort ecu,
         bool tls, byte record, int? size, TimeSpan timeout, CancellationToken token,
