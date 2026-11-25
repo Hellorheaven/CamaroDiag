@@ -858,6 +858,19 @@ internal static class StandardVehicleProtocolsSelfTests
         Reject<InvalidDataException>(() => ObdOnUdsServices.DecodeStoredRecord(1, [0x59, 5, 2]), "Wrong record rejected.");
         Reject<InvalidDataException>(() => ObdOnUdsServices.DecodeStoredRecord(1, [0x59, 5, 1, 1, 2, 3, 8, 2, 0xF1, 0x90]), "Missing DID rejected.");
         Reject<ArgumentException>(() => StandardProtocolCli.ParseVerifiedDoIpRead([..recordArgs, "--uds-stored-record", "0xFF"]), "Wildcard requires OEM layout.");
+        var allStored = StandardProtocolCli.ParseVerifiedDoIpRead([..recordArgs, "--uds-all-stored-records", "F40C:2,F40D:1"]);
+        Check(!allStored.Obd && allStored.Target.Request.SequenceEqual(new byte[] { 0x19, 5, 255 }), "All stored records use verified UDS.");
+        var catalog = ObdOnUdsServices.ParseStoredDidLengths("F40C:2,F40D:1");
+        var multiStored = ObdOnUdsServices.DecodeAllStoredRecords(Convert.FromHexString("5905010102030802F40C1234F40D56020405060001F40D78"), catalog);
+        Check(multiStored.Records.Count == 2 && multiStored.Records[1].Record == 2 &&
+            multiStored.Records[0].Dids[0].Data.SequenceEqual(new byte[] { 0x12, 0x34 }), "Multi-record stored data retained.");
+        Check(ObdOnUdsServices.DecodeAllStoredRecords([0x59, 5, 255], catalog).Records.Count == 0, "Empty wildcard response.");
+        foreach (var invalid in new[] { "590501", "5905010102030801F40C12", "5905010102030801FFFFAA",
+            "5905010102030800010405060000", "590501010203080000" })
+            Reject<InvalidDataException>(() => ObdOnUdsServices.DecodeAllStoredRecords(Convert.FromHexString(invalid), catalog), "Malformed all-stored response rejected.");
+        foreach (var invalid in new[] { "F40D:0", "F40D:1,F40D:2", "F40D:4097", "F40G:1" })
+            Reject<ArgumentException>(() => ObdOnUdsServices.ParseStoredDidLengths(invalid), "Invalid stored DID catalog rejected.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseVerifiedDoIpRead([..recordArgs, "--uds-all-stored-records", "F40D:1", "--uds-stored-record", "0x01"]), "Stored selectors are exclusive.");
         var recordSupport = StandardProtocolCli.ParseVerifiedDoIpRead([..recordArgs, "--uds-extended-record-support", "0x01"]);
         Check(!recordSupport.Obd && recordSupport.Target.Request.SequenceEqual(new byte[] { 0x19, 0x1A, 1 }),
             "Support query is verified UDS.");
