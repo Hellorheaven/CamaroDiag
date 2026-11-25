@@ -440,7 +440,7 @@ internal static class StandardProtocolCli
                 raw_records = report.Detail is null ? null : Convert.ToHexString(report.Detail.RawExtendedDataRecords)
             }));
         }
-        else if (request.Length == 3 && request[0] == 0x19 && request[1] == 5)
+        else if (request.Length == 3 && request[0] == 0x19 && request[1] == 5 && request[2] != 255)
         {
             var report = ObdOnUdsServices.DecodeStoredRecord(request[2], response);
             Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(new
@@ -1362,7 +1362,7 @@ internal static class StandardProtocolCli
             "--obd-dtc-mask", "--obd-dtc-count-mask", "--uds-historical-dtc",
             "--uds-severity-count", "--uds-severity-list", "--uds-severity-info", "--uds-severity-status",
             "--uds-memory", "--uds-memory-mask", "--uds-memory-snapshot", "--uds-memory-extended", "--uds-memory-record",
-            "--uds-stored-record", "--uds-extended-record-support", "--uds-extended-record-data", "--uds-extended-record-size",
+            "--uds-stored-record", "--uds-all-stored-records", "--uds-extended-record-support", "--uds-extended-record-data", "--uds-extended-record-size",
             "--uds-mirror-mask", "--uds-mirror-count", "--uds-mirror-extended", "--uds-mirror-record",
             "--uds-legacy-emissions-mask", "--uds-legacy-emissions-count",
             "--uds-dtc-mask", "--uds-dtc-count-mask", "--uds-snapshot", "--uds-snapshot-record",
@@ -1410,6 +1410,12 @@ internal static class StandardProtocolCli
         if (legacySelectors > 1 || (mirrorRecord is not null) != (mirrorExtended is not null) ||
             (legacySelectors == 1 && Optional(args, "--expected-vin") is null))
             throw new ArgumentException("Legacy DTC reads require VIN, one selector and explicit mirror record for detail.");
+        var allStoredRecords = Optional(args, "--uds-all-stored-records");
+        if (allStoredRecords is not null)
+        {
+            if (Optional(args, "--expected-vin") is null) throw new ArgumentException("Stored records require explicit VIN.");
+            _ = ObdOnUdsServices.ParseStoredDidLengths(allStoredRecords);
+        }
         var storedRecord = Optional(args, "--uds-stored-record");
         if (storedRecord is not null && Optional(args, "--expected-vin") is null)
             throw new ArgumentException("Stored DTC record requires explicit VIN.");
@@ -1472,7 +1478,7 @@ internal static class StandardProtocolCli
             (obdDtcMask is null ? 0 : 1) +
             (obdDtcCountMask is null ? 0 : 1) +
             (supportedDtcs ? 1 : 0) +
-            (permanentDtcs ? 1 : 0) + memorySelectors + extendedRecordSelectors + legacySelectors + (storedRecord is null ? 0 : 1) +
+            (permanentDtcs ? 1 : 0) + memorySelectors + extendedRecordSelectors + legacySelectors + (storedRecord is null ? 0 : 1) + (allStoredRecords is null ? 0 : 1) +
             (snapshotIndex ? 1 : 0) +
             (historicalDtc is null ? 0 : 1) +
             (faultCounters ? 1 : 0) +
@@ -1510,6 +1516,7 @@ internal static class StandardProtocolCli
             legacyEmissionsMask is not null ? ObdOnUdsServices.ReadLegacyDtc(0x13, checked((byte)Number(legacyEmissionsMask))) :
             legacyEmissionsCount is not null ? ObdOnUdsServices.ReadLegacyDtc(0x12, checked((byte)Number(legacyEmissionsCount))) :
             mirrorExtended is not null ? ObdOnUdsServices.ReadLegacyDtc(0x10, 0, Number(mirrorExtended), checked((byte)Number(mirrorRecord!))) :
+            allStoredRecords is not null ? ObdOnUdsServices.ReadAllStoredRecords() :
             storedRecord is not null ? ObdOnUdsServices.ReadStoredRecord(checked((byte)Number(storedRecord))) :
             extendedRecordSupport is not null ? ObdOnUdsServices.ReadExtendedRecord(checked((byte)Number(extendedRecordSupport)), null) :
             extendedRecordData is not null ? ObdOnUdsServices.ReadExtendedRecord(checked((byte)Number(extendedRecordData)),
@@ -2008,7 +2015,7 @@ internal static class StandardProtocolCli
         var genericRead = new[] { "--uds-did", "--uds-scaling-did", "--uds-dtc-mask",
             "--uds-dtc-count-mask", "--uds-snapshot", "--uds-extended-dtc",
             "--uds-memory-mask", "--uds-memory-snapshot", "--uds-memory-extended",
-            "--uds-stored-record", "--uds-extended-record-support", "--uds-extended-record-data", "--uds-mirror-mask", "--uds-mirror-count",
+            "--uds-stored-record", "--uds-all-stored-records", "--uds-extended-record-support", "--uds-extended-record-data", "--uds-mirror-mask", "--uds-mirror-count",
             "--uds-mirror-extended", "--uds-legacy-emissions-mask", "--uds-legacy-emissions-count" }
             .Any(selector => Optional(args, selector) is not null);
         genericRead |= args.Contains("--uds-supported-dtcs", StringComparer.OrdinalIgnoreCase) ||
@@ -2127,7 +2134,23 @@ internal static class StandardProtocolCli
             stop.Token.ThrowIfCancellationRequested();
             PrintMultiDidResponse(args, o.Request, reply);
             var sizeText = Optional(args, "--uds-extended-record-size");
-            if (verified.Obd || o.Request[0] == 0x19) PrintObdOnUdsResponse(o.Request, reply,
+            var storedCatalog = Optional(args, "--uds-all-stored-records");
+            if (storedCatalog is not null)
+            {
+                var report = ObdOnUdsServices.DecodeAllStoredRecords(reply, ObdOnUdsServices.ParseStoredDidLengths(storedCatalog));
+                Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(new
+                {
+                    subfunction = 5, record = 255, raw_response = Convert.ToHexString(report.RawResponse),
+                    records = report.Records.Select(row => new
+                    {
+                        record = row.Record, dtc = row.Dtc.ToString("X6"), status = row.Status,
+                        did_count = row.Dids.Count, raw_record = Convert.ToHexString(row.RawRecord),
+                        dids = row.Dids.Select(item => new { did = item.Did.ToString("X4"),
+                            length = item.Data.Length, data = Convert.ToHexString(item.Data) })
+                    })
+                }));
+            }
+            else if (verified.Obd || o.Request[0] == 0x19) PrintObdOnUdsResponse(o.Request, reply,
                 sizeText is null ? null : int.Parse(sizeText, NumberStyles.None, CultureInfo.InvariantCulture));
             if (o.ReceiveFile is not null) await SaveDoIpReplyAsync(o.ReceiveFile, reply);
             Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(new
