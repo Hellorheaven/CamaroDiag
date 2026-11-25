@@ -45,6 +45,28 @@ class FunctionalTestSuiteTest {
             .all { it.outcome == FunctionalTestOutcome.NOT_TESTED })
     }
 
+    @Test fun genericObdResponderDoesNotProveCamaroEcu() {
+        val rows = FunctionalTestPlanner.initial(emptyList(), "BLUETOOTH", true)
+        val observed = FunctionalTestPlanner.withStandardResponders(rows, listOf("7E8", "7E8", "18DAF110"))
+        assertEquals(2, observed.count { it.group == "obd_responder" && it.outcome == FunctionalTestOutcome.PASSED })
+        assertTrue(observed.none { it.group == "ecu" })
+        val checked = FunctionalTestPlanner.withDtcModeEvidence(observed, mapOf(3 to 0, 7 to null, 10 to 2))
+        assertEquals(FunctionalTestOutcome.PASSED, checked.first { it.key == "service:dtc-mode:03" }.outcome)
+        assertEquals(FunctionalTestOutcome.NOT_TESTED, checked.first { it.key == "service:dtc-mode:07" }.outcome)
+        assertEquals(FunctionalTestOutcome.PASSED, checked.first { it.key == "service:dtc-mode:0A" }.outcome)
+    }
+
+    @Test fun foreignVinIsNotCamaroCandidate() {
+        val matcher = com.camarodiag.gen5.domain.model.VehicleVinMatcher
+        assertTrue(matcher.isCamaroCandidate("2G1FF3D36C9104199"))
+        assertTrue(matcher.isCamaroCandidate("1G1FA1RXXR0123456"))
+        assertTrue(!matcher.isCamaroCandidate("3FMTK3SU0PMA00001"))
+        assertTrue(!matcher.isCamaroCandidate(null))
+        val context = FunctionalTestContext("", "OBDII", "BLUETOOTH", 3, observedVin = "3FMTK3SU0PMA00001")
+        assertEquals("", context.selectedVin)
+        assertEquals("3FMTK3SU0PMA00001", context.observedVin)
+    }
+
     @Test fun updateChangesOnlyTheTarget() {
         val rows = FunctionalTestPlanner.initial(modules, "BLE", true)
         val updated = FunctionalTestPlanner.updated(
