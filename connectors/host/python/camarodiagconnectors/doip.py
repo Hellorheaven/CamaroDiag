@@ -411,6 +411,11 @@ def positive(request: bytes, reply: bytes) -> bytes:
                 raise DoIpError("Malformed DTC index or fault counter report")
         elif len(reply) < 3 or (subfunction in (0x0A, 0x15) and (len(request) != 2 or (len(reply) - 3) % 4)):
             raise DoIpError("Malformed DTC report")
+        if subfunction == 5:
+            if len(request) != 3 or len(reply) < 3 or reply[2] != request[2]:
+                raise DoIpError("Stored DTC record response mismatch")
+            if 3 < len(reply) < 8:
+                raise DoIpError("Truncated stored DTC record")
         if subfunction in (0x16, 0x1A):
             offset = 2 if subfunction == 0x16 else 3
             if (len(request) != 3 or len(reply) <= offset or reply[offset] != request[2] or
@@ -1052,6 +1057,25 @@ class Session:
             self.verify_vin(expected)
             return {"kind": "snapshot-index" if snapshot_index else ("permanent-dtcs" if permanent else "supported-dtcs"),
                     "records": rows, **({} if snapshot_index else {"availability_mask": reply[2]})}
+        except BaseException:
+            self.close()
+            raise
+
+    def read_stored_dtc_record(self, expected: str, record: int) -> dict:
+        """Read one stored-data record (19/05); retain OEM-specific data verbatim."""
+        if type(record) is not int or not 0 <= record < 255:
+            raise DoIpError("Expected individual stored record 00..FE")
+        request = bytes((0x19, 5, record))
+        try:
+            self.verify_vin(expected)
+            reply = positive(request, self.exchange(request))
+            result = {"subfunction": 5, "record": record, "present": len(reply) > 3,
+                      "raw_response": reply.hex().upper()}
+            if len(reply) > 3:
+                result.update(dtc=reply[3:6].hex().upper(), status=reply[6],
+                              raw_stored_data=reply[7:].hex().upper())
+            self.verify_vin(expected)
+            return result
         except BaseException:
             self.close()
             raise
