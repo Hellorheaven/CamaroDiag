@@ -135,6 +135,12 @@
   <data name="StoredCatalog" xml:space="preserve"><value>Documented DID lengths (F40C:2,F40D:1)</value></data>
   <data name="InvalidStoredCatalog" xml:space="preserve"><value>Enter documented DID lengths.</value></data>
   <data name="AllStoredResult" xml:space="preserve"><value>Stored records: {0}</value></data>
+  <data name="DecodedExtended" xml:space="preserve"><value>Decoded UDS extended data</value></data>
+  <data name="ObdDecodedExtended" xml:space="preserve"><value>Decoded OBDonUDS extended data</value></data>
+  <data name="ExtendedCatalog" xml:space="preserve"><value>Documented record lengths (01:2,90:1)</value></data>
+  <data name="InvalidExtendedCatalog" xml:space="preserve"><value>Enter documented lengths and a valid record number.</value></data>
+  <data name="DecodedExtendedResult" xml:space="preserve"><value>DTC {0:X6} — status {1:X2} — records: {2}</value></data>
+  <data name="DecodedExtendedEntry" xml:space="preserve"><value>Record 0x{0:X2}: {1}</value></data>
   <data name="DecodedSnapshot" xml:space="preserve"><value>Decoded UDS snapshots</value></data>
   <data name="ObdDecodedSnapshot" xml:space="preserve"><value>Decoded OBDonUDS snapshots</value></data>
   <data name="DecodedSnapshotResult" xml:space="preserve"><value>DTC {0:X6} — status {1:X2} — snapshots: {2}</value></data>
