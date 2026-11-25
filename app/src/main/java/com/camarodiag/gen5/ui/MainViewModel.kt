@@ -5126,6 +5126,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         ("ECU responded with " + discovery.supported.size + " supported PIDs.") to
                             ("Réponse OBD physique : " + discovery.supported.size + " PID pris en charge.")
                     }
+                    var partialDtcEvidence = false
                     checkRead("service:dtcs") {
                         val modes = obdManager.withObdCommandSession { it.readDtcModeEvidence() }
                         if (!current()) throw CancellationException("Account or run changed")
@@ -5136,6 +5137,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         val count = modes.values.filterNotNull().sumOf { it.size }
                         val unavailable = modes.filterValues { it == null }.keys
                         if (unavailable.isNotEmpty()) {
+                            partialDtcEvidence = true
                             val missing = unavailable.joinToString("/") { "%02X".format(it) }
                             ("Partial physical DTC response: $count codes; modes $missing not confirmed, no clearing.") to
                                 ("Réponse DTC physique partielle : $count défauts ; modes $missing non confirmés, sans effacement.")
@@ -5143,6 +5145,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             "Physical DTC response verified: $count codes, no clearing." to
                                 "Réponse physique DTC vérifiée : $count défauts, sans effacement."
                         }
+                    }
+                    if (partialDtcEvidence && current()) {
+                        val partial = _functionalTestState.value.checks.first { it.key == "service:dtcs" }
+                        mark("service:dtcs", FunctionalTestOutcome.NOT_TESTED, partial.detailEn, partial.detailFr)
                     }
                     checkRead("service:readiness") {
                         val response = obdManager.withObdCommandSession { it.readReadiness() }
