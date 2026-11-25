@@ -176,6 +176,15 @@ def _run(argv: Sequence[str] | None, resources: ExitStack) -> dict:
         p.add_argument("--dtc", required=True, type=lambda x: hex_value(x, 6))
         p.add_argument("--record", required=True, type=lambda x: hex_value(x, 2))
         p.add_argument("--did-lengths", required=True, help=tr("DID:length catalog", "Catalogue DID:longueur"))
+    for action in ("memory-snapshot-decoded", "memory-extended-decoded"):
+        p = sub.add_parser(action, help=tr("Decode records in selected DTC memory", "Décoder les enregistrements de la mémoire DTC sélectionnée"))
+        p.add_argument("--memory", required=True, type=lambda x: hex_value(x, 2))
+        p.add_argument("--dtc", required=True, type=lambda x: hex_value(x, 6))
+        p.add_argument("--record", required=True, type=lambda x: hex_value(x, 2))
+        if action == "memory-snapshot-decoded":
+            p.add_argument("--did-lengths", required=True)
+        else:
+            p.add_argument("--record-lengths", required=True)
     for action, description in (
             ("memory-dtcs", tr("Read DTCs in a selected memory", "Lire les DTC d'une mémoire sélectionnée")),
             ("memory-snapshot", tr("Read a snapshot in a selected memory", "Lire un snapshot d'une mémoire sélectionnée")),
@@ -225,9 +234,11 @@ def _run(argv: Sequence[str] | None, resources: ExitStack) -> dict:
     layout = parse_did_layout(o.layout) if multi_monitor or o.action in ("dids", "obd-dids") else None
     if multi_monitor:
         layout = validate_monitor_layout(layout)
-    stored_lengths = parse_stored_did_lengths(o.did_lengths) if o.action in ("stored-records", "snapshot-decoded", "obd-snapshot-decoded") else None
+    stored_lengths = parse_stored_did_lengths(o.did_lengths) if o.action in ("stored-records", "snapshot-decoded", "obd-snapshot-decoded", "memory-snapshot-decoded") else None
     extended_lengths = None
-    if o.action in ("extended-decoded", "obd-extended-decoded"):
+    if o.action == "memory-snapshot-decoded" and o.record == 0:
+        parser.error(tr("Select snapshot record 01..FF", "Sélectionner un snapshot 01..FF"))
+    if o.action in ("extended-decoded", "obd-extended-decoded", "memory-extended-decoded"):
         extended_lengths = parse_extended_record_lengths(o.record_lengths)
         extended_records_request(o.dtc, o.record, extended_lengths)
     if o.action in ("obd-dids", "obd-monitor-dids") and any(not 0xF400 <= did <= 0xF8FF for did, _ in layout):
@@ -392,6 +403,12 @@ def _run(argv: Sequence[str] | None, resources: ExitStack) -> dict:
             subfunction = {"severity-count": 7, "severity-dtcs": 8, "severity-info": 9}[o.action]
             report = session.read_dtc_severity(o.vin, subfunction, severity_mask=getattr(o, "severity_mask", 255),
                                               status_mask=getattr(o, "mask", 255), dtc=getattr(o, "dtc", None))
+            return result | {"vin": o.vin, "ecu": o.ecu, "tester": o.tester, "tls": not o.tcp,
+                             "service_protocol": "UDS"} | report
+        if o.action in ("memory-snapshot-decoded", "memory-extended-decoded"):
+            extended = o.action == "memory-extended-decoded"
+            report = session.read_decoded_user_memory(o.vin, o.memory, o.dtc, o.record,
+                extended_lengths if extended else stored_lengths, extended=extended)
             return result | {"vin": o.vin, "ecu": o.ecu, "tester": o.tester, "tls": not o.tcp,
                              "service_protocol": "UDS"} | report
         if o.action in ("extended-decoded", "obd-extended-decoded"):
