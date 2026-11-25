@@ -108,6 +108,8 @@ python -m camarodiagconnectors.doip_cli --host 192.0.2.10 --vin 1G1FA1RXXR012345
 
 Pour les données étendues, FE limite la réponse aux enregistrements OBD réglementaires 90–9F ; FF demande tous les enregistrements. Les actions `obd-snapshot-decoded` et `obd-extended-decoded` vérifient également l'identification OBDonUDS. Les longueurs ci-dessus sont des exemples de syntaxe, à remplacer par les définitions réelles. / FE selects regulated OBD records 90–9F; FF requests all records. OBD-specific actions also verify OBDonUDS identification. Replace example lengths with actual documented ECU lengths.
 
+Les commandes `memory-snapshot-decoded --memory 02 --dtc 010203 --record FF --did-lengths F40D:1` et `memory-extended-decoded --memory 02 --dtc 010203 --record FF --record-lengths 01:2,90:1` utilisent la mémoire explicitement sélectionnée. Les exemples ne définissent pas les longueurs réelles du calculateur. / These commands decode records in the explicitly selected memory; example lengths are not ECU definitions.
+
 ### Acquisition mémoire DoIP / DoIP memory capture
 
 ```bash
