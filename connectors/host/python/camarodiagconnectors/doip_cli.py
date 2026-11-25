@@ -135,6 +135,7 @@ def _run(argv: Sequence[str] | None, resources: ExitStack) -> dict:
     sub.add_parser("supported-dtcs", help=tr("List supported DTCs", "Lister les DTC pris en charge"))
     stored = sub.add_parser("stored-record", help=tr("Read stored DTC data by record number", "Lire les données DTC mémorisées par numéro"))
     stored.add_argument("--record", required=True, type=lambda x: hex_value(x, 2))
+    stored.add_argument("--did-lengths", help=tr("Optional documented DID lengths", "Longueurs DID documentées facultatives"))
     all_stored = sub.add_parser("stored-records", help=tr("Read all stored DTC records", "Lire tous les enregistrements DTC mémorisés"))
     all_stored.add_argument("--did-lengths", required=True, help=tr(
         "Documented DID:length catalog, e.g. F190:17,F40D:1",
@@ -235,6 +236,8 @@ def _run(argv: Sequence[str] | None, resources: ExitStack) -> dict:
     if multi_monitor:
         layout = validate_monitor_layout(layout)
     stored_lengths = parse_stored_did_lengths(o.did_lengths) if o.action in ("stored-records", "snapshot-decoded", "obd-snapshot-decoded", "memory-snapshot-decoded") else None
+    if o.action == "stored-record" and o.did_lengths is not None:
+        stored_lengths = parse_stored_did_lengths(o.did_lengths)
     extended_lengths = None
     if o.action == "memory-snapshot-decoded" and o.record == 0:
         parser.error(tr("Select snapshot record 01..FF", "Sélectionner un snapshot 01..FF"))
@@ -426,7 +429,8 @@ def _run(argv: Sequence[str] | None, resources: ExitStack) -> dict:
             return result | {"vin": o.vin, "ecu": o.ecu, "tester": o.tester, "tls": not o.tcp,
                              "service_protocol": "UDS"} | report
         if o.action == "stored-record":
-            report = session.read_stored_dtc_record(o.vin, o.record)
+            report = (session.read_stored_dtc_record(o.vin, o.record) if stored_lengths is None else
+                      session.read_decoded_stored_dtc_records(o.vin, o.record, stored_lengths))
             return result | {"vin": o.vin, "ecu": o.ecu, "tester": o.tester, "tls": not o.tcp,
                              "service_protocol": "UDS"} | report
         if o.action in legacy_actions:
