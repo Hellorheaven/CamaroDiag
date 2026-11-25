@@ -133,6 +133,8 @@ def _run(argv: Sequence[str] | None, resources: ExitStack) -> dict:
         monitor.add_argument("--samples", type=int, default=10)
         monitor.add_argument("--interval", type=float, default=1)
     sub.add_parser("supported-dtcs", help=tr("List supported DTCs", "Lister les DTC pris en charge"))
+    stored = sub.add_parser("stored-record", help=tr("Read stored DTC data by record number", "Lire les données DTC mémorisées par numéro"))
+    stored.add_argument("--record", required=True, type=lambda x: hex_value(x, 2))
     sub.add_parser("snapshot-index", help=tr("List snapshot references", "Lister les références des snapshots"))
     sub.add_parser("permanent-dtcs", help=tr("Read permanent UDS DTCs", "Lire les DTC permanents UDS"))
     for action in ("severity-count", "severity-dtcs"):
@@ -249,6 +251,8 @@ def _run(argv: Sequence[str] | None, resources: ExitStack) -> dict:
         parser.error(tr("Invalid sample count or interval", "Nombre de mesures ou intervalle invalide"))
     if o.action in ("snapshot", "extended", "obd-snapshot", "obd-extended", "memory-snapshot", "memory-extended") and o.record == 0:
         parser.error(tr("Record must be nonzero", "Enregistrement non nul requis"))
+    if o.action == "stored-record" and o.record == 255:
+        parser.error(tr("Choose an individual record 00..FE", "Choisir un enregistrement individuel 00..FE"))
     if o.action == "memory-extended" and 0xF0 <= o.record <= 0xFD:
         parser.error(tr("Reserved extended record number", "Numéro d'enregistrement étendu réservé"))
     if o.tcp and (o.ca_file or o.client_cert or o.client_key):
@@ -368,6 +372,10 @@ def _run(argv: Sequence[str] | None, resources: ExitStack) -> dict:
             subfunction = {"severity-count": 7, "severity-dtcs": 8, "severity-info": 9}[o.action]
             report = session.read_dtc_severity(o.vin, subfunction, severity_mask=getattr(o, "severity_mask", 255),
                                               status_mask=getattr(o, "mask", 255), dtc=getattr(o, "dtc", None))
+            return result | {"vin": o.vin, "ecu": o.ecu, "tester": o.tester, "tls": not o.tcp,
+                             "service_protocol": "UDS"} | report
+        if o.action == "stored-record":
+            report = session.read_stored_dtc_record(o.vin, o.record)
             return result | {"vin": o.vin, "ecu": o.ecu, "tester": o.tester, "tls": not o.tcp,
                              "service_protocol": "UDS"} | report
         if o.action in legacy_actions:
