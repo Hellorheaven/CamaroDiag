@@ -1218,6 +1218,12 @@ internal static class StandardProtocolCli
         return Convert.FromHexString(value);
     }
 
+    private static ushort ParseTypedDid(string text)
+    {
+        var hex = text.StartsWith("0x", StringComparison.OrdinalIgnoreCase) ? text[2..] : text;
+        return DoIpVinReader.ParseLogicalAddress(hex);
+    }
+
     internal static DoIpOptions ParseDoIp(string[] args)
     {
         var host = Required(args, "--host");
@@ -1226,6 +1232,10 @@ internal static class StandardProtocolCli
         var hexPayload = Optional(args, "--payload");
         var payloadFile = Optional(args, "--payload-file");
         var udsDids = Optional(args, "--uds-dids");
+        var udsDid = Optional(args, "--uds-did");
+        var scalingDid = Optional(args, "--uds-scaling-did");
+        if ((udsDid is not null || scalingDid is not null) && Optional(args, "--expected-vin") is null)
+            throw new ArgumentException("Typed UDS DID reads require --expected-vin.");
         var obdDid = Optional(args, "--obd-did");
         var obdDtcMask = Optional(args, "--obd-dtc-mask");
         var obdDtcCountMask = Optional(args, "--obd-dtc-count-mask");
@@ -1252,6 +1262,8 @@ internal static class StandardProtocolCli
         if ((hexPayload is null ? 0 : 1) +
             (payloadFile is null ? 0 : 1) +
             (udsDids is null ? 0 : 1) +
+            (udsDid is null ? 0 : 1) +
+            (scalingDid is null ? 0 : 1) +
             (obdDid is null ? 0 : 1) +
             (obdDtcMask is null ? 0 : 1) +
             (obdDtcCountMask is null ? 0 : 1) +
@@ -1262,7 +1274,7 @@ internal static class StandardProtocolCli
             (wwhPermanent ? 1 : 0) +
             (obdIdentify ? 1 : 0) != 1)
             throw new ArgumentException(
-                "Supply exactly one of --payload, --obd-did or --obd-dtc-mask.");
+                "Supply exactly one diagnostic payload or typed read selector.");
         if (payloadFile is not null &&
             new FileInfo(payloadFile).Length > DoIpCodec.MaxPayload - 4)
             throw new ArgumentException(
@@ -1270,6 +1282,8 @@ internal static class StandardProtocolCli
         var bytes = obdIdentify ? ObdOnUdsServices.ReadProtocolIdentification() :
             udsDids is not null ? UdsMultiDidCli.BuildRequest(
                 UdsMultiDidCli.Parse(udsDids)) :
+            udsDid is not null ? UdsStandardServices.ReadDid(ParseTypedDid(udsDid)) :
+            scalingDid is not null ? UdsStandardServices.ReadScalingDid(ParseTypedDid(scalingDid)) :
             obdDid is not null ? ObdOnUdsServices.ReadObdDid(
                 checked((ushort)uint.Parse(
                     obdDid.StartsWith("0x", StringComparison.OrdinalIgnoreCase) ?
@@ -1638,7 +1652,9 @@ internal static class StandardProtocolCli
         if (Optional(args, "--payload") is not null || Optional(args, "--payload-file") is not null)
             throw new ArgumentException("For arbitrary UDS commands use the verified --sequence path.");
         var multi = Optional(args, "--uds-dids");
-        var obd = multi is null || bool.Parse(Optional(args, "--obd-verified") ?? "false");
+        var genericDid = Optional(args, "--uds-did") is not null ||
+            Optional(args, "--uds-scaling-did") is not null;
+        var obd = !genericDid && (multi is null || bool.Parse(Optional(args, "--obd-verified") ?? "false"));
         if (Optional(args, "--obd-verified") is not null && multi is null)
             throw new ArgumentException("--obd-verified is only needed with --uds-dids.");
         if (obd && multi is not null && UdsMultiDidCli.Parse(multi).Any(e =>
@@ -1652,7 +1668,7 @@ internal static class StandardProtocolCli
         var target = ParseDoIp(tlsDefault ? [..args, "--tls", "true"] : args);
         if (!System.Net.IPAddress.TryParse(target.Host, out var address) ||
             !DoIpVehicleDiscovery.IsExplicitUnicast(address) ||
-            target.Request[0] is not (0x22 or 0x19))
+            target.Request[0] is not (0x22 or 0x19 or 0x24))
             throw new ArgumentException("Verified reads require numeric unicast IP and a typed read.");
         var p2 = Math.Min(target.TimeoutMs, target.DoIpP2Ms);
         var p2Star = Math.Min(target.TimeoutMs, target.DoIpP2StarMs);
@@ -1661,6 +1677,15 @@ internal static class StandardProtocolCli
             throw new ArgumentException("Expected P2 <= P2* <= total timeout.");
         return new(target with { DoIpP2Ms = p2, DoIpP2StarMs = p2Star }, vin, obd,
             Optional(args, "--doip-version") is not null);
+    }
+
+    internal static byte[] DecodeVerifiedSingleDid(byte[] request, byte[] reply)
+    {
+        if (request.Length != 3 || request[0] is not (0x22 or 0x24) ||
+            reply.Length < 4 || reply[0] != request[0] + 0x40 ||
+            reply[1] != request[1] || reply[2] != request[2])
+            throw new InvalidDataException("Missing or uncorrelated UDS DID data.");
+        return reply[3..];
     }
 
     private static async Task<int> RunVerifiedDoIpReadAsync(string[] args)
@@ -1700,16 +1725,22 @@ internal static class StandardProtocolCli
             }
             await VerifyAsync();
             var reply = await link.ExchangeUdsAsync(o.Request, timeout, stop.Token);
+            var singleGeneric = !verified.Obd && o.Request.Length == 3 && o.Request[0] is (0x22 or 0x24);
+            var singleData = singleGeneric ? DecodeVerifiedSingleDid(o.Request, reply) : null;
             await VerifyAsync();
             stop.Token.ThrowIfCancellationRequested();
             PrintMultiDidResponse(args, o.Request, reply);
-            PrintObdOnUdsResponse(o.Request, reply);
+            if (verified.Obd) PrintObdOnUdsResponse(o.Request, reply);
             if (o.ReceiveFile is not null) await SaveDoIpReplyAsync(o.ReceiveFile, reply);
             Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(new
             {
                 complete = true, vin = verified.Vin, ecu = $"{o.Ecu:X4}",
                 protocol = verified.Obd ? "OBDonUDS" : "UDS",
                 bytes = reply.Length, sha256 = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(reply)),
+                did = singleGeneric ? Convert.ToHexString(o.Request.AsSpan(1, 2)) : null,
+                service = singleGeneric ? o.Request[0].ToString("X2") : null,
+                data = singleData is not null && o.ReceiveFile is null && singleData.Length <= 4093
+                    ? Convert.ToHexString(singleData) : null,
                 raw = o.ReceiveFile is null && reply.Length <= 4096 ? Convert.ToHexString(reply) : null
             }));
             return 0;

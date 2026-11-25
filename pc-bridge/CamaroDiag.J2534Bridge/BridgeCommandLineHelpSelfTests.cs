@@ -44,6 +44,7 @@ internal static class BridgeCommandLineHelpSelfTests
             "--doip-version", "--uds-p2-ms", "--uds-p2-star-ms", "--sequence", "--expected-vin",
             "--power-mode true", "--broadcast-ip", "--vin", "--eid",
             "--monitor-did", "--obd-monitor-did", "--samples", "--interval-ms",
+            "--uds-did", "--uds-scaling-did",
             "--tls true", "--tester", "--ecu", "--payload"
         })
         {

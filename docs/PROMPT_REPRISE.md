@@ -1,3 +1,7 @@
+## PR117 — parité CLI Windows UDS DID et scaling (25/11/2026)
+
+- Checkpoint 45553393453 sur ba811a855c781d93471a8adc8a02213a28ac2e07 : succès des 12 jobs techniques (revue ignorée PR draft). CLI Windows ajoute les sélecteurs exclusifs --uds-did et --uds-scaling-did (SID 22/24), VIN obligatoire, F190 avant/après, TLS par défaut, validation SID/DID/données non vides, JSON brut et aide FR/EN. Tests de parseur et décodage ajoutés. Ce nouveau lot nécessite validation ; aucune qualification physique ni clôture C6/DoIP.
+
 ## PR117 — vérification finale des défauts DoIP (25/11/2026)
 
 - Android, Windows GUI et Connectors CLI : lectures DTC 19/01, 19/02, 19/04, 19/06 vérifient désormais le VIN F190 avant et après sur la même session, sans publier le résultat typé si l'identité a changé. Trace brute conservée. Tests Windows loopback et Python ajoutés. Checkpoint groupé demandé ; aucun résultat de compilation ou qualification matérielle revendiqué.

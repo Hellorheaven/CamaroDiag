@@ -72,6 +72,9 @@ Exemples :
                               Lectures OBD typées avec --expected-vin VIN : F802/F810
                               avant/après. --uds-dids 0xF40C:2,0xF40D:1 peut ajouter
                               --obd-verified true ; longueurs ECU réelles requises.
+                              --uds-did F187 ou --uds-scaling-did F40C avec
+                              --expected-vin VIN vérifie F190 avant/après.
+                              Octets ECU bruts, sans coefficients supposés.
                               Ni contournement OEM ni flash ou récupération qualifiés.
 
 Chaque commande nécessite ses paramètres exacts. Utiliser --help seul :

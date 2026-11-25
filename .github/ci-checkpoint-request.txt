@@ -1,3 +1,7 @@
+PR117 — grouped Debug validation of typed generic Windows DoIP CLI DID and scaling
+Parent: ba811a855c781d93471a8adc8a02213a28ac2e07
+Previous 45553393453 succeeded all 12 technical jobs. Validate exclusive typed UDS 22/24, verified F190, raw JSON and bilingual help/regressions. Intermediate C6/DoIP. No merge or Release.
+
 PR117 — grouped Debug revalidation after Windows simulator fix, scaling DID and typed DTC identity
 Parent: 61ae62ee15599fd02a31aa223d2399ba388a5f5b
 Validate prior Windows F802/F810 loopback correction, SID 24 on Android/Windows/Connectors, final F190 on typed DTC reads, Windows loopback and Python tests. Intermediate C6 / DoIP only. No merge, release or physical qualification.

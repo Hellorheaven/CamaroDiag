@@ -638,6 +638,33 @@ internal static class StandardVehicleProtocolsSelfTests
             "--ecu", "1234", "--expected-vin", "1G1FA1RX0J0100001", "--obd-wwh-permanent"]);
         Check(verifiedRead.Obd && verifiedRead.Target.UseTls && verifiedRead.Target.DoIpP2Ms == 5000,
             "Verified OBD read defaults to TLS and bounded stage deadlines.");
+        foreach (var (selector, sid) in new[] { ("--uds-did", (byte)0x22),
+            ("--uds-scaling-did", (byte)0x24) })
+        {
+            string[] typedArgs = ["--host", "127.0.0.1", "--tester", "0E80",
+                "--ecu", "1234", "--expected-vin", "1G1FA1RX0J0100001", selector, "0xF40C"];
+            var typed = StandardProtocolCli.ParseVerifiedDoIpRead(typedArgs);
+            Check(!typed.Obd && typed.Target.UseTls && typed.Target.Request.SequenceEqual(
+                new byte[] { sid, 0xF4, 0x0C }), "Generic typed UDS DID uses F190 and TLS by default.");
+            Reject<ArgumentException>(() => StandardProtocolCli.ParseDoIp(
+                ["--host", "127.0.0.1", "--tester", "0E80", "--ecu", "1234", selector, "F40C"]),
+                "Typed UDS DID requires VIN before networking.");
+            Reject<ArgumentException>(() => StandardProtocolCli.ParseVerifiedDoIpRead(
+                [..typedArgs, "--obd-did", "F40C"]), "Typed selectors are exclusive.");
+            Reject<ArgumentException>(() => StandardProtocolCli.ParseVerifiedDoIpRead(
+                [..typedArgs[..^1], "F4"]), "DID must contain four hex digits.");
+            Reject<ArgumentException>(() => StandardProtocolCli.ParseVerifiedDoIpRead(
+                [..typedArgs, "--obd-verified", "true"]), "Generic UDS cannot be relabelled as OBDonUDS.");
+            var responseSid = (byte)(sid + 0x40);
+            Check(StandardProtocolCli.DecodeVerifiedSingleDid(typed.Target.Request,
+                [responseSid, 0xF4, 0x0C, 0xAB]).SequenceEqual(new byte[] {0xAB}),
+                "Typed UDS returns actual raw data.");
+            Reject<InvalidDataException>(() => StandardProtocolCli.DecodeVerifiedSingleDid(
+                typed.Target.Request, [responseSid, 0xF4, 0x0D, 0xAB]), "Wrong DID rejected.");
+            Reject<InvalidDataException>(() => StandardProtocolCli.DecodeVerifiedSingleDid(
+                typed.Target.Request, [responseSid, 0xF4, 0x0C]), "Empty DID rejected.");
+        }
+
         var verifiedMulti = StandardProtocolCli.ParseVerifiedDoIpRead([
             "--host", "127.0.0.1", "--tester", "0E80", "--ecu", "1234",
             "--expected-vin", "1G1FA1RX0J0100001", "--uds-dids", "0xF40C:2,0xF40D:1",

@@ -70,6 +70,9 @@ Examples:
                               Typed OBD reads with --expected-vin VIN verify F802/F810
                               before and after. --uds-dids 0xF40C:2,0xF40D:1 may add
                               --obd-verified true; use actual ECU lengths.
+                              --uds-did F187 or --uds-scaling-did F40C with
+                              --expected-vin VIN verifies F190 before and after.
+                              Returns raw ECU bytes; no assumed scaling coefficients.
                               No OEM security bypass, flash recovery or vehicle tests.
 
 Use each option with the exact arguments described above. --help must be alone:
