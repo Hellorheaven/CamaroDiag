@@ -1,3 +1,11 @@
+## PR117 — données DTC étendues UDS 19/06 décodées (25/11/2026)
+
+- Nouveau parcours 19/06 structuré sur Connectors Python, Android, Windows GUI et CLI : DTC et sélecteur explicites, catalogue numéro d'enregistrement:longueur documenté, découpage exact et conservation brute. 01..EF individuel, FE réglementaire OBD (90..9F), FF tous. Refus des numéros réservés, doublons, longueur inconnue, troncatures et réponses hors du sélecteur.
+- UDS F190 et OBDonUDS F802/F810 avant/après sur la même session, sans repli automatique ni interprétation physique inventée. Parcours brut historique conservé. FR/EN.
+- CLI Python `extended-decoded --dtc 010203 --record FF --record-lengths 01:2,90:1` (ou `obd-extended-decoded`). Windows `--uds-extended-dtc 0x010203 --uds-extended-record 0xFF --extended-record-lengths 01:2,90:1` (ou sélecteurs OBD), VIN obligatoire. Longueurs illustratives à remplacer par les définitions ECU.
+- Tests de régression écrits sur les trois plateformes, scénarios Windows TCP loopback pour 19/04 et 19/06 avec VIN final divergent, exemples Connectors et aide Windows actualisés. Aucun test, build ou checkpoint CI déclenché. DoIP/C6 restent en cours ; aucune fusion ou Release. Reste notamment à compléter les parcours Android de simulation TCP, les autres fonctions applicables et la validation de clôture.
+- Référence du format : https://uds.readthedocs.io/en/stable/pages/knowledge_base/service.html (19/06).
+
 ## PR117 — snapshots UDS 19/04 décodés et consolidation 19/05 FF (25/11/2026)
 
 - Nouveau parcours 19 04 pour un DTC et un numéro explicite (00 réglementaire si applicable, 01..FE individuel, FF multiple), avec catalogue DID:longueur documenté. Android et Windows GUI/CLI, Connectors Python. Modes UDS (F190) et OBDonUDS (F802/F810) vérifiés avant/après sur la même session. Les valeurs historiques sont conservées en octets, sans extrapolation physique ni conversion en live data.
