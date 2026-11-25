@@ -351,13 +351,14 @@ object DoIpDirectRead {
     private fun deadline(ms: Int) = System.nanoTime() + ms * 1_000_000L
 
     /** Closing the actual socket on cancellation interrupts blocking Java network I/O. */
-    private suspend fun <T : Any> io(timeoutMs: Long, close: () -> Unit, work: () -> T): T =
+    private suspend fun <T : Any> io(timeoutMs: Long, close: () -> Unit,
+        work: (() -> Boolean) -> T): T =
         withTimeoutOrNull(timeoutMs) {
             withContext(Dispatchers.IO) {
                 suspendCancellableCoroutine { cont ->
                     cont.invokeOnCancellation { runCatching(close) }
                     if (cont.isActive) {
-                        try { cont.resume(work()) }
+                        try { cont.resume(work { cont.isActive }) }
                         catch (error: Exception) { if (cont.isActive) cont.resumeWithException(error) }
                     }
                 }
@@ -937,7 +938,13 @@ object DoIpDirectRead {
         val trace = mutableListOf<Trace>()
         val base = Socket()
         try {
-            return io(budget, { base.close() }) {
+            return io(budget, { base.close() }) { active ->
+                val current = { active() && isReadContextCurrent() }
+                fun requireCurrent() {
+                    if (!active()) throw kotlinx.coroutines.CancellationException("DoIP operation cancelled.")
+                    check(isReadContextCurrent()) { "DoIP operation context changed." }
+                }
+                requireCurrent()
                 base.connect(InetSocketAddress(target.address, tcpPort), timeoutMs)
                 base.soTimeout = timeoutMs
                 val wire = if (target.tls) {
@@ -955,9 +962,11 @@ object DoIpDirectRead {
                     }
                 } else base
                 wire.use {
+                    requireCurrent()
                     val session = Session(wire, gateway, target, trace, rollingTrace = operation == Operation.BACKUP || monitoring,
-                        onTrace = onTrace, onControlTrace = onControlTrace, options = options,
-                        isReadContextCurrent = isReadContextCurrent)
+                        onTrace = { if (current()) onTrace(it) },
+                        onControlTrace = { if (current()) onControlTrace(it) }, options = options,
+                        isReadContextCurrent = current)
                     session.activate(timeoutMs)
                     fun readVin(vinDid: Int = 0xF190): String {
                         val reply = session.exchange(byteArrayOf(0x22, (vinDid shr 8).toByte(), vinDid.toByte()), timeoutMs)
@@ -982,10 +991,11 @@ object DoIpDirectRead {
                             val sample = Sample(index, (System.nanoTime() - start) / 1_000_000,
                                 if (multiMonitor) reply.copyOf() else reply.copyOfRange(3, reply.size), values)
                             verifySample()
-                            check(isReadContextCurrent()) { "DoIP operation context changed." }
+                            requireCurrent()
                             val verified = sample.copy(verifiedVin = target.expectedVin,
                                 gatewayLogicalAddress = gateway.logicalAddress)
                             samples += verified
+                            requireCurrent()
                             onSample(verified.copy(data = verified.data.copyOf(),
                                 values = values.map { it.copy(data = it.data.copyOf()) }))
                             if (index < sampleCount) session.waitBetweenSamples(intervalMs, timeoutMs)
@@ -1087,6 +1097,7 @@ object DoIpDirectRead {
                                 val reply = session.exchange(payload, timeoutMs)
                                 EcuWriteConsentFlow.requireCurrentForTransmit(requireNotNull(approval), isContextCurrent)
                                 replies += reply
+                                requireCurrent()
                                 onCommandReply(index + 1, reply.copyOf())
                             }
                             Outcome(gateway, target.ecu, vin, replies.last(), null, trace.toList(), commandReplies = replies.toList())
@@ -1185,7 +1196,10 @@ object DoIpDirectRead {
                                     reply.copyInto(data, offset, 1)
                                     offset += count
                                     blocks++
-                                    if (blocks % 32 == 0 || offset == data.size) onBackupProgress(index, offset)
+                                    if (blocks % 32 == 0 || offset == data.size) {
+                                        requireCurrent()
+                                        onBackupProgress(index, offset)
+                                    }
                                 }
                                 return data
                             }

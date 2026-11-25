@@ -1,3 +1,7 @@
+## PR117 — annulation DoIP Android à la frontière de publication (25/11/2026)
+
+- C6/DoIP : l'activité de la continuation réseau est désormais intégrée au contrôle du contexte de session TCP. Une annulation détectée empêche les nouvelles émissions et la publication tardive des mesures vérifiées, réponses de commandes et progressions de sauvegarde ; les traces TCP ne sont plus transmises à un observateur devenu obsolète. Fermeture du socket existante conservée, pas de réémission automatique. Une callback déjà commencée ne peut pas être annulée rétroactivement. Le test loopback existant couvre désormais annulation au dernier RX d'identité UDS et OBDonUDS. Tests écrits, non exécutés ; aucun checkpoint.
+
 ## PR117 — délai global des acquisitions DoIP Android (25/11/2026)
 
 - C6/DoIP : le budget TCP global de capture tient compte de chaque lecture DID et de chaque contrôle d'identité supplémentaire (VIN UDS, VIN et F810 OBDonUDS), pour les parcours mono/multi-DID. Il inclut la fin d'une trame Alive Check reçue en bord de période d'attente. Les limites individuelles P2/P2* et le nombre maximal de mesures restent inchangés. Expiration avant le premier octet pendant une pause traitée comme fin normale ; changement de contexte détecté pendant la pause. Régressions déterministes écrites, non exécutées. Aucun checkpoint.

@@ -8,6 +8,9 @@ import java.util.Locale
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.async
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Deferred
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -383,7 +386,8 @@ class DoIpGatewayControlTraceTest {
     @Test fun monitoringPublishesOnlySamplesWithVerifiedIdentity(): Unit = runBlocking {
         fun bytes(value: String) = value.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
         val loopback = InetAddress.getByName("127.0.0.1")
-        for (obd in listOf(false, true)) for (lastMatches in listOf(false, true)) {
+        for (obd in listOf(false, true))
+            for ((lastMatches, cancelAfterIdentity) in listOf(false to false, true to false, true to true)) {
             DatagramSocket(0, loopback).use { udp ->
                 java.net.ServerSocket(0, 1, loopback).use { tcp ->
                     udp.soTimeout = 5000
@@ -428,19 +432,32 @@ class DoIpGatewayControlTraceTest {
                         }
                         val target = DoIpDirectRead.Target.parse("127.0.0.1", "0E80", "1234", vin, false)
                         val samples = mutableListOf<Int>()
-                        val result = runCatching {
+                        var identities = 0
+                        lateinit var task: Deferred<DoIpDirectRead.Outcome>
+                        task = async(start = CoroutineStart.LAZY) {
                             DoIpDirectRead.readAt(target,
                                 if (obd) DoIpDirectRead.Operation.OBD_MONITOR else DoIpDirectRead.Operation.MONITOR,
                                 did = 0xF40D, timeoutMs = 2000, sampleCount = 2, intervalMs = 250,
+                                onTrace = { trace ->
+                                    // Cancel on the final identity RX, before the second
+                                    // verified measurement can be published by the worker.
+                                    if (trace.direction == "RX" &&
+                                        trace.payloadHex.startsWith(if (obd) "62F810" else "62F190")) {
+                                        identities++
+                                        if (cancelAfterIdentity && identities == 3) task.cancel()
+                                    }
+                                },
                                 onSample = {
                                     assertEquals(vin, it.verifiedVin)
                                     assertEquals(0x1000, it.gatewayLogicalAddress)
                                     samples += it.index
                                 }, udpPort = udp.localPort, tcpPort = tcp.localPort)
                         }
+                        val result = runCatching { task.await() }
                         server.get(6, TimeUnit.SECONDS)
-                        assertEquals(lastMatches, result.isSuccess)
-                        assertEquals(if (lastMatches) listOf(1, 2) else listOf(1), samples)
+                        assertEquals(lastMatches && !cancelAfterIdentity, result.isSuccess)
+                        if (cancelAfterIdentity) assertTrue(task.isCancelled)
+                        assertEquals(if (lastMatches && !cancelAfterIdentity) listOf(1, 2) else listOf(1), samples)
                     } finally { worker.shutdownNow() }
                 }
             }
