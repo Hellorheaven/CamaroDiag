@@ -234,8 +234,12 @@ object CamaroUdsProtocol {
             if (primaryPowertrainResponderOnly && responder != null &&
                 responder !in setOf("7E8", "18DAF110")) continue
             val data = when {
-                parts.size > 1 && canHeader.matches(parts[0]) ->
-                    parts.drop(1).joinToString("")
+                parts.size > 1 && canHeader.matches(parts[0]) -> {
+                    val body = parts.drop(1)
+                    if (body.first().length == 1 && body.first().all { it in '0'..'9' })
+                        "0" + body.joinToString("")
+                    else body.joinToString("")
+                }
                 // 11-bit (3 hex chars) or 29-bit (8 hex chars) CAN
                 // responder header without spacing, never an arbitrary prefix.
                 parts.size == 1 && line.length % 2 == 1 &&
@@ -247,10 +251,21 @@ object CamaroUdsProtocol {
             }
             if (!hexPairData.matches(data)) continue
             var bytes = data.chunked(2).map { it.toInt(16) }
+            // Explicit DLC before a PCI byte must exactly describe the frame.
+            if (responder != null && bytes.size in 4..9 &&
+                bytes.first() == bytes.size - 1 && bytes[1] in 1..7 &&
+                bytes[2] == 0x41) bytes = bytes.drop(1)
             if (bytes.first() != 0x41) {
-                val dlc = bytes.first()
-                if (dlc !in 1..8 || dlc != bytes.size - 1) continue
-                bytes = bytes.drop(1)
+                val declared = bytes.first()
+                if (declared !in 1..8) continue
+                bytes = when {
+                    declared == bytes.size - 1 -> bytes.drop(1)
+                    // Only an entire physical classic CAN frame can carry
+                    // padding beyond its explicit ISO-TP single-frame length.
+                    responder != null && bytes.size == 8 && declared in 1..7 &&
+                        bytes[1] == 0x41 -> bytes.drop(1).take(declared)
+                    else -> continue
+                }
             }
             if (bytes.size < 3 || bytes[0] != 0x41 || bytes[1] != expectedPid) continue
             // Apply the same exact SAE lengths as the read-only console and

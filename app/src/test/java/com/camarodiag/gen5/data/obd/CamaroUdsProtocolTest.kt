@@ -83,6 +83,25 @@ class CamaroUdsProtocolTest {
     }
 
     @Test
+    fun parsesPaddedPhysicalCanAndExplicitDlcWithoutTreatingPaddingAsData() {
+        val expected = intArrayOf(0x1A, 0xF8)
+        for (valid in listOf("7E8 04 41 0C 1A F8 AA AA AA",
+            "18DAF110 04 41 0C 1A F8 00 00 00",
+            "7E8 8 04 41 0C 1A F8 CC CC CC",
+            "7E8 04 41 0C 1A F8",
+            "7E804410C1AF8AAAAAA")) {
+            assertArrayEquals(valid, expected, CamaroUdsProtocol.parsePidBytes(valid, "0C"))
+        }
+        for (invalid in listOf("7E8 03 41 0C 1A F8 AA AA AA",
+            "7E8 05 41 0C 1A F8 AA AA AA",
+            "7E8 7 04 41 0C 1A F8 CC CC CC",
+            "04 41 0C 1A F8 00 00 00",
+            "7E8 41 0C 1A F8 00")) {
+            assertNull(invalid, CamaroUdsProtocol.parsePidBytes(invalid, "0C"))
+        }
+    }
+
+    @Test
     fun odometerNeverCombinesChatterOrIncompleteAndOverlongPidReplies() {
         for (invalid in listOf(
             "A641A60012D687",

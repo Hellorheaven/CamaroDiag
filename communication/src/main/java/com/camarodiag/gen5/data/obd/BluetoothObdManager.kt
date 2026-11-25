@@ -51,8 +51,7 @@ class BluetoothObdManager(context: Context) {
     }
 
     private val supportedMode01PidsMutex = Mutex()
-    @Volatile private var cachedSupportedMode01Pids: Set<Int>? = null
-    @Volatile private var cachedSupportedMode01PidsAtMillis: Long = 0L
+    private val mode01SupportCache = ObdPidSupportCache()
     private val usbTransport = ElmUsbTransport(context)
     private val connectorUsbContext = context.applicationContext
     private val connectorDiscoveryMutex = Mutex()
@@ -515,24 +514,27 @@ class BluetoothObdManager(context: Context) {
         check(isObdCommandChannelAvailable) {
             "No ELM/OBD-II command channel is available on the active transport."
         }
-        val supported = supportedMode01PidsMutex.withLock {
-            val cached = cachedSupportedMode01Pids
-            val cacheAgeMs = System.currentTimeMillis() - cachedSupportedMode01PidsAtMillis
-            if (cached != null && (cached.isNotEmpty() || cacheAgeMs < 10_000L)) {
-                cached
-            } else {
-                withObdCommandSession { engine ->
-                    engine.discoverSupportedPids()
-                }.also { discovered ->
-                    // Keep an empty result briefly to avoid repeating a slow bitmap timeout
-                    // for every live PID; retry after 10 seconds if the ECU/clone was not ready.
-                    cachedSupportedMode01Pids = discovered
-                    cachedSupportedMode01PidsAtMillis = System.currentTimeMillis()
+        val epoch = transportSessionEpoch.capture()
+        val generation = mode01SupportCache.generation()
+        return supportedMode01PidsMutex.withLock {
+            transportSessionEpoch.requireQueuedCurrent(epoch)
+            mode01SupportCache.requireCurrent(generation)
+            withObdCommandSession { engine ->
+                transportSessionEpoch.requireQueuedCurrent(epoch)
+                mode01SupportCache.requireCurrent(generation)
+                val supported = mode01SupportCache.get(generation, android.os.SystemClock.elapsedRealtime())
+                    ?: engine.discoverPidAvailability().let { discovery ->
+                        transportSessionEpoch.requireQueuedCurrent(epoch)
+                        mode01SupportCache.publish(generation, discovery.supported,
+                            discovery.firstUnresolvedPid == null, android.os.SystemClock.elapsedRealtime())
+                        discovery.supported
+                    }
+                mode01SupportCache.requireCurrent(generation)
+                engine.readMode01PidIfSupported(pid, supported).also {
+                    transportSessionEpoch.requireQueuedCurrent(epoch)
+                    mode01SupportCache.requireCurrent(generation)
                 }
             }
-        }
-        return withObdCommandSession { engine ->
-            engine.readMode01PidIfSupported(pid, supported)
         }
     }
 
@@ -626,25 +628,23 @@ class BluetoothObdManager(context: Context) {
     private suspend fun readJ2534PidIfSupported(pid: Int): String? {
         require(pid in 1..255)
         val epoch = transportSessionEpoch.capture()
+        val generation = mode01SupportCache.generation()
         return supportedMode01PidsMutex.withLock {
             commandSessionMutex.withLock session@{
                 transportSessionEpoch.requireQueuedCurrent(epoch)
+                mode01SupportCache.requireCurrent(generation)
                 check(isJ2534StandardObdAvailable())
                 val bridge = checkNotNull(j2534BridgeTransport)
-                val age = System.currentTimeMillis() - cachedSupportedMode01PidsAtMillis
-                val cached = cachedSupportedMode01Pids
-                val supported = if (cached != null && (cached.isNotEmpty() || age < 10_000L)) {
-                    cached
-                } else {
-                    bridge.discoverStandardObdPids().also {
+                val supported = mode01SupportCache.get(generation, android.os.SystemClock.elapsedRealtime())
+                    ?: bridge.discoverStandardObdPids().also {
                         transportSessionEpoch.requireQueuedCurrent(epoch)
-                        cachedSupportedMode01Pids = it
-                        cachedSupportedMode01PidsAtMillis = System.currentTimeMillis()
+                        mode01SupportCache.publish(generation, it, true, android.os.SystemClock.elapsedRealtime())
                     }
-                }
+                mode01SupportCache.requireCurrent(generation)
                 if (pid !in supported) return@session null
                 val result = bridge.readStandardObdPid(pid)
                 transportSessionEpoch.requireQueuedCurrent(epoch)
+                mode01SupportCache.requireCurrent(generation)
                 result
             }
         }
@@ -743,8 +743,7 @@ class BluetoothObdManager(context: Context) {
 
     /** Invalidates ECU-specific support data after a vehicle identity/profile change. */
     fun invalidateObdPidSupportCache() {
-        cachedSupportedMode01Pids = null
-        cachedSupportedMode01PidsAtMillis = 0L
+        mode01SupportCache.invalidate()
     }
 
     /**
@@ -1696,8 +1695,7 @@ class BluetoothObdManager(context: Context) {
             outputStream = null
             socket = null
             activeTransport = "BLUETOOTH"
-            cachedSupportedMode01Pids = null
-            cachedSupportedMode01PidsAtMillis = 0L
+            mode01SupportCache.invalidate()
             isDemoMode = true
             isSimulationActive = false
             activeAdapterCapabilities = null

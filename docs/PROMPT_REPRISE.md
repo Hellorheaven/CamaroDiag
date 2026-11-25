@@ -1,3 +1,7 @@
+## PR117 — fiabilité découverte PID (25/11/2026)
+
+- C6 : cache Mode 01 ELM/J2534 lié à une génération ; découverte incomplète renouvelée après 10 s même non vide, bitmap complet valide même vide conservé, horloge monotone et rejet des opérations obsolètes. Le parseur accepte le remplissage d'une trame CAN physique complète avec PCI cohérent et longueur SAE exacte, et le DLC explicite. Réponses tronquées refusées. Régressions écrites non exécutées ; aucun checkpoint. C6/DoIP restent actifs.
+
 ## PR117 — retour Mustang : sélection Live et lecture DTC (25/11/2026)
 
 - Android C6 : le sélecteur Live ne présente que les signaux réellement décodés dans le contexte courant ; disponibilité mémorisée séparément de la fraîcheur des valeurs, cases sélectionnables, catalogue OEM non lu masqué, remise à zéro sur changement véhicule/connexion et rejet des lots obsolètes. Les préférences restent par véhicule/compte. Un PID annoncé mais jamais décodé n'est pas affiché.
