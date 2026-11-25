@@ -22,9 +22,14 @@ def hex_value(value: str, digits: int) -> int:
     return int(value, 16)
 
 
-def _trace(direction, transport, host, pdu):
+def _trace(direction, transport, host, pdu, *, ecu=None):
     print(json.dumps({"direction": direction, "transport": transport, "host": host,
-                      "utc": datetime.now(timezone.utc).isoformat(), "pdu": pdu}), file=sys.stderr)
+                      "utc": datetime.now(timezone.utc).isoformat(), "pdu": pdu,
+                      **({"inventory_target": f"{ecu:04X}"} if ecu is not None else {})}), file=sys.stderr)
+
+
+def _inventory_trace(ecu, direction, transport, host, pdu):
+    _trace(direction, transport, host, pdu, ecu=ecu)
 
 
 def run(argv: Sequence[str] | None = None) -> dict:
@@ -223,7 +228,7 @@ def run(argv: Sequence[str] | None = None) -> dict:
         return result | inventory_ecus(gateway, o.vin, o.tester, targets, tls=not o.tcp,
             timeout=o.timeout, trace=trace, context=context, p2=p2, p2_star=p2_star,
             routing_type=o.routing_activation_type or 0, routing_oem_data=o.routing_oem_data,
-            obd=o.action == "obd-ecu-inventory")
+            obd=o.action == "obd-ecu-inventory", target_trace=_inventory_trace if o.trace else None)
     if commands is not None and not confirm_commands(commands, gateway, o.tester, o.ecu,
             not o.tcp, input, lambda line: print(line, file=sys.stderr), fr):
         return result | {"cancelled": True, "commands_sent": 0}

@@ -1,3 +1,7 @@
+## PR117 — attribution des traces d'inventaire Connectors (25/11/2026)
+
+- Parité des journaux multi-ECU avec Android/Windows : `--trace` ajoute inventory_target sur les échanges réels de découverte et de session associés à chaque adresse, sans attribuer la découverte finale à un ECU. Une erreur du collecteur de trace interrompt l'inventaire au lieu de simuler un ECU non vérifié. Tests écrits, non exécutés. Aucun checkpoint CI.
+
 ## PR117 — inventaire OBDonUDS Android et consolidation des sources (25/11/2026)
 
 - Parité de l'inventaire OBDonUDS Android/Windows/Connectors : bouton FR/EN, F802/F810 stables par session, résultat VIN séparé du protocole brut, erreurs d'identité ECU traitées comme non vérifiées, pas de repli F190. Tests écrits sans exécution.

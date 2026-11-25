@@ -74,6 +74,38 @@ class DoIpTests(unittest.TestCase):
             self.assertEqual(discover_mock.call_count, 4)
             active.verify_vin.assert_not_called()
 
+    def test_inventory_trace_attributes_real_events_and_final_discovery(self):
+        events = []
+        final = []
+        def discover_target(host, expected, timeout, trace):
+            trace("RX", "UDP", host, "0001")
+            return GATEWAY
+        def open_session(gateway, tester, ecu, **kwargs):
+            kwargs["trace"]("TX", "TLS", gateway.host, "0005")
+            context = unittest.mock.MagicMock()
+            context.__enter__.return_value.verify_vin.return_value = VIN
+            return context
+        with patch("camarodiagconnectors.doip.discover", side_effect=discover_target), \
+             patch("camarodiagconnectors.doip.Session", side_effect=open_session):
+            result = inventory_ecus(GATEWAY, VIN, 0x0E80, (0x1234, 0x1235),
+                trace=lambda *event: final.append(event), target_trace=lambda *event: events.append(event))
+        self.assertEqual(result["verified_count"], 2)
+        self.assertEqual([(row[0], row[2], row[4]) for row in events],
+                         [(0x1234, "UDP", "0001"), (0x1234, "TLS", "0005"),
+                          (0x1235, "UDP", "0001"), (0x1235, "TLS", "0005")])
+        self.assertEqual(final, [("RX", "UDP", GATEWAY.host, "0001")])
+
+    def test_inventory_trace_failure_aborts_without_next_ecu(self):
+        def broken(*args):
+            raise OSError("trace unavailable")
+        def open_session(gateway, tester, ecu, **kwargs):
+            kwargs["trace"]("TX", "TLS", gateway.host, "0005")
+        with patch("camarodiagconnectors.doip.discover", return_value=GATEWAY), \
+             patch("camarodiagconnectors.doip.Session", side_effect=open_session) as session:
+            with self.assertRaisesRegex(RuntimeError, "trace failed"):
+                inventory_ecus(GATEWAY, VIN, 0x0E80, (0x1234, 0x1235), target_trace=broken)
+            self.assertEqual(session.call_count, 1)
+
     def test_obd_inventory_cli_selects_legislated_operation(self):
         with patch("camarodiagconnectors.doip_cli.discover", return_value=GATEWAY), \
              patch("camarodiagconnectors.doip_cli.inventory_ecus", return_value={"complete": True}) as inventory:

@@ -14,6 +14,11 @@ from typing import Callable
 MAX_PAYLOAD = 1024 * 1024
 VERSIONS = (2, 3, 4)
 Trace = Callable[[str, str, str, str], None]
+InventoryTrace = Callable[[int, str, str, str, str], None]
+
+
+class InventoryTraceError(RuntimeError):
+    """A failed trace sink must not be mistaken for an unverified ECU."""
 
 
 class DoIpError(ValueError):
@@ -443,7 +448,8 @@ def inventory_ecus(gateway: Gateway, expected: str, tester: int, targets: tuple[
                    *, tls: bool = True, timeout: float = 3, trace: Trace | None = None,
                    context: ssl.SSLContext | None = None, p2: float | None = None,
                    p2_star: float | None = None, routing_type: int = 0,
-                   routing_oem_data: bytes | None = None, obd: bool = False) -> dict:
+                   routing_oem_data: bytes | None = None, obd: bool = False,
+                   target_trace: InventoryTrace | None = None) -> dict:
     """Identify explicit ECU addresses independently using the requested diagnostic operation."""
     if type(obd) is not bool:
         raise DoIpError("Invalid ECU inventory identification mode")
@@ -456,14 +462,29 @@ def inventory_ecus(gateway: Gateway, expected: str, tester: int, targets: tuple[
         raise DoIpError("Invalid ECU inventory target or gateway identity")
     _timeout(timeout)
     rows = []
-    def require_gateway():
-        current = discover(gateway.host, expected, timeout, trace)
+    def require_gateway(sink: Trace | None):
+        current = discover(gateway.host, expected, timeout, sink)
         if gateway_key(current) != gateway_key(gateway):
             raise DoIpError("Gateway identity changed during ECU inventory")
+
+    def sink_for(ecu: int) -> Trace | None:
+        if target_trace is None and trace is None:
+            return None
+        def sink(direction: str, transport: str, host: str, pdu: str):
+            try:
+                if target_trace is not None:
+                    target_trace(ecu, direction, transport, host, pdu)
+                elif trace is not None:
+                    trace(direction, transport, host, pdu)
+            except Exception as error:
+                raise InventoryTraceError("ECU inventory trace failed") from error
+        return sink
+
     for ecu in targets:
-        require_gateway()
+        sink = sink_for(ecu)
+        require_gateway(sink)
         try:
-            with Session(gateway, tester, ecu, tls=tls, timeout=timeout, trace=trace, context=context,
+            with Session(gateway, tester, ecu, tls=tls, timeout=timeout, trace=sink, context=context,
                          p2=p2, p2_star=p2_star, routing_type=routing_type,
                          routing_oem_data=routing_oem_data) as session:
                 if obd:
@@ -486,7 +507,7 @@ def inventory_ecus(gateway: Gateway, expected: str, tester: int, targets: tuple[
         except (DoIpError, OSError, EOFError):
             rows.append({"ecu": f"{ecu:04X}", "status": "unverified",
                          "reason": "communication_or_identity_failure"})
-    require_gateway()
+    require_gateway(trace)
     return {"vin": expected, "complete": True, "targets": rows,
             "identification": "F802/F810" if obd else "F190",
             "verified_count": sum(row["status"] == "vin_verified" for row in rows),
