@@ -399,6 +399,18 @@ internal static class UdsStandardServices
                 throw new InvalidDataException("Malformed DTC index or fault counter report.");
             if ((subfunction is 0x0A or 0x15) && (request.Length != 2 || response.Length < 3 || (response.Length - 3) % 4 != 0))
                 throw new InvalidDataException("Malformed supported DTC inventory.");
+            if (subfunction == 0x17 && (request.Length != 4 || response.Length < 4 ||
+                response[2] != request[3] || (response.Length - 4) % 4 != 0))
+                throw new InvalidDataException("Malformed or misdirected user-memory DTC list.");
+            if (subfunction is 0x18 or 0x19)
+            {
+                if (request.Length != 7 || response.Length < 7 || response[2] != request[6] ||
+                    !response.Slice(3, 3).SequenceEqual(request.Slice(2, 3)))
+                    throw new InvalidDataException("Misdirected user-memory DTC detail.");
+                if (response.Length >= 8 && request[5] != 0xFF &&
+                    (subfunction != 0x19 || request[5] != 0xFE) && response[7] != request[5])
+                    throw new InvalidDataException("Wrong user-memory DTC record.");
+            }
             if (subfunction == 9 && (request.Length != 5 || response.Length is not (3 or 9) ||
                 (response.Length == 9 && !response.Slice(5, 3).SequenceEqual(request.Slice(2, 3)))))
                 throw new InvalidDataException("DTC severity response belongs to another fault.");

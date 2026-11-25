@@ -1,3 +1,7 @@
+## PR117 — mémoire DTC sélectionnée Windows GUI/CLI (25/11/2026)
+
+- Parité UDS 19/17–19 Android/Windows/Connectors : mémoire explicite, trois actions FR/EN, CLI avec VIN et sélecteur exclusif, F190 avant/après sur même session, corrélation mémoire/DTC/record, résultats bruts séparés de la liste active. Tests de codec/CLI/aide écrits non exécutés ; aucun checkpoint CI. DoIP/C6 restent ouverts.
+
 ## PR117 — mémoire DTC sélectionnée Android (25/11/2026)
 
 - UDS 19/17–19 : décodeur commun, vérification mémoire/DTC/record, masque et octets bruts, session DoIP F190 avant/après, trois actions FR/EN et résultat distinct des défauts actifs. Tests écrits non exécutés. Windows reste à raccorder. Aucun checkpoint CI.

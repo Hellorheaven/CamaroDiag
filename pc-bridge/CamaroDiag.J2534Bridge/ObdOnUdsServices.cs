@@ -403,6 +403,33 @@ internal static class ObdOnUdsServices
         return rows;
     }
 
+    internal sealed record UserMemoryReport(byte Memory, DtcStatusReport? List, uint? Dtc, byte? Status, byte[]? RawRecords);
+
+    internal static byte[] ReadUserMemory(byte sub, byte memory, byte mask, uint dtc = 0, byte record = 1)
+    {
+        if (sub == 0x17) return UdsStandardServices.ReadDtc(sub, [mask, memory]);
+        if (sub is not (0x18 or 0x19) || dtc > 0xFFFFFF || record == 0 ||
+            (sub == 0x19 && record is >= 0xF0 and <= 0xFD))
+            throw new ArgumentException("Invalid user-memory DTC selector.");
+        return UdsStandardServices.ReadDtc(sub, [(byte)(dtc >> 16), (byte)(dtc >> 8),
+            (byte)dtc, record, memory]);
+    }
+
+    internal static UserMemoryReport DecodeUserMemory(ReadOnlySpan<byte> request, ReadOnlySpan<byte> reply)
+    {
+        if (request.Length < 2 || request[0] != 0x19 || request[1] is < 0x17 or > 0x19)
+            throw new ArgumentException("Invalid user-memory request.");
+        _ = UdsStandardServices.RequireResponse(request, reply);
+        var memory = request[^1];
+        if (request[1] == 0x17)
+        {
+            byte[] normalized = [0x59, 0x02, .. reply[3..].ToArray()];
+            return new(memory, DecodeDtcByStatusMask(request[2], normalized), null, null, null);
+        }
+        uint dtc = ((uint)reply[3] << 16) | ((uint)reply[4] << 8) | reply[5];
+        return new(memory, null, dtc, reply[6], reply[7..].ToArray());
+    }
+
     internal static byte[] ReadDtcByStatusMask(byte statusMask) =>
         UdsStandardServices.ReadDtc(0x02, [statusMask]);
 

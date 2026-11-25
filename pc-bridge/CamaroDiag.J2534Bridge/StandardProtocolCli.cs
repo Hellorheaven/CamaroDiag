@@ -427,6 +427,17 @@ internal static class StandardProtocolCli
             foreach (var code in report.Codes)
                 Console.WriteLine($"DTC=0x{code.Code:X6} status=0x{code.Status:X2}");
         }
+        else if (request.Length >= 2 && request[0] == 0x19 && request[1] is >= 0x17 and <= 0x19)
+        {
+            var report = ObdOnUdsServices.DecodeUserMemory(request, response);
+            Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(new
+            {
+                subfunction = request[1], memory = report.Memory, availability_mask = report.List?.AvailabilityMask,
+                records = report.List?.Codes.Select(c => new { dtc = $"{c.Code:X6}", status = c.Status }),
+                dtc = report.Dtc?.ToString("X6"), status = report.Status,
+                raw_records = report.RawRecords is null ? null : Convert.ToHexString(report.RawRecords)
+            }));
+        }
         else if (request.SequenceEqual(ObdOnUdsServices.ReadPermanentDtcs()))
         {
             var report = ObdOnUdsServices.DecodePermanentDtcs(response);
@@ -1314,6 +1325,7 @@ internal static class StandardProtocolCli
             "--uds-dids", "--uds-did", "--uds-scaling-did", "--obd-verified", "--obd-did",
             "--obd-dtc-mask", "--obd-dtc-count-mask", "--uds-historical-dtc",
             "--uds-severity-count", "--uds-severity-list", "--uds-severity-info", "--uds-severity-status",
+            "--uds-memory", "--uds-memory-mask", "--uds-memory-snapshot", "--uds-memory-extended", "--uds-memory-record",
             "--uds-dtc-mask", "--uds-dtc-count-mask", "--uds-snapshot", "--uds-snapshot-record",
             "--uds-extended-dtc", "--uds-extended-record", "--obd-wwh-status", "--obd-readiness-group",
             "--obd-snapshot", "--obd-snapshot-record", "--obd-extended-dtc", "--obd-extended-record",
@@ -1349,6 +1361,16 @@ internal static class StandardProtocolCli
         if ((supportedDtcs || permanentDtcs || snapshotIndex || faultCounters || historicalDtc is not null ||
             severityCount is not null || severityList is not null || severityInfo is not null) && Optional(args, "--expected-vin") is null)
             throw new ArgumentException("DTC inventory requires --expected-vin.");
+        var memory = Optional(args, "--uds-memory");
+        var memoryMask = Optional(args, "--uds-memory-mask");
+        var memorySnapshot = Optional(args, "--uds-memory-snapshot");
+        var memoryExtended = Optional(args, "--uds-memory-extended");
+        var memoryRecord = Optional(args, "--uds-memory-record");
+        var memorySelectors = (memoryMask is null ? 0 : 1) + (memorySnapshot is null ? 0 : 1) + (memoryExtended is null ? 0 : 1);
+        if (memorySelectors > 1 || (memory is not null) != (memorySelectors == 1) ||
+            (memoryRecord is not null) != (memorySnapshot is not null || memoryExtended is not null) ||
+            (memorySelectors == 1 && Optional(args, "--expected-vin") is null))
+            throw new ArgumentException("User-memory reads require VIN, memory and one explicit selector.");
         var udsDtcMask = Optional(args, "--uds-dtc-mask");
         var udsDtcCountMask = Optional(args, "--uds-dtc-count-mask");
         var udsSnapshot = Optional(args, "--uds-snapshot");
@@ -1391,7 +1413,7 @@ internal static class StandardProtocolCli
             (obdDtcMask is null ? 0 : 1) +
             (obdDtcCountMask is null ? 0 : 1) +
             (supportedDtcs ? 1 : 0) +
-            (permanentDtcs ? 1 : 0) +
+            (permanentDtcs ? 1 : 0) + memorySelectors +
             (snapshotIndex ? 1 : 0) +
             (historicalDtc is null ? 0 : 1) +
             (faultCounters ? 1 : 0) +
@@ -1424,6 +1446,11 @@ internal static class StandardProtocolCli
                     NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture))) :
             supportedDtcs ? ObdOnUdsServices.ReadSupportedDtcs() :
             permanentDtcs ? ObdOnUdsServices.ReadPermanentDtcs() :
+            memoryMask is not null ? ObdOnUdsServices.ReadUserMemory(0x17, checked((byte)Number(memory!)), checked((byte)Number(memoryMask))) :
+            memorySnapshot is not null ? ObdOnUdsServices.ReadUserMemory(0x18, checked((byte)Number(memory!)), 0,
+                Number(memorySnapshot), checked((byte)Number(memoryRecord!))) :
+            memoryExtended is not null ? ObdOnUdsServices.ReadUserMemory(0x19, checked((byte)Number(memory!)), 0,
+                Number(memoryExtended), checked((byte)Number(memoryRecord!))) :
             snapshotIndex ? ObdOnUdsServices.ReadSnapshotIndex() :
             faultCounters ? ObdOnUdsServices.ReadFaultCounters() :
             severityCount is not null ? ObdOnUdsServices.ReadSeverity(7, checked((byte)Number(severityCount)), checked((byte)Number(severityStatus!))) :
@@ -1911,7 +1938,8 @@ internal static class StandardProtocolCli
             throw new ArgumentException("For arbitrary UDS commands use the verified --sequence path.");
         var multi = Optional(args, "--uds-dids");
         var genericRead = new[] { "--uds-did", "--uds-scaling-did", "--uds-dtc-mask",
-            "--uds-dtc-count-mask", "--uds-snapshot", "--uds-extended-dtc" }
+            "--uds-dtc-count-mask", "--uds-snapshot", "--uds-extended-dtc",
+            "--uds-memory-mask", "--uds-memory-snapshot", "--uds-memory-extended" }
             .Any(selector => Optional(args, selector) is not null);
         genericRead |= args.Contains("--uds-supported-dtcs", StringComparer.OrdinalIgnoreCase) ||
             args.Contains("--uds-permanent-dtcs", StringComparer.OrdinalIgnoreCase) ||

@@ -825,6 +825,31 @@ internal static class StandardVehicleProtocolsSelfTests
             [0x19, 3], [0x59, 3, 1]), "Truncated snapshot index rejected at transport.");
         Reject<InvalidDataException>(() => UdsStandardServices.RequireResponse(
             [0x19, 0x0A], [0x59, 0x0A]), "Supported DTC response requires availability mask.");
+        string[] memoryArgs = ["--host", "127.0.0.1", "--tester", "0E80", "--ecu", "1234",
+            "--expected-vin", "1G1FA1RX0J0100001", "--uds-memory", "0x02"];
+        var memoryRead = StandardProtocolCli.ParseVerifiedDoIpRead([..memoryArgs, "--uds-memory-mask", "0x08"]);
+        Check(!memoryRead.Obd && memoryRead.Target.UseTls && memoryRead.Target.Request.SequenceEqual(
+            new byte[] { 0x19, 0x17, 8, 2 }), "User memory list uses verified UDS.");
+        var memoryList = ObdOnUdsServices.DecodeUserMemory(memoryRead.Target.Request, [0x59, 0x17, 2, 8, 1, 2, 3, 8]);
+        Check(memoryList.Memory == 2 && memoryList.List!.Codes.Single().Code == 0x010203, "Explicit memory and DTC preserved.");
+        Reject<InvalidDataException>(() => ObdOnUdsServices.DecodeUserMemory(memoryRead.Target.Request,
+            [0x59, 0x17, 3, 8]), "Wrong memory rejected.");
+        Reject<InvalidDataException>(() => ObdOnUdsServices.DecodeUserMemory(memoryRead.Target.Request,
+            [0x59, 0x17, 2, 8, 1, 2, 3, 1]), "Unmatched status rejected.");
+        foreach (var (option, sub) in new[] { ("--uds-memory-snapshot", (byte)0x18), ("--uds-memory-extended", (byte)0x19) })
+        {
+            var read = StandardProtocolCli.ParseVerifiedDoIpRead([..memoryArgs, option, "0x010203", "--uds-memory-record", "1"]);
+            Check(!read.Obd && read.Target.Request.SequenceEqual(new byte[] { 0x19, sub, 1, 2, 3, 1, 2 }),
+                "Explicit user memory detail.");
+            var report = ObdOnUdsServices.DecodeUserMemory(read.Target.Request, [0x59, sub, 2, 1, 2, 3, 8, 1, 0xAA]);
+            Check(report.Dtc == 0x010203 && report.RawRecords!.SequenceEqual(new byte[] { 1, 0xAA }), "Raw record preserved.");
+            Reject<InvalidDataException>(() => ObdOnUdsServices.DecodeUserMemory(read.Target.Request,
+                [0x59, sub, 2, 1, 2, 3, 8, 2]), "Wrong record rejected.");
+        }
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseVerifiedDoIpRead([..memoryArgs, "--uds-memory-mask", "8", "--uds-memory-record", "1"]),
+            "List cannot specify record.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseVerifiedDoIpRead([..memoryArgs, "--uds-memory-extended", "1", "--uds-memory-record", "0xF0"]),
+            "Reserved record rejected.");
         var severityTarget = StandardProtocolCli.ParseVerifiedDoIpRead([
             "--host", "127.0.0.1", "--tester", "0E80", "--ecu", "1234",
             "--expected-vin", "1G1FA1RX0J0100001", "--uds-severity-list", "0x80", "--uds-severity-status", "0x08"]);

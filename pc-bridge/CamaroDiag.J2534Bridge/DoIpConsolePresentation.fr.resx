@@ -120,6 +120,13 @@
   <data name="ObdSnapshot" xml:space="preserve"><value>Snapshot OBDonUDS</value></data>
   <data name="ObdExtended" xml:space="preserve"><value>Données étendues OBDonUDS</value></data>
   <data name="SupportedDtcs" xml:space="preserve"><value>DTC pris en charge</value></data>
+  <data name="MemorySelection" xml:space="preserve"><value>Mémoire DTC (hex)</value></data>
+  <data name="MemoryDtcs" xml:space="preserve"><value>Lire les DTC de la mémoire</value></data>
+  <data name="MemorySnapshot" xml:space="preserve"><value>Snapshot de la mémoire</value></data>
+  <data name="MemoryExtended" xml:space="preserve"><value>Données étendues de la mémoire</value></data>
+  <data name="InvalidMemorySelection" xml:space="preserve"><value>Sélecteur de mémoire DTC invalide.</value></data>
+  <data name="MemoryResult" xml:space="preserve"><value>Mémoire DTC 0x{0:X2}</value></data>
+  <data name="MemoryDetailResult" xml:space="preserve"><value>DTC 0x{0:X6}, statut 0x{1:X2}, enregistrements bruts {2}</value></data>
   <data name="PermanentDtcs" xml:space="preserve"><value>DTC permanents UDS</value></data>
   <data name="PermanentResult" xml:space="preserve"><value>DTC permanents : {0} ; masque disponible 0x{1:X2}</value></data>
   <data name="SnapshotIndex" xml:space="preserve"><value>Index des snapshots</value></data>

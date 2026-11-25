@@ -543,6 +543,19 @@ internal static class DoIpVinReader
                 ObdOnUdsServices.ReadSupportedDtcs(), timeout, token)));
     }
 
+    internal static async Task<ObdOnUdsServices.UserMemoryReport> ReadObservedUserMemoryAsync(
+        DoIpVehicleDiscovery.Identity gateway, IPAddress address, ushort tester, ushort ecu,
+        bool tls, byte sub, byte memory, byte mask, uint dtc, byte record, TimeSpan timeout,
+        CancellationToken token, string? certificate, Action<DoIpDiagnosticTransport.PduTrace>? trace,
+        DoIpDiagnosticTransport.SessionOptions? options)
+    {
+        var request = ObdOnUdsServices.ReadUserMemory(sub, memory, mask, dtc, record);
+        await using var link = await ConnectObservedAsync(gateway, address, tester, ecu,
+            tls, timeout, token, certificate, trace, options);
+        return await ReadVerifiedDtcAsync(link, gateway, timeout, token, async () =>
+            ObdOnUdsServices.DecodeUserMemory(request, await link.ExchangeUdsAsync(request, timeout, token)));
+    }
+
     internal static async Task<ObdOnUdsServices.DtcStatusReport> ReadObservedPermanentDtcsAsync(
         DoIpVehicleDiscovery.Identity gateway, IPAddress address, ushort tester, ushort ecu,
         bool tls, TimeSpan timeout, CancellationToken token, string? certificate,

@@ -120,6 +120,13 @@
   <data name="ObdSnapshot" xml:space="preserve"><value>OBDonUDS snapshot</value></data>
   <data name="ObdExtended" xml:space="preserve"><value>OBDonUDS extended data</value></data>
   <data name="SupportedDtcs" xml:space="preserve"><value>Supported DTCs</value></data>
+  <data name="MemorySelection" xml:space="preserve"><value>DTC memory (hex)</value></data>
+  <data name="MemoryDtcs" xml:space="preserve"><value>Read memory DTCs</value></data>
+  <data name="MemorySnapshot" xml:space="preserve"><value>Memory snapshot</value></data>
+  <data name="MemoryExtended" xml:space="preserve"><value>Memory extended data</value></data>
+  <data name="InvalidMemorySelection" xml:space="preserve"><value>Invalid DTC memory selector.</value></data>
+  <data name="MemoryResult" xml:space="preserve"><value>DTC memory 0x{0:X2}</value></data>
+  <data name="MemoryDetailResult" xml:space="preserve"><value>DTC 0x{0:X6}, status 0x{1:X2}, raw records {2}</value></data>
   <data name="PermanentDtcs" xml:space="preserve"><value>Permanent UDS DTCs</value></data>
   <data name="PermanentResult" xml:space="preserve"><value>Permanent DTCs: {0}; available status mask 0x{1:X2}</value></data>
   <data name="SnapshotIndex" xml:space="preserve"><value>Snapshot index</value></data>
