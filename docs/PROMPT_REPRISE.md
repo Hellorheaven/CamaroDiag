@@ -1,3 +1,7 @@
+## PR117 — clôture fiable de la capture DoIP CLI (25/11/2026)
+
+- Le bilan NDJSON complet est désormais émis après fermeture du transport et fermeture/flush du journal, jamais avant ; une erreur de fermeture conserve les échantillons déjà publiés mais laisse la capture incomplète. Documentation FR/EN du flux et de ses limites mise à jour. Aucun test ni checkpoint intermédiaire. C6/DoIP restent ouverts.
+
 ## PR117 — DoIP : distinction fermeture TCP et trame tronquée (25/11/2026)
 
 - Windows DoIP : une fermeture propre entre deux PDU peut conserver la dernière réponse finale déjà validée ; une trame tronquée, invalide ou un débordement constaté avant retour de l'échange interdit le succès et retire le socket. Aucune réémission automatique. Scénario loopback ajouté, non exécuté ; une anomalie arrivant après le retour ne peut pas invalider rétroactivement une réponse. C6/DoIP ouverts, aucun checkpoint.

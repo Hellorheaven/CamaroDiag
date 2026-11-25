@@ -1984,67 +1984,70 @@ internal static class StandardProtocolCli
         try
         {
             var timeout = TimeSpan.FromMilliseconds(o.TimeoutMs);
-            using var journal = OpenDoIpTrace(o);
-            var gateway = await DoIpVehicleDiscovery.DiscoverAsync(o.Host, timeout,
-                cancellation.Token, vin: monitor.Vin, trace: journal is null ? null : journal.RecordDatagram);
-            if (gateway.Vin != monitor.Vin ||
-                (monitor.ExplicitVersion && gateway.ProtocolVersion != o.Version) ||
-                gateway.LogicalAddress == o.Tester)
-                throw new InvalidDataException("Observed DoIP gateway differs from the monitoring target.");
-            await DoIpVehicleDiscovery.RequireCurrentIdentityAsync(gateway, timeout, cancellation.Token,
-                trace: journal is null ? null : journal.RecordDatagram);
-            await using var transport = await DoIpDiagnosticTransport.ConnectAsync(
-                o.Host, o.Tester, o.Ecu, timeout, cancellation.Token,
-                useTls: o.UseTls, protocolVersion: gateway.ProtocolVersion,
-                clientCertificateThumbprint: o.ClientCertificateThumbprint,
-                expectedGatewayAddress: gateway.LogicalAddress,
-                trace: journal is null ? null : journal.Record,
-                sessionOptions: new DoIpDiagnosticTransport.SessionOptions(o.DoIpP2Ms,
-                    o.DoIpP2StarMs, o.RoutingActivationType,
-                    o.RoutingOemData is null ? "" : Convert.ToHexString(o.RoutingOemData)));
-            observedGateway = gateway.LogicalAddress;
-            var interval = TimeSpan.FromMilliseconds(monitor.IntervalMs);
-            void Sample(int index, byte[] data)
+            // Dispose the transport and flush the trace before claiming a complete capture.
             {
-                capture.RecordVerified(index);
-                Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(
-                    new { sample = index, utc = DateTimeOffset.UtcNow, elapsedMs = elapsed.ElapsedMilliseconds,
-                        vin = monitor.Vin, gateway = $"{gateway.LogicalAddress:X4}", tester = $"{o.Tester:X4}",
-                        ecu = $"{o.Ecu:X4}", did = $"{monitor.Did:X4}", transport = o.UseTls ? "TLS" : "TCP",
-                        protocol = monitor.Obd ? "OBDonUDS" : "UDS",
-                        payload = Convert.ToHexString(data), verified = true, partial = true }));
-            }
-            if (monitor.Layout is not null)
-                await DoIpVinReader.MonitorVerifiedMultiDidAsync(transport, gateway, monitor.Vin,
-                    monitor.Layout, monitor.Obd, monitor.Count, interval, timeout, cancellation.Token,
-                    (index, values) =>
-                    {
-                        capture.RecordVerified(index);
-                        Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(new
-                        {
-                            sample = index, utc = DateTimeOffset.UtcNow, elapsedMs = elapsed.ElapsedMilliseconds,
-                            vin = monitor.Vin, gateway = $"{gateway.LogicalAddress:X4}", tester = $"{o.Tester:X4}",
-                            ecu = $"{o.Ecu:X4}", transport = o.UseTls ? "TLS" : "TCP",
-                            protocol = monitor.Obd ? "OBDonUDS" : "UDS", verified = true, partial = true,
-                            dids = values.Select(v => new { did = $"{v.Did:X4}", payload = Convert.ToHexString(v.Data) })
-                        }));
-                    });
-            else if (monitor.Obd)
-                await DoIpVinReader.MonitorVerifiedObdAsync(transport, monitor.Vin, monitor.Did,
-                    monitor.Count, interval, timeout, cancellation.Token, Sample);
-            else
-            {
-                var vin = await DoIpVinReader.VerifyObservedVinAsync(transport, gateway,
-                    timeout, cancellation.Token, null, null);
-                async Task VerifySampleAsync()
+                using var journal = OpenDoIpTrace(o);
+                var gateway = await DoIpVehicleDiscovery.DiscoverAsync(o.Host, timeout,
+                    cancellation.Token, vin: monitor.Vin, trace: journal is null ? null : journal.RecordDatagram);
+                if (gateway.Vin != monitor.Vin ||
+                    (monitor.ExplicitVersion && gateway.ProtocolVersion != o.Version) ||
+                    gateway.LogicalAddress == o.Tester)
+                    throw new InvalidDataException("Observed DoIP gateway differs from the monitoring target.");
+                await DoIpVehicleDiscovery.RequireCurrentIdentityAsync(gateway, timeout, cancellation.Token,
+                    trace: journal is null ? null : journal.RecordDatagram);
+                await using var transport = await DoIpDiagnosticTransport.ConnectAsync(
+                    o.Host, o.Tester, o.Ecu, timeout, cancellation.Token,
+                    useTls: o.UseTls, protocolVersion: gateway.ProtocolVersion,
+                    clientCertificateThumbprint: o.ClientCertificateThumbprint,
+                    expectedGatewayAddress: gateway.LogicalAddress,
+                    trace: journal is null ? null : journal.Record,
+                    sessionOptions: new DoIpDiagnosticTransport.SessionOptions(o.DoIpP2Ms,
+                        o.DoIpP2StarMs, o.RoutingActivationType,
+                        o.RoutingOemData is null ? "" : Convert.ToHexString(o.RoutingOemData)));
+                observedGateway = gateway.LogicalAddress;
+                var interval = TimeSpan.FromMilliseconds(monitor.IntervalMs);
+                void Sample(int index, byte[] data)
                 {
-                    var after = await DoIpVinReader.VerifyObservedVinAsync(transport, gateway,
-                        timeout, cancellation.Token, null, null);
-                    if (vin != after) throw new InvalidDataException("ECU VIN changed during monitoring.");
+                    capture.RecordVerified(index);
+                    Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(
+                        new { sample = index, utc = DateTimeOffset.UtcNow, elapsedMs = elapsed.ElapsedMilliseconds,
+                            vin = monitor.Vin, gateway = $"{gateway.LogicalAddress:X4}", tester = $"{o.Tester:X4}",
+                            ecu = $"{o.Ecu:X4}", did = $"{monitor.Did:X4}", transport = o.UseTls ? "TLS" : "TCP",
+                            protocol = monitor.Obd ? "OBDonUDS" : "UDS",
+                            payload = Convert.ToHexString(data), verified = true, partial = true }));
                 }
-                await DoIpVinReader.MonitorDidAsync(transport, monitor.Did, monitor.Count,
-                    interval, timeout, cancellation.Token, Sample, expectedVin: vin,
-                    verifySample: VerifySampleAsync);
+                if (monitor.Layout is not null)
+                    await DoIpVinReader.MonitorVerifiedMultiDidAsync(transport, gateway, monitor.Vin,
+                        monitor.Layout, monitor.Obd, monitor.Count, interval, timeout, cancellation.Token,
+                        (index, values) =>
+                        {
+                            capture.RecordVerified(index);
+                            Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(new
+                            {
+                                sample = index, utc = DateTimeOffset.UtcNow, elapsedMs = elapsed.ElapsedMilliseconds,
+                                vin = monitor.Vin, gateway = $"{gateway.LogicalAddress:X4}", tester = $"{o.Tester:X4}",
+                                ecu = $"{o.Ecu:X4}", transport = o.UseTls ? "TLS" : "TCP",
+                                protocol = monitor.Obd ? "OBDonUDS" : "UDS", verified = true, partial = true,
+                                dids = values.Select(v => new { did = $"{v.Did:X4}", payload = Convert.ToHexString(v.Data) })
+                            }));
+                        });
+                else if (monitor.Obd)
+                    await DoIpVinReader.MonitorVerifiedObdAsync(transport, monitor.Vin, monitor.Did,
+                        monitor.Count, interval, timeout, cancellation.Token, Sample);
+                else
+                {
+                    var vin = await DoIpVinReader.VerifyObservedVinAsync(transport, gateway,
+                        timeout, cancellation.Token, null, null);
+                    async Task VerifySampleAsync()
+                    {
+                        var after = await DoIpVinReader.VerifyObservedVinAsync(transport, gateway,
+                            timeout, cancellation.Token, null, null);
+                        if (vin != after) throw new InvalidDataException("ECU VIN changed during monitoring.");
+                    }
+                    await DoIpVinReader.MonitorDidAsync(transport, monitor.Did, monitor.Count,
+                        interval, timeout, cancellation.Token, Sample, expectedVin: vin,
+                        verifySample: VerifySampleAsync);
+                }
             }
             cancellation.Token.ThrowIfCancellationRequested();
             capture.MarkComplete();
