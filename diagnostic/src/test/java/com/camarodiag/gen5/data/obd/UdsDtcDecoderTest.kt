@@ -59,6 +59,23 @@ class UdsDtcDecoderTest {
         assertTrue(runCatching { UdsDtcDecoder.storedRecordRequest(255) }.isFailure)
     }
 
+    @Test fun decodedMemoryRecordsPreserveOriginalResponseAndMemoryScope() {
+        fun hex(s: String) = s.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
+        val snapshot = hex("591802010203080101F40D78")
+        val extended = hex("5919020102030801123490AA")
+        val didLengths = mapOf(0xF40D to 1)
+        val recordLengths = mapOf(1 to 2, 0x90 to 1)
+        val snapshots = UdsDtcDecoder.decodeUserMemorySnapshot(2, 0x010203, 255, snapshot, didLengths)
+        assertArrayEquals(snapshot, snapshots.rawResponse)
+        assertArrayEquals(hex("78"), snapshots.records.single().dids.single().data)
+        val records = UdsDtcDecoder.decodeUserMemoryExtended(2, 0x010203, 255, extended, recordLengths)
+        assertArrayEquals(extended, records.rawResponse)
+        assertArrayEquals(hex("1234"), records.records.first().data)
+        assertTrue(runCatching { UdsDtcDecoder.decodeUserMemorySnapshot(3, 0x010203, 255, snapshot, didLengths) }.isFailure)
+        assertTrue(runCatching { UdsDtcDecoder.decodeUserMemoryExtended(3, 0x010203, 255, extended, recordLengths) }.isFailure)
+        assertTrue(runCatching { UdsDtcDecoder.decodeUserMemoryExtended(2, 0x010203, 255, extended.copyOf(extended.size - 1), recordLengths) }.isFailure)
+    }
+
     @Test fun decodedExtendedRecordsRespectSelectorsAndLengths() {
         fun hex(s: String) = s.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
         val catalog = UdsDtcDecoder.parseExtendedRecordLengths("01:2,90:1,91:2")
