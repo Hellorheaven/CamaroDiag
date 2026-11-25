@@ -782,7 +782,30 @@ object DoIpDirectRead {
         wwhSeverity: Int = 255, wwhReadinessGroup: Int? = null,
         multiLayout: List<DoIpMultiDid.Field>? = null,
         isReadContextCurrent: () -> Boolean = { true }, severityMask: Int = 255, memory: Int? = null, extendedRecordSize: Int? = null,
-        storedDidLengths: Map<Int, Int>? = null, extendedRecordLengths: Map<Int, Int>? = null): Outcome {
+        storedDidLengths: Map<Int, Int>? = null, extendedRecordLengths: Map<Int, Int>? = null): Outcome  = readAt(
+        target, operation, did, mask, timeoutMs, sampleCount, intervalMs, backupScope,
+        onBackupProgress, onTrace, onSample, onControlTrace, command, approval, isContextCurrent, dtc,
+        record, commands, onCommandReply, clientTls, sessionOptions, wwhSeverity, wwhReadinessGroup, multiLayout,
+        isReadContextCurrent, severityMask, memory, extendedRecordSize, storedDidLengths, extendedRecordLengths)
+
+    internal suspend fun readAt(target: Target, operation: Operation, did: Int = 0xF190,
+        mask: Int = 255, timeoutMs: Int = 5000, sampleCount: Int = 10,
+        intervalMs: Int = 1000, backupScope: DoIpMemoryBackup.Scope? = null,
+        onBackupProgress: (Int, Int) -> Unit = { _, _ -> },
+        onTrace: (Trace) -> Unit = {}, onSample: (Sample) -> Unit = {},
+        onControlTrace: (ControlTrace) -> Unit = {},
+        command: ByteArray? = null, approval: EcuWriteConsentFlow.Approval? = null,
+        isContextCurrent: () -> Boolean = { false }, dtc: Int = 0, record: Int = 1,
+        commands: List<ByteArray>? = null, onCommandReply: (Int, ByteArray) -> Unit = { _, _ -> },
+        clientTls: DoIpClientTls? = null, sessionOptions: SessionOptions? = null,
+        wwhSeverity: Int = 255, wwhReadinessGroup: Int? = null,
+        multiLayout: List<DoIpMultiDid.Field>? = null,
+        isReadContextCurrent: () -> Boolean = { true }, severityMask: Int = 255, memory: Int? = null, extendedRecordSize: Int? = null,
+        storedDidLengths: Map<Int, Int>? = null, extendedRecordLengths: Map<Int, Int>? = null,
+        udpPort: Int = DOIP_UDP_PORT, tcpPort: Int = if (target.tls) 3496 else 13400): Outcome {
+        require(udpPort in 1..65535 && tcpPort in 1..65535)
+        require((udpPort == DOIP_UDP_PORT && tcpPort == (if (target.tls) 3496 else 13400)) ||
+            (target.address.isLoopbackAddress && !target.tls)) { "Custom DoIP ports are restricted to local TCP simulation." }
         check(isReadContextCurrent()) { "DoIP operation context changed." }
         val options = sessionOptions ?: SessionOptions(timeoutMs)
         require(options.timeoutMs == timeoutMs)
@@ -879,7 +902,7 @@ object DoIpDirectRead {
             timeoutMs * (sampleCount + 7L) + intervalMs * (sampleCount - 1L)
             else if (wwhKind != null || multi || obdDtc || operation in setOf(Operation.OBD_DID, Operation.OBD_IDENTIFY)) timeoutMs * 8L else timeoutMs * 5L
         check(isReadContextCurrent()) { "DoIP operation context changed." }
-        val gateway = discover(target.address, target.expectedVin, timeoutMs, onControlTrace)
+        val gateway = discover(target.address, target.expectedVin, timeoutMs, onControlTrace, port = udpPort)
         check(isReadContextCurrent()) { "DoIP operation context changed." }
         requireGatewayIdentity(target, gateway)
         if (operation == Operation.EXCHANGE) require(gateway.vin == target.expectedVin)
@@ -888,7 +911,7 @@ object DoIpDirectRead {
         val base = Socket()
         try {
             return io(budget, { base.close() }) {
-                base.connect(InetSocketAddress(target.address, if (target.tls) 3496 else 13400), timeoutMs)
+                base.connect(InetSocketAddress(target.address, tcpPort), timeoutMs)
                 base.soTimeout = timeoutMs
                 val wire = if (target.tls) {
                     val factory = clientTls?.factory ?: (SSLSocketFactory.getDefault() as SSLSocketFactory)
