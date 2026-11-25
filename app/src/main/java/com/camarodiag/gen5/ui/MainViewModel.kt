@@ -1498,6 +1498,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     require(didHex.matches(Regex("[0-9A-Fa-f]{2}")))
                     didHex.toInt(16).also { require(it in 0..254) }
                 } else null
+                val storedCatalog = if (operation == DoIpDirectRead.Operation.ALL_STORED_RECORDS)
+                    com.camarodiag.gen5.data.obd.UdsDtcDecoder.parseStoredDidLengths(didHex) else null
                 val extendedSupport = operation == DoIpDirectRead.Operation.EXTENDED_RECORD_SUPPORT
                 val extendedData = operation == DoIpDirectRead.Operation.EXTENDED_RECORD_DATA
                 val extendedParts = if (extendedData) didHex.split(':') else listOf(didHex)
@@ -1569,7 +1571,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     return@launchEnhancedUdsRead
                 }
                 val result = DoIpDirectRead.read(target, operation, did, mask = if (memoryList) didHex.take(2).toInt(16) else if (wwhMask || severityFilter) didHex.takeLast(2).toInt(16) else mask,
-                    memory = memory, extendedRecordSize = extendedRecordSize,
+                    memory = memory, extendedRecordSize = extendedRecordSize, storedDidLengths = storedCatalog,
                     severityMask = if (severityFilter) didHex.take(2).toInt(16) else 255,
                     wwhSeverity = if (wwhMask) didHex.take(2).toInt(16) else 255,
                     wwhReadinessGroup = if (wwhReadiness) didHex.toInt(16) else null, multiLayout = layout,
@@ -1636,6 +1638,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         localizedContext.getString(R.string.cal_doip_sequence_reply, index + 1,
                             reply.joinToString(" ") { "%02X".format(it.toInt() and 255) })
                     }.joinToString("\n")
+                    result.allStoredReport != null -> requireNotNull(result.allStoredReport).let { report ->
+                        val heading = localizedContext.getString(R.string.cal_doip_all_stored_result, report.records.size)
+                        (listOf(heading) + report.records.flatMap { row ->
+                            listOf(localizedContext.getString(R.string.cal_doip_stored_record_result, row.record),
+                                localizedContext.getString(R.string.cal_doip_detail_result, row.dtc, row.status,
+                                    row.rawRecord.joinToString(" ") { "%02X".format(it.toInt() and 255) })) +
+                                row.dids.map { item ->
+                                    localizedContext.getString(R.string.cal_doip_multi_result, item.did, item.data.size,
+                                        item.data.joinToString(" ") { "%02X".format(it.toInt() and 255) })
+                                }
+                        }).joinToString("\n")
+                    }
                     result.storedReport != null -> requireNotNull(result.storedReport).let { stored ->
                         val heading = localizedContext.getString(R.string.cal_doip_stored_record_result, stored.record)
                         val detail = stored.detail
