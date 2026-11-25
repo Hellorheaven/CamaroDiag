@@ -143,4 +143,10 @@
   <data name="SeverityCountResult" xml:space="preserve"><value>DTC correspondants : {0} ; disponibilité 0x{1:X2} ; format 0x{2:X2}</value></data>
   <data name="SeverityListResult" xml:space="preserve"><value>Enregistrements de sévérité : {0} ; disponibilité 0x{1:X2}</value></data>
   <data name="SeverityRecord" xml:space="preserve"><value>DTC 0x{0:X6} — sévérité 0x{1:X2}, unité 0x{2:X2}, statut 0x{3:X2}</value></data>
+  <data name="Inventory" xml:space="preserve"><value>Inventaire ECU</value></data>
+  <data name="InventoryAddresses" xml:space="preserve"><value>Adresses ECU (hex, séparées par virgules)</value></data>
+  <data name="InventoryStarted" xml:space="preserve"><value>Vérification des adresses explicites : {0}</value></data>
+  <data name="InventoryVerified" xml:space="preserve"><value>ECU 0x{0:X4} : VIN vérifié ({1})</value></data>
+  <data name="InventoryUnverified" xml:space="preserve"><value>ECU 0x{0:X4} : non vérifié (absence non prouvée)</value></data>
+  <data name="InventoryComplete" xml:space="preserve"><value>Inventaire terminé : {0}/{1} VIN vérifiés</value></data>
 </root>

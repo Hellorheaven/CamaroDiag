@@ -143,4 +143,10 @@
   <data name="SeverityCountResult" xml:space="preserve"><value>Matching DTCs: {0}; availability 0x{1:X2}; format 0x{2:X2}</value></data>
   <data name="SeverityListResult" xml:space="preserve"><value>Severity records: {0}; availability 0x{1:X2}</value></data>
   <data name="SeverityRecord" xml:space="preserve"><value>DTC 0x{0:X6} — severity 0x{1:X2}, unit 0x{2:X2}, status 0x{3:X2}</value></data>
+  <data name="Inventory" xml:space="preserve"><value>ECU inventory</value></data>
+  <data name="InventoryAddresses" xml:space="preserve"><value>ECU addresses (hex, comma-separated)</value></data>
+  <data name="InventoryStarted" xml:space="preserve"><value>Checking explicit ECU addresses: {0}</value></data>
+  <data name="InventoryVerified" xml:space="preserve"><value>ECU 0x{0:X4}: VIN verified ({1})</value></data>
+  <data name="InventoryUnverified" xml:space="preserve"><value>ECU 0x{0:X4}: not verified (not proof of absence)</value></data>
+  <data name="InventoryComplete" xml:space="preserve"><value>Inventory complete: {0}/{1} VINs verified</value></data>
 </root>

@@ -1,3 +1,7 @@
+## PR117 — inventaire explicite des ECU dans la console Windows (25/11/2026)
+
+- Champ liste d'adresses logiques et bouton d'inventaire FR/EN ; utilisation du moteur partagé CLI, contrôles VIN/passerelle, résultats vérifiés/non vérifiés distincts, annulation, journal UDP et PDU attribués à chaque ECU. Le champ ECU unitaire n'est pas utilisé pour cet inventaire. Pas de modification du profil ni de découverte d'adresses supposées. Android reste à raccorder. Aucun test/compilation lancé.
+
 ## PR117 — inventaire explicite ECU DoIP Windows CLI (25/11/2026)
 
 - Parité Connectors/Windows CLI : --ecu-inventory 1234,1235 remplace --ecu, 1–16 adresses connues, F190 par session, revalidation passerelle à chaque étape et en fin, TLS sans repli, résultat vérifié/non vérifié. Journal PDU attribué à l'adresse réellement interrogée. Annulation et refus des arguments concurrents. Moteur réutilisable pour GUI Windows. Tests écrits sans exécution ; Android et GUI Windows restent à raccorder. Aucun checkpoint CI.
