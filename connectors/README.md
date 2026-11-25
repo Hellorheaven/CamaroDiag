@@ -110,6 +110,8 @@ Pour les données étendues, FE limite la réponse aux enregistrements OBD régl
 
 Les commandes `memory-snapshot-decoded --memory 02 --dtc 010203 --record FF --did-lengths F40D:1` et `memory-extended-decoded --memory 02 --dtc 010203 --record FF --record-lengths 01:2,90:1` utilisent la mémoire explicitement sélectionnée. Les exemples ne définissent pas les longueurs réelles du calculateur. / These commands decode records in the explicitly selected memory; example lengths are not ECU definitions.
 
+Pour décoder un enregistrement mémorisé individuel (19/05), utiliser `stored-record --record 01 --did-lengths F40D:1`. Sans catalogue, la commande conserve son résultat brut historique. / To decode one stored record, supply documented DID lengths; without a catalog the original raw operation is unchanged.
+
 ### Acquisition mémoire DoIP / DoIP memory capture
 
 ```bash
