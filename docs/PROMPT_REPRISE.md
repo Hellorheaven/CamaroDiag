@@ -1,3 +1,7 @@
+## PR117 — extension des canaux OBD J2534 physiques (25/11/2026)
+
+- C6 pont Windows : lecture SAE J1979 sur paires physiques ISO 15765-4 11 bits 7E0..7E7 / 7E8..7EF et 29 bits 18DAxxF1 / 18DAF1xx corrélées strictement. Aucun broadcast ou changement d'ECU ; effacement réservé au canal primaire avec autorisations et contrôle de vitesse/régime existants. Régressions Windows écrites non exécutées. Parité Android à réaliser (accès GitHub à certains fichiers intermittent). C6/DoIP restent ouverts, aucun checkpoint.
+
 ## PR117 — découverte PID multicalculateur et télémétrie générique (25/11/2026)
 
 - C6 : collecte des bitmaps SAE Mode 01 par répondant réel avec suivi indépendant des pages, rejet des doublons contradictoires et conservation du statut incomplet lorsqu'une page manque. Télémétrie standard générique : source stable par PID, pas de substitution silencieuse si le répondant disparaît, identifiant CAN dans les libellés des mesures/CSV ; restriction ECM conservée pour Camaro confirmé. Ajout du PID 5B lorsque réellement annoncé et lu (durée de vie batterie hybride, pas état de charge ni capacité EV propriétaire). Tests écrits non exécutés ; aucune CI. C6/DoIP restent actifs.

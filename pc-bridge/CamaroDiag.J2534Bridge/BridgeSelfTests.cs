@@ -386,6 +386,13 @@ internal static class BridgeSelfTests
 
         Assert(StandardObdPhysicalPolicy.SupportsChannel(0x7E0,0x7E8,33), "Standard primary 11-bit OBD channel");
         Assert(StandardObdPhysicalPolicy.SupportsChannel(0x18DA10F1,0x18DAF110,34), "Standard primary 29-bit OBD channel");
+        Assert(StandardObdPhysicalPolicy.SupportsChannel(0x7E7,0x7EF,35), "Explicit secondary physical OBD channel");
+        Assert(StandardObdPhysicalPolicy.SupportsChannel(0x18DA11F1,0x18DAF111,36), "Explicit secondary 29-bit physical OBD channel");
+        Assert(!StandardObdPhysicalPolicy.SupportsChannel(0x7E1,0x7E8,33), "Mismatching responder denied");
+        Assert(!StandardObdPhysicalPolicy.SupportsChannel(0x18DA11F1,0x18DAF110,34), "Mismatching extended responder denied");
+        Assert(!StandardObdPhysicalPolicy.SupportsChannel(0x18DB33F1,0x18DAF110,34), "Functional 29-bit broadcast denied");
+        Assert(!StandardObdPhysicalPolicy.SupportsChannel(0x18DAF1F1,0x18DAF1F1,34), "Tester self-address denied");
+        Assert(!StandardObdPhysicalPolicy.SupportsPrimaryChannel(0x7E1,0x7E9,33), "Secondary read capability does not extend clear authorization");
         Assert(!StandardObdPhysicalPolicy.SupportsChannel(0x7DF,0x7E8,33), "Functional broadcasts not authorized");
         Assert(!StandardObdPhysicalPolicy.SupportsChannel(0x7E0,0x7E8,63), "SW-CAN not standard ISO 15765-4");
         foreach (byte[] req in new byte[][] { [1,0], [1,0x52], [3], [7], [0x0A] })

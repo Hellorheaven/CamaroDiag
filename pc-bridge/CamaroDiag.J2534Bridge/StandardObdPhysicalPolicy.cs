@@ -3,13 +3,24 @@ namespace CamaroDiag.J2534Bridge;
 /// <summary>
 /// Standard SAE J1979 reads on a selected ISO 15765-4 physical OBD channel.
 /// This is not a broadcast scan, ELM emulation or ECU programming permission.
-/// Start with the conventional primary powertrain address pair, on either
+/// Supports explicit, correlated physical OBD address pairs on either
 /// standardized CAN identifier width and bit rate. A response still has to
-/// prove that the ECU actually implements the requested OBD service.
+/// prove that the selected ECU implements the requested OBD service.
 /// </summary>
 internal static class StandardObdPhysicalPolicy
 {
-    internal static bool SupportsChannel(int request, int response, int protocol) =>
+    internal static bool SupportsChannel(int request, int response, int protocol)
+    {
+        if (protocol is 33 or 35)
+            return request is >= 0x7E0 and <= 0x7E7 && response == request + 8;
+        if (protocol is not (34 or 36) || (request & ~0xFF00) != 0x18DA00F1)
+            return false;
+        var address = (request >> 8) & 0xFF;
+        return address is not (0xF1 or 0xFE or 0xFF) &&
+            response == (0x18DAF100 | address);
+    }
+
+    internal static bool SupportsPrimaryChannel(int request, int response, int protocol) =>
         (protocol is 33 or 35 && request == 0x7E0 && response == 0x7E8) ||
         (protocol is 34 or 36 && request == 0x18DA10F1 && response == 0x18DAF110);
 

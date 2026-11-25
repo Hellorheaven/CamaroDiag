@@ -92,6 +92,8 @@ internal sealed partial class J2534Device : IDisposable
     public string ResponseCanIdLabel => _responseCanId.ToString(_can29Bit ? "X8" : "X3");
     public bool IsStandardObdReadEnabled => _opened && StandardObdPhysicalPolicy.SupportsChannel(
         _requestCanId, _responseCanId, _protocolNumber);
+    public bool IsPrimaryStandardObdChannel => _opened && StandardObdPhysicalPolicy.SupportsPrimaryChannel(
+        _requestCanId, _responseCanId, _protocolNumber);
     public bool IsMemoryReadEnabled => _memoryReadScope != null && _memoryReadVinVerified;
 
     [UnmanagedFunctionPointer(CallingConvention.StdCall)]
@@ -445,7 +447,7 @@ internal sealed partial class J2534Device : IDisposable
     internal void ClearStandardObdDtcs(bool locallyEnabled)
     {
         EnsureOpen();
-        if (!locallyEnabled || !IsStandardObdReadEnabled)
+        if (!locallyEnabled || !IsPrimaryStandardObdChannel)
             throw new UnauthorizedAccessException("Standard OBD clear is not enabled for this physical channel.");
         // No guessed engine state. Require actual zero-speed and zero-RPM
         // positive Mode 01 responses just before the irreversible reset.
@@ -453,7 +455,7 @@ internal sealed partial class J2534Device : IDisposable
         byte[] speed = Exchange([0x01,0x0D], 1800);
         ClearNativeReceiveQueue();
         byte[] rpm = Exchange([0x01,0x0C], 1800);
-        if (!StandardObdPhysicalPolicy.CanClear(locallyEnabled, IsStandardObdReadEnabled, speed, rpm))
+        if (!StandardObdPhysicalPolicy.CanClear(locallyEnabled, IsPrimaryStandardObdChannel, speed, rpm))
             throw new InvalidOperationException("Stop the vehicle and engine before an emissions diagnostic reset.");
         ClearNativeReceiveQueue();
         var ack = ExchangeCore([0x04], 2500, nativeBenchReply: false);
