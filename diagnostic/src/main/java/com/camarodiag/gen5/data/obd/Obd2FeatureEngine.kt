@@ -98,16 +98,18 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
             ask("ATS1")
             ask("ATH1")
             val response = ask("0100", 2500L)
-            val ids = Regex("(?i)(?:^|\\s)([0-9A-F]{3})\\s+(?=(?:[0-9A-F]{2}\\s*){4,})")
-                .findAll(response)
-                .mapNotNull { match ->
-                    val id = match.groupValues[1].uppercase(Locale.ROOT)
-                    val numeric = id.toIntOrNull(16) ?: return@mapNotNull null
-                    id.takeIf { numeric in 0x7E8..0x7EF }
+            val ids = response.lineSequence().mapNotNull { raw ->
+                val line = raw.trim().removeSuffix(">").trim().uppercase(Locale.ROOT)
+                val spaced = Regex("^(7E[8-F]|18DAF1[0-9A-F]{2})\\s+").find(line)
+                val id = spaced?.groupValues?.get(1) ?: when {
+                    line.length % 2 == 1 && line.startsWith("7E") -> line.take(3)
+                    line.startsWith("18DAF1") -> line.take(8)
+                    else -> return@mapNotNull null
                 }
-                .distinct()
-                .sorted()
-                .toList()
+                if (!id.matches(Regex("7E[8-F]|18DAF1[0-9A-F]{2}"))) return@mapNotNull null
+                val payload = CamaroUdsProtocol.parsePidBytes(line, "00") ?: return@mapNotNull null
+                id.takeIf { payload.size == 4 }
+            }.distinct().sorted().toList()
             ids
         } finally {
             // Restore normal ELM output framing regardless of the scan result.
@@ -130,8 +132,8 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
             val bytes = if (primaryPowertrainResponderOnly) {
                 CamaroUdsProtocol.parsePidBytes(response, pidHex, primaryPowertrainResponderOnly = true)
                     ?.takeIf { it.size == 4 }?.asList()
-            } else payload(response, 0x41, basePid)
-            if (bytes == null || bytes.size < 4) return PidDiscovery(supported, basePid + 1)
+            } else CamaroUdsProtocol.parsePidBytes(response, pidHex)?.takeIf { it.size == 4 }?.asList()
+            if (bytes == null || bytes.size != 4) return PidDiscovery(supported, basePid + 1)
 
             for (bit in 0 until 32) {
                 val mask = 1 shl (7 - (bit % 8))
