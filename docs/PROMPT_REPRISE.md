@@ -1,3 +1,7 @@
+## PR117 — journal DoIP CLI Windows (25/11/2026)
+
+- --trace-file NEW.jsonl pour les échanges bruts, séquences vérifiées, lectures typées et monitoring simple/multi-DID. Journal des PDU réels de session TCP/TLS (contrôle et diagnostic), UTC/direction/adresses/octets, écrit après consentement, CreateNew, jamais écrasé, conservé en cas d'erreur ; distinction du fichier RX. Ne couvre pas encore les datagrammes UDP de découverte. Aide FR/EN et tests écrits non exécutés. Aucun checkpoint CI.
+
 ## PR117 — UDS 19/14 Windows GUI/CLI (25/11/2026)
 
 - Parité FDC Android/Windows/Connectors : compteurs signés, aucune confusion avec statut DTC, réponse vide valide, rejet des doublons et longueurs incohérentes, F190 avant/après. Bouton FR/EN et --uds-fault-counters. Tests écrits sans exécution. Aucun checkpoint ni clôture DoIP.

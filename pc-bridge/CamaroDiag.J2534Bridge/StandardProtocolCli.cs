@@ -1184,7 +1184,7 @@ internal static class StandardProtocolCli
         string? ReceiveFile = null,
         string? ClientCertificateThumbprint = null,
         int DoIpP2Ms = 30000, int DoIpP2StarMs = 30000,
-        byte RoutingActivationType = 0x00, byte[]? RoutingOemData = null);
+        byte RoutingActivationType = 0x00, byte[]? RoutingOemData = null, string? TraceFile = null);
     internal sealed record PassThruOptions(int AdapterIndex, uint ProtocolId,
         uint Baud, uint Flags, byte[] Data, byte[]? Mask, byte[]? Pattern,
         byte[]? Flow, string? KlineInit, int TimeoutMs, int ReadFrames,
@@ -1398,6 +1398,21 @@ internal static class StandardProtocolCli
             throw new ArgumentException(
                 "DoIP OEM routing-activation data must be exactly four bytes.");
         var receiveFile = Optional(args, "--rx-file");
+        var traceFile = Optional(args, "--trace-file");
+        if (args.Count(x => x.Equals("--trace-file", StringComparison.OrdinalIgnoreCase)) > 1)
+            throw new ArgumentException("Repeated DoIP trace file option.");
+        if (traceFile is not null)
+        {
+            if (string.IsNullOrWhiteSpace(traceFile))
+                throw new ArgumentException("DoIP trace file path cannot be empty.");
+            traceFile = Path.GetFullPath(traceFile);
+            if (File.Exists(traceFile) || Directory.Exists(traceFile) ||
+                !Directory.Exists(Path.GetDirectoryName(traceFile)))
+                throw new ArgumentException("Choose a new DoIP trace file in an existing directory.");
+            if (receiveFile is not null && string.Equals(traceFile, Path.GetFullPath(receiveFile),
+                StringComparison.OrdinalIgnoreCase))
+                throw new ArgumentException("DoIP trace and response files must be distinct.");
+        }
         var clientCert = Optional(args, "--client-cert-thumbprint");
         if (clientCert is not null &&
             (!useTls || clientCert.Length != 40 ||
@@ -1410,7 +1425,7 @@ internal static class StandardProtocolCli
             throw new ArgumentException("DoIP target or diagnostic PDU is invalid.");
         return new(host, tester, ecu, bytes, timeout, useTls,
             version, receiveFile, clientCert, p2Ms, p2StarMs,
-            routingType, routingOem);
+            routingType, routingOem, traceFile);
     }
 
     internal static PassThruOptions ParseJ2534(string[] args)
@@ -1526,6 +1541,52 @@ internal static class StandardProtocolCli
         output.Flush(flushToDisk: true);
     }
 
+    internal static string FormatDoIpTrace(DoIpOptions target, DoIpDiagnosticTransport.PduTrace frame) =>
+        System.Text.Json.JsonSerializer.Serialize(new
+        {
+            utc = frame.ObservedAtUtc, direction = frame.Direction,
+            transport = target.UseTls ? "TLS" : "TCP", host = target.Host,
+            tester = $"{target.Tester:X4}", ecu = $"{target.Ecu:X4}",
+            bytes = frame.Bytes.Length, pdu = Convert.ToHexString(frame.Bytes)
+        });
+
+    // The transport can invoke the observer on either its reader or writer.
+    // Keep complete JSON lines in chronological callback order. A failed file
+    // write is not silently ignored; the exchange must not claim full logging.
+    private sealed class DoIpTraceJournal : IDisposable
+    {
+        private readonly object gate = new();
+        private readonly StreamWriter writer;
+        private readonly DoIpOptions target;
+        private bool disposed;
+        internal DoIpTraceJournal(DoIpOptions target)
+        {
+            this.target = target;
+            writer = new StreamWriter(new FileStream(target.TraceFile!, FileMode.CreateNew,
+                FileAccess.Write, FileShare.Read), new System.Text.UTF8Encoding(false)) { AutoFlush = true };
+        }
+        internal void Record(DoIpDiagnosticTransport.PduTrace frame)
+        {
+            lock (gate)
+            {
+                if (disposed) throw new ObjectDisposedException(nameof(DoIpTraceJournal));
+                writer.WriteLine(FormatDoIpTrace(target, frame));
+            }
+        }
+        public void Dispose()
+        {
+            lock (gate)
+            {
+                if (disposed) return;
+                disposed = true;
+                writer.Dispose();
+            }
+        }
+    }
+
+    private static DoIpTraceJournal? OpenDoIpTrace(DoIpOptions target) =>
+        target.TraceFile is null ? null : new DoIpTraceJournal(target);
+
     internal sealed record DoIpSequenceOptions(DoIpOptions Target, string Vin,
         byte[][] Commands, bool ExplicitVersion);
 
@@ -1537,7 +1598,7 @@ internal static class StandardProtocolCli
         {
             "--host", "--tester", "--ecu", "--expected-vin", "--sequence", "--timeout-ms",
             "--tls", "--doip-version", "--client-cert-thumbprint", "--uds-p2-ms",
-            "--uds-p2-star-ms", "--routing-activation-type", "--routing-oem-data"
+            "--uds-p2-star-ms", "--routing-activation-type", "--routing-oem-data", "--trace-file"
         };
         var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         for (var i = args.Length > 0 && args[0].Equals(DoIpCommand, StringComparison.OrdinalIgnoreCase) ? 1 : 0;
@@ -1590,12 +1651,14 @@ internal static class StandardProtocolCli
                 return 2;
             cancellation.Token.ThrowIfCancellationRequested();
             await DoIpVehicleDiscovery.RequireCurrentIdentityAsync(gateway, timeout, cancellation.Token);
+            using var journal = OpenDoIpTrace(o);
             await using var transport = await DoIpDiagnosticTransport.ConnectAsync(
                 o.Host, o.Tester, o.Ecu, timeout, cancellation.Token,
                 useTls: o.UseTls, protocolVersion: gateway.ProtocolVersion,
                 clientCertificateThumbprint: o.ClientCertificateThumbprint,
                 activationType: o.RoutingActivationType, activationOemData: o.RoutingOemData,
-                expectedGatewayAddress: gateway.LogicalAddress);
+                expectedGatewayAddress: gateway.LogicalAddress,
+                trace: journal is null ? null : journal.Record);
             var count = await DoIpVinReader.ExchangeSequenceVerifiedAsync(transport, gateway,
                 sequence.Commands, timeout, cancellation.Token, (index, reply) =>
                     Console.WriteLine(string.Format(DoIpConsolePresentation.Text("SequenceReply"),
@@ -1617,7 +1680,7 @@ internal static class StandardProtocolCli
             "--host", "--tester", "--ecu", "--expected-vin", "--monitor-did", "--obd-monitor-did",
             "--monitor-dids", "--obd-monitor-dids", "--samples", "--interval-ms", "--timeout-ms", "--tls", "--doip-version",
             "--client-cert-thumbprint", "--routing-activation-type", "--routing-oem-data",
-            "--uds-p2-ms", "--uds-p2-star-ms"
+            "--uds-p2-ms", "--uds-p2-star-ms", "--trace-file"
         };
         var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         for (var i = args.Length > 0 && args[0].Equals(DoIpCommand, StringComparison.OrdinalIgnoreCase) ? 1 : 0;
@@ -1680,11 +1743,13 @@ internal static class StandardProtocolCli
                 (monitor.ExplicitVersion && gateway.ProtocolVersion != o.Version) ||
                 gateway.LogicalAddress == o.Tester)
                 throw new InvalidDataException("Observed DoIP gateway differs from the monitoring target.");
+            using var journal = OpenDoIpTrace(o);
             await using var transport = await DoIpDiagnosticTransport.ConnectAsync(
                 o.Host, o.Tester, o.Ecu, timeout, cancellation.Token,
                 useTls: o.UseTls, protocolVersion: gateway.ProtocolVersion,
                 clientCertificateThumbprint: o.ClientCertificateThumbprint,
                 expectedGatewayAddress: gateway.LogicalAddress,
+                trace: journal is null ? null : journal.Record,
                 sessionOptions: new DoIpDiagnosticTransport.SessionOptions(o.DoIpP2Ms,
                     o.DoIpP2StarMs, o.RoutingActivationType,
                     o.RoutingOemData is null ? "" : Convert.ToHexString(o.RoutingOemData)));
@@ -1796,10 +1861,12 @@ internal static class StandardProtocolCli
                 $"host={o.Host} ECU={o.Ecu:X4} TLS={o.UseTls} TX={Convert.ToHexString(o.Request)}"))
                 return 2;
             await DoIpVehicleDiscovery.RequireCurrentIdentityAsync(gateway, timeout, stop.Token);
+            using var journal = OpenDoIpTrace(o);
             await using var link = await DoIpDiagnosticTransport.ConnectAsync(o.Host, o.Tester, o.Ecu,
                 timeout, stop.Token, useTls: o.UseTls, protocolVersion: gateway.ProtocolVersion,
                 clientCertificateThumbprint: o.ClientCertificateThumbprint,
                 expectedGatewayAddress: gateway.LogicalAddress,
+                trace: journal is null ? null : journal.Record,
                 sessionOptions: new DoIpDiagnosticTransport.SessionOptions(o.DoIpP2Ms, o.DoIpP2StarMs,
                     o.RoutingActivationType, o.RoutingOemData is null ? "" : Convert.ToHexString(o.RoutingOemData)));
             if (verified.IdentityOnly)
@@ -1891,13 +1958,15 @@ internal static class StandardProtocolCli
                 $"SHA256={Convert.ToHexString(
                     System.Security.Cryptography.SHA256.HashData(o.Request))}"))
                 return 2;
+            using var journal = OpenDoIpTrace(o);
             await using var link = await DoIpDiagnosticTransport.ConnectAsync(
                 o.Host, o.Tester, o.Ecu,
                 TimeSpan.FromMilliseconds(o.TimeoutMs), CancellationToken.None,
                 useTls: o.UseTls, protocolVersion: o.Version,
                 clientCertificateThumbprint: o.ClientCertificateThumbprint,
                 activationType: o.RoutingActivationType,
-                activationOemData: o.RoutingOemData);
+                activationOemData: o.RoutingOemData,
+                trace: journal is null ? null : journal.Record);
             var reply = await link.ExchangeUdsAsync(o.Request,
                 TimeSpan.FromMilliseconds(o.TimeoutMs), CancellationToken.None,
                 TimeSpan.FromMilliseconds(o.DoIpP2Ms),

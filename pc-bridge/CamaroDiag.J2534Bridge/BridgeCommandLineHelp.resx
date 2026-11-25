@@ -59,6 +59,8 @@ Examples:
                               validated TLS with no plaintext fallback; P2/P2* flags
                               control deadlines. May change ECU state: require the
                               correct authorized identity and explicit consent.
+                              --trace-file NEW.jsonl records complete TCP/TLS DoIP
+                              PDUs with UTC, TX/RX and target; retained on failure.
                               --sequence "22F190;1901FF" --expected-vin VIN
                               sends 1–16 ordered commands on one verified session,
                               TLS by default, stops at first error; interactive consent.

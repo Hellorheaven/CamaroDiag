@@ -519,9 +519,28 @@ internal static class StandardVehicleProtocolsSelfTests
             verifiedMonitor.Did == 0xF40C && verifiedMonitor.Count == 5 &&
             verifiedMonitor.IntervalMs == 250 && verifiedMonitor.Target.DoIpP2Ms == 100 &&
             verifiedMonitor.Target.DoIpP2StarMs == 2000, "Verified OBD monitoring parses a bounded TLS target and timings.");
+        var tracePath = Path.Combine(Path.GetTempPath(), $"camarodiag-doip-{Guid.NewGuid():N}.jsonl");
+        var traceTarget = StandardProtocolCli.ParseDoIp(["--host", "127.0.0.1", "--tester", "0E80",
+            "--ecu", "1234", "--payload", "22F190", "--trace-file", tracePath]);
+        Check(traceTarget.TraceFile == Path.GetFullPath(tracePath) && !File.Exists(tracePath),
+            "Trace path validation does not create a file before consent.");
+        using (var json = System.Text.Json.JsonDocument.Parse(StandardProtocolCli.FormatDoIpTrace(traceTarget,
+            new DoIpDiagnosticTransport.PduTrace("TX", DateTimeOffset.UnixEpoch, [2, 0xFD, 0x80, 1, 0, 0, 0, 7]))))
+        {
+            Check(json.RootElement.GetProperty("direction").GetString() == "TX" &&
+                json.RootElement.GetProperty("pdu").GetString() == "02FD800100000007" &&
+                json.RootElement.GetProperty("ecu").GetString() == "1234",
+                "Full PDU trace retains direction, target and bytes.");
+        }
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseDoIp([
+            "--host", "127.0.0.1", "--tester", "0E80", "--ecu", "1234",
+            "--payload", "22F190", "--trace-file", tracePath, "--rx-file", tracePath]),
+            "Trace and response cannot use the same file.");
         var monitorArgs = new[] { StandardProtocolCli.DoIpCommand, "--host", "192.0.2.10",
             "--tester", "0E80", "--ecu", "1234", "--expected-vin", "1G1FA1RXXR0123456",
             "--obd-monitor-did", "F40C" };
+        Check(StandardProtocolCli.ParseDoIpMonitor([..monitorArgs, "--trace-file", tracePath]).Target.TraceFile == tracePath,
+            "Monitoring forwards the trace file option.");
         Reject<ArgumentException>(() => StandardProtocolCli.ParseDoIpMonitor(
             [.. monitorArgs, "--uds-p2-ms", "1000", "--uds-p2-star-ms", "500"]),
             "Monitoring rejects reversed P2/P2-star timing before opening a socket.");
