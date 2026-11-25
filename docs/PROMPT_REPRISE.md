@@ -1,3 +1,9 @@
+## PR117 — simulation TCP Android et enregistrement 19/05 individuel décodé (25/11/2026)
+
+- Android : le parcours public read conserve les ports ISO standard (UDP/TCP 13400, TLS 3496) ; un point d'entrée interne readAt permet uniquement les ports alternatifs sur loopback TCP non TLS. Les tests de simulation UDP/TCP empruntent le même parcours réel : découverte, activation, Alive Check, ACK, requête physique exacte, VIN initial et final. Sept opérations (19/04, 19/05 FF, 19/06, 19/18, 19/19 et variantes OBDonUDS 19/04/06), cas concordants et divergents écrits, non exécutés.
+- UDS 19/05 individuel décodé sur Connectors, Android, Windows GUI/CLI : DID:longueur documenté, même décodeur structuré que FF mais sélection exacte d'un seul enregistrement et absence distinguée. Réponse originale conservée, refus des enregistrements supplémentaires ou inconnus, VIN F190 avant/après. Parcours brut historique maintenu. CLI Connectors stored-record --record 01 --did-lengths F40D:1 ; Windows --uds-stored-record 0x01 --stored-did-lengths F40D:1 avec VIN. FR/EN.
+- Régressions écrites sur les trois plateformes. Aucun test, build ou checkpoint CI déclenché. C6 et DoIP restent ouverts ; ne pas considérer cette simulation écrite comme validée, ni la qualification physique comme acquise. Restent l'audit des fonctions DoIP applicables, les corrections de cohérence et la validation de clôture.
+
 ## PR117 — décodage des mémoires DTC utilisateur (25/11/2026)
 
 - UDS 19/18 et 19/19 : parcours structurés Connectors Python, Android et Windows GUI/CLI. Sélection mémoire explicite, écho mémoire/DTC vérifié, longueurs documentées, VIN F190 avant/après et réponse brute originale conservée. Aucun repli vers la mémoire principale.
