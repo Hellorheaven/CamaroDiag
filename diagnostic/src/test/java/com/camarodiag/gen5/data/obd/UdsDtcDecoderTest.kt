@@ -59,6 +59,26 @@ class UdsDtcDecoderTest {
         assertTrue(runCatching { UdsDtcDecoder.storedRecordRequest(255) }.isFailure)
     }
 
+    @Test fun decodedExtendedRecordsRespectSelectorsAndLengths() {
+        fun hex(s: String) = s.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
+        val catalog = UdsDtcDecoder.parseExtendedRecordLengths("01:2,90:1,91:2")
+        assertArrayEquals(hex("1906010203FF"), UdsDtcDecoder.extendedRecordsRequest(0x010203, 255, catalog))
+        val response = hex("59060102030801123490AA91BBCC")
+        val report = UdsDtcDecoder.decodeExtendedRecords(0x010203, 255, response, catalog)
+        assertEquals(listOf(1, 0x90, 0x91), report.records.map { it.number })
+        assertArrayEquals(hex("BBCC"), report.records.last().data)
+        assertArrayEquals(response, report.rawResponse)
+        assertEquals(2, UdsDtcDecoder.decodeExtendedRecords(0x010203, 0xFE,
+            hex("59060102030890AA91BBCC"), catalog).records.size)
+        assertTrue(UdsDtcDecoder.decodeExtendedRecords(0x010203, 1, hex("590601020308"), catalog).records.isEmpty())
+        for ((selector, bad) in listOf(0xFE to "590601020308011234", 1 to "59060102030801123490AA",
+            255 to "59060102030890AA90BB", 255 to "5906010203080112",
+            255 to "59060102030802AA", 255 to "59060102040890AA"))
+            assertTrue(runCatching { UdsDtcDecoder.decodeExtendedRecords(0x010203, selector, hex(bad), catalog) }.isFailure)
+        for (invalid in listOf("00:1", "FE:1", "01:0", "01:4091", "01:1,01:2"))
+            assertTrue(runCatching { UdsDtcDecoder.parseExtendedRecordLengths(invalid) }.isFailure)
+    }
+
     @Test fun snapshotRecordsDecodeHistoricalDidsAndRejectWrongSelectors() {
         fun hex(s: String) = s.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
         val catalog = UdsDtcDecoder.parseStoredDidLengths("F40C:2,F40D:1")
