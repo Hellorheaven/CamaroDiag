@@ -26,7 +26,7 @@ import kotlin.coroutines.resumeWithException
  * A socket is owned by one operation and is never retained after failure.
  */
 object DoIpDirectRead {
-    enum class Operation { VIN, DID, DTC, DTC_COUNT, DTC_SNAPSHOT, DTC_EXTENDED, MONITOR, BACKUP, EXCHANGE, OBD_IDENTIFY, OBD_DID, OBD_MONITOR, OBD_WWH_MASK, OBD_WWH_PERMANENT, OBD_WWH_READINESS, MULTI_DID, OBD_MULTI_DID, SCALING_DID, OBD_DTC, OBD_DTC_COUNT, OBD_DTC_SNAPSHOT, OBD_DTC_EXTENDED, SUPPORTED_DTCS, PERMANENT_DTCS, SNAPSHOT_INDEX, MULTI_MONITOR, OBD_MULTI_MONITOR, FIRST_FAILED_DTC, FIRST_CONFIRMED_DTC, RECENT_FAILED_DTC, RECENT_CONFIRMED_DTC, FAULT_COUNTERS, SEVERITY_COUNT, SEVERITY_LIST, SEVERITY_INFO, INVENTORY, OBD_INVENTORY, MEMORY_DTCS, MEMORY_SNAPSHOT, MEMORY_EXTENDED, EXTENDED_RECORD_SUPPORT, EXTENDED_RECORD_DATA, MIRROR_DTCS, MIRROR_EXTENDED, MIRROR_COUNT, LEGACY_EMISSIONS_COUNT, LEGACY_EMISSIONS_DTCS, STORED_RECORD, ALL_STORED_RECORDS }
+    enum class Operation { VIN, DID, DTC, DTC_COUNT, DTC_SNAPSHOT, DTC_EXTENDED, MONITOR, BACKUP, EXCHANGE, OBD_IDENTIFY, OBD_DID, OBD_MONITOR, OBD_WWH_MASK, OBD_WWH_PERMANENT, OBD_WWH_READINESS, MULTI_DID, OBD_MULTI_DID, SCALING_DID, OBD_DTC, OBD_DTC_COUNT, OBD_DTC_SNAPSHOT, OBD_DTC_EXTENDED, SUPPORTED_DTCS, PERMANENT_DTCS, SNAPSHOT_INDEX, MULTI_MONITOR, OBD_MULTI_MONITOR, FIRST_FAILED_DTC, FIRST_CONFIRMED_DTC, RECENT_FAILED_DTC, RECENT_CONFIRMED_DTC, FAULT_COUNTERS, SEVERITY_COUNT, SEVERITY_LIST, SEVERITY_INFO, INVENTORY, OBD_INVENTORY, MEMORY_DTCS, MEMORY_SNAPSHOT, MEMORY_EXTENDED, EXTENDED_RECORD_SUPPORT, EXTENDED_RECORD_DATA, MIRROR_DTCS, MIRROR_EXTENDED, MIRROR_COUNT, LEGACY_EMISSIONS_COUNT, LEGACY_EMISSIONS_DTCS, STORED_RECORD, ALL_STORED_RECORDS, DECODED_SNAPSHOT, OBD_DECODED_SNAPSHOT }
     /** Immutable optional parameters. Defaults retain the original global deadline. */
     data class SessionOptions(val timeoutMs: Int = 5000, val p2Ms: Int = timeoutMs,
         val p2StarMs: Int = timeoutMs, val routingType: Int = 0, val routingOemHex: String = "") {
@@ -292,7 +292,8 @@ object DoIpDirectRead {
         val extendedRecordReport: UdsExtendedRecordReport? = null,
         val legacyReport: UdsLegacyDtcReport? = null,
         val storedReport: UdsStoredDtcRecord? = null,
-        val allStoredReport: UdsAllStoredRecords? = null)
+        val allStoredReport: UdsAllStoredRecords? = null,
+        val decodedSnapshot: UdsSnapshotRecords? = null)
     data class Sample(val index: Int, val elapsedMs: Long, val data: ByteArray,
         val values: List<DoIpMultiDid.Value> = emptyList())
 
@@ -810,7 +811,7 @@ object DoIpDirectRead {
         }
         val wwhRequest = wwhKind?.let { DoIpWwhDtc.request(it, mask, wwhSeverity, wwhReadinessGroup) }
         val obdDtc = operation in setOf(Operation.OBD_DTC, Operation.OBD_DTC_COUNT,
-            Operation.OBD_DTC_SNAPSHOT, Operation.OBD_DTC_EXTENDED)
+            Operation.OBD_DTC_SNAPSHOT, Operation.OBD_DTC_EXTENDED, Operation.OBD_DECODED_SNAPSHOT)
         val severityRequest = when (operation) {
             Operation.SEVERITY_COUNT -> UdsDtcDecoder.severityRequest(7, severityMask, mask, dtc)
             Operation.SEVERITY_LIST -> UdsDtcDecoder.severityRequest(8, severityMask, mask, dtc)
@@ -820,7 +821,8 @@ object DoIpDirectRead {
         require((operation == Operation.EXTENDED_RECORD_DATA) == (extendedRecordSize != null))
         val extendedRecordRequest = if (operation in setOf(Operation.EXTENDED_RECORD_SUPPORT, Operation.EXTENDED_RECORD_DATA))
             UdsDtcDecoder.extendedRecordRequest(record, extendedRecordSize) else null
-        require((operation == Operation.ALL_STORED_RECORDS) == (storedDidLengths != null))
+        val decodedSnapshot = operation in setOf(Operation.DECODED_SNAPSHOT, Operation.OBD_DECODED_SNAPSHOT)
+        require((operation == Operation.ALL_STORED_RECORDS || decodedSnapshot) == (storedDidLengths != null))
         val storedCatalog = storedDidLengths?.toMap()
         if (storedCatalog != null) require(storedCatalog.size in 1..255 &&
             storedCatalog.all { (did, size) -> did in 0..65535 && size in 1..4096 })
@@ -850,6 +852,7 @@ object DoIpDirectRead {
             Operation.RECENT_CONFIRMED_DTC -> 0x0E
             else -> null
         }
+        val decodedSnapshotRequest = if (decodedSnapshot) UdsDtcDecoder.snapshotRecordsRequest(dtc, record) else null
         val detailRequest = when (operation) {
             Operation.DTC_SNAPSHOT, Operation.OBD_DTC_SNAPSHOT -> UdsDtcDecoder.readDetailRequest(4, dtc, record)
             Operation.DTC_EXTENDED, Operation.OBD_DTC_EXTENDED -> UdsDtcDecoder.readDetailRequest(6, dtc, record)
@@ -996,6 +999,9 @@ object DoIpDirectRead {
                         val dtcDetail = if (obdDtc && detailRequest != null)
                             UdsDtcDecoder.decodeDetail(detailRequest[1].u8(), dtc,
                                 session.exchange(detailRequest, timeoutMs)) else null
+                        val snapshot = decodedSnapshotRequest?.let {
+                            UdsDtcDecoder.decodeSnapshotRecords(dtc, record, session.exchange(it, timeoutMs), requireNotNull(storedCatalog))
+                        }
                         if (obdDtc) {
                             require(readVin(0xF802) == vin)
                             require(decodeObdProtocol(session.exchange(byteArrayOf(0x22, 0xF8.toByte(), 0x10),
@@ -1003,7 +1009,7 @@ object DoIpDirectRead {
                         }
                         Outcome(gateway, target.ecu, vin, data, dtcReport, trace.toList(),
                             samples = samples, obdProtocolValue = protocolValue, wwhReport = wwhReport,
-                            multiValues = multiValues, dtcCount = dtcCount, dtcDetail = dtcDetail)
+                            multiValues = multiValues, dtcCount = dtcCount, dtcDetail = dtcDetail, decodedSnapshot = snapshot)
                     } else if (operation == Operation.VIN || (operation == Operation.DID && did == 0xF190)) {
                         vin = readVin()
                         Outcome(gateway, target.ecu, vin, vin.toByteArray(Charsets.US_ASCII), null, trace.toList())
@@ -1021,6 +1027,11 @@ object DoIpDirectRead {
                                 onCommandReply(index + 1, reply.copyOf())
                             }
                             Outcome(gateway, target.ecu, vin, replies.last(), null, trace.toList(), commandReplies = replies.toList())
+                        } else if (decodedSnapshotRequest != null) {
+                            val report = UdsDtcDecoder.decodeSnapshotRecords(dtc, record,
+                                session.exchange(decodedSnapshotRequest, timeoutMs), requireNotNull(storedCatalog))
+                            require(readVin() == vin)
+                            Outcome(gateway, target.ecu, vin, null, null, trace.toList(), decodedSnapshot = report)
                         } else if (operation == Operation.ALL_STORED_RECORDS) {
                             val report = UdsDtcDecoder.decodeAllStoredRecords(
                                 session.exchange(UdsDtcDecoder.allStoredRecordsRequest(), timeoutMs), requireNotNull(storedCatalog))
