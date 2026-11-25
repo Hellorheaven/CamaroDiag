@@ -1,3 +1,7 @@
+## PR117 — lectures sévérité DTC Windows (25/11/2026)
+
+- Parité UDS 19/07–09 Android/Windows/Connectors : masques sévérité/statut, sévérité et unité fonctionnelle brutes, sélection DTC 24 bits, compte/format, validation réponse et F190 avant/après. Console FR/EN et CLI --uds-severity-count/list/status/info. Tests écrits non exécutés, aucun checkpoint CI. Sources de format : py-uds et udsoncan ReadDTCInformation.
+
 ## PR117 — lectures sévérité DTC Android (25/11/2026)
 
 - UDS 19/07, 19/08, 19/09 : masques explicites, sévérité/unité/statut bruts et compte/format, réponse vide possible, validation du DTC et des filtres, F190 avant/après, résultats séparés de la liste active. UI FR/EN, tests écrits non exécutés. Windows reste à raccorder. Aucun checkpoint CI.

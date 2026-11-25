@@ -399,6 +399,9 @@ internal static class UdsStandardServices
                 throw new InvalidDataException("Malformed DTC index or fault counter report.");
             if (subfunction == 0x0A && (request.Length != 2 || response.Length < 3 || (response.Length - 3) % 4 != 0))
                 throw new InvalidDataException("Malformed supported DTC inventory.");
+            if (subfunction == 9 && (request.Length != 5 || response.Length is not (3 or 9) ||
+                (response.Length == 9 && !response.Slice(5, 3).SequenceEqual(request.Slice(2, 3)))))
+                throw new InvalidDataException("DTC severity response belongs to another fault.");
             // ISO 14229 WWH-OBD subfunctions echo the functional group
             // immediately after the subfunction. Ignoring it can attribute
             // a safety/legislated group DTC to an emissions request.

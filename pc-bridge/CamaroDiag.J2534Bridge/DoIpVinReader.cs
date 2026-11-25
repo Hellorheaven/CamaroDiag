@@ -434,6 +434,21 @@ internal static class DoIpVinReader
         return result;
     }
 
+    internal static async Task<ObdOnUdsServices.SeverityReport> ReadObservedSeverityAsync(
+        DoIpVehicleDiscovery.Identity gateway, IPAddress address, ushort tester, ushort ecu,
+        bool tls, byte[] request, TimeSpan timeout, CancellationToken token, string? certificate,
+        Action<DoIpDiagnosticTransport.PduTrace>? trace, DoIpDiagnosticTransport.SessionOptions? options)
+    {
+        var frozen = request.ToArray();
+        if (frozen.Length < 2 || frozen[0] != 0x19 || frozen[1] is < 7 or > 9 ||
+            frozen.Length != (frozen[1] == 9 ? 5 : 4))
+            throw new ArgumentException("Invalid severity request.");
+        await using var link = await ConnectObservedAsync(gateway, address, tester, ecu,
+            tls, timeout, token, certificate, trace, options);
+        return await ReadVerifiedDtcAsync(link, gateway, timeout, token, async () =>
+            ObdOnUdsServices.DecodeSeverity(frozen, await link.ExchangeUdsAsync(frozen, timeout, token)));
+    }
+
     internal static async Task<IReadOnlyList<ObdOnUdsServices.FaultCounter>> ReadObservedFaultCountersAsync(
         DoIpVehicleDiscovery.Identity gateway, IPAddress address, ushort tester, ushort ecu,
         bool tls, TimeSpan timeout, CancellationToken token, string? certificate,

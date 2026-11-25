@@ -136,4 +136,11 @@
   <data name="FaultCounters" xml:space="preserve"><value>Compteurs de détection des défauts</value></data>
   <data name="FaultCountersResult" xml:space="preserve"><value>Compteurs de détection : {0} enregistrements</value></data>
   <data name="FaultCounterEntry" xml:space="preserve"><value>DTC 0x{0:X6}, compteur {1}</value></data>
+  <data name="SeverityMask" xml:space="preserve"><value>Masque de sévérité UDS (hex)</value></data>
+  <data name="SeverityCount" xml:space="preserve"><value>Nombre par sévérité</value></data>
+  <data name="SeverityList" xml:space="preserve"><value>DTC par sévérité</value></data>
+  <data name="SeverityInfo" xml:space="preserve"><value>Sévérité du DTC</value></data>
+  <data name="SeverityCountResult" xml:space="preserve"><value>DTC correspondants : {0} ; disponibilité 0x{1:X2} ; format 0x{2:X2}</value></data>
+  <data name="SeverityListResult" xml:space="preserve"><value>Enregistrements de sévérité : {0} ; disponibilité 0x{1:X2}</value></data>
+  <data name="SeverityRecord" xml:space="preserve"><value>DTC 0x{0:X6} — sévérité 0x{1:X2}, unité 0x{2:X2}, statut 0x{3:X2}</value></data>
 </root>

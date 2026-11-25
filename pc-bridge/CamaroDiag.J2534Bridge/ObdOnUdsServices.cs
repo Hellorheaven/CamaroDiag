@@ -281,6 +281,52 @@ internal static class ObdOnUdsServices
         return new(reply[2], reply[3], count);
     }
 
+    internal sealed record SeverityRecord(uint Dtc, byte Severity, byte FunctionalUnit, byte Status);
+    internal sealed record SeverityReport(byte Subfunction, byte AvailabilityMask,
+        IReadOnlyList<SeverityRecord> Records, ushort? Count = null, byte? FormatIdentifier = null);
+
+    internal static byte[] ReadSeverity(byte subfunction, byte severityMask, byte statusMask, uint dtc = 0)
+    {
+        if (subfunction is < 7 or > 9 || dtc > 0xFFFFFF) throw new ArgumentOutOfRangeException(nameof(subfunction));
+        return subfunction == 9 ? [0x19, 9, (byte)(dtc >> 16), (byte)(dtc >> 8), (byte)dtc] :
+            [0x19, subfunction, severityMask, statusMask];
+    }
+
+    internal static SeverityReport DecodeSeverity(ReadOnlySpan<byte> request, ReadOnlySpan<byte> reply)
+    {
+        if (request.Length < 2 || request[0] != 0x19 || request[1] is < 7 or > 9 ||
+            request.Length != (request[1] == 9 ? 5 : 4) || reply.Length < 3 ||
+            reply[0] != 0x59 || reply[1] != request[1])
+            throw new InvalidDataException("Malformed severity response.");
+        var sub = request[1];
+        var availability = reply[2];
+        if (sub == 7)
+        {
+            if (reply.Length != 6) throw new InvalidDataException("Invalid severity count response.");
+            var count = BinaryPrimitives.ReadUInt16BigEndian(reply[4..]);
+            if (count != 0 && (request[2] == 0 || (request[3] & availability) == 0))
+                throw new InvalidDataException("Count contradicts requested masks.");
+            return new(sub, availability, Array.Empty<SeverityRecord>(), count, reply[3]);
+        }
+        if ((reply.Length - 3) % 6 != 0 || (sub == 9 && reply.Length is not (3 or 9)))
+            throw new InvalidDataException("Malformed severity records.");
+        var rows = new List<SeverityRecord>();
+        var seen = new HashSet<uint>();
+        for (var offset = 3; offset < reply.Length; offset += 6)
+        {
+            var dtc = ((uint)reply[offset+2] << 16) | ((uint)reply[offset+3] << 8) | reply[offset+4];
+            var row = new SeverityRecord(dtc, reply[offset], reply[offset+1], reply[offset+5]);
+            if (!seen.Add(dtc) || (row.Status & ~availability) != 0)
+                throw new InvalidDataException("Duplicate DTC or unavailable status bit.");
+            if (sub == 9 && !reply.Slice(offset+2, 3).SequenceEqual(request.Slice(2, 3)))
+                throw new InvalidDataException("Severity record belongs to another DTC.");
+            if (sub == 8 && ((row.Severity & request[2]) == 0 || (row.Status & request[3] & availability) == 0))
+                throw new InvalidDataException("Severity record contradicts requested masks.");
+            rows.Add(row);
+        }
+        return new(sub, availability, rows);
+    }
+
     internal sealed record FaultCounter(uint Dtc, sbyte Counter);
     internal static byte[] ReadFaultCounters() => UdsStandardServices.ReadDtc(0x14, []);
     internal static IReadOnlyList<FaultCounter> DecodeFaultCounters(ReadOnlySpan<byte> reply)

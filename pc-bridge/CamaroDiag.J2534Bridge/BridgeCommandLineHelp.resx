@@ -87,6 +87,9 @@ Examples:
                               --uds-dtc-count-mask 0xFF, --uds-snapshot 0x123456
                               --uds-snapshot-record 1, or --uds-extended-dtc 0x123456
                               --uds-extended-record 2.
+                              --uds-severity-count 0x80 or --uds-severity-list 0x80
+                              with --uds-severity-status 0x08; --uds-severity-info 0x123456.
+                              All require --expected-vin VIN.
                               --uds-fault-counters with --expected-vin VIN: signed FDC records.
                               --uds-historical-dtc 0x0B/0x0C/0x0D/0x0E (choose one)
                               with --expected-vin VIN: first/recent failed/confirmed DTC.

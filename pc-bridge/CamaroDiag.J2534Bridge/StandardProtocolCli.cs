@@ -387,6 +387,17 @@ internal static class StandardProtocolCli
                     "(physical units and availability require SAE J1979DA).");
             }
         }
+        else if (request.Length >= 2 && request[0] == 0x19 && request[1] is >= 7 and <= 9)
+        {
+            var report = ObdOnUdsServices.DecodeSeverity(request, response);
+            Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(new
+            {
+                severity_subfunction = report.Subfunction, availability_mask = report.AvailabilityMask,
+                count = report.Count, format_identifier = report.FormatIdentifier,
+                records = report.Records.Select(r => new { dtc = $"{r.Dtc:X6}", severity = r.Severity,
+                    functional_unit = r.FunctionalUnit, status = r.Status })
+            }));
+        }
         else if (request.SequenceEqual(ObdOnUdsServices.ReadFaultCounters()))
         {
             var rows = ObdOnUdsServices.DecodeFaultCounters(response);
@@ -1278,7 +1289,14 @@ internal static class StandardProtocolCli
         var snapshotIndex = args.Contains("--uds-snapshot-index", StringComparer.OrdinalIgnoreCase);
         var historicalDtc = Optional(args, "--uds-historical-dtc");
         var faultCounters = args.Contains("--uds-fault-counters", StringComparer.OrdinalIgnoreCase);
-        if ((supportedDtcs || snapshotIndex || faultCounters || historicalDtc is not null) && Optional(args, "--expected-vin") is null)
+        var severityCount = Optional(args, "--uds-severity-count");
+        var severityList = Optional(args, "--uds-severity-list");
+        var severityInfo = Optional(args, "--uds-severity-info");
+        var severityStatus = Optional(args, "--uds-severity-status");
+        if ((severityStatus is not null) != (severityCount is not null || severityList is not null))
+            throw new ArgumentException("Severity filters require explicit status mask.");
+        if ((supportedDtcs || snapshotIndex || faultCounters || historicalDtc is not null ||
+            severityCount is not null || severityList is not null || severityInfo is not null) && Optional(args, "--expected-vin") is null)
             throw new ArgumentException("DTC inventory requires --expected-vin.");
         var udsDtcMask = Optional(args, "--uds-dtc-mask");
         var udsDtcCountMask = Optional(args, "--uds-dtc-count-mask");
@@ -1325,6 +1343,7 @@ internal static class StandardProtocolCli
             (snapshotIndex ? 1 : 0) +
             (historicalDtc is null ? 0 : 1) +
             (faultCounters ? 1 : 0) +
+            (severityCount is null ? 0 : 1) + (severityList is null ? 0 : 1) + (severityInfo is null ? 0 : 1) +
             (udsDtcMask is null ? 0 : 1) +
             (udsDtcCountMask is null ? 0 : 1) +
             (udsSnapshot is null ? 0 : 1) +
@@ -1354,6 +1373,9 @@ internal static class StandardProtocolCli
             supportedDtcs ? ObdOnUdsServices.ReadSupportedDtcs() :
             snapshotIndex ? ObdOnUdsServices.ReadSnapshotIndex() :
             faultCounters ? ObdOnUdsServices.ReadFaultCounters() :
+            severityCount is not null ? ObdOnUdsServices.ReadSeverity(7, checked((byte)Number(severityCount)), checked((byte)Number(severityStatus!))) :
+            severityList is not null ? ObdOnUdsServices.ReadSeverity(8, checked((byte)Number(severityList)), checked((byte)Number(severityStatus!))) :
+            severityInfo is not null ? ObdOnUdsServices.ReadSeverity(9, 0, 0, Number(severityInfo)) :
             historicalDtc is not null ? ObdOnUdsServices.ReadHistoricalDtc(checked((byte)Number(historicalDtc))) :
             udsDtcMask is not null ? ObdOnUdsServices.ReadDtcByStatusMask(
                 checked((byte)Number(udsDtcMask))) :
@@ -1831,6 +1853,8 @@ internal static class StandardProtocolCli
         genericRead |= args.Contains("--uds-supported-dtcs", StringComparer.OrdinalIgnoreCase) ||
             args.Contains("--uds-snapshot-index", StringComparer.OrdinalIgnoreCase) ||
             Optional(args, "--uds-historical-dtc") is not null ||
+            Optional(args, "--uds-severity-count") is not null || Optional(args, "--uds-severity-list") is not null ||
+            Optional(args, "--uds-severity-info") is not null ||
             args.Contains("--uds-fault-counters", StringComparer.OrdinalIgnoreCase);
         var obd = !genericRead && (multi is null || bool.Parse(Optional(args, "--obd-verified") ?? "false"));
         if (Optional(args, "--obd-verified") is not null && multi is null)

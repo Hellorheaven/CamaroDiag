@@ -780,6 +780,24 @@ internal static class StandardVehicleProtocolsSelfTests
             [0x19, 3], [0x59, 3, 1]), "Truncated snapshot index rejected at transport.");
         Reject<InvalidDataException>(() => UdsStandardServices.RequireResponse(
             [0x19, 0x0A], [0x59, 0x0A]), "Supported DTC response requires availability mask.");
+        var severityTarget = StandardProtocolCli.ParseVerifiedDoIpRead([
+            "--host", "127.0.0.1", "--tester", "0E80", "--ecu", "1234",
+            "--expected-vin", "1G1FA1RX0J0100001", "--uds-severity-list", "0x80", "--uds-severity-status", "0x08"]);
+        Check(!severityTarget.Obd && severityTarget.Target.Request.SequenceEqual(new byte[] { 0x19, 8, 0x80, 8 }),
+            "Severity CLI uses generic verified UDS and explicit masks.");
+        var severityReport = ObdOnUdsServices.DecodeSeverity(severityTarget.Target.Request,
+            [0x59, 8, 8, 0x80, 0x12, 0x12, 0x34, 0x56, 8]);
+        Check(severityReport.Records.Single() == new ObdOnUdsServices.SeverityRecord(0x123456, 0x80, 0x12, 8),
+            "Severity fields preserved.");
+        Reject<InvalidDataException>(() => ObdOnUdsServices.DecodeSeverity(severityTarget.Target.Request,
+            [0x59, 8, 8, 0x40, 0x12, 0x12, 0x34, 0x56, 8]), "Severity mask mismatch rejected.");
+        var severityDetail = ObdOnUdsServices.ReadSeverity(9, 0, 0, 0x123456);
+        Check(ObdOnUdsServices.DecodeSeverity(severityDetail, [0x59, 9, 8]).Records.Count == 0,
+            "Missing severity record is a valid empty response.");
+        Reject<InvalidDataException>(() => ObdOnUdsServices.DecodeSeverity(severityDetail,
+            [0x59, 9, 8, 0x80, 0x12, 0x12, 0x34, 0x57, 8]), "Wrong DTC severity record rejected.");
+        Check(ObdOnUdsServices.DecodeSeverity(ObdOnUdsServices.ReadSeverity(7, 0x80, 8),
+            [0x59, 7, 8, 1, 0, 2]).Count == 2, "Severity count preserved.");
         var counters = StandardProtocolCli.ParseVerifiedDoIpRead([
             "--host", "127.0.0.1", "--tester", "0E80", "--ecu", "1234",
             "--expected-vin", "1G1FA1RX0J0100001", "--uds-fault-counters"]);
