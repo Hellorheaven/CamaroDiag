@@ -7,7 +7,8 @@ from camarodiagconnectors.doip_cli import run
 from camarodiagconnectors.doip import (
     Gateway, Session, DoIpError, NegativeResponse, decode, encode, parse_identity, positive,
     discover, discover_ipv4, discover_ipv6, discovery_request, discover_unique_vin, parse_commands, confirm_commands,
-    endpoint, tls_server_name, status, parse_did_layout, decode_did_layout
+    endpoint, tls_server_name, status, parse_did_layout, decode_did_layout,
+    parse_ecu_inventory, inventory_ecus
 )
 
 VIN = "1G1FA1RXXR0123456"
@@ -32,6 +33,38 @@ def receive(sock):
 
 
 class DoIpTests(unittest.TestCase):
+    def test_explicit_inventory_rejects_ranges_and_duplicates(self):
+        self.assertEqual(parse_ecu_inventory("1234,1235"), (0x1234, 0x1235))
+        for invalid in ("", "1234-1235", "1234,1234", "123", ",".join(f"{n:04X}" for n in range(17))):
+            with self.assertRaises(DoIpError):
+                parse_ecu_inventory(invalid)
+        with patch("camarodiagconnectors.doip.discover") as discover_mock:
+            with self.assertRaises(DoIpError):
+                inventory_ecus(GATEWAY, VIN, 0x0E80, (0x0E80,))
+            discover_mock.assert_not_called()
+
+    def test_inventory_separates_verified_and_unverified_targets(self):
+        with patch("camarodiagconnectors.doip.discover", return_value=GATEWAY) as discover_mock, \
+             patch("camarodiagconnectors.doip.Session") as session:
+            session.return_value.__enter__.return_value.verify_vin.side_effect = [VIN, NegativeResponse(0x22, 0x31)]
+            result = inventory_ecus(GATEWAY, VIN, 0x0E80, (0x1234, 0x1235))
+            self.assertEqual([row["status"] for row in result["targets"]], ["vin_verified", "unverified"])
+            self.assertEqual(result["targets"][1]["nrc"], 0x31)
+            self.assertEqual(result["verified_count"], 1)
+            self.assertEqual(discover_mock.call_count, 3)
+            self.assertEqual([call.args[2] for call in session.call_args_list], [0x1234, 0x1235])
+            self.assertTrue(all(call.kwargs["tls"] for call in session.call_args_list))
+
+    def test_inventory_stops_if_gateway_changes(self):
+        from dataclasses import replace
+        with patch("camarodiagconnectors.doip.discover", side_effect=[GATEWAY, replace(GATEWAY, logical_address=0x1235)]), \
+             patch("camarodiagconnectors.doip.Session") as session:
+            session.return_value.__enter__.return_value.verify_vin.return_value = VIN
+            with self.assertRaises(DoIpError):
+                inventory_ecus(GATEWAY, VIN, 0x0E80, (0x1234, 0x1235))
+            self.assertEqual(session.call_count, 1)
+
+
     def test_identity_and_correlation(self):
         raw = encode(2, 4, VIN.encode() + ECU + bytes(13))
         self.assertEqual(parse_identity("127.0.0.1", raw, VIN).logical_address, 0x1234)

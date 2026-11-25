@@ -428,6 +428,61 @@ def positive(request: bytes, reply: bytes) -> bytes:
     return reply
 
 
+def parse_ecu_inventory(value: str) -> tuple[int, ...]:
+    """Only explicitly supplied logical addresses; no ranges or implicit scans."""
+    items = value.split(",")
+    if not 1 <= len(items) <= 16 or any(not re.fullmatch(r"[0-9A-Fa-f]{4}", item) for item in items):
+        raise DoIpError("Supply 1..16 explicit four-digit logical ECU addresses")
+    targets = tuple(int(item, 16) for item in items)
+    if len(set(targets)) != len(targets):
+        raise DoIpError("Duplicate ECU address")
+    return targets
+
+
+def inventory_ecus(gateway: Gateway, expected: str, tester: int, targets: tuple[int, ...],
+                   *, tls: bool = True, timeout: float = 3, trace: Trace | None = None,
+                   context: ssl.SSLContext | None = None, p2: float | None = None,
+                   p2_star: float | None = None, routing_type: int = 0,
+                   routing_oem_data: bytes | None = None) -> dict:
+    """Identify explicit ECU addresses independently; no capability or topology inference."""
+    targets = tuple(targets)
+    logical(tester)
+    for ecu in targets:
+        logical(ecu)
+    if (not valid_vin(expected) or gateway.vin != expected or tester == gateway.logical_address or
+            not 1 <= len(targets) <= 16 or len(set(targets)) != len(targets) or tester in targets):
+        raise DoIpError("Invalid ECU inventory target or gateway identity")
+    _timeout(timeout)
+    rows = []
+    def require_gateway():
+        current = discover(gateway.host, expected, timeout, trace)
+        if gateway_key(current) != gateway_key(gateway):
+            raise DoIpError("Gateway identity changed during ECU inventory")
+    for ecu in targets:
+        require_gateway()
+        try:
+            with Session(gateway, tester, ecu, tls=tls, timeout=timeout, trace=trace, context=context,
+                         p2=p2, p2_star=p2_star, routing_type=routing_type,
+                         routing_oem_data=routing_oem_data) as session:
+                vin = session.verify_vin(expected)
+                if vin != expected:
+                    raise DoIpError("ECU VIN does not match selected vehicle")
+                rows.append({"ecu": f"{ecu:04X}", "status": "vin_verified", "vin": vin})
+        except ssl.SSLError:
+            # Never continue or downgrade a failed TLS authentication.
+            raise
+        except NegativeResponse as error:
+            rows.append({"ecu": f"{ecu:04X}", "status": "unverified",
+                         "reason": "uds_negative_response", "nrc": error.code})
+        except (DoIpError, OSError, EOFError):
+            rows.append({"ecu": f"{ecu:04X}", "status": "unverified",
+                         "reason": "communication_or_identity_failure"})
+    require_gateway()
+    return {"vin": expected, "complete": True, "targets": rows,
+            "verified_count": sum(row["status"] == "vin_verified" for row in rows),
+            "physical_qualification": False}
+
+
 class Session:
     """Sequential, one-owner routed socket. Any uncertain exchange retires it."""
     def __init__(self, gateway: Gateway, tester: int, ecu: int, *,

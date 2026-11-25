@@ -1,3 +1,7 @@
+## PR117 — inventaire explicite des ECU DoIP Connectors (25/11/2026)
+
+- CLI ecu-inventory --ecus 1234,1235 (1 à 16 adresses explicites, aucun balayage implicite), VIN/testeur obligatoires, TLS par défaut, sessions séparées, F190 et revalidation de passerelle avant chaque ECU et après inventaire. Distinction VIN vérifié/non vérifié ; NRC conservé, échec TLS bloque sans repli, aucune capacité de programmation déduite. Tests écrits non exécutés. Android et Windows à raccorder. Aucun checkpoint CI.
+
 ## PR117 — validation stricte des paramètres CLI DoIP Windows (25/11/2026)
 
 - Refus avant réseau des options inconnues, doublons, valeurs manquantes et sorties RX déjà présentes ; découverte/statut et échanges typés/bruts concernés. Adresse logique hexadécimale validée sans suppression incorrecte des zéros initiaux. Les commandes brutes restent bidirectionnelles. Tests de régression écrits non exécutés, aucune CI.

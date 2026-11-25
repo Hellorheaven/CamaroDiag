@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from typing import Sequence
 
 from .doip import (Session, discover, discover_unique_vin, discover_ipv4, discover_ipv6, gateway_key, status,
-                   DoIpError, valid_vin, parse_commands, confirm_commands, parse_did_layout, validate_monitor_layout)
+                   DoIpError, valid_vin, parse_commands, confirm_commands, parse_did_layout, validate_monitor_layout, parse_ecu_inventory, inventory_ecus)
 from .doip_archive import load_scope
 from .doip_capture import capture_region, save_capture
 
@@ -68,6 +68,9 @@ def run(argv: Sequence[str] | None = None) -> dict:
     sub = parser.add_subparsers(dest="action", required=True)
     for action in ("discover", "status", "power", "vin", "obd-identify"):
         sub.add_parser(action)
+    inventory = sub.add_parser("ecu-inventory", help=tr("Verify explicit ECU logical addresses", "Vérifier les adresses logiques ECU explicites"))
+    inventory.add_argument("--ecus", required=True,
+                           help=tr("1..16 explicit addresses, e.g. 1234,1235", "1 à 16 adresses explicites, ex. 1234,1235"))
     did = sub.add_parser("did")
     did.add_argument("--did", required=True, type=lambda x: hex_value(x, 4))
     scaling = sub.add_parser("scaling-did", help=tr("Read raw UDS scaling metadata", "Lire les données brutes de mise à l’échelle UDS"))
@@ -121,6 +124,7 @@ def run(argv: Sequence[str] | None = None) -> dict:
     sequence.add_argument("--commands", required=True,
                           help=tr("Hexadecimal commands separated by semicolons", "Commandes hexadécimales séparées par des points-virgules"))
     o = parser.parse_args(argv)
+    targets = parse_ecu_inventory(o.ecus) if o.action == "ecu-inventory" else None
     commands = parse_commands(o.commands) if o.action == "sequence" else None
     multi_monitor = o.action in ("monitor-dids", "obd-monitor-dids")
     layout = parse_did_layout(o.layout) if multi_monitor or o.action in ("dids", "obd-dids") else None
@@ -150,7 +154,11 @@ def run(argv: Sequence[str] | None = None) -> dict:
                             (o.p2_ms, o.p2_star_ms, o.routing_activation_type, o.routing_oem_data)):
         parser.error(tr("Routing and UDS options require a diagnostic action",
                         "Les options de routage et UDS nécessitent une action de diagnostic"))
-    if not network_only and (o.vin is None or not valid_vin(o.vin) or o.tester is None or o.ecu is None or o.tester == o.ecu):
+    if targets is not None and (o.ecu is not None or o.tester in targets):
+        parser.error(tr("Inventory uses --ecus instead of --ecu; tester must differ",
+                        "Inventaire : --ecus au lieu de --ecu ; testeur distinct"))
+    if not network_only and (o.vin is None or not valid_vin(o.vin) or o.tester is None or
+                             (targets is None and (o.ecu is None or o.tester == o.ecu))):
         parser.error(tr("Expected VIN and distinct tester/ECU addresses required", "VIN attendu et adresses testeur/ECU distinctes requis"))
     if o.action in ("obd-did", "obd-monitor") and not 0xF400 <= o.did <= 0xF8FF:
         parser.error(tr("Legislated DID F400..F8FF required", "DID réglementaire F400..F8FF requis"))
@@ -208,6 +216,10 @@ def run(argv: Sequence[str] | None = None) -> dict:
     context = ssl.create_default_context(cafile=o.ca_file) if (o.ca_file or o.client_cert) else None
     if o.client_cert:
         context.load_cert_chain(o.client_cert, o.client_key)
+    if targets is not None:
+        return result | inventory_ecus(gateway, o.vin, o.tester, targets, tls=not o.tcp,
+            timeout=o.timeout, trace=trace, context=context, p2=p2, p2_star=p2_star,
+            routing_type=o.routing_activation_type or 0, routing_oem_data=o.routing_oem_data)
     if commands is not None and not confirm_commands(commands, gateway, o.tester, o.ecu,
             not o.tcp, input, lambda line: print(line, file=sys.stderr), fr):
         return result | {"cancelled": True, "commands_sent": 0}
