@@ -73,6 +73,8 @@ Exemples :
                               --ecu-inventory 1234,1235 avec --expected-vin VIN :
                               vérifie 1 à 16 adresses explicites au lieu de --ecu,
                               lecture seule, aucun balayage ; non vérifié ne veut pas dire absent.
+                              --obd-ecu-inventory 1234,1235 : vérifie F802/F810 stables ;
+                              VIN vérifié distinct de la reconnaissance OBDonUDS.
                               --monitor-did F190 ou --obd-monitor-did F40C
                               avec --expected-vin VIN, --samples 10, --interval-ms 1000.
                               Monitoring en lecture seule, sur le même ECU, TLS par défaut.

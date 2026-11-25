@@ -611,6 +611,15 @@ internal static class StandardVehicleProtocolsSelfTests
         Check(ecuInventory.Target.UseTls && ecuInventory.Ecus.SequenceEqual(new ushort[] {0x1234, 0x1235}) &&
             ecuInventory.Target.Request.SequenceEqual(new byte[] {0x22, 0xF1, 0x90}),
             "Explicit ECU inventory uses TLS and only F190.");
+        Check(!ecuInventory.Obd, "Generic inventory uses UDS identity.");
+        var obdInventoryArgs = inventoryArgs.Select(arg => arg == "--ecu-inventory" ? "--obd-ecu-inventory" : arg).ToArray();
+        var obdInventory = StandardProtocolCli.ParseDoIpInventory(obdInventoryArgs);
+        Check(obdInventory.Obd && obdInventory.Target.UseTls &&
+            obdInventory.Target.Request.SequenceEqual(new byte[] {0x22, 0xF8, 0x02}),
+            "Legislated ECU inventory selects F802 and TLS.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseDoIpInventory(
+            [..inventoryArgs, "--obd-ecu-inventory", "1234"]),
+            "Generic and legislated inventory selectors are exclusive.");
         foreach (var invalid in new[] {"1234,1234", "1234-1235", "0E80", "123", ""})
             Reject<ArgumentException>(() => StandardProtocolCli.ParseDoIpInventory([..inventoryArgs[..^1], invalid]),
                 "Invalid or ambiguous ECU inventory rejected.");

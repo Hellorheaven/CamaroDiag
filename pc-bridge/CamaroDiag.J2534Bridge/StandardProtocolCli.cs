@@ -2034,29 +2034,35 @@ internal static class StandardProtocolCli
     }
 
     internal sealed record DoIpInventoryOptions(DoIpOptions Target, string Vin, ushort[] Ecus,
-        bool ExplicitVersion);
+        bool ExplicitVersion, bool Obd);
 
     internal static DoIpInventoryOptions ParseDoIpInventory(string[] args)
     {
         ValidateDoIpArguments(args, DoIpCommand, ["--host", "--tester", "--expected-vin",
-            "--ecu-inventory", "--timeout-ms", "--tls", "--doip-version", "--client-cert-thumbprint",
+            "--ecu-inventory", "--obd-ecu-inventory", "--timeout-ms", "--tls", "--doip-version", "--client-cert-thumbprint",
             "--uds-p2-ms", "--uds-p2-star-ms", "--routing-activation-type", "--routing-oem-data", "--trace-file"], []);
         var vin = Required(args, "--expected-vin");
         if (!DoIpVehicleDiscovery.IsVehicleVin(vin))
             throw new ArgumentException("Explicit valid VIN required.");
-        var ecus = DoIpVinReader.ParseInventoryAddresses(Required(args, "--ecu-inventory"));
+        var generic = Optional(args, "--ecu-inventory");
+        var legislated = Optional(args, "--obd-ecu-inventory");
+        if ((generic is null) == (legislated is null))
+            throw new ArgumentException("Choose exactly one ECU inventory operation.");
+        var obd = legislated is not null;
+        var ecus = DoIpVinReader.ParseInventoryAddresses(legislated ?? generic!);
         var tester = Address(Required(args, "--tester"));
         if (ecus.Contains(tester)) throw new ArgumentException("Tester must differ from every ECU.");
         var forwarded = new List<string>();
         for (var i = args.Length > 0 && args[0].Equals(DoIpCommand, StringComparison.OrdinalIgnoreCase) ? 1 : 0;
             i < args.Length; i += 2)
             if (!args[i].Equals("--ecu-inventory", StringComparison.OrdinalIgnoreCase) &&
+                !args[i].Equals("--obd-ecu-inventory", StringComparison.OrdinalIgnoreCase) &&
                 !args[i].Equals("--expected-vin", StringComparison.OrdinalIgnoreCase))
             {
                 forwarded.Add(args[i]);
                 forwarded.Add(args[i+1]);
             }
-        forwarded.AddRange(["--ecu", $"{ecus[0]:X4}", "--payload", "22F190"]);
+        forwarded.AddRange(["--ecu", $"{ecus[0]:X4}", "--payload", obd ? "22F802" : "22F190"]);
         if (Optional(args, "--tls") is null) forwarded.AddRange(["--tls", "true"]);
         var target = ParseDoIp(forwarded.ToArray());
         if (!System.Net.IPAddress.TryParse(target.Host, out var address) ||
@@ -2067,7 +2073,7 @@ internal static class StandardProtocolCli
             target.RoutingActivationType.ToString("X2"),
             target.RoutingOemData is null ? "" : Convert.ToHexString(target.RoutingOemData));
         return new(target with { DoIpP2Ms = timing.P2Ms, DoIpP2StarMs = timing.P2StarMs },
-            vin, ecus, Optional(args, "--doip-version") is not null);
+            vin, ecus, Optional(args, "--doip-version") is not null, obd);
     }
 
     private static async Task<int> RunDoIpInventoryAsync(string[] args)
@@ -2091,12 +2097,15 @@ internal static class StandardProtocolCli
                 new DoIpDiagnosticTransport.SessionOptions(o.DoIpP2Ms, o.DoIpP2StarMs, o.RoutingActivationType,
                     o.RoutingOemData is null ? "" : Convert.ToHexString(o.RoutingOemData)),
                 journal is null ? null : journal.RecordDatagram,
-                journal is null ? null : journal.RecordForEcu);
+                journal is null ? null : journal.RecordForEcu, inventory.Obd);
             Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(new
             {
                 complete = true, vin = inventory.Vin, verified_count = rows.Count(row => row.Vin is not null),
+                identification = inventory.Obd ? "F802/F810" : "F190",
+                obd_on_uds_count = inventory.Obd ? rows.Count(row => row.ProtocolValue == 1) : (int?)null,
                 targets = rows.Select(row => new { ecu = $"{row.Ecu:X4}", vin = row.Vin,
-                    status = row.Vin is null ? "unverified" : "vin_verified", reason = row.Reason }),
+                    status = row.Vin is null ? "unverified" : "vin_verified", reason = row.Reason,
+                    protocol_value = row.ProtocolValue, obd_on_uds = row.ProtocolValue.HasValue ? row.ProtocolValue == 1 : (bool?)null }),
                 physical_qualification = false
             }));
             return 0;
@@ -2108,7 +2117,8 @@ internal static class StandardProtocolCli
     {
         try
         {
-            if (args.Contains("--ecu-inventory", StringComparer.OrdinalIgnoreCase))
+            if (args.Contains("--ecu-inventory", StringComparer.OrdinalIgnoreCase) ||
+                args.Contains("--obd-ecu-inventory", StringComparer.OrdinalIgnoreCase))
                 return await RunDoIpInventoryAsync(args);
             if (args.Contains("--monitor-did", StringComparer.OrdinalIgnoreCase) ||
                 args.Contains("--obd-monitor-did", StringComparer.OrdinalIgnoreCase) ||

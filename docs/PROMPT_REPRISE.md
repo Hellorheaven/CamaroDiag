@@ -1,3 +1,7 @@
+## PR117 — inventaire OBDonUDS Windows GUI/CLI (25/11/2026)
+
+- Parité Windows/Connectors : `--obd-ecu-inventory` et bouton FR/EN, mêmes adresses explicites, F802/F810 vérifiés deux fois sur chaque session. VIN et protocole distingués, aucun repli F190, journal par ECU et annulation existants. Tests de parseur écrits, non exécutés. Android reste à raccorder. Aucun checkpoint CI.
+
 ## PR117 — inventaire OBDonUDS explicite Connectors (25/11/2026)
 
 - Nouvelle opération `obd-ecu-inventory --ecus 1234,1235` : identité réglementaire F802/F810 vérifiée deux fois sur chaque session, VIN vérifié distingué de la prise en charge OBDonUDS ; valeur F810 inconnue conservée, aucune bascule F190. Échec TLS interrompt l'inventaire, VIN non ASCII traité comme erreur de protocole. CLI FR/EN et tests écrits, non exécutés. Android et Windows restent à raccorder pour cette variante. Aucun checkpoint CI.

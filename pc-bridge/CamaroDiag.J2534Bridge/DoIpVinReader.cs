@@ -27,14 +27,14 @@ internal static class DoIpVinReader
         return targets;
     }
 
-    internal sealed record InventoryEntry(ushort Ecu, string? Vin, string? Reason);
+    internal sealed record InventoryEntry(ushort Ecu, string? Vin, string? Reason, byte? ProtocolValue = null);
 
     internal static async Task<IReadOnlyList<InventoryEntry>> InventoryObservedAsync(
         DoIpVehicleDiscovery.Identity gateway, string expectedVin, ushort tester,
         IReadOnlyList<ushort> targets, bool tls, TimeSpan timeout, CancellationToken token,
         string? certificate = null, DoIpDiagnosticTransport.SessionOptions? options = null,
         DoIpVehicleDiscovery.DatagramTrace? udpTrace = null,
-        Action<ushort, DoIpDiagnosticTransport.PduTrace>? pduTrace = null)
+        Action<ushort, DoIpDiagnosticTransport.PduTrace>? pduTrace = null, bool obd = false)
     {
         var frozen = targets.ToArray();
         if (!DoIpVehicleDiscovery.IsVehicleVin(expectedVin) || gateway.Vin != expectedVin ||
@@ -51,9 +51,10 @@ internal static class DoIpVinReader
             {
                 await using var link = await ConnectObservedAsync(gateway, gateway.Source, tester, ecu,
                     tls, timeout, token, certificate, pduTrace is null ? null : frame => pduTrace(ecu, frame), options);
-                var vin = await VerifyObservedVinAsync(link, gateway, timeout, token, null, null);
+                var identity = obd ? await ReadStableObdIdentityAsync(link, expectedVin, timeout, token) : null;
+                var vin = identity?.Vin ?? await VerifyObservedVinAsync(link, gateway, timeout, token, null, null);
                 if (vin != expectedVin) throw new InvalidDataException("ECU VIN mismatch.");
-                rows.Add(new(ecu, vin, null));
+                rows.Add(new(ecu, vin, null, identity?.ProtocolValue));
             }
             catch (OperationCanceledException) when (!token.IsCancellationRequested)
             {

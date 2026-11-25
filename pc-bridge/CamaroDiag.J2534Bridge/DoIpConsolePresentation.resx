@@ -149,4 +149,7 @@
   <data name="InventoryVerified" xml:space="preserve"><value>ECU 0x{0:X4}: VIN verified ({1})</value></data>
   <data name="InventoryUnverified" xml:space="preserve"><value>ECU 0x{0:X4}: not verified (not proof of absence)</value></data>
   <data name="InventoryComplete" xml:space="preserve"><value>Inventory complete: {0}/{1} VINs verified</value></data>
+  <data name="ObdInventory" xml:space="preserve"><value>OBDonUDS ECU inventory</value></data>
+  <data name="InventoryObdSupported" xml:space="preserve"><value>ECU 0x{0:X4}: OBDonUDS identified (0x{1:X2})</value></data>
+  <data name="InventoryObdUnrecognized" xml:space="preserve"><value>ECU 0x{0:X4}: OBDonUDS not identified (F810 = 0x{1:X2})</value></data>
 </root>
