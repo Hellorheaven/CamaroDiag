@@ -403,23 +403,6 @@ internal static class ObdOnUdsServices
         return rows;
     }
 
-    internal sealed record StoredDtcRecord(byte Record, uint? Dtc, byte? Status, byte[] RawStoredData, byte[] RawResponse);
-
-    internal static byte[] ReadStoredDtcRecord(byte record)
-    {
-        if (record == 0xFF) throw new ArgumentException("Expected individual stored record 00..FE.");
-        return UdsStandardServices.ReadDtc(0x05, [record]);
-    }
-
-    internal static StoredDtcRecord DecodeStoredDtcRecord(byte record, ReadOnlySpan<byte> reply)
-    {
-        var request = ReadStoredDtcRecord(record);
-        _ = UdsStandardServices.RequireResponse(request, reply);
-        if (reply.Length == 3) return new(record, null, null, [], reply.ToArray());
-        uint dtc = ((uint)reply[3] << 16) | ((uint)reply[4] << 8) | reply[5];
-        return new(record, dtc, reply[6], reply[7..].ToArray(), reply.ToArray());
-    }
-
     internal sealed record LegacyDtcReport(byte Subfunction, DtcStatusReport? List,
         DtcCountReport? Count, ExtendedDataReply? Detail);
 
