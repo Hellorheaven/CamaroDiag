@@ -578,6 +578,22 @@ internal static class ObdOnUdsServices
 
     internal static byte[] ReadAllStoredRecords() => UdsStandardServices.ReadDtc(5, [255]);
 
+    internal static AllStoredRecords DecodeStoredRecords(byte record, ReadOnlySpan<byte> reply,
+        IReadOnlyDictionary<ushort, int> lengths)
+    {
+        if (lengths.Count is < 1 or > 255 || lengths.Any(p => p.Value is < 1 or > 4096))
+            throw new ArgumentException("Invalid DID length catalog.");
+        if (record != 255)
+        {
+            _ = UdsStandardServices.RequireResponse(ReadStoredRecord(record), reply);
+            if (reply.Length == 3) return new([], reply.ToArray());
+        }
+        var report = DecodeAllStoredRecords(reply, lengths);
+        if (record != 255 && (report.Records.Count != 1 || report.Records[0].Record != record))
+            throw new InvalidDataException("Unexpected stored record.");
+        return report;
+    }
+
     internal static AllStoredRecords DecodeAllStoredRecords(ReadOnlySpan<byte> reply, IReadOnlyDictionary<ushort, int> lengths)
     {
         if (lengths.Count is < 1 or > 255 || lengths.Any(p => p.Value is < 1 or > 4096))
