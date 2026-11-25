@@ -411,6 +411,11 @@ def positive(request: bytes, reply: bytes) -> bytes:
                 raise DoIpError("Malformed DTC index or fault counter report")
         elif len(reply) < 3 or (subfunction in (0x0A, 0x15) and (len(request) != 2 or (len(reply) - 3) % 4)):
             raise DoIpError("Malformed DTC report")
+        if subfunction in (0x16, 0x1A):
+            offset = 2 if subfunction == 0x16 else 3
+            if (len(request) != 3 or len(reply) <= offset or reply[offset] != request[2] or
+                    (subfunction == 0x1A and (len(reply) - 4) % 4)):
+                raise DoIpError("Extended data record response mismatch")
         if subfunction == 0x17:
             if len(request) != 4 or len(reply) < 4 or reply[2] != request[3] or (len(reply) - 4) % 4:
                 raise DoIpError("User-defined DTC memory response mismatch")
@@ -1043,6 +1048,40 @@ class Session:
             self.verify_vin(expected)
             return {"kind": "snapshot-index" if snapshot_index else ("permanent-dtcs" if permanent else "supported-dtcs"),
                     "records": rows, **({} if snapshot_index else {"availability_mask": reply[2]})}
+        except BaseException:
+            self.close()
+            raise
+
+    def read_extended_record(self, expected: str, record: int, *, size: int | None = None) -> dict:
+        """19/1A lists supporting DTCs; 19/16 reads a record with an explicit uniform OEM size."""
+        if type(record) is not int or not 1 <= record <= 0xEF:
+            raise DoIpError("Expected specific extended data record 01..EF")
+        if size is not None and (type(size) is not int or not 1 <= size <= 4090):
+            raise DoIpError("Expected documented record byte length 1..4090")
+        sub = 0x1A if size is None else 0x16
+        request = bytes((0x19, sub, record))
+        try:
+            self.verify_vin(expected)
+            reply = positive(request, self.exchange(request))
+            start = 4 if size is None else 3
+            width = 4 if size is None else 4 + size
+            if (len(reply) - start) % width:
+                raise DoIpError("Extended data response does not match documented record length")
+            rows = []
+            seen = set()
+            for offset in range(start, len(reply), width):
+                dtc = reply[offset:offset+3].hex().upper()
+                status = reply[offset+3]
+                if dtc in seen or (size is None and status & ~reply[2]):
+                    raise DoIpError("Duplicate DTC or unavailable status bit")
+                seen.add(dtc)
+                row = {"dtc": dtc, "status": status}
+                if size is not None:
+                    row["data"] = reply[offset+4:offset+width].hex().upper()
+                rows.append(row)
+            self.verify_vin(expected)
+            return {"subfunction": sub, "record": record, "records": rows,
+                    **({"availability_mask": reply[2]} if size is None else {"record_size": size})}
         except BaseException:
             self.close()
             raise

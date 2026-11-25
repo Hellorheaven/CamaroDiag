@@ -1,3 +1,7 @@
+## PR117 — données étendues par numéro Connectors (25/11/2026)
+
+- UDS 19/1A inventorie les DTC qui prennent en charge un numéro d'enregistrement ; 19/16 lit ses données pour plusieurs DTC avec taille uniforme explicite (pas de découpage OEM inventé). Écho, doublons, longueur et statut disponible contrôlés ; statut nul accepté pour 1A. VIN F190 avant/après, TLS par défaut, CLI FR/EN, tests écrits non exécutés. Référence : https://uds.readthedocs.io/en/stable/pages/knowledge_base/service.html . Android/Windows restent à raccorder ; aucun checkpoint CI.
+
 ## PR117 — consolidation du parcours mémoire DTC (25/11/2026)
 
 - Libellé Android corrigé pour distinguer liste filtrée et inventaire, test loopback Windows de relecture VIN après 19/17, exemple Connectors FR/EN. Tests écrits, non exécutés ; aucun checkpoint CI. DoIP/C6 toujours en cours.

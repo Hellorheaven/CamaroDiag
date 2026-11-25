@@ -170,6 +170,14 @@ def _run(argv: Sequence[str] | None, resources: ExitStack) -> dict:
         else:
             memory.add_argument("--dtc", required=True, type=lambda x: hex_value(x, 6))
             memory.add_argument("--record", required=True, type=lambda x: hex_value(x, 2))
+    for action, description in (
+            ("extended-record-support", tr("DTCs supporting an extended record", "DTC prenant en charge un enregistrement étendu")),
+            ("extended-record-data", tr("Read extended records with known size", "Lire les enregistrements étendus de taille connue"))):
+        extended_record = sub.add_parser(action, help=description)
+        extended_record.add_argument("--record", required=True, type=lambda x: hex_value(x, 2))
+        if action == "extended-record-data":
+            extended_record.add_argument("--size", required=True, type=int,
+                help=tr("Uniform documented byte length per DTC", "Longueur uniforme documentée en octets par DTC"))
     backup = sub.add_parser("backup", help=tr("Read a documented ECU region twice", "Lire deux fois une zone ECU documentée"))
     backup.add_argument("--profile", required=True, type=Path)
     backup.add_argument("--output", required=True, type=Path)
@@ -192,6 +200,10 @@ def _run(argv: Sequence[str] | None, resources: ExitStack) -> dict:
         layout = validate_monitor_layout(layout)
     if o.action in ("obd-dids", "obd-monitor-dids") and any(not 0xF400 <= did <= 0xF8FF for did, _ in layout):
         parser.error(tr("Legislated DIDs F400..F8FF required", "DID réglementaires F400..F8FF requis"))
+    if o.action in ("extended-record-support", "extended-record-data"):
+        if not 1 <= o.record <= 0xEF or (o.action == "extended-record-data" and not 1 <= o.size <= 4090):
+            parser.error(tr("Expected record 01..EF and documented size 1..4090",
+                            "Enregistrement 01..EF et taille documentée 1..4090 attendus"))
     scope = None
     if o.action == "backup":
         scope = load_scope(o.profile)
@@ -344,6 +356,10 @@ def _run(argv: Sequence[str] | None, resources: ExitStack) -> dict:
             subfunction = {"severity-count": 7, "severity-dtcs": 8, "severity-info": 9}[o.action]
             report = session.read_dtc_severity(o.vin, subfunction, severity_mask=getattr(o, "severity_mask", 255),
                                               status_mask=getattr(o, "mask", 255), dtc=getattr(o, "dtc", None))
+            return result | {"vin": o.vin, "ecu": o.ecu, "tester": o.tester, "tls": not o.tcp,
+                             "service_protocol": "UDS"} | report
+        if o.action in ("extended-record-support", "extended-record-data"):
+            report = session.read_extended_record(o.vin, o.record, size=getattr(o, "size", None))
             return result | {"vin": o.vin, "ecu": o.ecu, "tester": o.tester, "tls": not o.tcp,
                              "service_protocol": "UDS"} | report
         if o.action in ("memory-dtcs", "memory-snapshot", "memory-extended"):

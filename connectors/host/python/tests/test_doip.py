@@ -601,6 +601,41 @@ class DoIpTests(unittest.TestCase):
                 Session.read_dtc_severity(fake, VIN, sub, **options)
             fake.close.assert_called_once()
 
+    def test_extended_record_support_and_data(self):
+        for size, payload, expected in (
+            (None, "591A0801", []),
+            (None, "591A08010102030001020408", [{"dtc": "010203", "status": 0}, {"dtc": "010204", "status": 8}]),
+            (2, "59160101020308AABB01020400CCDD", [{"dtc": "010203", "status": 8, "data": "AABB"},
+                                                   {"dtc": "010204", "status": 0, "data": "CCDD"}]),
+            (2, "591601", []),
+        ):
+            fake = unittest.mock.Mock(spec=Session)
+            fake.exchange.return_value = bytes.fromhex(payload)
+            report = Session.read_extended_record(fake, VIN, 1, size=size)
+            self.assertEqual(report["records"], expected)
+            fake.exchange.assert_called_once_with(bytes((0x19, 0x1A if size is None else 0x16, 1)))
+            self.assertEqual(fake.verify_vin.call_count, 2)
+        for size, payload in ((None, "591A0802"), (None, "591A080101020301"),
+                              (None, "591A08010102030801020300"), (2, "59160101020308AA"),
+                              (2, "591602"), (2, "59160101020308AABB01020308CCDD")):
+            fake = unittest.mock.Mock(spec=Session)
+            fake.exchange.return_value = bytes.fromhex(payload)
+            with self.assertRaises(DoIpError):
+                Session.read_extended_record(fake, VIN, 1, size=size)
+            fake.close.assert_called_once()
+        fake = unittest.mock.Mock(spec=Session)
+        with self.assertRaises(DoIpError):
+            Session.read_extended_record(fake, VIN, 0xFF, size=2)
+        fake.verify_vin.assert_not_called()
+        with patch("camarodiagconnectors.doip_cli.discover", return_value=GATEWAY), \
+             patch("camarodiagconnectors.doip_cli.Session") as session:
+            opened = session.return_value.__enter__.return_value
+            opened.read_extended_record.return_value = {"records": []}
+            run(["--host", GATEWAY.host, "--vin", VIN, "--tester", "0E80", "--ecu", "1234",
+                 "extended-record-data", "--record", "01", "--size", "2"])
+            opened.read_extended_record.assert_called_once_with(VIN, 1, size=2)
+            self.assertTrue(session.call_args.kwargs["tls"])
+
     def test_user_memory_dtc_operations_validate_memory_and_record(self):
         for sub, payload, options, request in (
             (0x17, "59170208", {"mask": 8}, "19170802"),
