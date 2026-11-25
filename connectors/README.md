@@ -132,3 +132,18 @@ python -m camarodiagconnectors.doip_cli --host 192.0.2.10 --vin 1G1FA1RXXR012345
 ```
 
 Exemples fictifs / Illustrative parameters only.
+
+
+### UDS historique : mémoire miroir et émissions / Legacy UDS: mirror memory and emissions
+
+À utiliser uniquement lorsque la documentation du calculateur indique la prise en charge des anciens services ISO 14229 (retirés dans l'édition 2020). Ces commandes ne remplacent pas les lectures de la mémoire principale ni OBDonUDS. / Use only for ECUs supporting these legacy services. No automatic fallback or clearing is performed.
+
+```bash
+python -m camarodiagconnectors.doip_cli --host 192.0.2.10 --vin 1G1FA1RXXR0123456 --tester 0E80 --ecu 1234 mirror-dtcs --mask 08
+python -m camarodiagconnectors.doip_cli --host 192.0.2.10 --vin 1G1FA1RXXR0123456 --tester 0E80 --ecu 1234 mirror-count --mask 08
+python -m camarodiagconnectors.doip_cli --host 192.0.2.10 --vin 1G1FA1RXXR0123456 --tester 0E80 --ecu 1234 mirror-extended --dtc 010203 --record 01
+python -m camarodiagconnectors.doip_cli --host 192.0.2.10 --vin 1G1FA1RXXR0123456 --tester 0E80 --ecu 1234 legacy-emissions-count --mask 08
+python -m camarodiagconnectors.doip_cli --host 192.0.2.10 --vin 1G1FA1RXXR0123456 --tester 0E80 --ecu 1234 legacy-emissions-dtcs --mask 08
+```
+
+Paramètres fictifs / Illustrative parameters only.

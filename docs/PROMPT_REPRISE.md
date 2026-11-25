@@ -1,3 +1,7 @@
+## PR117 — consolidation des lectures UDS historiques (25/11/2026)
+
+- Loopback Windows 19/0F–13 : contrôle des requêtes physiques exactes, du résultat séparé et de la revalidation du VIN avant publication. Exemples CLI Connectors FR/EN. Tests écrits non exécutés ; aucun checkpoint CI. DoIP/C6 restent ouverts, prochaine analyse 19/05 et intégrations restantes.
+
 ## PR117 — lectures UDS historiques Windows (25/11/2026)
 
 - Parité 19/0F–13 sur les trois plateformes : cinq actions GUI FR/EN, CLI explicite, contrôles identité, masque, longueur, écho et données brutes, scope miroir ou émissions historiques sans repli vers OBDonUDS. Tests écrits non exécutés, aucun checkpoint CI. DoIP/C6 toujours actifs.

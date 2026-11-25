@@ -405,6 +405,56 @@ internal static class DoIpDiagnosticSessionSelfTests
             });
         }
 
+        // Legacy scopes use the selected subfunction on the same verified session.
+        foreach (var sub in new byte[] { 0x0F, 0x10, 0x11, 0x12, 0x13 })
+        foreach (var finalMatches in new[] { true, false })
+        {
+            var request = ObdOnUdsServices.ReadLegacyDtc(sub, 8, 0x010203, 1);
+            await RunCaseAsync(async stream =>
+            {
+                _ = await RequireRequestAsync(stream);
+                await SendAsync(stream, DoIpCodec.DiagnosticMessage,
+                    FromEcu([0x62, 0xF1, 0x90, .. System.Text.Encoding.ASCII.GetBytes(selectedVehicleVin)]));
+                var query = await ReadAsync(stream);
+                byte[] expected = sub == 0x10 ? [0x0E, 0x80, 0x12, 0x34, 0x19, sub, 1, 2, 3, 1] :
+                    [0x0E, 0x80, 0x12, 0x34, 0x19, sub, 8];
+                Check(query.Payload.SequenceEqual(expected), "Legacy DTC request is not replaced by a primary/OBDonUDS request.");
+                byte[] reply = sub switch
+                {
+                    0x10 => [0x59, sub, 1, 2, 3, 8, 1, 0xAA],
+                    0x11 or 0x12 => [0x59, sub, 8, 1, 0, 1],
+                    _ => [0x59, sub, 8, 1, 2, 3, 8]
+                };
+                await SendAsync(stream, DoIpCodec.DiagnosticMessage, FromEcu(reply));
+                _ = await RequireRequestAsync(stream);
+                await SendAsync(stream, DoIpCodec.DiagnosticMessage,
+                    FromEcu([0x62, 0xF1, 0x90, .. System.Text.Encoding.ASCII.GetBytes(
+                        finalMatches ? selectedVehicleVin : otherVehicleVin)]));
+            }, async client =>
+            {
+                var timeout = TimeSpan.FromSeconds(2);
+                var token = CancellationToken.None;
+                Task<ObdOnUdsServices.LegacyDtcReport> Read() =>
+                    DoIpVinReader.ReadVerifiedDtcAsync(client, observedForVin, timeout, token, async () =>
+                        ObdOnUdsServices.DecodeLegacyDtc(request, await client.ExchangeUdsAsync(request, timeout, token)));
+                if (finalMatches)
+                {
+                    var report = await Read();
+                    Check(report.Subfunction == sub && (sub switch
+                    {
+                        0x10 => report.Detail?.Dtc == 0x010203,
+                        0x11 or 0x12 => report.Count?.Count == 1,
+                        _ => report.List?.Codes.Single().Code == 0x010203
+                    }), "Legacy scope and result preserved.");
+                }
+                else
+                {
+                    await Expect<InvalidDataException>(async () => { _ = await Read(); },
+                        "Changed VIN prevents publication of a legacy DTC result.");
+                }
+            });
+        }
+
         // Extended records: typed data is only published after the second VIN check.
         foreach (var sub in new byte[] { 0x16, 0x1A })
         foreach (var finalMatches in new[] { true, false })
