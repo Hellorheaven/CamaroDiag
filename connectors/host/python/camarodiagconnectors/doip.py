@@ -453,6 +453,40 @@ def decode_all_stored_records(reply: bytes, lengths: dict[int, int]) -> list[dic
     return rows
 
 
+def decode_snapshot_records(dtc: int, record: int, reply: bytes, lengths: dict[int, int]) -> dict:
+    """Decode 19/04 with documented DID lengths; retain historical values as bytes."""
+    catalog = validate_stored_did_lengths(lengths)
+    if type(dtc) is not int or not 0 <= dtc <= 0xFFFFFF or type(record) is not int or not 0 <= record <= 255:
+        raise DoIpError("Invalid snapshot selector")
+    request = b"\x19\x04" + dtc.to_bytes(3, "big") + bytes((record,))
+    positive(request, reply)
+    offset, rows, seen = 6, [], set()
+    while offset < len(reply):
+        start = offset
+        if len(reply) - offset < 2:
+            raise DoIpError("Truncated snapshot header")
+        number, count = reply[offset:offset+2]
+        if number == 255 or number in seen or (record != 255 and record != number):
+            raise DoIpError("Invalid, duplicate or unexpected snapshot record")
+        seen.add(number)
+        offset += 2
+        dids = []
+        for _ in range(count):
+            if len(reply) - offset < 2:
+                raise DoIpError("Truncated snapshot DID")
+            did = int.from_bytes(reply[offset:offset+2], "big")
+            size = catalog.get(did)
+            offset += 2
+            if size is None or len(reply) - offset < size:
+                raise DoIpError("Unknown DID length or truncated snapshot data")
+            dids.append({"did": f"{did:04X}", "length": size, "data": reply[offset:offset+size].hex().upper()})
+            offset += size
+        rows.append({"record": number, "did_count": count, "dids": dids,
+                     "raw_record": reply[start:offset].hex().upper()})
+    return {"dtc": f"{dtc:06X}", "status": reply[5], "requested_record": record,
+            "records": rows, "raw_response": reply.hex().upper()}
+
+
 def positive(request: bytes, reply: bytes) -> bytes:
     if not request or not reply or reply[0] != (request[0] + 0x40) & 0xFF:
         raise DoIpError("UDS response service mismatch")
@@ -1142,6 +1176,27 @@ class Session:
                 result.update(dtc=reply[3:6].hex().upper(), status=reply[6],
                               raw_stored_data=reply[7:].hex().upper())
             self.verify_vin(expected)
+            return result
+        except BaseException:
+            self.close()
+            raise
+
+    def read_snapshot_records(self, expected: str, dtc: int, record: int,
+                              lengths: dict[int, int], *, obd: bool = False) -> dict:
+        catalog = validate_stored_did_lengths(lengths)
+        if type(dtc) is not int or not 0 <= dtc <= 0xFFFFFF or type(record) is not int or not 0 <= record <= 255:
+            raise DoIpError("Invalid snapshot selector")
+        def verify():
+            if obd:
+                if not self.read_obd(expected)["obd_on_uds"]:
+                    raise DoIpError("Selected ECU did not identify as OBDonUDS")
+            else:
+                self.verify_vin(expected)
+        try:
+            verify()
+            request = b"\x19\x04" + dtc.to_bytes(3, "big") + bytes((record,))
+            result = decode_snapshot_records(dtc, record, self.exchange(request), catalog)
+            verify()
             return result
         except BaseException:
             self.close()
