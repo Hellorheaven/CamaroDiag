@@ -447,6 +447,7 @@ internal static class StandardProtocolCli
             {
                 subfunction = 5, record = report.Record, present = report.Dtc.HasValue,
                 dtc = report.Dtc?.ToString("X6"), status = report.Status,
+                did_count = report.Dtc.HasValue ? (int?)report.RawData[0] : null,
                 raw_stored_data = Convert.ToHexString(report.RawData),
                 raw_response = Convert.ToHexString(report.RawResponse)
             }));
