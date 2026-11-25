@@ -1358,6 +1358,32 @@ class Session:
             self.close()
             raise
 
+    def read_decoded_user_memory(self, expected: str, memory: int, dtc: int, record: int,
+                                 lengths: dict[int, int], *, extended: bool = False) -> dict:
+        """Decode only the explicit memory selected by the caller."""
+        if type(memory) is not int or not 0 <= memory <= 255:
+            raise DoIpError("Invalid DTC memory selection")
+        if extended:
+            catalog = dict(lengths)
+            base = extended_records_request(dtc, record, catalog)
+        else:
+            catalog = validate_stored_did_lengths(lengths)
+            if type(dtc) is not int or not 0 <= dtc <= 0xFFFFFF or type(record) is not int or not 1 <= record <= 255:
+                raise DoIpError("Invalid user-memory snapshot selector")
+            base = b"\x19\x04" + dtc.to_bytes(3, "big") + bytes((record,))
+        sub = 0x19 if extended else 0x18
+        request = bytes((0x19, sub)) + base[2:] + bytes((memory,))
+        try:
+            self.verify_vin(expected)
+            reply = positive(request, self.exchange(request))
+            normalized = bytes((0x59, base[1])) + reply[3:]
+            result = (decode_extended_records if extended else decode_snapshot_records)(dtc, record, normalized, catalog)
+            self.verify_vin(expected)
+            return result | {"subfunction": sub, "memory": memory, "raw_response": reply.hex().upper()}
+        except BaseException:
+            self.close()
+            raise
+
     def read_user_memory_dtc(self, expected: str, memory: int, *, subfunction: int = 0x17,
                              mask: int = 255, dtc: int | None = None, record: int | None = None) -> dict:
         """Read an explicitly selected DTC memory, never infer an OEM memory mapping."""
