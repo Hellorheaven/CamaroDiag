@@ -815,6 +815,21 @@ fun CalibrationWorkspaceScreen(
                         enabled = targetReady && vinReady, modifier = Modifier.fillMaxWidth()) {
                         Text(stringResource(R.string.cal_doip_permanent_dtcs))
                     }
+                    for ((operation, label) in listOf(
+                        DoIpDirectRead.Operation.MIRROR_DTCS to R.string.cal_doip_legacy_mirror_dtcs,
+                        DoIpDirectRead.Operation.MIRROR_COUNT to R.string.cal_doip_legacy_mirror_count,
+                        DoIpDirectRead.Operation.LEGACY_EMISSIONS_DTCS to R.string.cal_doip_legacy_emissions_dtcs,
+                        DoIpDirectRead.Operation.LEGACY_EMISSIONS_COUNT to R.string.cal_doip_legacy_emissions_count)) {
+                        OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu, doIpDtcMask,
+                            doIpTls, operation, doIpCertificate, requireNotNull(doIpOptions)) },
+                            enabled = targetReady && vinReady && doIpDtcMask.length == 2,
+                            modifier = Modifier.fillMaxWidth()) { Text(stringResource(label)) }
+                    }
+                    OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu,
+                        doIpDetailDtc + doIpDetailRecord, doIpTls, DoIpDirectRead.Operation.MIRROR_EXTENDED,
+                        doIpCertificate, requireNotNull(doIpOptions)) },
+                        enabled = detailReady && (doIpDetailRecord.toIntOrNull(16) ?: 0) !in 0xF0..0xFD,
+                        modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.cal_doip_legacy_mirror_extended)) }
                     val extendedRecordReady = targetReady && vinReady && doIpDetailRecord.length == 2 &&
                         (doIpDetailRecord.toIntOrNull(16) ?: 0) in 1..0xEF
                     OutlinedButton(onClick = { onReadDirectDoIp(doIpHost, doIpTester, doIpEcu,

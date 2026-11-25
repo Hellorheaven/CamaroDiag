@@ -1103,6 +1103,13 @@
     <string name="cal_doip_supported_dtcs">Supported DTCs</string>
     <string name="cal_doip_permanent_dtcs">Permanent UDS DTCs</string>
     <string name="cal_doip_permanent_result">Permanent DTCs: %1$d; available status mask 0x%2$02X</string>
+    <string name="cal_doip_legacy_mirror_dtcs">Legacy mirror DTCs</string>
+    <string name="cal_doip_legacy_mirror_count">Legacy mirror DTC count</string>
+    <string name="cal_doip_legacy_mirror_extended">Legacy mirror extended data</string>
+    <string name="cal_doip_legacy_emissions_dtcs">Legacy emissions DTCs</string>
+    <string name="cal_doip_legacy_emissions_count">Legacy emissions DTC count</string>
+    <string name="cal_doip_legacy_mirror_result">Legacy UDS mirror memory</string>
+    <string name="cal_doip_legacy_emissions_result">Legacy UDS emissions</string>
     <string name="cal_doip_extended_record_support">DTCs supporting the extended record</string>
     <string name="cal_doip_extended_record_size">Uniform documented record length (bytes)</string>
     <string name="cal_doip_extended_record_data">Read extended data by record</string>

@@ -1,3 +1,7 @@
+## PR117 — lectures historiques Android (25/11/2026)
+
+- UDS 19/0F–13 : cinq actions FR/EN distinctes, validation des paramètres avant réseau, rapport historique séparé de la liste active, F190 avant/après et contrôles des réponses. Tests écrits non exécutés. Windows reste à raccorder ; aucun checkpoint CI.
+
 ## PR117 — lectures UDS historiques Connectors (25/11/2026)
 
 - 19/0F, 10, 11 (mémoire miroir) et 19/12, 13 (émissions historiques) : commandes explicites, F190 avant/après, résultats distincts des DTC actifs et OBDonUDS, contrôles masque/longueur/écho/doublons, conservation brute des détails. Ces variantes retirées en ISO 14229-1:2020 restent utiles uniquement pour ECU compatibles, aucun repli automatique. Référence https://uds.readthedocs.io/en/stable/pages/knowledge_base/service.html . Tests écrits non exécutés ; Android/Windows à raccorder. Aucun checkpoint CI.

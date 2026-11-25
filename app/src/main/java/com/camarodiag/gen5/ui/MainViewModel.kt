@@ -1485,6 +1485,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 if (multiMonitor) com.camarodiag.gen5.data.obd.DoIpMultiDid.validateMonitor(requireNotNull(layout))
                 require(operation !in setOf(DoIpDirectRead.Operation.OBD_MULTI_DID, DoIpDirectRead.Operation.OBD_MULTI_MONITOR) ||
                     requireNotNull(layout).all { DoIpDirectRead.isObdDid(it.did) })
+                val legacyFilter = operation in setOf(DoIpDirectRead.Operation.MIRROR_DTCS, DoIpDirectRead.Operation.MIRROR_COUNT,
+                    DoIpDirectRead.Operation.LEGACY_EMISSIONS_COUNT, DoIpDirectRead.Operation.LEGACY_EMISSIONS_DTCS)
+                val legacyDetail = operation == DoIpDirectRead.Operation.MIRROR_EXTENDED
+                if (legacyFilter) require(didHex.matches(Regex("[0-9A-Fa-f]{2}")))
+                if (legacyDetail) {
+                    require(didHex.matches(Regex("[0-9A-Fa-f]{8}")))
+                    val selected = didHex.takeLast(2).toInt(16)
+                    require(selected != 0 && selected !in 0xF0..0xFD)
+                }
                 val extendedSupport = operation == DoIpDirectRead.Operation.EXTENDED_RECORD_SUPPORT
                 val extendedData = operation == DoIpDirectRead.Operation.EXTENDED_RECORD_DATA
                 val extendedParts = if (extendedData) didHex.split(':') else listOf(didHex)
@@ -1511,7 +1520,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     require(didHex.matches(Regex("[0-9A-Fa-f]{4}")))
                     didHex.toInt(16)
                 } else 0xF190
-                val mask = if (operation in setOf(DoIpDirectRead.Operation.DTC, DoIpDirectRead.Operation.DTC_COUNT, DoIpDirectRead.Operation.OBD_DTC, DoIpDirectRead.Operation.OBD_DTC_COUNT)) {
+                val mask = if (legacyFilter || operation in setOf(DoIpDirectRead.Operation.DTC, DoIpDirectRead.Operation.DTC_COUNT, DoIpDirectRead.Operation.OBD_DTC, DoIpDirectRead.Operation.OBD_DTC_COUNT)) {
                     require(didHex.matches(Regex("[0-9A-Fa-f]{2}")))
                     didHex.toInt(16)
                 } else 255
@@ -1525,8 +1534,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 if (wwhReadiness) require(didHex.matches(Regex("[0-9A-Fa-f]{2}")))
                 val isDetail = operation in setOf(DoIpDirectRead.Operation.DTC_SNAPSHOT, DoIpDirectRead.Operation.DTC_EXTENDED, DoIpDirectRead.Operation.OBD_DTC_SNAPSHOT, DoIpDirectRead.Operation.OBD_DTC_EXTENDED)
                 if (isDetail) require(didHex.matches(Regex("[0-9A-Fa-f]{8}")))
-                val detailDtc = if (isDetail || severityInfo || memoryDetail) didHex.take(6).toInt(16) else 0
-                val detailRecord = if (memoryDetail) didHex.substring(6, 8).toInt(16) else if (isDetail) didHex.takeLast(2).toInt(16) else 1
+                val detailDtc = if (isDetail || severityInfo || memoryDetail || legacyDetail) didHex.take(6).toInt(16) else 0
+                val detailRecord = if (memoryDetail) didHex.substring(6, 8).toInt(16) else if (isDetail || legacyDetail) didHex.takeLast(2).toInt(16) else 1
                 val clientTls = certificate?.let { DoIpClientTls.open(getApplication<Application>(), it, target) }
                 check(current())
                 if (operation in setOf(DoIpDirectRead.Operation.INVENTORY, DoIpDirectRead.Operation.OBD_INVENTORY)) {
@@ -1623,6 +1632,24 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         localizedContext.getString(R.string.cal_doip_sequence_reply, index + 1,
                             reply.joinToString(" ") { "%02X".format(it.toInt() and 255) })
                     }.joinToString("\n")
+                    result.legacyReport != null -> requireNotNull(result.legacyReport).let { legacy ->
+                        val heading = localizedContext.getString(if (legacy.subfunction in 0x0F..0x11)
+                            R.string.cal_doip_legacy_mirror_result else R.string.cal_doip_legacy_emissions_result)
+                        val list = legacy.list
+                        val count = legacy.count
+                        val detail = legacy.detail
+                        heading + "\n" + when {
+                            list != null -> localizedContext.getString(R.string.cal_doip_filtered_dtc_result,
+                                list.records.size, mask, list.statusAvailabilityMask) + list.records.joinToString("\n", prefix = "\n") {
+                                "0x%06X — 0x%02X".format(it.rawDtc, it.statusByte)
+                            }
+                            count != null -> localizedContext.getString(R.string.cal_doip_count_result,
+                                count.count, mask, count.availabilityMask, count.formatIdentifier)
+                            detail != null -> localizedContext.getString(R.string.cal_doip_detail_result, detail.dtc, detail.status,
+                                detail.records.joinToString(" ") { "%02X".format(it.toInt() and 255) })
+                            else -> error("Missing legacy DTC result")
+                        }
+                    }
                     result.extendedRecordReport != null -> requireNotNull(result.extendedRecordReport).let { report ->
                         val heading = localizedContext.getString(R.string.cal_doip_extended_record_result, report.record, report.entries.size)
                         heading + (report.availability?.let { "\n" + localizedContext.getString(R.string.cal_doip_extended_record_mask, it) } ?: "") +

@@ -25,6 +25,28 @@ class UdsDtcDecoderTest {
         assertTrue(runCatching { UdsDtcDecoder.decodeSeverity(listRequest, hex("590808801212345601")) }.isFailure)
     }
 
+    @Test fun legacyMirrorAndEmissionsStaySeparate() {
+        fun hex(s: String) = s.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
+        for (sub in listOf(0x0F, 0x13)) {
+            val request = UdsDtcDecoder.legacyRequest(sub, 8, 0, 1)
+            assertArrayEquals(hex("19%02X08".format(sub)), request)
+            val report = UdsDtcDecoder.decodeLegacy(request, hex("59%02X0801020308".format(sub)))
+            assertEquals(sub, report.subfunction)
+            assertEquals(0x010203, report.list!!.records.single().rawDtc)
+            assertTrue(runCatching { UdsDtcDecoder.decodeLegacy(request, hex("59%02X0801020301".format(sub))) }.isFailure)
+        }
+        for (sub in listOf(0x11, 0x12)) {
+            val request = UdsDtcDecoder.legacyRequest(sub, 8, 0, 1)
+            assertEquals(2, UdsDtcDecoder.decodeLegacy(request, hex("59%02X08010002".format(sub))).count!!.count)
+            assertTrue(runCatching { UdsDtcDecoder.decodeLegacy(request, hex("59%02X0801".format(sub))) }.isFailure)
+        }
+        val detail = UdsDtcDecoder.legacyRequest(0x10, 255, 0x010203, 1)
+        assertArrayEquals(hex("191001020301"), detail)
+        assertArrayEquals(hex("01AABB"), UdsDtcDecoder.decodeLegacy(detail, hex("59100102030801AABB")).detail!!.records)
+        assertTrue(runCatching { UdsDtcDecoder.decodeLegacy(detail, hex("59100102040801")) }.isFailure)
+        assertTrue(runCatching { UdsDtcDecoder.decodeLegacy(detail, hex("59100102030802")) }.isFailure)
+    }
+
     @Test fun extendedRecordUsesDocumentedWidthAndEcho() {
         fun hex(s: String) = s.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
         assertArrayEquals(hex("191A01"), UdsDtcDecoder.extendedRecordRequest(1, null))

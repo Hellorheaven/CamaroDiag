@@ -95,7 +95,44 @@ data class UdsMemoryDtcReport(val memory: Int, val list: UdsDtcReport? = null, v
 data class UdsExtendedRecordReport(val record: Int, val availability: Int?,
     val entries: List<UdsDtcDetail>)
 
+data class UdsLegacyDtcReport(val subfunction: Int, val list: UdsDtcReport? = null,
+    val count: UdsDtcCountReport? = null, val detail: UdsDtcDetail? = null)
+
 object UdsDtcDecoder {
+    fun legacyRequest(sub: Int, mask: Int, dtc: Int, record: Int): ByteArray {
+        require(mask in 0..255)
+        if (sub in setOf(0x0F, 0x11, 0x12, 0x13)) return byteArrayOf(0x19, sub.toByte(), mask.toByte())
+        require(sub == 0x10 && dtc in 0..0xFFFFFF && record in 1..255 && record !in 0xF0..0xFD)
+        return byteArrayOf(0x19, 0x10, (dtc shr 16).toByte(), (dtc shr 8).toByte(), dtc.toByte(), record.toByte())
+    }
+
+    fun decodeLegacy(request: ByteArray, reply: ByteArray): UdsLegacyDtcReport {
+        require(request.size >= 2 && request[0] == 0x19.toByte() && reply.size >= 2 &&
+            reply[0] == 0x59.toByte() && reply[1] == request[1])
+        val sub = request[1].toInt() and 255
+        return when (sub) {
+            0x0F, 0x13 -> {
+                require(request.size == 3)
+                UdsLegacyDtcReport(sub, list = decodeStatusMaskReport(reply.copyOfRange(2, reply.size), request[2].toInt() and 255))
+            }
+            0x11, 0x12 -> {
+                require(request.size == 3 && reply.size == 6)
+                val normalized = reply.copyOf().apply { this[1] = 1 }
+                UdsLegacyDtcReport(sub, count = decodeCountByStatusMask(normalized))
+            }
+            0x10 -> {
+                require(request.size == 6 && reply.size >= 6)
+                val dtc = ((request[2].toInt() and 255) shl 16) or
+                    ((request[3].toInt() and 255) shl 8) or (request[4].toInt() and 255)
+                val record = request[5].toInt() and 255
+                require(record in 1..255 && record !in 0xF0..0xFD)
+                if (reply.size > 6 && record !in setOf(0xFE, 0xFF)) require(reply[6] == request[5])
+                UdsLegacyDtcReport(sub, detail = decodeDetail(6, dtc, reply.copyOf().apply { this[1] = 6 }))
+            }
+            else -> error("Unsupported legacy DTC subfunction")
+        }
+    }
+
     fun extendedRecordRequest(record: Int, size: Int?): ByteArray {
         require(record in 1..0xEF && (size == null || size in 1..4090))
         return byteArrayOf(0x19, if (size == null) 0x1A else 0x16, record.toByte())

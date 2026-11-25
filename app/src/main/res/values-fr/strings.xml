@@ -1106,6 +1106,13 @@
     <string name="cal_doip_supported_dtcs">DTC pris en charge</string>
     <string name="cal_doip_permanent_dtcs">DTC permanents UDS</string>
     <string name="cal_doip_permanent_result">DTC permanents : %1$d ; masque disponible 0x%2$02X</string>
+    <string name="cal_doip_legacy_mirror_dtcs">DTC de mémoire miroir (historique)</string>
+    <string name="cal_doip_legacy_mirror_count">Comptage DTC miroir (historique)</string>
+    <string name="cal_doip_legacy_mirror_extended">Données étendues miroir (historique)</string>
+    <string name="cal_doip_legacy_emissions_dtcs">DTC émissions UDS historiques</string>
+    <string name="cal_doip_legacy_emissions_count">Comptage DTC émissions historiques</string>
+    <string name="cal_doip_legacy_mirror_result">Mémoire miroir UDS historique</string>
+    <string name="cal_doip_legacy_emissions_result">Émissions UDS historiques</string>
     <string name="cal_doip_extended_record_support">DTC prenant en charge cet enregistrement</string>
     <string name="cal_doip_extended_record_size">Longueur uniforme documentée (octets)</string>
     <string name="cal_doip_extended_record_data">Lire les données étendues par enregistrement</string>
