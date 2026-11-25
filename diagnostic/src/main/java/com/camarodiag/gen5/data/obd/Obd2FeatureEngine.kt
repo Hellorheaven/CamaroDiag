@@ -527,14 +527,28 @@ class Obd2FeatureEngine(
         return bytes.takeIf { it.isNotEmpty() }
     }
 
+    private fun identityRecords(response: String, service: Int, pid: Int, width: Int): List<List<Int>>? {
+        val messages = ObdNumberedIdentityFrames.parseAll(response) ?: return null
+        val matching = messages.filter { it.getOrNull(0) == service && it.getOrNull(1) == pid }
+        if (matching.isEmpty()) return null
+        val result = mutableListOf<List<Int>>()
+        for (message in matching) {
+            val data = message.drop(2)
+            val records = recordData(data, width) ?: return null
+            // VIN is one fixed record per responding ECU.
+            if (pid == 0x02 && records.size != 1) return null
+            result += records
+        }
+        return result
+    }
+
     private fun decodeAsciiRecords(
         response: String,
         service: Int,
         pid: Int,
         recordWidth: Int
     ): List<String> {
-        val data = payload(response, service, pid) ?: return emptyList()
-        val records = recordData(data, recordWidth) ?: return emptyList()
+        val records = identityRecords(response, service, pid, recordWidth) ?: return emptyList()
         val decoded = records.map { record ->
             val raw = record.map(Int::toChar).joinToString("")
             val trimmed = raw.trim(' ', '\u0000')
@@ -552,8 +566,7 @@ class Obd2FeatureEngine(
         pid: Int,
         recordWidth: Int
     ): List<String> {
-        val data = payload(response, service, pid) ?: return emptyList()
-        val records = recordData(data, recordWidth) ?: return emptyList()
+        val records = identityRecords(response, service, pid, recordWidth) ?: return emptyList()
         return records.map { record -> record.joinToString("") { "%02X".format(Locale.US, it) } }
     }
 

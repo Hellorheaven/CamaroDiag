@@ -1,3 +1,7 @@
+## PR117 — identité OBD multicalculateur (25/11/2026)
+
+- C6 : les lectures Mode 09 décodent séparément les blocs ELM numérotés et les réponses complètes anonymes, sans concaténer plusieurs ECU. VIN identiques acceptés, VIN divergents ou enregistrement tronqué refusés ; identifiants de calibration et CVN conservés par enregistrement. Console compatible avec plusieurs blocs valides. Aucun changement de droits d'écriture. Lecture des fichiers confirmée par SHA/blob avant modification. Régressions ajoutées non exécutées, aucun checkpoint C6/DoIP.
+
 ## PR117 — clôture fiable de la capture DoIP CLI (25/11/2026)
 
 - Le bilan NDJSON complet est désormais émis après fermeture du transport et fermeture/flush du journal, jamais avant ; une erreur de fermeture conserve les échantillons déjà publiés mais laisse la capture incomplète. Documentation FR/EN du flux et de ses limites mise à jour. Aucun test ni checkpoint intermédiaire. C6/DoIP restent ouverts.

@@ -116,10 +116,14 @@ object SafeObdRequestPolicy {
         }
         if (request.service == 0x09 && ':' in response) {
             if (expectedResponder != null) return false
-            val assembled = ObdNumberedIdentityFrames.parse(response) ?: return false
-            return hasPositiveResponse(request, assembled.joinToString("") {
-                "%02X".format(java.util.Locale.ROOT, it)
-            })
+            val records = ObdNumberedIdentityFrames.parseAll(response) ?: return false
+            val matching = records.filter { it.getOrNull(0) == 0x49 &&
+                it.getOrNull(1) == request.parameter }
+            return matching.isNotEmpty() && matching.all { assembled ->
+                hasPositiveResponse(request, assembled.joinToString("") {
+                    "%02X".format(java.util.Locale.ROOT, it)
+                })
+            }
         }
         val expected = when (request.service) {
             0x01 -> "41%02X".format(java.util.Locale.ROOT, requireNotNull(request.parameter))

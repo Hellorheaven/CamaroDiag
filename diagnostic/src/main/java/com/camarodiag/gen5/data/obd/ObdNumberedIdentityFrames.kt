@@ -8,6 +8,44 @@ import java.util.Locale
  * and the declared byte count are internally consistent.
  */
 internal object ObdNumberedIdentityFrames {
+    /**
+     * A functional request may return several complete ECU records. Keep
+     * each separate; a truncated second record must not validate the first
+     * as the only observed identity.
+     */
+    fun parseAll(response: String): List<List<Int>>? {
+        val lines = response.trim().removeSuffix(">").trim().uppercase(Locale.ROOT)
+            .lineSequence().map(String::trim)
+            .filter { it.isNotEmpty() && it != "SEARCHING..." &&
+                it !in setOf("0902", "0904", "0906", "090A") }.toList()
+        if (lines.isEmpty()) return null
+        val records = mutableListOf<List<Int>>()
+        var index = 0
+        while (index < lines.size) {
+            val line = lines[index]
+            if (line.matches(Regex("[0-9A-F]{3}"))) {
+                val block = mutableListOf(line)
+                index++
+                while (index < lines.size && lines[index].matches(Regex("[0-9A-F]:.*"))) {
+                    block += lines[index++]
+                }
+                records += parse(block.joinToString("\n")) ?: return null
+            } else {
+                // Headerless complete records may be mixed with numbered
+                // responses. A physical header is not inferred here.
+                val compact = line.filterNot(Char::isWhitespace)
+                if (!compact.matches(Regex("(?:[0-9A-F]{2}){3,255}"))) {
+                    // Retain support for a single compact numbered block.
+                    return if (records.isEmpty() && index == 0) parse(lines.joinToString("\n"))?.let(::listOf)
+                    else null
+                }
+                records += compact.chunked(2).map { it.toInt(16) }
+                index++
+            }
+        }
+        return records
+    }
+
     fun parse(response: String): List<Int>? {
         val text = response.trim().removeSuffix(">").trim().uppercase(Locale.ROOT)
             .removePrefix("SEARCHING...").trim()
