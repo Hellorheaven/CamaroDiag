@@ -858,6 +858,23 @@ internal static class StandardVehicleProtocolsSelfTests
         Reject<InvalidDataException>(() => ObdOnUdsServices.DecodeStoredRecord(1, [0x59, 5, 2]), "Wrong record rejected.");
         Reject<InvalidDataException>(() => ObdOnUdsServices.DecodeStoredRecord(1, [0x59, 5, 1, 1, 2, 3, 8, 2, 0xF1, 0x90]), "Missing DID rejected.");
         Reject<ArgumentException>(() => StandardProtocolCli.ParseVerifiedDoIpRead([..recordArgs, "--uds-stored-record", "0xFF"]), "Wildcard requires OEM layout.");
+        var memoryDecoded = StandardProtocolCli.ParseVerifiedDoIpRead([..recordArgs, "--uds-memory", "0x02",
+            "--uds-memory-snapshot", "0x010203", "--uds-memory-record", "0xFF", "--snapshot-did-lengths", "F40D:1"]);
+        Check(!memoryDecoded.Obd && memoryDecoded.Target.Request.SequenceEqual(new byte[] { 0x19, 0x18, 1, 2, 3, 255, 2 }),
+            "Decoded snapshot preserves explicit memory selector.");
+        var memorySnapshotBytes = Convert.FromHexString("591802010203080101F40D78");
+        var decodedMemorySnapshot = ObdOnUdsServices.DecodeUserMemorySnapshot(2, 0x010203, 255,
+            memorySnapshotBytes, ObdOnUdsServices.ParseStoredDidLengths("F40D:1"));
+        Check(decodedMemorySnapshot.RawResponse.SequenceEqual(memorySnapshotBytes) &&
+            decodedMemorySnapshot.Records.Single().Dids.Single().Data.SequenceEqual(new byte[] { 0x78 }),
+            "Memory snapshot preserves original response and historical DID.");
+        var memoryExtendedBytes = Convert.FromHexString("5919020102030801123490AA");
+        var decodedMemoryExtended = ObdOnUdsServices.DecodeUserMemoryExtended(2, 0x010203, 255,
+            memoryExtendedBytes, ObdOnUdsServices.ParseExtendedRecordLengths("01:2,90:1"));
+        Check(decodedMemoryExtended.RawResponse.SequenceEqual(memoryExtendedBytes) &&
+            decodedMemoryExtended.Records.Count == 2, "Memory extended data preserves records.");
+        Reject<InvalidDataException>(() => ObdOnUdsServices.DecodeUserMemoryExtended(3, 0x010203, 255,
+            memoryExtendedBytes, ObdOnUdsServices.ParseExtendedRecordLengths("01:2,90:1")), "Wrong memory rejected.");
         var decodedExtended = StandardProtocolCli.ParseVerifiedDoIpRead([..recordArgs, "--uds-extended-dtc", "0x010203",
             "--uds-extended-record", "0xFF", "--extended-record-lengths", "01:2,90:1,91:2"]);
         Check(!decodedExtended.Obd && decodedExtended.Target.Request.SequenceEqual(new byte[] { 0x19, 6, 1, 2, 3, 255 }),
