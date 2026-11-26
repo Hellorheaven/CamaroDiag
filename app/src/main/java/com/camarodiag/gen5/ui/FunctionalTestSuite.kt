@@ -88,6 +88,7 @@ data class FunctionalTestState(
     val clearCampaign: Boolean = false,
     val clearResult: com.camarodiag.gen5.data.obd.ObdClearRecipeResult? = null,
     val legacyTarget: com.camarodiag.gen5.data.obd.LegacyMutationTarget? = null,
+    val legacyBaseline: com.camarodiag.gen5.data.obd.LegacyMutationResult? = null,
     val legacyResult: com.camarodiag.gen5.data.obd.LegacyMutationResult? = null
 ) {
     val canExport: Boolean get() = !running && finishedAtMillis != null && context != null && checks.isNotEmpty()
