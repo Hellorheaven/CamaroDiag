@@ -28,6 +28,37 @@ class PhysicalRecoveryFolderTest {
         assertFalse(PhysicalRecoveryFolder.uniqueEntries(listOf(journal.copy(id = ""))))
     }
 
+    @Test fun treeInventoryRejectsCrossLevelAliases() {
+        val root = listOf(PhysicalRecoveryFolder.Entry("journal", "j", false),
+            PhysicalRecoveryFolder.Entry("journal.blocks", "b", true),
+            PhysicalRecoveryFolder.Entry("other", "o", false))
+        val block = PhysicalRecoveryFolder.Entry("region.ecu-block", "r", false)
+        assertTrue(PhysicalRecoveryFolder.uniqueTree("root", root, listOf(block)))
+        for (alias in listOf("j", "b", "o", "root"))
+            assertFalse(PhysicalRecoveryFolder.uniqueTree("root", root, listOf(block.copy(id = alias))))
+        assertFalse(PhysicalRecoveryFolder.uniqueTree("j", root, listOf(block)))
+    }
+
+    @Test fun stagingChecksFullDigestEvenWhenSizeIsUnchanged() {
+        val file = java.io.File.createTempFile("recovery", ".block")
+        try {
+            val data = byteArrayOf(1, 2, 3, 4)
+            val digest = java.security.MessageDigest.getInstance("SHA-256").digest(data)
+            file.writeBytes(data)
+            PhysicalRecoveryFolder.verifyStagedFile(file, 4, digest) {}
+            file.writeBytes(byteArrayOf(1, 2, 3, 5))
+            assertThrows(IllegalStateException::class.java) {
+                PhysicalRecoveryFolder.verifyStagedFile(file, 4, digest) {}
+            }
+            file.writeBytes(byteArrayOf(1, 2, 3))
+            assertThrows(IllegalStateException::class.java) {
+                PhysicalRecoveryFolder.verifyStagedFile(file, 4, digest) {}
+            }
+        } finally {
+            file.delete()
+        }
+    }
+
     @Test fun requiresIndependentCompleteIdentity() {
         val identity = PhysicalRecoveryIdentity("1G1FA1RXXR0123456", "E39", "ECM", "OS-A")
         assertTrue(identity.valid)
