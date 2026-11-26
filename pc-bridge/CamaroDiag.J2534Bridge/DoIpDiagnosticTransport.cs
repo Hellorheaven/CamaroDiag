@@ -193,10 +193,10 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
                 // Receiving a routing message concurrently with a timer's
                 // expiry cannot retroactively activate an expired session.
                 deadline.Token.ThrowIfCancellationRequested();
-                DoIpCodec.RequireNoGenericNack(routing);
                 if (routing.Version != protocolVersion)
                     throw new InvalidDataException(
                         "DoIP gateway routing response changed protocol version.");
+                DoIpCodec.RequireNoGenericNack(routing);
                 if (routing.Type == DoIpCodec.AliveCheckRequest)
                 {
                     await session.SendAsync(DoIpCodec.ReplyToAliveCheck(
@@ -348,10 +348,10 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
                     {
                         throw new TimeoutException("DoIP diagnostic UDS stage deadline exceeded.");
                     }
-                    DoIpCodec.RequireNoGenericNack(message);
                     if (message.Version != protocolVersion)
                         throw new InvalidDataException(
                             "DoIP response changed the negotiated protocol version.");
+                    DoIpCodec.RequireNoGenericNack(message);
                     if (message.Type == DoIpCodec.AliveCheckRequest)
                     {
                         await SendAsync(DoIpCodec.ReplyToAliveCheck(
