@@ -32,7 +32,11 @@ internal data class ElmObdSessionProfile(val protocol: Int) {
 
         /** Do not freeze an automatically selected protocol without ECU evidence. */
         fun fromObservation(reported: Int?, positivePid00: Boolean): ElmObdSessionProfile =
-            if (positivePid00 && reported != null && reported in 6..9)
+            // Positive Mode 01/PID 00 is evidence of a functional vehicle
+            // response on the adapter-selected protocol. Preserve the actual
+            // observed ELM 1..A, including J1850, ISO9141, KWP and J1939.
+            // No CAN header may be inferred for non-CAN protocols.
+            if (positivePid00 && reported != null && reported in 1..10)
                 ElmObdSessionProfile(reported) else AUTO
     }
 }

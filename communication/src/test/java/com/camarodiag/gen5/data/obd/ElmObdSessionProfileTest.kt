@@ -32,10 +32,34 @@ class ElmObdSessionProfileTest {
         }
     }
 
+    @Test fun physicallyObservedLegacyProtocolsSurviveCleanupWithoutCanHeader() {
+        for (protocol in listOf(1, 2, 3, 4, 5, 10)) {
+            val profile = ElmObdSessionProfile.fromObservation(protocol, true)
+            assertEquals(protocol, profile.protocol)
+            val commands = profile.restoreCommands()
+            assertTrue(commands.contains("ATD"))
+            assertTrue(commands.contains(
+                "ATSP" + protocol.toString(16).uppercase(java.util.Locale.ROOT)))
+            assertTrue(commands.containsAll(listOf("ATE0", "ATL0", "ATH1", "ATS0")))
+            assertFalse("No invented CAN address for protocol $protocol",
+                commands.any { it.startsWith("ATSH") })
+            assertFalse("Legacy profiles never force CAN autoframing",
+                commands.any { it == "ATCAF1" })
+            assertEquals(0, ElmObdSessionProfile.fromObservation(protocol, false).protocol)
+        }
+    }
+
+    @Test fun missingOrInvalidActualProtocolNeverBecomesABaseline() {
+        assertEquals(0, ElmObdSessionProfile.fromObservation(null, true).protocol)
+        assertEquals(0, ElmObdSessionProfile.fromObservation(0, true).protocol)
+        assertEquals(0, ElmObdSessionProfile.fromObservation(11, true).protocol)
+        assertEquals(0, ElmObdSessionProfile.fromObservation(1, false).protocol)
+    }
+
     @Test fun unconfirmedProtocolRestoresAutomaticWithoutInventingCanAddress() {
         val auto = ElmObdSessionProfile.fromObservation(7, false)
         assertEquals(0, auto.protocol)
-        assertEquals(auto, ElmObdSessionProfile.fromObservation(3, true))
+        assertEquals(3, ElmObdSessionProfile.fromObservation(3, true).protocol)
         assertEquals(9, ElmObdSessionProfile.fromObservation(9, true).protocol)
         assertTrue(auto.restoreCommands().containsAll(listOf("ATD", "ATSP0")))
         assertFalse(auto.restoreCommands().any { it.startsWith("ATSH") })
