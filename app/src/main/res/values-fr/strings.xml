@@ -1290,4 +1290,14 @@
     <string name="obd_mode08_partial">Inventaire des tests incomplet ou indisponible.</string>
     <string name="obd_mode08_no_execution">Aucun test de commande exécuté.</string>
     <string name="msg_dtc_clear_stationary_required">Immobilisez le véhicule et arrêtez le moteur. Une nouvelle lecture de vitesse et de régime à zéro est requise avant effacement.</string>
+    <string name="functional_evap_run">Mode 08 — EVAP</string>
+    <string name="functional_evap_scope">Test indépendant du calculateur CAN physique ; disponible uniquement sur une interface ELM/STN compatible.</string>
+    <string name="functional_evap_profile">Je confirme le calculateur moteur principal et le VIN sélectionné : %1$s</string>
+    <string name="functional_evap_warning">Respectez la procédure EVAP du constructeur. Véhicule immobilisé, moteur arrêté, local ventilé et conditions de sécurité réunies. Le calculateur peut refuser le test. Aucune répétition automatique.</string>
+    <string name="functional_evap_confirm">Demander une seule fois le test EVAP sur le véhicule %1$s ?</string>
+    <string name="functional_evap_ok">OK</string>
+    <string name="functional_evap_yes">Oui</string>
+    <string name="functional_evap_cancel">Annuler</string>
+    <string name="functional_evap_no">Non</string>
+    <string name="functional_evap_uncertain">Campagne EVAP interrompue ou en échec. État du test potentiellement incertain ; ne pas relancer automatiquement.</string>
 </resources>
