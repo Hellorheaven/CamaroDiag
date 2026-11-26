@@ -66,6 +66,8 @@ jobs:
           /tmp/j1979_usb_campaign_test
           g++ -std=c++11 -Wall -Wextra -Werror -pedantic connectors/firmware/esp32s3/native-tests/j1979_usb_auth_test.cpp -o /tmp/j1979_usb_auth_test
           /tmp/j1979_usb_auth_test
+          g++ -std=c++11 -Wall -Wextra -Werror -pedantic connectors/firmware/esp32s3/native-tests/j1979_local_usb_owner_test.cpp -o /tmp/j1979_local_usb_owner_test
+          /tmp/j1979_local_usb_owner_test
           g++ -std=c++11 -Wall -Wextra -Werror -pedantic connectors/firmware/shared/native-tests/kline_observer_test.cpp -o /tmp/kline_observer_test
           /tmp/kline_observer_test
   esp32-build:

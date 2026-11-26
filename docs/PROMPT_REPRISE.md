@@ -1,3 +1,7 @@
+## J1979 / C6 — propriétaire local USB et liaison des générations (26/11/2026)
+
+- Propriétaire concret de politique J1979 : génération de connexion, clé et consentement local figées ; profil CAN ET budget exacts ; preuve locale d'entropie avant nonce ; droit USB accordé une fois ; démarrage seulement sous bail natif ; arrêt même après activation partielle, révocation et verrou partagé sur arrêt incertain. Aucun arrêt de canal appartenant à un autre hôte. Tests natifs écrits (générations, profil, entropie, concurrence, démarrage partiel et récupération). Interface de carte à implémenter sur preuves électriques réelles, pas de qualification inventée. Aucune CI ni fusion/Release. J1979/C6 ouverts.
+
 ## J1979 / C6 — composition des runtimes STM32 et ESP32 (26/11/2026)
 
 - Runtime STM32 composé FDCAN/HAL SPI/endpoint/session locale, entrée tâche pour preuve NSS et suivi de défaut ; runtime ESP32 composé SPI maître/client CI/2/service CU/1 avec canal Arduino Stream borné et fermeture par callback d'identité de connexion. Recontrôle d'admission après publication READY, tests service USB bout en bout simulés (challenge, preuve, sortie, fermeture, déconnexion, échec export). Sources de composition incluses au build sans instanciation dans main. Reste propriétaire matériel concret, pinout READY/horloge et interlock qualifiés, provisionnement des clés et liaison USB réelle ; aucune activation ni revendication de qualification. Tests non exécutés, J1979/C6 ouverts, aucun merge ni Release.
