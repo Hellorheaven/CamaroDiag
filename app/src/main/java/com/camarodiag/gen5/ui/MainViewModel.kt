@@ -257,6 +257,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         // Retain the cancelled job until the next connection can join its
         // transport cleanup; clearing it would allow overlapping handshakes.
         connectionAttemptJob?.cancel()
+        bluetoothDiscoveryJob?.cancel()
         _savedSessions.value = emptyList()
         _activeAccountUid.value = accountUid
         discardCanMonitor()
@@ -1288,10 +1289,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             } catch (cancelled: CancellationException) {
                 if (current()) _calibrationWorkspace.update { it.copy(doIpReading = false, doIpGatewayReading = false) }
                 throw cancelled
-            } catch (_: Exception) {
-                if (current()) appendCanConsoleSystemEvent(localizedContext.getString(R.string.cal_doip_failed), succeeded = false)
+            } catch (error: Exception) {
+                val message = doIpFailureMessage(error, R.string.cal_doip_failed)
+                if (current()) appendCanConsoleSystemEvent(message, succeeded = false)
                 if (current()) _calibrationWorkspace.update { it.copy(doIpReading = false, doIpGatewayReading = false,
-                    doIpGatewayResult = localizedContext.getString(R.string.cal_doip_failed)) }
+                    doIpGatewayResult = message) }
             }
         }
     }
@@ -1372,6 +1374,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 doIpTrace = emptyList(), doIpBackupBytes = 0) }
             try {
                 require(current() && _calibrationWorkspace.value.doIpBackupScope == scope)
+                scope.validateCapture()
                 val target = resolveSelectedDoIpTarget(host, tester, ecu, _vehicle.value.vin, tls,
                     expectedGateway = scope.gateway, onTrace = { trace -> journalDoIpControlTrace(trace, current) })
                 check(current())
@@ -1415,13 +1418,32 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 if (current()) _calibrationWorkspace.update { it.copy(doIpReading = false, doIpBackupBytes = 0) }
                 throw cancelled
             } catch (error: Exception) {
-                val tlsError = error is DoIpClientCertificateException || error is javax.net.ssl.SSLException
-                val resource = if (tlsError) R.string.cal_doip_tls_error else R.string.cal_doip_backup_failed
-                if (current()) appendCanConsoleSystemEvent(localizedContext.getString(resource), succeeded = false)
+                val message = doIpFailureMessage(error, R.string.cal_doip_backup_failed)
+                if (current()) appendCanConsoleSystemEvent(message, succeeded = false)
                 if (current()) _calibrationWorkspace.update { it.copy(doIpReading = false, doIpBackupBytes = 0,
-                    doIpResult = localizedContext.getString(resource)) }
+                    doIpResult = message) }
             }
         }
+    }
+
+    private fun doIpFailureMessage(error: Exception, fallback: Int): String {
+        val base = localizedContext.getString(when (error) {
+            is DoIpClientCertificateException, is javax.net.ssl.SSLException -> R.string.cal_doip_tls_error
+            is DoIpDirectRead.Refusal -> when (error.layer) {
+                DoIpDirectRead.RefusalLayer.HEADER -> R.string.cal_doip_inventory_reason_header
+                DoIpDirectRead.RefusalLayer.ROUTING -> R.string.cal_doip_inventory_reason_routing
+                DoIpDirectRead.RefusalLayer.DIAGNOSTIC_ACK -> R.string.cal_doip_inventory_reason_ack
+            }
+            is com.camaradiag.gen5.data.obd.UdsNegativeResponseException -> R.string.cal_doip_inventory_reason_nrc
+            is java.net.SocketTimeoutException -> R.string.cal_doip_inventory_reason_timeout
+            else -> fallback
+        })
+        val code = when (error) {
+            is DoIpDirectRead.Refusal -> error.code
+            is com.camaradiag.gen5.data.obd.UdsNegativeResponseException -> error.negativeResponseCode
+            else -> null
+        }
+        return base + (code?.let { " (0x%02X)".format(java.util.Locale.ROOT, it) } ?: "")
     }
 
     /** Logical DoIP addresses are deliberately not formatted as CAN IDs.
@@ -1617,6 +1639,31 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 check(current())
                 if (operation in setOf(DoIpDirectRead.Operation.INVENTORY, DoIpDirectRead.Operation.OBD_INVENTORY)) {
                     val addresses = DoIpDirectRead.parseInventoryAddresses(didHex)
+                    fun renderInventory(rows: List<DoIpDirectRead.InventoryEntry>, total: Int, complete: Boolean): String {
+                        val title = localizedContext.getString(
+                            if (complete) R.string.cal_doip_inventory_result else R.string.cal_doip_inventory_progress,
+                            rows.count { it.vin != null }, total)
+                        return title + rows.joinToString("\n", prefix = "\n") { row ->
+                            if (row.vin == null) {
+                                val reason = when (row.failure) {
+                                    DoIpDirectRead.InventoryFailure.VIN_MISMATCH -> R.string.cal_doip_inventory_reason_vin
+                                    DoIpDirectRead.InventoryFailure.PROTOCOL_IDENTITY -> R.string.cal_doip_inventory_reason_protocol
+                                    DoIpDirectRead.InventoryFailure.NEGATIVE_RESPONSE -> R.string.cal_doip_inventory_reason_nrc
+                                    DoIpDirectRead.InventoryFailure.TIMEOUT -> R.string.cal_doip_inventory_reason_timeout
+                                    DoIpDirectRead.InventoryFailure.HEADER_NACK -> R.string.cal_doip_inventory_reason_header
+                                    DoIpDirectRead.InventoryFailure.ROUTING_DENIED -> R.string.cal_doip_inventory_reason_routing
+                                    DoIpDirectRead.InventoryFailure.DIAGNOSTIC_NACK -> R.string.cal_doip_inventory_reason_ack
+                                    DoIpDirectRead.InventoryFailure.COMMUNICATION, null -> R.string.cal_doip_inventory_reason_io
+                                }
+                                localizedContext.getString(R.string.cal_doip_inventory_unverified, row.ecu) +
+                                    " — " + localizedContext.getString(reason) +
+                                    (row.failureCode?.let { " (0x%02X)".format(java.util.Locale.ROOT, it) } ?: "")
+                            } else localizedContext.getString(R.string.cal_doip_inventory_verified, row.ecu, row.vin) +
+                                (row.protocolValue?.let { protocol -> "\n" + localizedContext.getString(
+                                    if (protocol == 1) R.string.cal_doip_inventory_obd_supported else R.string.cal_doip_inventory_obd_unknown,
+                                    row.ecu, protocol) } ?: "")
+                        }
+                    }
                     val rows = DoIpDirectRead.inventory(target, addresses, options, clientTls,
                         onTrace = { selected, trace ->
                             journalDoIpTrace(selected, trace, current)
@@ -1626,16 +1673,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                                     ("%04X ".format(selected.ecu) + doIpTraceLine(trace))).takeLast(128)) else state
                             }
                         }, onControlTrace = { trace -> journalDoIpControlTrace(trace, current) }, current = current,
-                        obd = operation == DoIpDirectRead.Operation.OBD_INVENTORY)
+                        obd = operation == DoIpDirectRead.Operation.OBD_INVENTORY,
+                        onProgress = { observed, total ->
+                            check(current())
+                            val partial = renderInventory(observed, total, false)
+                            _calibrationWorkspace.update { state ->
+                                if (current()) state.copy(doIpResult = partial) else state
+                            }
+                        })
                     if (!current()) return@launchEnhancedUdsRead
-                    val rendered = localizedContext.getString(R.string.cal_doip_inventory_result,
-                        rows.count { it.vin != null }, rows.size) + rows.joinToString("\n", prefix = "\n") { row ->
-                        if (row.vin == null) localizedContext.getString(R.string.cal_doip_inventory_unverified, row.ecu)
-                        else localizedContext.getString(R.string.cal_doip_inventory_verified, row.ecu, row.vin) +
-                            (row.protocolValue?.let { protocol -> "\n" + localizedContext.getString(
-                                if (protocol == 1) R.string.cal_doip_inventory_obd_supported else R.string.cal_doip_inventory_obd_unknown,
-                                row.ecu, protocol) } ?: "")
-                    }
+                    val rendered = renderInventory(rows, addresses.size, true)
                     _calibrationWorkspace.update { state -> if (current())
                         state.copy(doIpReading = false, doIpResult = rendered) else state }
                     if (current()) appendCanConsoleSystemEvent(localizedContext.getString(R.string.cal_doip_console_complete))
@@ -1866,13 +1913,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 if (current()) _calibrationWorkspace.update { it.copy(doIpReading = false) }
                 throw cancelled
             } catch (error: Exception) {
-                val tlsError = error is DoIpClientCertificateException || error is javax.net.ssl.SSLException
-                val resource = if (tlsError) R.string.cal_doip_tls_error else R.string.cal_doip_failed
-                if (current()) appendCanConsoleSystemEvent(localizedContext.getString(resource), succeeded = false)
+                val message = doIpFailureMessage(error, R.string.cal_doip_failed)
+                if (current()) appendCanConsoleSystemEvent(message, succeeded = false)
                 if (current()) _calibrationWorkspace.update {
-                    val error = localizedContext.getString(resource)
+                    val error = message
                     it.copy(doIpReading = false, doIpResult =
-                        if (operation == DoIpDirectRead.Operation.EXCHANGE && it.doIpResult.isNotBlank())
+                        if (operation in setOf(DoIpDirectRead.Operation.EXCHANGE,
+                            DoIpDirectRead.Operation.INVENTORY, DoIpDirectRead.Operation.OBD_INVENTORY) &&
+                            it.doIpResult.isNotBlank())
                             it.doIpResult + "\n" + error else error)
                 }
             }
@@ -2032,6 +2080,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         isJ2534MemoryReadAvailable = obdManager.isJ2534MemoryReadAvailable(),
                         j2534BridgeMessage = localizedContext.getString(R.string.vm_j2534_connected, result)
                     )
+                    _isStreamingLive.value = obdManager.isStandardObdReadAvailable()
                 } catch (cancelled: CancellationException) {
                     if (attempt == connectionAttemptGeneration) {
                         _calibrationWorkspace.value = _calibrationWorkspace.value.copy(isJ2534BridgeConnecting = false)
@@ -4486,6 +4535,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         return next
     }
     private var connectionAttemptJob: Job? = null
+    private var bluetoothDiscoveryJob: Job? = null
 
     private fun connectWithResult(
         connect: suspend () -> Result<AdapterCapabilities>,
@@ -4500,10 +4550,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         )
         invalidateFuelHistoryForConnectionChange()
         val previousAttempt = connectionAttemptJob
+        val previousDiscovery = bluetoothDiscoveryJob
+        previousDiscovery?.cancel()
         previousAttempt?.cancel()
         connectionAttemptJob = viewModelScope.launch {
             beginBusyOperation()
             try {
+                // Stop any previously requested BLE scan before opening the socket.
+                previousDiscovery?.join()
                 // A cancelled transport handshake may still be closing its
                 // socket. Wait for that cleanup before opening the replacement.
                 previousAttempt?.join()
@@ -4525,6 +4579,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             pendingUsbPermissionRetry = null
                             _adapter.value = capabilities
                             if (!discoveryOnly) {
+                                // A new explicitly selected connection begins
+                                // a new read-only live session, even after
+                                // account change or previous link loss.
+                                _isStreamingLive.value = obdManager.isStandardObdReadAvailable()
                                 rememberConnectionProfile(transport, capabilities, endpoint)
                                 refreshTopologyAndDefaults(runInitialScans = true)
                             }
@@ -4570,12 +4628,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun refreshPairedDevices() {
-        viewModelScope.launch {
+        if (bluetoothDiscoveryJob?.isActive == true || connectionAttemptJob?.isActive == true) return
+        val account = accountSessionGeneration
+        val connection = connectionAttemptGeneration
+        fun current() = account == accountSessionGeneration && connection == connectionAttemptGeneration
+        // Use LAZY so the handle is installed before a fast completion.
+        val job = viewModelScope.launch(start = CoroutineStart.LAZY) {
             try {
-                _pairedDevices.value = obdManager.getPairedDevices()
-                _usbDevices.value = obdManager.getUsbDevices()
+                val paired = withContext(Dispatchers.IO) { obdManager.getPairedDevices() }
+                val usb = withContext(Dispatchers.IO) { obdManager.getUsbDevices() }
+                if (!current()) return@launch
+                _pairedDevices.value = paired
+                _usbDevices.value = usb
                 val nearbyBle = obdManager.scanNearbyBleDevices()
-                _pairedDevices.value = (_pairedDevices.value + nearbyBle)
+                if (!current()) return@launch
+                _pairedDevices.value = (paired + nearbyBle)
                     .distinctBy { it.second }
                     .sortedByDescending {
                         it.first.contains("OBD", true) ||
@@ -4585,9 +4652,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
-                _connectionMessage.value = localizedContext.getString(R.string.msg_refresh_adapters_failed)
+                if (current()) _connectionMessage.value =
+                    localizedContext.getString(R.string.msg_refresh_adapters_failed)
             }
         }
+        bluetoothDiscoveryJob = job
+        job.start()
     }
 
     fun connectWifi(host: String, port: Int) {
@@ -4690,6 +4760,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val caps = obdManager.activateSimulatedAdapter(preset)
                 if (attempt != connectionAttemptGeneration) return@launch
                 _adapter.value = caps
+                _isStreamingLive.value = true
                 _connectionMessage.value = null
                 refreshTopologyAndDefaults()
             } catch (cancelled: CancellationException) {
@@ -5676,22 +5747,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 // flooding slower ELM327 adapters with every optional sensor on each refresh.
                 if (pidValue % 4 != activeTelemetryBatch) return null
                 if (batchEvidenceGeneration != liveEvidenceGeneration) return null
-                val response = obdManager.readMode01PidIfSupported(pidValue) ?: return null
+                val observations = obdManager.readMode01PidObservationsIfSupported(pidValue)
                 if (batchEvidenceGeneration != liveEvidenceGeneration) return null
-                if (response.equals("NO_SOCKET", ignoreCase = true) ||
-                    response.contains("UNABLE TO CONNECT", ignoreCase = true)) {
-                    throw ObdTransportDisconnectedException("Live OBD transport is disconnected")
-                }
                 // Generic live data may come from an explicitly selected
                 // secondary ECU even on a Camaro; fuel analysis has its own
-                // primary powertrain restriction.
-                val observation = liveSources.select(pidValue, CamaroUdsProtocol.parsePidObservations(response, pid))
+                // primary powertrain restriction. Only advertised responders
+                // may contribute when the transport knows their PID bitmaps.
+                val observation = liveSources.select(pidValue, observations)
                 lastReadResponder = observation?.responder
                 return observation?.bytes?.toIntArray()
             }
 
             while (currentCoroutineContext().isActive) {
-                if (_isStreamingLive.value) {
+                if (_isStreamingLive.value && connectionAttemptJob?.isActive != true) {
                     batchEvidenceGeneration = liveEvidenceGeneration
                     if (lastEvidenceGeneration != batchEvidenceGeneration) {
                         histories.clear()
@@ -5968,7 +6036,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         nextConnectionGeneration()
         val activeJobs = listOfNotNull(
             canMonitorJob, canRequestJob, detachedCanMonitorJob,
-            detachedCanRequestJob, connectionAttemptJob
+            detachedCanRequestJob, connectionAttemptJob, bluetoothDiscoveryJob
         )
             .distinct()
         canMonitorJob = null
@@ -5976,6 +6044,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         detachedCanMonitorJob = null
         detachedCanRequestJob = null
         connectionAttemptJob = null
+        bluetoothDiscoveryJob = null
         activeJobs.forEach(Job::cancel)
         consoleEventJournal.dispose()
         consoleEventJournalFailed = true

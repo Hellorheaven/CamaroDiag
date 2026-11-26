@@ -1055,14 +1055,18 @@ fun CalibrationWorkspaceScreen(
                         }
                         val matches = scope.vin == vehicle.vin.uppercase() &&
                             doIpTester.toIntOrNull(16) == scope.tester && doIpEcu.toIntOrNull(16) == scope.ecu
+                        if (!scope.canCapture()) {
+                            Text(stringResource(R.string.cal_doip_backup_limit),
+                                color = TextPrimary, fontSize = 12.sp)
+                        }
                         OutlinedButton(onClick = { pendingDoIpBackup = scope },
-                            enabled = targetReady && matches,
+                            enabled = targetReady && matches && scope.canCapture(),
                             modifier = Modifier.fillMaxWidth()) {
                             Text(stringResource(R.string.cal_doip_backup))
                         }
                     }
                     pendingDoIpBackup?.let { scope ->
-                        if (scope == state.doIpBackupScope && targetReady) {
+                        if (scope == state.doIpBackupScope && targetReady && scope.canCapture()) {
                             AlertDialog(onDismissRequest = { pendingDoIpBackup = null },
                                 title = { Text(stringResource(R.string.cal_doip_backup)) },
                                 text = { Text(stringResource(R.string.cal_doip_backup_confirm,
