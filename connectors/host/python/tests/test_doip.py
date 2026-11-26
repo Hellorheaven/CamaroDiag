@@ -332,7 +332,8 @@ class DoIpTests(unittest.TestCase):
             session.return_value.__exit__.side_effect = lambda *_: events.append("close")
             result = inventory_ecus(GATEWAY, VIN, 0x0E80, (0x1234, 0x1235), on_progress=progress)
         self.assertEqual(events, ["gateway", "close", "gateway", ("progress", 1, None),
-                                  "gateway", "close", "gateway", ("progress", 2, "timeout")])
+                                  "gateway", "close", "gateway", ("progress", 2, "timeout"),
+                                  "gateway"])
         self.assertEqual(result["targets"][0]["status"], "vin_verified")
         self.assertEqual(result["targets"][1]["reason"], "timeout")
 
