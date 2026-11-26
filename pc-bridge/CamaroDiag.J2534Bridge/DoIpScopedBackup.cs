@@ -47,20 +47,45 @@ internal sealed record DoIpBackupScope(string Vin, ushort Gateway, ushort Tester
 
 internal static class DoIpScopedBackup
 {
+    internal const int MaximumBlocksPerPass = 8192;
+    internal static readonly TimeSpan MaximumCaptureDuration = TimeSpan.FromMinutes(10);
+
     internal sealed record Capture(DoIpBackupScope Scope, byte[] First, byte[] Second, string Sha256);
+
+    internal static void ValidateCaptureBudget(DoIpBackupScope scope)
+    {
+        scope.Validate();
+        if (((long)scope.Length + scope.BlockSize - 1) / scope.BlockSize > MaximumBlocksPerPass)
+            throw new InvalidDataException("DoIP memory scope exceeds the maximum number of blocks per pass.");
+    }
 
     internal static async Task<Capture> ReadAsync(DoIpDiagnosticTransport link, DoIpBackupScope scope,
         TimeSpan timeout, CancellationToken token, Action<int, int>? progress = null)
     {
-        scope.Validate();
+        ValidateCaptureBudget(scope);
         if (!link.MatchesLogicalTarget(scope.Gateway, scope.Tester, scope.Ecu))
             throw new UnauthorizedAccessException("Active DoIP channel differs from the backup scope.");
+        using var budget = CancellationTokenSource.CreateLinkedTokenSource(token);
+        budget.CancelAfter(MaximumCaptureDuration);
+        var captureToken = budget.Token;
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+
+        void CheckBudget()
+        {
+            token.ThrowIfCancellationRequested();
+            if (clock.Elapsed >= MaximumCaptureDuration || budget.IsCancellationRequested)
+                throw new TimeoutException("DoIP memory capture exceeded its overall deadline.");
+        }
+
         async Task VerifyIdentity()
         {
-            var vin = await DoIpVinReader.ReadAsync(link, timeout, token);
+            CheckBudget();
+            var vin = await DoIpVinReader.ReadAsync(link, timeout, captureToken);
+            CheckBudget();
             if (!string.Equals(vin, scope.Vin, StringComparison.Ordinal))
                 throw new UnauthorizedAccessException("Live DoIP VIN does not match the approved profile.");
-            var identity = await DoIpVinReader.ReadDidAsync(link, scope.IdentityDid, timeout, token);
+            var identity = await DoIpVinReader.ReadDidAsync(link, scope.IdentityDid, timeout, captureToken);
+            CheckBudget();
             if (!string.Equals(Convert.ToHexString(identity), scope.IdentityHex, StringComparison.OrdinalIgnoreCase))
                 throw new UnauthorizedAccessException("Live DoIP ECU identity does not match the approved profile.");
         }
@@ -72,30 +97,43 @@ internal static class DoIpScopedBackup
             var blocks = 0;
             while (offset < data.Length)
             {
-                token.ThrowIfCancellationRequested();
-                if (blocks > 0 && blocks % 32 == 0) await VerifyIdentity();
+                CheckBudget();
                 var count = Math.Min(scope.BlockSize, data.Length - offset);
                 var address = checked(scope.Start + (uint)offset);
                 var request = UdsStandardServices.ReadMemory(address, (uint)count, 4,
                     count > 255 ? (byte)2 : (byte)1);
-                var reply = await link.ExchangeUdsAsync(request, timeout, token);
-                token.ThrowIfCancellationRequested();
+                var reply = await link.ExchangeUdsAsync(request, timeout, captureToken);
+                CheckBudget();
                 NativeScopedMemoryReader.ParseReadResponse(reply, count).CopyTo(data, offset);
                 offset += count;
                 blocks++;
-                if (NativeScopedMemoryReader.ShouldReportProgress(blocks, offset, data.Length))
+                if (blocks % 32 == 0 || offset == data.Length)
+                {
+                    // Do not publish progress for a batch until the same ECU
+                    // has confirmed its identity after those memory reads.
+                    await VerifyIdentity();
                     progress?.Invoke(pass, offset);
+                    CheckBudget();
+                }
             }
             return data;
         }
+
         // No security unlock, session change, programming or automatic retry.
-        var first = await ReadPass(1);
-        var second = await ReadPass(2);
-        await VerifyIdentity();
-        token.ThrowIfCancellationRequested();
-        if (!CryptographicOperations.FixedTimeEquals(first, second))
-            throw new InvalidDataException("Independent DoIP memory reads differ; no backup can be published.");
-        return new Capture(scope, first, second, Convert.ToHexString(SHA256.HashData(first)));
+        try
+        {
+            var first = await ReadPass(1);
+            var second = await ReadPass(2);
+            await VerifyIdentity();
+            CheckBudget();
+            if (!CryptographicOperations.FixedTimeEquals(first, second))
+                throw new InvalidDataException("Independent DoIP memory reads differ; no backup can be published.");
+            return new Capture(scope, first, second, Convert.ToHexString(SHA256.HashData(first)));
+        }
+        catch (OperationCanceledException) when (!token.IsCancellationRequested && budget.IsCancellationRequested)
+        {
+            throw new TimeoutException("DoIP memory capture exceeded its overall deadline.");
+        }
     }
 
     internal static async Task<Capture> ReadObservedAsync(DoIpVehicleDiscovery.Identity gateway,
@@ -104,7 +142,7 @@ internal static class DoIpScopedBackup
         Action<DoIpDiagnosticTransport.PduTrace>? trace = null,
         DoIpDiagnosticTransport.SessionOptions? options = null)
     {
-        scope.Validate();
+        ValidateCaptureBudget(scope);
         if (!gateway.Source.Equals(address) || gateway.LogicalAddress != scope.Gateway ||
             (gateway.Vin is not null && gateway.Vin != scope.Vin))
             throw new UnauthorizedAccessException("Discovered DoIP gateway differs from the backup profile.");
