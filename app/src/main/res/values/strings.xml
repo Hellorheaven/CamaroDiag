@@ -1301,4 +1301,9 @@
     <string name="functional_clear_warning">This can erase emissions faults, freeze-frame data and readiness. Export original evidence first. Follow the manufacturer’s procedure with the vehicle stationary and engine stopped. Never conceal an unresolved fault. No automatic retry.</string>
     <string name="functional_clear_confirm">Request one emissions diagnostic reset on vehicle %1$s?</string>
     <string name="functional_clear_uncertain">Mode 04 campaign interrupted or failed. Reset state may be uncertain; do not repeat automatically.</string>
+    <string name="functional_legacy_pwm_candidates">Candidate: older Ford Mustang (1996–2004, verify engine and market). The 2023 Mach-E is not a PWM candidate.</string>
+    <string name="functional_legacy_vpw_candidates">Candidate: fourth-generation Camaro, for example a 1998 Z28; verify the actual ECU protocol.</string>
+    <string name="functional_legacy_iso9141_candidates">Candidate: early-2000s Toyota or Honda gasoline vehicle with confirmed ISO 9141-2 OBD support.</string>
+    <string name="functional_legacy_kwp_candidates">Candidate: early-2000s European gasoline vehicle with confirmed ISO 14230-4 emissions diagnostics. K-Line alone does not prove J1979 support.</string>
+    <string name="functional_legacy_route_required">Connect a compatible ELM adapter on the selected legacy protocol. No automatic protocol switching. Read-only; anonymous identity fragments are not a verified ECU VIN.</string>
 </resources>
