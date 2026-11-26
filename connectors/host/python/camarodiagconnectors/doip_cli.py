@@ -554,7 +554,9 @@ def _run(argv: Sequence[str] | None, resources: ExitStack,
                                    "partial": True, "complete": False}}),
                       file=sys.stderr, flush=True)
                 sequence_progress["commands_completed"] = index
-            replies = session.exchange_sequence(commands, on_reply)
+            # Recheck ECU F190 under the same exclusive lock used for every
+            # approved command. An earlier VIN read alone leaves a race window.
+            replies = session.exchange_sequence(commands, on_reply, expected_vin=o.vin)
             return result | {"responses": [reply.hex().upper() for reply in replies],
                              "commands_completed": len(replies)}
         if scope is not None:
