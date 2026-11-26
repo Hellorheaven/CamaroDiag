@@ -244,6 +244,38 @@ class Obd2FeatureEngineTest {
     }
 
     @Test
+    fun mode09InventoryAcceptsExactEchoAndPreservesRawEvidence() = runBlocking {
+        val report = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+            when (command) {
+                "0100" -> "410000000000"
+                "0900" -> "09 00\r490001000000\r>"
+                "0908" -> "0908\r49080100010002\r>"
+                else -> "NO DATA"
+            }
+        }).fullReadOnlyScan()
+        assertEquals(setOf(8), report.vehicleInfoSupportedTypes)
+        assertEquals(true, report.vehicleInfoSupportComplete)
+        val read = report.vehicleInfoReads.single { it.infoType == 8 }
+        assertEquals(listOf(0x49, 8, 1, 0, 1, 0, 2), read.positiveRecords.single())
+        assertTrue(read.rawResponse.startsWith("0908"))
+    }
+
+    @Test
+    fun mode09MixedMalformedResponderCannotCertifyCompleteInventory() = runBlocking {
+        val report = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+            when (command) {
+                "0100" -> "410000000000"
+                "0900" -> "490001000000\r490080"
+                "0908" -> "49080100010002"
+                else -> "NO DATA"
+            }
+        }).fullReadOnlyScan()
+        assertEquals(setOf(8), report.vehicleInfoSupportedTypes)
+        assertEquals(false, report.vehicleInfoSupportComplete)
+        assertEquals(1, report.vehicleInfoReads.first().positiveRecords.size)
+    }
+
+    @Test
     fun mode09MissingContinuationIsNotACompleteInventory() = runBlocking {
         val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
             when (command) {
