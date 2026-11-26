@@ -4,6 +4,6 @@ Uniquement le prototype ESP32-S3 binaire isolé. Aucun J2534, CAN réel ni flash
 
 ## Native CU/1 read campaign (development only)
 
-`WindowsDiscovery --j1979-usb --port COM5 --key-file <32-byte-provisioned-key> --tx <hex> --rx <hex> --budget-ms 60000 --vehicle <label> --ecu <label> --connector <profile> --capture <new.cj> --output <new.json>` (add `--extended` only for a documented 29-bit pair). Requires interactive approval and qualified hardware/firmware. No discovery fallback, no mutating commands. The JSON is a frame-level report, not full semantic or physical verification; inspect the raw capture independently with the Python CJ/1 decoder.
+`WindowsDiscovery --j1979-usb --port COM5 --key-file <32-byte-provisioned-key> --tx <hex> --rx <hex> --budget-ms 60000 --vehicle <label> --ecu <label> --connector <profile> --capture <new.cj> --output <new.json>` (add `--extended` only for a documented 29-bit pair). Requires interactive approval and qualified hardware/firmware. No discovery fallback, no mutating commands. The JSON includes independent frame and semantic campaign checks, observed VIN, per-step raw evidence and summary. Physical provenance is not established; the Python CJ/1 decoder can independently inspect the raw capture.
 
 Recette distincte en lecture seule, port COM explicite, clé provisionnée hors session, fichiers exclusifs. Pas de support sur le firmware de découverte.

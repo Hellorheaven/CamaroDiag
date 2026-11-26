@@ -1,3 +1,7 @@
+## J1979 — export JSON natif détaillé Android/Windows (26/11/2026)
+
+- Raccordement des validateurs natifs aux exports : étapes, requêtes/réponses brutes, VIN observé, durée, résumé, flags et état d'intégrité sémantique. Code retour Windows succès seulement pour une campagne COMPLETE cohérente ; Android expose également captureIntegrityVerified et campaignComplete. Données partielles conservées, signature/provenance physique non déduites. Source Kotlin canonique modifiée depuis son blob exact. Aucun test exécuté ni CI ; J1979/C6 ouverts, aucun merge/Release.
+
 ## J1979 — validation sémantique des campagnes Java/.NET (26/11/2026)
 
 - Moteurs natifs indépendants : allowlist lecture, classification exacte PID/DTC/moniteurs/VIN, tailles et réponses négatives terminales, rejeu ordre/bitmaps/membres, cohérence flags et raison d'arrêt. Captures incohérentes gardent les observations valides sans validation intégrale. Tests de résumé falsifié et étapes manquantes écrits, non exécutés. Raccordement JSON détaillé reste à faire ; J1979/C6 ouverts, aucune CI ni fusion/Release.

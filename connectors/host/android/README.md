@@ -8,6 +8,6 @@ CI : tests Java portables, compilation contre Android SDK 35. Aucun test réel s
 
 ## Native J1979 CU/1 (development / développement)
 
-The communication module compiles the same Java sources. `CamaroDiagConnectorNativeCampaign.run` accepts an explicitly selected USB device/CDC interfaces, approved generation, documented physical CAN pair and locally provisioned credential; it preserves raw CJ/1 and a separate JSON frame report in a private directory. Not connected to the functional-test screen yet. Do not run against discovery firmware; frame integrity does not establish semantic campaign completion or physical vehicle provenance.
+The communication module compiles the same Java sources. `CamaroDiagConnectorNativeCampaign.run` accepts an explicitly selected USB device/CDC interfaces, approved generation, documented physical CAN pair and locally provisioned credential; it preserves raw CJ/1 and a separate JSON diagnostic report in a private directory. Not connected to the functional-test screen yet. Do not run against discovery firmware; frame integrity alone is insufficient; the report separately verifies campaign semantics and never asserts physical vehicle provenance.
 
 Le module communication réutilise ces sources ; l'entrée de campagne native conserve le flux brut et un JSON distinct. L'écran de recette reste à raccorder. Uniquement avec une carte et un firmware qualifiés.
