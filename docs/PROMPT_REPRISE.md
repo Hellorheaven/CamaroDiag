@@ -1,3 +1,7 @@
+## PR117 — masques DTC structurés Connectors DoIP (26/11/2026)
+
+- C6/DoIP : les opérations 19/01 et 19/02 UDS/OBDonUDS des Connectors retournent le masque effectif et la disponibilité du filtre ; les listes 19/02 exposent en plus les identifiants des bits d'état normalisés, sans perdre l'octet brut. Filtre vide distinct d'un résultat sans défaut sur un filtre disponible, masques invalides refusés avant émission. Documentation CLI FR/EN et régressions écrites, non exécutées. Aucun checkpoint.
+
 ## PR117 — interprétation DTC DoIP Windows (26/11/2026)
 
 - Console Windows : interprétation des huit bits d'état ISO 14229, filtrée par le masque de disponibilité réellement retourné. Le code DTC 24 bits et l'octet d'état brut restent affichés. Les rapports 19/02 indiquent le masque effectif ; aucun bit disponible ne signifie pas absence de défaut. Inventaires supportés/permanents et WWH affichent aussi les états disponibles sans inventer les définitions OEM. Ressources FR/EN et régressions écrites, non exécutées. Aucun checkpoint.

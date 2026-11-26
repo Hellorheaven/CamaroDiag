@@ -82,6 +82,10 @@ Exemples fictifs, à remplacer par les données de la passerelle et du calculate
 
 ### DTC et monitoring multi-DID / DTCs and multi-DID monitoring
 
+Les commandes `dtcs`, `obd-dtcs`, `count` et `obd-count` indiquent `effective_mask` (masque demandé intersecté avec le masque disponible) et `filter_available`. Un filtre indisponible ne permet pas de conclure à l'absence de défaut. Les DTC listés incluent les identifiants normalisés `status_flags` en plus de l'état brut ; ils ne remplacent pas les définitions constructeur.
+
+The `dtcs`, `obd-dtcs`, `count` and `obd-count` commands include `effective_mask` (requested AND available mask) and `filter_available`. An unavailable filter cannot establish absence of faults. Listed DTCs include standard `status_flags` identifiers alongside the raw status; these are not OEM fault descriptions.
+
 ```bash
 python -m camarodiagconnectors.doip_cli --host 192.0.2.10 --vin 1G1FA1RXXR0123456 --tester 0E80 --ecu 1234 supported-dtcs
 python -m camarodiagconnectors.doip_cli --host 192.0.2.10 --vin 1G1FA1RXXR0123456 --tester 0E80 --ecu 1234 permanent-dtcs

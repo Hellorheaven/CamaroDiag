@@ -31,6 +31,20 @@ class NegativeResponse(DoIpError):
         super().__init__(f"UDS NRC {service:02X}/{code:02X}")
 
 
+def dtc_status_flags(status: int, availability: int) -> list[str]:
+    """ISO 14229 status bit identifiers, not manufacturer DTC definitions."""
+    names = ("test_failed", "test_failed_this_operation_cycle", "pending_dtc", "confirmed_dtc",
+             "test_not_completed_since_last_clear", "test_failed_since_last_clear",
+             "test_not_completed_this_operation_cycle", "warning_indicator_requested")
+    return [name for bit, name in enumerate(names) if status & availability & (1 << bit)]
+
+
+def dtc_filter(mask: int, availability: int) -> dict:
+    effective = mask & availability
+    return {"requested_mask": mask, "availability_mask": availability,
+            "effective_mask": effective, "filter_available": bool(effective)}
+
+
 def valid_vin(vin: str) -> bool:
     return bool(re.fullmatch(r"[A-HJ-NPR-Z0-9]{17}", vin))
 
@@ -1456,14 +1470,18 @@ class Session:
             raise
 
     def dtc_count(self, mask: int) -> dict:
+        if type(mask) is not int or not 0 <= mask <= 255:
+            raise DoIpError("Invalid DTC mask")
         reply = self.exchange(bytes((0x19, 1, mask)))
         if len(reply) != 6:
             self.close()
             raise DoIpError("Invalid DTC count response")
-        return {"requested_mask": mask, "availability_mask": reply[2],
-                "format": reply[3], "count": int.from_bytes(reply[4:], "big")}
+        return dtc_filter(mask, reply[2]) | {
+            "format": reply[3], "count": int.from_bytes(reply[4:], "big")}
 
     def dtcs(self, mask: int) -> dict:
+        if type(mask) is not int or not 0 <= mask <= 255:
+            raise DoIpError("Invalid DTC mask")
         reply = self.exchange(bytes((0x19, 2, mask)))
         if len(reply) < 3 or (len(reply) - 3) % 4:
             self.close()
@@ -1475,7 +1493,9 @@ class Session:
                 not x["status"] & mask & available or x["status"] & ~available for x in records):
             self.close()
             raise DoIpError("Uncorrelated DTC status")
-        return {"requested_mask": mask, "availability_mask": available, "records": records}
+        for row in records:
+            row["status_flags"] = dtc_status_flags(row["status"], available)
+        return dtc_filter(mask, available) | {"records": records}
 
     def wwh_dtcs(self, expected: str, subfunction: int, *, status_mask: int = 255,
                  severity_mask: int = 255, readiness_group: int | None = None) -> dict:

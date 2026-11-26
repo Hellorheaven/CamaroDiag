@@ -38,6 +38,37 @@ def receive(sock):
 
 
 class DoIpTests(unittest.TestCase):
+    def test_dtc_status_mask_and_flags_are_observed_not_assumed(self):
+        fake = unittest.mock.Mock(spec=Session)
+        fake.exchange.return_value = bytes.fromhex("59020F1234560D")
+        result = Session.dtcs(fake, 0x05)
+        self.assertEqual(result["effective_mask"], 0x05)
+        self.assertTrue(result["filter_available"])
+        self.assertEqual(result["records"], [{"dtc": "123456", "status": 0x0D,
+            "status_flags": ["test_failed", "pending_dtc", "confirmed_dtc"]}])
+        fake.exchange.assert_called_once_with(bytes.fromhex("190205"))
+        fake.reset_mock()
+        fake.exchange.return_value = bytes.fromhex("590201")
+        result = Session.dtcs(fake, 0x80)
+        self.assertEqual(result["records"], [])
+        self.assertFalse(result["filter_available"])
+        self.assertEqual(result["effective_mask"], 0)
+        fake.exchange.return_value = bytes.fromhex("590101040000")
+        count = Session.dtc_count(fake, 0x80)
+        self.assertFalse(count["filter_available"])
+        self.assertEqual(count["count"], 0)
+        fake.exchange.return_value = bytes.fromhex("59020112345681")
+        with self.assertRaises(DoIpError):
+            Session.dtcs(fake, 0xFF)
+        fake.close.assert_called_once()
+        fake.reset_mock()
+        for invalid in (-1, 256, True):
+            with self.assertRaises(DoIpError):
+                Session.dtcs(fake, invalid)
+            with self.assertRaises(DoIpError):
+                Session.dtc_count(fake, invalid)
+        fake.exchange.assert_not_called()
+
     def test_cli_monitor_reports_verified_route_and_incomplete_capture(self):
         for action in ("monitor", "obd-monitor-dids"):
             for failure in ("none", "second_sample", "close"):
