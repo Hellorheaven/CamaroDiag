@@ -1,3 +1,9 @@
+## Méthode de développement — lots quadruplés (26/11/2026)
+
+- **Décision propriétaire 26/11/2026 — quadrupler la taille des lots de développement.** Viser un volume fonctionnel environ quatre fois supérieur aux reprises récentes, en enchaînant les implémentations de bout en bout (transport, logique, interfaces, exports, erreurs, tests écrits et documentation) tant que les capacités de la session le permettent. Ne pas s'arrêter à un nombre prédéfini de commits ou de lignes ; ne pas gonfler artificiellement le volume, ne pas fragmenter un changement cohérent, ne pas différer un travail réalisable. Publier les modifications réellement réalisées et indiquer les limites effectives si l'objectif n'est pas atteint. Respecter la PR unique, un chantier et un protocole actifs, les protections et consentements, et l'interdiction de lancer des validations intermédiaires. Aucun merge ni Release sans accord.
+
+C6 et SAE J1979 restent les deux périmètres actifs ; DoIP terminé logiciellement, C8 dernier. Priorité à l'intégration des fonctionnalités applicables plutôt qu'aux comptes de commits. Cette modification fixe la consigne de reprise ; elle ne constitue pas une implémentation fonctionnelle ni une validation.
+
 ## C6 — identité des fichiers de récupération SAF mis en cache (26/11/2026)
 
 - L'inspection Android contrôle désormais les identités de fichiers/répertoires privés quand le système expose fileKey, en plus des inventaires et SHA-256 existants ; refuse les remplacements même à octets identiques, les alias connus et les types inattendus. Contrôle avant copie, autour des relectures et avant nettoyage ; si le root a changé, ne pas effacer le substitut. Limite : fileKey peut être absent, SAF n'offre pas un instantané atomique et ces vérifications ne constituent pas une preuve matérielle. Régression écrite non exécutée. C6/J1979 ouverts, aucune CI intermédiaire, fusion ou Release.
