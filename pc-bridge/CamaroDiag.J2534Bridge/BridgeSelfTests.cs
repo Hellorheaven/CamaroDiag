@@ -418,6 +418,10 @@ internal static class BridgeSelfTests
 
         Assert(StandardObdPhysicalPolicy.AllowsRead([2,2,0]), "Standard freeze-frame DTC request");
         Assert(StandardObdPhysicalPolicy.AllowsRead([6,0]), "Standard Mode 06 supported monitor query");
+        Assert(StandardObdPhysicalPolicy.AllowsRead([8,0]), "Mode 08 control-test inventory");
+        Assert(StandardObdPhysicalPolicy.AllowsRead([8,0xE0]), "Mode 08 continuation inventory");
+        Assert(!StandardObdPhysicalPolicy.AllowsRead([8,1]), "Mode 08 actuation is not a read");
+        Assert(!StandardObdPhysicalPolicy.AllowsRead([8,0,0]), "Malformed Mode 08 inventory rejected");
         Assert(StandardObdPhysicalPolicy.AllowsRead([9,0]), "Mode 09 information inventory");
         Assert(StandardObdPhysicalPolicy.AllowsRead([9,8]), "Mode 09 advertised information read");
         Assert(!StandardObdPhysicalPolicy.AllowsRead([9,8,0]), "Malformed Mode 09 rejected");
