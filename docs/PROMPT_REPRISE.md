@@ -1,3 +1,13 @@
+## J1979 — Modes 04 et 08 (26/11/2026)
+
+- Mode 04 : réutilisation du parcours existant avec double consentement. ELM : ACK strict 44, gestion des en-têtes CAN/DLC et bourrage nul, puis relecture 03/07/0A dans une seule réservation de session. J2534 : même réservation de session pendant la commande autorisée et sa relecture. L'IHM ne supprime plus arbitrairement des défauts sur simple ACK ; conserve modes indisponibles et autres calculateurs, affiche les nombres réellement relus (FR/EN). Aucun retry d'effacement. Un ACK fonctionnel ne prouve pas tous les calculateurs. En cas de perte de connexion pendant la relecture, l'état reste incertain : ne pas renvoyer 04 automatiquement. Les confirmations, droits du pont et protections existants sont conservés. Le scénario de recette mutatrice avec export individuel reste à raccorder.
+- Mode 08 : découverte seule des bitmaps TID sur CAN et legacy identifié (ISO 15031-5:2006, §6.8 et §7.8 ; https://studylib.net/doc/25827573/iso-15031-5-2006). Android, canal physique J2534, politique du pont Windows, Scan OBD FR/EN et export JSON. Recette J1979 distingue inventaire vérifié et exécution de commande (toujours NOT_TESTED). Aucun actionnement automatique ; l'exécution dédiée consentie et sa preuve restent à implémenter. Aucun support ECU particulier déduit d'un bitmap anonyme.
+- Régressions Android et Windows écrites, non exécutées ; pas de CI de clôture tant que le périmètre reste incomplet. C6 n'a pas reçu de nouveau développement indépendant dans cette session. DoIP reste terminé logiciellement ; J1979 et C6 ouverts. C8 dernier, pas de Release ni fusion.
+
+## J1979 — Modes 05 et 06 legacy (26/11/2026)
+
+- Les commits de la session précédente (jusqu'à `0ea9a8d`) ajoutent les lecteurs de tests lambda et moniteurs legacy selon protocole ELM négocié, intégration scan/JSON/recette, tests non exécutés. Vérifier la conformité exacte et la couverture des variantes lors de la clôture J1979.
+
 ## SAE J1979 / C6 — preuves Mode 09 et inspection finale (26/11/2026)
 
 - J1979 Android : l'inventaire Mode 09 accepte l'écho exact de la commande (espaces et casse compris), conserve les réponses brutes et n'annonce plus une découverte complète lorsqu'une page mélange un bitmap valide et une réponse mal formée ou étrangère. Les types positivement annoncés restent consultables. Commits `4e72a56`, `0c2cbce` : code et deux régressions écrites, non exécutées.
