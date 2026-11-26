@@ -31,6 +31,11 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.camarodiag.gen5.R
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.LaunchedEffect
+import com.camarodiag.gen5.data.obd.EcuWriteConsentFlow
+import com.camarodiag.gen5.domain.model.VehicleProfile
 
 @Composable
 fun FunctionalTestsScreen(
@@ -38,7 +43,11 @@ fun FunctionalTestsScreen(
     onRunAll: () -> Unit,
     onStop: () -> Unit,
     onExport: () -> Unit,
-    onRunProtocol: (FunctionalProtocol, DoIpFunctionalTarget?) -> Unit
+    onRunProtocol: (FunctionalProtocol, DoIpFunctionalTarget?) -> Unit,
+    vehicle: VehicleProfile,
+    connectionGeneration: Long,
+    evapAvailable: Boolean,
+    onRunEvap: (EcuWriteConsentFlow.Approval, Long, VehicleProfile) -> Unit
 ) {
     var selected by remember { mutableStateOf(FunctionalProtocol.J1979) }
     var expanded by remember { mutableStateOf(false) }
@@ -48,6 +57,40 @@ fun FunctionalTestsScreen(
     var vin by remember { mutableStateOf("") }
     var tls by remember { mutableStateOf(true) }
     var physical by remember { mutableStateOf(false) }
+    var evapConfirmedProfile by remember { mutableStateOf(false) }
+    var evapPending by remember { mutableStateOf<Pair<Long, VehicleProfile>?>(null) }
+    var evapStep by remember { mutableStateOf(EcuWriteConsentFlow.Step.WARNING) }
+    LaunchedEffect(vehicle, connectionGeneration, evapAvailable) {
+        evapPending = null
+        evapConfirmedProfile = false
+        evapStep = EcuWriteConsentFlow.Step.WARNING
+    }
+    evapPending?.let { (epoch, profile) ->
+        val warning = evapStep == EcuWriteConsentFlow.Step.WARNING
+        AlertDialog(onDismissRequest = { evapPending = null; evapConfirmedProfile = false },
+            title = { Text(stringResource(R.string.functional_evap_run)) },
+            text = { Text(if (warning) stringResource(R.string.functional_evap_warning)
+                else stringResource(R.string.functional_evap_confirm, profile.vin)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    if (epoch != connectionGeneration || profile != vehicle || !evapAvailable) {
+                        evapPending = null
+                    } else if (warning) {
+                        evapStep = EcuWriteConsentFlow.afterWarningOk(evapStep)
+                    } else {
+                        EcuWriteConsentFlow.approvalForContext(evapStep, true, epoch,
+                            connectionGeneration, profile == vehicle)?.let { onRunEvap(it, epoch, profile) }
+                        evapPending = null
+                        evapConfirmedProfile = false
+                    }
+                }) { Text(stringResource(if (warning) R.string.functional_evap_ok else R.string.functional_evap_yes)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { evapPending = null; evapConfirmedProfile = false }) {
+                    Text(stringResource(if (warning) R.string.functional_evap_cancel else R.string.functional_evap_no))
+                }
+            })
+    }
     val doIp = DoIpFunctionalTarget(host.trim(), tester, ecu, vin, tls, physical)
     val fr = LocalConfiguration.current.locales[0].language == "fr"
     val passed = state.checks.count { it.outcome == FunctionalTestOutcome.PASSED }
@@ -103,7 +146,25 @@ fun FunctionalTestsScreen(
                     modifier = Modifier.fillMaxWidth()) {
                     Text(stringResource(R.string.functional_protocol_run))
                 }
+                if (selected == FunctionalProtocol.J1979) {
+                    Text(stringResource(R.string.functional_evap_scope), style = MaterialTheme.typography.bodySmall)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(evapConfirmedProfile, { evapConfirmedProfile = it },
+                            enabled = evapAvailable && !state.running)
+                        Text(stringResource(R.string.functional_evap_profile, vehicle.vin))
+                    }
+                    OutlinedButton(onClick = {
+                        evapStep = EcuWriteConsentFlow.Step.WARNING
+                        evapPending = connectionGeneration to vehicle
+                    }, enabled = evapAvailable && !state.running && evapConfirmedProfile &&
+                        vehicle.vin.matches(Regex("[A-HJ-NPR-Z0-9]{17}")),
+                        modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(R.string.functional_evap_run))
+                    }
+                }
                 state.protocol?.let { Text(stringResource(R.string.functional_protocol_report, it.title)) }
+                if (state.evapCampaign) Text(stringResource(R.string.functional_evap_run))
+                state.evapResult?.reason?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                     Button(onClick = onRunAll, enabled = !state.running) {
                         Text(stringResource(R.string.functional_tests_run))
