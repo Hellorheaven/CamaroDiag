@@ -81,6 +81,96 @@ def _exact(stream, size):
     return bytes(chunks)
 
 
+def _verify_campaign(steps, end, flags):
+    """Replay the exact read-only campaign plan, including advertised members.
+
+    Integrity means consistent recorded evidence, not successful measurements,
+    hardware provenance, or an authenticated capture.
+    """
+    index = 0
+    computed = 0
+    stopped = None
+
+    def read(req):
+        nonlocal index, stopped
+        if stopped:
+            return None
+        if index == len(steps):
+            stopped = "MISSING"
+            return None
+        row = steps[index]
+        if row["request_hex"] != req.hex().upper():
+            raise ValueError("Unexpected campaign request or order")
+        index += 1
+        if row["status"] == "FAILED":
+            stopped = "LINK_FAULT"
+        return bytes.fromhex(row["response_hex"]) if row["status"] == "PASSED" else None
+
+    initial = read(b"\x01\x00")
+    if initial is not None:
+        computed |= 1
+        read(b"\x09\x02")
+        for mode in (3, 7, 10):
+            read(bytes((mode,)))
+
+        def inventory(mode, cached=False, members=True):
+            offset = 3 if mode == 2 else 2
+            for base in range(0, 0xE1, 32):
+                if stopped:
+                    return False
+                suffix = b"\x00" if mode == 2 else b""
+                bitmap = initial[2:] if cached and base == 0 else None
+                if bitmap is None:
+                    response = read(bytes((mode, base)) + suffix)
+                    if response is None:
+                        return False
+                    bitmap = response[offset:]
+                if members:
+                    for bit in range(31):
+                        if stopped:
+                            return False
+                        if not bitmap[bit // 8] & (0x80 >> (bit % 8)):
+                            continue
+                        pid = base + bit + 1
+                        if mode in (2, 9) and pid == 2:
+                            continue
+                        read(bytes((mode, pid)) + suffix)
+                if not bitmap[3] & 1:
+                    return not stopped
+            return False
+
+        if inventory(1, cached=True):
+            computed |= 2
+        trigger = read(b"\x02\x02\x00")
+        if trigger is not None:
+            computed |= 4
+            if any(trigger[3:5]):
+                computed |= 8
+                if inventory(2):
+                    computed |= 16
+        if inventory(6):
+            computed |= 32
+        if inventory(8, members=False):
+            computed |= 64
+        if inventory(9):
+            computed |= 128
+
+    if index != len(steps):
+        raise ValueError("Unexpected records after campaign stopped")
+    if stopped == "LINK_FAULT":
+        expected_end = 4
+    elif stopped == "MISSING":
+        # Zero observations can also indicate the link disappeared before
+        # the campaign's first exchange, after the start record was emitted.
+        expected_end = 4 if not steps and end == 4 else 3
+    elif initial is None:
+        expected_end = 2
+    else:
+        expected_end = 1
+    if end != expected_end or flags != computed:
+        raise ValueError("Campaign summary inconsistent with recorded steps")
+
+
 def decode(stream):
     """Consume one capture, preserving verified prefix on corruption/truncation."""
     report = {"schema": "camarodiag-functional-j1979-embedded-evidence-v1",
@@ -148,6 +238,7 @@ def decode(stream):
                 raise ValueError("Transport observation inconsistent")
             if (flags & 8 and not flags & 4) or (flags & 16 and not flags & 8):
                 raise ValueError("Freeze-frame flags inconsistent")
+            _verify_campaign(report["steps"], end, flags)
             if stream.read(1):
                 raise ValueError("Trailing evidence after summary")
             report["summary"] = {"end": _END[end], "steps": steps, "counts": counts,

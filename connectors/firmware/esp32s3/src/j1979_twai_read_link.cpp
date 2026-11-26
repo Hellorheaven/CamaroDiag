@@ -19,26 +19,31 @@ bool TwaiJ1979ReadLink::snapshot(twai_status_info_t& status){
 }
 bool TwaiJ1979ReadLink::noLoss(const twai_status_info_t& status)const{
   return baseline_&&status.rx_missed_count==missed_&&status.rx_overrun_count==overrun_&&
-    status.tx_failed_count==failed_;
+    status.tx_failed_count==failed_&&status.bus_error_count==busErrors_;
 }
 bool TwaiJ1979ReadLink::active(){
   twai_status_info_t status{};
-  return snapshot(status)&&(!baseline_||noLoss(status));
+  return (snapshot(status)&&(!baseline_||noLoss(status)))||fail();
 }
 uint32_t TwaiJ1979ReadLink::monotonicMs(){
   return static_cast<uint32_t>(esp_timer_get_time()/1000);
 }
 bool TwaiJ1979ReadLink::discardReceive(){
-  baseline_=false;
   twai_status_info_t status{};
+  // Keep the original loss counters throughout this exclusive campaign.
+  // Rebaselining for each request would hide an error between exchanges.
   // Caller owns the entire channel, including alerts and TX/RX queues.
-  if(!snapshot(status)||status.msgs_to_tx!=0||twai_clear_receive_queue()!=ESP_OK)return fail();
+  if(!snapshot(status)||(baseline_&&!noLoss(status))||status.msgs_to_tx!=0)return fail();
+  if(!baseline_){
+    missed_=status.rx_missed_count;overrun_=status.rx_overrun_count;
+    failed_=status.tx_failed_count;busErrors_=status.bus_error_count;
+    baseline_=true;
+  }
+  if(twai_clear_receive_queue()!=ESP_OK)return fail();
   uint32_t stale=0;
   const esp_err_t cleared=twai_read_alerts(&stale,0);
   if(cleared!=ESP_OK&&cleared!=ESP_ERR_TIMEOUT)return fail();
-  if((stale&failureAlerts)!=0||!snapshot(status)||status.msgs_to_tx!=0)return fail();
-  missed_=status.rx_missed_count;overrun_=status.rx_overrun_count;failed_=status.tx_failed_count;
-  baseline_=true;
+  if((stale&failureAlerts)!=0||!snapshot(status)||!noLoss(status)||status.msgs_to_tx!=0)return fail();
   return true;
 }
 bool TwaiJ1979ReadLink::send(const Frame& frame,uint32_t timeoutMs){

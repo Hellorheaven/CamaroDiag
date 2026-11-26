@@ -23,6 +23,6 @@ class TwaiJ1979ReadLink final : public J1979CanReadLink {
   Admission admission_;
   bool baseline_=false, faulted_=false;
   bool fail(){faulted_=true;return false;}
-  uint32_t missed_=0,overrun_=0,failed_=0;
+  uint32_t missed_=0,overrun_=0,failed_=0,busErrors_=0;
 };
 }

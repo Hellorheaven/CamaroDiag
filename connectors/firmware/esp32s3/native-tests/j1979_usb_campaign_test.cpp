@@ -6,15 +6,18 @@ using U=cd::J1979UsbCampaign;
 using Link=cd::J1979CanReadLink;
 struct Owner final:U::Owner{
   bool present=true,qualified=true,stable=true,stopped=true,detachOnStop=false;
+  bool recoveryOnStop=false,recovery=false;
   unsigned stops=0;
   cd::InterfaceEvidence currentEvidence(const U::Profile&)override{
     cd::InterfaceEvidence e;
     e.qualified=qualified;e.localConsent=true;e.authenticated=true;
     e.exactProfile=true;e.electricalStable=stable;e.diagnosticAllowlistEnforced=true;
+    e.recoveryPending=recovery;
     return e;
   }
   bool currentHost()override{return present;}
-  bool stopAndVerifyQuiescent()override{++stops;stable=false;if(detachOnStop)present=false;return stopped;}
+  bool stopAndVerifyQuiescent()override{++stops;stable=false;if(detachOnStop)present=false;
+    if(recoveryOnStop)recovery=true;return stopped;}
 };
 struct Bus final:Link{
   explicit Bus(Owner& o):owner(o){}
@@ -77,6 +80,9 @@ int main(){
   Owner revoked;revoked.detachOnStop=true;Bus revBus(revoked);Writer revWriter;
   assert(U::run(arbiter,revoked,revBus,revWriter,profile,scratch).outcome==U::Outcome::EvidenceLost);
   assert(revoked.stops==1&&!hasSummary(revWriter)&&!arbiter.recoveryRequired());
+  Owner recovery;recovery.recoveryOnStop=true;Bus recBus(recovery);Writer recWriter;
+  assert(U::run(arbiter,recovery,recBus,recWriter,profile,scratch).outcome==U::Outcome::EvidenceLost);
+  assert(recovery.stops==1&&!hasSummary(recWriter));
   Owner detached;Bus lost(detached);Writer prefix;lost.detachAfterSend=true;
   auto partial=U::run(arbiter,detached,lost,prefix,profile,scratch);
   assert(partial.outcome==U::Outcome::EvidenceLost&&lost.sends==1&&detached.stops==1);

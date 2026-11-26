@@ -1,3 +1,8 @@
+## J1979 / C6 — intégrité des campagnes CJ/1 et continuité TWAI (26/11/2026)
+
+- Hôte Python : relecture du plan exact de campagne embarquée depuis les observations et bitmaps, vérification indépendante de l'ordre, des étapes obligatoires, de la raison d'arrêt et des drapeaux d'inventaire. Un résumé COMPLETE avec étapes omises ou inventaires inventés est rejeté même si CRC et compteurs correspondent. Préfixe conservé, aucune preuve d'origine matérielle déduite. Fixtures de campagne complète et régressions falsification/troncature/arrêt écrites.
+- ESP32-S3 : le lien TWAI conserve ses compteurs de pertes/erreurs sur la durée de l'instance, sans les réinitialiser à chaque requête ; état non actif verrouillé, perte entre échanges et erreurs de bus refusées. Le résumé USB est refusé si une récupération devient nécessaire pendant l'arrêt. Régression native ajoutée pour ce dernier cas ; la voie TWAI reste à vérifier au gate et sur matériel. Aucune activation du firmware de découverte, aucun test exécuté, aucun merge/Release. J1979 et C6 ouverts.
+
 ## C6 — contrôle de fraîcheur des sources SAF après inspection (26/11/2026)
 
 - Android : l'inspection des preuves de récupération relit à nouveau les documents originaux SAF et leur inventaire après l'inspection du cache, avant d'accepter le rapport. Le même vérificateur SHA-256 borné est utilisé pour les lectures source/cache ; annulation, taille erronée ou changement des octets refusés. Contrôle final du cache conservé ; aucune écriture ECU et aucune prétention de snapshot atomique. Régressions sur modification de même taille, troncature, ajout et annulation écrites, non exécutées. Coût : une passe source supplémentaire au maximum borné existant. C6/J1979 ouverts, aucune CI, fusion ou Release.

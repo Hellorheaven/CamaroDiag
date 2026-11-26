@@ -69,7 +69,7 @@ class J1979UsbCampaign {
         if(!o_.currentHost()||!a_.owns(lease_)||a_.recoveryRequired())return false;
         const auto e=o_.currentEvidence(p_);
         return e.qualified&&e.localConsent&&e.authenticated&&e.exactProfile&&
-          e.diagnosticAllowlistEnforced;
+          !e.recoveryPending&&e.diagnosticAllowlistEnforced;
       }
       bool write(const uint8_t* data,size_t size)override{
         return permitted()&&w_.write(data,size)&&permitted();
