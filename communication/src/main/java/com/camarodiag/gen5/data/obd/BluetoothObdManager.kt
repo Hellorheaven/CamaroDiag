@@ -950,6 +950,57 @@ class BluetoothObdManager(context: Context) {
         // ATH1 and the checksum-verified legacy records are checked in the
         // exclusive recipe before any potentially modifying command.
 
+    /** Read-only discovery of legacy emissions sources. Does not select an
+     * engine ECU or establish exhaustive vehicle coverage. */
+    suspend fun discoverElmLegacySources(protocol: Int, isCurrent: () -> Boolean): LegacySourceDiscovery {
+        require(protocol in 1..5)
+        val epoch = transportSessionEpoch.capture()
+        val original = standardElmProfile
+        fun guard() {
+            transportSessionEpoch.requireQueuedCurrent(epoch)
+            check(isCurrent()) { "Legacy discovery context changed." }
+        }
+        return commandSessionMutex.withLock {
+            guard()
+            check(legacyMutationProtocol == protocol && standardElmProfile == original)
+            try {
+                val header = when (protocol) {
+                    1 -> "616AF1"
+                    4,5 -> "C033F1"
+                    else -> "686AF1"
+                }
+                for (command in listOf("ATSP$protocol","ATE0","ATL0","ATH1","ATS1","ATSH $header")) {
+                    val response = sendAtCommandInternal(command,1500L,expectedEpoch=epoch,
+                        preserveLines=true,beforeTransmit=::guard)
+                    check(CanConsoleAdapterRestorationPolicy.accepted(response))
+                }
+                val raw = sendAtCommandInternal("0100",4000L,expectedEpoch=epoch,
+                    preserveLines=true,beforeTransmit=::guard)
+                val observed = sendAtCommandInternal("ATDPN",1500L,expectedEpoch=epoch,
+                    preserveLines=true,beforeTransmit=::guard)
+                guard()
+                ElmLegacyResponseFrames.discover(protocol,raw,observed)
+            } finally {
+                withContext(NonCancellable) {
+                    if (transportSessionEpoch.isCurrent(epoch)) {
+                        var restored = true
+                        for (command in original.restoreCommands()) {
+                            val reply = runCatching {
+                                sendAtCommandInternal(command,1500L,expectedEpoch=epoch)
+                            }.getOrNull()
+                            if (reply == null || !CanConsoleAdapterRestorationPolicy.accepted(reply))
+                                restored = false
+                        }
+                        if (!restored) {
+                            disconnectIfCurrent(epoch)
+                            throw CanAdapterRestorationException(activeTransport)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     suspend fun runElmLegacyMutation(target: LegacyMutationTarget, expectedVin: String,
         approval: EcuWriteConsentFlow.Approval, isCurrent: () -> Boolean,
         saveBaseline: suspend (LegacyMutationResult) -> Unit): LegacyMutationResult {
