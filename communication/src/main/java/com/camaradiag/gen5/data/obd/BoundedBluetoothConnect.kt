@@ -16,9 +16,14 @@ internal object BoundedBluetoothConnect {
     /** A blocked native write cannot be cancelled by a coroutine alone.
      * Interrupt the exact socket, never retry the possibly emitted command. */
     suspend fun write(timeoutMillis: Long, write: () -> Unit, close: () -> Unit) {
+        val closed = java.util.concurrent.atomic.AtomicBoolean(false)
+        fun retire() {
+            if (closed.compareAndSet(false, true)) runCatching(close)
+        }
         try {
-            bounded(timeoutMillis, write, close, "Bluetooth RFCOMM write timed out")
+            bounded(timeoutMillis, write, ::retire, "Bluetooth RFCOMM write timed out")
         } catch (timeout: SocketTimeoutException) {
+            retire()
             // A write timeout differs from a prompt timeout: the socket was
             // retired and the command's transmission outcome is uncertain.
             throw ObdTransportDisconnectedException("Bluetooth RFCOMM write timed out; reconnect the adapter", timeout)
