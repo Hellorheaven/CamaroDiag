@@ -1226,4 +1226,7 @@
     <string name="obd_export_full_scan_failed">Impossible d’exporter le scan OBD.</string>
     <string name="live_recording_observed_vehicle">Véhicule OBD observé (modèle non vérifié)</string>
     <string name="live_recording_identity_changed">Enregistrement arrêté : le VIN observé a changé.</string>
+    <string name="cal_workspace_navigation_hint">Identifiez le calculateur, puis choisissez un fichier de cartographie ou une opération mémoire. Les diagnostics réseau avancés sont facultatifs.</string>
+    <string name="cal_show_doip_advanced">Afficher les diagnostics DoIP avancés</string>
+    <string name="cal_hide_doip_advanced">Masquer les diagnostics DoIP avancés</string>
 </resources>

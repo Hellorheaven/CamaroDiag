@@ -391,6 +391,7 @@ fun CalibrationWorkspaceScreen(
     var memoryReadRegion by remember { mutableStateOf(EcuBackupCoverage.Region.OTHER) }
     var memoryReadRegionMenuExpanded by remember { mutableStateOf(false) }
     var expertExpanded by remember { mutableStateOf(false) }
+    var doIpExpanded by remember { mutableStateOf(false) }
     var expertControllerFamily by remember { mutableStateOf("") }
     var expertChipMarking by remember { mutableStateOf("") }
     var expertProgrammerName by remember { mutableStateOf("") }
@@ -441,6 +442,15 @@ fun CalibrationWorkspaceScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item {
+            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(stringResource(R.string.cal_workspace_title), color = CamaroAmber, fontWeight = FontWeight.ExtraBold)
+                Text(stringResource(R.string.cal_workspace_navigation_hint), color = TextMuted, fontSize = 12.sp)
+                OutlinedButton(onClick = { doIpExpanded = !doIpExpanded }, modifier = Modifier.fillMaxWidth()) {
+                    Text(stringResource(if (doIpExpanded) R.string.cal_hide_doip_advanced else R.string.cal_show_doip_advanced))
+                }
+            }
+        }
+        if (doIpExpanded || state.doIpReading) item {
             Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(stringResource(R.string.cal_doip_title), color = CamaroAmber, fontWeight = FontWeight.Bold)

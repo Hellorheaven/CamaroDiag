@@ -1223,4 +1223,7 @@
     <string name="obd_export_full_scan_failed">Could not export the OBD scan.</string>
     <string name="live_recording_observed_vehicle">Observed OBD vehicle (model not verified)</string>
     <string name="live_recording_identity_changed">Recording stopped: observed VIN changed.</string>
+    <string name="cal_workspace_navigation_hint">Identify the ECU first, then select a calibration file or a memory operation. Advanced network diagnostics are optional.</string>
+    <string name="cal_show_doip_advanced">Show advanced DoIP diagnostics</string>
+    <string name="cal_hide_doip_advanced">Hide advanced DoIP diagnostics</string>
 </resources>

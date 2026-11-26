@@ -908,8 +908,11 @@ class BluetoothObdManager(context: Context) {
             check(DiagnosticRouteSelector.rawCanProfile(can29Bit, bitrate) in availableRawCanProfiles()) {
                 "CAN monitor profile changed while waiting."
             }
-            suspend fun boundCommand(command: String, timeoutMs: Long, onChunk: ((String) -> Unit)? = null): String =
-                sendAtCommandInternal(command, timeoutMs, expectedEpoch = requestedEpoch, onChunk = onChunk)
+            suspend fun boundCommand(command: String, timeoutMs: Long,
+                beforeTransmit: () -> Unit = {}, onPrompt: () -> Unit = {},
+                onChunk: ((String) -> Unit)? = null): String =
+                sendAtCommandInternal(command, timeoutMs, expectedEpoch = requestedEpoch, onChunk = onChunk,
+                    beforeTransmit = beforeTransmit, onPrompt = onPrompt)
             val isStnAdapter = capabilities.tier == AdapterTier.PRO_STN
             val originalProfile = standardElmProfile
             // STMA emits ISO-15765 OBD messages on STN devices; STM is required for raw CAN frames.
@@ -918,16 +921,20 @@ class BluetoothObdManager(context: Context) {
             val monitorCommand = if (isStnAdapter) "STM" else "ATMA"
             val captured = CanCaptureTextBuffer()
             val monitorErrors = CanMonitorErrorTracker()
+            var monitorMayBeStreaming = false
             try {
                 // Configure one physical CAN format and clear STN receive filters.
                 // All steps require explicit adapter acknowledgement before streaming.
                 for (command in CanMonitorProtocolPolicy.setupCommands(can29Bit, isStnAdapter, bitrate)) {
                     val timeout = if (command.startsWith("ATSP")) 1_500L else 1_000L
                     val answer = boundCommand(command, timeout)
-                    if (!CanConsoleAdapterRestorationPolicy.accepted(answer))
-                        throw CanAdapterRestorationException()
+                    check(CanConsoleAdapterRestorationPolicy.accepted(answer)) {
+                        "The connected adapter rejected CAN monitor setup: $command"
+                    }
                 }
-                val monitorResponse = boundCommand(monitorCommand, durationMs) { chunk ->
+                val monitorResponse = boundCommand(monitorCommand, durationMs,
+                    beforeTransmit = { monitorMayBeStreaming = true },
+                    onPrompt = { monitorMayBeStreaming = false }) { chunk ->
                     captured.append(chunk)
                     monitorErrors.append(chunk)
                     onChunk(chunk)
@@ -940,9 +947,11 @@ class BluetoothObdManager(context: Context) {
                 // ELM/STN monitor mode has no normal prompt; ESC returns the adapter
                 // to command mode even when the caller cancels the capture.
                 withContext(NonCancellable) {
-                    // ESC may return only a prompt. A failed ESC still requires a
-                    // fail-closed session even if later configuration commands respond.
-                    var restored = runCatching { boundCommand("\u001B", 1_000L) }.isSuccess
+                    // Interrupt only a monitor that may still be streaming. A rejected
+                    // setup or a monitor that already returned its prompt needs no ESC.
+                    // A failed necessary interrupt still requires fail-closed restoration.
+                    var restored = !monitorMayBeStreaming ||
+                        runCatching { boundCommand("\u001B", 1_000L) }.isSuccess
                     val commands = CanMonitorProtocolPolicy.restoreCommands(isStnAdapter, originalProfile.protocol)
                     // Restore the command-channel formatting established at probe time.
                     for (command in commands) {
@@ -1178,7 +1187,8 @@ class BluetoothObdManager(context: Context) {
         expectedEpoch: Long? = null,
         onChunk: ((String) -> Unit)? = null,
         beforeTransmit: () -> Unit = {},
-        preserveLines: Boolean = false
+        preserveLines: Boolean = false,
+        onPrompt: () -> Unit = {}
     ): String = withContext(Dispatchers.IO) {
         commandMutex.withLock {
             // The operation may have waited on the command mutex across a reconnect.
@@ -1217,7 +1227,7 @@ class BluetoothObdManager(context: Context) {
                             buffer.append(if (onChunk == null) payloadChunk else payloadChunk.take(1024 - buffer.length))
                         }
                         if (payloadChunk.isNotEmpty()) onChunk?.invoke(payloadChunk)
-                        if (chunk.contains('>')) { promptReceived = true; break }
+                        if (chunk.contains('>')) { promptReceived = true; onPrompt(); break }
                     } else if (n < 0) {
                         throw java.io.EOFException("USB OBD adapter disconnected while reading")
                     } else delay(minOf(10L, budget.remainingMs()))
@@ -1245,7 +1255,7 @@ class BluetoothObdManager(context: Context) {
                             buffer.append(if (onChunk == null) payloadChunk else payloadChunk.take(1024 - buffer.length))
                         }
                         if (payloadChunk.isNotEmpty()) onChunk?.invoke(payloadChunk)
-                        if (chunk.contains('>')) { promptReceived = true; break }
+                        if (chunk.contains('>')) { promptReceived = true; onPrompt(); break }
                     } else delay(minOf(10L, budget.remainingMs()))
                 }
                 ensureSameSession()
@@ -1272,7 +1282,7 @@ class BluetoothObdManager(context: Context) {
                             buffer.append(if (onChunk == null) payloadChunk else payloadChunk.take(1024 - buffer.length))
                         }
                             if (payloadChunk.isNotEmpty()) onChunk?.invoke(payloadChunk)
-                            if (chunk.contains('>')) { promptReceived = true; break }
+                            if (chunk.contains('>')) { promptReceived = true; onPrompt(); break }
                         } else if (n < 0) {
                             throw java.io.EOFException("Wi-Fi OBD adapter closed the connection")
                         }
@@ -1330,7 +1340,7 @@ class BluetoothObdManager(context: Context) {
                         if (received < 0) throw java.io.EOFException("Bluetooth OBD adapter disconnected")
                         val char = received.toChar()
                         if (char == '>') {
-                            promptReceived = true
+                            promptReceived = true; onPrompt()
                             if (callbackBuffer.isNotEmpty()) onChunk?.invoke(callbackBuffer.toString())
                             break
                         }
