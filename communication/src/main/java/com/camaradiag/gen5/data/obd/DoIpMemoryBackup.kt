@@ -204,6 +204,7 @@ object DoIpMemoryBackup {
                 require(!entry.isDirectory && entry.name in names && seen.add(entry.name)) {
                     "Unexpected or duplicate DoIP archive entry."
                 }
+                guarded.beginLocalEntry(entry)
                 if (entry.name == "manifest.json") {
                     manifest = readBounded(zip, 16384)
                 } else {
@@ -230,6 +231,7 @@ object DoIpMemoryBackup {
                     }
                 }
                 zip.closeEntry()
+                guarded.finishLocalEntry(entry)
                 evidence[entry.name] = EcuZipCompletionGuard.EntryEvidence.from(entry)
             }
             guarded.requireCompletedArchive(seen.toList(), evidence)
@@ -249,8 +251,10 @@ object DoIpMemoryBackup {
             while (true) {
                 val entry = zip.nextEntry ?: break
                 val data = expected.remove(entry.name) ?: error("Unexpected or duplicate DoIP archive entry.")
+                guarded.beginLocalEntry(entry)
                 require(!entry.isDirectory && MessageDigest.isEqual(readBounded(zip, data.size), data))
                 zip.closeEntry()
+                guarded.finishLocalEntry(entry)
                 seen += entry.name
                 evidence[entry.name] = EcuZipCompletionGuard.EntryEvidence.from(entry)
             }
