@@ -2,7 +2,6 @@ package com.camarodiag.gen5.data.obd
 
 import java.io.DataInputStream
 import java.io.File
-import java.io.IOException
 import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
 
@@ -27,7 +26,10 @@ object EcuPhysicalBackupInspection {
         val sectors: List<Sector>,
         val verifiedBytes: Long,
         val problem: String,
-        val uncertainAddress: Long? = null
+        val uncertainAddress: Long? = null,
+        // A valid physical backup is NOT proof that a programming transaction
+        // completed: an erase may still be pending or recovery may be required.
+        val journalDisposition: PersistentEcuWriteJournal.RecoveryDisposition? = null
     )
 
     private const val MAX_JOURNAL_BYTES = 8L * 1024 * 1024
@@ -49,7 +51,7 @@ object EcuPhysicalBackupInspection {
             val audit = PersistentEcuWriteJournal.inspectExisting(journalFile, target, vin)
             check(audit.valid) { "ECU journal is missing, altered or out of sequence." }
             val length = journalFile.length()
-            check(length in 1..MAX_JOURNAL_BYTES) { "Invalid ECU journal size." }
+            check(length in 1L..MAX_JOURNAL_BYTES) { "Invalid ECU journal size." }
             val data = ByteArray(length.toInt())
             DataInputStream(journalFile.inputStream().buffered()).use { input ->
                 input.readFully(data)
@@ -81,7 +83,7 @@ object EcuPhysicalBackupInspection {
             }
             val observed = hashSetOf<Pair<EcuBackupCoverage.Region, Long>>()
             for (file in files) {
-                check(file.length() in 1..MAX_BLOCK_FILE_BYTES) {
+                check(file.length() in 1L..MAX_BLOCK_FILE_BYTES) {
                     "Saved physical ECU block exceeds the supported size."
                 }
                 DataInputStream(file.inputStream().buffered()).use { input ->
@@ -99,7 +101,7 @@ object EcuPhysicalBackupInspection {
                     val size = input.readLong()
                     val originalHash = input.readUTF()
                     val byteLength = input.readInt()
-                    check(size in 1..MAX_BLOCK_BYTES &&
+                    check(size in 1L..MAX_BLOCK_BYTES &&
                         byteLength.toLong() == size &&
                         file.name == "${region.name}-${address.toString(16)}-$size.ecu-block"
                     ) { "Saved sector size, address or file name is invalid." }
@@ -132,7 +134,8 @@ object EcuPhysicalBackupInspection {
                 "Not every original ECU sector has a matching physical backup."
             }
             Report(true, expectedCount, verified.sortedWith(compareBy({ it.region.name },
-                { it.address })), verifiedBytes, "")
+                { it.address })), verifiedBytes, "",
+                journalDisposition = audit.recoveryDisposition)
         } catch (error: Exception) {
             Report(false, expectedCount, emptyList(), 0L,
                 error.message ?: "ECU recovery evidence cannot be inspected.", current)

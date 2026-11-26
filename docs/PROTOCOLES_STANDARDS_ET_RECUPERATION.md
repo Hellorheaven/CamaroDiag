@@ -32,6 +32,16 @@ Ne pas confondre : norme publiée, codec validé par tests unitaires, transport 
 
 Le modèle de vérification `EcuPostFlashAssessment` représente ces preuves et refuse de transformer « non testé » en « OK » ; il **n'envoie aucune commande au calculateur**. Le transport DoIP peut transmettre des services UDS quelconques, y compris d'écriture ; la compatibilité matérielle reste à tester. Les services d'écriture nécessitent le consentement opérateur et les réelles sessions/conditions OEM.
 
+## Contrôle des sauvegardes et du BIN d'origine — C6 (PR117)
+
+Le pont Windows propose désormais une comparaison **hors ligne** du BIN original 3 Mio par le bouton « Comparer le BIN original » de l'onglet « Récupération ECU », et par la commande :
+
+`CamaroDiag.J2534Bridge.exe --inspect-write-journal tentative.jsonl original-3MiB.bin`
+
+Cette comparaison exige le manifeste `<journal>.meta.json` (VIN/OSID et SHA-256 de l'image d'origine), le journal et les blocs de secteur physiques intègres. Le BIN complet doit avoir le même SHA-256 ; chaque secteur physiquement sauvegardé est relu depuis le disque et comparé octet par octet à sa zone du BIN. Un échec interdit de présenter ce fichier comme une restauration qualifiée. L'intégrité du dossier **ne démontre pas** que le calculateur pourra démarrer, recevoir des données, ou être récupéré. Ne jamais effacer ni programmer automatiquement.
+
+Sur Android, `EcuWriteTransaction.inspectRecoveryEvidence(journalFile, target, vin)` inspecte le journal existant, son enchaînement SHA-256, les preuves `BASELINE_CHECKED` et les fichiers physiques `<journal>.blocks/*.ecu-block`. Le verdict différencie **originaux sauvegardés intègres** et **état de transaction potentiellement incomplet**. Aucune instance de pilote ECU n'est nécessaire ; les données ne sont ni modifiées ni envoyées à un réseau.
+
 ## Restauration des secteurs physiquement sauvegardés
 
 - Le moteur existant enregistre avant l'effacement les **octets originaux lus sur le véritable ECU** dans `<journal>.blocks/<adresse>-<taille>.ecu-block`. Les métadonnées incluent région, adresse, taille, SHA-256 et sont associées aux événements du journal. Conserver aussi `<journal>.meta.json` (VIN/OSID) et l'image de référence.

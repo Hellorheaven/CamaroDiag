@@ -88,6 +88,19 @@ object EcuWriteTransaction {
         val failedAddress: Long? = null
     )
 
+    /**
+     * Inspect an earlier physical ECU backup entirely offline, even after the
+     * previous programming coroutine or process exited. The report separates
+     * saved-sector integrity from the journal's uncertain programming status.
+     * It never authorizes flash, restore or a controller reset.
+     */
+    fun inspectRecoveryEvidence(
+        journalFile: java.io.File,
+        target: EcuProgrammingDriverContract.FirmwareTarget,
+        expectedVin: String
+    ): EcuPhysicalBackupInspection.Report =
+        EcuPhysicalBackupInspection.inspect(journalFile, target, expectedVin)
+
     private fun unavailableIdentity(value: String): Boolean {
         val normalized = value.trim().lowercase(java.util.Locale.ROOT)
         return normalized.isEmpty() ||

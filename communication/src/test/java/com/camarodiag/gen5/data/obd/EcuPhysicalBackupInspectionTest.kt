@@ -25,15 +25,18 @@ class EcuPhysicalBackupInspectionTest {
                     EcuBackupCoverage.Region.CALIBRATION, 0x1008, 8)
             )
             val files = mutableListOf<File>()
+            val baselines = mutableListOf<EcuWriteTransaction.Record>()
             for ((index, region) in regions.withIndex()) {
                 val bytes = ByteArray(8) { (it + index * 20).toByte() }
                 val sha = EcuBenchExpertPlan.sha256Hex(bytes)
                 // The write engine persists actual physical bytes before its
                 // durable BASELINE_CHECKED journal record.
                 store.preserve(region, bytes, sha)
-                journal.append(EcuWriteTransaction.Record(
+                val baseline = EcuWriteTransaction.Record(
                     EcuWriteTransaction.Stage.BASELINE_CHECKED, region.region,
-                    region.address, sha, "a".repeat(64)))
+                    region.address, sha, "a".repeat(64))
+                journal.append(baseline)
+                baselines += baseline
                 files += store.directory.listFiles().orEmpty().single {
                     it.name.contains("-${region.address.toString(16)}-")
                 }
@@ -43,6 +46,9 @@ class EcuPhysicalBackupInspectionTest {
             assertEquals(2, normal.expectedSectors)
             assertEquals(2, normal.sectors.size)
             assertEquals(16L, normal.verifiedBytes)
+            assertEquals(
+                PersistentEcuWriteJournal.RecoveryDisposition.NO_ERASE_RECORDED,
+                normal.journalDisposition)
 
             assertFalse(EcuPhysicalBackupInspection.inspect(
                 journalFile, target, "1G1FA1RXXR0123457").verified)
@@ -73,6 +79,17 @@ class EcuPhysicalBackupInspectionTest {
             assertFalse(EcuPhysicalBackupInspection.inspect(journalFile, target, vin).verified)
             journalFile.writeText(journalText)
             assertTrue(EcuPhysicalBackupInspection.inspect(journalFile, target, vin).verified)
+
+            // The original physical sectors remain intact even when the live
+            // controller may be mid-erase. Never confuse their integrity
+            // with a completed or recoverable ECU transaction.
+            journal.append(baselines.first().copy(
+                stage = EcuWriteTransaction.Stage.BEFORE_ERASE))
+            val interrupted = EcuPhysicalBackupInspection.inspect(journalFile, target, vin)
+            assertTrue(interrupted.verified)
+            assertEquals(
+                PersistentEcuWriteJournal.RecoveryDisposition.ERASE_OR_WRITE_MAY_BE_INCOMPLETE,
+                interrupted.journalDisposition)
         } finally { directory.deleteRecursively() }
         Unit
     }
