@@ -612,13 +612,17 @@ class Obd2FeatureEngine(
         result.joinToString("\n")
     }
 
-    suspend fun fullReadOnlyScan(): ObdScanReport {
+    suspend fun fullReadOnlyScan(expectedLegacyProtocol: Int? = null): ObdScanReport {
+        require(expectedLegacyProtocol == null || expectedLegacyProtocol in 1..5)
         log.clear()
         // The live adapter is already configured by its transport. Resetting it
         // here would silently switch 29-bit/250 kbit/s/legacy OBD to CAN 11-bit.
         val adapter = inspectAdapter()
         val respondingEcus = discoverFunctionalObdResponders()
         val negotiated = ObdLegacyOxygenTests.protocolNumber(ask("ATDPN"))
+        if (expectedLegacyProtocol != null) check(negotiated == expectedLegacyProtocol) {
+            "The negotiated ELM protocol does not match the selected legacy recipe."
+        }
         if (negotiated != null && negotiated in 1..5) {
             // Legacy headers are not CAN ISO-TP framing. Let ELM validate
             // link-layer checksums and expose anonymous application records.
@@ -631,6 +635,9 @@ class Obd2FeatureEngine(
                             ObdLegacyRecords.dtcs("07", legacyEngine.ask("07", 2500L), "pending"),
                             ObdLegacyRecords.dtcs("0A", legacyEngine.ask("0A", 2500L), "permanent"))
                     })
+                if (expectedLegacyProtocol != null) check(report.firstUnresolvedPid != 1) {
+                    "No verified initial legacy PID support response."
+                }
                 report.copy(rawLog = log.toList() + report.rawLog)
             }
         }
@@ -787,7 +794,7 @@ class Obd2FeatureEngine(
             vehicleInfoReads = vehicleInfo.reads,
             mode05 = mode05,
             mode08 = mode08,
-            negotiatedElmProtocol = protocolNumber,
+            negotiatedElmProtocol = protocolNumber.takeIf { discovery.firstUnresolvedPid != 1 },
             anonymousLegacyVinCandidate = vehicleInfo.anonymousVin
         )
     }
