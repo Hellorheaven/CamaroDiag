@@ -4,6 +4,7 @@ import com.camarodiag.gen5.data.obd.CamaroUdsProtocol
 import com.camarodiag.gen5.domain.model.AdapterCapabilities
 import com.camarodiag.gen5.domain.model.VehicleProfile
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -40,6 +41,26 @@ class FunctionalTestSuiteTest {
         assertFalse(FunctionalProtocol.PWM.implemented)
         assertFalse(FunctionalProtocol.ISO9141.implemented)
         assertTrue(FunctionalTestPlanner.j1979Checks().any { it.key == "protocol:transport" })
+    }
+
+    @Test fun legacyAckDoesNotProveMissingPendingCodesOrEvapCompletion() {
+        val target = com.camarodiag.gen5.data.obd.LegacyMutationTarget(2,0x10,listOf(0x10,0x11),true)
+        val state = FunctionalTestState(legacyTarget=target,checks=FunctionalTestPlanner.legacyMutationChecks())
+        val result = com.camarodiag.gen5.data.obd.LegacyMutationResult(target,"ACKNOWLEDGED_PARTIAL",
+            "PENDING_READBACK_UNAVAILABLE",true,"1G1FA1RXXR0123456",
+            mapOf("10" to "ACKNOWLEDGED","11" to "ACKNOWLEDGED"),emptyMap(),
+            mapOf("10" to mapOf("03" to emptyList<String>(),"07" to null),
+                "11" to mapOf("03" to emptyList<String>(),"07" to emptyList<String>())),emptyList())
+        fun status(snapshot: FunctionalTestState,key: String) =
+            snapshot.checks.single { it.key == "legacy:$key" }.outcome
+        val partial = FunctionalTestPlanner.legacyMutationResults(state,result,true)
+        assertEquals(FunctionalTestOutcome.PASSED,status(partial,"ack"))
+        assertEquals(FunctionalTestOutcome.PASSED,status(partial,"baseline"))
+        assertEquals(FunctionalTestOutcome.NOT_TESTED,status(partial,"remaining"))
+        val evap = FunctionalTestPlanner.legacyMutationResults(state,result.copy(
+            target=target.copy(clear=false),outcome="ACKNOWLEDGED",reason="LEAK_TEST_NOT_PERFORMED"),true)
+        assertEquals(FunctionalTestOutcome.NOT_TESTED,status(evap,"evap"))
+        assertEquals(FunctionalTestOutcome.NOT_TESTED,status(evap,"remaining"))
     }
 
     @Test fun resetAcknowledgmentDoesNotProveAllFaultsAbsent() {
