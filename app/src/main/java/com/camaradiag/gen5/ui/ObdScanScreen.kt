@@ -10,7 +10,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.semantics.Role
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.Checkbox
@@ -89,7 +91,10 @@ fun ObdScanScreen(
     var sensorQuery by remember(preferenceKey, transientReport) { mutableStateOf("") }
     var chosenPids by remember(preferenceKey, transientReport) { mutableStateOf(storedPids.orEmpty()) }
     var selectionApplied by remember(preferenceKey, transientReport) { mutableStateOf(storedPids != null) }
-    if (choosingSensors && report != null) {
+    LaunchedEffect(isConnected, isScanning, measuredPids) {
+        if (!isConnected || isScanning || measuredPids.isEmpty()) choosingSensors = false
+    }
+    if (choosingSensors && report != null && isConnected && !isScanning && measuredPids.isNotEmpty()) {
         var pendingPids by remember(preferenceKey, choosingSensors, measuredPids) {
             mutableStateOf((if (selectionApplied) chosenPids else report.liveData.map { it.pid })
                 .filter { it in measuredPids }.distinct())
@@ -111,19 +116,23 @@ fun ObdScanScreen(
                                 sensorNames[pid].orEmpty().contains(sensorQuery, ignoreCase = true)
                         }, key = { it }) { pid ->
                             Row(
-                                modifier = Modifier.fillMaxWidth().clickable(enabled = pid in measuredPids) {
-                                    pendingPids = if (pid in pendingPids)
-                                        pendingPids - pid else pendingPids + pid
-                                },
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Checkbox(
-                                    checked = pid in measuredPids && pid in pendingPids,
+                                modifier = Modifier.fillMaxWidth().toggleable(
+                                    value = pid in pendingPids,
                                     enabled = pid in measuredPids,
-                                    onCheckedChange = { checked ->
-                                        pendingPids = if (checked) pendingPids + pid
+                                    role = Role.Checkbox,
+                                    onValueChange = { checked ->
+                                        pendingPids = if (checked) (pendingPids + pid).distinct()
                                             else pendingPids - pid
                                     }
+                                ),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                // One toggle target for the entire row, including
+                                // the checkbox; no competing nested click handlers.
+                                Checkbox(
+                                    checked = pid in pendingPids,
+                                    enabled = pid in measuredPids,
+                                    onCheckedChange = null
                                 )
                                 Column {
                                     Text(sensorNames[pid] ?: stringResource(R.string.obd_pid_generic, pid))
