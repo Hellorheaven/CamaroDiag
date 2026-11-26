@@ -655,6 +655,7 @@
     <string name="msg_vehicle_profile_saved">Profil véhicule enregistré.</string>
     <string name="msg_vehicle_profile_review_required">Un profil a été créé depuis le VIN ECU. Vérifiez l’année, le moteur et la boîte avant tout diagnostic.</string>
     <string name="msg_vehicle_profile_loaded">Profil véhicule chargé : %1$s</string>
+    <string name="msg_gm_identity_required">Les diagnostics spécifiques Camaro exigent un VIN concordant lu sur le véhicule réel. Les diagnostics OBD standard et génériques sélectionnés manuellement restent disponibles.</string>
     <string name="msg_vehicle_non_camaro_vin">VIN hors Camaro Gen 5/6 : diagnostic OBD générique uniquement.</string>
     <string name="msg_vehicle_ecu_vin_invalid">Le calculateur n’a pas renvoyé de VIN valide de 17 caractères. Aucun profil n’a été créé.</string>
     <string name="cal_vin_matches_profile">Le VIN ECU correspond au profil véhicule sélectionné.</string>

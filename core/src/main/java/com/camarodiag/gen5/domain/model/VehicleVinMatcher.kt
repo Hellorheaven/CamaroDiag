@@ -33,6 +33,11 @@ object VehicleVinMatcher {
             (normalized.startsWith("1G1F") && year in 2016..2024)
     }
 
+    /** Admission for automatic OEM-specific interpretation, not a write authorization.
+     * A saved profile alone or a simulated VIN is never physical evidence. */
+    fun admitsCamaroSpecificRead(selectedVin: String?, observedVin: String?): Boolean =
+        isCamaroCandidate(observedVin) && normalize(selectedVin) == normalize(observedVin)
+
     fun compare(selectedVehicleVin: String?, ecuVin: String?): VehicleVinComparison? {
         val normalizedEcuVin = normalize(ecuVin) ?: return null
         val normalizedSelectedVin = normalize(selectedVehicleVin)

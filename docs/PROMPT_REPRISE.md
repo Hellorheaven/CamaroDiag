@@ -1,3 +1,7 @@
+## PR117 — admission des fonctions OEM après retour Mach-E (26/11/2026)
+
+- C6 : les lectures catalogue OBDb Camaro, enquête LFX et identification GMLAN exigent un VIN Camaro candidat observé sur connexion physique, concordant avec le profil sélectionné. Les vérifications sont répétées pendant les parcours concernés ; les diagnostics génériques restent distincts. Le VIN observé est actualisé aussi lors de l'identification initiale et manuelle, pas uniquement au scan complet. Les topologies incompatibles ne sont pas conservées. Régressions de la politique VIN écrites, non exécutées. Ce contrôle n'est pas une autorisation d'écriture ni une preuve de calibration. Aucun checkpoint.
+
 ## PR117 — identité Mode 09 multicalculateur après retour Mach-E (26/11/2026)
 
 - C6 : lorsque les CAL ID, CVN ou noms ECU ne peuvent être décodés sans en-têtes, nouvelle interrogation bornée en conservant les en-têtes CAN restaurés. Réassemblage ISO-TP classique indépendant par adresse, refus des trames tronquées, séquences incohérentes et blocs intercalés sans provenance. Le VIN existant reste sur son parcours éprouvé. Les identités ne sont pas attribuées à un nom de module OEM sans profil. Régressions sur réponses synthétiques intercalées (format observé dans les traces Mach-E), non exécutées. Aucun checkpoint.

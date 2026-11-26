@@ -196,6 +196,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         return false
     }
 
+    private fun hasMatchingPhysicalCamaro(): Boolean =
+        !obdManager.isDemoMode && !obdManager.isSimulationActive &&
+            VehicleVinMatcher.admitsCamaroSpecificRead(_vehicle.value.vin, _observedStandardVin.value)
+
+    private fun requireMatchingPhysicalCamaro(): Boolean {
+        if (hasMatchingPhysicalCamaro()) return true
+        _connectionMessage.value = localizedContext.getString(R.string.msg_gm_identity_required)
+        return false
+    }
+
     @Volatile private var accountSessionGeneration: Long = 0L
     private fun isCurrentAccountGeneration(started: Long): Boolean =
         started == accountSessionGeneration && authenticatedAccountUid != null
@@ -1871,7 +1881,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     /** Reads and decodes one read-only Camaro signal from the imported OBDb signalset. */
     fun readObdbSignal(signalId: String, protocolNumberText: String) {
-        if (!requirePremiumLicense()) return
+        if (!requirePremiumLicense() || !requireMatchingPhysicalCamaro()) return
         launchEnhancedUdsRead { current ->
             _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                 isObdbSignalReading = true,
@@ -1879,6 +1889,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 obdbSignalMessage = ""
             )
             try {
+                check(current() && hasMatchingPhysicalCamaro()) { "Physical Camaro identity required." }
                 val catalog = obdbCamaroSignalSet ?: ObdbCamaroSignalSet.load(getApplication<Application>()).also {
                     obdbCamaroSignalSet = it
                 }
@@ -1907,8 +1918,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         protocolNumber = protocolNumber,
                         timeoutMs = 5000L,
                         readDids = setOf(did)
-                    ) { client -> client.readDataByIdentifier(did) }
-                if (!current()) return@launchEnhancedUdsRead
+                    ) { client ->
+                        check(current() && hasMatchingPhysicalCamaro()) { "Physical Camaro identity changed." }
+                        client.readDataByIdentifier(did)
+                    }
+                if (!current() || !hasMatchingPhysicalCamaro()) return@launchEnhancedUdsRead
                 val decoded = signal.decode(raw)
                 val rendered = when {
                     decoded.unavailable -> localizedContext.getString(R.string.vm_sentinel_unavailable)
@@ -2463,7 +2477,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      * The UI never promotes this reading to proof of an installed sensor.
      */
     fun readLfx2012FuelSnapshot() {
-        if (!requirePremiumLicense()) return
+        if (!requirePremiumLicense() || !requireMatchingPhysicalCamaro()) return
         val vehicle = _vehicle.value
         if (vehicle.modelYear != 2012 ||
             !vehicle.engine.rpo.equals("LFX", ignoreCase = true)) return
@@ -2486,6 +2500,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     obdManager.isStandardObdReadAvailable()) {
                     "A connected physical, read-only OBD channel is required."
                 }
+                check(hasMatchingPhysicalCamaro()) { "Physical Camaro identity required." }
                 val survey = obdManager.readPhysicalFuelSurvey()
                 if (!current()) return@launch
                 val raw = Lfx2012FuelReadOnly.PIDS.associateWith { pid ->
@@ -2508,7 +2523,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 // connection changes on the UI dispatcher. Otherwise the VIN
                 // could change between the IO-thread guard and history append.
                 withContext(Dispatchers.Main) {
-                    if (current()) {
+                    if (current() && hasMatchingPhysicalCamaro()) {
                         val validVin = vehicle.vin.trim().uppercase(java.util.Locale.ROOT)
                             .takeIf { it.matches(Regex("[A-HJ-NPR-Z0-9]{17}")) }
                         val historySummary = if (validVin != null) {
@@ -2607,7 +2622,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     /** Keep the legacy GM observation separate from generic OBD Mode 09. */
     fun readGmlanIdentification() {
-        if (!requirePremiumLicense()) return
+        if (!requirePremiumLicense() || !requireMatchingPhysicalCamaro()) return
         if (_calibrationWorkspace.value.isGmlanReading) return
         val account = accountSessionGeneration
         val connection = connectionAttemptGeneration
@@ -2625,9 +2640,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             try {
                 if (!current()) return@launch
-                check(obdManager.isJ2534BridgeConnected())
+                check(obdManager.isJ2534BridgeConnected() && hasMatchingPhysicalCamaro())
                 val identity = obdManager.readGmlanIdentification()
-                if (current() && obdManager.isJ2534BridgeConnected()) {
+                if (current() && obdManager.isJ2534BridgeConnected() && hasMatchingPhysicalCamaro()) {
+                    check(VehicleVinMatcher.admitsCamaroSpecificRead(vehicle.vin, identity.vin)) {
+                        "GMLAN identity differs from selected physical Camaro."
+                    }
                     _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                         isGmlanReading = false, gmlanIdentity = identity
                     )
@@ -2690,6 +2708,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 if (!isCurrentAccountGeneration(startedGeneration) || startedConnection != connectionAttemptGeneration ||
                 requestId != calibrationIdentityGeneration) return@launch
                 val ecuVin = identity.vin
+                if (!sourceWasSimulated && !obdManager.isSimulationActive && !obdManager.isDemoMode) {
+                    _observedStandardVin.value = VehicleVinMatcher.normalize(ecuVin)
+                    if (ecuVin != null && !VehicleVinMatcher.admitsCamaroSpecificRead(_vehicle.value.vin, ecuVin))
+                        _modules.value = emptyList()
+                }
                 val validCal = identity.calibrationIds.isNotEmpty()
                 val validCvn = identity.calibrationVerificationNumbers.isNotEmpty()
                 val vinComparison = VehicleVinMatcher.compare(_vehicle.value.vin, ecuVin)
@@ -5430,8 +5453,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 if (!current()) return@launch
                 _obdScanReport.value = report
-                if (!obdManager.isSimulationActive && report.vin != null)
-                    _observedStandardVin.value = report.vin
+                if (!obdManager.isSimulationActive && !obdManager.isDemoMode) {
+                    _observedStandardVin.value = VehicleVinMatcher.normalize(report.vin)
+                    if (!VehicleVinMatcher.admitsCamaroSpecificRead(selectedVin, report.vin))
+                        _modules.value = emptyList()
+                }
                 if (!obdManager.isSimulationActive && report.vin != null && !VehicleVinMatcher.isCamaroCandidate(report.vin)) {
                     _modules.value = emptyList()
                     _calibrationWorkspace.value = _calibrationWorkspace.value.copy(ecuVinResponse = report.vin.orEmpty(),
@@ -5555,7 +5581,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun refreshTopologyAndDefaults(runInitialScans: Boolean = false) {
-        _modules.value = CamaroUdsProtocol.buildTopology(_vehicle.value, _adapter.value)
+        _modules.value = if (_observedStandardVin.value != null && !hasMatchingPhysicalCamaro())
+            emptyList() else CamaroUdsProtocol.buildTopology(_vehicle.value, _adapter.value)
         if (runInitialScans && obdManager.isObdCommandChannelAvailable) {
             // Read the ECU VIN immediately after a successful OBD connection so that
             // the selected vehicle profile can be checked before the user starts diagnosis.
@@ -5573,6 +5600,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     val identity = obdManager.withObdCommandSession { engine -> engine.readEcuIdentification() }
                     if (!current()) return@launch
                     val comparison = VehicleVinMatcher.compare(profile.vin, identity.vin)
+                    if (!sourceWasSimulated && !obdManager.isSimulationActive && !obdManager.isDemoMode) {
+                        _observedStandardVin.value = VehicleVinMatcher.normalize(identity.vin)
+                        if (!VehicleVinMatcher.admitsCamaroSpecificRead(profile.vin, identity.vin))
+                            _modules.value = emptyList()
+                    }
                     _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                         ecuVinResponse = identity.vin.orEmpty(),
                         ecuIdentityFromSimulation = sourceWasSimulated ||
