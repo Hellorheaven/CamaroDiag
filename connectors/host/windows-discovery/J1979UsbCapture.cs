@@ -16,6 +16,10 @@ internal sealed class J1979UsbCapture(J1979UsbCapture.ILink link,Func<long>? clo
     {
         public bool EvidenceAuthenticated=>false;
         public bool PhysicalVehicleVerified=>false;
+        public bool CaptureIntegrityVerified=>FrameIntegrityVerified&&Summary is not null;
+        public IReadOnlyList<J1979CampaignSemantics.Step> Steps{get;init;}=[];
+        public J1979CampaignSemantics.Summary? Summary{get;init;}
+        public string? ObservedVin=>Steps.Select(s=>s.ObservedVin).LastOrDefault(s=>s is not null);
     }
     private readonly Func<long> now=clock??(()=>Environment.TickCount64);
     private bool used;
@@ -42,6 +46,8 @@ internal sealed class J1979UsbCapture(J1979UsbCapture.ILink link,Func<long>? clo
         if(used)throw new IOException("Fresh CU/1 session required");
         if(key.Length!=32||budget is <1 or >600000||!raw.CanWrite)throw new ArgumentException("Invalid capture parameters");
         used=true;bool authenticated=false,framed=false;int records=0;string? error=null;
+        var steps=new List<J1979CampaignSemantics.Step>();
+        J1979CampaignSemantics.Summary? summary=null;
         try{
             long start=now();
             link.Write(hello,Remaining(start,5000));
@@ -70,12 +76,14 @@ internal sealed class J1979UsbCapture(J1979UsbCapture.ILink link,Func<long>? clo
                     int req=tail[1],res=BinaryPrimitives.ReadUInt16LittleEndian(tail.AsSpan(6));
                     if(req is <1 or >7||res>4095||len!=8+req+res||((state<=3)!=(res>0)))
                         throw new IOException("Invalid CJ/1 observation length");
+                    steps.Add(new(seq,state,U32(2),tail[8..(8+req)],tail[(8+req)..len]));
                     counts[state]++;
                 }else if(kind==3){
                     if(len!=22||tail[0] is <1 or >5||U32(2)!=(uint)(seq-1)||
                        U32(6)!=counts[1]||U32(10)!=counts[2]||U32(14)!=counts[3]||U32(18)!=counts[4])
                         throw new IOException("Inconsistent CJ/1 summary");
-                    link.CheckNoBufferedInput();_ = Remaining(start,limit);records++;framed=true;break;
+                    link.CheckNoBufferedInput();_ = Remaining(start,limit);records++;framed=true;
+                    summary=J1979CampaignSemantics.Verify(steps,tail[0],tail[1]);break;
                 }else throw new IOException("Unexpected CJ/1 record");
                 records++;
             }
@@ -86,6 +94,6 @@ internal sealed class J1979UsbCapture(J1979UsbCapture.ILink link,Func<long>? clo
             try{link.Dispose();}catch(Exception ex) when(ex is IOException or TimeoutException or InvalidOperationException){error??=ex.Message;framed=false;}
             try{raw.Flush();}catch(IOException ex){error??=ex.Message;framed=false;}
         }
-        return new(authenticated,framed,records,error);
+        return new(authenticated,framed,records,error){Steps=steps.AsReadOnly(),Summary=framed?summary:null};
     }
 }

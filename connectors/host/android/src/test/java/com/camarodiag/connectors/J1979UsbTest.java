@@ -47,12 +47,24 @@ public final class J1979UsbTest {
         byte[] capture=concat(start,end);
         Sim good=new Sim(concat(challenge,capture));ByteArrayOutputStream raw=new ByteArrayOutputStream();
         J1979UsbCapture.Result result=new J1979UsbCapture(good).runRequest(hello,10000,key,raw);
-        assert result.deviceCredentialAuthenticated&&result.frameIntegrityVerified&&!result.physicalVehicleVerified;
+        assert result.deviceCredentialAuthenticated&&result.frameIntegrityVerified&&result.captureIntegrityVerified&&!result.physicalVehicleVerified;
         assert good.closed&&good.writes==2&&Arrays.equals(raw.toByteArray(),capture);
         byte[] bad=challenge.clone();bad[67]^=1;
         Sim wrong=new Sim(concat(bad,capture));
         result=new J1979UsbCapture(wrong).runRequest(hello,10000,key,new ByteArrayOutputStream());
         assert !result.deviceCredentialAuthenticated&&!result.frameIntegrityVerified&&wrong.closed&&wrong.writes==1;
+        byte[] forgedEnd=frame(3,1,new byte[]{1,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0});
+        Sim forged=new Sim(concat(challenge,start,forgedEnd));
+        result=new J1979UsbCapture(forged).runRequest(hello,10000,key,new ByteArrayOutputStream());
+        assert !result.captureIntegrityVerified&&result.summary==null;
+        byte[] initial=ByteBuffer.allocate(16).order(ByteOrder.LITTLE_ENDIAN)
+            .put((byte)1).put((byte)2).putInt(1).putShort((short)6)
+            .put(new byte[]{1,0,0x41,0,0,0,0,0}).array();
+        byte[] missingSummary=ByteBuffer.allocate(22).order(ByteOrder.LITTLE_ENDIAN)
+            .put((byte)1).put((byte)3).putInt(1).putInt(1).array();
+        Sim missing=new Sim(concat(challenge,start,frame(2,1,initial),frame(3,2,missingSummary)));
+        result=new J1979UsbCapture(missing).runRequest(hello,10000,key,new ByteArrayOutputStream());
+        assert !result.captureIntegrityVerified&&result.steps.size()==1;
         Sim partial=new Sim(concat(challenge,Arrays.copyOf(capture,capture.length-1)));
         raw=new ByteArrayOutputStream();
         result=new J1979UsbCapture(partial).runRequest(hello,10000,key,raw);

@@ -1,3 +1,7 @@
+## J1979 — validation sémantique des campagnes Java/.NET (26/11/2026)
+
+- Moteurs natifs indépendants : allowlist lecture, classification exacte PID/DTC/moniteurs/VIN, tailles et réponses négatives terminales, rejeu ordre/bitmaps/membres, cohérence flags et raison d'arrêt. Captures incohérentes gardent les observations valides sans validation intégrale. Tests de résumé falsifié et étapes manquantes écrits, non exécutés. Raccordement JSON détaillé reste à faire ; J1979/C6 ouverts, aucune CI ni fusion/Release.
+
 ## J1979 — raccordement USB OTG Android / COM Windows (26/11/2026)
 
 - Adaptateur CDC Android explicite (permission, interfaces, bulk avec tampon, deadline, annulation/génération et fermeture) ; sources Java communes compilées dans communication, entrée Kotlin de campagne en IO avec capture CJ/1 et JSON privés exclusifs, secret non journalisé. Windows : sous-commande --j1979-usb, port COM et profil documentés, consentement, clé locale, captures exclusives synchronisées, lecture bornée et fermeture. Rapports frame-level distincts de l'intégrité sémantique/physique ; pas de claim VIN ni de succès protocole, pas de repli découverte. IHM Android/Windows principale et validation sémantique complète restent à raccorder, carte et firmware non qualifiés. Aucun test/CI, merge ou Release.

@@ -4,6 +4,9 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.net.SocketTimeoutException;
 import java.util.Arrays;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.Objects;
 import java.util.function.LongSupplier;
 import java.util.zip.CRC32;
@@ -22,10 +25,17 @@ public final class J1979UsbCapture {
         public final boolean deviceCredentialAuthenticated,frameIntegrityVerified;
         public final boolean evidenceAuthenticated=false,physicalVehicleVerified=false;
         public final int records;
-        public final String error;
-        Result(boolean authenticated,boolean framed,int records,String error) {
+        public final String error,observedVin;
+        public final boolean captureIntegrityVerified;
+        public final List<J1979CampaignSemantics.Step> steps;
+        public final J1979CampaignSemantics.Summary summary;
+        Result(boolean authenticated,boolean framed,int records,String error,List<J1979CampaignSemantics.Step> steps,
+               J1979CampaignSemantics.Summary summary) {
             this.deviceCredentialAuthenticated=authenticated;this.frameIntegrityVerified=framed;
-            this.records=records;this.error=error;
+            this.records=records;this.error=error;this.steps=Collections.unmodifiableList(new ArrayList<>(steps));
+            this.summary=framed?summary:null;captureIntegrityVerified=this.summary!=null;
+            String vin=null;for(J1979CampaignSemantics.Step s:steps)if(s.observedVin()!=null)vin=s.observedVin();
+            observedVin=vin;
         }
     }
     private final Link link;
@@ -66,6 +76,8 @@ public final class J1979UsbCapture {
         boolean authenticated=false,framed=false;
         int records=0;
         String error=null;
+        List<J1979CampaignSemantics.Step> steps=new ArrayList<>();
+        J1979CampaignSemantics.Summary summary=null;
         try {
             long start=clock.getAsLong();
             link.write(hello,remaining(start,5000));
@@ -94,6 +106,8 @@ public final class J1979UsbCapture {
                     int req=u(tail[1]),res=u(tail[6])|(u(tail[7])<<8);
                     if(req<1||req>7||res>4095||len!=8+req+res||((state<=3)!=(res>0)))
                         throw new IOException("Invalid CJ/1 observation length");
+                    steps.add(new J1979CampaignSemantics.Step(sequence,state,le32(tail,2),
+                        Arrays.copyOfRange(tail,8,8+req),Arrays.copyOfRange(tail,8+req,len)));
                     counts[state]++;
                 }else if(kind==3){
                     if(len!=22||u(tail[0])<1||u(tail[0])>5||le32(tail,2)!=sequence-1||
@@ -101,7 +115,9 @@ public final class J1979UsbCapture {
                        le32(tail,14)!=counts[3]||le32(tail,18)!=counts[4])
                         throw new IOException("Inconsistent CJ/1 summary");
                     link.checkNoBufferedInput();remaining(start,limit);
-                    records++;framed=true;break;
+                    records++;framed=true;
+                    summary=J1979CampaignSemantics.verify(steps,u(tail[0]),u(tail[1]));
+                    break;
                 }else throw new IOException("Unexpected CJ/1 record");
                 records++;
             }
@@ -111,6 +127,6 @@ public final class J1979UsbCapture {
             try{link.close();}catch(IOException failure){framed=false;if(error==null)error=failure.getMessage();}
             try{raw.flush();}catch(IOException failure){framed=false;if(error==null)error=failure.getMessage();}
         }
-        return new Result(authenticated,framed,records,error);
+        return new Result(authenticated,framed,records,error,steps,summary);
     }
 }

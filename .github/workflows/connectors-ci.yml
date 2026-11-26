@@ -113,7 +113,7 @@ jobs:
           mkdir -p /tmp/android-protocol
           javac -Xlint:all -Werror -d /tmp/android-protocol connectors/host/android/src/main/java/com/camarodiag/connectors/BinaryDiscovery.java connectors/host/android/src/test/java/com/camarodiag/connectors/BinaryDiscoveryTest.java
           java -ea -cp /tmp/android-protocol com.camarodiag.connectors.BinaryDiscoveryTest
-          javac -Xlint:all -Werror -d /tmp/android-protocol connectors/host/android/src/main/java/com/camarodiag/connectors/J1979UsbAuth.java connectors/host/android/src/main/java/com/camarodiag/connectors/J1979UsbCapture.java connectors/host/android/src/test/java/com/camarodiag/connectors/J1979UsbTest.java
+          javac -Xlint:all -Werror -d /tmp/android-protocol connectors/host/android/src/main/java/com/camarodiag/connectors/J1979UsbAuth.java connectors/host/android/src/main/java/com/camarodiag/connectors/J1979CampaignSemantics.java connectors/host/android/src/main/java/com/camarodiag/connectors/J1979UsbCapture.java connectors/host/android/src/test/java/com/camarodiag/connectors/J1979UsbTest.java
           java -ea -cp /tmp/android-protocol com.camarodiag.connectors.J1979UsbTest
       - name: Use runner Android SDK
         run: |
