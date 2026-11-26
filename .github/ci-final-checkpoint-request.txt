@@ -65,3 +65,13 @@ previous_gate_status: Windows Debug and self-tests, Python 3.11/3.12/3.13, nativ
 corrected:
 - Close the combined Mode01/Mode02 positive-response condition; preserve physical 7E8 source pinning and test.
 correction_commit: 520750dc9253748725c6092ec968a8435bd13a18
+
+attempt: 8 -- grouped DoIP closure; Android app integration after diagnostic passed
+previous_gate_sha: 80bc07e8e3de39f090e9fc5bdcfb5ae1b138b6ca
+previous_gate: https://github.com/Hellorheaven/CamaroDiag/actions/runs/45804010207
+previous_gate_status: Python 3.11/3.12/3.13, Windows, native and both firmware builds passed; Android diagnostic compiled and app compile failed on old UDS namespace (2) and missing Compose clickable import.
+corrected:
+- Android MainViewModel failure classification uses canonical com.camarodiag UdsNegativeResponseException and preserves numeric NRC
+- Android ObdScanScreen DTC card explicitly imports Compose clickable
+- C6: E39 kernel link exclusive operation plus simulated concurrency/cancellation regression added, scoped to one actual link, not a global ECU prohibition
+correction_commits: 7b6c904d8978bd97674ab130f5cbf40162c1e79d, e0730eacd59848e75ac7c7e648df5e825caa579a
