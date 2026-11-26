@@ -907,21 +907,28 @@ class DoIpTests(unittest.TestCase):
         layout = parse_did_layout("F40C:2,F40D:1")
         fake = unittest.mock.Mock(spec=Session)
         fake.exchange.side_effect = [bytes.fromhex("62F40C1234F40D56"), bytes.fromhex("62F40C5678F40D90")]
-        fake.read_obd.side_effect = [{"obd_on_uds": True}, {"obd_on_uds": True}]
+        fake.read_obd.side_effect = [{"obd_on_uds": True}] * 3
         def observe(row):
             row["dids"][0]["data"] = "BAD"
         report = Session.monitor_dids(fake, VIN, layout, 2, 0.25, obd=True, on_sample=observe)
         self.assertEqual([row["dids"][0]["data"] for row in report["samples"]], ["1234", "5678"])
         self.assertEqual(fake.exchange.call_count, 2)
         fake.wait.assert_called_once_with(0.25)
-        self.assertEqual(fake.read_obd.call_count, 2)
+        self.assertEqual(fake.read_obd.call_count, 3)
         fake.close.assert_not_called()
-        fake = unittest.mock.Mock(spec=Session)
-        fake.exchange.return_value = bytes.fromhex("62F40C1234F40D56")
-        fake.read_obd.side_effect = [{"obd_on_uds": True}, {"obd_on_uds": False}]
-        with self.assertRaises(DoIpError):
-            Session.monitor_dids(fake, VIN, layout, 1, 0.25, obd=True)
-        fake.close.assert_called_once()
+        for obd in (False, True):
+            fake = unittest.mock.Mock(spec=Session)
+            fake.exchange.side_effect = [bytes.fromhex("62F40C1234F40D56"),
+                                         bytes.fromhex("62F40C5678F40D90")]
+            fake.read_obd.side_effect = [{"obd_on_uds": True}, {"obd_on_uds": True},
+                                         {"obd_on_uds": False}]
+            fake.verify_vin.side_effect = [VIN, VIN, DoIpError("ECU VIN changed")]
+            observed = []
+            with self.assertRaises(DoIpError):
+                Session.monitor_dids(fake, VIN, layout, 2, 0.25, obd=obd, on_sample=observed.append)
+            self.assertEqual([row["index"] for row in observed], [1])
+            self.assertEqual(observed[0]["dids"][0]["data"], "1234")
+            fake.close.assert_called_once()
         fake = unittest.mock.Mock(spec=Session)
         with self.assertRaises(DoIpError):
             Session.monitor_dids(fake, VIN, ((0xF40C, 4096), (0xF40D, 1)))
@@ -1114,22 +1121,44 @@ class DoIpTests(unittest.TestCase):
                 self.calls.append(("wait", interval))
             def close(self):
                 self.closed = True
-        for values, ok, count in [([True, True], True, 2), ([False], False, 0),
-                                   ([True, False], False, 2)]:
+        for values, ok, count in [([True, True, True], True, 2), ([False], False, 0),
+                                   ([True, False], False, 0), ([True, True, False], False, 1)]:
             fake = Fake(values)
             partial = []
             if ok:
                 result = Session.monitor(fake, VIN, 0xF40C, 2, .25, obd=True, on_sample=partial.append)
                 self.assertEqual(result["service_protocol"], "OBDonUDS")
                 self.assertEqual([r["data"] for r in result["samples"]], ["1234", "1234"])
-                self.assertEqual(fake.calls, [("obd", VIN), ("did", 0xF40C), ("wait", .25),
-                                              ("did", 0xF40C), ("obd", VIN)])
+                self.assertEqual(fake.calls, [("obd", VIN), ("did", 0xF40C), ("obd", VIN),
+                                              ("wait", .25), ("did", 0xF40C), ("obd", VIN)])
             else:
                 with self.assertRaises(DoIpError):
                     Session.monitor(fake, VIN, 0xF40C, 2, .25, obd=True, on_sample=partial.append)
                 self.assertTrue(fake.closed)
             self.assertEqual(len(partial), count)
             self.assertNotIn(("uds", VIN), fake.calls)
+
+    def test_uds_monitor_does_not_publish_sample_with_changed_vin(self):
+        fake = unittest.mock.Mock(spec=Session)
+        fake.verify_vin.side_effect = [VIN, VIN, DoIpError("ECU VIN changed")]
+        fake.read_did.side_effect = [b"\x01", b"\x02"]
+        observed = []
+        with self.assertRaises(DoIpError):
+            Session.monitor(fake, VIN, 0xF40D, 2, .25, on_sample=observed.append)
+        self.assertEqual([(r["index"], r["data"]) for r in observed], [(1, "01")])
+        self.assertEqual(fake.verify_vin.call_count, 3)
+        fake.close.assert_called_once()
+
+    def test_idle_interval_expiring_before_read_does_not_close_session(self):
+        client = Session.__new__(Session)
+        client._busy = False
+        wire = unittest.mock.Mock()
+        client._wire = lambda: wire
+        client.close = unittest.mock.Mock()
+        with patch("camarodiagconnectors.doip.time.monotonic", side_effect=[0.0, 0.25]):
+            client.wait(.25)
+        wire.recv.assert_not_called()
+        client.close.assert_not_called()
 
     def test_routing_options_on_wire(self):
         for routing_type, oem in ((0, None), (0xE0, bytes.fromhex("01020304"))):

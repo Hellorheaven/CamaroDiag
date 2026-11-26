@@ -1,3 +1,7 @@
+## PR117 — parité monitoring DoIP Connectors Python (26/11/2026)
+
+- C6/DoIP : les captures mono et multi-DID UDS/OBDonUDS revérifient le VIN et, pour OBDonUDS, le protocole après chaque lecture avant publication du résultat. Les callbacks ne reçoivent plus de mesure provisoire ; un échec ultérieur conserve les échantillons précédemment vérifiés et retire la session. Une expiration de pause avant le premier octet est normale, une trame incomplète reste fatale. Régressions ajustées et ajoutées, non exécutées. Les délais par échange restent inchangés, la cadence dépend des contrôles supplémentaires. Aucun checkpoint.
+
 ## PR117 — invalidation de la découverte DoIP UDP Android (25/11/2026)
 
 - C6/DoIP : le contrôle d'activité s'applique maintenant aux datagrammes de découverte directe, broadcast, multicast, écoute et requêtes d'état/alimentation. La découverte liée à une opération ou un inventaire vérifie en plus le contexte véhicule avant transmission et après observation. Une annonce reçue après invalidation ne peut pas ouvrir une session TCP. Régression loopback ajoutée ; isolation des échecs attendus dans la coroutine du test de monitoring. Aucun test exécuté, aucun checkpoint.

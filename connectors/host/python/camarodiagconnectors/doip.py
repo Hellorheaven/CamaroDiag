@@ -819,9 +819,15 @@ class Session:
             raise DoIpError("Invalid idle interval")
         end = time.monotonic() + seconds
         try:
-            while time.monotonic() < end:
+            while True:
                 wire = self._wire()
-                wire.settimeout(remaining(end))
+                # An expired idle interval before the first byte is normal,
+                # including expiration between clock evaluation and settimeout.
+                try:
+                    budget = remaining(end)
+                except TimeoutError:
+                    return
+                wire.settimeout(budget)
                 try:
                     first = wire.recv(1)
                 except socket.timeout:
@@ -932,12 +938,14 @@ class Session:
         logical(did)
         if obd and not 0xF400 <= did <= 0xF8FF:
             raise DoIpError("Expected legislated OBDonUDS DID F400..F8FF")
-        try:
+        def verify():
             if obd:
                 if not self.read_obd(expected)["obd_on_uds"]:
                     raise DoIpError("Selected ECU did not identify as OBDonUDS")
             else:
                 self.verify_vin(expected)
+        try:
+            verify()
             rows = []
             start = time.monotonic()
             for index in range(1, samples + 1):
@@ -948,15 +956,13 @@ class Session:
                 row = {"index": index, "utc": datetime.now(timezone.utc).isoformat(),
                        "elapsed_ms": int((time.monotonic() - start) * 1000),
                        "data": data.hex().upper()}
+                # Publish only after identity has been checked on this same route.
+                # A subsequent failure must not invalidate already verified rows.
+                verify()
                 rows.append(row)
                 on_sample(dict(row))
                 if index < samples:
                     self.wait(interval)
-            if obd:
-                if not self.read_obd(expected)["obd_on_uds"]:
-                    raise DoIpError("OBDonUDS identification changed during monitoring")
-            else:
-                self.verify_vin(expected)
             return {"vin": expected, "did": did, "service_protocol": "OBDonUDS" if obd else "UDS",
                     "samples": rows}
         except BaseException:
@@ -987,11 +993,11 @@ class Session:
                 require_sample_identity(values, expected, obd)
                 row = {"index": index, "utc": datetime.now(timezone.utc).isoformat(),
                        "elapsed_ms": int((time.monotonic() - start) * 1000), "dids": values}
+                verify()
                 rows.append(row)
                 on_sample({**row, "dids": [dict(item) for item in values]})
                 if index < samples:
                     self.wait(interval)
-            verify()
             return {"vin": expected, "service_protocol": "OBDonUDS" if obd else "UDS", "samples": rows}
         except BaseException:
             self.close()
