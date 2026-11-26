@@ -1282,4 +1282,7 @@
     <string name="obd_mode09_raw">Mode 09 type %1$02X — réponse brute</string>
     <string name="cal_recovery_problem_address">Bloc de sauvegarde invalide ou corrompu à 0x%1$X</string>
     <string name="cal_recovery_uncertain_region">Région à risque : %1$s</string>
+    <string name="obd_mode05_results">Mode 05 — résultats des tests de sondes lambda (protocoles historiques)</string>
+    <string name="obd_mode05_partial">Inventaire des tests ou réponse incomplets.</string>
+    <string name="obd_mode05_raw_notice">Résultats codés ; fin du test embarqué et attribution au calculateur non établies.</string>
 </resources>
