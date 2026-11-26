@@ -895,22 +895,39 @@ internal sealed partial class BridgeDesktopForm
                     var certificate = thumbprint.Length == 0 ? null : thumbprint;
                     if (inventoryTargets is not null)
                     {
+                        var displayed = 0;
                         var rows = await DoIpVinReader.InventoryObservedAsync(observed, expectedObdVin, tester,
                             inventoryTargets, useTls, timeout, stop.Token, certificate, options, JournalDoIpUdp, TraceForEcu,
-                            operation == DoIpReadOperation.ObdInventory);
+                            operation == DoIpReadOperation.ObdInventory, (partial, total) =>
+                            {
+                                RequireCompleteTrace();
+                                stop.Token.ThrowIfCancellationRequested();
+                                if (IsDisposed || Disposing || !ReferenceEquals(observed, doIpObservedGateway))
+                                    throw new InvalidOperationException("DoIP target changed.");
+                                foreach (var row in partial.Skip(displayed))
+                                {
+                                    ConsoleLine("SYSTEM", string.Format(DoIpConsolePresentation.Text(row.Vin is null ?
+                                        "InventoryUnverified" : "InventoryVerified"), row.Ecu, row.Vin ?? ""),
+                                        row.Vin is null ? Color.DarkOrange : Color.DarkGreen);
+                                    if (row.Vin is null)
+                                        ConsoleLine("SYSTEM", DoIpConsolePresentation.Text(row.Reason switch
+                                        {
+                                            "timeout" => "InventoryReasonTimeout",
+                                            "identity_or_response_invalid" => "InventoryReasonIdentity",
+                                            _ => "InventoryReasonCommunication"
+                                        }), Color.DarkOrange);
+                                    if (row.ProtocolValue is byte protocol)
+                                        ConsoleLine("SYSTEM", string.Format(DoIpConsolePresentation.Text(protocol == 1 ?
+                                            "InventoryObdSupported" : "InventoryObdUnrecognized"), row.Ecu, protocol),
+                                            protocol == 1 ? Color.DarkGreen : Color.DarkOrange);
+                                }
+                                displayed = partial.Count;
+                                ConsoleLine("SYSTEM", string.Format(DoIpConsolePresentation.Text("InventoryProgress"),
+                                    partial.Count, total), Color.DarkSlateGray);
+                            });
                         RequireCompleteTrace();
                         stop.Token.ThrowIfCancellationRequested();
-                        if (IsDisposed || Disposing) return;
-                        foreach (var row in rows)
-                        {
-                            ConsoleLine("SYSTEM", string.Format(DoIpConsolePresentation.Text(row.Vin is null ?
-                                "InventoryUnverified" : "InventoryVerified"), row.Ecu, row.Vin ?? ""),
-                                row.Vin is null ? Color.DarkOrange : Color.DarkGreen);
-                            if (row.ProtocolValue is byte protocol)
-                                ConsoleLine("SYSTEM", string.Format(DoIpConsolePresentation.Text(protocol == 1 ?
-                                    "InventoryObdSupported" : "InventoryObdUnrecognized"), row.Ecu, protocol),
-                                    protocol == 1 ? Color.DarkGreen : Color.DarkOrange);
-                        }
+                        if (IsDisposed || Disposing || !ReferenceEquals(observed, doIpObservedGateway)) return;
                         ConsoleLine("SYSTEM", string.Format(DoIpConsolePresentation.Text("InventoryComplete"),
                             rows.Count(row => row.Vin is not null), rows.Count), Color.DarkGreen);
                     }
