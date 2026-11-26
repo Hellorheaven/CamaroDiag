@@ -57,6 +57,34 @@ class DoIpArchiveTests(unittest.TestCase):
                 archive.write_bytes(broken)
                 with self.assertRaises(ValueError):
                     run(args)
+            # Local metadata must agree even when the central directory is intact.
+            for offset in (8, 14, 18, 22, 30):
+                broken = bytearray(valid)
+                broken[offset] ^= 1
+                archive.write_bytes(broken)
+                with self.assertRaises(ValueError):
+                    run(args)
+            # Android ZipOutputStream writes CRC and sizes after compressed
+            # data. Reproduce that form with a non-seekable Python writer.
+            import io
+            from zipfile import ZIP_DEFLATED
+            class NonSeekable(io.BytesIO):
+                def seek(self, *args):
+                    raise io.UnsupportedOperation("not seekable")
+            output = NonSeekable()
+            with ZipFile(output, "w", ZIP_DEFLATED) as zip:
+                zip.writestr("manifest.json", json.dumps(manifest))
+                zip.writestr("original.bin", data)
+                zip.writestr("verification.bin", data)
+            descriptor_zip = output.getvalue()
+            archive.write_bytes(descriptor_zip)
+            self.assertTrue(run(args)["archive_integrity_verified"])
+            first_descriptor = descriptor_zip.index(b"PK\x07\x08")
+            broken = bytearray(descriptor_zip)
+            broken[first_descriptor + 4] ^= 1
+            archive.write_bytes(broken)
+            with self.assertRaises(ValueError):
+                run(args)
             for invalid in ("2026-11-24", "2026-11-24 12:00:00+00:00",
                             "2026-11-24T12:00:00", "2026-11-24T12:00:00+0000"):
                 original_time = manifest["capturedAtUtc"]
