@@ -54,8 +54,12 @@ class DoIpGatewayControlTraceTest {
         fun bytes(value: String) = value.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
         val scope = DoIpMemoryBackup.Scope(vin, 0x1000, 0x0E80, 0x1234, 0x1235,
             "A1B2", 0x100, 4, 2, "CALIBRATION")
-        scope.copy(length = 8192, blockSize = 1).validate()
-        assertTrue(runCatching { scope.copy(length = 8193, blockSize = 1).validate() }.isFailure)
+        scope.copy(length = 8192, blockSize = 1).validateCapture()
+        scope.copy(length = 8192 * 256, blockSize = 256).validateCapture()
+        val archiveOnly = scope.copy(length = 8193, blockSize = 1)
+        archiveOnly.validate()
+        assertFalse(archiveOnly.canCapture())
+        assertTrue(runCatching { archiveOnly.validateCapture() }.isFailure)
         for (scenario in listOf("success", "identity-changed", "gateway-changed")) {
             DatagramSocket(0, loopback).use { udp ->
                 java.net.ServerSocket(0, 1, loopback).use { tcp ->
@@ -129,6 +133,36 @@ class DoIpGatewayControlTraceTest {
                 }
             }
         }
+    }
+
+    @Test fun archiveReaderComparesBinaryEntriesInEitherOrderAndRejectsInvalidLengths() {
+        val first = ByteArray(2 * 1024 * 1024 + 1) { (it % 251).toByte() }
+        fun archive(original: ByteArray, verification: ByteArray,
+            reversed: Boolean = false, extra: Boolean = false): ByteArray {
+            val output = java.io.ByteArrayOutputStream()
+            java.util.zip.ZipOutputStream(output).use { zip ->
+                fun entry(name: String, data: ByteArray) {
+                    zip.putNextEntry(java.util.zip.ZipEntry(name))
+                    zip.write(data)
+                    zip.closeEntry()
+                }
+                if (reversed) entry("verification.bin", verification) else entry("original.bin", original)
+                entry("manifest.json", "{}".toByteArray())
+                if (reversed) entry("original.bin", original) else entry("verification.bin", verification)
+                if (extra) entry("unexpected.bin", byteArrayOf(1))
+            }
+            return output.toByteArray()
+        }
+        fun read(bytes: ByteArray) = DoIpMemoryBackup.readArchiveContents(bytes.inputStream(), first.size)
+        val normal = read(archive(first, first.copyOf()))
+        val reversed = read(archive(first, first.copyOf(), reversed = true))
+        assertEquals(normal.sha256, reversed.sha256)
+        assertEquals("{}", normal.manifest.toString(Charsets.UTF_8))
+        val changed = first.copyOf().also { it[it.lastIndex] = 99 }
+        assertTrue(runCatching { read(archive(first, changed)) }.isFailure)
+        assertTrue(runCatching { read(archive(first, first.copyOf(first.size - 1))) }.isFailure)
+        assertTrue(runCatching { read(archive(first.copyOf(first.size + 1), first)) }.isFailure)
+        assertTrue(runCatching { read(archive(first, first, extra = true)) }.isFailure)
     }
 
     @Test fun discoverySourceRequiresExpectedIpv6Scope() {
