@@ -87,6 +87,61 @@ internal static class DoIpConsolePresentationSelfTests
         progress.MarkComplete();
         Check(progress.Complete && progress.VerifiedSamples == progress.RequestedSamples, "Complete verified capture.");
 
+        var sequence = new DoIpSequenceProgress("1G1FA1RXXR0123456", "127.0.0.1",
+            0x1234, 0x0E80, 0x1235, tls: true, requestedCommands: 2);
+        using (var firstProgress = System.Text.Json.JsonDocument.Parse(
+            sequence.RecordVerified(1, [0x62,0xF1,0x90])))
+        {
+            var row = firstProgress.RootElement.GetProperty("sequence_progress");
+            Check(row.GetProperty("partial").GetBoolean() && !row.GetProperty("complete").GetBoolean() &&
+                row.GetProperty("index").GetInt32() == 1 &&
+                row.GetProperty("commands_completed").GetInt32() == 1 &&
+                row.GetProperty("requested_commands").GetInt32() == 2 &&
+                row.GetProperty("vin").GetString() == "1G1FA1RXXR0123456" &&
+                row.GetProperty("tester").GetUInt16() == 0x0E80 &&
+                row.GetProperty("ecu").GetUInt16() == 0x1235 &&
+                row.GetProperty("gateway_logical_address").GetUInt16() == 0x1234 &&
+                row.GetProperty("transport").GetString() == "TLS" &&
+                row.GetProperty("response").GetString() == "62F190",
+                "Sequence JSON records verified route and never claims early completion.");
+        }
+        foreach (var invalidIndex in new[] { 0, 1, 3 })
+        {
+            var rejected = false;
+            try { _ = sequence.RecordVerified(invalidIndex, [0x62]); }
+            catch (InvalidDataException) { rejected = true; }
+            Check(rejected && sequence.CommandsCompleted == 1,
+                "Duplicate or out-of-order DoIP sequence responses cannot advance progress.");
+        }
+        var prematureSequence = false;
+        try { _ = sequence.Summary(complete: true); }
+        catch (InvalidDataException) { prematureSequence = true; }
+        Check(prematureSequence, "Incomplete command sequence cannot publish success.");
+        using (var partialSummary = System.Text.Json.JsonDocument.Parse(sequence.Summary(complete: false)))
+        {
+            var row = partialSummary.RootElement.GetProperty("sequence_summary");
+            Check(row.GetProperty("commands_completed").GetInt32() == 1 &&
+                !row.GetProperty("sequence_complete").GetBoolean() &&
+                !row.GetProperty("complete").GetBoolean(),
+                "Failure summary retains verified partial progress.");
+        }
+        _ = sequence.RecordVerified(2, [0x59,0x01,0xFF]);
+        using (var closeFailed = System.Text.Json.JsonDocument.Parse(sequence.Summary(complete: false)))
+        {
+            var row = closeFailed.RootElement.GetProperty("sequence_summary");
+            Check(row.GetProperty("commands_completed").GetInt32() == 2 &&
+                !row.GetProperty("sequence_complete").GetBoolean(),
+                "Even a full reply count is not a clean-close proof.");
+        }
+        using (var finishedSequence = System.Text.Json.JsonDocument.Parse(sequence.Summary(complete: true)))
+        {
+            var row = finishedSequence.RootElement.GetProperty("sequence_summary");
+            Check(row.GetProperty("sequence_complete").GetBoolean() &&
+                row.GetProperty("complete").GetBoolean() &&
+                row.GetProperty("commands_completed").GetInt32() == 2,
+                "Completion summary is allowed only after every verified reply.");
+        }
+
         var defaults = DoIpDiagnosticTransport.SessionOptions.Parse(3000, "", "", "00", "");
         Check(defaults.P2Ms == 3000 && defaults.P2StarMs == 3000 &&
             defaults.RoutingType == 0 && defaults.OemBytes is null, "Blank settings retain total timeout and default routing.");
