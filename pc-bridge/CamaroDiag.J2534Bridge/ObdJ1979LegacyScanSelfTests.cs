@@ -113,6 +113,24 @@ internal static class ObdJ1979LegacyScanSelfTests
             string[] cli = [ObdJ1979LegacyCli.Command, "--adapter-index", "0", "--variant", "2", "--source", "10",
                 "--confirm-legacy-profile", "--output", "new.json"];
             Check(ObdJ1979LegacyCli.Parse(cli).Variant == vpw, "independent CLI variant");
+            var discoveryOptions = ObdJ1979LegacyCli.Parse(cli.Select(x => x == "10" ? "discover" : x).ToArray());
+            Check(discoveryOptions.Source is null, "explicit unpinned discovery");
+            var discovery = ObdJ1979LegacyDiscovery.Run((request, _) =>
+            {
+                Check(request.SequenceEqual(new byte[] {1,0}), "discovery only PID00");
+                return new("686AF10100", [
+                    new(0x10, "486B10410080000000", [0x41,0,0x80,0,0,0], 1),
+                    new(0x11, "486B11410040000000", [0x41,0,0x40,0,0,0], 2),
+                    new(0x11, "486B11410080000000", [0x41,0,0x80,0,0,0], 3),
+                    new(0x12, "486B127F0111", [0x7F,1,0x11], 4)
+                ]);
+            }, () => {});
+            Check(discovery.HasVerifiedSource && discovery.Sources.Single(x => x.ResponseSource == "10").Status == "PASSED",
+                "verified source retained");
+            Check(discovery.Sources.Single(x => x.ResponseSource == "11").Status == "FAILED" &&
+                discovery.Sources.Single(x => x.ResponseSource == "12").Status == "NOT_TESTED",
+                "conflicts and refusals do not become verified sources");
+            Check(discovery.Sources.Single(x => x.ResponseSource == "11").Records.Count == 2, "conflict evidence retained");
             Reject(() => ObdJ1979LegacyCli.Parse([..cli, "--allow-obd-clear"]), "mixed command denied");
             Reject(() => ObdJ1979LegacyCli.Parse(cli.Where(x => x != "--confirm-legacy-profile").ToArray()), "explicit profile required");
             Reject(() => ObdJ1979LegacyCli.Parse([..cli, "--source", "11"]), "duplicate source denied");
