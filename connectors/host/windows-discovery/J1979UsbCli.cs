@@ -41,25 +41,30 @@ internal static class J1979UsbCli
             Console.Write("Qualified hardware and documented physical ECU, stationary vehicle; start read-only test? [yes/no] ");
             if(Console.ReadLine()!="yes")return 2;
             using var output=new FileStream(reportPath,FileMode.CreateNew,FileAccess.Write,FileShare.None);
-            J1979UsbCapture.Result result;
+            J1979UsbCapture.Result result=new(false,false,0,"USB campaign not started");
             var timer=Stopwatch.StartNew();
+            int cancelled=0;
+            ConsoleCancelEventHandler cancelHandler=(_,e)=>{e.Cancel=true;Interlocked.Exchange(ref cancelled,1);};
+            Console.CancelKeyPress+=cancelHandler;
             try{
                 using var raw=new FileStream(capturePath,FileMode.CreateNew,FileAccess.Write,FileShare.None);
                 using var port=new SerialPort(values["--port"],115200,Parity.None,8,StopBits.One){
                     Handshake=Handshake.None,DtrEnable=true,RtsEnable=false,ReadTimeout=100,WriteTimeout=1000
                 };
+                if(Volatile.Read(ref cancelled)!=0)throw new OperationCanceledException("USB campaign cancelled");
                 port.Open();
-                result=new J1979UsbCapture(new J1979SerialPortLink(port,()=>true)).Run(tx,rx,ext,budget,key,raw);
+                result=new J1979UsbCapture(new J1979SerialPortLink(port,()=>Volatile.Read(ref cancelled)==0)).Run(tx,rx,ext,budget,key,raw);
                 raw.Flush(flushToDisk:true);
-            }catch(Exception error) when(error is IOException or UnauthorizedAccessException or TimeoutException or InvalidOperationException){
-                result=new(false,false,0,error.Message);
-            }
+            }catch(Exception error) when(error is IOException or UnauthorizedAccessException or TimeoutException or InvalidOperationException or OperationCanceledException){
+                result=result with {FrameIntegrityVerified=false,Error=error.Message,Summary=null};
+            }finally{Console.CancelKeyPress-=cancelHandler;}
+            bool wasCancelled=Volatile.Read(ref cancelled)!=0;
             J1979NativeReport.Write(output,result,typeof(J1979UsbCli).Assembly.GetName().Version?.ToString()??"",
                 values["--vehicle"],values["--ecu"],values["--connector"],tx,rx,ext,budget,timer.ElapsedMilliseconds,
-                Path.GetFileName(capturePath),expectedVin:expectedVin);
+                Path.GetFileName(capturePath),cancelled:wasCancelled,expectedVin:expectedVin);
             output.Flush(flushToDisk:true);
             Console.WriteLine("Raw CJ/1 and diagnostic evidence saved. Physical provenance not established.");
-            return result.CaptureIntegrityVerified&&result.Summary?.End=="COMPLETE"&&
+            return !wasCancelled&&result.CaptureIntegrityVerified&&result.Summary?.End=="COMPLETE"&&
                 (expectedVin is null||J1979NativeReport.VinMatch(result,expectedVin)=="MATCH")?0:2;
         }catch(Exception error) when(error is IOException or UnauthorizedAccessException or ArgumentException or TimeoutException or InvalidOperationException){
             Console.Error.WriteLine("CU/1 failed: "+error.Message);return 2;

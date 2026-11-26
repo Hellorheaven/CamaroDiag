@@ -79,3 +79,34 @@ class LiveUsbTests(unittest.TestCase):
         other = record(1, 0, struct.pack("<IIBI", 0x7E1, 0x7E9, 0, 10000))
         report, _, _ = self.run_fake(self.challenge + other + self.capture[len(self.start):])
         self.assertFalse(report["capture_integrity_verified"])
+
+    def test_interrupt_preserves_capture_prefix(self):
+        class InterruptPort(FakePort):
+            def read(self, size):
+                if len(self.writes) == 2 and len(self.incoming) < len(self_capture):
+                    raise KeyboardInterrupt()
+                return super().read(size)
+        self_capture = self.capture
+        port = InterruptPort(self.challenge + self.capture)
+        raw = io.BytesIO()
+        report = run_campaign(port, key=self.key, tx=0x7E0, rx=0x7E8,
+            extended=False, budget_ms=10000, capture=raw, clock=lambda: port.now,
+            nonce=self.nonce)
+        self.assertTrue(report["cancelled"])
+        self.assertTrue(report["device_credential_authenticated"])
+        self.assertFalse(report["capture_integrity_verified"])
+        self.assertEqual(raw.getvalue(), self.capture[:7])
+        self.assertEqual(len(port.writes), 2)
+
+    def test_slow_hello_cannot_send_client_proof(self):
+        class SlowPort(FakePort):
+            def write(self, data):
+                self.now += 6.0
+                return super().write(data)
+        port = SlowPort(self.challenge + self.capture)
+        report = run_campaign(port, key=self.key, tx=0x7E0, rx=0x7E8,
+            extended=False, budget_ms=10000, capture=io.BytesIO(), clock=lambda: port.now,
+            nonce=self.nonce)
+        self.assertFalse(report["capture_integrity_verified"])
+        self.assertFalse(report["device_credential_authenticated"])
+        self.assertEqual(len(port.writes), 1)

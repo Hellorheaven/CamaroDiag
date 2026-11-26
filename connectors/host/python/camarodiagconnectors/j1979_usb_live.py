@@ -23,11 +23,16 @@ def run_campaign(port, *, key: bytes, tx: int, rx: int, extended: bool,
     authenticated = False
     started = clock()
     error = None
+    cancelled = False
     raw = bytearray()
 
-    def write_once(data):
+    def write_once(data, deadline):
+        if clock() >= deadline:
+            raise TimeoutError("USB write deadline exceeded")
         if port.write(data) != len(data):
             raise OSError("Incomplete USB command; no retry")
+        if clock() >= deadline:
+            raise TimeoutError("USB write deadline exceeded; no retry")
 
     def read_exact(size, deadline, *, record=False):
         result = bytearray()
@@ -48,11 +53,11 @@ def run_campaign(port, *, key: bytes, tx: int, rx: int, extended: bool,
         return bytes(result)
 
     try:
-        write_once(request)
+        write_once(request, started + 5.0)
         challenge = read_exact(68, started + 5.0)
         client = proof(request, challenge, key)
         authenticated = True
-        write_once(client)
+        write_once(client, started + 5.0)
         # Campaign budget is diagnostic execution time; a bounded allowance
         # covers start/stop and stream overhead. No per-record timeout reset.
         deadline = clock() + budget_ms / 1000 + 15.0
@@ -67,7 +72,11 @@ def run_campaign(port, *, key: bytes, tx: int, rx: int, extended: bool,
                 # A serial connection has no EOF. A bounded quiet read only
                 # detects immediately available trailing bytes; it does not
                 # authenticate the stream or prove permanent closure.
+                if clock() >= deadline:
+                    raise TimeoutError("USB summary deadline exceeded")
                 extra = port.read(1)
+                if clock() >= deadline:
+                    raise TimeoutError("USB summary deadline exceeded")
                 if extra:
                     raw.extend(extra)
                     if capture.write(extra) != len(extra):
@@ -76,6 +85,9 @@ def run_campaign(port, *, key: bytes, tx: int, rx: int, extended: bool,
                 break
         else:
             raise ValueError("Campaign record limit exceeded")
+    except KeyboardInterrupt:
+        cancelled = True
+        error = "USB campaign cancelled by operator; no retry"
     except (ValueError, OSError, EOFError) as exc:
         error = str(exc)
     report = decode(io.BytesIO(raw))
@@ -89,6 +101,7 @@ def run_campaign(port, *, key: bytes, tx: int, rx: int, extended: bool,
         report["capture_integrity_verified"] = False
         report["error"] = error
     report.update(source="LIVE_USB_CU1", device_credential_authenticated=authenticated,
+                  cancelled=cancelled,
                   hardware_provenance_verified=False, evidence_authenticated=False,
                   duration_ms=max(0, int((clock() - started) * 1000)))
     return report

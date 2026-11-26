@@ -63,14 +63,17 @@ def run(argv=None):
                         extended=args.extended, budget_ms=args.budget_ms, capture=raw)
                 raw.flush()
                 os.fsync(raw.fileno())
-        except (OSError, ValueError) as exc:
+        except (OSError, ValueError, KeyboardInterrupt) as exc:
             if report is None:
                 report = {"schema": "camarodiag-functional-j1979-embedded-evidence-v1",
                           "protocol": "SAE-J1979", "source": "LIVE_USB_CU1",
                           "device_credential_authenticated": False, "evidence_authenticated": False,
                           "physical_vehicle_verified": False, "observed_vin": None,
                           "steps": [], "summary": None}
-            report.update(capture_integrity_verified=False, error=str(exc))
+            report.update(capture_integrity_verified=False,
+                          cancelled=bool(report.get("cancelled")) or isinstance(exc, KeyboardInterrupt),
+                          error="USB campaign cancelled by operator" if isinstance(exc, KeyboardInterrupt) else str(exc))
+        report.setdefault("cancelled", False)
         report.setdefault("service_observations", service_observations(report["steps"]))
         report.update(declared_vin=expected_vin,
                       vin_match=vin_match(report, expected_vin, require_device_auth=True))
@@ -93,7 +96,7 @@ def main():
         raise SystemExit(2) from exc
     print(json.dumps({"capture_integrity_verified": report["capture_integrity_verified"],
                       "steps": len(report["steps"]), "error": report["error"]}))
-    if (not report["capture_integrity_verified"] or report["summary"]["end"] != "COMPLETE"
+    if (report.get("cancelled") or not report["capture_integrity_verified"] or report["summary"]["end"] != "COMPLETE"
             or report["vin_match"] not in ("NOT_REQUESTED", "MATCH")):
         raise SystemExit(2)
 

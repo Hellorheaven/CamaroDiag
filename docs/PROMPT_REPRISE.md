@@ -1,3 +1,7 @@
+## J1979 — annulation CLI et échéances USB (26/11/2026)
+
+- Python : interruption opérateur conservée comme résultat annulé, préfixe CJ/1 conservé, échéance vérifiée avant/après les deux écritures et la lecture finale, aucun renvoi automatique. Windows : Ctrl+C révoque la session série sans tuer immédiatement le processus, export JSON annulé, conservation des observations déjà acquises lors d'une erreur de synchronisation disque/fermeture. Régressions Python écrites, non exécutées ; clôture logicielle J1979/C6 toujours ouverte, aucun test intermédiaire ni Release.
+
 ## J1979 — comparaison VIN et cohérence des rapports USB (26/11/2026)
 
 - Android et Windows GUI enregistrent le VIN déclaré et l'état MATCH/MISMATCH/UNVERIFIED ; CLI Windows et Python live/offline acceptent désormais --vin facultatif et retournent un code non nul si la comparaison demandée échoue. Python conserve le préfixe de rapport en cas d'échec de persistance et invalide son intégrité. La comparaison ne prouve pas la provenance physique. Régressions écrites, aucune exécution. C6/J1979 ouverts ; pas de CI, merge ou Release.
