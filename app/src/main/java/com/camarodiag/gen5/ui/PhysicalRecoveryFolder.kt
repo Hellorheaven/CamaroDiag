@@ -38,6 +38,37 @@ internal object PhysicalRecoveryFolder {
     internal fun sameInventory(before: List<Entry>, after: List<Entry>): Boolean =
         uniqueEntries(before) && uniqueEntries(after) && before.toSet() == after.toSet()
 
+    internal fun uniqueTree(rootId: String, root: List<Entry>, blocks: List<Entry>): Boolean =
+        rootId.isNotBlank() && uniqueEntries(root) && uniqueEntries(blocks) &&
+            (listOf(rootId) + root.map { it.id } + blocks.map { it.id }).let {
+                it.size == it.distinct().size
+            }
+
+    internal fun verifyStagedFile(file: File, expectedSize: Long, expectedHash: ByteArray,
+        active: () -> Unit) {
+        active()
+        check(expectedSize > 0 && expectedHash.size == 32 &&
+            Files.isRegularFile(file.toPath(), java.nio.file.LinkOption.NOFOLLOW_LINKS))
+        val digest = MessageDigest.getInstance("SHA-256")
+        var count = 0L
+        file.inputStream().use { input ->
+            val buffer = ByteArray(8192)
+            while (true) {
+                active()
+                val n = input.read(buffer)
+                if (n < 0) break
+                check(n > 0)
+                count += n
+                check(count <= expectedSize)
+                digest.update(buffer, 0, n)
+            }
+        }
+        check(count == expectedSize && MessageDigest.isEqual(expectedHash, digest.digest())) {
+            "Recovery staging bytes changed."
+        }
+        active()
+    }
+
     suspend fun inspect(
         resolver: ContentResolver, tree: Uri, cacheDir: File, identity: PhysicalRecoveryIdentity,
         current: () -> Boolean
@@ -69,7 +100,7 @@ internal object PhysicalRecoveryFolder {
         val journal = root.single { it.name == name && !it.directory }
         val blocks = root.single { it.name == "$name.blocks" && it.directory }
         val files = children(blocks.id)
-        check(files.none { it.id == journal.id || it.id == blocks.id || it.id == rootId })
+        check(uniqueTree(rootId, root, files)) { "Recovery document alias across directories." }
         check(files.isNotEmpty() && files.all { !it.directory && safeName(it.name) && it.name.endsWith(".ecu-block") })
         val staging = Files.createTempDirectory(cacheDir.toPath(), "ecu-inspection-").toFile()
         var total = 0L
@@ -136,9 +167,21 @@ internal object PhysicalRecoveryFolder {
             check(sameInventory(root, children(rootId)) && sameInventory(files, children(blocks.id))) {
                 "Recovery source inventory changed during verification."
             }
+            fun verifyStaging() {
+                active()
+                check(staging.list()?.toSet() == setOf(name, "$name.blocks"))
+                check(Files.isDirectory(blockDir.toPath(), java.nio.file.LinkOption.NOFOLLOW_LINKS))
+                check(blockDir.list()?.toSet() == files.map { it.name }.toSet())
+                for ((entry, evidence) in digests) {
+                    val destination = if (entry == journal) journalFile else File(blockDir, entry.name)
+                    verifyStagedFile(destination, evidence.first, evidence.second, ::active)
+                }
+            }
+            verifyStaging()
+            val result = EcuWriteTransaction.inspectRecoveryEvidence(journalFile, identity.target(), identity.vin, ::active)
+            verifyStaging()
             active()
-            return EcuWriteTransaction.inspectRecoveryEvidence(journalFile, identity.target(), identity.vin, ::active)
-                .also { active() }
+            return result
         } finally {
             staging.deleteRecursively()
         }
