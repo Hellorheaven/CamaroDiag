@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms</value></resheader>
+  <data name="Run" xml:space="preserve"><value>SAE J1979 CAN</value></data>
+  <data name="Prerequisites" xml:space="preserve"><value>Sélectionnez une interface, confirmez le profil physique du calculateur et arrêtez le pont et la console.</value></data>
+  <data name="InvalidChannel" xml:space="preserve"><value>Sélectionnez une paire d’adresses CAN physiques OBD ISO 15765-4 valide.</value></data>
+  <data name="Running" xml:space="preserve"><value>Campagne de lecture physique J1979 en cours.</value></data>
+  <data name="Completed" xml:space="preserve"><value>Campagne achevée. Consultez les résultats individuels.</value></data>
+  <data name="Partial" xml:space="preserve"><value>Durée maximale atteinte ; campagne incomplète.</value></data>
+  <data name="Unavailable" xml:space="preserve"><value>Indisponible</value></data>
+  <data name="MutationsNotTested" xml:space="preserve"><value>Mode 04, Mode 05 legacy et exécution des commandes Mode 08 non testés.</value></data>
+  <data name="Cancelled" xml:space="preserve"><value>Campagne annulée ou autorisation expirée.</value></data>
+  <data name="Failed" xml:space="preserve"><value>Échec de la campagne :</value></data>
+  <data name="JsonFilter" xml:space="preserve"><value>Rapport JSON (*.json)|*.json</value></data>
+  <data name="ExportFailed" xml:space="preserve"><value>Impossible d’exporter le rapport J1979.</value></data>
+</root>
