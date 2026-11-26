@@ -797,9 +797,19 @@ internal static class DoIpVinReader
         var frozen = FreezeCommands(commands);
         if (gateway.Vin is null || !DoIpVehicleDiscovery.IsVehicleVin(gateway.Vin))
             throw new ArgumentException("A valid observed VIN is required.");
-        await using var transport = await ConnectObservedAsync(gateway, address, tester, ecu,
-            useTls, timeout, token, certificate, trace, options);
-        return await ExchangeSequenceVerifiedAsync(transport, gateway, frozen, timeout, token, onReply);
+        int completed;
+        await using (var transport = await ConnectObservedAsync(gateway, address, tester, ecu,
+            useTls, timeout, token, certificate, trace, options))
+        {
+            completed = await ExchangeSequenceVerifiedAsync(transport, gateway, frozen, timeout, token, onReply);
+        }
+        // Confirm gateway identity *after* all commands and TCP/TLS disposal.
+        // A substituted gateway must not produce a completed GUI sequence;
+        // already delivered replies remain provisional and are never replayed.
+        token.ThrowIfCancellationRequested();
+        await DoIpVehicleDiscovery.RequireCurrentIdentityAsync(gateway, timeout, token);
+        token.ThrowIfCancellationRequested();
+        return completed;
     }
 
     private static byte[][] FreezeCommands(IReadOnlyList<byte[]> commands)
