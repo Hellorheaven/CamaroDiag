@@ -402,7 +402,7 @@ object DoIpDirectRead {
                     controlTrace("RX", "UDP", address, buffer.copyOf(received.length), onControlTrace)
                     requireIoCurrent(active, current)
                     val frame = parseFrame(buffer.copyOfRange(0, 8), buffer.copyOfRange(8, received.length))
-                    if (frame.type == 0) throw IOException("DoIP gateway rejected identification.")
+                    requireNoHeaderNack(frame)
                     if (frame.type != 0x0004) continue
                     require(frame.data.size in setOf(32, 33)) { "Invalid DoIP identity announcement." }
                     val observedEid = hex(frame.data.copyOfRange(19, 25))
@@ -621,7 +621,7 @@ object DoIpDirectRead {
                     requireIoCurrent(active)
                     val frame = parseFrame(buffer.copyOfRange(0, 8), buffer.copyOfRange(8, packet.length))
                     require(frame.version == gateway.version)
-                    if (frame.type == 0) throw IOException("DoIP gateway rejected control query.")
+                    requireNoHeaderNack(frame)
                     if (frame.type != if (power) 0x4004 else 0x4002) continue
                     if (power) {
                         require(frame.data.size == 1 && frame.data[0].u8() in 0..2)
@@ -688,7 +688,7 @@ object DoIpDirectRead {
             if (idle || frame.type != 0x8001) recordControl("RX", header + data)
             remaining(deadline)
             require(frame.version == gateway.version) { "DoIP protocol version changed." }
-            if (frame.type == 0) throw IOException("DoIP generic negative acknowledgement.")
+            requireNoHeaderNack(frame)
             return frame
         }
         private fun alive(frame: Frame, deadline: Long): Boolean {
@@ -708,7 +708,7 @@ object DoIpDirectRead {
                 when (frame.data[4].u8()) {
                     0x10 -> return
                     0x11 -> continue
-                    else -> throw IOException("DoIP routing activation denied.")
+                    else -> throw Refusal(RefusalLayer.ROUTING, frame.data[4].u8())
                 }
             }
         }
@@ -772,8 +772,10 @@ object DoIpDirectRead {
                 if (frame.type == 0x8002 || frame.type == 0x8003) {
                     val echo = frame.data.copyOfRange(5, frame.data.size)
                     require(echo.size <= request.size && request.copyOf(echo.size).contentEquals(echo))
-                    if (frame.type == 0x8003 || frame.data[4].u8() != 0)
-                        throw IOException("DoIP diagnostic acknowledgement rejected.")
+                    if (frame.type == 0x8003)
+                        throw Refusal(RefusalLayer.DIAGNOSTIC_ACK, frame.data[4].u8())
+                    if (frame.data[4].u8() != 0)
+                        throw IOException("Invalid positive DoIP diagnostic acknowledgement.")
                     continue
                 }
                 val reply = frame.data.copyOfRange(4, frame.data.size)
@@ -794,9 +796,19 @@ object DoIpDirectRead {
         }
     }
 
-    enum class InventoryFailure { VIN_MISMATCH, PROTOCOL_IDENTITY, NEGATIVE_RESPONSE, TIMEOUT, COMMUNICATION }
+    enum class RefusalLayer { HEADER, ROUTING, DIAGNOSTIC_ACK }
+    class Refusal(val layer: RefusalLayer, val code: Int) : IOException(
+        "DoIP ${layer.name} refusal 0x%02X".format(Locale.ROOT, code))
+    private fun requireNoHeaderNack(frame: Frame) {
+        if (frame.type != 0) return
+        if (frame.data.size != 1 || frame.data[0].u8() !in 0..4)
+            throw IOException("Malformed DoIP generic header NACK.")
+        throw Refusal(RefusalLayer.HEADER, frame.data[0].u8())
+    }
+
+    enum class InventoryFailure { VIN_MISMATCH, PROTOCOL_IDENTITY, NEGATIVE_RESPONSE, TIMEOUT, COMMUNICATION, HEADER_NACK, ROUTING_DENIED, DIAGNOSTIC_NACK }
     data class InventoryEntry(val ecu: Int, val vin: String?, val protocolValue: Int? = null,
-        val failure: InventoryFailure? = null)
+        val failure: InventoryFailure? = null, val failureCode: Int? = null)
     private class EcuVinMismatch : IllegalArgumentException("ECU VIN differs from selected vehicle or gateway.")
     private class EcuObdIdentityMismatch : IllegalArgumentException("Invalid or unstable ECU protocol identification.")
 
@@ -867,8 +879,16 @@ object DoIpDirectRead {
                 results += InventoryEntry(ecu, null, failure = InventoryFailure.VIN_MISMATCH)
             } catch (_: EcuObdIdentityMismatch) {
                 results += InventoryEntry(ecu, null, failure = InventoryFailure.PROTOCOL_IDENTITY)
-            } catch (_: UdsNegativeResponseException) {
-                results += InventoryEntry(ecu, null, failure = InventoryFailure.NEGATIVE_RESPONSE)
+            } catch (error: UdsNegativeResponseException) {
+                results += InventoryEntry(ecu, null, failure = InventoryFailure.NEGATIVE_RESPONSE,
+                    failureCode = error.negativeResponseCode)
+            } catch (error: Refusal) {
+                val failure = when (error.layer) {
+                    RefusalLayer.HEADER -> InventoryFailure.HEADER_NACK
+                    RefusalLayer.ROUTING -> InventoryFailure.ROUTING_DENIED
+                    RefusalLayer.DIAGNOSTIC_ACK -> InventoryFailure.DIAGNOSTIC_NACK
+                }
+                results += InventoryEntry(ecu, null, failure = failure, failureCode = error.code)
             } catch (_: SocketTimeoutException) {
                 results += InventoryEntry(ecu, null, failure = InventoryFailure.TIMEOUT)
             } catch (_: IOException) {
