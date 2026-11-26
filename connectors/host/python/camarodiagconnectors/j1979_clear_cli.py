@@ -34,7 +34,7 @@ def run(argv=None, *, prompt=input) -> dict:
         if args.fr else
         "Follow the manufacturer's test procedure. Stationary vehicle, engine stopped, "
         "ventilated area and safe conditions. This can erase emissions DTCs, freeze frame and readiness. Export original evidence first. One reset only. Type OK: ")
-    confirmation = (f"Confirmer le effacement antipollution sur {args.vin}, {args.tx:X}/{args.rx:X} ? OUI/NON : "
+    confirmation = (f"Confirmer l’effacement antipollution sur {args.vin}, {args.tx:X}/{args.rx:X} ? OUI/NON : "
                     if args.fr else
                     f"Confirm emissions reset on {args.vin}, {args.tx:X}/{args.rx:X}? YES/NO: ")
     try:
@@ -79,7 +79,7 @@ def main():
         raise SystemExit(2) from exc
     print(json.dumps({"outcome": report["outcome"], "reason": report.get("reason"),
                       "acknowledged": report.get("acknowledged", False)}))
-    if report["outcome"] != "ACKNOWLEDGED_READBACK":
+    if report["outcome"] != "ACKNOWLEDGED_READBACK" or report.get("reason") is not None:
         raise SystemExit(2)
 
 
