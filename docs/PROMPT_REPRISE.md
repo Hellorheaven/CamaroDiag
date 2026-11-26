@@ -1,3 +1,7 @@
+## C6 — relecture des sauvegardes durables Android avant chaque effacement (26/11/2026)
+
+- Parité Windows : capture figée avant SHA, digest de l'enveloppe complète calculé pendant la relecture initiale, inventaire exact et relecture bornée de toutes les enveloppes avant chaque erase, puis vérification de puissance/identité. Annulation contrôlée pendant les lectures. Store sans revalidation refusé, harness mémoire vérifie les hashes. Régressions de corruption après marqueur et d'ajout de fichier, non exécutées. Aucun pilote réel ajouté ni activation matérielle ; C6/J1979 ouverts, aucune CI/fusion/Release.
+
 ## C6 — contrôle des sauvegardes persistées avant chaque effacement E39 (26/11/2026)
 
 - Windows : copie des octets avant tout await, limite de taille, empreinte de l'enveloppe complète conservée ; nouvelle vérification obligatoire de l'intégralité de l'inventaire et des enveloppes originales avant chaque effacement, après le journal durable EraseStarted, puis contrôle alimentation. Refus du dépassement des bornes de l'image. Aucun effet sur ECU réel, tests de corruption après préflight et sur enveloppe écrits sans exécution. Toute implémentation de journal sans relecture échoue fermée. C6/J1979 ouverts, aucune CI/fusion/Release.

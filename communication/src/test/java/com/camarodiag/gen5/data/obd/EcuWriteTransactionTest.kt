@@ -567,6 +567,20 @@ class EcuWriteTransactionTest {
         assertEquals(1, device.eraseCalls)
     }
 
+    @Test fun changedSavedOriginalAfterJournalMarkerPreventsErase() = runBlocking {
+        val device = FakeDriver(original, expectedIdentity)
+        val snapshots = InMemoryEcuPhysicalBlockBackup()
+        val outcome = EcuWriteExecutionEngine(
+            device, EcuWriteTransaction.Journal {
+                if (it.stage == EcuWriteTransaction.Stage.BEFORE_ERASE)
+                    snapshots.blocks.values.first()[0] = 99
+            }, EcuWriteTransaction.PowerMonitor { true }, snapshots
+        ).run(request())
+        assertEquals(EcuWriteTransaction.Status.STOPPED_REQUIRES_ASSESSMENT,outcome.status)
+        assertEquals(0,device.eraseCalls)
+        assertEquals(0,device.writeCalls)
+    }
+
     @Test fun diskBackupFailureCannotEraseOrWriteEcu() = runBlocking {
         val device = FakeDriver(original, expectedIdentity)
         val refusingBackup = EcuPhysicalBlockBackup { _, _, _ ->

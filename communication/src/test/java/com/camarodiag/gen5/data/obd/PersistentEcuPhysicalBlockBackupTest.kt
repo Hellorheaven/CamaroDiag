@@ -36,6 +36,30 @@ class PersistentEcuPhysicalBlockBackupTest {
         Unit
     }
 
+    @Test fun alteredOriginalEnvelopeAndUnexpectedFilesAreRejectedBeforeErase() = runBlocking {
+        val folder = Files.createTempDirectory("camarodiag-recheck").toFile()
+        try {
+            val journal = File(folder,"attempt.journal")
+            assertTrue(journal.createNewFile())
+            val target = EcuProgrammingDriverContract.FirmwareTarget("E39","ECM","OS-A")
+            val store = PersistentEcuPhysicalBlockBackup(journal,target,"1G1FA1RXXR0123456")
+            val bytes = ByteArray(8) { it.toByte() }
+            val region = EcuProgrammingDriverContract.RegionRequest(EcuBackupCoverage.Region.CALIBRATION,0x4000L,8L)
+            store.preserve(region,bytes,EcuBenchExpertPlan.sha256Hex(bytes))
+            store.requireOriginalsIntact()
+            val file = store.directory.listFiles()!!.single()
+            val original = file.readBytes()
+            file.writeBytes(original.copyOf().also { it[it.lastIndex] = 99 })
+            assertTrue(runCatching { store.requireOriginalsIntact() }.isFailure)
+            file.writeBytes(original)
+            store.requireOriginalsIntact()
+            val extra = File(store.directory,"unexpected")
+            assertTrue(extra.createNewFile())
+            assertTrue(runCatching { store.requireOriginalsIntact() }.isFailure)
+        } finally { folder.deleteRecursively() }
+        Unit
+    }
+
     @Test fun multiMegabyteSectorIsDurablyVerifiedWithoutSecondFullImageBuffer() = runBlocking {
         val folder = Files.createTempDirectory("camarodiag-large-ecu-block").toFile()
         try {

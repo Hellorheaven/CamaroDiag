@@ -434,6 +434,9 @@ internal class EcuWriteExecutionEngine(
                         sector.originalSha256, sector.updatedSha256
                     )
                 )
+                // Revalidate every preserved original, including sectors
+                // already programmed, before allowing the next erase.
+                boundary { physicalBlockBackup.requireOriginalsIntact() }
                 // Durable storage and readback may take time. Recheck power
                 // after journal I/O before issuing the destructive operation.
                 if (!supplyStable() || liveIdentity() != request.expectedIdentity) {
