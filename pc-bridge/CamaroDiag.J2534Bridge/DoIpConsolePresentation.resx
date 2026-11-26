@@ -39,7 +39,18 @@
   <data name="DtcMask" xml:space="preserve"><value>DTC status mask (hex)</value></data>
   <data name="InvalidDtcMask" xml:space="preserve"><value>Enter exactly two hexadecimal digits for the DTC status mask.</value></data>
   <data name="DtcStarted" xml:space="preserve"><value>DoIP / {0} / UDS: DTC read at gateway {1}, ECU 0x{2:X4}, tester 0x{3:X4}, version 0x{4:X2}.</value></data>
-  <data name="DtcResult" xml:space="preserve"><value>DTC count={0}; requested mask=0x{1:X2}; available mask=0x{2:X2}</value></data>
+  <data name="DtcResult" xml:space="preserve"><value>DTC count={0}; requested mask=0x{1:X2}; available mask=0x{2:X2}; effective mask=0x{3:X2}</value></data>
+  <data name="DtcBitFailed" xml:space="preserve"><value>Test failed</value></data>
+  <data name="DtcBitFailedCycle" xml:space="preserve"><value>Failed this operation cycle</value></data>
+  <data name="DtcBitPending" xml:space="preserve"><value>Pending</value></data>
+  <data name="DtcBitConfirmed" xml:space="preserve"><value>Confirmed</value></data>
+  <data name="DtcBitIncompleteSinceClear" xml:space="preserve"><value>Test not completed since last clear</value></data>
+  <data name="DtcBitFailedSinceClear" xml:space="preserve"><value>Failed since last clear</value></data>
+  <data name="DtcBitIncompleteCycle" xml:space="preserve"><value>Test not completed this operation cycle</value></data>
+  <data name="DtcBitWarningRequested" xml:space="preserve"><value>Warning indicator requested</value></data>
+  <data name="DtcStatusUnavailable" xml:space="preserve"><value>Status unavailable</value></data>
+  <data name="DtcNoAssertedAvailableBits" xml:space="preserve"><value>No available status bit asserted</value></data>
+  <data name="DtcNoAvailableFilter" xml:space="preserve"><value>No requested status bit is available; this result cannot establish absence of faults.</value></data>
   <data name="DtcEntry" xml:space="preserve"><value>DTC 0x{0:X6}, status 0x{1:X2}</value></data>
   <data name="DtcNotice" xml:space="preserve"><value>Read-only status report; no faults were cleared. An empty result only applies to the requested available status bits.</value></data>
   <data name="ReadDid" xml:space="preserve"><value>Read ECU data</value></data>

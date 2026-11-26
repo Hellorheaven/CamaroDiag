@@ -39,7 +39,18 @@
   <data name="DtcMask" xml:space="preserve"><value>Masque d’état DTC (hex)</value></data>
   <data name="InvalidDtcMask" xml:space="preserve"><value>Saisissez exactement deux chiffres hexadécimaux pour le masque d’état DTC.</value></data>
   <data name="DtcStarted" xml:space="preserve"><value>DoIP / {0} / UDS : lecture DTC via {1}, ECU 0x{2:X4}, testeur 0x{3:X4}, version 0x{4:X2}.</value></data>
-  <data name="DtcResult" xml:space="preserve"><value>Nombre de DTC={0} ; masque demandé=0x{1:X2} ; masque disponible=0x{2:X2}</value></data>
+  <data name="DtcResult" xml:space="preserve"><value>Nombre de DTC={0} ; masque demandé=0x{1:X2} ; masque disponible=0x{2:X2} ; masque effectif=0x{3:X2}</value></data>
+  <data name="DtcBitFailed" xml:space="preserve"><value>Test en échec</value></data>
+  <data name="DtcBitFailedCycle" xml:space="preserve"><value>Échec pendant ce cycle</value></data>
+  <data name="DtcBitPending" xml:space="preserve"><value>En attente</value></data>
+  <data name="DtcBitConfirmed" xml:space="preserve"><value>Confirmé</value></data>
+  <data name="DtcBitIncompleteSinceClear" xml:space="preserve"><value>Test non terminé depuis le dernier effacement</value></data>
+  <data name="DtcBitFailedSinceClear" xml:space="preserve"><value>Échec depuis le dernier effacement</value></data>
+  <data name="DtcBitIncompleteCycle" xml:space="preserve"><value>Test non terminé pendant ce cycle</value></data>
+  <data name="DtcBitWarningRequested" xml:space="preserve"><value>Voyant demandé</value></data>
+  <data name="DtcStatusUnavailable" xml:space="preserve"><value>État indisponible</value></data>
+  <data name="DtcNoAssertedAvailableBits" xml:space="preserve"><value>Aucun bit d'état disponible positionné</value></data>
+  <data name="DtcNoAvailableFilter" xml:space="preserve"><value>Aucun bit d'état demandé n'est disponible ; ce résultat ne permet pas de conclure à l'absence de défauts.</value></data>
   <data name="DtcEntry" xml:space="preserve"><value>DTC 0x{0:X6}, état 0x{1:X2}</value></data>
   <data name="DtcNotice" xml:space="preserve"><value>Rapport en lecture seule ; aucun défaut effacé. Un résultat vide concerne uniquement les bits d’état demandés et disponibles.</value></data>
   <data name="ReadDid" xml:space="preserve"><value>Lire donnée ECU</value></data>

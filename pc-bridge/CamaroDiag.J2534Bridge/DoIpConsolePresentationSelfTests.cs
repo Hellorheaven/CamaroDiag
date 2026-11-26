@@ -120,6 +120,16 @@ internal static class DoIpConsolePresentationSelfTests
                 dtcLines[0].Contains("0x0F") && dtcLines[1].Contains("0x123456") &&
                 dtcLines[1].Contains("0x01"),
                 "DTC report preserves code and requested/available masks in " + language);
+            var flags = DoIpConsolePresentation.FormatDtcStatus(0xFF, 0xFF, culture);
+            foreach (var key in new[] { "DtcBitFailed", "DtcBitFailedCycle", "DtcBitPending", "DtcBitConfirmed",
+                "DtcBitIncompleteSinceClear", "DtcBitFailedSinceClear", "DtcBitIncompleteCycle", "DtcBitWarningRequested" })
+                Check(flags.Contains(DoIpConsolePresentation.Text(key, culture)), "Status bit " + key + " in " + language);
+            Check(DoIpConsolePresentation.FormatDtcStatus(0xFF, 0x04, culture) ==
+                DoIpConsolePresentation.Text("DtcBitPending", culture), "Unavailable bits are not interpreted.");
+            Check(DoIpConsolePresentation.FormatDtcStatus(0, 0, culture) ==
+                DoIpConsolePresentation.Text("DtcStatusUnavailable", culture), "No available status is not a healthy ECU.");
+            Check(DoIpConsolePresentation.FormatDtcStatus(0, 0xFF, culture) ==
+                DoIpConsolePresentation.Text("DtcNoAssertedAvailableBits", culture), "Zero status does not imply no DTC.");
             var detail = DoIpConsolePresentation.ParseDetail("123456", "01");
             Check(detail.Dtc == 0x123456 && detail.Record == 1 &&
                 DoIpConsolePresentation.FormatDetail(detail.Dtc, 8, [1, 0xAB], culture).Contains("01AB"),
@@ -137,7 +147,8 @@ internal static class DoIpConsolePresentationSelfTests
             var emptyLines = DoIpConsolePresentation.FormatDtcs(emptyDtcs, 0x80, culture);
             Check(emptyLines.Count == 2 && emptyLines[0].Contains("0x80") &&
                 emptyLines[0].Contains("0x01") &&
-                emptyLines[1] == DoIpConsolePresentation.Text("DtcNotice", culture),
+                emptyLines[0].Contains("0x00") &&
+                emptyLines[1] == DoIpConsolePresentation.Text("DtcNoAvailableFilter", culture),
                 "Empty DTC report retains availability limits in " + language);
             foreach (var dtcKey in new[] { "ReadDtcs", "DtcMask", "InvalidDtcMask",
                 "DtcStarted", "DtcResult", "DtcEntry", "DtcNotice", "ReadDid", "DidLabel",

@@ -1037,8 +1037,8 @@ internal sealed partial class BridgeDesktopForm
                         ConsoleLine("SYSTEM", string.Format(DoIpConsolePresentation.Text("SupportedResult"),
                             report.Codes.Count, report.AvailabilityMask), Color.DarkGreen);
                         foreach (var code in report.Codes)
-                            ConsoleLine("SYSTEM", string.Format(DoIpConsolePresentation.Text("DtcEntry"),
-                                code.Code, code.Status), Color.DarkSlateGray);
+                            ConsoleLine("SYSTEM", DoIpConsolePresentation.FormatDtcEntry(
+                                code.Code, code.Status, report.AvailabilityMask), Color.DarkSlateGray);
                     }
                     else if (legacySub != 0)
                     {
@@ -1175,8 +1175,8 @@ internal sealed partial class BridgeDesktopForm
                         ConsoleLine("SYSTEM", string.Format(DoIpConsolePresentation.Text("PermanentResult"),
                             report.Codes.Count, report.AvailabilityMask), Color.DarkGreen);
                         foreach (var code in report.Codes)
-                            ConsoleLine("SYSTEM", string.Format(DoIpConsolePresentation.Text("DtcEntry"),
-                                code.Code, code.Status), Color.DarkSlateGray);
+                            ConsoleLine("SYSTEM", DoIpConsolePresentation.FormatDtcEntry(
+                                code.Code, code.Status, report.AvailabilityMask), Color.DarkSlateGray);
                     }
                     else if (operation == DoIpReadOperation.SnapshotIndex)
                     {

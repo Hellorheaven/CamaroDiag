@@ -62,6 +62,29 @@ internal static class DoIpConsolePresentation
                 Text("Unavailable", culture));
     }
 
+    // ISO 14229 status bits, independent of the OEM's DTC code dictionary.
+    // Bits outside DTCStatusAvailabilityMask are never interpreted.
+    internal static string FormatDtcStatus(byte status, byte availabilityMask,
+        CultureInfo? culture = null)
+    {
+        string[] keys = ["DtcBitFailed", "DtcBitFailedCycle", "DtcBitPending", "DtcBitConfirmed",
+            "DtcBitIncompleteSinceClear", "DtcBitFailedSinceClear", "DtcBitIncompleteCycle",
+            "DtcBitWarningRequested"];
+        var labels = new List<string>();
+        int asserted = status & availabilityMask;
+        for (int bit = 0; bit < keys.Length; bit++)
+            if ((asserted & (1 << bit)) != 0)
+                labels.Add(Text(keys[bit], culture));
+        if (availabilityMask == 0) return Text("DtcStatusUnavailable", culture);
+        if (labels.Count == 0) return Text("DtcNoAssertedAvailableBits", culture);
+        return string.Join(", ", labels);
+    }
+
+    internal static string FormatDtcEntry(uint code, byte status, byte availabilityMask,
+        CultureInfo? culture = null) =>
+        string.Format(CultureInfo.InvariantCulture, Text("DtcEntry", culture), code, status) +
+            " — " + FormatDtcStatus(status, availabilityMask, culture);
+
     internal static IReadOnlyList<string> FormatDtcs(
         ObdOnUdsServices.DtcStatusReport report, byte requestedMask,
         CultureInfo? culture = null)
@@ -70,12 +93,13 @@ internal static class DoIpConsolePresentation
         var lines = new List<string>(report.Codes.Count + 2)
         {
             string.Format(CultureInfo.InvariantCulture, Text("DtcResult", culture),
-                report.Codes.Count, requestedMask, report.AvailabilityMask)
+                report.Codes.Count, requestedMask, report.AvailabilityMask,
+                requestedMask & report.AvailabilityMask)
         };
         foreach (var code in report.Codes)
-            lines.Add(string.Format(CultureInfo.InvariantCulture,
-                Text("DtcEntry", culture), code.Code, code.Status));
-        lines.Add(Text("DtcNotice", culture));
+            lines.Add(FormatDtcEntry(code.Code, code.Status, report.AvailabilityMask, culture));
+        lines.Add(Text((requestedMask & report.AvailabilityMask) == 0 ?
+            "DtcNoAvailableFilter" : "DtcNotice", culture));
         return lines;
     }
 
@@ -92,7 +116,8 @@ internal static class DoIpConsolePresentation
         };
         foreach (var code in report.Codes)
             lines.Add(string.Format(CultureInfo.InvariantCulture, Text("WwhRecord", culture),
-                code.Code, code.Status, Hex(code.Severity)));
+                code.Code, code.Status, Hex(code.Severity)) + " — " +
+                FormatDtcStatus(code.Status, report.StatusAvailabilityMask, culture));
         return lines;
     }
 
