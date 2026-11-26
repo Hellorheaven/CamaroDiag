@@ -12,5 +12,11 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="System.IO.Ports" Version="8.0.0" />
+    <Compile Include="../../connectors/host/windows-discovery/BinaryDiscovery.cs" Link="Connectors/BinaryDiscovery.cs" />
+    <Compile Include="../../connectors/host/windows-discovery/J1979UsbAuth.cs" Link="Connectors/J1979UsbAuth.cs" />
+    <Compile Include="../../connectors/host/windows-discovery/J1979UsbCapture.cs" Link="Connectors/J1979UsbCapture.cs" />
+    <Compile Include="../../connectors/host/windows-discovery/J1979CampaignSemantics.cs" Link="Connectors/J1979CampaignSemantics.cs" />
+    <Compile Include="../../connectors/host/windows-discovery/J1979SerialPortLink.cs" Link="Connectors/J1979SerialPortLink.cs" />
+    <Compile Include="../../connectors/host/windows-discovery/J1979NativeReport.cs" Link="Connectors/J1979NativeReport.cs" />
   </ItemGroup>
 </Project>

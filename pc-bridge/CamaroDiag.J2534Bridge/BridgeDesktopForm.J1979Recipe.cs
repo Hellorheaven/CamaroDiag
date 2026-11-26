@@ -26,7 +26,7 @@ internal sealed partial class BridgeDesktopForm
         if (functionalCancellation is not null) return;
         if (DateTimeOffset.UtcNow >= functionalAuthorizedUntil)
         {
-            functionalRunAll.Enabled = functionalRunJ1979.Enabled = functionalRunEvap.Enabled = functionalRunClear.Enabled = functionalRunLegacy.Enabled = functionalRunLegacyMutation.Enabled = false;
+            functionalRunNativeUsb.Enabled = functionalRunAll.Enabled = functionalRunJ1979.Enabled = functionalRunEvap.Enabled = functionalRunClear.Enabled = functionalRunLegacy.Enabled = functionalRunLegacyMutation.Enabled = false;
             return;
         }
         if (busy || bridgeTask is { IsCompleted: false } || consoleDevice is not null ||
@@ -64,7 +64,7 @@ internal sealed partial class BridgeDesktopForm
         completedClear = null;
         completedLegacy = null;
         completedFunctionalChecks = [];
-        functionalRunAll.Enabled = functionalRunJ1979.Enabled = functionalRunEvap.Enabled = functionalRunClear.Enabled = functionalRunLegacy.Enabled = functionalRunLegacyMutation.Enabled =
+        functionalRunNativeUsb.Enabled = functionalRunAll.Enabled = functionalRunJ1979.Enabled = functionalRunEvap.Enabled = functionalRunClear.Enabled = functionalRunLegacy.Enabled = functionalRunLegacyMutation.Enabled =
             functionalGoogleSignIn.Enabled = functionalExport.Enabled = false;
         functionalCancel.Enabled = true;
         functionalResults.Text = J1979RecipeText("Running");
@@ -117,7 +117,7 @@ internal sealed partial class BridgeDesktopForm
             busy = false;
             functionalCancel.Enabled = false;
             functionalGoogleSignIn.Enabled = true;
-            functionalRunAll.Enabled = functionalRunJ1979.Enabled = functionalRunEvap.Enabled = functionalRunClear.Enabled = functionalRunLegacy.Enabled = functionalRunLegacyMutation.Enabled =
+            functionalRunNativeUsb.Enabled = functionalRunAll.Enabled = functionalRunJ1979.Enabled = functionalRunEvap.Enabled = functionalRunClear.Enabled = functionalRunLegacy.Enabled = functionalRunLegacyMutation.Enabled =
                 DateTimeOffset.UtcNow < functionalAuthorizedUntil;
         }
     }

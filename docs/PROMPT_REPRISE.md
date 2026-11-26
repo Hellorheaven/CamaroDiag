@@ -1,3 +1,7 @@
+## J1979 — recette Connectors USB dans le pont Windows (26/11/2026)
+
+- Bouton propriétaire dans Tests fonctionnels Windows : sélection COM explicite, VIN et paire CAN du profil confirmé, clé locale, dossier choisi et confirmation ; blocage si pont/console occupés, annulation et expiration contrôlées pendant chaque lecture/écriture. Codecs et moteur partagés avec CLI par Compile Include ; extraction du lien série et sérialiseur JSON commun. Captures exclusives synchronisées, résultats affichés, VIN comparé, provenance physique non déduite. Ressources FR/EN, états des boutons harmonisés. Dépendance org.json JVM pour régressions Android. Aucune validation lancée, J1979/C6 ouverts, aucune fusion/Release.
+
 ## J1979 — recette USB native dans Android (26/11/2026)
 
 - Écran propriétaire Tests fonctionnels : sélection USB et permission explicites, CDC non ambigu, paire CAN saisie, clé locale via sélecteur sans stockage de secret, consentement. ViewModel vérifie propriétaire Firebase, véhicule/génération et absence d'opérations concurrentes, garde le job natif jusqu'à fermeture avant changement de connexion, conserve rapports privés isolés par compte et export JSON individuel. Contrôles distincts auth, intégrité, VIN, inventaires, DTC par mode et provenance non testée. Ressources FR/EN et régressions de classification ajoutées sans exécution. Carte/firmware non qualifiés, aucun test ni CI, aucune fusion/Release.

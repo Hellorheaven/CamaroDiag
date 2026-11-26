@@ -59,4 +59,15 @@
   <data name="LegacyMutationConfirm" xml:space="preserve"><value>Confirm one vehicle-wide functional request on VIN {0}, {1}, documented sources {2}? Other ECUs may also be affected.</value></data>
   <data name="LegacyMutationUncertain" xml:space="preserve"><value>Campaign interrupted, unavailable or uncertain. Inspect saved evidence; do not retry automatically.</value></data>
   <data name="LegacyMutationSaved" xml:space="preserve"><value>Final report saved at:</value></data>
+  <data name="NativeUsbRun" xml:space="preserve"><value>J1979 Connectors USB</value></data>
+  <data name="NativeUsbPrerequisites" xml:space="preserve"><value>Stop the bridge, console and other operations first.</value></data>
+  <data name="NativeUsbNoPorts" xml:space="preserve"><value>No serial port detected.</value></data>
+  <data name="NativeUsbSelect" xml:space="preserve"><value>Select</value></data>
+  <data name="NativeUsbPort" xml:space="preserve"><value>Select the qualified connector COM port.</value></data>
+  <data name="NativeUsbKey" xml:space="preserve"><value>Select local 32-byte credential</value></data>
+  <data name="NativeUsbKeyFilter" xml:space="preserve"><value>Credential file (*.*)|*.*</value></data>
+  <data name="NativeUsbFolder" xml:space="preserve"><value>Select the private diagnostic report folder.</value></data>
+  <data name="NativeUsbConfirm" xml:space="preserve"><value>Qualified board and documented ECM profile, vehicle stationary. Read-only test on {0}, VIN {1}, CAN {2}/{3}?</value></data>
+  <data name="NativeUsbVinMismatch" xml:space="preserve"><value>VIN unavailable or does not match the selected vehicle.</value></data>
+  <data name="NativeUsbProvenance" xml:space="preserve"><value>Recorded evidence only; physical provenance not established.</value></data>
 </root>

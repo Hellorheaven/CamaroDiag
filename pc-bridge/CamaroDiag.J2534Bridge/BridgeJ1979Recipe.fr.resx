@@ -59,4 +59,15 @@
   <data name="LegacyMutationConfirm" xml:space="preserve"><value>Confirmer une seule requête fonctionnelle véhicule sur le VIN {0}, {1}, sources documentées {2} ? D’autres calculateurs peuvent être affectés.</value></data>
   <data name="LegacyMutationUncertain" xml:space="preserve"><value>Campagne interrompue, indisponible ou incertaine. Consultez les preuves enregistrées ; ne relancez pas automatiquement.</value></data>
   <data name="LegacyMutationSaved" xml:space="preserve"><value>Rapport final enregistré ici :</value></data>
+  <data name="NativeUsbRun" xml:space="preserve"><value>J1979 Connectors USB</value></data>
+  <data name="NativeUsbPrerequisites" xml:space="preserve"><value>Arrêtez le pont, la console et les autres opérations.</value></data>
+  <data name="NativeUsbNoPorts" xml:space="preserve"><value>Aucun port série détecté.</value></data>
+  <data name="NativeUsbSelect" xml:space="preserve"><value>Sélectionner</value></data>
+  <data name="NativeUsbPort" xml:space="preserve"><value>Choisissez le port COM du boîtier qualifié.</value></data>
+  <data name="NativeUsbKey" xml:space="preserve"><value>Choisissez la clé locale de 32 octets</value></data>
+  <data name="NativeUsbKeyFilter" xml:space="preserve"><value>Fichier de clé (*.*)|*.*</value></data>
+  <data name="NativeUsbFolder" xml:space="preserve"><value>Choisissez le dossier privé des rapports.</value></data>
+  <data name="NativeUsbConfirm" xml:space="preserve"><value>Carte qualifiée et profil ECM documenté, véhicule immobilisé. Lancer la lecture sur {0}, VIN {1}, CAN {2}/{3} ?</value></data>
+  <data name="NativeUsbVinMismatch" xml:space="preserve"><value>VIN indisponible ou différent du véhicule sélectionné.</value></data>
+  <data name="NativeUsbProvenance" xml:space="preserve"><value>Preuves enregistrées uniquement ; provenance physique non établie.</value></data>
 </root>

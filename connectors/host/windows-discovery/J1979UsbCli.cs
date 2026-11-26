@@ -1,7 +1,6 @@
 using System.IO.Ports;
 using System.Diagnostics;
 using System.Security.Cryptography;
-using System.Text.Json;
 using System.Globalization;
 using System.Text.RegularExpressions;
 
@@ -9,30 +8,6 @@ namespace CamaroDiagConnectors.Windows;
 
 internal static class J1979UsbCli
 {
-    private sealed class SerialLink(SerialPort port):J1979UsbCapture.ILink
-    {
-        private bool closed;
-        private void Current(){if(closed||!port.IsOpen)throw new IOException("USB session closed");}
-        public int Read(byte[] data,int offset,int size,int timeoutMs){
-            long start=Environment.TickCount64;
-            while(true){
-                Current();long elapsed=Environment.TickCount64-start;
-                if(elapsed<0||elapsed>=timeoutMs)throw new TimeoutException("USB read deadline exceeded");
-                port.ReadTimeout=(int)Math.Min(100,timeoutMs-elapsed);
-                try{int n=port.Read(data,offset,size);if(n>0)return n;}
-                catch(TimeoutException){ /* wait only within the original deadline */ }
-            }
-        }
-        public void Write(byte[] data,int timeoutMs){
-            Current();port.WriteTimeout=Math.Min(timeoutMs,1000);
-            port.Write(data,0,data.Length);Current(); // no resend
-        }
-        public void CheckNoBufferedInput(){
-            Current();
-            if(port.BytesToRead!=0)throw new IOException("Unexpected buffered CU/1 bytes");
-        }
-        public void Dispose(){if(!closed){closed=true;port.Close();}}
-    }
     internal static int Run(string[] args)
     {
         var required=new HashSet<string>(StringComparer.Ordinal)
@@ -72,31 +47,14 @@ internal static class J1979UsbCli
                     Handshake=Handshake.None,DtrEnable=true,RtsEnable=false,ReadTimeout=100,WriteTimeout=1000
                 };
                 port.Open();
-                result=new J1979UsbCapture(new SerialLink(port)).Run(tx,rx,ext,budget,key,raw);
+                result=new J1979UsbCapture(new J1979SerialPortLink(port,()=>true)).Run(tx,rx,ext,budget,key,raw);
                 raw.Flush(flushToDisk:true);
             }catch(Exception error) when(error is IOException or UnauthorizedAccessException or TimeoutException or InvalidOperationException){
                 result=new(false,false,0,error.Message);
             }
-            JsonSerializer.Serialize(output,new{
-                schema="camarodiag-functional-j1979-native-usb-v1",protocol="SAE-J1979",
-                source="LIVE_USB_CU1",host_version=typeof(J1979UsbCli).Assembly.GetName().Version?.ToString(),
-                captured_at_utc=DateTimeOffset.UtcNow,duration_ms=timer.ElapsedMilliseconds,
-                declared_vehicle=values["--vehicle"],declared_ecu=values["--ecu"],declared_connector=values["--connector"],
-                request_can_id=tx.ToString("X",CultureInfo.InvariantCulture),response_can_id=rx.ToString("X",CultureInfo.InvariantCulture),
-                extended=ext,budget_ms=budget,device_credential_authenticated=result.DeviceCredentialAuthenticated,
-                frame_integrity_verified=result.FrameIntegrityVerified,capture_integrity_verified=result.CaptureIntegrityVerified,
-                evidence_authenticated=false,physical_vehicle_verified=false,observed_vin=result.ObservedVin,
-                steps=result.Steps.Select(s=>new{sequence=s.Sequence,request_hex=s.RequestHex,response_hex=s.ResponseHex,
-                    status=s.Status,duration_ms=s.DurationMs}),
-                summary=result.Summary is { } summary?new{
-                    end=summary.End,steps=summary.Steps,
-                    transport_observed=(summary.Flags&1)!=0,pid_inventory_complete=(summary.Flags&2)!=0,
-                    freeze_trigger_observed=(summary.Flags&4)!=0,freeze_frame_present=(summary.Flags&8)!=0,
-                    freeze_inventory_complete=(summary.Flags&16)!=0,monitor_inventory_complete=(summary.Flags&32)!=0,
-                    control_inventory_complete=(summary.Flags&64)!=0,identity_inventory_complete=(summary.Flags&128)!=0
-                }:null,
-                records=result.Records,raw_capture_name=Path.GetFileName(capturePath),error=result.Error
-            },new JsonSerializerOptions{WriteIndented=true});
+            J1979NativeReport.Write(output,result,typeof(J1979UsbCli).Assembly.GetName().Version?.ToString()??"",
+                values["--vehicle"],values["--ecu"],values["--connector"],tx,rx,ext,budget,timer.ElapsedMilliseconds,
+                Path.GetFileName(capturePath));
             output.Flush(flushToDisk:true);
             Console.WriteLine("Raw CJ/1 and diagnostic evidence saved. Physical provenance not established.");
             return result.CaptureIntegrityVerified&&result.Summary?.End=="COMPLETE"?0:2;
