@@ -1297,4 +1297,8 @@
     <string name="functional_evap_cancel">Cancel</string>
     <string name="functional_evap_no">No</string>
     <string name="functional_evap_uncertain">EVAP campaign interrupted or failed. Test state may be uncertain; do not repeat automatically.</string>
+    <string name="functional_clear_run">Mode 04 — emissions DTC reset</string>
+    <string name="functional_clear_warning">This can erase emissions faults, freeze-frame data and readiness. Export original evidence first. Follow the manufacturer’s procedure with the vehicle stationary and engine stopped. Never conceal an unresolved fault. No automatic retry.</string>
+    <string name="functional_clear_confirm">Request one emissions diagnostic reset on vehicle %1$s?</string>
+    <string name="functional_clear_uncertain">Mode 04 campaign interrupted or failed. Reset state may be uncertain; do not repeat automatically.</string>
 </resources>
