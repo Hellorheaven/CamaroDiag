@@ -34,6 +34,7 @@ internal static class ObdJ1979FunctionalScanSelfTests
         }
         var report = ObdJ1979FunctionalScan.Run(Exchange, () => {}, TimeSpan.FromMinutes(1));
         Assert(report.Completed, "completed bounded campaign");
+        Assert(sent.Take(4).SequenceEqual(new[] { "0902", "03", "07", "0A" }), "identity and DTC priority");
         Assert(report.ObservedVin == "1G1FA1RXXR0123456", "actual VIN only");
         Assert(sent.Contains("010C") && !sent.Contains("010D"), "only advertised PID read");
         Assert(sent.Contains("0800") && !sent.Contains("0801") && !sent.Contains("04"),
@@ -47,7 +48,7 @@ internal static class ObdJ1979FunctionalScanSelfTests
         var malformed = ObdJ1979FunctionalScan.Run((request, _) =>
             request[0] == 1 ? [0x41, 0x20, 0, 0, 0, 0] : [0x7F, request[0], 0x11],
             () => {}, TimeSpan.FromMinutes(1));
-        Assert(malformed.Steps[0].Status == "FAILED", "wrong identifier rejected");
+        Assert(malformed.Steps.Single(x => x.RequestHex == "0100").Status == "FAILED", "wrong identifier rejected");
         Assert(malformed.ObservedVin is null, "missing VIN not inferred");
         var tx = 0;
         try
