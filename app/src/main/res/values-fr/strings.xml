@@ -1309,4 +1309,10 @@
     <string name="functional_legacy_iso9141_candidates">Candidat : Toyota ou Honda essence du début des années 2000, avec OBD ISO 9141-2 confirmé.</string>
     <string name="functional_legacy_kwp_candidates">Candidat : véhicule européen essence du début des années 2000, avec diagnostic antipollution ISO 14230-4 confirmé. La K-Line seule ne prouve pas J1979.</string>
     <string name="functional_legacy_route_required">Connectez une interface ELM compatible sur le protocole legacy choisi. Aucun changement automatique. Lecture seule ; les fragments anonymes ne prouvent pas le VIN du calculateur.</string>
+    <string name="functional_legacy_mutation_scope">Requête fonctionnelle véhicule : même des calculateurs silencieux peuvent être affectés. La sélection des sources de réponse ne limite pas la portée de transmission. Respectez la procédure constructeur et exportez le scan complet initial.</string>
+    <string name="functional_legacy_mutation_confirm">Confirmer une seule demande fonctionnelle véhicule sur le VIN %1$s, sources documentées %2$s ? D’autres calculateurs peuvent aussi être affectés.</string>
+    <string name="functional_legacy_engine_source">Source moteur (deux chiffres hexadécimaux)</string>
+    <string name="functional_legacy_documented_sources">Sources documentées (hexadécimal, séparées par virgules)</string>
+    <string name="functional_legacy_mutation_profile">Je confirme le protocole, le moteur et toutes les sources antipollution documentées pour le VIN %1$s.</string>
+    <string name="functional_legacy_mutation_uncertain">Campagne legacy interrompue ou en échec. État de la demande potentiellement incertain. Ne relancez pas automatiquement.</string>
 </resources>
