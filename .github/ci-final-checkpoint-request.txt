@@ -57,3 +57,11 @@ corrected:
 - Android simulator: consistent physical 7E8 provenance for Mode02 DTC, support bitmap and freeze-frame values
 - Regress Mode02 source continuity on the synthetic LFX simulator without relaxing strict real ECU attribution
 commits: fd642d3a2ab52643ad5d9f421a0c33939a630f89, e7720e438a082ba70e4b8fd804122db8228a6145, f07bb766dd01d2a53f39aa9079557ce8e548be54
+
+attempt: 7 -- final acceptance after correcting Mode02 Kotlin syntax
+previous_gate_sha: 279b0e790b3dbfbde032b548a16295d174c4adda
+previous_gate: https://github.com/Hellorheaven/CamaroDiag/actions/runs/45803467014
+previous_gate_status: Windows Debug and self-tests, Python 3.11/3.12/3.13, native, STM32 and ESP32 all passed; Android failed only at diagnostic Kotlin syntax.
+corrected:
+- Close the combined Mode01/Mode02 positive-response condition; preserve physical 7E8 source pinning and test.
+correction_commit: 520750dc9253748725c6092ec968a8435bd13a18
