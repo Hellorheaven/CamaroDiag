@@ -298,6 +298,9 @@ internal static class NativeE39WriteSequence
             await journal.AppendAsync(
                 new(Phase.Completed, 0, $"Sectors={sectors.Count};Bytes={writtenBytes}"),
                 cancellationToken);
+            // A non-cooperative journal can return after cancellation. Do
+            // not report success after the operator has stopped the run.
+            cancellationToken.ThrowIfCancellationRequested();
             return new Result(sectors.Count, writtenBytes);
         }
         catch (Exception error)
@@ -341,6 +344,10 @@ internal static class NativeE39WriteSequence
         {
             cancellationToken.ThrowIfCancellationRequested();
             var millivolts = await link.ReadSupplyMillivoltsAsync(cancellationToken);
+            // Some vendor adapters ignore cancellation and return a value.
+            // Cancellation may have arrived DURING this voltage read. No
+            // erase/write packet can be issued on that stale observation.
+            cancellationToken.ThrowIfCancellationRequested();
             if (!millivolts.HasValue ||
                 millivolts.Value < options.MinimumSupplyMillivolts ||
                 millivolts.Value > options.MaximumSupplyMillivolts)

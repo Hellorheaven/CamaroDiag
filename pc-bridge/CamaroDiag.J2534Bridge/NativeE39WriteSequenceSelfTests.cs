@@ -7,6 +7,7 @@ internal static class NativeE39WriteSequenceSelfTests
     {
         internal readonly List<NativeE39WriteSequence.Event> Events = [];
         internal readonly Dictionary<uint, byte[]> SavedBlocks = [];
+        internal Action<NativeE39WriteSequence.Event>? OnAppend;
         public Task PreserveOriginalBlockAsync(uint address, byte[] liveBytes,
             string sha256, CancellationToken token)
         {
@@ -22,6 +23,7 @@ internal static class NativeE39WriteSequenceSelfTests
         {
             token.ThrowIfCancellationRequested();
             Events.Add(evidence);
+            OnAppend?.Invoke(evidence);
             return Task.CompletedTask;
         }
     }
@@ -38,6 +40,7 @@ internal static class NativeE39WriteSequenceSelfTests
         internal uint? SupplyMillivolts = 13500;
         internal bool LoseSupplyAfterErase;
         internal int VoltageReads;
+        internal Action? OnSupplyRead;
         internal int ByteReads;
         internal bool CorruptEarlierSectorOnSecondErase;
         internal bool CorruptNextSectorOnFirstErase;
@@ -49,6 +52,7 @@ internal static class NativeE39WriteSequenceSelfTests
         {
             token.ThrowIfCancellationRequested();
             VoltageReads++;
+            OnSupplyRead?.Invoke();
             return Task.FromResult(LoseSupplyAfterErase && Erases > 0
                 ? (uint?)null : SupplyMillivolts);
         }
@@ -250,6 +254,79 @@ internal static class NativeE39WriteSequenceSelfTests
                lostSupplyJournal.Events[^1].Phase == NativeE39WriteSequence.Phase.RecoveryRequired &&
                !lostSupply.Requests.Any(x => x[0] == 0x36 && x[1] == 0),
             "Voltage loss after erase prevents programming and requires recovery");
+
+        // A vendor driver that ignores cancellation until AFTER returning
+        // voltage must not permit an erase or physical write to follow.
+        using (var stoppedBeforeErase = new CancellationTokenSource())
+        {
+            var physical = new TestEcu(origin);
+            var evidence = new TestJournal();
+            var armSupplyCancellation = false;
+            evidence.OnAppend = step =>
+            {
+                if (step.Phase == NativeE39WriteSequence.Phase.EraseStarted)
+                    armSupplyCancellation = true;
+            };
+            physical.OnSupplyRead = () =>
+            {
+                if (armSupplyCancellation)
+                {
+                    armSupplyCancellation = false;
+                    stoppedBeforeErase.Cancel();
+                }
+            };
+            Expect<OperationCanceledException>(() =>
+                NativeE39WriteSequence.RunBenchSequenceAsync(physical, evidence,
+                    plan, opts, stoppedBeforeErase.Token).GetAwaiter().GetResult());
+            Assert(physical.Erases == 0 &&
+                   !physical.Requests.Any(x => x[0] == 0x36 && x[1] == 0) &&
+                   evidence.Events[^1].Phase == NativeE39WriteSequence.Phase.EraseStarted,
+                "Cancellation during a noncooperative supply read never erases or writes");
+        }
+
+        using (var stoppedAfterErase = new CancellationTokenSource())
+        {
+            var physical = new TestEcu(origin);
+            var evidence = new TestJournal();
+            var armSupplyCancellation = false;
+            evidence.OnAppend = step =>
+            {
+                if (step.Phase == NativeE39WriteSequence.Phase.WriteStarted)
+                    armSupplyCancellation = true;
+            };
+            physical.OnSupplyRead = () =>
+            {
+                if (armSupplyCancellation)
+                {
+                    armSupplyCancellation = false;
+                    stoppedAfterErase.Cancel();
+                }
+            };
+            Expect<OperationCanceledException>(() =>
+                NativeE39WriteSequence.RunBenchSequenceAsync(physical, evidence,
+                    plan, opts, stoppedAfterErase.Token).GetAwaiter().GetResult());
+            Assert(physical.Erases == 1 &&
+                   !physical.Requests.Any(x => x[0] == 0x36 && x[1] == 0) &&
+                   evidence.Events[^1].Phase == NativeE39WriteSequence.Phase.RecoveryRequired,
+                "Cancellation after erase does not write or silently retry and records recovery");
+        }
+
+        using (var stoppedAtCompletion = new CancellationTokenSource())
+        {
+            var physical = new TestEcu(origin);
+            var evidence = new TestJournal();
+            evidence.OnAppend = step =>
+            {
+                if (step.Phase == NativeE39WriteSequence.Phase.Completed)
+                    stoppedAtCompletion.Cancel();
+            };
+            Expect<OperationCanceledException>(() =>
+                NativeE39WriteSequence.RunBenchSequenceAsync(physical, evidence,
+                    plan, opts, stoppedAtCompletion.Token).GetAwaiter().GetResult());
+            Assert(physical.Erases == 2 &&
+                   evidence.Events[^1].Phase == NativeE39WriteSequence.Phase.RecoveryRequired,
+                "Completion callback cancellation never returns a false successful transaction");
+        }
 
         var wrongBaseline = origin.ToArray();
         wrongBaseline[1] ^= 0x05;
