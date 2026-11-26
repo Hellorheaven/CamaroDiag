@@ -16,14 +16,23 @@ class FakeSession:
         self.closed = False
         self.reads = []
         self.changed = changed
+        self.deadlines = []
+        self.identity_reads = 0
+        self.change_identity_after = None
 
-    def verify_vin(self, vin):
+    def verify_vin(self, vin, *, overall_deadline=None):
+        self.deadlines.append(overall_deadline)
         return vin
 
-    def read_did(self, did):
+    def read_did(self, did, *, overall_deadline=None):
+        self.deadlines.append(overall_deadline)
+        self.identity_reads += 1
+        if self.change_identity_after is not None and self.identity_reads > self.change_identity_after:
+            return bytes.fromhex("A1B3")
         return bytes.fromhex("A1B2")
 
-    def exchange(self, request):
+    def exchange(self, request, *, overall_deadline=None):
+        self.deadlines.append(overall_deadline)
         self.reads.append(request)
         address = int.from_bytes(request[2:6], "big")
         count = int.from_bytes(request[6:], "big")
@@ -47,6 +56,9 @@ class DoIpCaptureTests(unittest.TestCase):
             scope = load_scope(profile)
             session = FakeSession(scope)
             a, b = capture_region(session, scope)
+            self.assertEqual(len(set(session.deadlines)), 1)
+            self.assertIsNotNone(session.deadlines[0])
+            self.assertEqual(session.identity_reads, 5)
             self.assertEqual(a, b"\x00\x01\x02\x03")
             self.assertEqual(session.reads, [bytes.fromhex("23140000010002"), bytes.fromhex("23140000010202")] * 2)
             result = save_capture(output, profile, scope, a, b)
@@ -60,3 +72,21 @@ class DoIpCaptureTests(unittest.TestCase):
                 capture_region(bad, scope)
             self.assertTrue(bad.closed)
             self.assertTrue(output.exists())
+
+            changed = FakeSession(scope)
+            changed.change_identity_after = 1
+            progress = []
+            with self.assertRaises(DoIpError):
+                capture_region(changed, scope, lambda *row: progress.append(row))
+            self.assertTrue(changed.closed)
+            self.assertEqual(progress, [])
+            self.assertEqual(len(changed.reads), 2)
+
+            # A callback may change the caller's dictionary, but never the
+            # range already approved and frozen for the ongoing acquisition.
+            original = dict(scope)
+            frozen = FakeSession(scope)
+            a, b = capture_region(frozen, scope, lambda *_: scope.update(Start=0x200))
+            self.assertEqual(a, b)
+            self.assertEqual(frozen.reads, session.reads)
+            scope = original
