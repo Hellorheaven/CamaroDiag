@@ -1287,4 +1287,14 @@
     <string name="obd_mode08_partial">Control test inventory incomplete or unavailable.</string>
     <string name="obd_mode08_no_execution">No control test executed.</string>
     <string name="msg_dtc_clear_stationary_required">Stop the vehicle and engine. Fresh zero speed and engine RPM readings are required before clearing DTCs.</string>
+    <string name="functional_evap_run">Mode 08 — EVAP</string>
+    <string name="functional_evap_scope">Separate physical CAN ECM test; available only on a compatible ELM/STN adapter.</string>
+    <string name="functional_evap_profile">I verified the primary ECM and the selected vehicle VIN: %1$s</string>
+    <string name="functional_evap_warning">Follow the manufacturer’s EVAP procedure. Vehicle stationary, engine stopped, ventilated area and safe conditions. The ECU may refuse the test. No automatic retry.</string>
+    <string name="functional_evap_confirm">Request the EVAP test once on vehicle %1$s?</string>
+    <string name="functional_evap_ok">OK</string>
+    <string name="functional_evap_yes">Yes</string>
+    <string name="functional_evap_cancel">Cancel</string>
+    <string name="functional_evap_no">No</string>
+    <string name="functional_evap_uncertain">EVAP campaign interrupted or failed. Test state may be uncertain; do not repeat automatically.</string>
 </resources>
