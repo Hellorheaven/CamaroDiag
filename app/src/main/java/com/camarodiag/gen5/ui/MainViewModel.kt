@@ -5374,9 +5374,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             else emptyList()
             _functionalTestState.value = FunctionalTestState(
                 running = true, startedAtMillis = System.currentTimeMillis(),
-                checks = when (protocol) {
-                    FunctionalProtocol.J1979 -> FunctionalTestPlanner.j1979Checks()
-                    FunctionalProtocol.DOIP -> FunctionalTestPlanner.doIpChecks()
+                checks = when {
+                    protocol?.isJ1979Recipe == true -> FunctionalTestPlanner.j1979Checks()
+                    protocol == FunctionalProtocol.DOIP -> FunctionalTestPlanner.doIpChecks()
                     else -> FunctionalTestPlanner.initial(topology, transport, connected)
                 },
                 context = if (protocol == FunctionalProtocol.DOIP)
@@ -5502,10 +5502,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             }
                         }
                     } finally { publishTrace() }
-                } else if (protocol == FunctionalProtocol.J1979 && connected && obdManager.isStandardObdReadAvailable()) {
-                    val report = if (obdManager.isJ2534StandardObdAvailable()) obdManager.fullJ2534StandardObdScan()
-                        else withRecordedObd { it.fullReadOnlyScan() }
-                    if (current()) _functionalTestState.value = FunctionalTestPlanner.j1979Results(_functionalTestState.value, report)
+                } else if (protocol?.isJ1979Recipe == true && connected && obdManager.isStandardObdReadAvailable()) {
+                    val expectedLegacy = protocol.expectedLegacyElmProtocol
+                    if (expectedLegacy != null && !obdManager.isObdCommandChannelAvailable) {
+                        mark("protocol:transport", FunctionalTestOutcome.NOT_TESTED,
+                            "Legacy ELM-compatible transport required.", "Interface ELM legacy compatible requise.")
+                    } else {
+                        val report = if (expectedLegacy == null && obdManager.isJ2534StandardObdAvailable())
+                            obdManager.fullJ2534StandardObdScan()
+                        else withRecordedObd { it.fullReadOnlyScan(expectedLegacy) }
+                        if (current()) _functionalTestState.value =
+                            FunctionalTestPlanner.j1979Results(_functionalTestState.value, report)
+                    }
                 } else if (protocol != null || !connected) {
                     if (current()) _functionalTestState.value = _functionalTestState.value.copy(
                         error = localizedContext.getString(R.string.functional_tests_not_connected)
