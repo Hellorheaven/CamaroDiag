@@ -43,12 +43,13 @@ def records(command: str, raw: str) -> list[bytes]:
 
 class LegacyElmSerial:
     """Own one serial port for the campaign. Explicit protocol only."""
-    def __init__(self, port: str, baud: int, protocol: int):
+    def __init__(self, port: str, baud: int, protocol: int, *, headered: bool = False):
         if protocol not in PROTOCOLS or baud not in (9600, 19200, 38400, 57600, 115200, 230400):
             raise ValueError("Unsupported legacy protocol or serial baud")
         import serial
         self._serial = serial.Serial(port, baudrate=baud, timeout=0.1, write_timeout=1.0)
         self.protocol = protocol
+        self.headered = headered
         self._ready = False
 
     def __enter__(self):
@@ -59,7 +60,11 @@ class LegacyElmSerial:
             banner = self._command("ATZ", 4.0)
             if not re.search(r"ELM|STN|OBDLINK", banner, re.I):
                 raise ValueError("Unrecognized ELM-compatible adapter reset")
-            for cmd in ("ATE0", "ATL0", "ATS1", "ATH0", f"ATSP{self.protocol}"):
+            header = "616AF1" if self.protocol == 1 else "C033F1" if self.protocol in (4, 5) else "686AF1"
+            config = ["ATE0", "ATL0", "ATS1", "ATH1" if self.headered else "ATH0", f"ATSP{self.protocol}"]
+            if self.headered:
+                config += ["ATSH" + header]
+            for cmd in config:
                 reply = self._command(cmd, 2.0)
                 if [s.strip().upper() for s in reply.splitlines() if s.strip() and
                         s.strip().upper() != cmd] != ["OK"]:
@@ -80,6 +85,7 @@ class LegacyElmSerial:
         deadline = time.monotonic() + timeout
         wire = (command + "\r").encode("ascii")
         if self._serial.write(wire) != len(wire):
+            self._ready = False
             raise OSError("Incomplete ELM write")
         received = bytearray()
         while time.monotonic() < deadline:
@@ -88,9 +94,11 @@ class LegacyElmSerial:
                 return received.decode("ascii", errors="strict")
             received.extend(chunk)
             if len(received) > 32768:
+                self._ready = False
                 raise OSError("ELM response exceeds bound")
         # No prompt means the serial session is no longer synchronized.
         # Never continue with another request or retry automatically.
+        self._ready = False
         raise OSError("ELM prompt timeout")
 
     def exchange(self, command: str, timeout: float) -> str:
@@ -98,7 +106,32 @@ class LegacyElmSerial:
             raise ValueError("Unsupported legacy read")
         return self._command(command, timeout)
 
+    def run_vehicle_mutation(self, operation, *, expected_vin, engine_source, documented_sources,
+                             warning_acknowledged, confirmed_yes, save_baseline,
+                             require_current=lambda: None):
+        if not self._ready or not self.headered:
+            raise ValueError("Dedicated headered legacy session required")
+        from .j1979_legacy_mutation import mutation_recipe
+        attempted = False
+
+        def transmit():
+            nonlocal attempted
+            if attempted or not self._ready:
+                raise RuntimeError("One authorized legacy request only")
+            command = {"clear": "04", "evap": "08010000000000"}[operation]
+            require_current()
+            attempted = True
+            return self._command(command, 4.0)
+
+        return mutation_recipe(self.protocol, self.exchange, self.observed_protocol, transmit,
+                               operation=operation, expected_vin=expected_vin,
+                               engine_source=engine_source, documented_sources=documented_sources,
+                               warning_acknowledged=warning_acknowledged, confirmed_yes=confirmed_yes,
+                               save_baseline=save_baseline, require_current=require_current)
+
     def observed_protocol(self) -> int:
+        if not self._ready:
+            raise RuntimeError("No synchronized ELM session")
         raw = self._command("ATDPN", 2.0)
         values = [s.strip().upper() for s in raw.splitlines()
                   if s.strip() and s.strip().upper() != "ATDPN"]
