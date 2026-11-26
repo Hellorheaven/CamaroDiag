@@ -429,6 +429,30 @@ class BluetoothObdManager(context: Context) {
         command: suspend (String, Long) -> String
     ): ProbeResult {
         suspend fun probeCommand(value: String, timeoutMs: Long = 1200L) = command(value, timeoutMs)
+        if (activeTransport == "BLUETOOTH") {
+            val ownedSocket = checkNotNull(socket)
+            val input = checkNotNull(inputStream)
+            val output = checkNotNull(outputStream)
+            val context = currentCoroutineContext()
+            ElmStartupSynchronization.synchronize(
+                available = { input.available() },
+                read = { size ->
+                    val buffer = ByteArray(size)
+                    val count = input.read(buffer)
+                    if (count <= 0) ByteArray(0) else buffer.copyOf(count)
+                },
+                interrupt = {
+                    output.write(ElmResponseCompletion.wireBytes("\u001B"))
+                    output.flush()
+                },
+                ensureCurrent = {
+                    context.ensureActive()
+                    transportSessionEpoch.requireQueuedCurrent(expectedEpoch)
+                    if (socket !== ownedSocket || !ownedSocket.isConnected)
+                        throw ObdTransportDisconnectedException("Bluetooth startup socket was replaced")
+                }
+            )
+        }
         val atz = probeCommand("ATZ", 3500L)
         probeCommand("ATE0")
         probeCommand("ATL0")
