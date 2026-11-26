@@ -213,6 +213,16 @@ internal sealed class J2534StandardChannel : IDisposable
         return null;
     }
 
+    /// <summary>Discard queued receive data before a new correlated request.
+    /// A driver that cannot perform CLEAR_RX_BUFFER is not suitable for
+    /// this independent legacy evidence campaign.</summary>
+    internal void ClearReceiveQueue()
+    {
+        EnsureConnected();
+        Require(ioctl!(channelId, 0x08, IntPtr.Zero, IntPtr.Zero),
+            "PassThruIoctl(CLEAR_RX_BUFFER)");
+    }
+
     /// <summary>Install native filter; flowControlData is required for ISO-TP.</summary>
     internal void ConfigureFilter(byte[] maskData, byte[] patternData,
         byte[]? flowControlData = null, uint txFlags = 0)
