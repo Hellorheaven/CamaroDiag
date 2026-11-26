@@ -156,6 +156,9 @@ internal static class DoIpScopedBackup
 
     // .NET 8 ZipArchive does not independently verify CRC on decompression.
     // Inspect the bounded classic ZIP directory and use its CRCs during reads.
+    private sealed record ZipEvidence(string Name, uint Offset, ushort Flags, ushort Method,
+        uint Crc, uint CompressedSize, uint Size);
+
     private static Dictionary<string, uint> VerifyDirectory(FileStream file)
     {
         var size = file.Length;
@@ -178,6 +181,7 @@ internal static class DoIpScopedBackup
             throw new InvalidDataException("Invalid DoIP ZIP directory.");
         var result = new Dictionary<string, uint>(StringComparer.Ordinal);
         var offsets = new HashSet<uint>();
+        var evidence = new List<ZipEvidence>(3);
         file.Position = start;
         for (var i = 0; i < 3; i++)
         {
@@ -199,22 +203,68 @@ internal static class DoIpScopedBackup
                 name is not ("manifest.json" or "original.bin" or "verification.bin") ||
                 !result.TryAdd(name, H32(16)))
                 throw new InvalidDataException("Unexpected DoIP ZIP entry.");
+            evidence.Add(new ZipEvidence(name, local, H16(8), H16(10), H32(16), H32(20), H32(24)));
             file.Position += H16(30) + H16(32);
         }
         if (file.Position != size - tail.Length + end || !offsets.Contains(0))
             throw new InvalidDataException("Inconsistent DoIP ZIP directory.");
+        var ordered = evidence.OrderBy(item => item.Offset).ToArray();
+        for (var i = 0; i < ordered.Length; ++i)
+        {
+            var entry = ordered[i];
+            long next = i + 1 < ordered.Length ? ordered[i + 1].Offset : start;
+            file.Position = entry.Offset;
+            var header = new byte[30];
+            file.ReadExactly(header);
+            ushort L16(int offset) => BinaryPrimitives.ReadUInt16LittleEndian(header.AsSpan(offset));
+            uint L32(int offset) => BinaryPrimitives.ReadUInt32LittleEndian(header.AsSpan(offset));
+            if (L32(0) != 0x04034B50 || L16(6) != entry.Flags || L16(8) != entry.Method ||
+                L16(26) != entry.Name.Length)
+                throw new InvalidDataException("Invalid DoIP ZIP local header.");
+            var name = new byte[L16(26)];
+            file.ReadExactly(name);
+            if (!name.AsSpan().SequenceEqual(System.Text.Encoding.ASCII.GetBytes(entry.Name)))
+                throw new InvalidDataException("DoIP ZIP local filename differs from directory.");
+            long dataEnd = file.Position + L16(28) + entry.CompressedSize;
+            if (dataEnd > next)
+                throw new InvalidDataException("Overlapping DoIP ZIP entries.");
+            var localMatches = L32(14) == entry.Crc && L32(18) == entry.CompressedSize && L32(22) == entry.Size;
+            if ((entry.Flags & 8) != 0)
+            {
+                if (!localMatches && (L32(14) != 0 || L32(18) != 0 || L32(22) != 0))
+                    throw new InvalidDataException("Unexpected DoIP ZIP local descriptor metadata.");
+                file.Position = dataEnd;
+                var gap = next - dataEnd;
+                if (gap is not (12 or 16))
+                    throw new InvalidDataException("Incomplete DoIP ZIP data descriptor.");
+                var descriptor = new byte[(int)gap];
+                file.ReadExactly(descriptor);
+                var offset = gap == 16 ? 4 : 0;
+                if ((offset == 4 && BinaryPrimitives.ReadUInt32LittleEndian(descriptor) != 0x08074B50) ||
+                    BinaryPrimitives.ReadUInt32LittleEndian(descriptor.AsSpan(offset)) != entry.Crc ||
+                    BinaryPrimitives.ReadUInt32LittleEndian(descriptor.AsSpan(offset + 4)) != entry.CompressedSize ||
+                    BinaryPrimitives.ReadUInt32LittleEndian(descriptor.AsSpan(offset + 8)) != entry.Size)
+                    throw new InvalidDataException("DoIP ZIP descriptor differs from directory.");
+            }
+            else if (dataEnd != next || !localMatches)
+                throw new InvalidDataException("DoIP ZIP local metadata differs from directory.");
+        }
         file.Position = 0;
         return result;
     }
 
+    private static readonly uint[] CrcTable = Enumerable.Range(0, 256).Select(value =>
+    {
+        var crc = (uint)value;
+        for (var bit = 0; bit < 8; bit++)
+            crc = (crc & 1) != 0 ? (crc >> 1) ^ 0xEDB88320U : crc >> 1;
+        return crc;
+    }).ToArray();
+
     private static uint UpdateCrc(uint crc, ReadOnlySpan<byte> bytes)
     {
         foreach (var value in bytes)
-        {
-            crc ^= value;
-            for (var bit = 0; bit < 8; bit++)
-                crc = (crc & 1) != 0 ? (crc >> 1) ^ 0xEDB88320U : crc >> 1;
-        }
+            crc = CrcTable[(int)((crc ^ value) & 255)] ^ (crc >> 8);
         return crc;
     }
 
