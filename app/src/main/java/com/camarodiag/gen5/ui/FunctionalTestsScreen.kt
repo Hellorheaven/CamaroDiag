@@ -120,6 +120,16 @@ fun FunctionalTestsScreen(
                     }
                 }
                 if (selected == FunctionalProtocol.J1979) Text(stringResource(R.string.functional_j1979_candidates))
+                selected.expectedLegacyElmProtocol?.let { number ->
+                    val candidate = when (number) {
+                        1 -> R.string.functional_legacy_pwm_candidates
+                        2 -> R.string.functional_legacy_vpw_candidates
+                        3 -> R.string.functional_legacy_iso9141_candidates
+                        else -> R.string.functional_legacy_kwp_candidates
+                    }
+                    Text(stringResource(candidate), style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.functional_legacy_route_required), style = MaterialTheme.typography.bodySmall)
+                }
                 if (selected == FunctionalProtocol.DOIP) {
                     Text(stringResource(R.string.functional_doip_candidates))
                     OutlinedTextField(host, { host = it.take(80); physical = false },
