@@ -1,3 +1,7 @@
+## J1979 — clients natifs Java Android et .NET Windows CU/1 (26/11/2026)
+
+- Codecs HMAC-SHA256 interopérables avec ESP/Python, contrôle profil/nonce, vérification de preuve boîtier avant envoi du client. Capture CJ/1 bornée avec CRC, séquence, tailles, profil et compteurs, conservation des fragments reçus et fermeture unique ; résultat distinct frameIntegrityVerified, pas de preuve de campagne sémantique ni physique. Vecteur HMAC indépendant commun Java/.NET, régressions challenge invalide et troncature ajoutées au gate sans exécution. Restent adaptation USB/CDC et UI/CLI, validation sémantique complète des rapports et propriétaire matériel. Aucune CI ni merge/Release, J1979/C6 ouverts.
+
 ## J1979 / C6 — cycle matériel HAL STM32 et contrôle du bail SPI (26/11/2026)
 
 - Propriétaire HAL FDCAN/SPI : filtre RX exact unique 11/29 bits, rejet des autres trames/RTR, FIFO bloquante, démarrage FDCAN sous interlock TX fermé, contrôle de génération et d'états physiques avant admission, inhibition TX avant annulation et arrêt HAL, preuve de quiescence indépendante et verrou recovery. Les callbacks doivent provenir du véritable superviseur local ; GPIO/bitrate/horloge et qualification non inventés. ESP32 : vérification après persistance de l'intention et contrôle du bail exact à chaque transaction SPI ; régression de bail révoqué écrite. Aucun test exécuté ni CI, fusion ou Release. J1979/C6 ouverts.
