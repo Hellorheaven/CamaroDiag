@@ -899,6 +899,11 @@ class BluetoothObdManager(context: Context) {
             // changed profile. Only the mutation needs live operator consent.
             if (command == "04") requireCurrent()
         }) { engine, channel ->
+            requireCurrent()
+            check(engine.hasFreshStationaryEvidence()) {
+                "Stop the vehicle and engine; positive speed and RPM evidence is required."
+            }
+            requireCurrent()
             val raw = channel.command("04", 2500L)
             if (!StandardObdClearEvidence.acknowledged(raw)) {
                 StandardObdClearResult(raw, null)
