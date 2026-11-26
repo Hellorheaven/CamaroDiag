@@ -389,8 +389,11 @@ internal static class DoIpDiagnosticSessionSelfTests
                 var token = CancellationToken.None;
                 Task<ObdOnUdsServices.DtcStatusReport> Read() =>
                     DoIpVinReader.ReadVerifiedDtcAsync(client, observedForVin, timeout, token, async () =>
-                        ObdOnUdsServices.DecodePermanentDtcs(await client.ExchangeUdsAsync(
-                            ObdOnUdsServices.ReadPermanentDtcs(), timeout, token)));
+                    {
+                        var response = await client.ExchangeUdsAsync(
+                            ObdOnUdsServices.ReadPermanentDtcs(), timeout, token);
+                        return ObdOnUdsServices.DecodePermanentDtcs(response);
+                    });
                 if (finalMatches)
                 {
                     var report = await Read();
@@ -436,7 +439,10 @@ internal static class DoIpDiagnosticSessionSelfTests
                 var token = CancellationToken.None;
                 Task<ObdOnUdsServices.LegacyDtcReport> Read() =>
                     DoIpVinReader.ReadVerifiedDtcAsync(client, observedForVin, timeout, token, async () =>
-                        ObdOnUdsServices.DecodeLegacyDtc(request, await client.ExchangeUdsAsync(request, timeout, token)));
+                    {
+                        var response = await client.ExchangeUdsAsync(request, timeout, token);
+                        return ObdOnUdsServices.DecodeLegacyDtc(request, response);
+                    });
                 if (finalMatches)
                 {
                     var report = await Read();
@@ -482,7 +488,10 @@ internal static class DoIpDiagnosticSessionSelfTests
                 var request = ObdOnUdsServices.ReadExtendedRecord(1, size);
                 Task<ObdOnUdsServices.ExtendedRecordReport> Read() =>
                     DoIpVinReader.ReadVerifiedDtcAsync(client, observedForVin, timeout, token, async () =>
-                        ObdOnUdsServices.DecodeExtendedRecord(1, size, await client.ExchangeUdsAsync(request, timeout, token)));
+                    {
+                        var response = await client.ExchangeUdsAsync(request, timeout, token);
+                        return ObdOnUdsServices.DecodeExtendedRecord(1, size, response);
+                    });
                 if (finalMatches)
                 {
                     var result = await Read();
@@ -521,7 +530,10 @@ internal static class DoIpDiagnosticSessionSelfTests
                 var request = ObdOnUdsServices.ReadUserMemory(0x17, 2, 8);
                 Task<ObdOnUdsServices.UserMemoryReport> Read() =>
                     DoIpVinReader.ReadVerifiedDtcAsync(client, observedForVin, timeout, token, async () =>
-                        ObdOnUdsServices.DecodeUserMemory(request, await client.ExchangeUdsAsync(request, timeout, token)));
+                    {
+                        var response = await client.ExchangeUdsAsync(request, timeout, token);
+                        return ObdOnUdsServices.DecodeUserMemory(request, response);
+                    });
                 if (finalMatches)
                 {
                     var report = await Read();
@@ -559,7 +571,10 @@ internal static class DoIpDiagnosticSessionSelfTests
                 var request = ObdOnUdsServices.ReadStoredRecord(1);
                 Task<ObdOnUdsServices.StoredRecordReport> Read() =>
                     DoIpVinReader.ReadVerifiedDtcAsync(client, observedForVin, timeout, token, async () =>
-                        ObdOnUdsServices.DecodeStoredRecord(1, await client.ExchangeUdsAsync(request, timeout, token)));
+                    {
+                        var response = await client.ExchangeUdsAsync(request, timeout, token);
+                        return ObdOnUdsServices.DecodeStoredRecord(1, response);
+                    });
                 if (finalMatches)
                 {
                     var report = await Read();
@@ -595,7 +610,10 @@ internal static class DoIpDiagnosticSessionSelfTests
                 var catalog = ObdOnUdsServices.ParseStoredDidLengths("F40C:2,F40D:1");
                 Task<ObdOnUdsServices.AllStoredRecords> Read() =>
                     DoIpVinReader.ReadVerifiedDtcAsync(client, observedForVin, timeout, token, async () =>
-                        ObdOnUdsServices.DecodeAllStoredRecords(await client.ExchangeUdsAsync(request, timeout, token), catalog));
+                    {
+                        var response = await client.ExchangeUdsAsync(request, timeout, token);
+                        return ObdOnUdsServices.DecodeAllStoredRecords(response, catalog);
+                    });
                 if (finalMatches)
                 {
                     var report = await Read();
