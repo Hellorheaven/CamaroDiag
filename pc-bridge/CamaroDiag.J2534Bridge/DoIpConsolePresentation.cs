@@ -104,8 +104,12 @@ internal static class DoIpConsolePresentation
     }
 
     internal static IReadOnlyList<string> FormatWwh(ObdOnUdsServices.WwhDtcReport report,
-        byte subfunction, byte? group, CultureInfo? culture = null)
+        byte subfunction, byte? group, CultureInfo? culture = null,
+        byte? requestedStatusMask = null, byte? requestedSeverityMask = null)
     {
+        if (requestedStatusMask.HasValue != requestedSeverityMask.HasValue ||
+            (requestedStatusMask.HasValue && subfunction != 0x42))
+            throw new ArgumentException("Filters must be the two masks transmitted by WWH 19/42.");
         string Hex(byte? value) => value?.ToString("X2", CultureInfo.InvariantCulture) ?? Text("Unavailable", culture);
         var lines = new List<string>
         {
@@ -114,6 +118,16 @@ internal static class DoIpConsolePresentation
             string.Format(CultureInfo.InvariantCulture, Text("WwhMetadata", culture),
                 Hex(report.SeverityAvailabilityMask), Hex(group))
         };
+        if (requestedStatusMask is byte status && requestedSeverityMask is byte severity)
+        {
+            var effectiveStatus = status & report.StatusAvailabilityMask;
+            var effectiveSeverity = severity & (report.SeverityAvailabilityMask ??
+                throw new InvalidDataException("Missing WWH severity availability."));
+            lines.Add(string.Format(CultureInfo.InvariantCulture, Text("WwhFilters", culture),
+                status, effectiveStatus, severity, effectiveSeverity));
+            if (effectiveStatus == 0 || effectiveSeverity == 0)
+                lines.Add(Text("WwhFilterUnavailable", culture));
+        }
         foreach (var code in report.Codes)
             lines.Add(string.Format(CultureInfo.InvariantCulture, Text("WwhRecord", culture),
                 code.Code, code.Status, Hex(code.Severity)) + " — " +

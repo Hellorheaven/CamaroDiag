@@ -1,3 +1,7 @@
+## PR117 — parité WWH Android et Windows (26/11/2026)
+
+- C6/DoIP : les interfaces Android et Windows affichent les masques demandés et effectifs d'état et de sévérité pour WWH 19/42, uniquement quand ces filtres ont réellement été transmis. Les rapports 19/55 et 19/56 n'inventent aucun filtre. Les octets DTC/sevérité restent bruts et les états Android sont interprétés selon les bits disponibles. Un filtre WWH indisponible ne peut pas conclure à l'absence de défauts. Ressources FR/EN et régressions écrites, non exécutées. Aucun checkpoint.
+
 ## PR117 — états WWH et filtres effectivement transmis (26/11/2026)
 
 - C6/DoIP Connectors : les rapports WWH 19/42, 19/55 et 19/56 exposent les états normalisés selon le masque disponible, en conservant les octets bruts. 19/42 distingue les intersections effectives des filtres d'état et de sévérité ; aucun filtre artificiel n'est attribué aux requêtes 19/55 et 19/56. Documentation FR/EN et régressions écrites, non exécutées. Aucun checkpoint.

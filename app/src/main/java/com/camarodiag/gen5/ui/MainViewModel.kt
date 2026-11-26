@@ -1702,9 +1702,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             localizedContext.getString(R.string.cal_doip_wwh_metadata,
                                 wwh.severityAvailability?.let { "%02X".format(it) } ?: unavailable,
                                 wwh.readinessGroup?.let { "%02X".format(it) } ?: unavailable) +
-                            wwh.records.joinToString(separator = "\n", prefix = "\n") { row ->
-                                localizedContext.getString(R.string.cal_doip_wwh_record, row.dtc, row.status,
-                                    row.severity?.let { "%02X".format(it) } ?: unavailable)
+                            (wwh.effectiveStatusMask?.let { effective ->
+                                "\n" + localizedContext.getString(R.string.cal_doip_wwh_filters,
+                                    requireNotNull(wwh.requestedStatusMask), effective,
+                                    requireNotNull(wwh.requestedSeverityMask), requireNotNull(wwh.effectiveSeverityMask)) +
+                                    (if (wwh.filterAvailable == false) "\n" +
+                                        localizedContext.getString(R.string.cal_doip_wwh_filter_unavailable) else "")
+                            } ?: "") +
+                            wwh.records.joinToString(separator = "") { row ->
+                                "\n" + localizedContext.getString(R.string.cal_doip_wwh_record, row.dtc, row.status,
+                                    row.severity?.let { "%02X".format(it) } ?: unavailable) +
+                                    " — " + renderUdsDtcStatus(row.status, wwh.statusAvailability)
                             }
                     }
                     result.commandReplies.isNotEmpty() -> result.commandReplies.mapIndexed { index, reply ->
@@ -2242,21 +2250,24 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private fun renderUdsDtcRecord(record: DecodedUdsDtcRecord, availability: Int): String {
+    private fun renderUdsDtcStatus(status: Int, availability: Int): String {
         val keys = listOf(R.string.cal_uds_bit_failed, R.string.cal_uds_bit_failed_cycle,
             R.string.cal_uds_bit_pending, R.string.cal_uds_bit_confirmed,
             R.string.cal_uds_bit_incomplete_since_clear, R.string.cal_uds_bit_failed_since_clear,
             R.string.cal_uds_bit_incomplete_cycle, R.string.cal_uds_bit_warning)
         val labels = keys.mapIndexedNotNull { bit, key ->
-            if ((record.statusByte and availability and (1 shl bit)) != 0) localizedContext.getString(key) else null
+            if ((status and availability and (1 shl bit)) != 0) localizedContext.getString(key) else null
         }
-        val state = when {
+        return when {
             availability == 0 -> localizedContext.getString(R.string.cal_uds_status_unavailable)
             labels.isEmpty() -> localizedContext.getString(R.string.cal_uds_status_none_asserted)
             else -> labels.joinToString(", ")
         }
-        return "0x%06X — 0x%02X — %s".format(record.rawDtc, record.statusByte, state)
     }
+
+    private fun renderUdsDtcRecord(record: DecodedUdsDtcRecord, availability: Int): String =
+        "0x%06X — 0x%02X — %s".format(record.rawDtc, record.statusByte,
+            renderUdsDtcStatus(record.statusByte, availability))
 
     private fun renderUdsDtcFilter(filter: UdsDtcFilter): String =
         "\n" + localizedContext.getString(R.string.cal_uds_effective_mask, filter.effectiveMask) +

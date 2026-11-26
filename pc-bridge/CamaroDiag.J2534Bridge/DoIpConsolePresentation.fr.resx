@@ -118,6 +118,8 @@
   <data name="WwhGroup" xml:space="preserve"><value>Groupe de préparation WWH (hex)</value></data>
   <data name="WwhResult" xml:space="preserve"><value>WWH 0x{0:X2} : {1} défauts ; masque statut 0x{2:X2} ; format 0x{3:X2}</value></data>
   <data name="WwhMetadata" xml:space="preserve"><value>Disponibilité sévérité : {0} ; groupe : {1}</value></data>
+  <data name="WwhFilters" xml:space="preserve"><value>État demandé/effectif : 0x{0:X2} / 0x{1:X2} · sévérité demandée/effective : 0x{2:X2} / 0x{3:X2}</value></data>
+  <data name="WwhFilterUnavailable" xml:space="preserve"><value>Au moins un filtre WWH est indisponible ; ce résultat ne permet pas de conclure à l’absence de défauts d’émissions.</value></data>
   <data name="WwhRecord" xml:space="preserve"><value>DTC {0:X6} ; statut {1:X2} ; sévérité {2}</value></data>
   <data name="MultiLayout" xml:space="preserve"><value>Longueurs DID (0xHHHH:octets, ...)</value></data>
   <data name="MultiRead" xml:space="preserve"><value>Lire plusieurs DID UDS</value></data>

@@ -1106,6 +1106,8 @@
     <string name="cal_doip_wwh_readiness">Lire les défauts du groupe WWH</string>
     <string name="cal_doip_wwh_result">WWH 0x%1$02X : %2$d défauts · masque statut 0x%3$02X · format 0x%4$02X</string>
     <string name="cal_doip_wwh_metadata">Disponibilité sévérité : %1$s · groupe : %2$s</string>
+    <string name="cal_doip_wwh_filters">État demandé/effectif : 0x%1$02X / 0x%2$02X · sévérité demandée/effective : 0x%3$02X / 0x%4$02X</string>
+    <string name="cal_doip_wwh_filter_unavailable">Au moins un filtre WWH est indisponible ; ce résultat ne permet pas de conclure à l’absence de défauts d’émissions.</string>
     <string name="cal_doip_wwh_record">DTC %1$06X · statut %2$02X · sévérité %3$s</string>
     <string name="cal_doip_multi_layout">DID:longueur en octets, séparés par virgule</string>
     <string name="cal_doip_multi_read">Lire plusieurs DID UDS</string>

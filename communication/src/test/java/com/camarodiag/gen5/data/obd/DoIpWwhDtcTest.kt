@@ -11,6 +11,22 @@ class DoIpWwhDtcTest {
         assertEquals(DoIpWwhDtc.Record(0x123456,8,0x40),report.records.single())
         assertEquals(0xE0,report.severityAvailability ?: -1)
     }
+    @Test fun maskCoverageUsesOnlyTransmittedFilters() {
+        val kind = DoIpWwhDtc.Kind.MASK
+        val response = bytes(0x59, 0x42, 0x33, 0x01, 0x40, 4)
+        val unavailable = DoIpWwhDtc.decode(kind, response, statusMask = 8, severityMask = 0x80)
+        assertEquals(0, unavailable.effectiveStatusMask)
+        assertEquals(0, unavailable.effectiveSeverityMask)
+        assertEquals(false, unavailable.filterAvailable)
+        val available = DoIpWwhDtc.decode(kind, response, statusMask = 0xFF, severityMask = 0xFF)
+        assertEquals(1, available.effectiveStatusMask)
+        assertEquals(0x40, available.effectiveSeverityMask)
+        assertEquals(true, available.filterAvailable)
+        val permanent = DoIpWwhDtc.decode(DoIpWwhDtc.Kind.PERMANENT, bytes(0x59,0x55,0x33,0xFF,4))
+        assertNull(permanent.filterAvailable)
+        assertTrue(runCatching { DoIpWwhDtc.decode(DoIpWwhDtc.Kind.PERMANENT,
+            bytes(0x59,0x55,0x33,0xFF,4), statusMask=8,severityMask=64) }.isFailure)
+    }
     @Test fun permanentAndReadinessResponses() {
         val permanent = DoIpWwhDtc.Kind.PERMANENT
         val readiness = DoIpWwhDtc.Kind.READINESS

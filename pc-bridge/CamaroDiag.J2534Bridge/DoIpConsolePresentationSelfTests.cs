@@ -81,6 +81,18 @@ internal static class DoIpConsolePresentationSelfTests
             "An unobserved gateway VIN is not proof of selected identity.");
         foreach (var language in new[] { "fr-FR", "en-US" })
         {
+            var wwh = new ObdOnUdsServices.WwhDtcReport(0x33, 1, 0x40, 4, []);
+            var filtered = DoIpConsolePresentation.FormatWwh(wwh, 0x42, null,
+                CultureInfo.GetCultureInfo(language), requestedStatusMask: 8, requestedSeverityMask: 0x80);
+            Check(filtered.Contains(DoIpConsolePresentation.Text("WwhFilterUnavailable",
+                CultureInfo.GetCultureInfo(language))), "Unavailable WWH filter is explicit.");
+            var supported = DoIpConsolePresentation.FormatWwh(wwh, 0x42, null,
+                CultureInfo.GetCultureInfo(language), requestedStatusMask: 1, requestedSeverityMask: 0x40);
+            Check(supported.Count == 3 && supported[2].Contains("0x40"), "Effective WWH masks preserved.");
+            var permanent = DoIpConsolePresentation.FormatWwh(
+                new ObdOnUdsServices.WwhDtcReport(0x33, 1, null, 4, []), 0x55, null,
+                CultureInfo.GetCultureInfo(language));
+            Check(permanent.Count == 2, "Permanent WWH read has no synthetic filters.");
             var culture = CultureInfo.GetCultureInfo(language);
             var text = DoIpConsolePresentation.FormatIdentity(observed, culture);
             Check(text.Contains("127.0.0.1") && text.Contains("0x03") &&

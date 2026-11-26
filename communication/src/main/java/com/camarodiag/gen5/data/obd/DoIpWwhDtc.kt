@@ -5,7 +5,13 @@ object DoIpWwhDtc {
     enum class Kind(val subfunction: Int) { MASK(0x42), PERMANENT(0x55), READINESS(0x56) }
     data class Record(val dtc: Int, val status: Int, val severity: Int?)
     data class Report(val kind: Kind, val statusAvailability: Int, val severityAvailability: Int?,
-        val format: Int, val readinessGroup: Int?, val records: List<Record>)
+        val format: Int, val readinessGroup: Int?, val records: List<Record>,
+        val requestedStatusMask: Int? = null, val requestedSeverityMask: Int? = null) {
+        val effectiveStatusMask: Int? get() = requestedStatusMask?.and(statusAvailability)
+        val effectiveSeverityMask: Int? get() = requestedSeverityMask?.and(requireNotNull(severityAvailability))
+        val filterAvailable: Boolean? get() = effectiveStatusMask?.let { it != 0 &&
+            requireNotNull(effectiveSeverityMask) != 0 }
+    }
     private fun Byte.u8() = toInt() and 255
     fun request(kind: Kind, statusMask: Int = 255, severityMask: Int = 255,
         readinessGroup: Int? = null): ByteArray {
@@ -17,7 +23,11 @@ object DoIpWwhDtc {
             Kind.READINESS -> byteArrayOf(requireNotNull(readinessGroup).toByte())
         }
     }
-    fun decode(kind: Kind, reply: ByteArray, readinessGroup: Int? = null): Report {
+    fun decode(kind: Kind, reply: ByteArray, readinessGroup: Int? = null,
+        statusMask: Int? = null, severityMask: Int? = null): Report {
+        require((statusMask == null) == (severityMask == null))
+        require(statusMask == null || (kind == Kind.MASK && statusMask in 0..255 &&
+            requireNotNull(severityMask) in 0..255))
         val start = if (kind == Kind.PERMANENT) 5 else 6
         val width = if (kind == Kind.MASK) 5 else 4
         require(reply.size >= start && (reply.size - start) % width == 0 &&
@@ -29,6 +39,7 @@ object DoIpWwhDtc {
                 reply[index + 3].u8(), if (kind == Kind.MASK) reply[offset].u8() else null)
         }
         return Report(kind, reply[3].u8(), if (kind == Kind.MASK) reply[4].u8() else null,
-            reply[if (kind == Kind.MASK) 5 else 4].u8(), readinessGroup, records)
+            reply[if (kind == Kind.MASK) 5 else 4].u8(), readinessGroup, records,
+            statusMask, severityMask)
     }
 }

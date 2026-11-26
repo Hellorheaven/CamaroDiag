@@ -1103,6 +1103,8 @@
     <string name="cal_doip_wwh_readiness">Read WWH readiness DTCs</string>
     <string name="cal_doip_wwh_result">WWH 0x%1$02X: %2$d DTCs · status mask 0x%3$02X · format 0x%4$02X</string>
     <string name="cal_doip_wwh_metadata">Severity availability: %1$s · readiness group: %2$s</string>
+    <string name="cal_doip_wwh_filters">Requested/effective status: 0x%1$02X / 0x%2$02X · requested/effective severity: 0x%3$02X / 0x%4$02X</string>
+    <string name="cal_doip_wwh_filter_unavailable">At least one WWH filter is unavailable; the result cannot establish absence of emissions faults.</string>
     <string name="cal_doip_wwh_record">DTC %1$06X · status %2$02X · severity %3$s</string>
     <string name="cal_doip_multi_layout">DID:byte length, comma separated</string>
     <string name="cal_doip_multi_read">Read multiple UDS DIDs</string>

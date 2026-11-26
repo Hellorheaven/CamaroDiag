@@ -1272,7 +1272,9 @@ internal sealed partial class BridgeDesktopForm
                         stop.Token.ThrowIfCancellationRequested();
                         if (IsDisposed || Disposing) return;
                         foreach (var line in DoIpConsolePresentation.FormatWwh(report, subfunction,
-                            subfunction == 0x56 ? wwhGroup : null))
+                            subfunction == 0x56 ? wwhGroup : null,
+                            requestedStatusMask: subfunction == 0x42 ? dtcMask : null,
+                            requestedSeverityMask: subfunction == 0x42 ? wwhSeverity : null))
                             ConsoleLine("SYSTEM", line, Color.DarkGreen);
                     }
                     else if (operation is DoIpReadOperation.ObdIdentify or DoIpReadOperation.ObdDid)

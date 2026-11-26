@@ -1078,7 +1078,9 @@ object DoIpDirectRead {
                         } else emptyList()
                         val wwhReport = wwhKind?.let {
                             val report = DoIpWwhDtc.decode(it,
-                                session.exchange(requireNotNull(wwhRequest), timeoutMs), wwhReadinessGroup)
+                                session.exchange(requireNotNull(wwhRequest), timeoutMs), wwhReadinessGroup,
+                                statusMask = if (it == DoIpWwhDtc.Kind.MASK) mask else null,
+                                severityMask = if (it == DoIpWwhDtc.Kind.MASK) wwhSeverity else null)
                             require(readVin(0xF802) == vin)
                             require(decodeObdProtocol(session.exchange(byteArrayOf(0x22, 0xF8.toByte(), 0x10),
                                 timeoutMs)) == protocolValue)
