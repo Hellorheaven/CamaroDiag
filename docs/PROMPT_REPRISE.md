@@ -1,3 +1,9 @@
+## SAE J1979 / C6 — preuves Mode 09 et inspection finale (26/11/2026)
+
+- J1979 Android : l'inventaire Mode 09 accepte l'écho exact de la commande (espaces et casse compris), conserve les réponses brutes et n'annonce plus une découverte complète lorsqu'une page mélange un bitmap valide et une réponse mal formée ou étrangère. Les types positivement annoncés restent consultables. Commits `4e72a56`, `0c2cbce` : code et deux régressions écrites, non exécutées.
+- C6 Android : le rapport d'inspection hors ligne vérifie l'annulation pendant la dernière revue des fichiers et juste avant publication. En cas d'échec d'intégrité, le diagnostic d'interruption du journal n'est repris que si son identité de fichier et ses octets restent identiques avant/après la nouvelle lecture ; aucun lien symbolique accepté. Commits `6b9a346`, `d698f57` : code et régression d'annulation finale écrite, non exécutée. Ceci ne garantit pas l'absence de modification concurrente sophistiquée.
+- J1979 et C6 restent actifs ; DoIP clos logiciellement sur e3b5f2a, qualification réelle à faire. Restent notamment Mode 05 legacy, services 04/08 avec consentement, intégration Windows/Connectors et clôtures logicielles. Aucun lancement CI, aucune Release ni fusion.
+
 ## C6 — stabilité des fichiers de récupération (26/11/2026)
 
 - L'inspection hors ligne refuse les liens symboliques et vérifie taille, dates et identité de fichier avant/après lecture puis sur l'inventaire complet en fin de campagne. Un bloc modifié pendant l'inspection ne donne plus de résultat positif sur une empreinte antérieure. Cette vérification de stabilité n'est pas une protection cryptographique contre une modification concurrente sophistiquée ; les empreintes du journal restent la preuve des octets lus. Régression écrite, non exécutée. Aucun accès ECU.
