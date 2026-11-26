@@ -92,6 +92,32 @@ class J1979Tests(unittest.TestCase):
         self.assertEqual(["0902"], sent)
         self.assertEqual("BUDGET_EXHAUSTED", report["stop_reason"])
 
+    def test_socket_drains_stale_replies_and_waits_for_final_response(self):
+        from unittest.mock import Mock
+        channel = LinuxIsoTp.__new__(LinuxIsoTp)
+        channel._socket = Mock()
+        channel._socket.recv.side_effect = [
+            b"\x43\x00", BlockingIOError(), b"\x7F\x03\x78", b"\x43\x00"]
+        channel._socket.send.return_value = 1
+        self.assertEqual(b"\x43\x00", channel.exchange(b"\x03", 2.5))
+        channel._socket.send.assert_called_once_with(b"\x03")
+        self.assertEqual(4, channel._socket.recv.call_count)
+
+    def test_socket_refuses_busy_queue_before_tx(self):
+        from unittest.mock import Mock
+        channel = LinuxIsoTp.__new__(LinuxIsoTp)
+        channel._socket = Mock()
+        channel._socket.recv.return_value = b"\x43\x00"
+        with self.assertRaises(OSError):
+            channel.exchange(b"\x03", 2.5)
+        channel._socket.send.assert_not_called()
+
+    def test_correct_identifier_with_truncated_pid_is_not_positive(self):
+        replies = dict(REPLIES, **{"010C": b"\x41\x0C\x00"})
+        report = scan(lambda req, _: replies[req.hex().upper()])
+        self.assertEqual("FAILED", next(row for row in report["steps"]
+                         if row["request_hex"] == "010C")["status"])
+
     def test_invalid_channel_never_opens_socket(self):
         with patch("camarodiagconnectors.j1979.socket.socket") as factory:
             with self.assertRaises(ValueError):
