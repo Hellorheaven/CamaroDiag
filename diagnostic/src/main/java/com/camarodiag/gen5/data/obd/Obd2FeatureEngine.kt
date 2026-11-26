@@ -101,7 +101,8 @@ data class ObdScanReport(
     val vehicleInfoSupportedTypes: Set<Int> = emptySet(),
     val vehicleInfoSupportComplete: Boolean? = null,
     val vehicleInfoReads: List<ObdVehicleInfoRead> = emptyList(),
-    val mode05: ObdMode05Report? = null
+    val mode05: ObdMode05Report? = null,
+    val mode08: ObdMode08Inventory? = null
 )
 
 /**
@@ -718,6 +719,9 @@ class Obd2FeatureEngine(
         val mode06 = if (legacy) withHeaderlessRecords {
             ObdLegacyOxygenTests.scanMode06({ command, timeout -> ask(command, timeout) })
         } else readMonitorTests()
+        val mode08 = if (legacy || physicalCanResponder != null || protocolNumber != null && protocolNumber in 6..9) withHeaderlessRecords {
+            ObdMode08Discovery.discover(legacy, physicalCanResponder) { command, timeout -> ask(command, timeout) }
+        } else null
         return ObdScanReport(
             supportedPids = supported,
             liveData = live,
@@ -749,7 +753,8 @@ class Obd2FeatureEngine(
             vehicleInfoSupportedTypes = vehicleInfo.supported,
             vehicleInfoSupportComplete = vehicleInfo.complete,
             vehicleInfoReads = vehicleInfo.reads,
-            mode05 = mode05
+            mode05 = mode05,
+            mode08 = mode08
         )
     }
 
