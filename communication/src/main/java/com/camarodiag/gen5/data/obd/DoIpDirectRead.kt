@@ -1,6 +1,7 @@
 package com.camarodiag.gen5.data.obd
 
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
@@ -401,7 +402,7 @@ object DoIpDirectRead {
                     controlTrace("RX", "UDP", address, buffer.copyOf(received.length), onControlTrace)
                     requireIoCurrent(active, current)
                     val frame = parseFrame(buffer.copyOfRange(0, 8), buffer.copyOfRange(8, received.length))
-                    if (frame.type == 0) throw IOException("DoIP gateway rejected identification.")
+                    requireNoHeaderNack(frame)
                     if (frame.type != 0x0004) continue
                     require(frame.data.size in setOf(32, 33)) { "Invalid DoIP identity announcement." }
                     val observedEid = hex(frame.data.copyOfRange(19, 25))
@@ -620,7 +621,7 @@ object DoIpDirectRead {
                     requireIoCurrent(active)
                     val frame = parseFrame(buffer.copyOfRange(0, 8), buffer.copyOfRange(8, packet.length))
                     require(frame.version == gateway.version)
-                    if (frame.type == 0) throw IOException("DoIP gateway rejected control query.")
+                    requireNoHeaderNack(frame)
                     if (frame.type != if (power) 0x4004 else 0x4002) continue
                     if (power) {
                         require(frame.data.size == 1 && frame.data[0].u8() in 0..2)
@@ -677,13 +678,17 @@ object DoIpDirectRead {
             if (type != 0x8001) recordControl("TX", pdu)
             remaining(deadline)
         }
-        private fun receive(deadline: Long): Frame {
-            val header = readExact(8, deadline)
+        private fun receive(deadline: Long, first: Int? = null, idle: Boolean = false): Frame {
+            val header = if (first == null) readExact(8, deadline)
+                else byteArrayOf(first.toByte()) + readExact(7, deadline)
             val data = readExact(length(header), deadline)
             val frame = parseFrame(header, data)
-            if (frame.type != 0x8001) recordControl("RX", header + data)
+            // A diagnostic PDU received while idle has no UDS request to
+            // attribute it to. Keep the complete wire frame in the trace.
+            if (idle || frame.type != 0x8001) recordControl("RX", header + data)
+            remaining(deadline)
             require(frame.version == gateway.version) { "DoIP protocol version changed." }
-            if (frame.type == 0) throw IOException("DoIP generic negative acknowledgement.")
+            if (!idle) requireNoHeaderNack(frame)
             return frame
         }
         private fun alive(frame: Frame, deadline: Long): Boolean {
@@ -703,7 +708,7 @@ object DoIpDirectRead {
                 when (frame.data[4].u8()) {
                     0x10 -> return
                     0x11 -> continue
-                    else -> throw IOException("DoIP routing activation denied.")
+                    else -> throw Refusal(RefusalLayer.ROUTING, frame.data[4].u8())
                 }
             }
         }
@@ -724,17 +729,35 @@ object DoIpDirectRead {
                 check(isReadContextCurrent()) { "DoIP operation context changed." }
                 if (first < 0) throw EOFException("DoIP socket closed between samples.")
                 val frameEnd = deadline(frameTimeoutMs)
-                val header = byteArrayOf(first.toByte()) + readExact(7, frameEnd)
-                val data = readExact(length(header), frameEnd)
-                val frame = parseFrame(header, data)
-                if (frame.type != 0x8001) recordControl("RX", header + data)
-                require(frame.version == gateway.version && alive(frame, frameEnd)) {
+                val frame = receive(frameEnd, first, idle = true)
+                require(alive(frame, frameEnd)) {
                     "Unsolicited DoIP message between samples."
                 }
             }
         }
-        fun exchange(request: ByteArray, timeout: Int): ByteArray {
-            val end = deadline(timeout)
+        /** Consume only already available frames before sending a new request.
+         * On TLS, available() may not expose bytes still in the encrypted
+         * socket; use a bounded probe. This is not a transaction identifier
+         * and cannot disambiguate a late identical reply racing a new request. */
+        private fun drainBeforeExchange(end: Long) {
+            val stream = socket.getInputStream()
+            while (true) {
+                check(isReadContextCurrent()) { "DoIP operation context changed." }
+                remaining(end)
+                if (socket !is SSLSocket && stream.available() == 0) return
+                socket.soTimeout = minOf(remaining(end), 1)
+                val first = try { stream.read() } catch (_: SocketTimeoutException) {
+                    check(isReadContextCurrent()) { "DoIP operation context changed." }
+                    return
+                }
+                if (first < 0) throw EOFException("DoIP socket closed before next exchange.")
+                val frame = receive(end, first, idle = true)
+                require(alive(frame, end)) { "Unsolicited DoIP message before next request." }
+            }
+        }
+        fun exchange(request: ByteArray, timeout: Int, overallDeadline: Long? = null): ByteArray {
+            val end = minOf(deadline(timeout), overallDeadline ?: Long.MAX_VALUE)
+            drainBeforeExchange(end)
             send(0x8001, addr(target.tester) + addr(target.ecu) + request, end)
             record("TX", request)
             var responseEnd = responseDeadline(end, System.nanoTime(), options.p2Ms)
@@ -749,8 +772,10 @@ object DoIpDirectRead {
                 if (frame.type == 0x8002 || frame.type == 0x8003) {
                     val echo = frame.data.copyOfRange(5, frame.data.size)
                     require(echo.size <= request.size && request.copyOf(echo.size).contentEquals(echo))
-                    if (frame.type == 0x8003 || frame.data[4].u8() != 0)
-                        throw IOException("DoIP diagnostic acknowledgement rejected.")
+                    if (frame.type == 0x8003)
+                        throw Refusal(RefusalLayer.DIAGNOSTIC_ACK, frame.data[4].u8())
+                    if (frame.data[4].u8() != 0)
+                        throw IOException("Invalid positive DoIP diagnostic acknowledgement.")
                     continue
                 }
                 val reply = frame.data.copyOfRange(4, frame.data.size)
@@ -764,13 +789,26 @@ object DoIpDirectRead {
                     throw UdsNegativeResponseException(reply[1].u8(), reply[2].u8())
                 }
                 requirePositiveResponse(request, reply)
+                remaining(responseEnd)
                 check(isReadContextCurrent()) { "DoIP operation context changed." }
                 return reply
             }
         }
     }
 
-    data class InventoryEntry(val ecu: Int, val vin: String?, val protocolValue: Int? = null)
+    enum class RefusalLayer { HEADER, ROUTING, DIAGNOSTIC_ACK }
+    class Refusal(val layer: RefusalLayer, val code: Int) : IOException(
+        "DoIP ${layer.name} refusal 0x%02X".format(Locale.ROOT, code))
+    private fun requireNoHeaderNack(frame: Frame) {
+        if (frame.type != 0) return
+        if (frame.data.size != 1 || frame.data[0].u8() !in 0..4)
+            throw IOException("Malformed DoIP generic header NACK.")
+        throw Refusal(RefusalLayer.HEADER, frame.data[0].u8())
+    }
+
+    enum class InventoryFailure { VIN_MISMATCH, PROTOCOL_IDENTITY, NEGATIVE_RESPONSE, TIMEOUT, COMMUNICATION, HEADER_NACK, ROUTING_DENIED, DIAGNOSTIC_NACK }
+    data class InventoryEntry(val ecu: Int, val vin: String?, val protocolValue: Int? = null,
+        val failure: InventoryFailure? = null, val failureCode: Int? = null)
     private class EcuVinMismatch : IllegalArgumentException("ECU VIN differs from selected vehicle or gateway.")
     private class EcuObdIdentityMismatch : IllegalArgumentException("Invalid or unstable ECU protocol identification.")
 
@@ -785,8 +823,10 @@ object DoIpDirectRead {
     suspend fun inventory(target: Target, addresses: List<Int>, options: SessionOptions,
         clientTls: DoIpClientTls? = null, onTrace: (Target, Trace) -> Unit = { _, _ -> },
         onControlTrace: (ControlTrace) -> Unit = {}, current: () -> Boolean = { true },
-        obd: Boolean = false): List<InventoryEntry> = inventoryAt(target, addresses, options,
-        clientTls, onTrace, onControlTrace, current, obd)
+        obd: Boolean = false,
+        onProgress: (List<InventoryEntry>, Int) -> Unit = { _, _ -> }): List<InventoryEntry> =
+        inventoryAt(target, addresses, options, clientTls, onTrace, onControlTrace, current, obd,
+            onProgress = onProgress)
 
     internal class InventoryTraceException(cause: Exception) :
         IllegalStateException("DoIP inventory trace failed.", cause)
@@ -795,7 +835,8 @@ object DoIpDirectRead {
         clientTls: DoIpClientTls? = null, onTrace: (Target, Trace) -> Unit = { _, _ -> },
         onControlTrace: (ControlTrace) -> Unit = {}, current: () -> Boolean = { true },
         obd: Boolean = false, udpPort: Int = DOIP_UDP_PORT,
-        tcpPort: Int = if (target.tls) 3496 else 13400): List<InventoryEntry> {
+        tcpPort: Int = if (target.tls) 3496 else 13400,
+        onProgress: (List<InventoryEntry>, Int) -> Unit = { _, _ -> }): List<InventoryEntry> {
         require(udpPort in 1..65535 && tcpPort in 1..65535)
         require((udpPort == DOIP_UDP_PORT && tcpPort == (if (target.tls) 3496 else 13400)) ||
             (target.address.isLoopbackAddress && !target.tls)) { "Custom DoIP ports are restricted to local TCP simulation." }
@@ -835,21 +876,36 @@ object DoIpDirectRead {
             } catch (error: DoIpClientCertificateException) {
                 throw error
             } catch (_: EcuVinMismatch) {
-                results += InventoryEntry(ecu, null)
+                results += InventoryEntry(ecu, null, failure = InventoryFailure.VIN_MISMATCH)
             } catch (_: EcuObdIdentityMismatch) {
-                results += InventoryEntry(ecu, null)
-            } catch (_: UdsNegativeResponseException) {
-                results += InventoryEntry(ecu, null)
+                results += InventoryEntry(ecu, null, failure = InventoryFailure.PROTOCOL_IDENTITY)
+            } catch (error: UdsNegativeResponseException) {
+                results += InventoryEntry(ecu, null, failure = InventoryFailure.NEGATIVE_RESPONSE,
+                    failureCode = error.negativeResponseCode)
+            } catch (error: Refusal) {
+                val failure = when (error.layer) {
+                    RefusalLayer.HEADER -> InventoryFailure.HEADER_NACK
+                    RefusalLayer.ROUTING -> InventoryFailure.ROUTING_DENIED
+                    RefusalLayer.DIAGNOSTIC_ACK -> InventoryFailure.DIAGNOSTIC_NACK
+                }
+                results += InventoryEntry(ecu, null, failure = failure, failureCode = error.code)
+            } catch (_: SocketTimeoutException) {
+                results += InventoryEntry(ecu, null, failure = InventoryFailure.TIMEOUT)
             } catch (_: IOException) {
-                results += InventoryEntry(ecu, null)
+                results += InventoryEntry(ecu, null, failure = InventoryFailure.COMMUNICATION)
             }
             check(current())
             val observed = discover(target.address, target.expectedVin, options.timeoutMs, control,
                 port = udpPort, current = current)
             require(gateway.matchesIdentity(observed)) { "Gateway changed during ECU inventory." }
+            check(current())
+            // Publish a detached snapshot only after the ECU socket closed
+            // and gateway revalidation succeeded. A callback failure aborts
+            // the inventory, rather than being classified as an ECU failure.
+            observe { onProgress(results.toList(), frozen.size) }
         }
         check(current())
-        return results
+        return results.toList()
     }
 
     /** One explicitly addressed operation. Unknown vehicle VIN cannot authorize
@@ -980,7 +1036,7 @@ object DoIpDirectRead {
             EcuWriteConsentFlow.requireCurrentForTransmit(requireNotNull(approval), isContextCurrent)
         }
         if (backupScope != null) {
-            backupScope.validate()
+            backupScope.validateCapture()
             require(backupScope.vin == target.expectedVin && backupScope.tester == target.tester && backupScope.ecu == target.ecu)
         }
         val budget = if (operation == Operation.BACKUP) 600_000L
@@ -997,8 +1053,9 @@ object DoIpDirectRead {
         if (backupScope != null) require(gateway.logicalAddress == backupScope.gateway)
         val trace = mutableListOf<Trace>()
         val base = Socket()
-        try {
-            return io(budget, { base.close() }) { active ->
+        val outcome = try {
+            io(budget, { base.close() }) { active ->
+                val backupDeadline = if (operation == Operation.BACKUP) deadline(600_000) else null
                 val current = { active() && isReadContextCurrent() }
                 fun requireCurrent() {
                     if (!active()) throw kotlinx.coroutines.CancellationException("DoIP operation cancelled.")
@@ -1029,7 +1086,8 @@ object DoIpDirectRead {
                         isReadContextCurrent = current)
                     session.activate(timeoutMs)
                     fun readVin(vinDid: Int = 0xF190): String {
-                        val reply = session.exchange(byteArrayOf(0x22, (vinDid shr 8).toByte(), vinDid.toByte()), timeoutMs)
+                        val reply = session.exchange(byteArrayOf(0x22, (vinDid shr 8).toByte(), vinDid.toByte()),
+                            timeoutMs, backupDeadline)
                         require(reply.size == 20)
                         val vin = reply.copyOfRange(3,20).toString(Charsets.US_ASCII)
                         if (!validVin(vin) || (gateway.vin != null && gateway.vin != vin) ||
@@ -1235,10 +1293,17 @@ object DoIpDirectRead {
                             Outcome(gateway, target.ecu, vin, null, null, trace.toList(), snapshotIndex = index)
                         } else if (operation == Operation.BACKUP) {
                             val scope = checkNotNull(backupScope)
+                            val end = requireNotNull(backupDeadline)
+                            fun checkBudget() {
+                                requireCurrent()
+                                remaining(end)
+                            }
                             fun identity() {
+                                checkBudget()
                                 require(readVin() == scope.vin)
-                                val response = session.exchange(byteArrayOf(0x22, (scope.identityDid shr 8).toByte(), scope.identityDid.toByte()), timeoutMs)
+                                val response = session.exchange(byteArrayOf(0x22, (scope.identityDid shr 8).toByte(), scope.identityDid.toByte()), timeoutMs, end)
                                 require(hex(response.copyOfRange(3, response.size)) == scope.identityHex) { "ECU identity differs from memory scope." }
+                                checkBudget()
                             }
                             fun pass(index: Int): ByteArray {
                                 identity()
@@ -1246,21 +1311,23 @@ object DoIpDirectRead {
                                 var offset = 0
                                 var blocks = 0
                                 while (offset < data.size) {
-                                    if (blocks > 0 && blocks % 32 == 0) identity()
+                                    checkBudget()
                                     val count = minOf(scope.blockSize, data.size - offset)
                                     val address = scope.start + offset
                                     val request = byteArrayOf(0x23, if (count > 255) 0x24 else 0x14,
                                         (address shr 24).toByte(), (address shr 16).toByte(),
                                         (address shr 8).toByte(), address.toByte()) +
                                         if (count > 255) byteArrayOf((count shr 8).toByte(), count.toByte()) else byteArrayOf(count.toByte())
-                                    val reply = session.exchange(request, timeoutMs)
+                                    val reply = session.exchange(request, timeoutMs, end)
+                                    checkBudget()
                                     require(reply.size == count + 1) { "Incomplete scoped memory response." }
                                     reply.copyInto(data, offset, 1)
                                     offset += count
                                     blocks++
                                     if (blocks % 32 == 0 || offset == data.size) {
-                                        requireCurrent()
+                                        identity()
                                         onBackupProgress(index, offset)
+                                        checkBudget()
                                     }
                                 }
                                 return data
@@ -1269,6 +1336,7 @@ object DoIpDirectRead {
                             val second = pass(2)
                             identity()
                             val capture = DoIpMemoryBackup.createCapture(scope, first, second)
+                            checkBudget()
                             Outcome(gateway, target.ecu, vin, null, null, trace.toList(), capture = capture)
                         } else if (operation in setOf(Operation.MONITOR, Operation.MULTI_MONITOR)) {
                             val samples = monitorDid { require(readVin() == vin) }
@@ -1305,5 +1373,17 @@ object DoIpDirectRead {
                 }
             }
         } finally { base.close() }
+        if (operation == Operation.BACKUP) {
+            // No completed acquisition is returned before the TCP/TLS socket
+            // has closed and the same gateway has been rediscovered.
+            kotlinx.coroutines.currentCoroutineContext().ensureActive()
+            check(isReadContextCurrent()) { "DoIP operation context changed." }
+            val observed = discover(target.address, target.expectedVin, timeoutMs, onControlTrace,
+                port = udpPort, current = isReadContextCurrent)
+            require(gateway.matchesIdentity(observed)) { "DoIP gateway identity changed during memory capture." }
+            kotlinx.coroutines.currentCoroutineContext().ensureActive()
+            check(isReadContextCurrent()) { "DoIP operation context changed." }
+        }
+        return outcome
     }
 }
