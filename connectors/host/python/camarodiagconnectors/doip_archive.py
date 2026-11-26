@@ -9,6 +9,7 @@ import hashlib
 import json
 import re
 import struct
+import zlib
 from datetime import datetime
 from pathlib import Path
 from zipfile import BadZipFile, ZipFile
@@ -96,6 +97,43 @@ def _verify_footer(stream):
     raise ValueError("Incomplete DoIP ZIP footer")
 
 
+def _verify_local_layout(source, entries, central_start):
+    """Check the actual local headers, data extents and optional descriptors.
+    
+    A directory listing alone can hide extra local records or point to the
+    wrong header. The three files in this format occupy a contiguous ZIP.
+    """
+    ordered = sorted(entries, key=lambda entry: entry.header_offset)
+    for index, entry in enumerate(ordered):
+        next_offset = ordered[index + 1].header_offset if index + 1 < len(ordered) else central_start
+        source.seek(entry.header_offset)
+        raw = source.read(30)
+        signature, version, flags, method, _, _, crc, compressed, size, names, extra = struct.unpack(
+            "<4s5H3I2H", raw)
+        if (signature != b"PK\x03\x04" or flags != entry.flag_bits or method != entry.compress_type or
+                names != len(entry.filename) or source.read(names) != entry.filename.encode("ascii")):
+            raise ValueError("Invalid DoIP ZIP local entry")
+        data_end = entry.header_offset + 30 + names + extra + entry.compress_size
+        if data_end > next_offset:
+            raise ValueError("Overlapping DoIP ZIP entries")
+        expected = (entry.CRC, entry.compress_size, entry.file_size)
+        if flags & 8:
+            if (crc, compressed, size) not in ((0, 0, 0), expected):
+                raise ValueError("Unexpected local DoIP ZIP descriptor metadata")
+            source.seek(data_end)
+            gap = next_offset - data_end
+            if gap == 16 and source.read(4) == b"PK\x07\x08":
+                descriptor = struct.unpack("<3I", source.read(12))
+            elif gap == 12:
+                descriptor = struct.unpack("<3I", source.read(12))
+            else:
+                raise ValueError("Incomplete DoIP ZIP data descriptor")
+            if descriptor != expected:
+                raise ValueError("DoIP ZIP descriptor differs from directory")
+        elif data_end != next_offset or (crc, compressed, size) != expected:
+            raise ValueError("DoIP ZIP local metadata differs from directory")
+
+
 def verify_archive(path: Path, profile: Path) -> dict:
     scope = load_scope(profile)
     try:
@@ -113,11 +151,12 @@ def verify_archive(path: Path, profile: Path) -> dict:
                     if (entry.is_dir() or not 1 <= entry.file_size <= limit or
                             (entry.filename != "manifest.json" and entry.file_size != limit) or
                             entry.header_offset in offsets or not 0 <= entry.header_offset < central_start or
-                            entry.flag_bits & 1 or entry.compress_type not in (0, 8)):
+                            entry.volume != 0 or entry.flag_bits & 1 or entry.compress_type not in (0, 8)):
                         raise ValueError("Invalid DoIP archive entry metadata")
                     offsets.add(entry.header_offset)
                 if min(offsets) != 0:
                     raise ValueError("Unexpected DoIP ZIP prefix")
+                _verify_local_layout(source, entries, central_start)
                 with archive.open("manifest.json") as stream:
                     metadata = stream.read(16385)
                     if len(metadata) != archive.getinfo("manifest.json").file_size or stream.read(1):
@@ -137,7 +176,7 @@ def verify_archive(path: Path, profile: Path) -> dict:
                     if first.read(1) or second.read(1):
                         raise ValueError("Oversized DoIP region")
                 digest = digest_builder.hexdigest().upper()
-    except (BadZipFile, RuntimeError, NotImplementedError, EOFError, struct.error) as exc:
+    except (BadZipFile, RuntimeError, NotImplementedError, EOFError, struct.error, zlib.error) as exc:
         raise ValueError("Invalid DoIP ZIP") from exc
     manifest = _json(metadata)
     if set(manifest) != {"format", "transport", "coverage", "origin",
