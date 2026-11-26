@@ -1,3 +1,7 @@
+## J1979 — liaison des preuves CI/2 au profil CAN exact (26/11/2026)
+
+- Le client fixe la paire TX/RX et la variante 11/29 bits, le moteur vérifie cette paire avant la campagne et chaque requête CI/2 la transporte pour vérification indépendante par le STM32 avant toute émission. Profil divergent refusé sans TX, aucune attribution au mauvais ECU. Régressions des divergences client/campagne et client/endpoint écrites. CI/2 encore interne non déployé ; aucun test, compilation, fusion ni Release. J1979/C6 ouverts.
+
 ## J1979 — raccordement de CI/2 à la campagne commune (26/11/2026)
 
 - Le moteur de campagne accepte désormais un transport applicatif corrélé en plus du CAN local. Client CI/2 raccordé directement à ce contrat, contrôle indépendant des formes de réponse avant lecture des bitmaps, budget absolu partagé par la requête et tous les fragments. Régression campagne complète sur boucle interprocesseur et expiration pendant récupération de fragments, non exécutée. Aucun démarrage matériel ni authentification USB ajouté. J1979/C6 ouverts ; pas de CI, fusion ou Release.

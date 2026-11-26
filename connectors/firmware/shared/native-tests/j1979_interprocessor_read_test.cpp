@@ -46,7 +46,7 @@ struct Sink final:J1979CanCampaign::Sink {
 int main(){
   Bus bus;Exchange::Result scratch,out;
   Endpoint endpoint(bus,scratch,0x7e0,0x7e8,false,admission);
-  Loop wire(endpoint);Client client(wire);
+  Loop wire(endpoint);Client client(wire,0x7e0,0x7e8,false);
   const uint8_t read[]={1,0},write[]={4};
   assert(client.read(read,2,1000,out)&&out.state==State::Positive&&out.responseSize==6);
   assert(bus.sent==1&&wire.calls==2);
@@ -54,24 +54,30 @@ int main(){
   assert(!client.read(write,1,1000,out)&&client.closed()&&bus.sent==2);
   assert(!client.read(read,2,1000,out)&&bus.sent==2);
   Bus second;Endpoint direct(second,scratch,0x7e0,0x7e8,false,admission);
-  Packet p;p.op=Op::Read;p.length=3;put16(p.body,1000);p.body[2]=4;
+  Packet p;p.op=Op::Read;p.length=12;put16(p.body,1000);
+  put32(p.body+2,0x7e0);put32(p.body+6,0x7e8);p.body[10]=0;p.body[11]=4;
   uint8_t tx[Size],rx[Size];assert(encode(p,tx,Size));
   assert(!direct.transact(tx,Size,rx,Size)&&direct.closed()&&second.sent==0);
   Endpoint replay(second,scratch,0x7e0,0x7e8,false,admission);
-  p.length=4;p.body[2]=1;p.body[3]=0;
+  p.length=13;p.body[11]=1;p.body[12]=0;
   assert(encode(p,tx,Size)&&replay.transact(tx,Size,rx,Size));
   assert(!replay.transact(tx,Size,rx,Size)&&replay.closed()&&second.sent==1);
   Endpoint damaged(second,scratch,0x7e0,0x7e8,false,admission);
-  Loop bad(damaged);bad.corrupt=true;Client badClient(bad);
+  Loop bad(damaged);bad.corrupt=true;Client badClient(bad,0x7e0,0x7e8,false);
   assert(!badClient.read(read,2,1000,out)&&badClient.closed()&&second.sent==2);
   assert(!badClient.read(read,2,1000,out)&&second.sent==2);
   Bus campaignBus;Endpoint campaignEndpoint(campaignBus,scratch,0x7e0,0x7e8,false,admission);
-  Loop campaignWire(campaignEndpoint);Client campaignClient(campaignWire);Sink sink;
+  Loop campaignWire(campaignEndpoint);Client campaignClient(campaignWire,0x7e0,0x7e8,false);Sink sink;
   const auto campaign=J1979CanCampaign::runApplication(campaignClient,0x7e0,0x7e8,false,10000,sink,out);
   assert(campaign.end==J1979CanCampaign::End::Complete&&campaign.transportObserved&&
     campaign.pidInventoryComplete&&campaign.steps==sink.count&&campaignBus.sent==sink.count);
+  Bus wrongBus;Endpoint wrongEndpoint(wrongBus,scratch,0x7e0,0x7e8,false,admission);
+  Loop wrongWire(wrongEndpoint);Client wrongClient(wrongWire,0x7e1,0x7e9,false);Sink wrongSink;
+  const auto wrong=J1979CanCampaign::runApplication(wrongClient,0x7e0,0x7e8,false,10000,wrongSink,out);
+  assert(wrong.end==J1979CanCampaign::End::LinkFault&&wrongWire.calls==0&&wrongBus.sent==0);
+  assert(!wrongClient.read(read,2,1000,out)&&wrongClient.closed()&&wrongEndpoint.closed()&&wrongBus.sent==0);
   Bus slowBus;Endpoint slowEndpoint(slowBus,scratch,0x7e0,0x7e8,false,admission);
-  Loop slowWire(slowEndpoint);slowWire.delay=60;Client slowClient(slowWire);
+  Loop slowWire(slowEndpoint);slowWire.delay=60;Client slowClient(slowWire,0x7e0,0x7e8,false);
   assert(!slowClient.read(read,2,100,out)&&slowClient.closed()&&slowBus.sent==1&&slowWire.calls==2);
   Endpoint revoked(second,scratch,0x7e0,0x7e8,false,admission);
   authorized=false;

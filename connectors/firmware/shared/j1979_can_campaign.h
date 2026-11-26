@@ -30,6 +30,7 @@ class J1979CanCampaign {
    public:
     virtual ~ApplicationLink()=default;
     virtual bool active()=0;
+    virtual bool matches(uint32_t tx,uint32_t rx,bool extended)const=0;
     virtual uint32_t monotonicMs()=0;
     virtual void exchange(const uint8_t* request,size_t size,uint32_t timeout,
                           Exchange::Result& result)=0;
@@ -40,6 +41,9 @@ class J1979CanCampaign {
      public:
       Local(J1979CanReadLink& l,uint32_t tx,uint32_t rx,bool ext):l_(l),tx_(tx),rx_(rx),ext_(ext){}
       bool active()override{return l_.active();}
+      bool matches(uint32_t tx,uint32_t rx,bool ext)const override{
+        return tx==tx_&&rx==rx_&&ext==ext_;
+      }
       uint32_t monotonicMs()override{return l_.monotonicMs();}
       void exchange(const uint8_t* req,size_t n,uint32_t timeout,Exchange::Result& result)override{
         Exchange::run(l_,tx_,rx_,ext_,req,n,timeout,result);
@@ -53,7 +57,8 @@ class J1979CanCampaign {
                      uint32_t budgetMs,Sink& sink,Exchange::Result& scratch){
     Summary s;
     if(budgetMs<1||budgetMs>600000u||
-       !J1979CanReadSession::physicalPair(tx,rx,extended)||!link.active())return s;
+       !J1979CanReadSession::physicalPair(tx,rx,extended)||
+       !link.matches(tx,rx,extended)||!link.active())return s;
     const uint32_t started=link.monotonicMs();
     s.end=End::Complete;
     auto read=[&](const uint8_t* request,size_t size)->bool {
@@ -69,7 +74,7 @@ class J1979CanCampaign {
       if(scratch.state==State::Positive||scratch.state==State::Raw||scratch.state==State::Negative){
         const auto shape=scratch.responseSize<=sizeof(scratch.response)?
           J1979ReadEvidence::classify(J1979ReadEvidence::Variant::ClassicCan,
-            request,size,scratch.response,scratch.responseSize):static_cast<R>(255);
+            request,size,scratch.response,scratch.responseSize):R::Invalid;
         if((scratch.state==State::Positive&&shape!=R::Positive)||
            (scratch.state==State::Raw&&shape!=R::Raw)||
            (scratch.state==State::Negative&&shape!=R::Negative)){

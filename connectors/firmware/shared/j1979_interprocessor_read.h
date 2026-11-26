@@ -81,14 +81,15 @@ class Endpoint {
        !decode(in,n,p)||p.seq!=next_)return fail();
     r.seq=p.seq;
     if(p.op==Op::Read){
-      if(offset_!=scratchSize_||p.length<3||p.length>9)return fail();
+      if(offset_!=scratchSize_||p.length<12||p.length>18)return fail();
       const uint16_t timeout=get16(p.body);
-      const size_t reqSize=p.length-2;
-      if(timeout<1||timeout>4000||
-         !J1979ReadEvidence::readRequest(J1979ReadEvidence::Variant::ClassicCan,p.body+2,reqSize))
+      const size_t reqSize=p.length-11;
+      if(timeout<1||timeout>4000||get32(p.body+2)!=tx_||
+         get32(p.body+6)!=rx_||p.body[10]!=(ext_?1:0)||
+         !J1979ReadEvidence::readRequest(J1979ReadEvidence::Variant::ClassicCan,p.body+11,reqSize))
         return fail();
-      Exchange::run(bus_,tx_,rx_,ext_,p.body+2,reqSize,timeout,scratch_);
-      if(!validResult(p.body+2,reqSize,scratch_))return fail();
+      Exchange::run(bus_,tx_,rx_,ext_,p.body+11,reqSize,timeout,scratch_);
+      if(!validResult(p.body+11,reqSize,scratch_))return fail();
       scratchSize_=scratch_.responseSize;offset_=0;
       r.op=Op::Result;r.length=7;r.body[0]=wireState(scratch_.state);
       put16(r.body+1,uint16_t(scratchSize_));put32(r.body+3,scratch_.elapsedMs);
@@ -124,11 +125,17 @@ class Transport {
 };
 class Client final:public J1979CanCampaign::ApplicationLink {
  public:
-  explicit Client(Transport& transport):transport_(transport){}
+  Client(Transport& transport,uint32_t tx,uint32_t rx,bool ext)
+    :transport_(transport),tx_(tx),rx_(rx),ext_(ext){}
   Client(const Client&)=delete;
   Client& operator=(const Client&)=delete;
   bool closed()const{return closed_;}
-  bool active()override{return !closed_&&transport_.active();}
+  bool active()override{
+    return !closed_&&J1979CanReadSession::physicalPair(tx_,rx_,ext_)&&transport_.active();
+  }
+  bool matches(uint32_t tx,uint32_t rx,bool ext)const override{
+    return tx==tx_&&rx==rx_&&ext==ext_;
+  }
   uint32_t monotonicMs()override{return transport_.monotonicMs();}
   void exchange(const uint8_t* req,size_t n,uint32_t timeout,Exchange::Result& out)override{
     if(timeout>4000u||!read(req,n,uint16_t(timeout),out)){
@@ -139,13 +146,14 @@ class Client final:public J1979CanCampaign::ApplicationLink {
     out.state=State::Fault;out.responseSize=0;out.elapsedMs=0;
     if(!active()||!req||n>7||timeout<2||timeout>4000||
        !J1979ReadEvidence::readRequest(J1979ReadEvidence::Variant::ClassicCan,req,n))return fail();
-    Packet p,r;p.op=Op::Read;p.length=uint8_t(n+2);
+    Packet p,r;p.op=Op::Read;p.length=uint8_t(n+11);
     // Reserve part of the absolute exchange budget for mailbox overhead.
     // Every chunk shares the same deadline; no per-fragment extension.
     const uint32_t started=monotonicMs();
     const uint16_t reserve=timeout>400?100:uint16_t(timeout/2);
     const uint16_t vehicleTimeout=uint16_t(timeout-reserve);
-    put16(p.body,vehicleTimeout);std::memcpy(p.body+2,req,n);
+    put16(p.body,vehicleTimeout);put32(p.body+2,tx_);put32(p.body+6,rx_);
+    p.body[10]=ext_?1:0;std::memcpy(p.body+11,req,n);
     if(!request(p,Op::Result,r,started,timeout)||r.length!=7||
        r.body[0]<1||r.body[0]>5)return fail();
     const uint8_t state=r.body[0];const size_t total=get16(r.body+1);
@@ -181,6 +189,7 @@ class Client final:public J1979CanCampaign::ApplicationLink {
     if(next_==0xffffu)closed_=true;else ++next_;
     return true;
   }
-  Transport& transport_;uint16_t next_=0;bool closed_=false;
+  Transport& transport_;uint32_t tx_,rx_;bool ext_;
+  uint16_t next_=0;bool closed_=false;
 };
 } }
