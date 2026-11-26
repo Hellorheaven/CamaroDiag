@@ -2368,3 +2368,7 @@ Ce créneau est resté sur la PR #95 `chore/unified-ci` : aucune nouvelle branch
 
 ### C6 — Empreinte de preuves physiques Android
 Inspection bornée des entrées, ouverture NOFOLLOW, identité du répertoire et rejet des alias connus. Empreinte SHA-256 canonique du journal et des enveloppes complètes affichée et exportée, uniquement si inspection réussie. Empreinte ≠ signature, autorisation ou récupération physique démontrée. Tests ajoutés, non exécutés (validation groupée C6).
+
+
+### C6 — Cohérence des preuves Windows
+Rapport composite journal/secteurs/manifeste, avec empreinte de journal et contrôle de stabilité, séquence invalide refusée hors marqueur RecoveryRequired conservé. Le rapprochement BIN relit chaque enveloppe avec son empreinte issue d'un seul snapshot et revalide l'ensemble avant restitution, sans rescanner tous les secteurs pour chaque secteur. Tests écrits non exécutés.

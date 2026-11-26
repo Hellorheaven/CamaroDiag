@@ -122,6 +122,14 @@ internal static class NativeE39RecoveryImageAssessmentSelfTests
 
             var blockDirectory = journalPath + ".blocks";
             var originalEvidence = NativeE39SavedBlockAssessment.Inspect(journalPath);
+            var bundle = NativeE39SavedBlockAssessment.InspectBundle(journalPath);
+            Check(bundle.Blocks.Verified && bundle.Target.Verified &&
+                bundle.Blocks.JournalInspection is { SequenceValid: true } &&
+                bundle.Blocks.JournalSnapshotSha256 is { Length: 64 } &&
+                bundle.Blocks.SnapshotSha256 == originalEvidence.SnapshotSha256,
+                "Composite inspection uses one pinned journal and stable target metadata");
+            Check(originalEvidence.EnvelopeSha256.Count == 1,
+                "Each original sector envelope has an independently pinned digest");
             Check(originalEvidence.Verified && originalEvidence.SnapshotSha256 is { Length: 64 },
                 "Exact journal and sector-envelope digest available");
             var journalBytes = File.ReadAllText(journalPath);
@@ -139,6 +147,15 @@ internal static class NativeE39RecoveryImageAssessmentSelfTests
                 System.Text.Encoding.UTF8.GetString(originalEnvelope, 0, cut) + " \n")
                 .Concat(originalEnvelope.Skip(cut + 1)).ToArray();
             File.WriteAllBytes(blockPath, changedEnvelope);
+            bool rejectedStaleEnvelope = false;
+            try
+            {
+                NativeE39SavedBlockAssessment.ReadPhysicalOriginal(
+                    journalPath, originalEvidence.Blocks.Single(), originalEvidence);
+            }
+            catch (InvalidDataException) { rejectedStaleEnvelope = true; }
+            Check(rejectedStaleEnvelope,
+                "A stale multi-sector snapshot rejects a changed envelope even if data bytes match");
             var changedHeader = NativeE39SavedBlockAssessment.Inspect(journalPath);
             Check(changedHeader.Verified && changedHeader.Blocks.SequenceEqual(originalEvidence.Blocks) &&
                 changedHeader.SnapshotSha256 != originalEvidence.SnapshotSha256,

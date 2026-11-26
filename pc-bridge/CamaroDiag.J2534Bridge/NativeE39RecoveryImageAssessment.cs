@@ -61,7 +61,7 @@ internal static class NativeE39RecoveryImageAssessment
                 // Read the on-disk capture a second time after the journal and
                 // sector manifest were inspected; reject a late changed file.
                 var physicalBytes = NativeE39SavedBlockAssessment.ReadPhysicalOriginal(
-                    journalPath, block);
+                    journalPath, block, physical);
                 if (!physicalBytes.AsSpan().SequenceEqual(
                     image.AsSpan(checked((int)block.Address), block.Length)))
                     throw new InvalidDataException(

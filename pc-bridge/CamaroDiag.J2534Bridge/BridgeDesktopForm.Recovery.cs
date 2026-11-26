@@ -52,12 +52,12 @@ internal sealed partial class BridgeDesktopForm
             {
                 await RunBusyAsync(async () =>
                 {
-                    var report = await Task.Run(() =>
-                        NativeE39FileWriteJournal.InspectDetailed(dialog.FileName));
-                    var savedBlocks = await Task.Run(() =>
-                        NativeE39SavedBlockAssessment.Inspect(dialog.FileName));
-                    var target = await Task.Run(() =>
-                        NativeE39SavedBlockAssessment.InspectTargetMetadata(dialog.FileName));
+                    var bundle = await Task.Run(() =>
+                        NativeE39SavedBlockAssessment.InspectBundle(dialog.FileName));
+                    var savedBlocks = bundle.Blocks;
+                    var target = bundle.Target;
+                    var report = savedBlocks.JournalInspection ??
+                        new NativeE39FileWriteJournal.Inspection(savedBlocks.JournalState, false);
                     var lines = new List<string>
                     {
                         "Fichier : " + Path.GetFileName(dialog.FileName),
@@ -84,6 +84,8 @@ internal sealed partial class BridgeDesktopForm
                     lines.Add("Sauvegardes PHYSIQUES des secteurs originaux : " +
                         (savedBlocks.Verified ? "INTÈGRES" : "NON VÉRIFIÉES"));
                     lines.Add($"Secteurs originaux contrôlés : {savedBlocks.Blocks.Count}/{savedBlocks.ExpectedSectors}");
+                    if (savedBlocks.SnapshotSha256 is not null)
+                        lines.Add($"SHA-256 des preuves inspectées : {savedBlocks.SnapshotSha256}");
                     if (!savedBlocks.Verified)
                         lines.Add("Anomalie sauvegarde : " + savedBlocks.Problem);
                     else

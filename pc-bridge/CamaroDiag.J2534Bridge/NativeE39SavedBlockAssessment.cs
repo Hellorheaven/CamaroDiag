@@ -19,6 +19,39 @@ internal static class NativeE39SavedBlockAssessment
     {
         internal bool PhysicalRestoreQualified => false;
         internal string? SnapshotSha256 { get; init; }
+        internal string? JournalSnapshotSha256 { get; init; }
+        internal NativeE39FileWriteJournal.Inspection? JournalInspection { get; init; }
+        internal IReadOnlyDictionary<string, string> EnvelopeSha256 { get; init; } =
+            new System.Collections.ObjectModel.ReadOnlyDictionary<string, string>(
+                new Dictionary<string, string>(StringComparer.Ordinal));
+    }
+
+    internal sealed record Bundle(Result Blocks, TargetMetadata Target);
+
+    // Compose only observations that still refer to the same journal and
+    // metadata bytes. Inconsistent observations must not display stale success.
+    internal static Bundle InspectBundle(string journalPath)
+    {
+        var before = InspectTargetMetadata(journalPath);
+        var blocks = Inspect(journalPath);
+        var after = InspectTargetMetadata(journalPath);
+        bool journalStable = false;
+        try
+        {
+            journalStable = blocks.JournalSnapshotSha256 is not null &&
+                blocks.JournalSnapshotSha256 == Convert.ToHexString(
+                    SHA256.HashData(ReadBoundedFile(journalPath, MaximumJournalBytes)));
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or
+            InvalidDataException or ArgumentException) { }
+        if (!journalStable || before != after)
+        {
+            var failed = new Result(false, blocks.ExpectedSectors, [],
+                "Recovery evidence changed or could not be pinned during assessment.",
+                NativeE39FileWriteJournal.CompletionState.Interrupted);
+            return new Bundle(failed, new TargetMetadata(false, null, null, null, failed.Problem));
+        }
+        return new Bundle(blocks, after);
     }
 
     internal sealed record TargetMetadata(bool Verified, string? Family,
@@ -105,10 +138,15 @@ internal static class NativeE39SavedBlockAssessment
         var destructiveStarted = false;
         var verified = new List<Block>();
         byte[]? snapshot = null;
+        NativeE39FileWriteJournal.Inspection? inspection = null;
         try
         {
             snapshot = ReadBoundedFile(journalPath, MaximumJournalBytes);
-            state = NativeE39FileWriteJournal.InspectSnapshot(snapshot).State;
+            inspection = NativeE39FileWriteJournal.InspectSnapshot(snapshot);
+            state = inspection.State;
+            if (!inspection.SequenceValid &&
+                state != NativeE39FileWriteJournal.CompletionState.RecoveryRequired)
+                throw new InvalidDataException("Invalid recovery journal sequence.");
             var text = StrictUtf8.GetString(snapshot);
             if (text.Length == 0 || text[^1] != '\n')
                 throw new InvalidDataException("The journal has an incomplete final record.");
@@ -176,7 +214,7 @@ internal static class NativeE39SavedBlockAssessment
             if (!Directory.Exists(dir) ||
                 (File.GetAttributes(dir) & FileAttributes.ReparsePoint) != 0)
                 throw new InvalidDataException("Physical ECU sector backup directory missing or linked.");
-            var files = Directory.EnumerateFileSystemEntries(dir).ToArray();
+            var files = Directory.EnumerateFileSystemEntries(dir).Take(expected.Count + 1).ToArray();
             if (files.Length != expected.Count)
                 throw new InvalidDataException("Physical backup count differs from the journal.");
             var observed = new HashSet<uint>();
@@ -227,6 +265,10 @@ internal static class NativeE39SavedBlockAssessment
                 if (!CryptographicOperations.FixedTimeEquals(hash,
                     SHA256.HashData(ReadBoundedFile(path, MaximumSectorFileBytes))))
                     throw new InvalidDataException("Physical backup changed during inspection.");
+            if ((File.GetAttributes(dir) & FileAttributes.ReparsePoint) != 0 ||
+                !Directory.EnumerateFileSystemEntries(dir).Take(expected.Count + 1)
+                    .ToHashSet(StringComparer.Ordinal).SetEquals(envelopeHashes.Keys))
+                throw new InvalidDataException("Physical backup inventory changed during final inspection.");
             if (!snapshot.AsSpan().SequenceEqual(ReadBoundedFile(journalPath, MaximumJournalBytes)))
             {
                 state = NativeE39FileWriteJournal.CompletionState.Interrupted;
@@ -235,7 +277,12 @@ internal static class NativeE39SavedBlockAssessment
             return new Result(true, expected.Count,
                 verified.OrderBy(b => b.Address).ToArray(), "", state)
             {
-                SnapshotSha256 = ComputeSnapshotDigest(snapshot, envelopeHashes)
+                SnapshotSha256 = ComputeSnapshotDigest(snapshot, envelopeHashes),
+                JournalSnapshotSha256 = Convert.ToHexString(SHA256.HashData(snapshot)),
+                JournalInspection = inspection,
+                EnvelopeSha256 = new System.Collections.ObjectModel.ReadOnlyDictionary<string, string>(
+                    envelopeHashes.ToDictionary(x => Path.GetFileName(x.Key),
+                        x => Convert.ToHexString(x.Value), StringComparer.Ordinal))
             };
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException or
@@ -244,10 +291,13 @@ internal static class NativeE39SavedBlockAssessment
         {
             // Preserve the interruption state only if the audited journal
             // bytes remain stable, even when a sector check failed first.
+            string? journalDigest = null;
             try
             {
-                if (snapshot is null ||
-                    !snapshot.AsSpan().SequenceEqual(ReadBoundedFile(journalPath, MaximumJournalBytes)))
+                if (snapshot is not null &&
+                    snapshot.AsSpan().SequenceEqual(ReadBoundedFile(journalPath, MaximumJournalBytes)))
+                    journalDigest = Convert.ToHexString(SHA256.HashData(snapshot));
+                else
                     state = NativeE39FileWriteJournal.CompletionState.Interrupted;
             }
             catch (Exception rereadError) when (rereadError is IOException or
@@ -255,7 +305,11 @@ internal static class NativeE39SavedBlockAssessment
             {
                 state = NativeE39FileWriteJournal.CompletionState.Interrupted;
             }
-            return new Result(false, expected.Count, [], error.Message, state);
+            return new Result(false, expected.Count, [], error.Message, state)
+            {
+                JournalSnapshotSha256 = journalDigest,
+                JournalInspection = journalDigest is not null ? inspection : null
+            };
         }
     }
 
@@ -320,13 +374,27 @@ internal static class NativeE39SavedBlockAssessment
     internal static byte[] ReadPhysicalOriginal(string journalPath, Block descriptor)
     {
         var evidence = Inspect(journalPath);
-        if (!evidence.Verified || !evidence.Blocks.Contains(descriptor))
+        return ReadPhysicalOriginal(journalPath, descriptor, evidence);
+    }
+
+    // The caller must revalidate the complete evidence snapshot before publishing
+    // a multi-sector result. Each read still verifies the exact saved envelope.
+    internal static byte[] ReadPhysicalOriginal(string journalPath, Block descriptor, Result evidence)
+    {
+        var fileName = $"{descriptor.Address:X8}-{descriptor.Length}.ecu-block";
+        if (!evidence.Verified || evidence.SnapshotSha256 is null ||
+            !evidence.Blocks.Contains(descriptor) ||
+            !evidence.EnvelopeSha256.TryGetValue(fileName, out var expectedEnvelope))
             throw new InvalidDataException("Incomplete or changed physical-sector backups.");
-        var name = Path.Combine(journalPath + ".blocks",
-            $"{descriptor.Address:X8}-{descriptor.Length}.ecu-block");
+        var directory = journalPath + ".blocks";
+        if ((File.GetAttributes(directory) & FileAttributes.ReparsePoint) != 0)
+            throw new InvalidDataException("Linked original sector directory.");
+        var name = Path.Combine(directory, fileName);
         // The file may have been swapped or expanded since Inspect(). The
         // second acquisition must be independently bounded and rechecked.
         var file = ReadBoundedFile(name, MaximumSectorFileBytes);
+        if (Convert.ToHexString(SHA256.HashData(file)) != expectedEnvelope)
+            throw new InvalidDataException("Physical sector envelope changed after inspection.");
         var cut = Array.IndexOf(file, (byte)'\n');
         if (cut is < 1 or > 1024)
             throw new InvalidDataException("Saved-sector metadata is missing on second read.");
