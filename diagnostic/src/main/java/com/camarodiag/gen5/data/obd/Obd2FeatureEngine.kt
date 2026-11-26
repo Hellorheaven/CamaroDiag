@@ -714,8 +714,10 @@ class Obd2FeatureEngine(
         val mode05 = if (protocolNumber != null && legacy) withHeaderlessRecords {
             ObdLegacyOxygenTests.scan(protocolNumber, { command, timeout -> ask(command, timeout) })
         } else null
-        // The existing Mode 06 reader implements the CAN record layout only.
-        val mode06 = if (legacy) null else readMonitorTests()
+        // Distinct legacy TID/CID records and CAN MID/TID/UASID records.
+        val mode06 = if (legacy) withHeaderlessRecords {
+            ObdLegacyOxygenTests.scanMode06({ command, timeout -> ask(command, timeout) })
+        } else readMonitorTests()
         return ObdScanReport(
             supportedPids = supported,
             liveData = live,
