@@ -18,6 +18,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.io.InputStream
@@ -391,62 +392,27 @@ class BluetoothObdManager(context: Context) {
         // Every probe request is tied to the original adapter generation,
         // including the last 0100. A newer selection must never receive the
         // remaining AT commands of the cancelled probe.
-        suspend fun probeCommand(command: String, timeoutMs: Long = 1200L): String =
-            commandSessionMutex.withLock {
-                transportSessionEpoch.requireQueuedCurrent(expectedEpoch)
-                sendAtCommandInternal(command, timeoutMs, expectedEpoch = expectedEpoch, preserveLines = true)
-            }
+        suspend fun probeCommand(command: String, timeoutMs: Long = 1200L): String {
+            transportSessionEpoch.requireQueuedCurrent(expectedEpoch)
+            return sendAtCommandInternal(command, timeoutMs, expectedEpoch = expectedEpoch, preserveLines = true)
+        }
         return try {
-            val atz = probeCommand("ATZ")
-            probeCommand("ATE0")
-            probeCommand("ATL0")
-            val headersResp = probeCommand("ATH1")
-            val sti = probeCommand("STI")
-            val hardware = probeCommand("STDI")
-            val atal = probeCommand("ATAL")
-            val stp61 = probeCommand("STP 61")
-            val stp62 = probeCommand("STP 62")
-            // ATTP selects a trial configuration without sending a vehicle request.
-            // Keep acceptance separate from physical wiring and ECU evidence.
-            val protocolProbe = linkedMapOf<Int, String>()
-            for (number in 1..10) {
-                protocolProbe[number] = probeCommand("ATTP" + number.toString(16).uppercase(java.util.Locale.ROOT))
-            }
-            // Let the adapter discover the vehicle protocol instead of assuming HS-CAN.
-            val protocolResp = probeCommand("ATSP 0")
-            check(CanConsoleAdapterRestorationPolicy.accepted(protocolResp)) {
-                "The adapter did not accept automatic OBD protocol selection."
-            }
-            val transmitProbeResp = probeCommand("0100", 12_000L)
-            val protocolNumberResponse = probeCommand("ATDPN")
-            val reportedProtocol = ElmObdSessionProfile.parseProtocolNumber(protocolNumberResponse)
-            val selectedProfile = ElmObdSessionProfile.fromObservation(reportedProtocol,
-                CamaroUdsProtocol.parsePidBytes(transmitProbeResp, "00")?.size == 4)
-
-            val capabilities = CamaroUdsProtocol.evaluateAdapterProbe(
-                deviceName = deviceName,
-                macAddress = address,
-                atzResp = atz,
-                stiResp = sti,
-                atalResp = atal,
-                stp61Resp = stp61,
-                headersResp = headersResp,
-                protocolResp = protocolResp,
-                transmitProbeResp = transmitProbeResp,
-                hardwareResp = hardware,
-                elmProtocolProbe = protocolProbe,
-                stnProtocolProbe = mapOf(61 to stp61, 62 to stp62),
-                selectedElmProtocol = 0,
-                reportedElmProtocol = reportedProtocol,
-                protocolNumberResponse = protocolNumberResponse
-            )
+            // Keep all adapter configuration in one exclusive session. No
+            // telemetry or console operation may interleave ATTP/ATSP setup.
+            val capabilities = withTimeoutOrNull(45_000L) {
+                commandSessionMutex.withLock {
+                    transportSessionEpoch.requireQueuedCurrent(expectedEpoch)
+                    probeConnectedAdapterLocked(deviceName, address, expectedEpoch, ::probeCommand)
+                }
+            } ?: throw java.net.SocketTimeoutException("ELM adapter initialization timed out")
+            currentCoroutineContext().ensureActive()
             synchronized(adapterLifecycleLock) {
                 transportSessionEpoch.requireQueuedCurrent(expectedEpoch)
+                standardElmProfile = capabilities.profile
+                activeAdapterCapabilities = capabilities.capabilities
                 isDemoMode = false
-                standardElmProfile = selectedProfile
-                activeAdapterCapabilities = capabilities
             }
-            Result.success(capabilities)
+            Result.success(capabilities.capabilities)
         } catch (cancelled: kotlinx.coroutines.CancellationException) {
             disconnectIfCurrent(expectedEpoch)
             throw cancelled
@@ -454,6 +420,89 @@ class BluetoothObdManager(context: Context) {
             disconnectIfCurrent(expectedEpoch)
             Result.failure(error)
         }
+    }
+
+    private data class ProbeResult(val capabilities: AdapterCapabilities, val profile: ElmObdSessionProfile)
+
+    private suspend fun probeConnectedAdapterLocked(
+        deviceName: String, address: String, expectedEpoch: Long,
+        command: suspend (String, Long) -> String
+    ): ProbeResult {
+        suspend fun probeCommand(value: String, timeoutMs: Long = 1200L) = command(value, timeoutMs)
+        if (activeTransport == "BLUETOOTH") {
+            val ownedSocket = checkNotNull(socket)
+            val input = checkNotNull(inputStream)
+            val output = checkNotNull(outputStream)
+            val context = currentCoroutineContext()
+            ElmStartupSynchronization.synchronize(
+                available = { input.available() },
+                read = { size ->
+                    val buffer = ByteArray(size)
+                    val count = input.read(buffer)
+                    if (count <= 0) ByteArray(0) else buffer.copyOf(count)
+                },
+                interrupt = {
+                    BoundedBluetoothConnect.write(1500L, write = {
+                        context.ensureActive()
+                        transportSessionEpoch.requireQueuedCurrent(expectedEpoch)
+                        if (socket !== ownedSocket || !ownedSocket.isConnected)
+                            throw ObdTransportDisconnectedException("Bluetooth startup socket was replaced")
+                        output.write(ElmResponseCompletion.wireBytes("\u001B"))
+                        output.flush()
+                    }, close = { ownedSocket.close() })
+                },
+                ensureCurrent = {
+                    context.ensureActive()
+                    transportSessionEpoch.requireQueuedCurrent(expectedEpoch)
+                    if (socket !== ownedSocket || !ownedSocket.isConnected)
+                        throw ObdTransportDisconnectedException("Bluetooth startup socket was replaced")
+                }
+            )
+        }
+        val atz = probeCommand("ATZ", 3500L)
+        probeCommand("ATE0")
+        probeCommand("ATL0")
+        val headersResp = probeCommand("ATH1")
+        val sti = probeCommand("STI")
+        val hardware = probeCommand("STDI")
+        val atal = probeCommand("ATAL")
+        val stp61 = probeCommand("STP 61")
+        val stp62 = probeCommand("STP 62")
+        // ATTP selects a trial configuration without sending a vehicle request.
+        // Keep acceptance separate from physical wiring and ECU evidence.
+        val protocolProbe = linkedMapOf<Int, String>()
+        for (number in 1..10) {
+            protocolProbe[number] = probeCommand("ATTP" + number.toString(16).uppercase(java.util.Locale.ROOT))
+        }
+        // Let the adapter discover the vehicle protocol instead of assuming HS-CAN.
+        val protocolResp = probeCommand("ATSP 0")
+        check(CanConsoleAdapterRestorationPolicy.accepted(protocolResp)) {
+            "The adapter did not accept automatic OBD protocol selection."
+        }
+        val transmitProbeResp = probeCommand("0100", 12_000L)
+        val protocolNumberResponse = probeCommand("ATDPN")
+        val reportedProtocol = ElmObdSessionProfile.parseProtocolNumber(protocolNumberResponse)
+        val selectedProfile = ElmObdSessionProfile.fromObservation(reportedProtocol,
+            CamaroUdsProtocol.parsePidBytes(transmitProbeResp, "00")?.size == 4)
+
+        val capabilities = CamaroUdsProtocol.evaluateAdapterProbe(
+            deviceName = deviceName,
+            macAddress = address,
+            atzResp = atz,
+            stiResp = sti,
+            atalResp = atal,
+            stp61Resp = stp61,
+            headersResp = headersResp,
+            protocolResp = protocolResp,
+            transmitProbeResp = transmitProbeResp,
+            hardwareResp = hardware,
+            elmProtocolProbe = protocolProbe,
+            stnProtocolProbe = mapOf(61 to stp61, 62 to stp62),
+            selectedElmProtocol = 0,
+            reportedElmProtocol = reportedProtocol,
+            protocolNumberResponse = protocolNumberResponse
+        )
+        return ProbeResult(capabilities, selectedProfile)
     }
 
     suspend fun activateSimulatedAdapter(preset: String): AdapterCapabilities = withContext(Dispatchers.Default) {
@@ -537,6 +586,31 @@ class BluetoothObdManager(context: Context) {
      */
     suspend fun readMode01PidIfSupported(pid: Int): String? {
         if (isJ2534StandardObdAvailable()) return readJ2534PidIfSupported(pid)
+        return readElmPidWithInventory(pid) { response, _ -> response }
+    }
+
+    /** Live telemetry must respect the responder's own advertised bitmap,
+     * not merely the union of every ECU's supported PIDs. The validation
+     * and parsing run inside the same transport/cache generation as the read. */
+    suspend fun readMode01PidObservationsIfSupported(pid: Int): List<CamaroUdsProtocol.PidObservation> {
+        require(pid in 1..255)
+        val pidHex = "%02X".format(java.util.Locale.ROOT, pid)
+        if (isJ2534StandardObdAvailable()) {
+            val raw = readJ2534PidIfSupported(pid) ?: return emptyList()
+            return CamaroUdsProtocol.parsePidObservations(raw, pidHex)
+        }
+        return readElmPidWithInventory(pid) { response, inventory ->
+            if (response.equals("NO_SOCKET", ignoreCase = true) ||
+                response.contains("UNABLE TO CONNECT", ignoreCase = true)) {
+                throw ObdTransportDisconnectedException("Live OBD transport is disconnected")
+            }
+            inventory.accept(pid, CamaroUdsProtocol.parsePidObservations(response, pidHex))
+        }.orEmpty()
+    }
+
+    private suspend fun <T> readElmPidWithInventory(pid: Int,
+        decode: (String, ObdPidSupportCache.Inventory) -> T): T? {
+        require(pid in 1..255)
         check(isObdCommandChannelAvailable) {
             "No ELM/OBD-II command channel is available on the active transport."
         }
@@ -548,18 +622,19 @@ class BluetoothObdManager(context: Context) {
             withObdCommandSession { engine ->
                 transportSessionEpoch.requireQueuedCurrent(epoch)
                 mode01SupportCache.requireCurrent(generation)
-                val supported = mode01SupportCache.get(generation, android.os.SystemClock.elapsedRealtime())
+                val inventory = mode01SupportCache.getInventory(generation, android.os.SystemClock.elapsedRealtime())
                     ?: engine.discoverPidAvailability().let { discovery ->
                         transportSessionEpoch.requireQueuedCurrent(epoch)
                         mode01SupportCache.publish(generation, discovery.supported,
-                            discovery.firstUnresolvedPid == null, android.os.SystemClock.elapsedRealtime())
-                        discovery.supported
+                            discovery.firstUnresolvedPid == null, android.os.SystemClock.elapsedRealtime(),
+                            discovery.byResponder)
+                        checkNotNull(mode01SupportCache.getInventory(generation, android.os.SystemClock.elapsedRealtime()))
                     }
                 mode01SupportCache.requireCurrent(generation)
-                engine.readMode01PidIfSupported(pid, supported).also {
-                    transportSessionEpoch.requireQueuedCurrent(epoch)
-                    mode01SupportCache.requireCurrent(generation)
-                }
+                val response = engine.readMode01PidIfSupported(pid, inventory.pids)
+                transportSessionEpoch.requireQueuedCurrent(epoch)
+                mode01SupportCache.requireCurrent(generation)
+                response?.let { decode(it, inventory) }
             }
         }
     }
@@ -1216,8 +1291,8 @@ class BluetoothObdManager(context: Context) {
                 check(sessionTransport == "BLUETOOTH") {
                     "An ELM command cannot be sent through the selected transport."
                 }
-                val out = outputStream; val inp = inputStream
-                if (out == null || inp == null || socket?.isConnected != true) {
+                val out = outputStream; val inp = inputStream; val ownedSocket = socket
+                if (out == null || inp == null || ownedSocket?.isConnected != true) {
                     throw ObdTransportDisconnectedException("Bluetooth OBD adapter is not connected")
                 }
                 // Bound the drain if the adapter was left streaming CAN.
@@ -1232,7 +1307,17 @@ class BluetoothObdManager(context: Context) {
                     drained++
                 }
                 ensureSameSession()
-                out.write(payload); out.flush()
+                BoundedBluetoothConnect.write(timeoutMs.coerceIn(1L, 4000L), write = {
+                    ensureSameSession()
+                    if (socket !== ownedSocket || !ownedSocket.isConnected)
+                        throw ObdTransportDisconnectedException("Bluetooth command socket was replaced")
+                    // Recheck approval after drain and worker dispatch, just
+                    // before sending bytes on this exact socket.
+                    beforeTransmit()
+                    ensureSameSession()
+                    out.write(payload)
+                    out.flush()
+                }, close = { ownedSocket.close() })
                 val buffer = StringBuilder()
                 val callbackBuffer = StringBuilder()
                 val budget = ElmCommandReadBudget(timeoutMs)
@@ -1750,9 +1835,10 @@ class BluetoothObdManager(context: Context) {
             j2534BridgeRequestCanId = null
             j2534BridgeResponseCanId = null
             j2534BridgeProtocolNumber = null
+            // Closing RFCOMM first interrupts pending native reads/writes.
+            runCatching { socket?.close() }
             runCatching { inputStream?.close() }
             runCatching { outputStream?.close() }
-            runCatching { socket?.close() }
 
             inputStream = null
             outputStream = null

@@ -47,3 +47,54 @@ internal class ElmCommandReadBudget(
         return if (remaining == 0L) null else minOf(remaining, maxMs.toLong()).toInt()
     }
 }
+
+/** On a newly opened RFCOMM stream, discard residual adapter output before
+ * sending ATZ. A previous monitor may still be producing data. Interrupt it
+ * once with ESC (never an empty CR, which can repeat the previous command).
+ * Require a prompt after interruption and a quiet boundary before proceeding.
+ * This routine never sends a vehicle diagnostic request. */
+internal object ElmStartupSynchronization {
+    suspend fun synchronize(
+        available: () -> Int,
+        read: (Int) -> ByteArray,
+        interrupt: suspend () -> Unit,
+        ensureCurrent: () -> Unit,
+        clockMs: () -> Long = { System.nanoTime() / 1_000_000L },
+        pause: suspend (Long) -> Unit = { kotlinx.coroutines.delay(it) }
+    ) {
+        val started = clockMs()
+        var lastData = started
+        var bytes = 0
+        var interrupted = false
+        var promptAfterInterrupt = false
+        while (true) {
+            ensureCurrent()
+            val now = clockMs()
+            if (now - started >= 2000L || bytes >= 65536)
+                throw SocketTimeoutException("ELM startup stream did not become idle")
+            val queued = available()
+            require(queued >= 0)
+            if (queued > 0) {
+                val count = minOf(queued, 256, 65536 - bytes)
+                val chunk = read(count)
+                ensureCurrent()
+                if (chunk.isEmpty()) throw java.io.EOFException("ELM startup stream closed")
+                require(chunk.size <= count)
+                bytes += chunk.size
+                lastData = clockMs()
+                if (interrupted && chunk.any { it == '>'.code.toByte() }) promptAfterInterrupt = true
+                if (!interrupted && (bytes >= 512 || lastData - started >= 150L)) {
+                    ensureCurrent()
+                    interrupt()
+                    interrupted = true
+                    lastData = clockMs()
+                }
+                // Avoid starving cancellation even when data arrives continuously.
+                pause(1L)
+            } else {
+                if ((!interrupted || promptAfterInterrupt) && now - lastData >= 75L) return
+                pause(10L)
+            }
+        }
+    }
+}
