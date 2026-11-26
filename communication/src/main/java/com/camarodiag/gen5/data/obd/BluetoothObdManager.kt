@@ -925,7 +925,21 @@ class BluetoothObdManager(context: Context) {
     /** Dedicated EVAP recipe only, using the negotiated CAN profile and
      * explicitly pinned primary ECM. No functional addressing or fallback. */
     suspend fun runElmEvapTest(expectedVin: String, approval: EcuWriteConsentFlow.Approval,
-        isCurrent: () -> Boolean): ObdEvapResult {
+        isCurrent: () -> Boolean): ObdEvapResult =
+        withPrimaryObdMutationSession(expectedVin, approval, isCurrent, "0801") { protocol, guard, exchange ->
+            ElmJ1979EvapTest.run(protocol, expectedVin, guard, exchange)
+        }
+
+    suspend fun runElmClearRecipe(expectedVin: String, approval: EcuWriteConsentFlow.Approval,
+        isCurrent: () -> Boolean): ObdClearRecipeResult =
+        withPrimaryObdMutationSession(expectedVin, approval, isCurrent, "04") { protocol, guard, exchange ->
+            ElmJ1979ClearRecipe.run(protocol, expectedVin, guard, exchange)
+        }
+
+    private suspend fun <T> withPrimaryObdMutationSession(expectedVin: String,
+        approval: EcuWriteConsentFlow.Approval, isCurrent: () -> Boolean, mutation: String,
+        recipe: suspend (Int, () -> Unit, suspend (ByteArray) -> ByteArray) -> T): T {
+        require(mutation == "04" || mutation == "0801")
         require(approval.warningAcknowledged && approval.confirmedYes)
         require(expectedVin.matches(Regex("[A-HJ-NPR-Z0-9]{17}")))
         val epoch = transportSessionEpoch.capture()
@@ -956,7 +970,17 @@ class BluetoothObdManager(context: Context) {
                         "ELM rejected physical diagnostic configuration."
                     }
                 }
-                ElmJ1979EvapTest.run(protocol, expectedVin, ::requireCurrent) { payload ->
+                var mutationAttempted = false
+                recipe(protocol, ::requireCurrent) { payload ->
+                    val request = ElmJ1979EvapTest.hex(payload)
+                    if (request == mutation) {
+                        check(!mutationAttempted) { "A mutating command cannot be retried." }
+                        mutationAttempted = true
+                    } else {
+                        check(request in setOf("0902", "0800", "010D", "010C", "0101", "03", "07", "0A")) {
+                            "Unsupported request in dedicated mutation recipe."
+                        }
+                    }
                     val frame = byteArrayOf(payload.size.toByte()) + payload
                     val response = sendAtCommandInternal(ElmJ1979EvapTest.hex(frame), 2500L,
                         expectedEpoch = epoch, preserveLines = true,
