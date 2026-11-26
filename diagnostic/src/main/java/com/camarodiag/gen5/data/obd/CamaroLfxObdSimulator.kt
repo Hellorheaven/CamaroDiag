@@ -32,7 +32,7 @@ object CamaroLfxObdSimulator {
             val positiveResponse = (selected.startsWith("01") && raw.startsWith("41")) ||
                 (selected.startsWith("02") && raw.startsWith("42"))
             if (selected.matches(Regex("(?:01|02)[0-9A-F]{2}(?:00)?")) &&
-                positiveResponse && raw.matches(Regex("(?:[0-9A-F]{2}){3,8}")) {
+                positiveResponse && raw.matches(Regex("(?:[0-9A-F]{2}){3,8}"))) {
                 "7E8 %02X ".format(Locale.ROOT, raw.length / 2) +
                     raw.chunked(2).joinToString(" ")
             } else raw
