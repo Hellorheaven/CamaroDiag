@@ -20,6 +20,7 @@ internal static class BridgeSelfTests
         checks += DoIpConsolePresentationSelfTests.Run();
         checks += ObdJ1979FunctionalScanSelfTests.Run();
         checks += ObdJ1979EvapTestSelfTests.Run();
+        checks += ObdJ1979ClearRecipeSelfTests.Run();
         void Assert(bool condition, string name)
         {
             checks++;
