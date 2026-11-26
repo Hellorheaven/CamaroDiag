@@ -104,6 +104,30 @@ class PhysicalRecoveryFolderTest {
         }
     }
 
+    @Test fun sameLengthSameBytesReplacementCannotReuseKnownStagedIdentity() {
+        val folder=java.nio.file.Files.createTempDirectory("recovery-identity")
+        val original=folder.resolve("original.ecu-block")
+        val saved=folder.resolve("saved.ecu-block")
+        try {
+            java.nio.file.Files.write(original,byteArrayOf(1,2,3))
+            val identity=PhysicalRecoveryFolder.stagedIdentity(original.toFile(),false)
+            org.junit.Assume.assumeNotNull(identity.key)
+            java.nio.file.Files.move(original,saved)
+            java.nio.file.Files.write(original,byteArrayOf(1,2,3))
+            PhysicalRecoveryFolder.requireStagedIdentity(saved.toFile(),identity)
+            assertThrows(IllegalStateException::class.java) {
+                PhysicalRecoveryFolder.requireStagedIdentity(original.toFile(),identity)
+            }
+            assertFalse(PhysicalRecoveryFolder.uniqueStagedIdentities(listOf(identity,identity)))
+            assertTrue(PhysicalRecoveryFolder.uniqueStagedIdentities(listOf(identity,
+                PhysicalRecoveryFolder.stagedIdentity(original.toFile(),false))))
+        } finally {
+            java.nio.file.Files.deleteIfExists(original)
+            java.nio.file.Files.deleteIfExists(saved)
+            java.nio.file.Files.deleteIfExists(folder)
+        }
+    }
+
     @Test fun requiresIndependentCompleteIdentity() {
         val identity = PhysicalRecoveryIdentity("1G1FA1RXXR0123456", "E39", "ECM", "OS-A")
         assertTrue(identity.valid)

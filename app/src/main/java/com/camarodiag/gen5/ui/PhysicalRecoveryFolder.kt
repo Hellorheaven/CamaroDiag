@@ -66,6 +66,30 @@ internal object PhysicalRecoveryFolder {
         active()
     }
 
+    internal data class StagedIdentity(val key:Any?,val directory:Boolean)
+    internal fun stagedIdentity(file:File,directory:Boolean):StagedIdentity {
+        val attrs=Files.readAttributes(file.toPath(),java.nio.file.attribute.BasicFileAttributes::class.java,
+            java.nio.file.LinkOption.NOFOLLOW_LINKS)
+        check(!attrs.isSymbolicLink && if(directory) attrs.isDirectory else attrs.isRegularFile) {
+            "Recovery staging entry has unexpected file type."
+        }
+        return StagedIdentity(attrs.fileKey(),directory)
+    }
+
+    /** Some providers do not expose file keys. In that case retain the
+     * independent type, inventory and byte checks; never claim inode proof. */
+    internal fun requireStagedIdentity(file:File,expected:StagedIdentity) {
+        val actual=stagedIdentity(file,expected.directory)
+        check(expected.key==null || actual.key==expected.key) {
+            "Recovery staging entry was replaced."
+        }
+    }
+
+    internal fun uniqueStagedIdentities(entries:Collection<StagedIdentity>):Boolean {
+        val known=entries.mapNotNull { it.key }
+        return known.size==known.distinct().size
+    }
+
     internal fun verifyStagedFile(file: File, expectedSize: Long, expectedHash: ByteArray,
         active: () -> Unit) {
         active()
@@ -110,10 +134,23 @@ internal object PhysicalRecoveryFolder {
         check(uniqueTree(rootId, root, files)) { "Recovery document alias across directories." }
         check(files.isNotEmpty() && files.all { !it.directory && safeName(it.name) && it.name.endsWith(".ecu-block") })
         val staging = Files.createTempDirectory(cacheDir.toPath(), "ecu-inspection-").toFile()
+        val stagingIdentity=stagedIdentity(staging,true)
         var total = 0L
         try {
             val digests = mutableMapOf<Entry, Pair<Long, ByteArray>>()
+            val stagedIdentities=mutableMapOf<Entry,StagedIdentity>()
+            val journalFile = File(staging, name)
+            val blockDir = File(staging, "$name.blocks")
+            requireStagedIdentity(staging,stagingIdentity)
+            check(blockDir.mkdir())
+            val blockIdentity=stagedIdentity(blockDir,true)
+            fun verifyDirectories() {
+                active()
+                requireStagedIdentity(staging,stagingIdentity)
+                requireStagedIdentity(blockDir,blockIdentity)
+            }
             fun copy(entry: Entry, destination: File, max: Long) {
+                verifyDirectories()
                 val uri = DocumentsContract.buildDocumentUriUsingTree(tree, entry.id)
                 var count = 0L
                 val digest = MessageDigest.getInstance("SHA-256")
@@ -137,6 +174,11 @@ internal object PhysicalRecoveryFolder {
                     }
                 }
                 check(count > 0)
+                verifyDirectories()
+                stagedIdentities[entry]=stagedIdentity(destination,false)
+                check(uniqueStagedIdentities(listOf(stagingIdentity,blockIdentity)+stagedIdentities.values)) {
+                    "Aliased recovery staging entries."
+                }
                 digests[entry] = count to digest.digest()
             }
             // SAF has no portable stable inode guarantee. Re-read the same
@@ -150,9 +192,6 @@ internal object PhysicalRecoveryFolder {
                     verifyBytes(input, originalSize, originalHash, ::active)
                 }
             }
-            val journalFile = File(staging, name)
-            val blockDir = File(staging, "$name.blocks")
-            check(blockDir.mkdir())
             copy(journal, journalFile, MAX_JOURNAL)
             files.forEach { copy(it, File(blockDir, it.name), MAX_BLOCK) }
             fun verifySourceTree() {
@@ -169,13 +208,17 @@ internal object PhysicalRecoveryFolder {
             verifySourceTree()
             fun verifyStaging() {
                 active()
-                check(Files.isDirectory(staging.toPath(), java.nio.file.LinkOption.NOFOLLOW_LINKS))
+                verifyDirectories()
                 check(staging.list()?.toSet() == setOf(name, "$name.blocks"))
-                check(Files.isDirectory(blockDir.toPath(), java.nio.file.LinkOption.NOFOLLOW_LINKS))
+                check(uniqueStagedIdentities(listOf(stagingIdentity,blockIdentity)+stagedIdentities.values))
                 check(blockDir.list()?.toSet() == files.map { it.name }.toSet())
                 for ((entry, evidence) in digests) {
                     val destination = if (entry == journal) journalFile else File(blockDir, entry.name)
+                    val expected=stagedIdentities.getValue(entry)
+                    requireStagedIdentity(destination,expected)
                     verifyStagedFile(destination, evidence.first, evidence.second, ::active)
+                    requireStagedIdentity(destination,expected)
+                    verifyDirectories()
                 }
             }
             verifyStaging()
@@ -189,6 +232,11 @@ internal object PhysicalRecoveryFolder {
             active()
             return result
         } finally {
+            // If the root was replaced, do not delete the substituted tree.
+            // A provider without stable file keys still relies on private storage.
+            if (!runCatching { requireStagedIdentity(staging,stagingIdentity) }.isSuccess) {
+                throw IllegalStateException("Recovery staging root was replaced; refusing cleanup.")
+            }
             // Do not traverse an unexpected symbolic-link directory when
             // cleaning private staged recovery evidence.
             Files.walkFileTree(staging.toPath(), object : java.nio.file.SimpleFileVisitor<java.nio.file.Path>() {

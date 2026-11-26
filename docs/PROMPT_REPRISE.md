@@ -1,3 +1,7 @@
+## C6 — identité des fichiers de récupération SAF mis en cache (26/11/2026)
+
+- L'inspection Android contrôle désormais les identités de fichiers/répertoires privés quand le système expose fileKey, en plus des inventaires et SHA-256 existants ; refuse les remplacements même à octets identiques, les alias connus et les types inattendus. Contrôle avant copie, autour des relectures et avant nettoyage ; si le root a changé, ne pas effacer le substitut. Limite : fileKey peut être absent, SAF n'offre pas un instantané atomique et ces vérifications ne constituent pas une preuve matérielle. Régression écrite non exécutée. C6/J1979 ouverts, aucune CI intermédiaire, fusion ou Release.
+
 ## J1979 — présentation commune des résultats natifs (26/11/2026)
 
 - Scan OBD et recette Android partagent désormais les composants de présentation MIL/readiness et Mode 06. Dans le scan natif, absence explicite, déclencheur freeze non vérifié et valeurs freeze non obtenues sont distingués. Mots Mode 06 encodés affichés sans verdict inventé. Ressources FR/EN. C6/J1979 ouverts, aucun test intermédiaire, fusion ou Release.
