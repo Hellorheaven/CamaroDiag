@@ -1289,10 +1289,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             } catch (cancelled: CancellationException) {
                 if (current()) _calibrationWorkspace.update { it.copy(doIpReading = false, doIpGatewayReading = false) }
                 throw cancelled
-            } catch (_: Exception) {
-                if (current()) appendCanConsoleSystemEvent(localizedContext.getString(R.string.cal_doip_failed), succeeded = false)
+            } catch (error: Exception) {
+                val message = doIpFailureMessage(error, R.string.cal_doip_failed)
+                if (current()) appendCanConsoleSystemEvent(message, succeeded = false)
                 if (current()) _calibrationWorkspace.update { it.copy(doIpReading = false, doIpGatewayReading = false,
-                    doIpGatewayResult = localizedContext.getString(R.string.cal_doip_failed)) }
+                    doIpGatewayResult = message) }
             }
         }
     }
@@ -1417,13 +1418,32 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 if (current()) _calibrationWorkspace.update { it.copy(doIpReading = false, doIpBackupBytes = 0) }
                 throw cancelled
             } catch (error: Exception) {
-                val tlsError = error is DoIpClientCertificateException || error is javax.net.ssl.SSLException
-                val resource = if (tlsError) R.string.cal_doip_tls_error else R.string.cal_doip_backup_failed
-                if (current()) appendCanConsoleSystemEvent(localizedContext.getString(resource), succeeded = false)
+                val message = doIpFailureMessage(error, R.string.cal_doip_backup_failed)
+                if (current()) appendCanConsoleSystemEvent(message, succeeded = false)
                 if (current()) _calibrationWorkspace.update { it.copy(doIpReading = false, doIpBackupBytes = 0,
-                    doIpResult = localizedContext.getString(resource)) }
+                    doIpResult = message) }
             }
         }
+    }
+
+    private fun doIpFailureMessage(error: Exception, fallback: Int): String {
+        val base = localizedContext.getString(when (error) {
+            is DoIpClientCertificateException, is javax.net.ssl.SSLException -> R.string.cal_doip_tls_error
+            is DoIpDirectRead.Refusal -> when (error.layer) {
+                DoIpDirectRead.RefusalLayer.HEADER -> R.string.cal_doip_inventory_reason_header
+                DoIpDirectRead.RefusalLayer.ROUTING -> R.string.cal_doip_inventory_reason_routing
+                DoIpDirectRead.RefusalLayer.DIAGNOSTIC_ACK -> R.string.cal_doip_inventory_reason_ack
+            }
+            is com.camaradiag.gen5.data.obd.UdsNegativeResponseException -> R.string.cal_doip_inventory_reason_nrc
+            is java.net.SocketTimeoutException -> R.string.cal_doip_inventory_reason_timeout
+            else -> fallback
+        })
+        val code = when (error) {
+            is DoIpDirectRead.Refusal -> error.code
+            is com.camaradiag.gen5.data.obd.UdsNegativeResponseException -> error.negativeResponseCode
+            else -> null
+        }
+        return base + (code?.let { " (0x%02X)".format(java.util.Locale.ROOT, it) } ?: "")
     }
 
     /** Logical DoIP addresses are deliberately not formatted as CAN IDs.
@@ -1893,11 +1913,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 if (current()) _calibrationWorkspace.update { it.copy(doIpReading = false) }
                 throw cancelled
             } catch (error: Exception) {
-                val tlsError = error is DoIpClientCertificateException || error is javax.net.ssl.SSLException
-                val resource = if (tlsError) R.string.cal_doip_tls_error else R.string.cal_doip_failed
-                if (current()) appendCanConsoleSystemEvent(localizedContext.getString(resource), succeeded = false)
+                val message = doIpFailureMessage(error, R.string.cal_doip_failed)
+                if (current()) appendCanConsoleSystemEvent(message, succeeded = false)
                 if (current()) _calibrationWorkspace.update {
-                    val error = localizedContext.getString(resource)
+                    val error = message
                     it.copy(doIpReading = false, doIpResult =
                         if (operation in setOf(DoIpDirectRead.Operation.EXCHANGE,
                             DoIpDirectRead.Operation.INVENTORY, DoIpDirectRead.Operation.OBD_INVENTORY) &&
