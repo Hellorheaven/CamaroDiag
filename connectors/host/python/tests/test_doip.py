@@ -490,6 +490,38 @@ class DoIpTests(unittest.TestCase):
                 save.assert_not_called()
                 self.assertFalse(output.exists())
 
+    def test_backup_publication_requires_successful_session_close(self):
+        for close_fails in (False, True):
+            with self.subTest(close_fails=close_fails), tempfile.TemporaryDirectory() as directory:
+                profile = Path(directory) / "profile.json"
+                output = Path(directory) / "backup.zip"
+                scope = {"Vin": VIN, "Gateway": GATEWAY.logical_address, "Tester": 0x0E80,
+                         "Ecu": 0x1234, "Length": 4, "BlockSize": 2}
+                with patch("camarodiagconnectors.doip_cli.load_scope", return_value=scope), \
+                     patch("camarodiagconnectors.doip_cli.discover", return_value=GATEWAY), \
+                     patch("camarodiagconnectors.doip_cli.Session") as session, \
+                     patch("camarodiagconnectors.doip_cli.capture_region", return_value=(b"ABCD", b"ABCD")), \
+                     patch("camarodiagconnectors.doip_cli.save_capture") as save:
+                    closed = []
+                    def close(*_):
+                        closed.append(True)
+                        if close_fails:
+                            raise OSError("Socket close failed")
+                    session.return_value.__exit__.side_effect = close
+                    def publish(*_):
+                        self.assertEqual(closed, [True])
+                        return {"archive_integrity_verified": True}
+                    save.side_effect = publish
+                    args = ["--host", GATEWAY.host, "backup", "--profile", str(profile),
+                            "--output", str(output)]
+                    if close_fails:
+                        with self.assertRaises(OSError):
+                            run(args)
+                        save.assert_not_called()
+                    else:
+                        self.assertTrue(run(args)["archive_integrity_verified"])
+                        save.assert_called_once()
+
     def test_confirmed_sequence_revalidates_gateway_before_connect(self):
         from dataclasses import replace
         with (patch("camarodiagconnectors.doip_cli.discover",
