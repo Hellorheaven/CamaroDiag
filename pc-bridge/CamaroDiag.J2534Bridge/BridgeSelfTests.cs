@@ -18,6 +18,7 @@ internal static class BridgeSelfTests
         var checks = DoIpDiagnosticSessionSelfTests.Run();
         checks += DoIpUdpDiscoverySelfTests.Run();
         checks += DoIpConsolePresentationSelfTests.Run();
+        checks += ObdJ1979FunctionalScanSelfTests.Run();
         void Assert(bool condition, string name)
         {
             checks++;
@@ -419,6 +420,10 @@ internal static class BridgeSelfTests
         Assert(StandardObdPhysicalPolicy.AllowsRead([2,2,0]), "Standard freeze-frame DTC request");
         Assert(StandardObdPhysicalPolicy.AllowsRead([6,0]), "Standard Mode 06 supported monitor query");
         Assert(StandardObdPhysicalPolicy.AllowsRead([8,0]), "Mode 08 control-test inventory");
+        Assert(J2534Device.DecodeReceivedPayload(6,0,10,0,[0,0,7,0xE8,0x48,0x20,0,0,0,0],6,0x7E8,[8,0]) is null,
+            "Mode 08 reply for another identifier rejected");
+        Assert(J2534Device.DecodeReceivedPayload(6,0,10,0,[0,0,7,0xE8,0x48,0,0,0,0,0],6,0x7E8,[8,0]) is not null,
+            "Matching Mode 08 inventory reply accepted");
         Assert(StandardObdPhysicalPolicy.AllowsRead([8,0xE0]), "Mode 08 continuation inventory");
         Assert(!StandardObdPhysicalPolicy.AllowsRead([8,1]), "Mode 08 actuation is not a read");
         Assert(!StandardObdPhysicalPolicy.AllowsRead([8,0,0]), "Malformed Mode 08 inventory rejected");
