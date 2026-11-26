@@ -25,6 +25,20 @@ internal static class J1979CampaignSemantics
             Sequence=seq;State=state;DurationMs=duration;Request=req.ToArray();Response=res.ToArray();
             RequestHex=Convert.ToHexString(req);ResponseHex=res.Length==0?null:Convert.ToHexString(res);Status=States[state];
         }
+        internal IReadOnlyList<string>? DtcCodes {
+            get {
+                int mode=Request[0];
+                if(State!=1||mode is not (3 or 7 or 10))return null;
+                var codes=new List<string>();
+                const string hex="0123456789ABCDEF";
+                for(int i=2;i<Response.Length;i+=2){
+                    int a=Response[i],b=Response[i+1];
+                    codes.Add(new string(new[]{"PCBU"[a>>6],hex[(a>>4)&3],hex[a&15],hex[b>>4],hex[b&15]}));
+                }
+                return codes.AsReadOnly();
+            }
+        }
+        internal int? NegativeResponseCode=>State==3?Response[2]:null;
         internal string? ObservedVin=>State==1&&Request.AsSpan().SequenceEqual(new byte[]{9,2})?Encoding.ASCII.GetString(Response,3,17):null;
     }
     internal sealed record Summary(string End,int Flags,int Steps);

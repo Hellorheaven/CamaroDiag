@@ -65,6 +65,12 @@ public final class J1979UsbTest {
         Sim missing=new Sim(concat(challenge,start,frame(2,1,initial),frame(3,2,missingSummary)));
         result=new J1979UsbCapture(missing).runRequest(hello,10000,key,new ByteArrayOutputStream());
         assert !result.captureIntegrityVerified&&result.steps.size()==1;
+        J1979CampaignSemantics.Step codes=new J1979CampaignSemantics.Step(3,1,1,new byte[]{3},
+            new byte[]{0x43,4,1,0x23,0x45,0x67,(byte)0x89,(byte)0xab,(byte)0xcd,(byte)0xef});
+        assert codes.dtcCodes().equals(java.util.Arrays.asList("P0123","C0567","B09AB","U0DEF"));
+        J1979CampaignSemantics.Step denied=new J1979CampaignSemantics.Step(4,3,1,new byte[]{7},new byte[]{0x7f,7,0x11});
+        assert denied.dtcCodes()==null&&denied.negativeResponseCode()==0x11;
+        assert new J1979CampaignSemantics.Step(5,1,1,new byte[]{10},new byte[]{0x4a,0}).dtcCodes().isEmpty();
         Sim partial=new Sim(concat(challenge,Arrays.copyOf(capture,capture.length-1)));
         raw=new ByteArrayOutputStream();
         result=new J1979UsbCapture(partial).runRequest(hello,10000,key,raw);

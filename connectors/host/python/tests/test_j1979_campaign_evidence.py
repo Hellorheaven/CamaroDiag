@@ -48,6 +48,18 @@ class CaptureTests(unittest.TestCase):
         self.assertEqual("COMPLETE", report["summary"]["end"])
         self.assertEqual("PASSED", report["steps"][0]["status"])
 
+    def test_dtc_codes_distinguish_zero_unavailable_and_observed(self):
+        dtc = (step(3, b"\x03", bytes.fromhex("43040123456789ABCDEF")) +
+               step(4, b"\x07", bytes.fromhex("7F0711"), 3) +
+               step(5, b"\x0A", b"\x4A\x00"))
+        report = decode(io.BytesIO(start() + INITIAL + IDENTITY + dtc + TAIL +
+                                   summary(10, flags=231, steps=9, positive=8, negative=1)))
+        self.assertTrue(report["capture_integrity_verified"])
+        self.assertEqual(["P0123", "C0567", "B09AB", "U0DEF"], report["steps"][2]["dtc_codes"])
+        self.assertIsNone(report["steps"][3]["dtc_codes"])
+        self.assertEqual(0x11, report["steps"][3]["negative_response_code"])
+        self.assertEqual([], report["steps"][4]["dtc_codes"])
+
     def test_corruption_and_truncation_keep_prefix(self):
         for tail in (IDENTITY[:-1], IDENTITY[:-1] + bytes([IDENTITY[-1] ^ 1])):
             report = decode(io.BytesIO(start() + INITIAL + tail))

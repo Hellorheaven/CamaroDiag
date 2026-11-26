@@ -1,3 +1,7 @@
+## J1979 — décodage DTC et NRC commun aux captures natives (26/11/2026)
+
+- Exports Android, Windows et Python enrichis par étape : DTC SAE à cinq caractères (P/C/B/U), NRC terminal, différence explicite entre liste vide vérifiée et absence de réponse positive. Aucune traduction OEM inventée. Tests de quatre familles, réponse négative et zéro défaut rédigés sans exécution. C6/J1979 ouverts, aucune CI/fusion/Release.
+
 ## C6 — maintien des preuves jusqu'à la clôture E39 (26/11/2026)
 
 - Audit du workflow E39 : la relecture intégrale des zones voisines/protégées était déjà implémentée dans CompletionGuard. Conservée sans duplication ; raccordement obligatoire de la nouvelle revalidation des sauvegardes au décorateur, relecture avant Completed dans le moteur puis après le contrôle du BIN entier dans le workflow. Corruption tardive interdit Completed et conserve RecoveryRequired. Fake journal et régression de bout en bout mis à jour sans exécution. Aucun test/CI/fusion/Release ; C6/J1979 ouverts.

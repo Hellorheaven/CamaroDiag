@@ -4,6 +4,8 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
+import java.util.ArrayList;
+import java.util.Collections;
 
 /** Validates recorded J1979 application responses and the exact read-only campaign. */
 public final class J1979CampaignSemantics {
@@ -32,6 +34,22 @@ public final class J1979CampaignSemantics {
             sequence=seq;this.state=state;durationMs=duration;request=req.clone();response=res.clone();
             requestHex=hex(req);responseHex=res.length==0?null:hex(res);status=STATES[state];
         }
+        /** Null = no verified DTC response, empty = verified zero records. */
+        public List<String> dtcCodes(){
+            int m=u(request[0]);
+            if(state!=1||(m!=3&&m!=7&&m!=10))return null;
+            List<String> codes=new ArrayList<>();
+            String digits="0123456789ABCDEF";
+            for(int i=2;i<response.length;i+=2){
+                int a=u(response[i]),b=u(response[i+1]);
+                codes.add(new String(new char[]{"PCBU".charAt(a>>>6),
+                    digits.charAt((a>>>4)&3),digits.charAt(a&15),
+                    digits.charAt(b>>>4),digits.charAt(b&15)}));
+            }
+            return Collections.unmodifiableList(codes);
+        }
+        /** NRC is meaningful only on a verified terminal negative response. */
+        public Integer negativeResponseCode(){return state==3?u(response[2]):null;}
         public String observedVin(){return state==1&&Arrays.equals(request,new byte[]{9,2})?
             new String(response,3,17,StandardCharsets.US_ASCII):null;}
     }

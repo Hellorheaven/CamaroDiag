@@ -218,9 +218,14 @@ def decode(stream):
                         raise ValueError("Malformed VIN record")
                     report["observed_vin"] = res[3:].decode("ascii")
                 counts[status] += 1
+                dtc_codes = None
+                if state == 1 and req[0] in (3, 7, 10):
+                    dtc_codes = [f"{'PCBU'[a >> 6]}{(a >> 4) & 3:X}{a & 15:X}{b:02X}"
+                                 for a, b in zip(res[2::2], res[3::2])]
                 report["steps"].append({"sequence": seq, "request_hex": req.hex().upper(),
                     "response_hex": res.hex().upper() if res else None, "status": status,
-                    "duration_ms": elapsed})
+                    "duration_ms": elapsed, "dtc_codes": dtc_codes,
+                    "negative_response_code": res[2] if state == 3 else None})
                 continue
             if kind != 3 or length != 22:
                 raise ValueError("Unexpected evidence record")

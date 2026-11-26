@@ -18,7 +18,8 @@ internal static class J1979NativeReport
             frame_integrity_verified=result.FrameIntegrityVerified,capture_integrity_verified=result.CaptureIntegrityVerified&&!cancelled,
             evidence_authenticated=false,physical_vehicle_verified=false,observed_vin=result.ObservedVin,cancelled,
             steps=result.Steps.Select(s=>new{sequence=s.Sequence,request_hex=s.RequestHex,response_hex=s.ResponseHex,
-                status=s.Status,duration_ms=s.DurationMs}),
+                status=s.Status,duration_ms=s.DurationMs,dtc_codes=s.DtcCodes,
+                negative_response_code=s.NegativeResponseCode}),
             summary=result.Summary is { } summary?new{
                 end=summary.End,steps=summary.Steps,
                 transport_observed=(summary.Flags&1)!=0,pid_inventory_complete=(summary.Flags&2)!=0,

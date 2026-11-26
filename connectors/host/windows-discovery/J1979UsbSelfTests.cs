@@ -52,6 +52,11 @@ internal static class J1979UsbSelfTests
         using var incompleteRaw=new MemoryStream();
         result=new J1979UsbCapture(incomplete).RunRequest(hello,10000,key,incompleteRaw);
         Require(!result.CaptureIntegrityVerified&&result.Steps.Count==1);
+        var codes=new J1979CampaignSemantics.Step(3,1,1,[3],[0x43,4,1,0x23,0x45,0x67,0x89,0xab,0xcd,0xef]);
+        Require(codes.DtcCodes!.SequenceEqual(new[]{"P0123","C0567","B09AB","U0DEF"}));
+        var denied=new J1979CampaignSemantics.Step(4,3,1,[7],[0x7f,7,0x11]);
+        Require(denied.DtcCodes is null&&denied.NegativeResponseCode==0x11);
+        Require(new J1979CampaignSemantics.Step(5,1,1,[10],[0x4a,0]).DtcCodes!.Count==0);
         var partial=new Sim([.. challenge,.. capture[..^1]]);using var partialRaw=new MemoryStream();
         result=new J1979UsbCapture(partial).RunRequest(hello,10000,key,partialRaw);
         Require(result.DeviceCredentialAuthenticated&&!result.FrameIntegrityVerified&&partial.Closed&&partialRaw.Length==capture.Length-1);
