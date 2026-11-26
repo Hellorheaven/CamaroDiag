@@ -26,6 +26,9 @@ import java.io.OutputStream
 import java.util.UUID
 
 /** A functional Mode 04 ACK is distinct from the subsequent observed DTC state. */
+class ObdStationaryEvidenceRequiredException :
+    IllegalStateException("Stop the vehicle and engine; fresh zero speed and RPM evidence required.")
+
 data class StandardObdClearResult(
     val rawResponse: String,
     val snapshot: PhysicalObdDtcSnapshot?
@@ -900,9 +903,8 @@ class BluetoothObdManager(context: Context) {
             if (command == "04") requireCurrent()
         }) { engine, channel ->
             requireCurrent()
-            check(engine.hasFreshStationaryEvidence()) {
-                "Stop the vehicle and engine; positive speed and RPM evidence is required."
-            }
+            if (!engine.hasFreshStationaryEvidence())
+                throw ObdStationaryEvidenceRequiredException()
             requireCurrent()
             val raw = channel.command("04", 2500L)
             if (!StandardObdClearEvidence.acknowledged(raw)) {
