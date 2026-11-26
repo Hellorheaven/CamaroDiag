@@ -9,7 +9,7 @@
   <data name="InvalidChannel" xml:space="preserve"><value>Sélectionnez une paire d’adresses CAN physiques OBD ISO 15765-4 valide.</value></data>
   <data name="Running" xml:space="preserve"><value>Campagne de lecture physique J1979 en cours.</value></data>
   <data name="Completed" xml:space="preserve"><value>Campagne achevée. Consultez les résultats individuels.</value></data>
-  <data name="Partial" xml:space="preserve"><value>Durée maximale atteinte ; campagne incomplète.</value></data>
+  <data name="Partial" xml:space="preserve"><value>Campagne interrompue ou durée maximale atteinte ; consultez les résultats.</value></data>
   <data name="Unavailable" xml:space="preserve"><value>Indisponible</value></data>
   <data name="MutationsNotTested" xml:space="preserve"><value>Mode 04, Mode 05 legacy et exécution des commandes Mode 08 non testés.</value></data>
   <data name="Cancelled" xml:space="preserve"><value>Campagne annulée ou autorisation expirée.</value></data>
