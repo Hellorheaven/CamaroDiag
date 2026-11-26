@@ -652,7 +652,7 @@ def inventory_ecus(gateway: Gateway, expected: str, tester: int, targets: tuple[
                    context: ssl.SSLContext | None = None, p2: float | None = None,
                    p2_star: float | None = None, routing_type: int = 0,
                    routing_oem_data: bytes | None = None, obd: bool = False,
-                   target_trace: InventoryTrace | None = None) -> dict:
+                   target_trace: InventoryTrace | None = None, on_progress=None) -> dict:
     """Identify explicit ECU addresses independently using the requested diagnostic operation."""
     if type(obd) is not bool:
         raise DoIpError("Invalid ECU inventory identification mode")
@@ -683,9 +683,9 @@ def inventory_ecus(gateway: Gateway, expected: str, tester: int, targets: tuple[
                 raise InventoryTraceError("ECU inventory trace failed") from error
         return sink
 
+    require_gateway(sink_for(targets[0]))
     for ecu in targets:
         sink = sink_for(ecu)
-        require_gateway(sink)
         try:
             with Session(gateway, tester, ecu, tls=tls, timeout=timeout, trace=sink, context=context,
                          p2=p2, p2_star=p2_star, routing_type=routing_type,
@@ -710,10 +710,16 @@ def inventory_ecus(gateway: Gateway, expected: str, tester: int, targets: tuple[
         except NegativeResponse as error:
             rows.append({"ecu": f"{ecu:04X}", "status": "unverified",
                          "reason": "uds_negative_response", "nrc": error.code})
+        except TimeoutError:
+            rows.append({"ecu": f"{ecu:04X}", "status": "unverified", "reason": "timeout"})
         except (DoIpError, OSError, EOFError):
             rows.append({"ecu": f"{ecu:04X}", "status": "unverified",
                          "reason": "communication_or_identity_failure"})
-    require_gateway(trace)
+        require_gateway(sink)
+        if on_progress is not None:
+            # Do not expose mutable internal rows, or publish before gateway
+            # revalidation. Consumer errors terminate the inventory.
+            on_progress(tuple(dict(row) for row in rows), len(targets))
     return {"vin": expected, "complete": True, "targets": rows,
             "identification": "F802/F810" if obd else "F190",
             "verified_count": sum(row["status"] == "vin_verified" for row in rows),
