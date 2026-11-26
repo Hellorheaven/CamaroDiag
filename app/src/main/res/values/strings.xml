@@ -1306,4 +1306,10 @@
     <string name="functional_legacy_iso9141_candidates">Candidate: early-2000s Toyota or Honda gasoline vehicle with confirmed ISO 9141-2 OBD support.</string>
     <string name="functional_legacy_kwp_candidates">Candidate: early-2000s European gasoline vehicle with confirmed ISO 14230-4 emissions diagnostics. K-Line alone does not prove J1979 support.</string>
     <string name="functional_legacy_route_required">Connect a compatible ELM adapter on the selected legacy protocol. No automatic protocol switching. Read-only; anonymous identity fragments are not a verified ECU VIN.</string>
+    <string name="functional_legacy_mutation_scope">Functional vehicle-wide request: even silent ECUs may be affected. Selecting response sources does not limit transmission scope. Follow the manufacturer procedure and export the original complete scan first.</string>
+    <string name="functional_legacy_mutation_confirm">Confirm one functional vehicle-wide request on VIN %1$s, documented response sources %2$s? Other ECUs may also be affected.</string>
+    <string name="functional_legacy_engine_source">Engine response source (two hex digits)</string>
+    <string name="functional_legacy_documented_sources">Documented response sources (comma-separated hex)</string>
+    <string name="functional_legacy_mutation_profile">I verified the protocol, engine and all documented emissions response sources for VIN %1$s.</string>
+    <string name="functional_legacy_mutation_uncertain">Legacy campaign interrupted or failed. Operation state may be uncertain. Do not retry automatically.</string>
 </resources>
