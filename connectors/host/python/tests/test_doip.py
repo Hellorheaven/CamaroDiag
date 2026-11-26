@@ -1561,6 +1561,47 @@ class DoIpTests(unittest.TestCase):
         self.assertFalse(client._operation_lock.locked())
         client.close.assert_not_called()
 
+    def test_sequence_rejects_other_thread_while_first_command_is_pending(self):
+        client = Session.__new__(Session)
+        client._operation_lock = threading.Lock()
+        client._busy = False
+        client.close = unittest.mock.Mock()
+        entered, release = threading.Event(), threading.Event()
+        errors, replies = [], []
+
+        def fake_exchange(command, **_):
+            if command == bytes.fromhex("22F190"):
+                entered.set()
+                if not release.wait(2):
+                    raise AssertionError("Sequence was not released")
+            return b"\\x62" + command[1:]
+
+        client._exchange_owned = unittest.mock.Mock(side_effect=fake_exchange)
+        def worker():
+            try:
+                replies.extend(client.exchange_sequence(
+                    (bytes.fromhex("22F190"), bytes.fromhex("22F187"))))
+            except BaseException as error:
+                errors.append(error)
+
+        thread = threading.Thread(target=worker)
+        thread.start()
+        try:
+            self.assertTrue(entered.wait(2))
+            with self.assertRaises(DoIpError):
+                client.exchange(bytes.fromhex("221234"))
+            with self.assertRaises(DoIpError):
+                client.exchange_sequence((bytes.fromhex("221234"),))
+            client.close.assert_not_called()
+        finally:
+            release.set()
+            thread.join(3)
+        self.assertFalse(thread.is_alive())
+        self.assertEqual(errors, [])
+        self.assertEqual(replies, [bytes.fromhex("62F190"), bytes.fromhex("62F187")])
+        self.assertFalse(client._operation_lock.locked())
+        client.close.assert_not_called()
+
     def test_sequence_failure_retires_socket_and_releases_lock(self):
         for failure in ("exchange", "callback"):
             with self.subTest(failure=failure):
