@@ -78,4 +78,36 @@ class ObdLegacyOxygenTestsTest {
         assertFalse(report.complete)
         assertFalse(report.hasTestResults)
     }
+
+    @Test fun legacyMode06DecodesBothLimitTypesWithoutInventingMonitorPass() = runBlocking {
+        val commands = mutableListOf<String>()
+        val result = ObdLegacyOxygenTests.scanMode06({ command, _ ->
+            commands += command
+            when (command) {
+                "0600" -> "4600FF40000001"
+                "0620" -> "4620FF80000000"
+                "0602" -> "46028400100000\r46021600320020"
+                "0621" -> "46210100010002"
+                else -> error("Unexpected command: $command")
+            }
+        }, clockMs = { 0L })
+        assertEquals(listOf("0600", "0620", "0602", "0621"), commands)
+        assertTrue(result?.contains("TID=02 CID=04 LIMIT_TYPE=MIN RAW=0010 LIMIT_RAW=0000") == true)
+        assertTrue(result?.contains("TID=02 CID=16 LIMIT_TYPE=MAX RAW=0032 LIMIT_RAW=0020") == true)
+        assertTrue(result?.contains("TID=21 CID=01 LIMIT_TYPE=MAX RAW=0001 LIMIT_RAW=0002") == true)
+        assertFalse(result.orEmpty().contains("PARTIAL"))
+        assertFalse(result.orEmpty().contains("PASS"))
+    }
+
+    @Test fun legacyMode06RejectsCanBitmapAndMarksTruncatedResultPartial() = runBlocking {
+        assertNull(ObdLegacyOxygenTests.scanMode06({ _, _ -> "460080000000" }, clockMs = { 0L }))
+        val result = ObdLegacyOxygenTests.scanMode06({ command, _ ->
+            when (command) {
+                "0600" -> "4600FF80000000"
+                "0601" -> "46020100010002"
+                else -> error("Unexpected command: $command")
+            }
+        }, clockMs = { 0L })
+        assertEquals("TID=01: N/A\nPARTIAL", result)
+    }
 }
