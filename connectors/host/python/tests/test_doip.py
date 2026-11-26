@@ -1574,7 +1574,7 @@ class DoIpTests(unittest.TestCase):
                 entered.set()
                 if not release.wait(2):
                     raise AssertionError("Sequence was not released")
-            return b"\\x62" + command[1:]
+            return bytes((0x62,)) + command[1:]
 
         client._exchange_owned = unittest.mock.Mock(side_effect=fake_exchange)
         def worker():
