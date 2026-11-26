@@ -322,7 +322,7 @@ internal static class DoIpCodec
     {
         if (response.Type != EntityStatusResponse ||
             response.Payload.Length is not (3 or 7) ||
-            response.Payload[0] > 1)
+            response.Payload[0] > 1 || response.Payload[2] > response.Payload[1])
             throw new InvalidDataException("Invalid DoIP entity status response.");
         return new EntityStatus(response.Payload[0], response.Payload[1],
             response.Payload[2], response.Payload.Length == 7 ?
