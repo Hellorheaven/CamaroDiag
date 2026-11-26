@@ -34,6 +34,7 @@ internal static class NativeE39BenchWorkflowSelfTests
         internal bool AlterSecondIdentity, CorruptAfterWrite;
         internal Func<CancellationToken, Task>? BeforeFirstIdentity;
         internal CancellationTokenSource? CancelAfterFlashRead;
+        internal CancellationTokenSource? CancelAfterRunningSupplyRead;
         private bool corruptDone, running;
         public async Task<NativeGmlanIdentification.Identity> ReadIdentityAsync(CancellationToken token)
         {
@@ -47,7 +48,11 @@ internal static class NativeE39BenchWorkflowSelfTests
                 ? identity with { OperatingSystemId = identity.OperatingSystemId + 1 } : identity;
         }
         public Task<uint?> ReadSupplyMillivoltsAsync(CancellationToken token)
-        { token.ThrowIfCancellationRequested(); return Task.FromResult<uint?>(13500); }
+        {
+            token.ThrowIfCancellationRequested();
+            if (running) CancelAfterRunningSupplyRead?.Cancel();
+            return Task.FromResult<uint?>(13500);
+        }
         public Task SendAsync(byte[] request, CancellationToken token)
         { token.ThrowIfCancellationRequested(); Frames++; return Task.CompletedTask; }
         public Task DelayAsync(TimeSpan duration, CancellationToken token)
@@ -161,6 +166,17 @@ internal static class NativeE39BenchWorkflowSelfTests
             Check(lateRead.Erases == 0 &&
                 lateJournal.Events.All(e => e.Phase != NativeE39WriteSequence.Phase.Completed),
                 "Late successful ECU read after cancellation cannot authorize erase or completion");
+        }
+        using (var canceledSupply = new CancellationTokenSource())
+        {
+            var lateSupply = new Bench(original, id) { CancelAfterRunningSupplyRead = canceledSupply };
+            var supplyJournal = new Journal();
+            Reject<OperationCanceledException>(() =>
+                NativeE39BenchWorkflow.RunAsync(lateSupply, supplyJournal, policy, backup,
+                    original, target, kernel, canceledSupply.Token).GetAwaiter().GetResult());
+            Check(lateSupply.Erases == 0 &&
+                supplyJournal.Events.All(e => e.Phase != NativeE39WriteSequence.Phase.Completed),
+                "Late voltage observation after cancellation cannot authorize ECU erase");
         }
         var normal = new Bench(original,id); var normalJournal = new Journal();
         var result = Execute(normal,normalJournal,policy,backup);
