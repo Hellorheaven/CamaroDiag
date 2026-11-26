@@ -1282,4 +1282,5 @@
     <string name="obd_mode05_results">Mode 05 — legacy oxygen monitor results</string>
     <string name="obd_mode05_partial">Incomplete test inventory or response.</string>
     <string name="obd_mode05_raw_notice">Encoded test results; monitor completion and ECU attribution are not established.</string>
+    <string name="msg_dtc_clear_readback">Reset acknowledged. Fresh DTC read: confirmed %1$s; pending %2$s; permanent %3$s.</string>
 </resources>
