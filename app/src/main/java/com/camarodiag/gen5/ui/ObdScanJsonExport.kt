@@ -77,6 +77,16 @@ internal object ObdScanJsonExport {
                             .put("positiveRecords", JSONArray(read.positiveRecords.map { JSONArray(it) }))
                     }))
             } ?: JSONObject.NULL)
+            put("mode08", report.mode08?.let { mode ->
+                JSONObject().put("supportedTests", JSONArray(mode.supportedTests.sorted()))
+                    .put("complete", mode.complete)
+                    .put("physicalResponder", mode.physicalResponder ?: JSONObject.NULL)
+                    .put("pages", JSONArray(mode.pages.map { page ->
+                        JSONObject().put("base", page.base).put("command", page.command)
+                            .put("rawResponse", page.rawResponse)
+                            .put("positiveRecords", JSONArray(page.positiveRecords.map { JSONArray(it) }))
+                    }))
+            } ?: JSONObject.NULL)
             put("monitorTestRaw", report.monitorTestRaw ?: JSONObject.NULL)
             put("rawLog", JSONArray(report.rawLog))
         }.toString(2)
