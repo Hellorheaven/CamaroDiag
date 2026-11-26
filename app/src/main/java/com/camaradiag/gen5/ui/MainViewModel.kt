@@ -1630,10 +1630,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                                     DoIpDirectRead.InventoryFailure.PROTOCOL_IDENTITY -> R.string.cal_doip_inventory_reason_protocol
                                     DoIpDirectRead.InventoryFailure.NEGATIVE_RESPONSE -> R.string.cal_doip_inventory_reason_nrc
                                     DoIpDirectRead.InventoryFailure.TIMEOUT -> R.string.cal_doip_inventory_reason_timeout
+                                    DoIpDirectRead.InventoryFailure.HEADER_NACK -> R.string.cal_doip_inventory_reason_header
+                                    DoIpDirectRead.InventoryFailure.ROUTING_DENIED -> R.string.cal_doip_inventory_reason_routing
+                                    DoIpDirectRead.InventoryFailure.DIAGNOSTIC_NACK -> R.string.cal_doip_inventory_reason_ack
                                     DoIpDirectRead.InventoryFailure.COMMUNICATION, null -> R.string.cal_doip_inventory_reason_io
                                 }
                                 localizedContext.getString(R.string.cal_doip_inventory_unverified, row.ecu) +
-                                    " — " + localizedContext.getString(reason)
+                                    " — " + localizedContext.getString(reason) +
+                                    (row.failureCode?.let { " (0x%02X)".format(java.util.Locale.ROOT, it) } ?: "")
                             } else localizedContext.getString(R.string.cal_doip_inventory_verified, row.ecu, row.vin) +
                                 (row.protocolValue?.let { protocol -> "\n" + localizedContext.getString(
                                     if (protocol == 1) R.string.cal_doip_inventory_obd_supported else R.string.cal_doip_inventory_obd_unknown,
