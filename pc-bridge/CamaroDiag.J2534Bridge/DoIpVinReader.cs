@@ -43,53 +43,62 @@ internal static class DoIpVinReader
             frozen.Distinct().Count() != frozen.Length || frozen.Contains(tester))
             throw new ArgumentException("Invalid ECU inventory targets or gateway identity.");
         options?.Validate(timeout);
+        return await CollectInventoryAsync(frozen,
+            () => DoIpVehicleDiscovery.RequireCurrentIdentityAsync(gateway, timeout, token, udpTrace),
+            async ecu =>
+            {
+                await using var link = await ConnectObservedAsync(gateway, gateway.Source, tester, ecu,
+                    tls, timeout, token, certificate, pduTrace is null ? null : frame => pduTrace(ecu, frame), options);
+                var identity = obd ? await ReadStableObdIdentityAsync(link, expectedVin, timeout, token) : null;
+                var vin = identity?.Vin ?? await VerifyObservedVinAsync(link, gateway, timeout, token, null, null);
+                if (vin != expectedVin) throw new InvalidDataException("ECU VIN mismatch.");
+                return new InventoryEntry(ecu, vin, null, identity?.ProtocolValue);
+            }, token, progress);
+    }
+
+    // The query delegate owns and disposes its exact transport before returning.
+    // The same orchestration can be exercised without a vehicle or fixed ports.
+    internal static async Task<IReadOnlyList<InventoryEntry>> CollectInventoryAsync(
+        IReadOnlyList<ushort> targets, Func<Task> revalidate,
+        Func<ushort, Task<InventoryEntry>> query, CancellationToken token,
+        Action<IReadOnlyList<InventoryEntry>, int>? progress)
+    {
+        var frozen = targets.ToArray();
         var rows = new List<InventoryEntry>();
-        await DoIpVehicleDiscovery.RequireCurrentIdentityAsync(gateway, timeout, token, udpTrace);
+        token.ThrowIfCancellationRequested();
+        await revalidate();
         foreach (var ecu in frozen)
         {
             token.ThrowIfCancellationRequested();
+            InventoryEntry row;
             try
             {
-                InventoryEntry verified;
-                await using (var link = await ConnectObservedAsync(gateway, gateway.Source, tester, ecu,
-                    tls, timeout, token, certificate, pduTrace is null ? null : frame => pduTrace(ecu, frame), options))
-                {
-                    var identity = obd ? await ReadStableObdIdentityAsync(link, expectedVin, timeout, token) : null;
-                    var vin = identity?.Vin ?? await VerifyObservedVinAsync(link, gateway, timeout, token, null, null);
-                    if (vin != expectedVin) throw new InvalidDataException("ECU VIN mismatch.");
-                    verified = new(ecu, vin, null, identity?.ProtocolValue);
-                }
-                // Publish a single row only after session disposal succeeded.
-                token.ThrowIfCancellationRequested();
-                rows.Add(verified);
+                row = await query(ecu);
             }
             catch (OperationCanceledException) when (!token.IsCancellationRequested)
             {
-                rows.Add(new(ecu, null, "timeout"));
+                row = new(ecu, null, "timeout");
             }
             catch (TimeoutException)
             {
-                token.ThrowIfCancellationRequested();
-                rows.Add(new(ecu, null, "timeout"));
+                row = new(ecu, null, "timeout");
             }
             catch (InvalidDataException)
             {
-                token.ThrowIfCancellationRequested();
-                rows.Add(new(ecu, null, "identity_or_response_invalid"));
+                row = new(ecu, null, "identity_or_response_invalid");
             }
             catch (Exception error) when (error is IOException or System.Net.Sockets.SocketException)
             {
-                // A failed read cannot establish that an ECU does not exist.
-                token.ThrowIfCancellationRequested();
-                rows.Add(new(ecu, null, "communication_or_identity_failure"));
+                row = new(ecu, null, "communication_or_identity_failure");
             }
-            // Revalidate the gateway outside the ECU failure handlers. Never
-            // publish a row, even a failed one, if the gateway has drifted.
-            await DoIpVehicleDiscovery.RequireCurrentIdentityAsync(gateway, timeout, token, udpTrace);
             token.ThrowIfCancellationRequested();
+            if (row.Ecu != ecu)
+                throw new InvalidOperationException("Inventory query returned a different logical ECU.");
+            await revalidate();
+            token.ThrowIfCancellationRequested();
+            rows.Add(row);
             progress?.Invoke(Array.AsReadOnly(rows.ToArray()), frozen.Length);
             token.ThrowIfCancellationRequested();
-            // AuthenticationException and caller/trace errors are deliberately fatal.
         }
         return Array.AsReadOnly(rows.ToArray());
     }
