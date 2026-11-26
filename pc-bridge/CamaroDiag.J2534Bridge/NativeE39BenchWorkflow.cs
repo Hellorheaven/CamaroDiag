@@ -110,14 +110,21 @@ internal static class NativeE39BenchWorkflow
         var session = (NativeE39ProgrammingSession.ITransport)transport;
         token.ThrowIfCancellationRequested();
         var first = await transport.ReadIdentityAsync(token);
+        // A vendor driver may return an identity even after the caller
+        // cancelled. Do not issue the second probe or enter programming mode.
+        token.ThrowIfCancellationRequested();
         var second = await transport.ReadIdentityAsync(token);
+        token.ThrowIfCancellationRequested();
         var identity = NativeGmlanBenchProbe.RequireStableIdentity(first, second);
         await NativeE39ProgrammingSession.PrepareAsync(session, identity, q, token);
+        token.ThrowIfCancellationRequested();
         await NativeE39RamLoader.StageAsync(transport, prepared.Kernel,
             q.MinimumSupplyMillivolts, q.MaximumSupplyMillivolts, token);
+        token.ThrowIfCancellationRequested();
         var link = new NativeE39KernelLink(session.ExchangeAsync, session.ReadSupplyMillivoltsAsync,
             policy.MaximumReadBytes);
         await link.ProbeAsync(token);
+        token.ThrowIfCancellationRequested();
 
         // Full fresh read of the physical main flash, including unchanged
         // regions, before ANY erase is admitted.

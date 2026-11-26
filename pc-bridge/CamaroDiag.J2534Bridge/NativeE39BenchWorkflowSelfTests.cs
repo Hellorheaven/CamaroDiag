@@ -35,6 +35,11 @@ internal static class NativeE39BenchWorkflowSelfTests
         internal Func<CancellationToken, Task>? BeforeFirstIdentity;
         internal CancellationTokenSource? CancelAfterFlashRead;
         internal CancellationTokenSource? CancelAfterRunningSupplyRead;
+        internal CancellationTokenSource? CancelAfterIdentityRead;
+        internal CancellationTokenSource? CancelAfterSessionReply;
+        internal CancellationTokenSource? CancelAfterRamDownloadReply;
+        internal CancellationTokenSource? CancelAfterKernelProbeReply;
+        internal int RamTransferFrames, FlashReads;
         private bool corruptDone, running;
         public async Task<NativeGmlanIdentification.Identity> ReadIdentityAsync(CancellationToken token)
         {
@@ -44,6 +49,7 @@ internal static class NativeE39BenchWorkflowSelfTests
             if (pause is not null) await pause(token);
             token.ThrowIfCancellationRequested();
             IdentityReads++;
+            CancelAfterIdentityRead?.Cancel();
             return AlterSecondIdentity && IdentityReads == 2
                 ? identity with { OperatingSystemId = identity.OperatingSystemId + 1 } : identity;
         }
@@ -71,13 +77,23 @@ internal static class NativeE39BenchWorkflowSelfTests
                     0xA5 => [0xE5], 0x34 => [0x74], 0x36 when request[1] == 0x80 => [0x99],
                     0x36 => [0x76], _ => throw new InvalidOperationException("Unexpected staging request")
                 };
+                if (request[0] == 0x36)
+                    RamTransferFrames++;
+                if (request[0] == 0x10)
+                    CancelAfterSessionReply?.Cancel();
+                if (request[0] == 0x34)
+                    CancelAfterRamDownloadReply?.Cancel();
                 if (request[0] == 0x36 && request[1] == 0x80) running = true;
                 return Task.FromResult(reply);
             }
             if (request.SequenceEqual(new byte[]{0x3D,0}))
+            {
+                CancelAfterKernelProbeReply?.Cancel();
                 return Task.FromResult(new byte[]{0x7D,0,0x43,0x44,0x33,0x39,1,0,28,0});
+            }
             if (request[0] == 0x23)
             {
+                FlashReads++;
                 int address = checked((int)BinaryPrimitives.ReadUInt32BigEndian(request.AsSpan(2,4)));
                 int size = BinaryPrimitives.ReadUInt16BigEndian(request.AsSpan(6,2));
                 reply = new byte[size+1]; reply[0] = 0x63;
@@ -153,6 +169,45 @@ internal static class NativeE39BenchWorkflowSelfTests
         var wrongIdentity = new Bench(original,id) { AlterSecondIdentity = true };
         Reject<InvalidDataException>(() => Execute(wrongIdentity,new Journal(),policy,backup));
         Check(wrongIdentity.Frames == 0,"Unstable identity prevents programming session");
+        // Non-cooperative adapter responses must not cause the next ECU
+        // command to be sent after the operator cancels the transaction.
+        using (var cancelled = new CancellationTokenSource())
+        {
+            var physical = new Bench(original, id) { CancelAfterIdentityRead = cancelled };
+            Reject<OperationCanceledException>(() =>
+                NativeE39BenchWorkflow.RunAsync(physical, new Journal(), policy, backup,
+                    original, target, kernel, cancelled.Token).GetAwaiter().GetResult());
+            Check(physical.IdentityReads == 1 && physical.Frames == 0,
+                "Cancelled first identity prevents second probe and programming mode");
+        }
+        using (var cancelled = new CancellationTokenSource())
+        {
+            var physical = new Bench(original, id) { CancelAfterSessionReply = cancelled };
+            Reject<OperationCanceledException>(() =>
+                NativeE39BenchWorkflow.RunAsync(physical, new Journal(), policy, backup,
+                    original, target, kernel, cancelled.Token).GetAwaiter().GetResult());
+            Check(physical.IdentityReads == 2 && physical.Frames == 1 &&
+                physical.RamTransferFrames == 0,
+                "Cancelled programming session ACK prevents any further ECU request");
+        }
+        using (var cancelled = new CancellationTokenSource())
+        {
+            var physical = new Bench(original, id) { CancelAfterRamDownloadReply = cancelled };
+            Reject<OperationCanceledException>(() =>
+                NativeE39BenchWorkflow.RunAsync(physical, new Journal(), policy, backup,
+                    original, target, kernel, cancelled.Token).GetAwaiter().GetResult());
+            Check(physical.RamTransferFrames == 0 && physical.Erases == 0,
+                "Cancelled RAM download ACK cannot transfer kernel or erase ECU");
+        }
+        using (var cancelled = new CancellationTokenSource())
+        {
+            var physical = new Bench(original, id) { CancelAfterKernelProbeReply = cancelled };
+            Reject<OperationCanceledException>(() =>
+                NativeE39BenchWorkflow.RunAsync(physical, new Journal(), policy, backup,
+                    original, target, kernel, cancelled.Token).GetAwaiter().GetResult());
+            Check(physical.FlashReads == 0 && physical.Erases == 0,
+                "Cancelled kernel probe cannot mark link ready or read ECU flash");
+        }
         var mismatch = new Bench(original,id); mismatch.Memory[0x100] ^= 1;
         Reject<InvalidDataException>(() => Execute(mismatch,new Journal(),policy,backup));
         Check(mismatch.Erases == 0,"Full preflight mismatch outside planned sector prevents erase");
