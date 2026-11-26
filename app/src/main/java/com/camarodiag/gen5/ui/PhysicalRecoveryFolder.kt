@@ -92,7 +92,7 @@ internal object PhysicalRecoveryFolder {
             copy(journal, journalFile, MAX_JOURNAL)
             files.forEach { copy(it, File(blockDir, it.name), MAX_BLOCK) }
             active()
-            return EcuWriteTransaction.inspectRecoveryEvidence(journalFile, identity.target(), identity.vin)
+            return EcuWriteTransaction.inspectRecoveryEvidence(journalFile, identity.target(), identity.vin, ::active)
                 .also { active() }
         } finally {
             staging.deleteRecursively()

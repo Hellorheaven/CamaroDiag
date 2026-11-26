@@ -97,9 +97,10 @@ object EcuWriteTransaction {
     fun inspectRecoveryEvidence(
         journalFile: java.io.File,
         target: EcuProgrammingDriverContract.FirmwareTarget,
-        expectedVin: String
+        expectedVin: String,
+        checkActive: () -> Unit = {}
     ): EcuPhysicalBackupInspection.Report =
-        EcuPhysicalBackupInspection.inspect(journalFile, target, expectedVin)
+        EcuPhysicalBackupInspection.inspect(journalFile, target, expectedVin, checkActive)
 
     private fun unavailableIdentity(value: String): Boolean {
         val normalized = value.trim().lowercase(java.util.Locale.ROOT)

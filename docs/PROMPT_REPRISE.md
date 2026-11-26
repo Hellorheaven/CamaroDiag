@@ -1,3 +1,7 @@
+## C6 — inspection interrompue et adresse incertaine (26/11/2026)
+
+- Propagation de l'adresse du secteur en cours d'effacement lorsque les originaux sont intègres mais la transaction interrompue. Le calcul de SHA-256 vérifie l'annulation et le contexte à chaque bloc de lecture, propage l'annulation plutôt que d'afficher une fausse erreur d'intégrité. Tests de régression ajoutés, non exécutés. Aucun accès ECU.
+
 ## C6 — inspection de récupération dans Android (26/11/2026)
 
 - Écran cartographie > mémoire : saisie indépendante VIN/famille/contrôleur/firmware, sélection SAF du dossier contenant un journal Android et son dossier .blocks, inspection hors connexion avec copies temporaires privées bornées (256 Mio), effacées après traitement. Résultat lié au compte et à l'identité saisie, sans opération ECU. FR/EN ; état de transaction distinct de l'intégrité, adresses et SHA-256 des 20 premiers secteurs. Limite : pas de récupération active, ni format Windows interchangeable, ni validation matérielle. Tests écrits/non exécutés avant clôture C6.

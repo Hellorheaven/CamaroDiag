@@ -39,7 +39,8 @@ object EcuPhysicalBackupInspection {
     fun inspect(
         journalFile: File,
         target: EcuProgrammingDriverContract.FirmwareTarget,
-        vin: String
+        vin: String,
+        checkActive: () -> Unit = {}
     ): Report {
         var expectedCount = 0
         var current: Long? = null
@@ -49,6 +50,7 @@ object EcuPhysicalBackupInspection {
             // Audit exactly the snapshot used to derive the baseline list.
             // A different read of a changing file must never supply the evidence.
             fun readSnapshot(): ByteArray {
+                checkActive()
                 val length = journalFile.length()
                 check(length in 1L..MAX_JOURNAL_BYTES) { "Invalid ECU journal size." }
                 return ByteArray(length.toInt()).also { data ->
@@ -87,6 +89,7 @@ object EcuPhysicalBackupInspection {
             }
             val observed = hashSetOf<Pair<EcuBackupCoverage.Region, Long>>()
             for (file in files) {
+                checkActive()
                 check(file.length() in 1L..MAX_BLOCK_FILE_BYTES) {
                     "Saved physical ECU block exceeds the supported size."
                 }
@@ -118,6 +121,7 @@ object EcuPhysicalBackupInspection {
                     val buffer = ByteArray(8192)
                     var remaining = size
                     while (remaining > 0) {
+                        checkActive()
                         val count = minOf(remaining, buffer.size.toLong()).toInt()
                         input.readFully(buffer, 0, count)
                         digest.update(buffer, 0, count)
@@ -142,7 +146,10 @@ object EcuPhysicalBackupInspection {
             }
             Report(true, expectedCount, verified.sortedWith(compareBy({ it.region.name },
                 { it.address })), verifiedBytes, "",
+                uncertainAddress = audit.uncertainAddress,
                 journalDisposition = audit.recoveryDisposition)
+        } catch (cancelled: java.util.concurrent.CancellationException) {
+            throw cancelled
         } catch (error: Exception) {
             Report(false, expectedCount, emptyList(), 0L,
                 error.message ?: "ECU recovery evidence cannot be inspected.", current)

@@ -90,6 +90,16 @@ class EcuPhysicalBackupInspectionTest {
             assertEquals(
                 PersistentEcuWriteJournal.RecoveryDisposition.ERASE_OR_WRITE_MAY_BE_INCOMPLETE,
                 interrupted.journalDisposition)
+            assertEquals(0x1000L, interrupted.uncertainAddress)
+            var checks = 0
+            try {
+                EcuPhysicalBackupInspection.inspect(journalFile, target, vin) {
+                    if (++checks == 3) throw java.util.concurrent.CancellationException("cancelled")
+                }
+                throw AssertionError("Cancellation must propagate, not be reported as failed integrity")
+            } catch (_: java.util.concurrent.CancellationException) {
+                assertEquals(3, checks)
+            }
         } finally { directory.deleteRecursively() }
         Unit
     }
