@@ -30,6 +30,24 @@ class FunctionalTestSuiteTest {
         assertEquals(false to false, evidence(null))
     }
 
+    @Test fun evapAcknowledgmentNeverPassesMonitorCompletion() {
+        val vin = "1G1FA1RXXR0123456"
+        val state = FunctionalTestState(evapCampaign = true,
+            checks = FunctionalTestPlanner.evapChecks(),
+            context = FunctionalTestContext(vin, "ELM", "USB", 1))
+        val result = com.camarodiag.gen5.data.obd.ObdEvapResult("ACKNOWLEDGED", true, vin,
+            null, listOf(com.camarodiag.gen5.data.obd.ObdEvapExchange("0801", "4801")), 6, "7E0", "7E8")
+        val updated = FunctionalTestPlanner.evapResults(state, result)
+        assertEquals(FunctionalTestOutcome.PASSED, updated.checks.first().outcome)
+        assertEquals(FunctionalTestOutcome.NOT_TESTED, updated.checks.last().outcome)
+        assertEquals(vin, updated.context?.observedVin)
+        assertEquals(listOf("> 0801 -> 4801"), updated.rawObdExchanges)
+        val uncertain = FunctionalTestPlanner.evapResults(state,
+            result.copy(outcome = "UNCERTAIN", reason = "TIMEOUT"))
+        assertEquals(FunctionalTestOutcome.FAILED, uncertain.checks.first().outcome)
+        assertEquals(FunctionalTestOutcome.NOT_TESTED, uncertain.checks.last().outcome)
+    }
+
     @Test fun doIpCampaignRequiresExplicitIdentityAndPhysicalConfirmation() {
         val target = DoIpFunctionalTarget("192.0.2.10", "0E80", "1234", "1G1FA1RXXR0123456", true, true)
         assertTrue(target.valid)
