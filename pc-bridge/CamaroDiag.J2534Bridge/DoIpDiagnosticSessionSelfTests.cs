@@ -1035,6 +1035,10 @@ internal static class DoIpDiagnosticSessionSelfTests
         // Scope-qualified memory capture on a simulated gateway. No physical ECU.
         var backupScope = new DoIpBackupScope(simulatedVin, Ecu, Tester, Ecu, 0x1234,
             "A1B2", 0x100, 4, 2, "CALIBRATION");
+        DoIpScopedBackup.ValidateCaptureBudget(backupScope with { Length = 8192, BlockSize = 1 });
+        await Expect<InvalidDataException>(() => Task.Run(() =>
+            DoIpScopedBackup.ValidateCaptureBudget(backupScope with { Length = 8193, BlockSize = 1 })),
+            "DoIP capture must reject excessive block count before network access.");
         async Task BackupRequest(Stream stream, byte[] request, byte[] response)
         {
             var message = await ReadAsync(stream);
@@ -1056,6 +1060,7 @@ internal static class DoIpDiagnosticSessionSelfTests
                 await BackupIdentity(stream);
                 await BackupRequest(stream, [0x23, 0x14, 0, 0, 1, 0, 2], [0x63, 1, 2]);
                 await BackupRequest(stream, [0x23, 0x14, 0, 0, 1, 2, 2], [0x63, 3, 4]);
+                await BackupIdentity(stream);
             }
             await BackupIdentity(stream);
         }, async client =>
@@ -1103,6 +1108,25 @@ internal static class DoIpDiagnosticSessionSelfTests
                 _ = await DoIpScopedBackup.ReadAsync(client, backupScope, TimeSpan.FromSeconds(2),
                     CancellationToken.None);
             }, "Different firmware identity prevents memory acquisition.");
+        });
+
+        await RunCaseAsync(async stream =>
+        {
+            await BackupIdentity(stream);
+            await BackupRequest(stream, [0x23, 0x14, 0, 0, 1, 0, 2], [0x63, 1, 2]);
+            await BackupRequest(stream, [0x23, 0x14, 0, 0, 1, 2, 2], [0x63, 3, 4]);
+            await BackupRequest(stream, Request,
+                [0x62, 0xF1, 0x90, .. System.Text.Encoding.ASCII.GetBytes(simulatedVin)]);
+            await BackupRequest(stream, [0x22, 0x12, 0x34], [0x62, 0x12, 0x34, 0xA1, 0xB3]);
+        }, async client =>
+        {
+            var progressCount = 0;
+            await Expect<UnauthorizedAccessException>(async () =>
+            {
+                _ = await DoIpScopedBackup.ReadAsync(client, backupScope, TimeSpan.FromSeconds(2),
+                    CancellationToken.None, (_, _) => progressCount++);
+            }, "Identity changed before publishing memory acquisition progress.");
+            Check(progressCount == 0, "No unverified memory progress may be published.");
         });
 
         // UDP and TCP identity correlation: no diagnostic PDU may be sent
