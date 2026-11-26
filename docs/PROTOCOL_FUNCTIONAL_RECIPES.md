@@ -64,3 +64,21 @@ Exporter le scan OBD complet initial avant toute demande d'effacement. Le Mode 0
 Android : tests privés SAE J1979, confirmer le profil/VIN et sélectionner Mode 04 (ELM/STN CAN physique seulement). Windows : tests privés, ECM physique principal sélectionné, VIN explicite et bouton Mode 04 dédié. Linux : `camarodiagconnectors-j1979-clear`, adaptateur SocketCAN externe déjà configuré. Dans chaque cas deux confirmations distinctes, VIN lu comparé, baseline confirmée Mode 03 et lectures positives vitesse/régime à zéro. Une seule demande autorisée, aucune diffusion ni retry. Rapports JSON individuels avec phases BEFORE/AFTER, lectures 03/07/0A, PID 01 (MIL/readiness), réponses brutes, ACK et statut. Un silence, NRC ou trame malformée ne signifie jamais zéro défaut. Les défauts permanents sont observés et non présumés effacés. Un ACK avec relecture partielle ou défauts persistants n'est pas une validation de leur disparition. Le parcours Android vers pont J2534 réseau reste celui du diagnostic ordinaire ; utiliser Windows local pour la campagne indépendante J2534. Variantes legacy non qualifiées dans cette recette.
 
 Independent physical CAN Mode 04 campaign for Android ELM/STN, local Windows J2534 and Linux SocketCAN host. Save the complete original scan, follow manufacturer procedure and use separate confirmations. Baseline and readback evidence never infer zero from missing replies. No automatic retry or generic write access.
+
+### SAE J1979 legacy — cinq recettes distinctes
+
+Android : choisir SAE J1979 — J1850 PWM / J1850 VPW / ISO 9141-2 / KWP slow init / KWP fast init dans les tests privés, avec un ELM/STN compatible et déjà connecté sur cette variante. Le scan vérifie ATDPN et une réponse initiale PID 00, refuse la variante différente sans repli, et produit le JSON propre à cette variante. Les records non-CAN des DTC, Mode 05/06/08 et Mode 09 sont traités séparément du CAN. Le VIN anonyme éventuel est conservé en candidat et non en identité de calculateur ; CALID/CVN et autres fragments restent bruts lorsque l'attribution n'est pas possible.
+
+Windows/Linux : utiliser la recette ELM série `camarodiagconnectors-j1979-legacy` décrite dans `connectors/README.md`. Ce n'est pas encore le parcours natif J2534 legacy. Les campagnes sont indépendantes de l'OBD CAN et des protocoles génériques J1850/ISO9141/KWP, qui ne sont pas clôturés.
+
+| Variante | Candidat prioritaire / alternatif à confirmer |
+|---|---|
+| VPW | Camaro Gen4, p. ex. Z28 1998 ; pas Camaro 2012 |
+| PWM | Mustang thermique ancienne, p. ex. années 1996–2004 ; pas Mach-E 2023 |
+| ISO 9141-2 | Toyota/Honda essence début années 2000, variante documentée |
+| KWP slow init | Ancienne voiture européenne essence avec OBD ISO 14230-4 slow init confirmé |
+| KWP fast init | Ancienne voiture européenne essence avec OBD ISO 14230-4 fast init confirmé |
+
+La Ducati 848 2008 peut être candidate à l'étude K-Line constructeur mais ne prouve pas SAE J1979 ; Peugeot 207 CC 2010 et les voitures récentes du parc ne sont pas des candidats legacy présumés. Utiliser un banc si aucun véhicule compatible n'est disponible. Références : ISO 15031-5:2006 §6.3/6.5/6.6/6.8/6.9, https://studylib.net/doc/25827573/iso-15031-5-2006 ; historique indicatif des véhicules https://www.obdtester.com/obd2_protocols et https://www.blafusel.de/obd/obd2_scanned.php?order=usb . Vérifier année, marché, moteur, adaptateur et vraie réponse, sans déduire le protocole de la seule prise DLC.
+
+Separate legacy read recipes on Android and serial ELM host, with variant-specific JSON and raw anonymous records. Mutating legacy recipes and native J2534 legacy integration remain open. Firmware passive application classifier is not a vehicle transport.
