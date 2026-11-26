@@ -135,6 +135,75 @@ class DoIpGatewayControlTraceTest {
         }
     }
 
+    @Test fun confirmedSequenceRequiresStableGatewayAfterSocketClose(): Unit = runBlocking {
+        val loopback = InetAddress.getByName("127.0.0.1")
+        fun bytes(value: String) = value.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
+        for (changed in listOf(false, true)) {
+            DatagramSocket(0, loopback).use { udp ->
+                java.net.ServerSocket(0, 1, loopback).use { tcp ->
+                    udp.soTimeout = 5000
+                    tcp.soTimeout = 5000
+                    val worker = Executors.newSingleThreadExecutor()
+                    try {
+                        val server = worker.submit {
+                            respond(udp, pdu(255, 1), identity())
+                            tcp.accept().use { socket ->
+                                socket.soTimeout = 5000
+                                val input = java.io.DataInputStream(socket.getInputStream())
+                                val output = socket.getOutputStream()
+                                fun receive(type: Int, expected: ByteArray) {
+                                    val header = ByteArray(8).also { input.readFully(it) }
+                                    val size = ByteBuffer.wrap(header).getInt(4)
+                                    assertTrue(size in 0..4096)
+                                    val payload = ByteArray(size).also { input.readFully(it) }
+                                    assertArrayEquals(pdu(2, type, expected), header + payload)
+                                }
+                                fun send(type: Int, body: ByteArray) {
+                                    output.write(pdu(2, type, body))
+                                    output.flush()
+                                }
+                                receive(5, bytes("0E800000000000"))
+                                send(6, bytes("0E8010001000000000"))
+                                receive(0x8001, bytes("0E80123422F190"))
+                                send(0x8001, bytes("12340E8062F190") + vin.toByteArray(Charsets.US_ASCII))
+                                receive(0x8001, bytes("0E801234221234"))
+                                send(0x8001, bytes("12340E80621234AB"))
+                                // The next UDP verification is never performed
+                                // before closing the routed TCP session.
+                                assertEquals(-1, input.read())
+                            }
+                            val finalIdentity = identity()
+                            if (changed) finalIdentity[8 + 19] = 1
+                            respond(udp, pdu(255, 1), finalIdentity)
+                        }
+                        val approval = requireNotNull(EcuWriteConsentFlow.approval(
+                            EcuWriteConsentFlow.Step.CONFIRMATION, true, true))
+                        val target = DoIpDirectRead.Target.parse(
+                            "127.0.0.1", "0E80", "1234", vin, false)
+                        val partial = mutableListOf<Int>()
+                        val result = runCatching {
+                            DoIpDirectRead.readAt(target, DoIpDirectRead.Operation.EXCHANGE,
+                                timeoutMs = 2000, commands = listOf(bytes("221234")),
+                                approval = approval, isContextCurrent = { true },
+                                onCommandReply = { index, reply ->
+                                    assertArrayEquals(bytes("621234AB"), reply)
+                                    partial += index
+                                }, udpPort = udp.localPort, tcpPort = tcp.localPort)
+                        }
+                        server.get(6, TimeUnit.SECONDS)
+                        assertEquals(listOf(1), partial)
+                        if (changed) {
+                            assertTrue("A changed gateway must not complete the sequence", result.isFailure)
+                        } else {
+                            assertArrayEquals(bytes("621234AB"),
+                                result.getOrThrow().commandReplies.single())
+                        }
+                    } finally { worker.shutdownNow() }
+                }
+            }
+        }
+    }
+
     @Test fun archiveReaderComparesBinaryEntriesInEitherOrderAndRejectsInvalidLengths() {
         val first = ByteArray(2 * 1024 * 1024 + 1) { (it % 251).toByte() }
         fun archive(original: ByteArray, verification: ByteArray,
