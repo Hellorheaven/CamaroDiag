@@ -25,6 +25,12 @@ import java.io.InputStream
 import java.io.OutputStream
 import java.util.UUID
 
+/** A functional Mode 04 ACK is distinct from the subsequent observed DTC state. */
+data class StandardObdClearResult(
+    val rawResponse: String,
+    val snapshot: PhysicalObdDtcSnapshot?
+)
+
 class BluetoothObdManager(context: Context) {
 
     // Do not query the Bluetooth service while constructing the startup ViewModel.
@@ -550,11 +556,11 @@ class BluetoothObdManager(context: Context) {
      * another diagnostic action to interleave adapter setup and response parsing.
      */
     suspend fun <T> withObdCommandSession(block: suspend (Obd2FeatureEngine) -> T): T =
-        withGuardedObdCommandSession({}, block)
+        withGuardedObdCommandSession({}) { engine, _ -> block(engine) }
 
     private suspend fun <T> withGuardedObdCommandSession(
         beforeCommand: (String) -> Unit,
-        block: suspend (Obd2FeatureEngine) -> T
+        block: suspend (Obd2FeatureEngine, ObdCommandChannel) -> T
     ): T {
         val requestedEpoch = transportSessionEpoch.capture()
         check(isObdCommandChannelAvailable) {
@@ -566,15 +572,13 @@ class BluetoothObdManager(context: Context) {
             check(isObdCommandChannelAvailable) {
                 "OBD command channel disconnected while waiting for the previous operation."
             }
-            val engine = Obd2FeatureEngine(
-                ObdCommandChannel { command, timeoutMs ->
-                    sendAtCommandInternal(command, timeoutMs, expectedEpoch = requestedEpoch, preserveLines = true,
-                        beforeTransmit = { beforeCommand(command) })
-                },
-                physicalElmHeaders = true
-            )
+            val channel = ObdCommandChannel { command, timeoutMs ->
+                sendAtCommandInternal(command, timeoutMs, expectedEpoch = requestedEpoch, preserveLines = true,
+                    beforeTransmit = { beforeCommand(command) })
+            }
+            val engine = Obd2FeatureEngine(channel, physicalElmHeaders = true)
             return try {
-                block(engine)
+                block(engine, channel)
             } catch (formatting: ObdElmFormattingException) {
                 if (!transportSessionEpoch.isCurrent(requestedEpoch))
                     throw ObdSupersededSessionException(formatting)
@@ -891,11 +895,18 @@ class BluetoothObdManager(context: Context) {
     ): StandardObdClearResult {
         require(approval.warningAcknowledged && approval.confirmedYes)
         return withGuardedObdCommandSession({ command ->
-            requireCurrent()
-            if (command == "04")
-                EcuWriteConsentFlow.requireCurrentForTransmit(approval) { true }
-        }) { engine ->
-            engine.clearStandardDtcsAndReadBack(approval)
+            // Adapter restoration must still run after cancellation or a
+            // changed profile. Only the mutation needs live operator consent.
+            if (command == "04") requireCurrent()
+        }) { engine, channel ->
+            val raw = channel.command("04", 2500L)
+            if (!StandardObdClearEvidence.acknowledged(raw)) {
+                StandardObdClearResult(raw, null)
+            } else {
+                requireCurrent()
+                val modes = engine.readDtcModeEvidence()
+                StandardObdClearResult(raw, PhysicalObdDtcSnapshot(modes[3], modes[7], modes[10]))
+            }
         }
     }
 
