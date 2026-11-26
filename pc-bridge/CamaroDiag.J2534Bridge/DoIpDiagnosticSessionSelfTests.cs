@@ -1603,6 +1603,26 @@ internal static class DoIpDiagnosticSessionSelfTests
             });
         }
 
+        // A broken journal is fatal, not an unavailable ECU or a successful reply.
+        await RunCaseAsync(async stream =>
+        {
+            await RequireRequestAsync(stream);
+            await SendAsync(stream, DoIpCodec.DiagnosticMessage, FromEcu(Positive));
+        }, async client =>
+        {
+            await Expect<DoIpDiagnosticTransport.TraceObserverException>(() =>
+                client.ExchangeUdsAsync(Request, TimeSpan.FromSeconds(2), CancellationToken.None),
+                "A trace sink IOException must remain distinguishable from a transport IOException.");
+            await Expect<InvalidOperationException>(() =>
+                client.ExchangeUdsAsync(Request, TimeSpan.FromSeconds(1), CancellationToken.None),
+                "Trace observer failure retires the route.");
+        }, trace: observed =>
+        {
+            if (observed.Direction == "RX" &&
+                DoIpCodec.Decode(observed.Bytes).Type == DoIpCodec.DiagnosticMessage)
+                throw new IOException("Simulated evidence sink failure.");
+        });
+
         // Invalid P2 or P2* must fail before an on-wire diagnostic request.
         await RunCaseAsync(async stream =>
         {

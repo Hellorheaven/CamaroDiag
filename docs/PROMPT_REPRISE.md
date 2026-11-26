@@ -1,3 +1,7 @@
+## PR117 — attribution des échecs de journal pendant inventaire Windows (26/11/2026)
+
+- C6/DoIP : une exception du callback de trace TCP/TLS est distinguée d'une erreur réseau, y compris lorsqu'elle est de type IOException. L'inventaire n'enchaîne plus les ECU après une erreur de journal constatée durant une transaction ; un résultat vérifié n'est ajouté qu'après fermeture de sa session afin d'éviter une double ligne si la fermeture échoue. Annulation revérifiée avant publication. Régression loopback écrite, non exécutée ; aucun checkpoint.
+
 ## PR117 — parité WWH Android et Windows (26/11/2026)
 
 - C6/DoIP : les interfaces Android et Windows affichent les masques demandés et effectifs d'état et de sévérité pour WWH 19/42, uniquement quand ces filtres ont réellement été transmis. Les rapports 19/55 et 19/56 n'inventent aucun filtre. Les octets DTC/sevérité restent bruts et les états Android sont interprétés selon les bits disponibles. Un filtre WWH indisponible ne peut pas conclure à l'absence de défauts. Ressources FR/EN et régressions écrites, non exécutées. Aucun checkpoint.

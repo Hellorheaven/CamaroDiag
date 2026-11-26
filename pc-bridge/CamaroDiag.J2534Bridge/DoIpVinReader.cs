@@ -49,12 +49,18 @@ internal static class DoIpVinReader
             await DoIpVehicleDiscovery.RequireCurrentIdentityAsync(gateway, timeout, token, udpTrace);
             try
             {
-                await using var link = await ConnectObservedAsync(gateway, gateway.Source, tester, ecu,
-                    tls, timeout, token, certificate, pduTrace is null ? null : frame => pduTrace(ecu, frame), options);
-                var identity = obd ? await ReadStableObdIdentityAsync(link, expectedVin, timeout, token) : null;
-                var vin = identity?.Vin ?? await VerifyObservedVinAsync(link, gateway, timeout, token, null, null);
-                if (vin != expectedVin) throw new InvalidDataException("ECU VIN mismatch.");
-                rows.Add(new(ecu, vin, null, identity?.ProtocolValue));
+                InventoryEntry verified;
+                await using (var link = await ConnectObservedAsync(gateway, gateway.Source, tester, ecu,
+                    tls, timeout, token, certificate, pduTrace is null ? null : frame => pduTrace(ecu, frame), options))
+                {
+                    var identity = obd ? await ReadStableObdIdentityAsync(link, expectedVin, timeout, token) : null;
+                    var vin = identity?.Vin ?? await VerifyObservedVinAsync(link, gateway, timeout, token, null, null);
+                    if (vin != expectedVin) throw new InvalidDataException("ECU VIN mismatch.");
+                    verified = new(ecu, vin, null, identity?.ProtocolValue);
+                }
+                // Publish a single row only after session disposal succeeded.
+                token.ThrowIfCancellationRequested();
+                rows.Add(verified);
             }
             catch (OperationCanceledException) when (!token.IsCancellationRequested)
             {
@@ -64,6 +70,7 @@ internal static class DoIpVinReader
                 System.Net.Sockets.SocketException or TimeoutException)
             {
                 // A failed read cannot establish that an ECU does not exist.
+                token.ThrowIfCancellationRequested();
                 rows.Add(new(ecu, null, "communication_or_identity_failure"));
             }
             // AuthenticationException and caller/trace errors are deliberately fatal.

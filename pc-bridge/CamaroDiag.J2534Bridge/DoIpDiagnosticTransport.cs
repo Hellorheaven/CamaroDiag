@@ -57,12 +57,21 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
         routedGatewayAddress == gateway && testerAddress == tester && ecuAddress == ecu;
     private readonly byte protocolVersion;
     internal sealed record PduTrace(string Direction, DateTimeOffset ObservedAtUtc, byte[] Bytes);
+    internal sealed class TraceObserverException(Exception inner)
+        : InvalidOperationException("DoIP trace observer failed: " + inner.Message, inner) { }
     private readonly Action<PduTrace>? trace;
     private void Trace(string direction, byte[] frame)
     {
         // Give the observer a private copy; it cannot alter a transmitted
         // request or received response. Includes diagnostic and control PDUs.
-        trace?.Invoke(new PduTrace(direction, DateTimeOffset.UtcNow, frame.ToArray()));
+        if (trace is null) return;
+        try { trace(new PduTrace(direction, DateTimeOffset.UtcNow, frame.ToArray())); }
+        catch (Exception error)
+        {
+            // Evidence sink errors must never be mistaken for ECU timeouts
+            // or communication failures eligible for inventory continuation.
+            throw new TraceObserverException(error);
+        }
     }
     // 0 = ready, 1 = one UDS exchange in progress, 2 = closed/uncertain.
     // DoIP carries no per-request transaction ID. A late reply after a
