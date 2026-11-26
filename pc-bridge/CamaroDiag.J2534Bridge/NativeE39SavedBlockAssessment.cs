@@ -215,6 +215,7 @@ internal static class NativeE39SavedBlockAssessment
                         "Physical saved ECU bytes do not match their recorded SHA-256.");
                 verified.Add(new Block(address, length, onDiskHash));
             }
+            ValidateImageRanges(verified);
             // A journal append or a replacement of a previously inspected
             // sector invalidates this composite report. Re-read every envelope
             // and check the full directory inventory before publishing.
@@ -255,6 +256,23 @@ internal static class NativeE39SavedBlockAssessment
                 state = NativeE39FileWriteJournal.CompletionState.Interrupted;
             }
             return new Result(false, expected.Count, [], error.Message, state);
+        }
+    }
+
+    // The journal contains E39_MAIN_FLASH offsets into a complete 3 MiB
+    // image. Consistent individual hashes do not prove disjoint ranges.
+    // This verifies bounds only, never OEM erase geometry or recoverability.
+    internal static void ValidateImageRanges(IReadOnlyList<Block> blocks)
+    {
+        if (blocks.Count == 0)
+            throw new InvalidDataException("No physical backup ranges.");
+        ulong previousEnd = 0;
+        foreach (var block in blocks.OrderBy(b => b.Address))
+        {
+            if (block.Length <= 0 || block.Address < previousEnd ||
+                (ulong)block.Address + (uint)block.Length > NativeE39ImageInspector.ImageBytes)
+                throw new InvalidDataException("Physical backup ranges overlap or exceed the E39 image.");
+            previousEnd = (ulong)block.Address + (uint)block.Length;
         }
     }
 

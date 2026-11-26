@@ -70,6 +70,39 @@ internal static class NativeE39RecoveryImageAssessmentSelfTests
                 "A wrong JSON value type fails closed instead of throwing");
             File.WriteAllText(metadataPath, unchangedMetadata);
 
+            // Even individually consistent journal and envelope hashes must
+            // not qualify a set of physically impossible or overlapping ranges.
+            void RejectRanges(string name, uint[] addresses)
+            {
+                var invalidJournal = Path.Combine(folder, name + ".jsonl");
+                var invalid = new NativeE39FileWriteJournal(invalidJournal);
+                try
+                {
+                    foreach (var at in addresses)
+                        invalid.AppendAsync(new(NativeE39WriteSequence.Phase.Prepared, at, sectorSha),
+                            CancellationToken.None).GetAwaiter().GetResult();
+                    foreach (var at in addresses)
+                    {
+                        invalid.AppendAsync(new(NativeE39WriteSequence.Phase.OriginalCrcVerified, at, "12345678"),
+                            CancellationToken.None).GetAwaiter().GetResult();
+                        invalid.PreserveOriginalBlockAsync(at, sector, sectorSha,
+                            CancellationToken.None).GetAwaiter().GetResult();
+                        invalid.AppendAsync(new(NativeE39WriteSequence.Phase.OriginalBytesVerified, at, sectorSha),
+                            CancellationToken.None).GetAwaiter().GetResult();
+                    }
+                }
+                finally { invalid.DisposeAsync().AsTask().GetAwaiter().GetResult(); }
+                var verdict = NativeE39SavedBlockAssessment.Inspect(invalidJournal);
+                Check(!verdict.Verified && verdict.Blocks.Count == 0 && verdict.SnapshotSha256 is null,
+                    "Impossible physical ranges are rejected: " + name);
+            }
+            RejectRanges("overlap", [address, address + 0x8000]);
+            RejectRanges("outside", [0x2F8000]);
+            RejectRanges("overflow", [0xFFFF8000]);
+            NativeE39SavedBlockAssessment.ValidateImageRanges(
+                [new(address + sectorBytes, sectorBytes, sectorSha), new(address, sectorBytes, sectorSha)]);
+            Check(true, "Adjacent disjoint ranges are accepted independently of enumeration order");
+
             var pass = NativeE39RecoveryImageAssessment.Inspect(journalPath, imagePath);
             Check(pass.Verified && pass.VerifiedSectors == 1 && pass.FailedSectorAddress is null,
                 "Full original BIN and live ECU saved sector bytes match the same evidence");
