@@ -10,7 +10,7 @@ from unittest.mock import patch
 from camarodiagconnectors.doip_cli import run
 
 from camarodiagconnectors.doip import (
-    Gateway, Session, DoIpError, NegativeResponse, decode, encode, parse_identity, positive,
+    Gateway, Session, DoIpError, NegativeResponse, TransportRefusal, decode, encode, parse_identity, positive,
     discover, discover_ipv4, discover_ipv6, discovery_request, discover_unique_vin, parse_commands, confirm_commands,
     endpoint, tls_server_name, status, parse_did_layout, decode_did_layout,
     parse_ecu_inventory, inventory_ecus, parse_stored_did_lengths, decode_all_stored_records
@@ -270,6 +270,35 @@ class DoIpTests(unittest.TestCase):
             self.assertEqual([row["status"] for row in result["targets"]],
                              ["unverified", "vin_verified"])
             self.assertEqual(result["verified_count"], 1)
+
+    def test_inventory_distinguishes_transport_refusal_from_uds_nrc(self):
+        failures = [TransportRefusal("header_nack", 2), TransportRefusal("routing_denied", 6),
+                    TransportRefusal("diagnostic_nack", 6), NegativeResponse(0x22, 0x31)]
+        with patch("camarodiagconnectors.doip.discover", return_value=GATEWAY), \
+             patch("camarodiagconnectors.doip.Session") as session:
+            session.return_value.__enter__.return_value.verify_vin.side_effect = failures
+            result = inventory_ecus(GATEWAY, VIN, 0x0E80, (0x1234, 0x1235, 0x1236, 0x1237))
+        rows = result["targets"]
+        self.assertEqual([row["reason"] for row in rows],
+                         ["header_nack", "routing_denied", "diagnostic_nack", "uds_negative_response"])
+        self.assertEqual([row["failure_code"] for row in rows], [2, 6, 6, 0x31])
+        self.assertNotIn("nrc", rows[2])
+        self.assertEqual(rows[3]["requested_service"], 0x22)
+        self.assertEqual(rows[3]["nrc"], 0x31)
+
+    def test_header_nack_preserves_code_only_for_valid_length(self):
+        from camarodiagconnectors.doip import require_no_header_nack
+        for code in range(5):
+            with self.assertRaises(TransportRefusal) as error:
+                require_no_header_nack(0, bytes((code,)))
+            self.assertEqual((error.exception.layer, error.exception.code), ("header_nack", code))
+        for malformed in (b"", b"\x05", b"\x00\x01"):
+            with self.assertRaises(DoIpError) as error:
+                require_no_header_nack(0, malformed)
+            self.assertNotIsInstance(error.exception, TransportRefusal)
+        require_no_header_nack(0x8001, b"")
+        with self.assertRaises(TransportRefusal):
+            parse_identity(GATEWAY.host, encode(2, 0, b"\x02"), VIN)
 
     def test_inventory_progress_is_detached_and_follows_gateway_revalidation(self):
         events = []
