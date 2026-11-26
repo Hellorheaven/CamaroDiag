@@ -9,7 +9,7 @@
   <data name="InvalidChannel" xml:space="preserve"><value>Select a valid physical ISO 15765-4 OBD CAN address pair.</value></data>
   <data name="Running" xml:space="preserve"><value>J1979 physical read campaign in progress.</value></data>
   <data name="Completed" xml:space="preserve"><value>Campaign finished. Check individual results.</value></data>
-  <data name="Partial" xml:space="preserve"><value>Time budget reached; campaign incomplete.</value></data>
+  <data name="Partial" xml:space="preserve"><value>Campaign interrupted or time budget reached; check individual results.</value></data>
   <data name="Unavailable" xml:space="preserve"><value>Unavailable</value></data>
   <data name="MutationsNotTested" xml:space="preserve"><value>Mode 04, legacy Mode 05 and Mode 08 control execution not tested.</value></data>
   <data name="Cancelled" xml:space="preserve"><value>Campaign cancelled or authorization expired.</value></data>
