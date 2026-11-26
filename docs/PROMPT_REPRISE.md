@@ -1,3 +1,7 @@
+## PR117 — bilan de capture Connectors DoIP CLI (26/11/2026)
+
+- Les sorties stderr partial_sample sont désormais attribuées au VIN, à la passerelle, au testeur, à l'ECU, au transport et au service réellement sélectionnés. Le bilan stdout ne devient complet qu'après fermeture de la session et du journal ; en échec un monitor_summary incomplet conserve le compteur de mesures publiées. Index vérifiés, aucun succès si fermeture échouée ; si stderr lui-même est inutilisable, la cause originale est propagée. Documentation utilisateur FR/EN corrigée, régressions écrites non exécutées. Aucun checkpoint.
+
 ## PR117 — parité monitoring DoIP Connectors Python (26/11/2026)
 
 - C6/DoIP : les captures mono et multi-DID UDS/OBDonUDS revérifient le VIN et, pour OBDonUDS, le protocole après chaque lecture avant publication du résultat. Les callbacks ne reçoivent plus de mesure provisoire ; un échec ultérieur conserve les échantillons précédemment vérifiés et retire la session. Une expiration de pause avant le premier octet est normale, une trame incomplète reste fatale. Régressions ajustées et ajoutées, non exécutées. Les délais par échange restent inchangés, la cadence dépend des contrôles supplémentaires. Aucun checkpoint.

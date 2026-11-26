@@ -58,11 +58,28 @@ def _trace_sinks(stderr, file):
 
 
 def run(argv: Sequence[str] | None = None) -> dict:
-    with ExitStack() as resources:
-        return _run(argv, resources)
+    monitor_progress = {}
+    try:
+        with ExitStack() as resources:
+            result = _run(argv, resources, monitor_progress)
+        # Neither a session-close error nor a trace-close error may become
+        # a complete capture. The final result is assembled after both.
+        if monitor_progress:
+            if monitor_progress["verified_samples"] != monitor_progress["requested_samples"]:
+                raise DoIpError("Incomplete DoIP monitoring result")
+            result |= monitor_progress | {"capture_complete": True}
+        return result
+    except BaseException:
+        if monitor_progress:
+            try:
+                print(json.dumps({"monitor_summary": monitor_progress |
+                                  {"capture_complete": False}}), file=sys.stderr, flush=True)
+            except (OSError, ValueError):
+                pass  # Keep the original operation failure if stderr also failed.
+        raise
 
 
-def _run(argv: Sequence[str] | None, resources: ExitStack) -> dict:
+def _run(argv: Sequence[str] | None, resources: ExitStack, monitor_progress: dict) -> dict:
     argv = list(sys.argv[1:] if argv is None else argv)
     fr = "--fr" in argv
     def tr(en, french):
@@ -370,6 +387,24 @@ def _run(argv: Sequence[str] | None, resources: ExitStack) -> dict:
         if gateway_key(current) != gateway_key(gateway):
             raise DoIpError(tr("Gateway identity changed", "L'identité de la passerelle a changé"))
 
+    # Every partial sample carries its actual route, even if a later sample
+    # or transport cleanup fails and no successful JSON report is returned.
+    if multi_monitor or o.action in ("monitor", "obd-monitor"):
+        monitor_progress.update(vin=o.vin, ecu=o.ecu, tester=o.tester,
+                                gateway_logical_address=gateway.logical_address,
+                                gateway_host=gateway.host, transport="TCP" if o.tcp else "TLS",
+                                service_protocol="OBDonUDS" if o.action.startswith("obd-") else "UDS",
+                                requested_samples=o.samples, verified_samples=0)
+
+    def on_verified_sample(row):
+        expected_index = monitor_progress["verified_samples"] + 1
+        if row["index"] != expected_index or expected_index > monitor_progress["requested_samples"]:
+            raise DoIpError("Unexpected monitoring sample index")
+        evidence = row | {key: value for key, value in monitor_progress.items()
+                          if key not in ("requested_samples", "verified_samples")}
+        print(json.dumps({"partial_sample": evidence}), file=sys.stderr, flush=True)
+        monitor_progress["verified_samples"] = expected_index
+
     # Recheck the selected endpoint after preparation (and consent for raw sequences).
     verify_gateway()
     with Session(gateway, o.tester, o.ecu, tls=not o.tcp, timeout=o.timeout,
@@ -380,10 +415,8 @@ def _run(argv: Sequence[str] | None, resources: ExitStack) -> dict:
             return result | {"vin": o.vin, "ecu": o.ecu, "tester": o.tester, "tls": not o.tcp,
                              "did": o.did, "scaling_data": session.read_scaling_did(o.vin, o.did).hex().upper()}
         if multi_monitor:
-            def on_multi_sample(row):
-                print(json.dumps({"partial_sample": row}), file=sys.stderr)
             return result | {"ecu": o.ecu, "tester": o.tester, "tls": not o.tcp} | session.monitor_dids(
-                o.vin, layout, o.samples, o.interval, obd=o.action == "obd-monitor-dids", on_sample=on_multi_sample)
+                o.vin, layout, o.samples, o.interval, obd=o.action == "obd-monitor-dids", on_sample=on_verified_sample)
         if layout is not None:
             return result | {"ecu": o.ecu, "tester": o.tester, "tls": not o.tcp} | session.read_dids(
                 o.vin, layout, obd=o.action == "obd-dids")
@@ -398,10 +431,8 @@ def _run(argv: Sequence[str] | None, resources: ExitStack) -> dict:
                 o.vin, subfunction, status_mask=getattr(o, "mask", 255),
                 severity_mask=getattr(o, "severity_mask", 255), readiness_group=getattr(o, "group", None))
         if o.action in ("monitor", "obd-monitor"):
-            def on_sample(row):
-                print(json.dumps({"partial_sample": row}), file=sys.stderr)
             return result | {"ecu": o.ecu, "tester": o.tester, "tls": not o.tcp} | session.monitor(
-                o.vin, o.did, o.samples, o.interval, obd=o.action == "obd-monitor", on_sample=on_sample)
+                o.vin, o.did, o.samples, o.interval, obd=o.action == "obd-monitor", on_sample=on_verified_sample)
         if o.action in ("severity-count", "severity-dtcs", "severity-info"):
             subfunction = {"severity-count": 7, "severity-dtcs": 8, "severity-info": 9}[o.action]
             report = session.read_dtc_severity(o.vin, subfunction, severity_mask=getattr(o, "severity_mask", 255),

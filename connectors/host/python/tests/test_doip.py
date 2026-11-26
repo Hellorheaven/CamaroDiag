@@ -1,5 +1,7 @@
 import socket
 import json
+import io
+from contextlib import redirect_stderr
 import tempfile
 from pathlib import Path
 import threading
@@ -36,6 +38,50 @@ def receive(sock):
 
 
 class DoIpTests(unittest.TestCase):
+    def test_cli_monitor_reports_verified_route_and_incomplete_capture(self):
+        for action in ("monitor", "obd-monitor-dids"):
+            for failure in ("none", "second_sample", "close"):
+                with self.subTest(action=action, failure=failure):
+                    output = io.StringIO()
+                    args = ["--host", GATEWAY.host, "--vin", VIN, "--tester", "0E80",
+                            "--ecu", "1234", "--tcp", action, "--samples", "2"]
+                    args += ["--did", "F40D"] if action == "monitor" else ["--layout", "F40D:1"]
+                    def monitor(*args, on_sample, **kwargs):
+                        rows = [{"index": 1, "data": "01"}, {"index": 2, "data": "02"}]
+                        on_sample(rows[0])
+                        if failure == "second_sample":
+                            raise DoIpError("Identity changed")
+                        on_sample(rows[1])
+                        return {"samples": rows}
+                    with patch("camarodiagconnectors.doip_cli.discover", return_value=GATEWAY), \
+                         patch("camarodiagconnectors.doip_cli.Session") as session, redirect_stderr(output):
+                        active = session.return_value.__enter__.return_value
+                        active.monitor.side_effect = monitor
+                        active.monitor_dids.side_effect = monitor
+                        if failure == "close":
+                            session.return_value.__exit__.side_effect = OSError("Close failed")
+                        if failure == "none":
+                            report = run(args)
+                            self.assertTrue(report["capture_complete"])
+                            self.assertEqual(report["verified_samples"], 2)
+                        else:
+                            with self.assertRaises((DoIpError, OSError)):
+                                run(args)
+                    events = [json.loads(line) for line in output.getvalue().splitlines()]
+                    verified = 1 if failure == "second_sample" else 2
+                    samples = [event["partial_sample"] for event in events if "partial_sample" in event]
+                    self.assertEqual(len(samples), verified)
+                    self.assertEqual(samples[0]["vin"], VIN)
+                    self.assertEqual(samples[0]["gateway_logical_address"], GATEWAY.logical_address)
+                    self.assertEqual(samples[0]["ecu"], 0x1234)
+                    self.assertEqual(samples[0]["tester"], 0x0E80)
+                    self.assertEqual(samples[0]["transport"], "TCP")
+                    if failure != "none":
+                        self.assertFalse(events[-1]["monitor_summary"]["capture_complete"])
+                        self.assertEqual(events[-1]["monitor_summary"]["verified_samples"], verified)
+                    else:
+                        self.assertNotIn("monitor_summary", events[-1])
+
     def test_trace_file_records_observed_discovery_and_never_overwrites(self):
         def observed(host, vin, timeout, trace):
             trace("TX", "UDP", host, "FF00000100000000")
