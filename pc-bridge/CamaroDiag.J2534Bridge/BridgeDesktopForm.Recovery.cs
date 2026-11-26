@@ -25,6 +25,9 @@ internal sealed partial class BridgeDesktopForm
         };
         var choose = Button("Ouvrir et analyser un journal");
         var chooseConnector = Button("Ouvrir un checkpoint CDJ/1");
+        var verifyOriginal = Button(BridgeRecoveryPresentation.Text("VerifyOriginalButton"));
+        verifyOriginal.Enabled = false;
+        string? selectedJournal = null;
         var results = new TextBox
         {
             Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Vertical,
@@ -41,6 +44,8 @@ internal sealed partial class BridgeDesktopForm
                 CheckFileExists = true, Multiselect = false
             };
             if (dialog.ShowDialog(this) != DialogResult.OK) return;
+            selectedJournal = dialog.FileName;
+            verifyOriginal.Enabled = true;
             results.Text = "Analyse hors ligne…";
             choose.Enabled = false;
             try
@@ -108,6 +113,48 @@ internal sealed partial class BridgeDesktopForm
             }
             finally { choose.Enabled = true; }
         };
+        verifyOriginal.Click += async (_, _) =>
+        {
+            if (busy || selectedJournal is null) return;
+            using var imageDialog = new OpenFileDialog
+            {
+                Title = BridgeRecoveryPresentation.Text("ChooseOriginalTitle"),
+                Filter = BridgeRecoveryPresentation.Text("OriginalBinFilter"),
+                CheckFileExists = true, Multiselect = false
+            };
+            if (imageDialog.ShowDialog(this) != DialogResult.OK) return;
+            verifyOriginal.Enabled = false;
+            var journal = selectedJournal;
+            var bin = imageDialog.FileName;
+            try
+            {
+                await RunBusyAsync(async () =>
+                {
+                    var comparison = await Task.Run(() =>
+                        NativeE39RecoveryImageAssessment.Inspect(journal, bin));
+                    var lines = results.Lines.ToList();
+                    lines.Add("");
+                    lines.Add(string.Format(
+                        System.Globalization.CultureInfo.CurrentUICulture,
+                        BridgeRecoveryPresentation.Text("OriginalBinName"),
+                        Path.GetFileName(bin)));
+                    lines.Add(comparison.Verified
+                        ? string.Format(System.Globalization.CultureInfo.CurrentUICulture,
+                            BridgeRecoveryPresentation.Text("OriginalBinMatched"),
+                            comparison.VerifiedSectors)
+                        : string.Format(System.Globalization.CultureInfo.CurrentUICulture,
+                            BridgeRecoveryPresentation.Text("OriginalBinRejected"),
+                            comparison.Problem));
+                    if (comparison.FailedSectorAddress is uint failedAddress)
+                        lines.Add(string.Format(System.Globalization.CultureInfo.CurrentUICulture,
+                            BridgeRecoveryPresentation.Text("FailedSector"),
+                            failedAddress));
+                    lines.Add(BridgeRecoveryPresentation.Text("OfflineNotice"));
+                    results.Lines = lines.ToArray();
+                });
+            }
+            finally { verifyOriginal.Enabled = selectedJournal is not null; }
+        };
         chooseConnector.Click += async (_, _) =>
         {
             if (busy) return;
@@ -149,6 +196,7 @@ internal sealed partial class BridgeDesktopForm
         layout.Controls.Add(instructions, 0, 0);
         var actions = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true };
         actions.Controls.Add(choose);
+        actions.Controls.Add(verifyOriginal);
         actions.Controls.Add(chooseConnector);
         layout.Controls.Add(actions, 0, 1);
         layout.Controls.Add(results, 0, 2);

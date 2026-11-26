@@ -595,6 +595,7 @@ internal static class BridgeSelfTests
         checks += UdsResponseDeadlineSelfTests.Run();
         checks += ObdOnUdsCanDiscoverySelfTests.Run();
         checks += EcuPostFlashAssessmentSelfTests.Run();
+        checks += BridgeRecoveryPresentationSelfTests.Run();
         checks += NativeE39RecoveryImageAssessmentSelfTests.Run();
         checks += NativeEcuSectorSelfTests.Run();
         checks += NativeMpc5566FlashMapSelfTests.Run();

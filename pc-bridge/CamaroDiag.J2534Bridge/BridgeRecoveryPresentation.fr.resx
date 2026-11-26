@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms</value></resheader>
+  <data name="VerifyOriginalButton" xml:space="preserve"><value>Comparer le BIN original</value></data>
+  <data name="ChooseOriginalTitle" xml:space="preserve"><value>Sélectionner le BIN E39 original complet</value></data>
+  <data name="OriginalBinFilter" xml:space="preserve"><value>Image ECU (*.bin)|*.bin|Tous les fichiers (*.*)|*.*</value></data>
+  <data name="OriginalBinName" xml:space="preserve"><value>BIN original sélectionné : {0}</value></data>
+  <data name="OriginalBinMatched" xml:space="preserve"><value>BIN original conforme aux {0} secteur(s) physiques sauvegardés.</value></data>
+  <data name="OriginalBinRejected" xml:space="preserve"><value>Comparaison du BIN original refusée : {0}</value></data>
+  <data name="FailedSector" xml:space="preserve"><value>Premier secteur ECU incohérent : 0x{0:X8}</value></data>
+  <data name="OfflineNotice" xml:space="preserve"><value>Analyse hors ligne uniquement : aucune autorisation de programmation ou restauration ECU.</value></data>
+</root>
