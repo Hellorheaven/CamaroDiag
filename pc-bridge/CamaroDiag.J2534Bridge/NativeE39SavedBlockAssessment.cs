@@ -83,7 +83,7 @@ internal static class NativeE39SavedBlockAssessment
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException or
             InvalidDataException or JsonException or KeyNotFoundException or
-            ArgumentException or FormatException or OverflowException)
+            ArgumentException or FormatException or OverflowException or InvalidOperationException)
         {
             return new TargetMetadata(false, null, null, null, error.Message);
         }
@@ -235,7 +235,7 @@ internal static class NativeE39SavedBlockAssessment
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException or
             InvalidDataException or JsonException or KeyNotFoundException or
-            ArgumentException or FormatException or OverflowException)
+            ArgumentException or FormatException or OverflowException or InvalidOperationException)
         {
             // Preserve the interruption state only if the audited journal
             // bytes remain stable, even when a sector check failed first.
