@@ -1529,6 +1529,67 @@ class DoIpTests(unittest.TestCase):
         self.assertTrue(client._operation_lock.acquire(blocking=False))
         client._operation_lock.release()
 
+    def test_sequence_holds_exclusive_lock_through_all_replies_and_callbacks(self):
+        client = Session.__new__(Session)
+        client._operation_lock = threading.Lock()
+        client._busy = False
+        client.close = unittest.mock.Mock()
+        commands = (bytes.fromhex("22F190"), bytes.fromhex("22F187"))
+        replies = (bytes.fromhex("62F190"), bytes.fromhex("62F187"))
+        client._exchange_owned = unittest.mock.Mock(side_effect=replies)
+        seen = []
+
+        def on_reply(index, reply):
+            self.assertTrue(client._busy)
+            self.assertTrue(client._operation_lock.locked())
+            seen.append((index, reply))
+            # Even from a callback running on the owner thread, a nested
+            # request must not consume a response or interrupt the sequence.
+            with self.assertRaises(DoIpError):
+                client.exchange(bytes.fromhex("221234"))
+            with self.assertRaises(DoIpError):
+                client.wait(.01)
+            with self.assertRaises(DoIpError):
+                client.exchange_sequence((bytes.fromhex("221234"),))
+            client.close.assert_not_called()
+
+        self.assertEqual(client.exchange_sequence(commands, on_reply), list(replies))
+        self.assertEqual(seen, [(1, replies[0]), (2, replies[1])])
+        self.assertEqual([call.args[0] for call in client._exchange_owned.call_args_list],
+                         list(commands))
+        self.assertFalse(client._busy)
+        self.assertFalse(client._operation_lock.locked())
+        client.close.assert_not_called()
+
+    def test_sequence_failure_retires_socket_and_releases_lock(self):
+        for failure in ("exchange", "callback"):
+            with self.subTest(failure=failure):
+                client = Session.__new__(Session)
+                client._operation_lock = threading.Lock()
+                client._busy = False
+                client.close = unittest.mock.Mock()
+                client._exchange_owned = unittest.mock.Mock(
+                    side_effect=DoIpError("Uncertain response") if failure == "exchange"
+                    else [bytes.fromhex("62F190")])
+                def callback(*_):
+                    raise ValueError("Cannot publish reply")
+                with self.assertRaises(DoIpError if failure == "exchange" else ValueError):
+                    client.exchange_sequence((bytes.fromhex("22F190"),), callback)
+                client.close.assert_called_once_with()
+                self.assertFalse(client._busy)
+                self.assertFalse(client._operation_lock.locked())
+
+    def test_concurrent_sequence_never_closes_current_owner(self):
+        client = Session.__new__(Session)
+        client._operation_lock = threading.Lock()
+        client.close = unittest.mock.Mock()
+        client._exchange_owned = unittest.mock.Mock()
+        with client._operation_lock:
+            with self.assertRaises(DoIpError):
+                client.exchange_sequence((bytes.fromhex("22F190"),))
+        client.close.assert_not_called()
+        client._exchange_owned.assert_not_called()
+
     def test_routing_options_on_wire(self):
         for routing_type, oem in ((0, None), (0xE0, bytes.fromhex("01020304"))):
             with self.subTest(routing_type=routing_type), socket.socket() as listener:
