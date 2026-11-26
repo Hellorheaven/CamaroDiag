@@ -5649,14 +5649,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun canRunFunctionalEvapTest(): Boolean = obdManager.isElmEvapCandidate
+
     fun runFunctionalEvapTest(approval: EcuWriteConsentFlow.Approval, confirmedConnection: Long,
         confirmedVehicle: VehicleProfile) {
         if (confirmedConnection != connectionAttemptGeneration || confirmedVehicle != _vehicle.value ||
             !confirmedVehicle.vin.matches(Regex("[A-HJ-NPR-Z0-9]{17}")) ||
             functionalTestJob?.isCompleted == false || enhancedUdsJob?.isCompleted == false ||
             _liveCanMonitorState.value.isCapturing || _liveCanMonitorState.value.isSendingRequest ||
-            !obdManager.isElmUdsReadCandidate || obdManager.isDemoMode || obdManager.isSimulationActive ||
-            obdManager.isJ2534BridgeConnected()) return
+            !obdManager.isElmEvapCandidate) return
         val account = authenticatedAccountUid ?: return
         val accountGeneration = accountSessionGeneration
         val execution = ++functionalTestGeneration
