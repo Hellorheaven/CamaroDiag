@@ -106,7 +106,7 @@ internal static class ObdJ1979LegacyScan
             var ids = new SortedSet<byte>();
             for (int page = 0; page <= 0xE0 && stop is null; page += 32)
             {
-                var rows = page == 0 && first is not null ? new[] { first } :
+                var rows = page == 0 && first is not null ? new byte[][] { first } :
                     Read(request((byte)page), r => Page(r, mode, page, offset, filler), single: true);
                 if (rows.Length != 1) break;
                 var data = rows[0];
@@ -163,7 +163,12 @@ internal static class ObdJ1979LegacyScan
                     steps[^1] = steps[^1] with { Status = "FAILED", Detail = "INVALID_VIN_RECORD" };
                 else steps[^1] = steps[^1] with { Detail = vin };
             }
-            if (type == 4 && count % 4 == 0)
+            if (type == 4 && count % 4 != 0)
+            {
+                steps[^1] = steps[^1] with { Status = "FAILED", Detail = "INVALID_CALID_COUNT" };
+                continue;
+            }
+            if (type == 4)
             {
                 var bytes = fragments.SelectMany(x => x.Skip(3)).ToArray();
                 var calibrationIds = bytes.Chunk(16).Select(x => Encoding.ASCII.GetString(x).TrimEnd(' ', '\0')).ToArray();
