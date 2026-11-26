@@ -42,6 +42,10 @@ Le modèle de vérification `EcuPostFlashAssessment` représente ces preuves et 
 
 L'onglet **Récupération ECU** et la commande Windows `--inspect-write-journal <journal.jsonl>` vérifient désormais le journal **et** les sauvegardes physiques (adresses, tailles, SHA-256), avant tout verdict positif de l'inspection CLI. Le contrôle `MatchesSiliconEraseGeometry` exige les limites exactes de secteurs dans la carte silicium MPC5566 ; une sauvegarde tronquée, déplacée, dupliquée ou de taille incohérente n'est pas présentée comme une géométrie valide. Un secteur peut cependant être cohérent sur le silicium sans que la **carte électronique, le firmware ou la procédure OEM** soient qualifiés pour sa restauration.
 
+Le manifeste `<journal>.meta.json` est inspecté hors ligne avec une longueur maximale de 16 Kio, des champs uniques, VIN/OSID, famille E39/E39A et SHA-256 valides. Une absence ou une modification invalide le contexte d'identité sauvegardée sans supprimer les originaux. Il ne s'agit pas d'une preuve d'identité ECU en direct. La réservation interprocessus de DLL J2534 n'est garantie qu'entre les processus utilisant le même profil Windows, pas les comptes tiers ni les autres outils.
+
+L'inspecteur hors ligne de la CLI Windows retourne une erreur si une transaction est marquée terminée mais que la preuve de cible `.meta.json`, les blocs physiques ou leur géométrie sont absents/incohérents. L'interface détaille séparément les résultats afin de guider une vérification manuelle sans masquer un incident matériel.
+
 Un journal interrompu conserve l'accès à l'inspection hors ligne des octets originaux physiques : la console précise l'adresse potentiellement effacée et ne prétend jamais que l'ECU a été restauré. Aucune vérification hors ligne ne prouve l'état actuel du calculateur, le redémarrage moteur ou le retour des services de diagnostic. **Aucune reprise ni écriture automatique n'est déclenchée.**
 
 ## Vérification et limites de ce lot

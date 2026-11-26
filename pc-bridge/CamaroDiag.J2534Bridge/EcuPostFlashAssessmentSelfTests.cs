@@ -101,6 +101,17 @@ internal static class EcuPostFlashAssessmentSelfTests
                 "\"Schema\":1,\"Schema\":1"));
             Check(!NativeE39SavedBlockAssessment.InspectTargetMetadata(journalPath).Verified,
                 "Duplicate target metadata fields cannot masquerade as original qualification");
+            File.WriteAllText(metadataPath, metadata.Replace("\"ExpectedOsId\":12664221",
+                "\"ExpectedOsId\":0"));
+            Check(!NativeE39SavedBlockAssessment.InspectTargetMetadata(journalPath).Verified,
+                "Zero ECU OSID can never validate the recorded recovery target");
+            File.WriteAllText(metadataPath, metadata.Replace("\"DriverSha256\":\"" + sha + "\"",
+                "\"DriverSha256\":\"BAD\""));
+            Check(!NativeE39SavedBlockAssessment.InspectTargetMetadata(journalPath).Verified,
+                "Invalid original driver digest prevents trusting recovery target metadata");
+            File.Delete(metadataPath);
+            Check(!NativeE39SavedBlockAssessment.InspectTargetMetadata(journalPath).Verified,
+                "Missing target metadata is reported without inventing VIN or firmware identity");
             File.WriteAllText(metadataPath, metadata);
             var saved = NativeE39SavedBlockAssessment.Inspect(journalPath);
             Check(saved.Verified && saved.Blocks.Count == 1 &&

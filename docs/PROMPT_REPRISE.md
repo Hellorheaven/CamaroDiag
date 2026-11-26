@@ -1,3 +1,9 @@
+## PR117 — C6 : traçabilité des preuves E39 et conclusion de cette session (26/11/2026)
+
+- **PR #117** : chantier C6 en développement. Dernier ensemble de commits de cette session sur `chore/unified-ci` : `6cef80e` (annulation E39 Windows), `4998f61` (annulation aux frontières ECU Android), `8fbdfa6` puis `cc9fc55` (réservation exclusive de DLL J2534, même profil Windows, vérification tension/identité), `26dc559` (sauvegarde physique + géométrie secteur dans GUI/CLI), `d11ed2a` (aide FR/EN et documentation), `68f1221` (contrôle de manifeste VIN/OSID), `a008668` (erreurs CLI exactes selon preuve manquante).
+- La vérification hors ligne distingue **trois preuves** : journal séquentiellement cohérent, blocs physiques intègres, manifeste cible VIN/OSID structurellement valide ; l'affichage de géométrie MPC5566 est seulement une cohérence silicium. Aucune de ces preuves ne démontre à elle seule l'identité physique ECU courante, les protections OEM ou la possibilité de restauration.
+- Régressions écrites (incluant désormais l'absence de manifeste, OSID nul et empreinte mal formée), **aucun test/compilation intermédiaire exécutés**. Le registre Android de pilotes flash physiques demeure non qualifié, C6 et les protocoles restants sont ouverts. DoIP déjà validé logiciellement sur `e3b5f2a`, C8 dernier. Aucun merge ni Release dans cette session.
+
 ## PR117 — C6 : vérification physique des sauvegardes dans la console Windows (26/11/2026)
 
 - **Commit `26dc559`** : `--inspect-write-journal` inspecte le journal et les blocs originaux physiquement sauvegardés, signale les fichiers absents/modifiés, retourne un résultat non positif si les sauvegardes d'une transaction achevée sont manquantes. L'onglet Windows « Récupération ECU » affiche les secteurs originaux, tailles et SHA-256 avec un contrôle hors ligne des bornes d'effacement du silicium MPC5566.
