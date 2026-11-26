@@ -39,4 +39,11 @@
   <data name="ClearOutcome_REFUSED" xml:space="preserve"><value>Demande refusée par le calculateur.</value></data>
   <data name="ClearOutcome_UNCERTAIN" xml:space="preserve"><value>État de la demande incertain — ne pas relancer automatiquement.</value></data>
   <data name="ClearOutcome_NOT_TESTED" xml:space="preserve"><value>Conditions non vérifiées ; aucune demande tentée.</value></data>
+  <data name="LegacyRun" xml:space="preserve"><value>J1979 legacy</value></data>
+  <data name="LegacyCancel" xml:space="preserve"><value>Annuler</value></data>
+  <data name="LegacyVariant" xml:space="preserve"><value>Protocole documenté</value></data>
+  <data name="LegacySource" xml:space="preserve"><value>Source de réponse ECU (hex)</value></data>
+  <data name="LegacyConfirmProfile" xml:space="preserve"><value>Je confirme le protocole, l’interface et la source de réponse du calculateur.</value></data>
+  <data name="LegacyScope" xml:space="preserve"><value>Lectures fonctionnelles filtrées sur la source sélectionnée. Pas de scan global véhicule, d’effacement ni d’actionnement.</value></data>
+  <data name="LegacyPrerequisites" xml:space="preserve"><value>Sélectionnez une interface J2534, arrêtez le pont et fermez la console avant la recette legacy.</value></data>
 </root>
