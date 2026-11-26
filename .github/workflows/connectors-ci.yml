@@ -52,6 +52,8 @@ jobs:
           /tmp/j1979_can_read_session_test
           g++ -std=c++11 -Wall -Wextra -Werror -pedantic connectors/firmware/shared/native-tests/j1979_can_read_exchange_test.cpp -o /tmp/j1979_can_read_exchange_test
           /tmp/j1979_can_read_exchange_test
+          g++ -std=c++11 -Wall -Wextra -Werror -pedantic connectors/firmware/shared/native-tests/j1979_can_campaign_test.cpp -o /tmp/j1979_can_campaign_test
+          /tmp/j1979_can_campaign_test
           g++ -std=c++11 -Wall -Wextra -Werror -pedantic connectors/firmware/shared/native-tests/kline_observer_test.cpp -o /tmp/kline_observer_test
           /tmp/kline_observer_test
   esp32-build:
