@@ -16,6 +16,7 @@ camarodiagconnectors = "camarodiagconnectors.__main__:main"
 camarodiagconnectors-offline = "camarodiagconnectors.offline_cli:main"
 camarodiagconnectors-doip = "camarodiagconnectors.doip_cli:main"
 camarodiagconnectors-j1979 = "camarodiagconnectors.j1979_cli:main"
+camarodiagconnectors-j1979-evap = "camarodiagconnectors.j1979_evap_cli:main"
 
 [tool.setuptools]
 packages = ["camarodiagconnectors"]
