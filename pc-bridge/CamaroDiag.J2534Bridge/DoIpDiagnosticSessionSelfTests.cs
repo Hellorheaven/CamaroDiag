@@ -810,11 +810,18 @@ internal static class DoIpDiagnosticSessionSelfTests
             }, async client =>
             {
                 var completed = false;
+                Task<byte[]>? competing = null;
                 try
                 {
                     var done = await DoIpVinReader.ExchangeSequenceVerifiedAsync(client, observedForVin,
                         new byte[][] { [0x22,0x12,0x34], [0x19,1,0xFF] }, TimeSpan.FromSeconds(2),
-                        CancellationToken.None, (index, _) => replies.Add(index));
+                        CancellationToken.None, (index, _) =>
+                        {
+                            replies.Add(index);
+                            if (index == 1)
+                                competing = client.ExchangeUdsAsync([0x22,0x12,0x34],
+                                    TimeSpan.FromSeconds(2), CancellationToken.None);
+                        });
                     completed = done == 2;
                 }
                 catch (Exception) when (failFirst)
@@ -822,9 +829,44 @@ internal static class DoIpDiagnosticSessionSelfTests
                     // A negative reply closes the transport; no subsequent command.
                 }
                 Check(completed != failFirst, "Sequence completes only on both correlated replies.");
+                if (!failFirst)
+                {
+                    Check(competing is not null, "Sequence callback attempted a concurrent request.");
+                    await Expect<InvalidOperationException>(async () =>
+                    {
+                        _ = await competing!;
+                    }, "A concurrent callback cannot inject a diagnostic request.");
+                }
             });
             Check(replies.Count == (failFirst ? 0 : 2), "Sequence stopped or completed as expected.");
         }
+
+        // A callback failure after a valid reply is not permission to reuse
+        // the same socket for another operation; the session is retired.
+        await RunCaseAsync(async stream =>
+        {
+            _ = await RequireRequestAsync(stream);
+            await SendAsync(stream, DoIpCodec.DiagnosticMessage,
+                FromEcu([0x62, 0xF1, 0x90, .. System.Text.Encoding.ASCII.GetBytes(selectedVehicleVin)]));
+            var first = await RequireRequestAsync(stream);
+            Check(first.Payload.SequenceEqual(new byte[] { 0x0E,0x80,0x12,0x34,0x22,0x12,0x34 }),
+                "Callback failure fixture received the first command.");
+            await SendAsync(stream, DoIpCodec.DiagnosticMessage, FromEcu([0x62,0x12,0x34,0x01]));
+        }, async client =>
+        {
+            await Expect<IOException>(async () =>
+            {
+                _ = await DoIpVinReader.ExchangeSequenceVerifiedAsync(client, observedForVin,
+                    new byte[][] { [0x22,0x12,0x34], [0x19,1,0xFF] },
+                    TimeSpan.FromSeconds(2), CancellationToken.None,
+                    (_, _) => throw new IOException("Cannot publish confirmed reply."));
+            }, "Sequence callback failure is reported.");
+            await Expect<InvalidOperationException>(async () =>
+            {
+                _ = await client.ExchangeUdsAsync([0x22,0x12,0x34],
+                    TimeSpan.FromSeconds(2), CancellationToken.None);
+            }, "Callback failure retires the entire DoIP socket.");
+        });
 
         // A legislated OBD route uses F802 and F810, not generic F190.
         // Check both an unknown initial protocol and a changed final protocol.
