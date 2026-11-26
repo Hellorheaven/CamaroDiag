@@ -1,3 +1,7 @@
+## C6 — distinction incident mémoire et corruption sauvegarde (26/11/2026)
+
+- Conserver l'avertissement d'interruption si un bloc est corrompu mais le journal strictement identique au snapshot audité. Distinguer secteur d'effacement incertain (adresse et région) du bloc de sauvegarde invalide. Aucun secteur déclaré vérifié si l'ensemble invalide. UI, JSON et régression adaptés. Tests non exécutés. Aucune écriture ECU.
+
 ## SAE J1979 — inventaire Mode 09 et données constructeur brutes (26/11/2026)
 
 - Scan complet : bitmaps 0900/continuations, union annoncée (pas une attribution par ECU), lecture des InfoTypes supplémentaires annoncés, conservation des réponses et enregistrements bruts. VIN/CAL ID/CVN/nom gardent les lecteurs existants et leur repli. Export JSON, écran et recette fonctionnelle distincte ; transport physique J2534 autorise les lectures Mode 09 de deux octets sans étendre les écritures. Régressions Android/Windows écrites, non exécutées. Limites : pas de décodage IUPR ni de preuve individuelle par ECU à ce stade. Référence SAE J1979/ISO 15031-5, https://phprell.github.io/obd-diag/en/technik/dienste.html.

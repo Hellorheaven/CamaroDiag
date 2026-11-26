@@ -29,7 +29,9 @@ object EcuPhysicalBackupInspection {
         val uncertainAddress: Long? = null,
         // A valid physical backup is NOT proof that a programming transaction
         // completed: an erase may still be pending or recovery may be required.
-        val journalDisposition: PersistentEcuWriteJournal.RecoveryDisposition? = null
+        val journalDisposition: PersistentEcuWriteJournal.RecoveryDisposition? = null,
+        val problemAddress: Long? = null,
+        val uncertainRegion: EcuBackupCoverage.Region? = null
     )
 
     private const val MAX_JOURNAL_BYTES = 8L * 1024 * 1024
@@ -44,6 +46,8 @@ object EcuPhysicalBackupInspection {
     ): Report {
         var expectedCount = 0
         var current: Long? = null
+        var auditedSnapshot: ByteArray? = null
+        var auditedJournal: PersistentEcuWriteJournal.Audit? = null
         val verified = mutableListOf<Sector>()
         var verifiedBytes = 0L
         return try {
@@ -63,6 +67,8 @@ object EcuPhysicalBackupInspection {
             val data = readSnapshot()
             val audit = PersistentEcuWriteJournal.inspectSnapshot(journalFile, target, vin, data)
             check(audit.valid) { "ECU journal is missing, altered or out of sequence." }
+            auditedSnapshot = data
+            auditedJournal = audit
             val records = String(data, StandardCharsets.UTF_8).trimEnd('\n').split('\n')
             val expected = linkedMapOf<Pair<EcuBackupCoverage.Region, Long>, String>()
             for (line in records.drop(1)) {
@@ -89,6 +95,7 @@ object EcuPhysicalBackupInspection {
             }
             val observed = hashSetOf<Pair<EcuBackupCoverage.Region, Long>>()
             for (file in files) {
+                current = null
                 checkActive()
                 check(file.length() in 1L..MAX_BLOCK_FILE_BYTES) {
                     "Saved physical ECU block exceeds the supported size."
@@ -138,6 +145,7 @@ object EcuPhysicalBackupInspection {
                     verifiedBytes = Math.addExact(verifiedBytes, size)
                 }
             }
+            current = null
             check(observed.size == expectedCount) {
                 "Not every original ECU sector has a matching physical backup."
             }
@@ -147,12 +155,29 @@ object EcuPhysicalBackupInspection {
             Report(true, expectedCount, verified.sortedWith(compareBy({ it.region.name },
                 { it.address })), verifiedBytes, "",
                 uncertainAddress = audit.uncertainAddress,
-                journalDisposition = audit.recoveryDisposition)
+                journalDisposition = audit.recoveryDisposition, uncertainRegion = audit.uncertainRegion)
         } catch (cancelled: java.util.concurrent.CancellationException) {
             throw cancelled
         } catch (error: Exception) {
+            // A bad block does not erase a valid warning in an unchanged journal.
+            checkActive()
+            val stableAudit = auditedSnapshot?.let { snapshot ->
+                try {
+                    if (journalFile.length() != snapshot.size.toLong()) null
+                    else DataInputStream(journalFile.inputStream().buffered()).use { input ->
+                        val again = ByteArray(snapshot.size)
+                        input.readFully(again)
+                        if (input.read() == -1 && snapshot.contentEquals(again)) auditedJournal else null
+                    }
+                } catch (cancelled: java.util.concurrent.CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) { null }
+            }
             Report(false, expectedCount, emptyList(), 0L,
-                error.message ?: "ECU recovery evidence cannot be inspected.", current)
+                error.message ?: "ECU recovery evidence cannot be inspected.",
+                uncertainAddress = stableAudit?.uncertainAddress,
+                journalDisposition = stableAudit?.recoveryDisposition,
+                problemAddress = current, uncertainRegion = stableAudit?.uncertainRegion)
         }
     }
 }

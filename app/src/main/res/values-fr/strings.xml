@@ -1280,4 +1280,6 @@
     <string name="obd_mode09_types">Types d’informations véhicule annoncés</string>
     <string name="obd_mode09_partial">Inventaire des informations véhicule incomplet ou non pris en charge.</string>
     <string name="obd_mode09_raw">Mode 09 type %1$02X — réponse brute</string>
+    <string name="cal_recovery_problem_address">Bloc de sauvegarde invalide ou corrompu à 0x%1$X</string>
+    <string name="cal_recovery_uncertain_region">Région à risque : %1$s</string>
 </resources>

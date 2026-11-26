@@ -91,6 +91,17 @@ class EcuPhysicalBackupInspectionTest {
                 PersistentEcuWriteJournal.RecoveryDisposition.ERASE_OR_WRITE_MAY_BE_INCOMPLETE,
                 interrupted.journalDisposition)
             assertEquals(0x1000L, interrupted.uncertainAddress)
+            val secondOriginal = files[1].readBytes()
+            files[1].writeBytes(secondOriginal.copyOf().also { it[it.lastIndex] = (it.last() + 1).toByte() })
+            val corrupted = EcuPhysicalBackupInspection.inspect(journalFile, target, vin)
+            assertFalse(corrupted.verified)
+            assertEquals(0x1000L, corrupted.uncertainAddress)
+            assertEquals(0x1008L, corrupted.problemAddress)
+            assertEquals(EcuBackupCoverage.Region.CALIBRATION, corrupted.uncertainRegion)
+            assertEquals(PersistentEcuWriteJournal.RecoveryDisposition.ERASE_OR_WRITE_MAY_BE_INCOMPLETE,
+                corrupted.journalDisposition)
+            assertTrue(corrupted.sectors.isEmpty())
+            files[1].writeBytes(secondOriginal)
             var checks = 0
             try {
                 EcuPhysicalBackupInspection.inspect(journalFile, target, vin) {

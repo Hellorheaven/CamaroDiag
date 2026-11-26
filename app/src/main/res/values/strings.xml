@@ -1277,4 +1277,6 @@
     <string name="obd_mode09_types">Supported vehicle information types</string>
     <string name="obd_mode09_partial">Vehicle information inventory incomplete or unsupported.</string>
     <string name="obd_mode09_raw">Mode 09 type %1$02X — raw response</string>
+    <string name="cal_recovery_problem_address">Corrupt or invalid backup block at 0x%1$X</string>
+    <string name="cal_recovery_uncertain_region">Region at risk: %1$s</string>
 </resources>

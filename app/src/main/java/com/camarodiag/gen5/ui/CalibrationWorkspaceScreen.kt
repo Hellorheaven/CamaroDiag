@@ -2848,6 +2848,8 @@ private fun PhysicalRecoveryPanel(state: CalibrationWorkspaceState, defaultVin: 
             }
             Text(stringResource(disposition), color = CamaroAmber)
             report.uncertainAddress?.let { Text(stringResource(R.string.cal_recovery_address, it), color = WarnRed) }
+            report.uncertainRegion?.let { Text(stringResource(R.string.cal_recovery_uncertain_region, it.name), color = WarnRed) }
+            report.problemAddress?.let { Text(stringResource(R.string.cal_recovery_problem_address, it), color = WarnRed) }
             // Keep very large reports readable without composing thousands of rows.
             report.sectors.take(20).forEach { sector ->
                 Text(stringResource(R.string.cal_recovery_sector, sector.region.name, sector.address, sector.length),

@@ -3925,6 +3925,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     .put("verifiedBytes", report.verifiedBytes)
                     .put("problem", report.problem)
                     .put("uncertainAddress", report.uncertainAddress ?: JSONObject.NULL)
+                    .put("uncertainRegion", report.uncertainRegion?.name ?: JSONObject.NULL)
+                    .put("problemAddress", report.problemAddress ?: JSONObject.NULL)
                     .put("journalDisposition", report.journalDisposition?.name ?: JSONObject.NULL)
                     .put("sectors", JSONArray(report.sectors.map { sector ->
                         JSONObject().put("region", sector.region.name).put("address", sector.address)
