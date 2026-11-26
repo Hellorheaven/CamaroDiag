@@ -359,6 +359,12 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
             remaining, deadline.Token, p2Timeout, p2StarTimeout);
         lock (exchangeBoundary)
         {
+            // Cancellation or expiry during final decoding/queue validation
+            // must not turn an uncertain transaction into a reusable socket.
+            cancellationToken.ThrowIfCancellationRequested();
+            if (overall.Elapsed >= timeout)
+                throw new TimeoutException("DoIP exchange expired before final publication.");
+            deadline.Token.ThrowIfCancellationRequested();
             if (exchangeState != 1)
                 throw new ObjectDisposedException(nameof(DoIpDiagnosticTransport));
             // Check for queued duplicates and transition to idle atomically
@@ -372,6 +378,10 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
             // already detected by the pump cannot establish success.
             if (receiveFailure is not null && receiveFailure is not PeerClosedAtBoundaryException)
                 ExceptionDispatchInfo.Capture(receiveFailure).Throw();
+            cancellationToken.ThrowIfCancellationRequested();
+            if (overall.Elapsed >= timeout)
+                throw new TimeoutException("DoIP exchange expired before final publication.");
+            deadline.Token.ThrowIfCancellationRequested();
             exchangeState = receiveFailure is null ? 0 : 2;
         }
         return response;
@@ -397,6 +407,7 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
         await writeGate.WaitAsync(token);
         try
         {
+            token.ThrowIfCancellationRequested();
             await stream.WriteAsync(frame, token);
             await stream.FlushAsync(token);
             Trace("TX", frame);

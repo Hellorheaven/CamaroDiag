@@ -1577,6 +1577,32 @@ internal static class DoIpDiagnosticSessionSelfTests
                 "Cancelled DoIP UDS exchange retires the shared socket.");
         });
 
+        // A cancellation triggered by the last received diagnostic PDU
+        // prevents even a positive raw exchange from being published.
+        using (var finalRxCancellation = new CancellationTokenSource())
+        {
+            await RunCaseAsync(async stream =>
+            {
+                await RequireRequestAsync(stream);
+                await SendAsync(stream, DoIpCodec.DiagnosticMessage, FromEcu(Positive));
+            }, async client =>
+            {
+                await Expect<OperationCanceledException>(() =>
+                    client.ExchangeUdsAsync(Request, TimeSpan.FromSeconds(2),
+                        finalRxCancellation.Token),
+                    "Cancellation at final diagnostic RX rejects a positive result.");
+                await Expect<InvalidOperationException>(() =>
+                    client.ExchangeUdsAsync(Request, TimeSpan.FromSeconds(1),
+                        CancellationToken.None),
+                    "Cancelled final response cannot be reused for another request.");
+            }, trace: observed =>
+            {
+                if (observed.Direction == "RX" &&
+                    DoIpCodec.Decode(observed.Bytes).Type == DoIpCodec.DiagnosticMessage)
+                    finalRxCancellation.Cancel();
+            });
+        }
+
         // Invalid P2 or P2* must fail before an on-wire diagnostic request.
         await RunCaseAsync(async stream =>
         {

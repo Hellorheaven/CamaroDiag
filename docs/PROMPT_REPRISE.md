@@ -1,3 +1,7 @@
+## PR117 — frontière de fin de transaction DoIP Windows (26/11/2026)
+
+- C6/DoIP : le transport Windows contrôle de nouveau l'annulation et le délai global sous verrou au moment de rendre le socket disponible après une réponse finale. Une réponse devenue hors délai ou annulée retire la connexion, sans réémission. Le contrôle s'applique également juste avant l'écriture après acquisition du verrou TX. Régression TCP loopback d'annulation au dernier RX ajoutée, non exécutée. Aucun checkpoint.
+
 ## PR117 — bilan de capture Connectors DoIP CLI (26/11/2026)
 
 - Les sorties stderr partial_sample sont désormais attribuées au VIN, à la passerelle, au testeur, à l'ECU, au transport et au service réellement sélectionnés. Le bilan stdout ne devient complet qu'après fermeture de la session et du journal ; en échec un monitor_summary incomplet conserve le compteur de mesures publiées. Index vérifiés, aucun succès si fermeture échouée ; si stderr lui-même est inutilisable, la cause originale est propagée. Documentation utilisateur FR/EN corrigée, régressions écrites non exécutées. Aucun checkpoint.
