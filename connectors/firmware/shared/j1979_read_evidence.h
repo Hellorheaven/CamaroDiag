@@ -9,7 +9,7 @@ namespace cd {
 class J1979ReadEvidence {
  public:
   enum class Variant { ClassicCan, Legacy };
-  enum class Result { Invalid, Negative, Pending, Positive };
+  enum class Result { Invalid, Negative, Pending, Positive, Raw };
 
   static bool readRequest(Variant variant,const uint8_t* req,size_t n) {
     if(!req||!n)return false;
@@ -25,6 +25,25 @@ class J1979ReadEvidence {
     if(variant!=Variant::Legacy||n!=7||mode!=8||req[1]%32!=0)return false;
     for(size_t i=2;i<n;++i)if(req[i])return false;
     return true;
+  }
+
+  // Widths shared with the host PID definitions. Unknown widths are
+  // reported as correlated raw records, not validated decoded measurements.
+  static size_t pidWidth(uint8_t pid){
+    switch(pid){
+      case 0x01:return 4;
+      case 0x0c:case 0x10:case 0x1f:case 0x21:case 0x22:case 0x23:
+      case 0x31:case 0x32:case 0x3c:case 0x3d:case 0x3e:case 0x3f:
+      case 0x42:case 0x43:case 0x44:case 0x4d:case 0x4e:case 0x53:
+      case 0x54:case 0x59:case 0x5d:case 0x5e:case 0x63:return 2;
+      case 0x04:case 0x05:case 0x06:case 0x07:case 0x08:case 0x09:
+      case 0x0a:case 0x0b:case 0x0d:case 0x0e:case 0x0f:case 0x11:
+      case 0x13:case 0x1d:case 0x2c:case 0x2d:case 0x2e:case 0x2f:
+      case 0x30:case 0x33:case 0x45:case 0x46:case 0x47:case 0x48:
+      case 0x49:case 0x4a:case 0x4b:case 0x4c:case 0x52:case 0x5a:
+      case 0x5b:case 0x5c:case 0x61:case 0x62:return 1;
+      default:return 0;
+    }
   }
 
   static Result classify(Variant variant,const uint8_t* req,size_t n,
@@ -61,11 +80,9 @@ class J1979ReadEvidence {
     if(mode==1||mode==2){
       size_t offset=mode==2?3u:2u;
       if(mode==2&&req[1]==2)return len==5?Result::Positive:Result::Invalid;
-      if(req[1]==1)return len==offset+4?Result::Positive:Result::Invalid;
-      if(req[1]==0x0c)return len==offset+2?Result::Positive:Result::Invalid;
-      if(req[1]==0x0d)return len==offset+1?Result::Positive:Result::Invalid;
-      // Unlisted PID widths remain unclassified, not invented.
-      return Result::Invalid;
+      const size_t width=pidWidth(req[1]);
+      if(width)return len==offset+width?Result::Positive:Result::Invalid;
+      return len>offset&&(!legacy||len<=7)?Result::Raw:Result::Invalid;
     }
     if(mode==5)return len==(req[1]>=1&&req[1]<=4?4u:6u)?Result::Positive:Result::Invalid;
     if(mode==6){
@@ -86,8 +103,9 @@ class J1979ReadEvidence {
         return Result::Positive;
       }
       size_t width=req[1]==4?16u:req[1]==6?4u:req[1]==10?20u:0u;
-      return width&&len>=3&&reply[2]>0&&len==3u+reply[2]*width?
+      if(width)return len>=3&&reply[2]>0&&len==3u+reply[2]*width?
         Result::Positive:Result::Invalid;
+      return len>2?Result::Raw:Result::Invalid;
     }
     return Result::Invalid;
   }
