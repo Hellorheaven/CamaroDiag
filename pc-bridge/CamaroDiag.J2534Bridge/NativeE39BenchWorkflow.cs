@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using System.Runtime.CompilerServices;
 
 namespace CamaroDiag.J2534Bridge;
 
@@ -10,6 +11,27 @@ namespace CamaroDiag.J2534Bridge;
 /// </summary>
 internal static class NativeE39BenchWorkflow
 {
+    // An E39 programming session changes diagnostic/security state long
+    // before the first flash erase. Reserve the actual transport from
+    // identity preflight through RAM loading, full-image verification and
+    // final durable journal completion, not just the inner flash link.
+    private static readonly ConditionalWeakTable<ITransport, SemaphoreSlim> TransportGates = new();
+
+    private sealed class TransportLease(SemaphoreSlim gate) : IDisposable
+    {
+        private SemaphoreSlim? owner = gate;
+        public void Dispose() => Interlocked.Exchange(ref owner, null)?.Release();
+    }
+
+    private static IDisposable ReserveTransport(ITransport transport)
+    {
+        var gate = TransportGates.GetValue(transport, static _ => new SemaphoreSlim(1, 1));
+        if (!gate.Wait(0))
+            throw new InvalidOperationException(
+                "Another E39 programming workflow already owns this physical transport.");
+        return new TransportLease(gate);
+    }
+
     internal interface ITransport : NativeE39ProgrammingSession.ITransport, NativeE39RamLoader.ILink
     {
         Task<NativeGmlanIdentification.Identity> ReadIdentityAsync(CancellationToken cancellationToken);
@@ -80,6 +102,9 @@ internal static class NativeE39BenchWorkflow
     {
         ArgumentNullException.ThrowIfNull(transport);
         ArgumentNullException.ThrowIfNull(journal);
+        // Do not send session/seed-key/kernel commands before reserving this
+        // adapter transport. Other distinct transports are unaffected.
+        using var exclusiveTransport = ReserveTransport(transport);
         var prepared = Prepare(policy, backup, original, target, kernel);
         var q = policy.Session;
         var session = (NativeE39ProgrammingSession.ITransport)transport;

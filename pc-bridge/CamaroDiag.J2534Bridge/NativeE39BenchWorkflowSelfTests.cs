@@ -32,13 +32,18 @@ internal static class NativeE39BenchWorkflowSelfTests
         internal byte[] Memory = original.ToArray();
         internal int Erases, IdentityReads, Frames;
         internal bool AlterSecondIdentity, CorruptAfterWrite;
+        internal Func<CancellationToken, Task>? BeforeFirstIdentity;
         private bool corruptDone, running;
-        public Task<NativeGmlanIdentification.Identity> ReadIdentityAsync(CancellationToken token)
+        public async Task<NativeGmlanIdentification.Identity> ReadIdentityAsync(CancellationToken token)
         {
             token.ThrowIfCancellationRequested();
+            var pause = BeforeFirstIdentity;
+            BeforeFirstIdentity = null;
+            if (pause is not null) await pause(token);
+            token.ThrowIfCancellationRequested();
             IdentityReads++;
-            return Task.FromResult(AlterSecondIdentity && IdentityReads == 2
-                ? identity with { OperatingSystemId = identity.OperatingSystemId + 1 } : identity);
+            return AlterSecondIdentity && IdentityReads == 2
+                ? identity with { OperatingSystemId = identity.OperatingSystemId + 1 } : identity;
         }
         public Task<uint?> ReadSupplyMillivoltsAsync(CancellationToken token)
         { token.ThrowIfCancellationRequested(); return Task.FromResult<uint?>(13500); }
@@ -153,6 +158,39 @@ internal static class NativeE39BenchWorkflowSelfTests
         Check(corrupted.Erases == 1 && journal.Events[^1].Phase == NativeE39WriteSequence.Phase.RecoveryRequired &&
             journal.Events.All(e => e.Phase != NativeE39WriteSequence.Phase.Completed),
             "Untouched region corruption fails complete verification and requires recovery");
+        // A diagnostic/security session must be exclusive BEFORE the first
+        // identity read, seed/key exchange or RAM staging, not only at erase.
+        using (var interrupt = new CancellationTokenSource())
+        {
+            var shared = new Bench(original, id);
+            var entered = new TaskCompletionSource<bool>(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+            shared.BeforeFirstIdentity = async token =>
+            {
+                entered.TrySetResult(true);
+                await Task.Delay(Timeout.Infinite, token);
+            };
+            var holding = NativeE39BenchWorkflow.RunAsync(
+                shared, new Journal(), policy, backup, original, target, kernel, interrupt.Token);
+            entered.Task.GetAwaiter().GetResult();
+            Reject<InvalidOperationException>(() =>
+                NativeE39BenchWorkflow.RunAsync(shared, new Journal(), policy,
+                    backup, original, target, kernel, CancellationToken.None)
+                    .GetAwaiter().GetResult());
+            Check(shared.IdentityReads == 0 && shared.Frames == 0 && shared.Erases == 0,
+                "Competing workflow fails before identity, security and any ECU traffic");
+            // The reservation is per physical transport object, never a
+            // process-wide ban on independent adapters.
+            var independent = new Bench(original, id);
+            var independentResult = Execute(independent, new Journal(), policy, backup);
+            Check(independentResult.SectorsWritten == 1,
+                "Independent bench transport remains operational");
+            interrupt.Cancel();
+            Reject<OperationCanceledException>(() => holding.GetAwaiter().GetResult());
+            var restart = Execute(shared, new Journal(), policy, backup);
+            Check(restart.SectorsWritten == 1 && shared.Memory.SequenceEqual(target),
+                "Aborted preflight releases transport for fresh fully verified workflow");
+        }
         Console.WriteLine($"PASS: {checks} local E39 workflow hardware-free checks.");
         return checks;
     }
