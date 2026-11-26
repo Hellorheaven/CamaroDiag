@@ -1203,6 +1203,9 @@
     <string name="cal_doip_inventory_reason_protocol">Identification du protocole ECU invalide ou instable</string>
     <string name="cal_doip_inventory_reason_nrc">Réponse diagnostique négative du calculateur</string>
     <string name="cal_doip_inventory_reason_timeout">Délai de réponse dépassé</string>
+    <string name="cal_doip_inventory_reason_header">En-tête DoIP rejeté</string>
+    <string name="cal_doip_inventory_reason_routing">Activation du routage DoIP refusée</string>
+    <string name="cal_doip_inventory_reason_ack">Acquittement diagnostique DoIP négatif</string>
     <string name="cal_doip_inventory_reason_io">Échec de communication ou de vérification de l’identité</string>
     <string name="cal_doip_inventory_verified">ECU 0x%1$04X : VIN vérifié (%2$s)</string>
     <string name="cal_doip_inventory_unverified">ECU 0x%1$04X : non vérifié (absence non prouvée)</string>
