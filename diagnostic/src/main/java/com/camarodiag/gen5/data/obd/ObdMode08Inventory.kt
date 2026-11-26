@@ -14,14 +14,20 @@ data class ObdMode08Inventory(val supportedTests: Set<Int>, val complete: Boolea
  * Only bitmap queries are generated, never a control test request. */
 internal object ObdMode08Discovery {
     suspend fun discover(legacy: Boolean, physicalResponder: String? = null,
+        budgetMs: Long = 20_000L,
+        clockMs: () -> Long = { System.nanoTime() / 1_000_000L },
         request: suspend (String, Long) -> String): ObdMode08Inventory {
+        require(budgetMs > 0)
+        val start = clockMs()
         val supported = linkedSetOf<Int>()
         val pages = mutableListOf<ObdMode08Page>()
         var complete = false
         for (base in 0..0xE0 step 32) {
             currentCoroutineContext().ensureActive()
             val command = "08%02X".format(Locale.ROOT, base) + if (legacy) "0000000000" else ""
-            val raw = request(command, 2500L)
+            val remaining = budgetMs - (clockMs() - start)
+            if (remaining <= 0) break
+            val raw = request(command, minOf(2500L, remaining))
             currentCoroutineContext().ensureActive()
             val clean = raw.lineSequence().filterNot {
                 it.trim().removeSuffix(">").filterNot(Char::isWhitespace)
@@ -31,7 +37,7 @@ internal object ObdMode08Discovery {
             val offset = if (legacy) 3 else 2
             val records = messages.filter {
                 it.size == offset + 4 && it[0] == 0x48 && it[1] == base &&
-                    (!legacy || it[2] == 0)
+                    (!legacy || it[2] == 0) && (base != 0xE0 || it.last() and 1 == 0)
             }
             pages += ObdMode08Page(base, command, raw, records)
             if (records.isEmpty()) break
