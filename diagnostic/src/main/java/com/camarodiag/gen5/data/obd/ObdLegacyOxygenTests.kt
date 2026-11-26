@@ -39,12 +39,7 @@ internal object ObdLegacyOxygenTests {
     }
 
     private fun records(command: String, response: String): List<List<Int>>? {
-        val clean = response.lineSequence().filterNot {
-            it.trim().removeSuffix(">").filterNot(Char::isWhitespace)
-                .equals(command, ignoreCase = true)
-        }.joinToString("\n")
-        if (ObdNumberedIdentityFrames.hasPhysicalHeaders(clean)) return null
-        return ObdNumberedIdentityFrames.parseAll(clean)
+        return ObdLegacyRecords.parse(command, response)
     }
 
     suspend fun scan(
@@ -92,7 +87,8 @@ internal object ObdLegacyOxygenTests {
             val tids = linkedSetOf<Int>()
             for (base in 0..0xE0 step 32) {
                 val pages = read("05%02X%02X".format(Locale.ROOT, base, sensor)) {
-                    it.size == 7 && it[0] == 0x45 && it[1] == base && it[2] == sensor
+                    it.size == 7 && it[0] == 0x45 && it[1] == base && it[2] == sensor &&
+                        (base != 0xE0 || it.last() and 1 == 0)
                 }
                 if (pages.isEmpty()) break
                 for (page in pages) for (bit in 0 until 31) {
@@ -143,7 +139,8 @@ internal object ObdLegacyOxygenTests {
         for (base in 0..0xE0 step 32) {
             val messages = read(base).orEmpty()
             val pages = messages.filter {
-                it.size == 7 && it[0] == 0x46 && it[1] == base && it[2] == 0xFF
+                it.size == 7 && it[0] == 0x46 && it[1] == base && it[2] == 0xFF &&
+                    (base != 0xE0 || it.last() and 1 == 0)
             }
             if (pages.isEmpty()) {
                 if (discovered) partial = true
