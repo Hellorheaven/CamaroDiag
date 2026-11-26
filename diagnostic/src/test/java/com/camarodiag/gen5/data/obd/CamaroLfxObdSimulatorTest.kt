@@ -39,6 +39,17 @@ class CamaroLfxObdSimulatorTest {
     }
 
     @Test
+    fun freezeFrameDtcAndValuesRemainPinnedToSyntheticPhysicalEcu() = runBlocking {
+        val engine = CamaroLfxObdSimulator.createEngine()
+        assertEquals("P0171", engine.readFreezeFrameDtc()?.code)
+        val supported = engine.discoverFreezeFrameSupportedPids()
+        assertTrue("The synthetic Mode 02 bitmap must announce RPM", 0x0C in supported)
+        val data = engine.readFreezeFrame(supported)
+        assertEquals(listOf(0x0B, 0xB8), data[0x0C])
+        assertEquals(listOf(0x7F), data[0x05])
+    }
+
+    @Test
     fun fullScanReturnsClearlySyntheticLfxDataWithoutHardware() = runBlocking {
         val report = CamaroLfxObdSimulator.createEngine().fullReadOnlyScan()
 
