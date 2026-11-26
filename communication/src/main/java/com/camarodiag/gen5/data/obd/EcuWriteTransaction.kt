@@ -38,6 +38,9 @@ object EcuWriteTransaction {
     }
 
     enum class Blocker {
+        // A separate operation owns this exact physical driver instance.
+        // This is not an unsupported-transport or licensing restriction.
+        DRIVER_BUSY,
         UNKNOWN_TARGET, DIAGNOSTIC_ONLY_TRANSPORT, INCOMPATIBLE_TRANSPORT_REGION,
         INCOMPATIBLE_ACCESS_METHOD, SEPARATE_EEPROM_WORKFLOW_REQUIRED, UNVERIFIED_MEMORY_MAP,
         UNVERIFIED_OEM_CHECKSUM, UNVERIFIED_HARDWARE_BACKUP, NO_VALIDATED_RECOVERY,
@@ -204,7 +207,34 @@ internal class EcuWriteExecutionEngine(
     // injects a durable, file-backed store that fsyncs live ECU bytes.
     private val physicalBlockBackup: EcuPhysicalBlockBackup = InMemoryEcuPhysicalBlockBackup()
 ) {
+    private companion object {
+        // Identity semantics: even a driver overriding equals/hashCode owns
+        // its own physical communication context. Entries live only while an
+        // operation is active, avoiding a permanent reference to disconnected
+        // hardware. Synchronize only the short acquisition/release, NEVER I/O.
+        private val activeDriverInstances =
+            java.util.Collections.newSetFromMap(
+                java.util.IdentityHashMap<EcuProgrammingDriverContract, Boolean>()
+            )
+    }
+
+    /** Exclusive from preflight to final verification and journal closure. */
     suspend fun run(input: EcuWriteTransaction.Request): EcuWriteTransaction.Outcome {
+        val acquired = synchronized(activeDriverInstances) { activeDriverInstances.add(driver) }
+        if (!acquired) {
+            return EcuWriteTransaction.Outcome(
+                EcuWriteTransaction.Status.BLOCKED,
+                setOf(EcuWriteTransaction.Blocker.DRIVER_BUSY)
+            )
+        }
+        try {
+            return runOwned(input)
+        } finally {
+            synchronized(activeDriverInstances) { activeDriverInstances.remove(driver) }
+        }
+    }
+
+    private suspend fun runOwned(input: EcuWriteTransaction.Request): EcuWriteTransaction.Outcome {
         val request = input.frozen()
         val plan = EcuWriteTransaction.prepare(request)
         if (!plan.canAttemptWithValidatedHardware) {

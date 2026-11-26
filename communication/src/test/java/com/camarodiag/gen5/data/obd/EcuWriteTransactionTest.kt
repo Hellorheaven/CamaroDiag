@@ -1,6 +1,11 @@
 package com.camarodiag.gen5.data.obd
 
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.async
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.CancellationException
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -121,6 +126,74 @@ class EcuWriteTransactionTest {
 
     private fun journal(records: MutableList<EcuWriteTransaction.Record>) =
         EcuWriteTransaction.Journal { records += it }
+
+    @Test fun concurrentEnginesOnOneDriverNeverInterleaveOrErase() = runBlocking {
+        val shared = FakeDriver(original, expectedIdentity)
+        val entered = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        val ownerRecords = mutableListOf<EcuWriteTransaction.Record>()
+        // Hold the first owner at a journal boundary after live baseline
+        // acquisition but before any possible erase on the shared driver.
+        val pausedJournal = EcuWriteTransaction.Journal { record ->
+            ownerRecords += record
+            entered.complete(Unit)
+            release.await()
+        }
+        val first = async(start = CoroutineStart.UNDISPATCHED) {
+            EcuWriteExecutionEngine(
+                shared, pausedJournal, EcuWriteTransaction.PowerMonitor { true }
+            ).run(request())
+        }
+        entered.await()
+        try {
+            val competingRecords = mutableListOf<EcuWriteTransaction.Record>()
+            val readsBefore = shared.reads
+            val second = EcuWriteExecutionEngine(
+                shared, journal(competingRecords), EcuWriteTransaction.PowerMonitor { true }
+            ).run(request())
+            assertEquals(EcuWriteTransaction.Status.BLOCKED, second.status)
+            assertTrue(EcuWriteTransaction.Blocker.DRIVER_BUSY in second.blockers)
+            assertTrue(competingRecords.isEmpty())
+            assertEquals(readsBefore, shared.reads)
+            assertEquals(0, shared.eraseCalls)
+
+            // The reservation is *not global*: unrelated ECU links proceed
+            // while the first link is waiting for its durable evidence sink.
+            val independent = FakeDriver(original, expectedIdentity)
+            val elsewhere = EcuWriteExecutionEngine(
+                independent, EcuWriteTransaction.Journal {},
+                EcuWriteTransaction.PowerMonitor { true }
+            ).run(request())
+            assertEquals(EcuWriteTransaction.Status.COMPLETED, elsewhere.status)
+            assertEquals(1, independent.eraseCalls)
+        } finally {
+            first.cancelAndJoin()
+        }
+        assertEquals(0, shared.eraseCalls)
+        // Cancellation releases the exact driver; a fresh operation starts
+        // with full preflight rather than silently resuming the aborted one.
+        val retried = EcuWriteExecutionEngine(
+            shared, EcuWriteTransaction.Journal {},
+            EcuWriteTransaction.PowerMonitor { true }
+        ).run(request())
+        assertEquals(EcuWriteTransaction.Status.COMPLETED, retried.status)
+        assertEquals(1, shared.eraseCalls)
+    }
+
+    @Test fun failedJournalAlsoReleasesTheDriverReservation() = runBlocking {
+        val driver = FakeDriver(original, expectedIdentity)
+        val failure = EcuWriteExecutionEngine(
+            driver, EcuWriteTransaction.Journal { throw java.io.IOException("Journal unavailable") },
+            EcuWriteTransaction.PowerMonitor { true }
+        ).run(request())
+        assertEquals(EcuWriteTransaction.Status.STOPPED_REQUIRES_ASSESSMENT, failure.status)
+        assertEquals(0, driver.eraseCalls)
+        val resumed = EcuWriteExecutionEngine(
+            driver, EcuWriteTransaction.Journal {}, EcuWriteTransaction.PowerMonitor { true }
+        ).run(request())
+        assertEquals(EcuWriteTransaction.Status.COMPLETED, resumed.status)
+        assertEquals(1, driver.eraseCalls)
+    }
 
     @Test fun realEntryPointCannotWriteWithoutRegisteredHardwareDriver() = runBlocking {
         val records = mutableListOf<EcuWriteTransaction.Record>()
