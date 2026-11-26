@@ -2,6 +2,8 @@ package com.camarodiag.gen5.data.obd
 
 import java.io.DataInputStream
 import java.io.File
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.LinkOption
@@ -35,7 +37,8 @@ object EcuPhysicalBackupInspection {
         // completed: an erase may still be pending or recovery may be required.
         val journalDisposition: PersistentEcuWriteJournal.RecoveryDisposition? = null,
         val problemAddress: Long? = null,
-        val uncertainRegion: EcuBackupCoverage.Region? = null
+        val uncertainRegion: EcuBackupCoverage.Region? = null,
+        val snapshotSha256: String? = null
     )
 
     private const val MAX_JOURNAL_BYTES = 8L * 1024 * 1024
@@ -45,10 +48,42 @@ object EcuPhysicalBackupInspection {
     private data class FileIdentity(val size: Long, val modified: java.nio.file.attribute.FileTime,
         val created: java.nio.file.attribute.FileTime, val key: Any?)
 
-    private fun identity(file: File): FileIdentity {
+    private fun identity(file: File, directory: Boolean = false): FileIdentity {
         val attributes = Files.readAttributes(file.toPath(), BasicFileAttributes::class.java, LinkOption.NOFOLLOW_LINKS)
-        check(attributes.isRegularFile && !attributes.isSymbolicLink) { "Expected a regular recovery file." }
+        check(!attributes.isSymbolicLink && (if (directory) attributes.isDirectory else attributes.isRegularFile)) {
+            "Unexpected or linked recovery evidence path."
+        }
         return FileIdentity(attributes.size(), attributes.lastModifiedTime(), attributes.creationTime(), attributes.fileKey())
+    }
+
+    private fun openUnlinked(file: File) =
+        Files.newInputStream(file.toPath(), LinkOption.NOFOLLOW_LINKS).buffered()
+
+    // Same canonical framing as the Windows inspector. This is a fingerprint
+    // of the inspected evidence, not a signature or a restore authorization.
+    internal fun computeSnapshotDigest(journal: ByteArray, envelopes: Map<String, ByteArray>): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+        digest.update(MessageDigest.getInstance("SHA-256").digest(journal))
+        for ((name, hash) in envelopes.toSortedMap()) {
+            val encoded = name.toByteArray(StandardCharsets.UTF_8)
+            require(encoded.isNotEmpty() && '/' !in name && '\\' !in name && hash.size == 32)
+            digest.update(ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN).putInt(encoded.size).array())
+            digest.update(encoded)
+            digest.update(hash)
+        }
+        return digest.digest().joinToString("") { "%02X".format(it.toInt() and 0xff) }
+    }
+
+    private fun inventory(directory: File, expected: Int): List<File> {
+        val result = mutableListOf<File>()
+        Files.newDirectoryStream(directory.toPath()).use { entries ->
+            for (entry in entries) {
+                check(result.size < expected) { "Unexpected original ECU sector file." }
+                result += entry.toFile()
+            }
+        }
+        check(result.size == expected) { "Physical ECU backup count differs from journal." }
+        return result
     }
 
     // Different regions may have different address spaces. Within a region
@@ -75,7 +110,7 @@ object EcuPhysicalBackupInspection {
         }
         val digest = MessageDigest.getInstance("SHA-256")
         val buffer = ByteArray(8192)
-        DataInputStream(file.inputStream().buffered()).use { input ->
+        DataInputStream(openUnlinked(file)).use { input ->
             var remaining = expected.size
             while (remaining > 0) {
                 checkActive()
@@ -109,10 +144,10 @@ object EcuPhysicalBackupInspection {
             // A different read of a changing file must never supply the evidence.
             fun readSnapshot(): ByteArray {
                 checkActive()
-                val length = journalFile.length()
+                val length = identity(journalFile).size
                 check(length in 1L..MAX_JOURNAL_BYTES) { "Invalid ECU journal size." }
                 return ByteArray(length.toInt()).also { data ->
-                    DataInputStream(journalFile.inputStream().buffered()).use { input ->
+                    DataInputStream(openUnlinked(journalFile)).use { input ->
                         input.readFully(data)
                         check(input.read() == -1) { "ECU journal changed while being inspected." }
                     }
@@ -147,12 +182,14 @@ object EcuPhysicalBackupInspection {
             check(Files.isDirectory(directory.toPath(), LinkOption.NOFOLLOW_LINKS)) {
                 "Missing or linked original ECU sector backup directory."
             }
-            val files = directory.listFiles()
-                ?: error("Cannot enumerate persisted original ECU sectors.")
-            check(files.size == expectedCount && files.all { it.isFile }) {
-                "Physical ECU backup files do not match the journal baselines."
-            }
+            val directoryIdentity = identity(directory, directory = true)
+            val files = inventory(directory, expectedCount)
             val fileIdentities = files.associate { it.name to identity(it) }
+            val keys = (fileIdentities.values.map { it.key } + journalIdentity.key).filterNotNull()
+            check(keys.size == keys.toSet().size) { "Aliased recovery evidence files." }
+            check(identity(directory, directory = true) == directoryIdentity) {
+                "Original ECU sector directory changed during enumeration."
+            }
             val observed = hashSetOf<Pair<EcuBackupCoverage.Region, Long>>()
             val envelopeHashes = linkedMapOf<String, ByteArray>()
             for (file in files) {
@@ -163,7 +200,7 @@ object EcuPhysicalBackupInspection {
                     "Saved physical ECU block exceeds the supported size."
                 }
                 val envelopeHash = MessageDigest.getInstance("SHA-256")
-                DataInputStream(DigestInputStream(file.inputStream().buffered(), envelopeHash)).use { input ->
+                DataInputStream(DigestInputStream(openUnlinked(file), envelopeHash)).use { input ->
                     check(input.readUTF() == "CAMARODIAG-PHYSICAL-BLOCK-V1") {
                         "Unknown original ECU sector file schema."
                     }
@@ -221,8 +258,8 @@ object EcuPhysicalBackupInspection {
             }
             // A previously read sector may have been replaced while another
             // sector was hashed. Recheck the complete directory inventory.
-            check(Files.isDirectory(directory.toPath(), LinkOption.NOFOLLOW_LINKS))
-            val finalFiles = directory.listFiles() ?: error("Cannot re-enumerate original ECU sectors.")
+            check(identity(directory, directory = true) == directoryIdentity)
+            val finalFiles = inventory(directory, expectedCount)
             check(finalFiles.map { it.name }.toSet() == fileIdentities.keys) {
                 "Original ECU sector inventory changed during inspection."
             }
@@ -238,8 +275,8 @@ object EcuPhysicalBackupInspection {
                 }
             }
             current = null
-            check(Files.isDirectory(directory.toPath(), LinkOption.NOFOLLOW_LINKS) &&
-                directory.listFiles()?.map { it.name }?.toSet() == fileIdentities.keys &&
+            check(identity(directory, directory = true) == directoryIdentity &&
+                inventory(directory, expectedCount).map { it.name }.toSet() == fileIdentities.keys &&
                 data.contentEquals(readSnapshot()) && identity(journalFile) == journalIdentity) {
                 "ECU recovery evidence changed during final inspection."
             }
@@ -247,7 +284,8 @@ object EcuPhysicalBackupInspection {
             Report(true, expectedCount, verified.sortedWith(compareBy({ it.region.name },
                 { it.address })), verifiedBytes, "",
                 uncertainAddress = audit.uncertainAddress,
-                journalDisposition = audit.recoveryDisposition, uncertainRegion = audit.uncertainRegion)
+                journalDisposition = audit.recoveryDisposition, uncertainRegion = audit.uncertainRegion,
+                snapshotSha256 = computeSnapshotDigest(data, envelopeHashes))
         } catch (cancelled: java.util.concurrent.CancellationException) {
             throw cancelled
         } catch (error: Exception) {
@@ -257,7 +295,7 @@ object EcuPhysicalBackupInspection {
                 try {
                     val before = identity(journalFile)
                     if (before != auditedIdentity || before.size != snapshot.size.toLong()) null
-                    else DataInputStream(journalFile.inputStream().buffered()).use { input ->
+                    else DataInputStream(openUnlinked(journalFile)).use { input ->
                         val again = ByteArray(snapshot.size)
                         input.readFully(again)
                         checkActive()

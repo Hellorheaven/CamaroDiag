@@ -2364,3 +2364,7 @@ Ce créneau est resté sur la PR #95 `chore/unified-ci` : aucune nouvelle branch
 - **CLI et catalogue** : erreurs numériques invalides attrapées proprement dans les principales commandes, matrice protocolaire synchronisée avec l'état réellement codé, test du nombre d'entrées du catalogue passé de 13 à 14.
 
 **Point bloquant** : aucune campagne Windows Debug (warnings as errors), aucun `--self-test` réellement lancé au dernier HEAD de cette tranche, aucun pilote J2534 ou calculateur physique vérifié. Ne déclarer ni « 100 % standard » ni « sauvegarde intégralement restaurable ». Restent la qualification physique, J1979-2 intégral, OEM seed/key/routines/checksums/bootloader par ECU, J2411 et les différents adaptateurs, plus les chantiers C1/C2/C4/C6/C8 détaillés dans l'audit. Exécuter une campagne regroupée au checkpoint de chantier et corriger sans lancer une CI par commit.
+
+
+### C6 — Empreinte de preuves physiques Android
+Inspection bornée des entrées, ouverture NOFOLLOW, identité du répertoire et rejet des alias connus. Empreinte SHA-256 canonique du journal et des enveloppes complètes affichée et exportée, uniquement si inspection réussie. Empreinte ≠ signature, autorisation ou récupération physique démontrée. Tests ajoutés, non exécutés (validation groupée C6).

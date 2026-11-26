@@ -2837,6 +2837,10 @@ private fun PhysicalRecoveryPanel(state: CalibrationWorkspaceState, defaultVin: 
             Text(stringResource(if (report.verified) R.string.cal_recovery_verified else R.string.cal_recovery_failed),
                 color = if (report.verified) OkGreen else WarnRed)
             Text(stringResource(R.string.cal_recovery_counts, report.sectors.size, report.expectedSectors, report.verifiedBytes))
+            report.snapshotSha256?.let {
+                Text(stringResource(R.string.cal_recovery_snapshot_sha256), fontSize = 12.sp)
+                Text(it, fontFamily = FontFamily.Monospace, fontSize = 10.sp)
+            }
             val disposition = when (report.journalDisposition) {
                 com.camarodiag.gen5.data.obd.PersistentEcuWriteJournal.RecoveryDisposition.NO_ERASE_RECORDED -> R.string.cal_recovery_no_erase
                 com.camarodiag.gen5.data.obd.PersistentEcuWriteJournal.RecoveryDisposition.ERASE_OR_WRITE_MAY_BE_INCOMPLETE -> R.string.cal_recovery_incomplete

@@ -3927,6 +3927,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     .put("verified", report.verified)
                     .put("expectedSectors", report.expectedSectors)
                     .put("verifiedBytes", report.verifiedBytes)
+                    .put("snapshotSha256", report.snapshotSha256 ?: JSONObject.NULL)
+                    .put("snapshotAlgorithm", if (report.snapshotSha256 != null) "SHA256_JOURNAL_AND_ENVELOPES_V1" else JSONObject.NULL)
                     .put("problem", report.problem)
                     .put("uncertainAddress", report.uncertainAddress ?: JSONObject.NULL)
                     .put("uncertainRegion", report.uncertainRegion?.name ?: JSONObject.NULL)

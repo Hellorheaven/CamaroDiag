@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="cal_recovery_snapshot_sha256">Inspected evidence SHA-256</string>
+</resources>

@@ -12,6 +12,30 @@ class EcuPhysicalBackupInspectionTest {
     private val target = EcuProgrammingDriverContract.FirmwareTarget("E39", "ECM", "OS-A")
     private val vin = "1G1FA1RXXR0123456"
 
+    @Test fun evidenceDigestBindsJournalAndFullEnvelopesIndependentOfEnumerationOrder() {
+        val journal = byteArrayOf(1, 2, 3)
+        val first = ByteArray(32) { 1 }
+        val second = ByteArray(32) { 2 }
+        val digest = EcuPhysicalBackupInspection.computeSnapshotDigest(journal, linkedMapOf("b" to second, "a" to first))
+        assertEquals(digest, EcuPhysicalBackupInspection.computeSnapshotDigest(journal, linkedMapOf("a" to first, "b" to second)))
+        assertFalse(digest == EcuPhysicalBackupInspection.computeSnapshotDigest(byteArrayOf(1, 2), mapOf("a" to first, "b" to second)))
+        assertFalse(digest == EcuPhysicalBackupInspection.computeSnapshotDigest(journal, mapOf("a" to second, "b" to first)))
+        assertFalse(digest == EcuPhysicalBackupInspection.computeSnapshotDigest(journal, mapOf("c" to first, "b" to second)))
+    }
+
+    @Test fun linkedJournalIsNotAcceptedAsRecoveryEvidence() {
+        val directory = Files.createTempDirectory("ecu-linked-journal")
+        try {
+            val original = Files.write(directory.resolve("original"), byteArrayOf(1))
+            val linked = Files.createSymbolicLink(directory.resolve("linked"), original)
+            val report = EcuPhysicalBackupInspection.inspect(linked.toFile(), target, vin)
+            assertFalse(report.verified)
+            assertEquals(null, report.snapshotSha256)
+        } finally {
+            directory.toFile().deleteRecursively()
+        }
+    }
+
     @Test fun offlineInspectorMatchesDurablePhysicalBytesToHashChainedJournal() = runBlocking {
         val directory = Files.createTempDirectory("camarodiag-ecu-inspection").toFile()
         try {
@@ -46,6 +70,8 @@ class EcuPhysicalBackupInspectionTest {
             assertEquals(2, normal.expectedSectors)
             assertEquals(2, normal.sectors.size)
             assertEquals(16L, normal.verifiedBytes)
+            assertTrue(normal.snapshotSha256?.matches(Regex("[0-9A-F]{64}")) == true)
+            assertEquals(normal.snapshotSha256, EcuPhysicalBackupInspection.inspect(journalFile, target, vin).snapshotSha256)
 
             // Cancellation at the last possible checkpoint must not publish
             // an already computed but no longer authorized success.
@@ -101,6 +127,7 @@ class EcuPhysicalBackupInspectionTest {
             files[0].writeBytes(changed)
             val tampered = EcuPhysicalBackupInspection.inspect(journalFile, target, vin)
             assertFalse(tampered.verified)
+            assertEquals(null, tampered.snapshotSha256)
             files[0].writeBytes(original)
 
             val extra = File(store.directory, "unexpected.ecu-block")
