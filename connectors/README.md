@@ -202,3 +202,11 @@ Avec un adaptateur ELM/STN série dédié prenant réellement en charge le rése
 Lecture des modes applicables 01/02/03/05/06/07/08 (inventaire)/09 et 0A si disponible, selon les formats non-CAN de la norme. Export JSON séparé par exécution et protocole, sans écrasement. Réponses sans adresse anonymes : un candidat VIN reconstruit n'est pas un VIN ECU attribué. Absence de réponse distincte d'un zéro ; aucun Mode 04 ou actionnement 08 dans cette recette. Ce client n'est ni un pilote J2534 legacy ni une activation du firmware USB.
 
 The standalone serial ELM host recipe runs on Windows/Linux with an adapter and vehicle supporting the explicitly selected legacy protocol. No automatic CAN fallback, no mutations, no physical attribution of anonymous records. Dedicated adapter configuration is changed; close other diagnostic software first.
+
+### J1979 — préparation du transport embarqué CAN classique
+
+Le noyau partagé `j1979_can_read_session.h`, `j1979_can_read_exchange.h` et `j1979_can_campaign.h` implémente le parcours de lecture sur un canal physique ISO 15765-4 explicitement choisi (11/29 bits). Il vérifie les réponses ISO-TP, gère les trames de contrôle de flux, les NRC et le délai global, et transmet les preuves par étape à un collecteur externe. Les réponses corrélées de format inconnu sont RAW et non PASSED. Les inventaires 01/02/06/08/09 ont des indicateurs de complétude distincts de la fin de campagne ; le Mode 08 n'est qu'un inventaire. Aucun accès mutateur.
+
+L'adaptateur `firmware/esp32s3/src/j1979_twai_read_link.*` est prévu pour un canal TWAI déjà configuré et détenu exclusivement par un profil matériel qualifié. Il exige une confirmation effective TX_SUCCESS, contrôle les pertes, arrête le parcours et verrouille l'instance sur erreur. Il ne configure aucune broche, alimentation ou transceiver et ne lance pas le pilote. Après une erreur de transmission, le propriétaire matériel doit contrôler et arrêter le canal avant toute nouvelle session ; la classe ne garantit pas l'annulation d'une trame déjà soumise au pilote.
+
+**Le firmware USB de découverte reste inchangé et n'annonce aucun accès CAN.** Aucune liaison physique ou qualification matérielle n'est démontrée ; ne pas connecter le prototype au véhicule. Les tests natifs de campagne sont enregistrés pour la clôture logicielle, pas exécutés dans cette session.
