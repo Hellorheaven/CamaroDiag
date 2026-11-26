@@ -454,6 +454,14 @@ def _run(argv: Sequence[str] | None, resources: ExitStack,
                                  gateway_host=gateway.host, transport="TCP" if o.tcp else "TLS",
                                  service_protocol="UDS", requested_commands=len(commands),
                                  commands_completed=0)
+        def require_final_gateway_identity(exc_type, exc_value, traceback):
+            # ExitStack invokes this only after the routed Session.__exit__
+            # succeeded, and before the trace is closed. A failed exchange
+            # stays failed: do not mask it with an unrelated UDP error.
+            if exc_type is None:
+                verify_gateway()
+            return False
+        resources.push(require_final_gateway_identity)
     with Session(gateway, o.tester, o.ecu, tls=not o.tcp, timeout=o.timeout,
                  trace=trace, context=context, p2=p2, p2_star=p2_star,
                  routing_type=o.routing_activation_type or 0,
