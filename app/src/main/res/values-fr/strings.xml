@@ -1285,4 +1285,5 @@
     <string name="obd_mode05_results">Mode 05 — résultats des tests de sondes lambda (protocoles historiques)</string>
     <string name="obd_mode05_partial">Inventaire des tests ou réponse incomplets.</string>
     <string name="obd_mode05_raw_notice">Résultats codés ; fin du test embarqué et attribution au calculateur non établies.</string>
+    <string name="msg_dtc_clear_readback">Effacement acquitté. Nouvelle lecture DTC : confirmés %1$s ; en attente %2$s ; permanents %3$s.</string>
 </resources>
