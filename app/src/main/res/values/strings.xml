@@ -1082,6 +1082,8 @@
     <string name="cal_doip_extended">Extended data</string>
     <string name="cal_doip_detail_result">DTC 0x%1$06X · status 0x%2$02X · raw records: %3$s</string>
     <string name="cal_doip_sequence_reply">Command %1$d: %2$s</string>
+    <string name="cal_doip_sequence_complete">Sequence complete: %1$d/%2$d verified replies.</string>
+    <string name="cal_doip_sequence_incomplete">Sequence incomplete: %1$d/%2$d verified replies.</string>
     <string name="cal_doip_cert_install">Install client certificate (.p12/.pfx)</string>
     <string name="cal_doip_cert_select">Choose client certificate</string>
     <string name="cal_doip_cert_selected">Client: %1$s · SHA-256 %2$s</string>
