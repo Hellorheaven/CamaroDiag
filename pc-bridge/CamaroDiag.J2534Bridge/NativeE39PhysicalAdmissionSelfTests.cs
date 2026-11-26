@@ -39,6 +39,14 @@ internal static class NativeE39PhysicalAdmissionSelfTests
                 try { using var rejected = NativeE39PhysicalBenchGate.Acquire(adapter); }
                 catch (InvalidOperationException) { busy = true; }
                 Check(busy, "Concurrent bench operation is denied for the same vendor DLL");
+                busy = false;
+                try
+                {
+                    using var duplicateView = NativeE39PhysicalBenchGate.Acquire(
+                        adapter with { RegistryView = "Registry32" });
+                }
+                catch (InvalidOperationException) { busy = true; }
+                Check(busy, "A second registry architecture cannot bypass a locked vendor DLL");
 
                 var otherDll = Path.Combine(Path.GetDirectoryName(path)!,
                     Path.GetFileName(path) + ".other");

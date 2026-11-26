@@ -1,3 +1,11 @@
+## PR117 — C6 : annulation fail-closed et verrou pilote J2534 (26/11/2026)
+
+- **PR #117, branche `chore/unified-ci`, C6 toujours actif.** Commits `6cef80e`, `4998f61`, `8fbdfa6` et cette reprise : annulation contrôlée aux frontières du pilote ECU et du journal durable, sans autoriser de commande tardive si le pilote retourne après annulation.
+- **Windows E39** : contrôles d'annulation après les réponses d'identification, d'entrée en programmation, sécurité OEM, transfert du chargeur RAM, sonde CD39, lecture/écriture et mesure de tension. Régressions offline simulant quatre réponses tardives ; aucune campagne lancée.
+- **Android** : la transaction d'écriture ECU vérifie l'annulation avant/après chaque callback externe (identité, tension, lectures, sauvegardes, journal, effacement, écriture). Régressions pour réponse tardive de tension, lecture mémoire et journal de référence ; **pas de pilote flash Android réel enregistré**.
+- **J2534 local** : ajout d'une réservation de fichier exclusive pour le chemin de la DLL constructeur couvrant la lecture physique initiale, la programmation et le journal. Plusieurs processus CamaroDiag utilisant cette même DLL ne peuvent pas mener deux programmations E39 simultanées ; les pilotes distincts restent indépendants. Les entrées Windows x86/x64 d'une même DLL partagent cette réservation. Les autres logiciels ne respectent pas nécessairement ce mécanisme : il ne garantit pas à lui seul l'exclusivité physique de l'ECU.
+- **Tests écrits, non exécutés** : conformément au choix propriétaire, aucune validation C6 intermédiaire. DoIP est déjà clos logiciellement sur `e3b5f2a` (Actions #45805147429), C8 reste dernier chantier. Aucun nouveau test matériel, merge ni Release effectué dans cette reprise.
+
 ## PR117 — C6 : isolation ECU, annulation et capacités réelles (26/11/2026)
 
 - **Protocole DoIP déjà validé logiciellement** sur `e3b5f2a5a0ef704da7a5d622ef8b11116f337d96` (Actions #45805147429), aucune modification des moteurs DoIP après cette acceptation. **Chantier C6 toujours ouvert**.

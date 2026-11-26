@@ -26,7 +26,9 @@ internal static class NativeE39PhysicalBenchGate
 
         var path = Path.GetFullPath(adapter.FunctionLibrary);
         var identity = OperatingSystem.IsWindows() ? path.ToUpperInvariant() : path;
-        var key = identity + "|" + adapter.RegistryView.ToUpperInvariant();
+        // A dual-registered vendor DLL can serve x86/x64 clients in
+        // separate processes. Both registrations must share ONE lock.
+        var key = identity;
         var digest = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(key)));
         var root = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
