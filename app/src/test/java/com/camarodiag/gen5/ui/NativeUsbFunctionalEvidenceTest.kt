@@ -58,6 +58,15 @@ class NativeUsbFunctionalEvidenceTest {
         monitor.put("value_encoded",0x5678)
         assertTrue(NativeUsbFunctionalEvidence.diagnosticValues(input)!!.monitors.isEmpty())
     }
+    @Test fun identityValuesMustAgreeWithRawMode09Record() {
+        val input=report(true)
+        val info=JSONObject().put("info_type",6).put("values",JSONArray().put("01020304").put("FFFFFFFF"))
+        input.getJSONArray("steps").put(JSONObject().put("request_hex","0906").put("status","PASSED")
+            .put("response_hex","49060201020304FFFFFFFF").put("vehicle_info",info))
+        assertEquals(listOf("01020304","FFFFFFFF"),NativeUsbFunctionalEvidence.diagnosticValues(input)!!.identity[6])
+        info.put("values",JSONArray().put("00000000").put("FFFFFFFF"))
+        assertTrue(NativeUsbFunctionalEvidence.diagnosticValues(input)!!.identity.isEmpty())
+    }
     @Test fun inconsistentCampaignAndWrongVinAreNotPasses() {
         val bad=NativeUsbFunctionalEvidence.results(state,report(false)).checks.associateBy { it.key }
         assertEquals(FunctionalTestOutcome.FAILED,bad["native:integrity"]?.outcome)

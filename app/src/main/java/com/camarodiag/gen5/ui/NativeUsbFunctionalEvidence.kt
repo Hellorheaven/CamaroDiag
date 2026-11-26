@@ -24,7 +24,40 @@ internal object NativeUsbFunctionalEvidence {
     data class Measurement(val mode: Int, val pid: Int, val name: String, val number: Double, val unit: String)
     data class Monitor(val mid: Int, val tid: Int, val scaling: Int, val value: Int, val minimum: Int, val maximum: Int)
     data class DiagnosticValues(val observedVin: String?, val dtcs: Map<Int, List<String>?>,
-        val measurements: List<Measurement>, val monitors: List<Monitor>)
+        val measurements: List<Measurement>, val monitors: List<Monitor>, val identity: Map<Int,List<String>>)
+
+    private fun identityValues(step: JSONObject): Pair<Int,List<String>>? {
+        val req=step.optString("request_hex")
+        if (req !in setOf("0904","0906","090A")) return null
+        val type=req.takeLast(2).toInt(16)
+        val raw=step.optString("response_hex")
+        if (raw.length !in 6..8190 || raw.length%2!=0 || !raw.startsWith("49"+req.takeLast(2)) ||
+            !raw.matches(Regex("[0-9A-F]+"))) return null
+        val data=raw.chunked(2).map { it.toInt(16) }
+        val count=data[2]
+        val width=when(type){4->16;6->4;else->20}
+        if (count==0 || data.size!=3+count*width) return null
+        fun ascii(bytes: List<Int>): String? {
+            val clean=bytes.dropLastWhile { it==0 }
+            if (clean.isEmpty() || clean.any { it !in 32..126 }) return null
+            return clean.map { it.toChar() }.joinToString("")
+        }
+        val values=when(type){
+            4->(0 until count).map { ascii(data.subList(3+it*16,3+(it+1)*16)) ?: return null }
+            6->(0 until count).map { raw.substring(6+it*8,6+(it+1)*8) }
+            else->{
+                if(count!=1 || data[7]!=45) return null
+                val acronym=ascii(data.subList(3,7)) ?: return null
+                val description=ascii(data.subList(8,23)) ?: return null
+                listOf("$acronym-$description")
+            }
+        }
+        val info=step.optJSONObject("vehicle_info") ?: return null
+        val declared=info.optJSONArray("values") ?: return null
+        if(info.optInt("info_type",-1)!=type || declared.length()!=values.size ||
+            values.indices.any { declared.optString(it)!=values[it] }) return null
+        return type to values
+    }
 
     /** Only a coherent authenticated-session report can feed the value display.
      * Missing mode evidence remains null, never an empty fault list. */
@@ -36,10 +69,12 @@ internal object NativeUsbFunctionalEvidence {
         val dtcs = linkedMapOf<Int, List<String>?>(3 to null, 7 to null, 10 to null)
         val measured = linkedMapOf<Pair<Int, Int>, Measurement>()
         val monitors = mutableListOf<Monitor>()
+        val identity=linkedMapOf<Int,List<String>>()
         for (i in 0 until steps.length()) {
             val step = steps.optJSONObject(i) ?: continue
             if (step.optString("status") != "PASSED") continue
             val request = step.optString("request_hex")
+            identityValues(step)?.let { (type,values)->identity[type]=values }
             if (request in setOf("03","07","0A")) {
                 val mode = request.toInt(16)
                 val codes = step.optJSONArray("dtc_codes") ?: continue
@@ -83,7 +118,7 @@ internal object NativeUsbFunctionalEvidence {
                 !number.isFinite() || name.isBlank() || unit.isBlank()) continue
             measured[mode to pid] = Measurement(mode,pid,name,number,unit)
         }
-        return DiagnosticValues(vin,dtcs,measured.values.sortedWith(compareBy({ it.mode },{ it.pid })),monitors.toList())
+        return DiagnosticValues(vin,dtcs,measured.values.sortedWith(compareBy({ it.mode },{ it.pid })),monitors.toList(),identity.toMap())
     }
 
     fun results(state: FunctionalTestState, report: JSONObject): FunctionalTestState {

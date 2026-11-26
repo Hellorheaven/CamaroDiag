@@ -114,6 +114,12 @@ internal sealed partial class BridgeDesktopForm
                         text.AppendLine($"  {measurement.Name}: {measurement.Number.ToString("0.###",CultureInfo.CurrentCulture)} {measurement.Unit}");
                     if(step.DtcCodes is { } codes)
                         text.AppendLine("  "+(codes.Count==0?J1979RecipeText("NativeUsbZeroDtc"):string.Join(", ",codes)));
+                    if(step.Identification is { } info&&info.InfoType!=2)
+                    {
+                        string label=J1979RecipeText(info.InfoType switch {
+                            4=>"NativeUsbCalibration",6=>"NativeUsbCvn",_=>"NativeUsbEcuName"});
+                        text.AppendLine("  "+label+": "+string.Join(", ",info.Values));
+                    }
                     if(step.MonitorRecords is { } monitors)
                         foreach(var monitor in monitors)
                             text.AppendLine("  "+string.Format(CultureInfo.CurrentUICulture,J1979RecipeText("NativeUsbMonitorEncoded"),

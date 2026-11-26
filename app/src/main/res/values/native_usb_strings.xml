@@ -23,4 +23,7 @@
     <string name="functional_native_usb_monitors">OBD monitors — encoded data</string>
     <string name="functional_native_usb_monitor_id">MID %1$s • TID %2$s • Scaling %3$s</string>
     <string name="functional_native_usb_monitor_words">Value %1$s • Min %2$s • Max %3$s (hex)</string>
+    <string name="functional_native_usb_calibration">Calibration identifiers (CALID)</string>
+    <string name="functional_native_usb_cvn">Calibration verification numbers (CVN)</string>
+    <string name="functional_native_usb_ecu_name">ECU name</string>
 </resources>

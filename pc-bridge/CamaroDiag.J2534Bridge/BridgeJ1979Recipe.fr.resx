@@ -72,4 +72,7 @@
   <data name="NativeUsbProvenance" xml:space="preserve"><value>Preuves enregistrées uniquement ; provenance physique non établie.</value></data>
   <data name="NativeUsbZeroDtc" xml:space="preserve"><value>0 code vérifié</value></data>
   <data name="NativeUsbMonitorEncoded" xml:space="preserve"><value>MID {0:X2} • TID {1:X2} • Échelle {2:X2} : valeur {3:X4}, min {4:X4}, max {5:X4} (hex)</value></data>
+  <data name="NativeUsbCalibration" xml:space="preserve"><value>Identifiants de calibration (CALID)</value></data>
+  <data name="NativeUsbCvn" xml:space="preserve"><value>Numéros de vérification (CVN)</value></data>
+  <data name="NativeUsbEcuName" xml:space="preserve"><value>Nom du calculateur</value></data>
 </root>

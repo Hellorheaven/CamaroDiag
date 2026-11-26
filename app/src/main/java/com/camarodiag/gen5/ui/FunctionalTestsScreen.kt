@@ -336,6 +336,14 @@ fun FunctionalTestsScreen(
                         Text(stringResource(R.string.functional_native_usb_values),style=MaterialTheme.typography.titleMedium)
                         Text(stringResource(R.string.functional_native_usb_observed_vin,
                             values.observedVin ?: stringResource(R.string.obd_not_available)))
+                        for ((type,entries) in values.identity) {
+                            val label=when(type){
+                                4->R.string.functional_native_usb_calibration
+                                6->R.string.functional_native_usb_cvn
+                                else->R.string.functional_native_usb_ecu_name
+                            }
+                            Text(stringResource(label)+": "+entries.joinToString(", "))
+                        }
                         for ((mode,codes) in values.dtcs) {
                             val caption = when(mode) {
                                 3 -> R.string.functional_native_usb_dtc_confirmed
