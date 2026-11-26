@@ -88,7 +88,7 @@
   <data name="ExchangeStarted" xml:space="preserve"><value>DoIP / {0} / UDS: command at {1}, ECU 0x{2:X4}, tester 0x{3:X4}, version 0x{4:X2}.</value></data>
   <data name="ExchangeResult" xml:space="preserve"><value>ECU response: {0}</value></data>
   <data name="CountDtcs" xml:space="preserve"><value>Count DTCs</value></data>
-  <data name="DtcCountResult" xml:space="preserve"><value>DTC count={0}; requested mask=0x{1:X2}; available mask=0x{2:X2}; format=0x{3:X2}</value></data>
+  <data name="DtcCountResult" xml:space="preserve"><value>DTC count={0}; requested mask=0x{1:X2}; available mask=0x{2:X2}; format=0x{3:X2}; effective mask=0x{4:X2}</value></data>
   <data name="Snapshot" xml:space="preserve"><value>Read snapshot</value></data>
   <data name="Extended" xml:space="preserve"><value>Read extended data</value></data>
   <data name="DetailDtc" xml:space="preserve"><value>DTC (6 hex digits)</value></data>

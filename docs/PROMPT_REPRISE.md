@@ -1,3 +1,7 @@
+## PR117 — cohérence du comptage DTC Windows et Android (26/11/2026)
+
+- C6/DoIP : le comptage Windows 19/01 affiche aussi le masque effectif et signale un filtre indisponible, y compris si le compteur est nul. Régression FR/EN écrite. Ajustement de compatibilité Kotlin du rendu des états Android (liste d'identifiants de ressources, concaténation explicite). Aucune compilation ni test exécuté.
+
 ## PR117 — disponibilité des filtres DTC Android (26/11/2026)
 
 - C6/DoIP : Android affiche le masque effectif pour les résultats DTC 19/01 et 19/02, y compris les listes de mémoire et historiques filtrées. Les états DTC sont traduits FR/EN en ne décodant que les bits disponibles ; le code et l'octet bruts restent affichés. Une lecture sans bit disponible ne remplace plus l'inventaire précédent du calculateur, en DoIP et sur le parcours UDS CAN. Une requête filtrée ne remplace pas l'inventaire complet. Tests de politique écrits, non exécutés ; aucun checkpoint.

@@ -122,9 +122,13 @@ internal static class DoIpConsolePresentation
     }
 
     internal static string FormatDtcCount(ObdOnUdsServices.DtcCountReport report,
-        byte requestedMask, CultureInfo? culture = null) =>
-        string.Format(CultureInfo.InvariantCulture, Text("DtcCountResult", culture),
-            report.Count, requestedMask, report.StatusAvailabilityMask, report.DtcFormatIdentifier);
+        byte requestedMask, CultureInfo? culture = null)
+    {
+        var effective = requestedMask & report.StatusAvailabilityMask;
+        var result = string.Format(CultureInfo.InvariantCulture, Text("DtcCountResult", culture),
+            report.Count, requestedMask, report.StatusAvailabilityMask, report.DtcFormatIdentifier, effective);
+        return effective == 0 ? result + "\n" + Text("DtcNoAvailableFilter", culture) : result;
+    }
 
     internal static (uint Dtc, byte Record) ParseDetail(string dtc, string record)
     {

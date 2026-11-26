@@ -140,6 +140,11 @@ internal static class DoIpConsolePresentationSelfTests
             var countText = DoIpConsolePresentation.FormatDtcCount(count, 0xF0, culture);
             Check(countText.Contains("4660") && countText.Contains("0xF0") && countText.Contains("0x04"),
                 "DTC count preserves unsigned value, availability and format in " + language);
+            var noFilter = DoIpConsolePresentation.FormatDtcCount(
+                ObdOnUdsServices.DecodeDtcCountByStatusMask([0x59, 1, 1, 4, 0, 0]), 0x80, culture);
+            Check(noFilter.Contains("0x00") && noFilter.Contains(
+                DoIpConsolePresentation.Text("DtcNoAvailableFilter", culture)),
+                "DTC count cannot imply no faults when the filter is unavailable in " + language);
             Check(!string.IsNullOrWhiteSpace(DoIpConsolePresentation.Text("CountDtcs", culture)),
                 "Localized DTC count button in " + language);
             var emptyDtcs = ObdOnUdsServices.DecodeDtcByStatusMask(

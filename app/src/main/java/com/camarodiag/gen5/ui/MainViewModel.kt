@@ -2243,7 +2243,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun renderUdsDtcRecord(record: DecodedUdsDtcRecord, availability: Int): String {
-        val keys = intArrayOf(R.string.cal_uds_bit_failed, R.string.cal_uds_bit_failed_cycle,
+        val keys = listOf(R.string.cal_uds_bit_failed, R.string.cal_uds_bit_failed_cycle,
             R.string.cal_uds_bit_pending, R.string.cal_uds_bit_confirmed,
             R.string.cal_uds_bit_incomplete_since_clear, R.string.cal_uds_bit_failed_since_clear,
             R.string.cal_uds_bit_incomplete_cycle, R.string.cal_uds_bit_warning)
@@ -2260,7 +2260,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun renderUdsDtcFilter(filter: UdsDtcFilter): String =
         "\n" + localizedContext.getString(R.string.cal_uds_effective_mask, filter.effectiveMask) +
-            if (filter.available) "" else "\n" + localizedContext.getString(R.string.cal_uds_filter_unavailable)
+            (if (filter.available) "" else "\n" + localizedContext.getString(R.string.cal_uds_filter_unavailable))
 
     private fun renderUdsDtcList(report: UdsDtcReport, requestedMask: Int): String =
         localizedContext.getString(R.string.cal_doip_filtered_dtc_result,
