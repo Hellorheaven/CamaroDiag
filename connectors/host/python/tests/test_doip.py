@@ -259,6 +259,18 @@ class DoIpTests(unittest.TestCase):
             self.assertTrue(inventory.call_args.kwargs["tls"])
             self.assertEqual(inventory.call_args.args[3], (0x1234, 0x1235))
 
+    def test_inventory_close_failure_does_not_duplicate_target(self):
+        with patch("camarodiagconnectors.doip.discover", return_value=GATEWAY), \
+             patch("camarodiagconnectors.doip.Session") as session:
+            context = session.return_value
+            context.__enter__.return_value.verify_vin.return_value = VIN
+            context.__exit__.side_effect = [OSError("close failed"), None]
+            result = inventory_ecus(GATEWAY, VIN, 0x0E80, (0x1234, 0x1235))
+            self.assertEqual([row["ecu"] for row in result["targets"]], ["1234", "1235"])
+            self.assertEqual([row["status"] for row in result["targets"]],
+                             ["unverified", "vin_verified"])
+            self.assertEqual(result["verified_count"], 1)
+
     def test_inventory_tls_error_stops_all_remaining_targets(self):
         import ssl
         with patch("camarodiagconnectors.doip.discover", return_value=GATEWAY), \

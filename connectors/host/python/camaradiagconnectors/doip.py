@@ -698,7 +698,10 @@ def inventory_ecus(gateway: Gateway, expected: str, tester: int, targets: tuple[
                     details = {}
                 if vin != expected:
                     raise DoIpError("ECU VIN does not match selected vehicle")
-                rows.append({"ecu": f"{ecu:04X}", "status": "vin_verified", "vin": vin} | details)
+                verified = {"ecu": f"{ecu:04X}", "status": "vin_verified", "vin": vin} | details
+            # A successful VIN read does not complete the target if session
+            # shutdown fails. Publish exactly one observation per target.
+            rows.append(verified)
         except ssl.SSLError:
             # Never continue or downgrade a failed TLS authentication.
             raise
