@@ -18,6 +18,7 @@ import org.json.JSONObject
 object DoIpMemoryBackup {
     const val MAX_BYTES = 16 * 1024 * 1024
     const val MAX_BLOCKS_PER_PASS = 8192
+    private const val MAX_ZIP_BYTES = 2L * MAX_BYTES + 1024 * 1024
     data class Scope(val vin: String, val gateway: Int, val tester: Int, val ecu: Int,
         val identityDid: Int, val identityHex: String, val start: Long, val length: Int,
         val blockSize: Int, val region: String) {
@@ -195,7 +196,8 @@ object DoIpMemoryBackup {
         val seen = mutableSetOf<String>()
         var manifest: ByteArray? = null
         var reference: ByteArray? = null
-        ZipInputStream(input).use { zip ->
+        val guarded = EcuZipCompletionGuard(input, MAX_ZIP_BYTES)
+        ZipInputStream(guarded).use { zip ->
             while (true) {
                 val entry = zip.nextEntry ?: break
                 require(!entry.isDirectory && entry.name in names && seen.add(entry.name)) {
@@ -228,6 +230,7 @@ object DoIpMemoryBackup {
                 }
                 zip.closeEntry()
             }
+            guarded.requireCompletedArchive(seen.toList())
         }
         require(seen == names)
         return ArchiveContents(requireNotNull(manifest), sha(requireNotNull(reference)))
@@ -237,13 +240,17 @@ object DoIpMemoryBackup {
     fun verifyStaged(input: InputStream, capture: Capture) {
         val expected = linkedMapOf("manifest.json" to capture.manifest,
             "original.bin" to capture.first, "verification.bin" to capture.second)
-        ZipInputStream(input).use { zip ->
+        val guarded = EcuZipCompletionGuard(input, MAX_ZIP_BYTES)
+        val seen = mutableListOf<String>()
+        ZipInputStream(guarded).use { zip ->
             while (true) {
                 val entry = zip.nextEntry ?: break
                 val data = expected.remove(entry.name) ?: error("Unexpected or duplicate DoIP archive entry.")
                 require(!entry.isDirectory && MessageDigest.isEqual(readBounded(zip, data.size), data))
                 zip.closeEntry()
+                seen += entry.name
             }
+            guarded.requireCompletedArchive(seen)
         }
         require(expected.isEmpty()) { "Incomplete DoIP backup." }
     }
