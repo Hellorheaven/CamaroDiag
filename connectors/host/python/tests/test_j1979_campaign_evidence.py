@@ -62,6 +62,19 @@ class CaptureTests(unittest.TestCase):
         ):
             self.assertFalse(decode(io.BytesIO(capture))["capture_integrity_verified"])
 
+    def test_capture_cannot_upgrade_unknown_or_truncated_record(self):
+        for request, response, state in (
+            (b"\x01\xA1", b"\x41\xA1\x01", 1),
+            (b"\x01\x0C", b"\x41\x0C\x00", 1),
+            (b"\x01\x05", b"\x41\x05\x40", 2),
+            (b"\x03", b"\x43\x01\x00\x00", 1),
+            (b"\x01\xA1", b"\x41\xA1", 2),
+        ):
+            report = decode(io.BytesIO(start() + INITIAL + step(2, request, response, state)))
+            self.assertFalse(report["capture_integrity_verified"])
+            self.assertEqual(1, len(report["steps"]))
+            self.assertIn("shape", report["error"])
+
     def test_partial_and_raw_evidence(self):
         data = start() + INITIAL + step(2, b"\x01\xA1", b"\x41\xA1\x01", 2)
         data += step(3, b"\x07", b"", 4)
