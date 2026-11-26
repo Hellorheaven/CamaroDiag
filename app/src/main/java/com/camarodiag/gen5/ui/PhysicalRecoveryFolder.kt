@@ -74,7 +74,7 @@ internal object PhysicalRecoveryFolder {
         val staging = Files.createTempDirectory(cacheDir.toPath(), "ecu-inspection-").toFile()
         var total = 0L
         try {
-            val digests = mutableMapOf<Entry, ByteArray>()
+            val digests = mutableMapOf<Entry, Pair<Long, ByteArray>>()
             fun copy(entry: Entry, destination: File, max: Long) {
                 val uri = DocumentsContract.buildDocumentUriUsingTree(tree, entry.id)
                 var count = 0L
@@ -96,7 +96,7 @@ internal object PhysicalRecoveryFolder {
                     }
                 }
                 check(count > 0)
-                digests[entry] = digest.digest()
+                digests[entry] = count to digest.digest()
             }
             // SAF has no portable stable inode guarantee. Re-read the same
             // source document IDs with a separate bounded pass and compare
@@ -104,6 +104,7 @@ internal object PhysicalRecoveryFolder {
             fun verifySource(entry: Entry, max: Long) {
                 val uri = DocumentsContract.buildDocumentUriUsingTree(tree, entry.id)
                 val digest = MessageDigest.getInstance("SHA-256")
+                val (originalSize, originalHash) = digests.getValue(entry)
                 var count = 0L
                 requireNotNull(resolver.openInputStream(uri)).use { input ->
                     val buffer = ByteArray(8192)
@@ -113,11 +114,11 @@ internal object PhysicalRecoveryFolder {
                         if (n < 0) break
                         check(n > 0)
                         count += n
-                        check(count <= max)
+                        check(count <= max && count <= originalSize)
                         digest.update(buffer, 0, n)
                     }
                 }
-                check(count > 0 && MessageDigest.isEqual(digests.getValue(entry), digest.digest())) {
+                check(count == originalSize && MessageDigest.isEqual(originalHash, digest.digest())) {
                     "Recovery source changed during import."
                 }
             }
