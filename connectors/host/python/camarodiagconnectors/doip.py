@@ -901,41 +901,15 @@ class Session:
             self._operation_lock.release()
 
     def exchange(self, request: bytes, *, overall_deadline: float | None = None) -> bytes:
-        """Generic transport; optional caller deadline also bounds P2/P2*."""
+        """One exclusive UDS request; contention must not close its owner."""
         request = bytes(request)
-        if not 1 <= len(request) <= 4091 or not self._operation_lock.acquire(blocking=False):
-            raise DoIpError("Invalid or concurrent diagnostic request")
+        if not 1 <= len(request) <= 4091:
+            raise DoIpError("Invalid diagnostic request")
+        if not self._operation_lock.acquire(blocking=False):
+            raise DoIpError("Concurrent diagnostic request")
         self._busy = True
         try:
-            deadline = time.monotonic() + self.timeout
-            if overall_deadline is not None:
-                deadline = min(deadline, overall_deadline)
-            expected = logical(self.ecu) + logical(self.tester)
-            self._drain_ready(deadline)
-            self._send(0x8001, logical(self.tester) + logical(self.ecu) + request, deadline)
-            response_deadline = min(deadline, time.monotonic() + self.p2)
-            while True:
-                kind, body = self._receive(response_deadline)
-                remaining(response_deadline)
-                if self._alive(kind, body, response_deadline):
-                    continue
-                if kind not in (0x8001, 0x8002, 0x8003) or len(body) < 5 or body[:4] != expected:
-                    raise DoIpError("Uncorrelated diagnostic PDU")
-                if kind in (0x8002, 0x8003):
-                    if body[5:] != request[:len(body)-5] or kind == 0x8003 or body[4] != 0:
-                        raise DoIpError("Diagnostic acknowledgement rejected")
-                    continue
-                reply = body[4:]
-                if reply[0] == 0x7F:
-                    if len(reply) != 3 or reply[1] != request[0]:
-                        raise DoIpError("Uncorrelated UDS negative response")
-                    if reply[2] == 0x78:
-                        response_deadline = min(deadline, time.monotonic() + self.p2_star)
-                        continue
-                    raise NegativeResponse(reply[1], reply[2])
-                result = positive(request, reply)
-                remaining(response_deadline)
-                return result
+            return self._exchange_owned(request, overall_deadline=overall_deadline)
         except BaseException:
             self.close()
             raise
@@ -943,20 +917,65 @@ class Session:
             self._busy = False
             self._operation_lock.release()
 
+    def _exchange_owned(self, request: bytes, *, overall_deadline: float | None = None) -> bytes:
+        """Exchange with the exclusive operation lock already held.
+
+        Callers must retire this session on any uncertain exchange or callback
+        failure. Do not call from another thread without the operation lock.
+        """
+        deadline = time.monotonic() + self.timeout
+        if overall_deadline is not None:
+            deadline = min(deadline, overall_deadline)
+        expected = logical(self.ecu) + logical(self.tester)
+        self._drain_ready(deadline)
+        self._send(0x8001, logical(self.tester) + logical(self.ecu) + request, deadline)
+        response_deadline = min(deadline, time.monotonic() + self.p2)
+        while True:
+            kind, body = self._receive(response_deadline)
+            remaining(response_deadline)
+            if self._alive(kind, body, response_deadline):
+                continue
+            if kind not in (0x8001, 0x8002, 0x8003) or len(body) < 5 or body[:4] != expected:
+                raise DoIpError("Uncorrelated diagnostic PDU")
+            if kind in (0x8002, 0x8003):
+                if body[5:] != request[:len(body)-5] or kind == 0x8003 or body[4] != 0:
+                    raise DoIpError("Diagnostic acknowledgement rejected")
+                continue
+            reply = body[4:]
+            if reply[0] == 0x7F:
+                if len(reply) != 3 or reply[1] != request[0]:
+                    raise DoIpError("Uncorrelated UDS negative response")
+                if reply[2] == 0x78:
+                    response_deadline = min(deadline, time.monotonic() + self.p2_star)
+                    continue
+                raise NegativeResponse(reply[1], reply[2])
+            result = positive(request, reply)
+            remaining(response_deadline)
+            return result
+
     def exchange_sequence(self, commands: tuple[bytes, ...], on_reply=lambda *_: None) -> list[bytes]:
+        """Execute the entire approved sequence on one exclusive TCP/TLS owner."""
         frozen = tuple(bytes(command) for command in commands)
-        if not 1 <= len(frozen) <= 16 or any(not 1 <= len(c) <= 4091 for c in frozen) or sum(map(len, frozen)) > 4091:
+        if (not 1 <= len(frozen) <= 16 or
+                any(not 1 <= len(command) <= 4091 for command in frozen) or
+                sum(map(len, frozen)) > 4091):
             raise DoIpError("Invalid command sequence")
+        if not self._operation_lock.acquire(blocking=False):
+            raise DoIpError("Concurrent diagnostic sequence")
+        self._busy = True
         replies = []
         try:
             for index, command in enumerate(frozen, 1):
-                reply = self.exchange(command)
+                reply = self._exchange_owned(command)
                 replies.append(reply)
                 on_reply(index, reply)
             return replies
         except BaseException:
             self.close()
             raise
+        finally:
+            self._busy = False
+            self._operation_lock.release()
 
     def read_obd(self, expected: str, did: int | None = None) -> dict:
         if did is not None and not 0xF400 <= did <= 0xF8FF:
