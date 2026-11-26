@@ -5711,7 +5711,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             throw error
                         }
                     }
+                    check(current())
                     baselineSaved = true
+                    // Preserve the verified pre-operation evidence in the
+                    // report even if the user cancels after transmission.
+                    _functionalTestState.update { it.copy(legacyBaseline=baseline) }
                 }
                 if (current()) _functionalTestState.value = FunctionalTestPlanner.legacyMutationResults(
                     _functionalTestState.value,result,baselineSaved)
@@ -5893,7 +5897,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
             snapshot.legacyTarget?.let { target ->
                 json.put("legacyMutation",snapshot.legacyResult?.let(LegacyMutationEvidenceJson::encode) ?: JSONObject.NULL)
+                    .put("legacyBaseline",snapshot.legacyBaseline?.let(LegacyMutationEvidenceJson::encode) ?: JSONObject.NULL)
                     .put("legacyOperation",if (target.clear) "CLEAR" else "EVAP_PREPARATION")
+                    .put("legacyEngineSource","%02X".format(java.util.Locale.ROOT,target.engineSource))
+                    .put("legacyDocumentedSources",JSONArray(target.sources.map { "%02X".format(java.util.Locale.ROOT,it) }))
                     .put("legacyProtocol",target.protocol).put("wholeVehicleCoverageVerified",false)
             }
             val exportName = if (snapshot.legacyTarget != null)
