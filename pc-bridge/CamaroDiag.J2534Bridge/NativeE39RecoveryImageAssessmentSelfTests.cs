@@ -55,6 +55,17 @@ internal static class NativeE39RecoveryImageAssessmentSelfTests
                 TargetSha256 = imageSha, KernelSha256 = imageSha
             });
             File.WriteAllText(metadataPath, Metadata(imageSha));
+            var initialMetadata = NativeE39SavedBlockAssessment.InspectTargetMetadata(journalPath);
+            Check(initialMetadata.Verified && initialMetadata.MetadataSnapshotSha256 is { Length: 64 },
+                "Recovery metadata retains its complete byte snapshot digest");
+            var unchangedMetadata = File.ReadAllText(metadataPath);
+            File.WriteAllText(metadataPath, unchangedMetadata + " ");
+            var modifiedMetadata = NativeE39SavedBlockAssessment.InspectTargetMetadata(journalPath);
+            Check(modifiedMetadata.Verified && modifiedMetadata.Vin == initialMetadata.Vin &&
+                modifiedMetadata.MetadataSnapshotSha256 != initialMetadata.MetadataSnapshotSha256,
+                "A metadata-only change is detectable even when parsed identity remains unchanged");
+            File.WriteAllText(metadataPath, unchangedMetadata);
+
             var pass = NativeE39RecoveryImageAssessment.Inspect(journalPath, imagePath);
             Check(pass.Verified && pass.VerifiedSectors == 1 && pass.FailedSectorAddress is null,
                 "Full original BIN and live ECU saved sector bytes match the same evidence");
