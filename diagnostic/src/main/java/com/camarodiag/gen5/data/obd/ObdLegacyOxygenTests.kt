@@ -117,4 +117,74 @@ internal object ObdLegacyOxygenTests {
         currentCoroutineContext().ensureActive()
         return ObdMode05Report(protocol, complete, sensors, reads.toList())
     }
+
+    /** Legacy Mode 06 has TID, component/limit type and one limit per record.
+     * It is not the CAN MID/TID/UASID record. Keep encoded words and do
+     * not declare a component passed without monitor completion and OEM data. */
+    suspend fun scanMode06(
+        request: suspend (String, Long) -> String,
+        budgetMs: Long = 20_000L,
+        clockMs: () -> Long = { System.nanoTime() / 1_000_000L }
+    ): String? {
+        require(budgetMs > 0)
+        val start = clockMs()
+        var partial = false
+        var discovered = false
+        val tids = linkedSetOf<Int>()
+        suspend fun read(tid: Int): List<List<Int>>? {
+            currentCoroutineContext().ensureActive()
+            val remaining = budgetMs - (clockMs() - start)
+            if (remaining <= 0) return null
+            val command = "06%02X".format(Locale.ROOT, tid)
+            val raw = request(command, minOf(1800L, remaining))
+            currentCoroutineContext().ensureActive()
+            return records(command, raw)
+        }
+        for (base in 0..0xE0 step 32) {
+            val messages = read(base).orEmpty()
+            val pages = messages.filter {
+                it.size == 7 && it[0] == 0x46 && it[1] == base && it[2] == 0xFF
+            }
+            if (pages.isEmpty()) {
+                if (discovered) partial = true
+                break
+            }
+            discovered = true
+            if (messages.size != pages.size) partial = true
+            for (page in pages) for (bit in 0 until 31) {
+                if (page[3 + bit / 8] and (1 shl (7 - bit % 8)) != 0)
+                    tids += base + bit + 1
+            }
+            if (pages.none { it[6] and 1 != 0 }) break
+            if (base == 0xE0) partial = true
+        }
+        if (!discovered) return null
+        val output = mutableListOf<String>()
+        val requested = tids.sorted()
+        for ((index, tid) in requested.withIndex()) {
+            if (budgetMs - (clockMs() - start) <= 0) {
+                partial = true
+                output += "UNQUERIED_TIDS=" + requested.drop(index).joinToString(",") {
+                    "%02X".format(Locale.ROOT, it)
+                }
+                break
+            }
+            val messages = read(tid).orEmpty()
+            val matched = messages.filter { it.size == 7 && it[0] == 0x46 && it[1] == tid }
+            if (matched.isEmpty() || matched.size != messages.size) partial = true
+            if (matched.isEmpty()) output += "TID=%02X: N/A".format(Locale.ROOT, tid)
+            for (record in matched) {
+                val cid = record[2] and 0x7F
+                val limitType = if (record[2] and 0x80 == 0) "MAX" else "MIN"
+                val value = (record[3] shl 8) or record[4]
+                val limit = (record[5] shl 8) or record[6]
+                output += "TID=%02X CID=%02X LIMIT_TYPE=%s RAW=%04X LIMIT_RAW=%04X"
+                    .format(Locale.ROOT, tid, cid, limitType, value, limit)
+            }
+        }
+        if (output.isEmpty()) output += "DISCOVERED_TIDS=0"
+        if (partial) output += "PARTIAL"
+        currentCoroutineContext().ensureActive()
+        return output.joinToString("\n")
+    }
 }
