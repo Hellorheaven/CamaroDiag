@@ -617,6 +617,63 @@ class DoIpTests(unittest.TestCase):
             self.assertEqual(discover_mock.call_count, 2)
             session.assert_not_called()
 
+    def test_cli_sequence_progress_distinguishes_partial_from_clean_close(self):
+        args = ["--host", GATEWAY.host, "--vin", VIN, "--tester", "0E80", "--ecu", "1234",
+                "--tcp", "sequence", "--commands", "22F190;22F187"]
+        for outcome in ("complete", "second_command_error", "socket_close_error"):
+            with self.subTest(outcome=outcome), \
+                 patch("camarodiagconnectors.doip_cli.discover", return_value=GATEWAY), \
+                 patch("camarodiagconnectors.doip_cli.confirm_commands", return_value=True), \
+                 patch("camarodiagconnectors.doip_cli.sys.stdin.isatty", return_value=True), \
+                 patch("camarodiagconnectors.doip_cli.Session") as session:
+                client = session.return_value.__enter__.return_value
+                client.verify_vin.return_value = VIN
+                replies = [bytes.fromhex("62F190"), bytes.fromhex("62F187")]
+                def exchange_sequence(commands, on_reply):
+                    self.assertEqual(commands, parse_commands("22F190;22F187"))
+                    on_reply(1, replies[0])
+                    if outcome == "second_command_error":
+                        raise DoIpError("Second reply unavailable")
+                    on_reply(2, replies[1])
+                    return replies
+                client.exchange_sequence.side_effect = exchange_sequence
+                if outcome == "socket_close_error":
+                    session.return_value.__exit__.side_effect = OSError("Close failed")
+                output = io.StringIO()
+                with redirect_stderr(output):
+                    if outcome == "complete":
+                        report = run(args)
+                        self.assertEqual(report["responses"], ["62F190", "62F187"])
+                        self.assertEqual(report["commands_completed"], 2)
+                        self.assertTrue(report["sequence_complete"])
+                    else:
+                        with self.assertRaises(DoIpError if outcome == "second_command_error"
+                                               else OSError):
+                            run(args)
+                events = [json.loads(line) for line in output.getvalue().splitlines()
+                          if line.startswith("{")]
+                progress = [event["sequence_progress"] for event in events
+                            if "sequence_progress" in event]
+                expected_count = 1 if outcome == "second_command_error" else 2
+                self.assertEqual([item["index"] for item in progress],
+                                 list(range(1, expected_count + 1)))
+                self.assertEqual([item["commands_completed"] for item in progress],
+                                 list(range(1, expected_count + 1)))
+                self.assertTrue(all(item["partial"] and not item["complete"] for item in progress))
+                self.assertTrue(all(item["vin"] == VIN and item["ecu"] == 0x1234 and
+                                    item["tester"] == 0x0E80 and item["requested_commands"] == 2
+                                    for item in progress))
+                summaries = [event["sequence_summary"] for event in events
+                             if "sequence_summary" in event]
+                if outcome == "complete":
+                    self.assertEqual(summaries, [])
+                else:
+                    self.assertEqual(len(summaries), 1)
+                    self.assertFalse(summaries[0]["sequence_complete"])
+                    self.assertFalse(summaries[0]["complete"])
+                    self.assertEqual(summaries[0]["commands_completed"], expected_count)
+                client.exchange_sequence.assert_called_once()
+
     def test_sequence_requires_two_separate_confirmations(self):
         commands = parse_commands("22 F1 90;19 01 FF")
         self.assertEqual(commands, (bytes.fromhex("22F190"), bytes.fromhex("1901FF")))
