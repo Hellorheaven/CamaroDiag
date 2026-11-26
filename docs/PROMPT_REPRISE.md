@@ -1,3 +1,7 @@
+## PR117 — navigation de la cartographie ECU (26/11/2026)
+
+- Ajout du menu de navigation fixe par rubrique (véhicule, identification, signaux, traces, fichiers, éditeur, mémoire, expert, DoIP), suppression du doublon de titre, identification explicite du profil sélectionné et rappel si VIN divergent. Aucun contrôle de sécurité ou opération existante retiré ; DoIP reste repliable et visible pendant découverte/lecture. Non compilé avant clôture du chantier.
+
 ## Retour propriétaire — suivi des correctifs Mach-E (26/11/2026)
 
 - PID Mode 01 5B : le propriétaire confirme que 71,37 % correspond au SOC de sa Mach-E, non au SOH. Libellé générique neutre dans live, catalogue et scan ; définition spécifique par modèle à qualifier via #42, ne pas généraliser le SOC à tout véhicule. Aucun VIN réel ajouté au dépôt.

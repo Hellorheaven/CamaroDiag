@@ -14,6 +14,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
@@ -437,20 +438,57 @@ fun CalibrationWorkspaceScreen(
     val allProfiles = remember { CamaroCalibrationCatalog.profiles }
     val yearProfiles = remember(vehicle.modelYear) { CamaroCalibrationCatalog.forYear(vehicle.modelYear) }
 
+    val listState = rememberLazyListState()
+    val navigationScope = rememberCoroutineScope()
+    var navigationOpen by remember { mutableStateOf(false) }
+    val showDoIp = doIpExpanded || state.doIpReading || state.doIpGatewayReading
+    val hasLfxPanel = vehicle.modelYear == 2012 && vehicle.engine.rpo == "LFX"
+    // Count the optional panels before the keyed sections; keep all controls and warnings.
+    val sectionOffset = (if (showDoIp) 1 else 0) + (if (hasLfxPanel) 1 else 0)
+    val sections = listOf(
+        R.string.cal_section_vehicle to 1 + (if (showDoIp) 1 else 0),
+        R.string.cal_ecu_identification to 3 + sectionOffset,
+        R.string.cal_section_signals to 4 + sectionOffset,
+        R.string.cal_trace_title to 6 + sectionOffset,
+        R.string.calibration_files to 7 + sectionOffset,
+        R.string.cal_table_editor to 8 + sectionOffset,
+        R.string.cal_ecu_memory_read_write to 9 + sectionOffset,
+        R.string.cal_expert_title to 10 + sectionOffset
+    )
+    Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Box(Modifier.fillMaxWidth()) {
+            OutlinedButton(onClick = { navigationOpen = true }, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.cal_section_navigation))
+            }
+            DropdownMenu(expanded = navigationOpen, onDismissRequest = { navigationOpen = false }) {
+                sections.forEach { (label, index) ->
+                    DropdownMenuItem(text = { Text(stringResource(label)) }, onClick = {
+                        navigationOpen = false
+                        navigationScope.launch { listState.scrollToItem(index) }
+                    })
+                }
+                DropdownMenuItem(text = { Text(stringResource(R.string.cal_doip_title)) }, onClick = {
+                    navigationOpen = false
+                    doIpExpanded = true
+                    navigationScope.launch { listState.scrollToItem(0) }
+                })
+            }
+        }
     LazyColumn(
-        modifier = Modifier.fillMaxSize(),
+        state = listState,
+        modifier = Modifier.weight(1f).fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        item {
+        item(key = "workspace") {
             Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(stringResource(R.string.cal_workspace_title), color = CamaroAmber, fontWeight = FontWeight.ExtraBold)
-                Text(stringResource(R.string.cal_workspace_navigation_hint), color = TextMuted, fontSize = 12.sp)
+                // Text(stringResource(R.string.cal_workspace_navigation_hint), color = TextMuted, fontSize = 12.sp)
                 OutlinedButton(onClick = { doIpExpanded = !doIpExpanded }, modifier = Modifier.fillMaxWidth()) {
                     Text(stringResource(if (doIpExpanded) R.string.cal_hide_doip_advanced else R.string.cal_show_doip_advanced))
                 }
             }
         }
-        if (doIpExpanded || state.doIpReading) item {
+        if (showDoIp) item(key = "doip") {
             Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(stringResource(R.string.cal_doip_title), color = CamaroAmber, fontWeight = FontWeight.Bold)
@@ -1136,9 +1174,12 @@ fun CalibrationWorkspaceScreen(
         }
         item {
             Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                Text(stringResource(R.string.cal_workspace_title),
-                    color = CamaroAmber, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.sp)
-                Text(vehicleLabel, color = TextPrimary, fontWeight = FontWeight.SemiBold)
+                Text(stringResource(R.string.cal_section_vehicle),
+                    color = CamaroAmber, fontWeight = FontWeight.ExtraBold)
+                Text(stringResource(R.string.cal_selected_profile_label, vehicleLabel), color = TextPrimary, fontWeight = FontWeight.SemiBold)
+                if (state.vinComparison?.matches == false) {
+                    Text(stringResource(R.string.cal_vin_mismatch_title), color = WarnRed, fontWeight = FontWeight.Bold)
+                }
                 Text(stringResource(R.string.cal_ecm_family, ecmType),
                     color = TextMuted, fontSize = 12.sp)
                 Text(
@@ -2681,6 +2722,7 @@ fun CalibrationWorkspaceScreen(
         if (state.message.isNotBlank()) {
             item { Text(state.message, color = CamaroAmber, fontSize = 12.sp) }
         }
+    }
     }
     if (showVinMismatchDialog) {
         val comparison = state.vinComparison

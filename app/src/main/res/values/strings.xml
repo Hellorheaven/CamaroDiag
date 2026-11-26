@@ -1226,4 +1226,8 @@
     <string name="cal_workspace_navigation_hint">Identify the ECU first, then select a calibration file or a memory operation. Advanced network diagnostics are optional.</string>
     <string name="cal_show_doip_advanced">Show advanced DoIP diagnostics</string>
     <string name="cal_hide_doip_advanced">Hide advanced DoIP diagnostics</string>
+    <string name="cal_section_navigation">Go to section</string>
+    <string name="cal_section_vehicle">Vehicle and selected profile</string>
+    <string name="cal_section_signals">Diagnostic signal catalogues</string>
+    <string name="cal_selected_profile_label">Selected profile: %1$s</string>
 </resources>

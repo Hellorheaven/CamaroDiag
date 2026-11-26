@@ -1229,4 +1229,8 @@
     <string name="cal_workspace_navigation_hint">Identifiez le calculateur, puis choisissez un fichier de cartographie ou une opération mémoire. Les diagnostics réseau avancés sont facultatifs.</string>
     <string name="cal_show_doip_advanced">Afficher les diagnostics DoIP avancés</string>
     <string name="cal_hide_doip_advanced">Masquer les diagnostics DoIP avancés</string>
+    <string name="cal_section_navigation">Accéder à une rubrique</string>
+    <string name="cal_section_vehicle">Véhicule et profil sélectionné</string>
+    <string name="cal_section_signals">Catalogues de données diagnostiques</string>
+    <string name="cal_selected_profile_label">Profil sélectionné : %1$s</string>
 </resources>
