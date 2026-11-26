@@ -18,8 +18,8 @@
   <data name="ExportFailed" xml:space="preserve"><value>Could not export the J1979 report.</value></data>
   <data name="EvapRun" xml:space="preserve"><value>Mode 08 — EVAP</value></data>
   <data name="EvapVinRequired" xml:space="preserve"><value>Enter the documented 17-character VIN of the vehicle to test.</value></data>
-  <data name="EvapWarning" xml:space="preserve"><value>This operation requests the ECU to start an evaporative system leak test. Follow the manufacturer's procedure, ensure the vehicle is stationary, engine stopped, in a ventilated area and safe to test. The ECU may refuse the test. Do not repeat it automatically.</value></data>
-  <data name="EvapConfirm" xml:space="preserve"><value>Run the EVAP test once on VIN {0}, physical CAN {1}/{2}?</value></data>
+  <data name="EvapWarning" xml:space="preserve"><value>This operation requests the ECU to establish the conditions for an evaporative-system leak test; it does not itself perform the leak test. Follow the manufacturer's procedure, ensure the vehicle is stationary, engine stopped, in a ventilated area and safe to test. The ECU may refuse the test. Do not repeat it automatically.</value></data>
+  <data name="EvapConfirm" xml:space="preserve"><value>Request EVAP test conditions once on VIN {0}, physical CAN {1}/{2}?</value></data>
   <data name="EvapRunning" xml:space="preserve"><value>EVAP precondition checks in progress.</value></data>
   <data name="EvapExpired" xml:space="preserve"><value>Authorization expired; test state may be uncertain. Do not repeat automatically.</value></data>
   <data name="EvapNotCompletion" xml:space="preserve"><value>An acknowledgment does not prove completion or a leak-test result.</value></data>
