@@ -41,6 +41,12 @@ La commande de diagnostic demande une confirmation explicite avant émission. **
 
 Le CLI `--monitor-did` / `--monitor-dids` et leurs variantes OBDonUDS publient une ligne JSON par échantillon vérifié, avec VIN, passerelle, testeur, ECU, transport et temps écoulé. Le bilan final contient `samples`, `requestedSamples`, `complete` et `status` (`complete`, `canceled`, `failed`). Une capture interrompue conserve les mesures précédemment vérifiées ; elle n'est jamais déclarée complète. La fermeture du transport et du journal éventuel précède le bilan complet. Les lignes d'échantillons restent marquées `partial: true` tant que le bilan n'est pas disponible. Un arrêt brutal du processus peut empêcher l'émission du bilan final ; l'absence de bilan signifie que la complétude n'est pas attestée. La cadence réelle inclut les contrôles d'identité et dépend de la latence ECU.
 
+### Sauvegarde mémoire limitée à une zone
+
+Android, le pont Windows et les Connectors Python lisent deux fois la même zone ECU décrite par un profil explicite. Le nombre de blocs est limité à 8 192 par lecture (soit au maximum 2 Mio avec des blocs de 256 octets). La durée globale de lecture est de 600 s ; sur Android elle inclut également l'établissement TCP/TLS et le routage. La découverte UDP initiale, la revalidation finale de la passerelle et l'export ZIP ne sont pas inclus dans ce budget. Le VIN et l'identifiant ECU sont revérifiés après chaque lot de 32 blocs ou fin de passe avant publication de progression, puis avant acceptation des deux lectures. La passerelle est contrôlée à nouveau avant publication, sans réémission automatique ni écriture ECU.
+
+La vérification hors ligne accepte les profils et archives de 16 Mio au maximum, indépendamment de leur faisabilité en acquisition directe. Android compare les deux entrées binaires octet par octet en ne conservant qu'une région entière en mémoire. L'intégrité du fichier ne garantit pas la provenance physique des données. Un profil au-delà du budget d'acquisition reste utilisable en vérification, mais ne permet pas de démarrer une lecture sur le véhicule.
+
 ### Critères du lot logiciel et limites
 
 La recette automatique du lot couvre la syntaxe des paquets, les réponses de routage, les versions TCP 0x02/0x03/0x04, le diagnostic sur TCP IPv4/IPv6 en boucle locale, la corrélation des adresses, l'ACK/NACK, les temporisations P2/P2*, les annulations, les modifications du buffer de requête par l'appelant et les erreurs. **L'aide Windows `--help` décrit maintenant les commandes DoIP en français et anglais** ; le mélange de `--help` avec une commande de transmission est bloqué sans E/S. Les nouveaux scénarios de passerelle TCP/UDP exécutent de **vraies communications réseau en boucle locale** : TCP fragmenté, ACK obsolète, SID ou version erronés, trames tronquées, confirmations de routage `0x11`/`0x10` avec stabilité de l'adresse logique passerelle, réponse d'activation OEM optionnelle à 13 octets, NRC `0x78` répétés, **service d'écriture UDS `0x2E` avec ACK ou NRC négatif (passerelle fictive uniquement)** et refus du repli TLS vers TCP non sécurisé. Ils n'accèdent à aucun adaptateur, calculateur ou réseau de véhicule.
@@ -76,6 +82,12 @@ Automated TCP/UDP tests cover fragmented frames, stale acknowledgments, incorrec
 ### DID monitoring capture
 
 The CLI emits one JSON line per identity-verified sample, including VIN, gateway, tester, ECU, transport and elapsed time. The terminal record contains `samples`, `requestedSamples`, `complete` and `status` (`complete`, `canceled`, `failed`). Interrupted captures retain previously verified samples but are never declared complete. Transport disposal and optional trace journal closure precede successful completion. Sample lines retain `partial: true` until the terminal summary is available. Abrupt process termination can prevent that summary; a missing summary does not establish completeness. Actual sampling cadence includes identity checks and depends on ECU latency.
+
+### Scoped memory backup
+
+Android, Windows Bridge and Python Connectors perform two independent reads of a region defined by an explicit ECU profile. Each pass is limited to 8,192 blocks (at most 2 MiB with 256-byte blocks). The common read deadline is 600 seconds; Android also includes TCP/TLS establishment and routing in this budget. Initial UDP discovery, final gateway revalidation and ZIP export are outside that deadline. VIN and ECU identity are rechecked after each batch of 32 blocks or end of pass before reporting progress, and before accepting the two reads. The gateway is revalidated before publication; no automatic retry or ECU write is performed.
+
+Offline verification accepts profiles and archives with a region of up to 16 MiB independently of live acquisition feasibility. Android compares the binary entries byte for byte while holding only one complete region in memory. Archive integrity does not establish hardware provenance. Profiles beyond the live block budget remain available for offline verification only.
 
 ### Références de normalisation / Standards
 
