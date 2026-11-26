@@ -521,6 +521,13 @@
     <string name="mileage_source_generic">Source %1$s</string>
     <string name="mileage_details_unavailable">Technical details are unavailable for this source.</string>
     <string name="mileage_caveat_unavailable">No additional localized information is available for this source.</string>
+    <string name="obd_value_source">CAN responder %1$s</string>
+    <string name="obd_pid_standard">OBD standard</string>
+    <string name="obd_pid_runtime">Run time since engine start</string>
+    <string name="obd_pid_mil_distance">Distance with MIL on</string>
+    <string name="obd_pid_warmups">Warm-ups since DTC clear</string>
+    <string name="obd_pid_clear_distance">Distance since DTC clear</string>
+    <string name="obd_pid_odometer">Total odometer</string>
     <string name="obd_pid_generic">PID %1$02X</string>
     <string name="cal_format_raw_binary">BIN / raw binary</string>
     <string name="cal_format_intel_hex">Intel HEX</string>

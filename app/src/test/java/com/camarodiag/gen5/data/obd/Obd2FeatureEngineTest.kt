@@ -213,6 +213,28 @@ class Obd2FeatureEngineTest {
     }
 
     @Test
+    fun machEObservedPidValuesAndOdometerRemainSeparate() = runBlocking {
+        val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+            when (command) {
+                "0105" -> "7E8 03 41 05 FF 7EA 03 41 05 00 7EC 03 41 05 37"
+                "0131" -> "7E8 04 41 31 39 3D"
+                "01A6" -> "41A6000BD967"
+                "011C" -> "411C03 411C03"
+                "0101" -> "410100040000 410100278000"
+                else -> "NO DATA"
+            }
+        })
+        val rows = engine.readLiveData(setOf(5, 0x31, 0xA6, 0x1C))
+        assertEquals(setOf("7E8", "7EA", "7EC"), rows.filter { it.pid == 5 }.map { it.responder }.toSet())
+        assertEquals("77655.10", rows.single { it.pid == 0xA6 }.value)
+        assertEquals("14653.00", rows.single { it.pid == 0x31 }.value)
+        assertEquals(listOf(3), rows.single { it.pid == 0x1C }.raw)
+        assertEquals(2, engine.readReadiness()?.lines()?.size)
+        assertEquals(77655.1, CamaroUdsProtocol.parseOdometerPidA6("41A6000BD967") ?: -1.0, 0.0001)
+        assertNull(CamaroUdsProtocol.parseOdometerPidA6("41A6000BD967\\r41A600000001".replace("\\r", "\r")))
+    }
+
+    @Test
     fun readsAndDecodesEngineRpmFromSupportedPid() = runBlocking {
         val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
             when (command) {
@@ -267,7 +289,9 @@ class Obd2FeatureEngineTest {
         assertEquals(emptyList<ObdDtc>(), modes[7])
         assertNull(modes[10])
         assertEquals(listOf("ATH0", "ATS0", "03", "07", "0A", "ATH1", "ATS0"), commands)
-        assertEquals("1726.00", engine.readLiveData(setOf(0x0C)).single().value)
+        val rpm = engine.readLiveData(setOf(0x0C)).associateBy { it.responder }
+        assertEquals("1726.00", rpm["7E8"]?.value)
+        assertEquals("0.00", rpm["7E9"]?.value)
     }
 
     @Test

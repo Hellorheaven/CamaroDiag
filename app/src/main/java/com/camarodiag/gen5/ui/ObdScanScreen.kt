@@ -79,8 +79,7 @@ fun ObdScanScreen(
     val storedPids = remember(preferenceKey, preferences) {
         preferenceKey?.let { preferences.getString(it, null)?.split(",")?.mapNotNull(String::toIntOrNull) }
     }
-    val knownPids = listOf(0x03, 0x04, 0x05, 0x06, 0x07, 0x0B, 0x0C, 0x0D, 0x0F, 0x10, 0x11, 0x42, 0x52)
-    val catalogPids = (knownPids + report?.supportedPids.orEmpty() + report?.liveData.orEmpty().map { it.pid }).distinct().sorted()
+    val catalogPids = report?.liveData.orEmpty().map { it.pid }.distinct().sorted()
     val sensorNames = catalogPids.associateWith { localizedObdPidName(it) }
     val measuredPids = report?.liveData.orEmpty().map { it.pid }.toSet()
     var choosingSensors by rememberSaveable(preferenceKey) { mutableStateOf(false) }
@@ -88,8 +87,9 @@ fun ObdScanScreen(
     var chosenPids by rememberSaveable(preferenceKey) { mutableStateOf(storedPids.orEmpty()) }
     var selectionApplied by rememberSaveable(preferenceKey) { mutableStateOf(storedPids != null) }
     if (choosingSensors && report != null) {
-        var pendingPids by remember(preferenceKey, choosingSensors) {
-            mutableStateOf(if (selectionApplied) chosenPids else report.liveData.map { it.pid })
+        var pendingPids by remember(preferenceKey, choosingSensors, measuredPids) {
+            mutableStateOf((if (selectionApplied) chosenPids else report.liveData.map { it.pid })
+                .filter { it in measuredPids }.distinct())
         }
         AlertDialog(
             onDismissRequest = { choosingSensors = false },
@@ -135,7 +135,7 @@ fun ObdScanScreen(
             },
             confirmButton = {
                 TextButton(onClick = {
-                    chosenPids = pendingPids.distinct()
+                    chosenPids = pendingPids.filter { it in measuredPids }.distinct()
                     selectionApplied = true
                     preferenceKey?.let { key ->
                         preferences.edit { putString(key, chosenPids.joinToString(",")) }
@@ -239,7 +239,9 @@ fun ObdScanScreen(
             if (report.liveData.isEmpty()) {
                 item { Text(stringResource(R.string.obd_no_live_data), color = TextMuted) }
             } else {
-                items(report.liveData.filter { !selectionApplied || it.pid in chosenPids }, key = { it.pid }) { value ->
+                items(report.liveData.filter { !selectionApplied || it.pid in chosenPids }, key = {
+                    "${it.responder.orEmpty()}:${it.pid}:${it.name}:${it.unit}"
+                }) { value ->
                     ObdValueCard(value)
                 }
             }
@@ -351,7 +353,18 @@ private fun localizedObdPidName(pid: Int): String = when (pid) {
     0x0F -> stringResource(R.string.live_pid_iat)
     0x10 -> stringResource(R.string.live_pid_maf)
     0x11 -> stringResource(R.string.live_pid_throttle)
+    0x1C -> stringResource(R.string.obd_pid_standard)
+    0x1F -> stringResource(R.string.obd_pid_runtime)
+    0x21 -> stringResource(R.string.obd_pid_mil_distance)
+    0x30 -> stringResource(R.string.obd_pid_warmups)
+    0x31 -> stringResource(R.string.obd_pid_clear_distance)
     0x42 -> stringResource(R.string.live_pid_bat)
+    0x43 -> stringResource(R.string.live_pid_abs_load)
+    0x44 -> stringResource(R.string.live_pid_eq_ratio)
+    0x46 -> stringResource(R.string.live_pid_ambient)
+    0x49 -> stringResource(R.string.live_pid_app_d)
+    0x4A -> stringResource(R.string.live_pid_app_e)
+    0xA6 -> stringResource(R.string.obd_pid_odometer)
     0x52 -> stringResource(R.string.live_pid_ethanol)
     else -> stringResource(R.string.obd_pid_generic, pid)
 }
@@ -363,6 +376,8 @@ private fun ObdValueCard(value: ObdValue) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 Text(stringResource(R.string.obd_pid_generic, value.pid), color = CamaroAmber, fontWeight = FontWeight.Bold, fontSize = 11.sp)
                 Text(localizedObdPidName(value), color = TextMuted, fontSize = 12.sp)
+                value.responder?.let { Text(stringResource(R.string.obd_value_source, it),
+                    color = TextMuted, fontSize = 11.sp) }
             }
             Text("${value.value} ${value.unit}", color = TextPrimary, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, fontSize = 13.sp)
         }

@@ -239,7 +239,20 @@ object CamaroUdsProtocol {
         // A Mode 01 reply must use a documented OBD responder header, not
         // arbitrary three hex characters that could be adapter chatter.
         val canHeader = Regex("(?:7E[8-F]|18DAF1[0-9A-F]{2})")
-        for (sourceLine in response.lineSequence()) {
+        val lines = response.lineSequence().flatMap { line ->
+            // A compact journal/adapter can flatten several complete records.
+            // Split only explicit header boundaries or compact positive records,
+            // never individual hexadecimal bytes of a spaced payload.
+            val headers = line.split(Regex("(?i)\\s+(?=(?:7E[8-F]|18DAF1[0-9A-F]{2})(?:\\s|[0-9A-F]{6,}))"))
+            headers.asSequence().flatMap { row ->
+                val tokens = row.trim().split(Regex("\\s+"))
+                if (tokens.size > 1 && tokens.all {
+                    it.matches(Regex("(?i)(?:[0-9A-F]{2}){3,10}")) &&
+                        it.startsWith("%02X%02X".format(Locale.ROOT, service, expectedPid), ignoreCase = true)
+                }) tokens.asSequence() else sequenceOf(row)
+            }
+        }
+        for (sourceLine in lines) {
             val line = sourceLine.trim().removeSuffix(">").trimEnd().uppercase(Locale.ROOT)
             if (line.isEmpty()) continue
             val parts = line.split(Regex("\\s+"))
@@ -351,7 +364,8 @@ object CamaroUdsProtocol {
     fun parseOdometerPidD3(response: String): Double? = parseOdometerPid(response, "D3")
 
     private fun parseOdometerPid(response: String, pid: String): Double? {
-        val bytes = parsePidBytes(response, pid) ?: return null
+        val observations = parsePidObservations(response, pid)
+        val bytes = observations.map { it.bytes }.distinct().singleOrNull() ?: return null
         // The four-byte definition is required; a truncated or concatenated
         // reply must never become a plausible vehicle mileage reading.
         if (bytes.size != 4) return null

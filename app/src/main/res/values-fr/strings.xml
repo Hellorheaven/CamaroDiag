@@ -524,6 +524,13 @@
     <string name="mileage_source_generic">Source %1$s</string>
     <string name="mileage_details_unavailable">Les détails techniques ne sont pas disponibles pour cette source.</string>
     <string name="mileage_caveat_unavailable">Aucune information localisée supplémentaire n’est disponible pour cette source.</string>
+    <string name="obd_value_source">Répondant CAN %1$s</string>
+    <string name="obd_pid_standard">Norme OBD</string>
+    <string name="obd_pid_runtime">Durée depuis le démarrage</string>
+    <string name="obd_pid_mil_distance">Distance avec voyant défaut allumé</string>
+    <string name="obd_pid_warmups">Cycles de chauffe depuis effacement</string>
+    <string name="obd_pid_clear_distance">Distance depuis effacement des défauts</string>
+    <string name="obd_pid_odometer">Kilométrage total</string>
     <string name="obd_pid_generic">PID %1$02X</string>
     <string name="cal_format_raw_binary">BIN / binaire brut</string>
     <string name="cal_format_intel_hex">Intel HEX</string>

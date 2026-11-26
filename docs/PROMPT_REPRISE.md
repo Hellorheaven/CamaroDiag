@@ -1,3 +1,7 @@
+## PR117 — retour réel Mach-E : scan OBD multicalculateur (26/11/2026)
+
+- C6 : le scan conserve les réponses Mode 01 par adresse CAN, les associe aux bitmaps annoncés et refuse une valeur arbitraire en cas de contradiction sans adresse. Les mesures du scan portent leur répondant, la sélection ne propose que les PID effectivement mesurés et les clés UI distinguent les réponses et unités. A6 est intégré au scan lorsque annoncé ; 31 reste la distance depuis effacement. Le relevé réel A6 41A6000BD967 (77655,1 km) est conservé en régression ; aucune modification de sa formule, refus des kilométrages contradictoires. Les réponses aplaties de PID sont séparées sans concaténation aveugle. Readiness affiche les observations distinctes. Libellés FR/EN. Tests écrits non exécutés ; aucun checkpoint. Les valeurs extrêmes réelles restent brutes, pas de suppression arbitraire des 0xFF. Le réassemblage Mode 09 intercalé, l'identité de l'audit et l'attribution des PID sur ELM sans en-têtes restent à traiter.
+
 ## PR117 — arrêt de l'inventaire Android en cas de perte de journal (26/11/2026)
 
 - C6/DoIP : les callbacks de trace UDP/TCP/TLS d'un inventaire Android sont isolés des exceptions de transport. Un échec du journal ne devient plus une ligne ECU indisponible et interrompt les interrogations suivantes. L'annulation reste une annulation ; contrôle du contexte avant publication, testeur distinct de la passerelle. Point d'entrée interne à ports personnalisés limité au loopback TCP pour la régression écrite, non exécutée. Aucun checkpoint.

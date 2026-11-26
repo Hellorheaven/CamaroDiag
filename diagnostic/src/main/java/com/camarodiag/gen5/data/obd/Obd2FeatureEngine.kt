@@ -15,7 +15,8 @@ data class ObdValue(
     val name: String,
     val value: String,
     val unit: String = "",
-    val raw: List<Int>
+    val raw: List<Int>,
+    val responder: String? = null
 )
 
 data class ObdDtc(val code: String, val status: String)
@@ -209,12 +210,16 @@ class Obd2FeatureEngine(
     }
 
     /** Reads Mode 01 supported-PID bitmaps (PID 00, 20, ... E0). */
-    data class PidDiscovery(val supported: Set<Int>, val firstUnresolvedPid: Int?)
+    data class PidDiscovery(val supported: Set<Int>, val firstUnresolvedPid: Int?,
+        val byResponder: Map<String, Set<Int>> = emptyMap())
 
     suspend fun discoverSupportedPids(): Set<Int> = discoverPidAvailability().supported
 
     suspend fun discoverPidAvailability(primaryPowertrainResponderOnly: Boolean = false): PidDiscovery {
         val supported = linkedSetOf<Int>()
+        val byResponder = linkedMapOf<String, MutableSet<Int>>()
+        fun result(unresolved: Int?) = PidDiscovery(supported.toSet(), unresolved,
+            byResponder.mapValues { it.value.toSet() })
         var expectedResponders: Set<String?>? = null
         var firstUnresolved: Int? = null
         var basePid = 0x00
@@ -234,20 +239,24 @@ class Obd2FeatureEngine(
                 (expected == null && accepted.size != candidates.size)) {
                 if (firstUnresolved == null) firstUnresolved = basePid + 1
             }
-            if (accepted.isEmpty()) return PidDiscovery(supported, firstUnresolved)
+            if (accepted.isEmpty()) return result(firstUnresolved)
             val next = linkedSetOf<String?>()
             for ((address, bytes) in accepted) {
                 for (bit in 0 until 31) {
                     val mask = 1 shl (7 - (bit % 8))
-                    if ((bytes[bit / 8] and mask) != 0) supported += basePid + bit + 1
+                    if ((bytes[bit / 8] and mask) != 0) {
+                        val pid = basePid + bit + 1
+                        supported += pid
+                        if (address != null) byResponder.getOrPut(address) { linkedSetOf() } += pid
+                    }
                 }
                 if ((bytes[3] and 0x01) != 0) next += address
             }
-            if (next.isEmpty()) return PidDiscovery(supported, firstUnresolved)
+            if (next.isEmpty()) return result(firstUnresolved)
             expectedResponders = next
             basePid += 0x20
         }
-        return PidDiscovery(supported, firstUnresolved)
+        return result(firstUnresolved)
     }
 
     /**
@@ -261,7 +270,8 @@ class Obd2FeatureEngine(
         return ask("01%02X".format(Locale.US, pid), 1800L)
     }
 
-    suspend fun readLiveData(supportedPids: Set<Int>): List<ObdValue> {
+    suspend fun readLiveData(supportedPids: Set<Int>,
+        byResponder: Map<String, Set<Int>> = emptyMap()): List<ObdValue> {
         val requested = listOf(
             0x01, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B,
             0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x11, 0x12, 0x13, 0x1C, 0x1F,
@@ -270,15 +280,22 @@ class Obd2FeatureEngine(
             0x35, 0x36, 0x37, 0x38, 0x39, 0x3A, 0x3B, 0x3C, 0x3D, 0x3E,
             0x3F, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4A,
             0x4B, 0x4C, 0x4D, 0x4E, 0x52, 0x5A, 0x5B, 0x5C, 0x5D, 0x5E, 0x5F,
-            0x59, 0x61, 0x62, 0x63
+            0x59, 0x61, 0x62, 0x63, 0xA6
         )
         val values = mutableListOf<ObdValue>()
         for (pid in requested) {
             if (pid !in supportedPids) continue
             val response = ask("01%02X".format(Locale.US, pid), 1200L)
-            val data = CamaroUdsProtocol.parsePidBytes(response, "%02X".format(Locale.ROOT, pid))
-                ?.asList() ?: continue
-            values += decode(pid, data)
+            val observations = CamaroUdsProtocol.parsePidObservations(response, "%02X".format(Locale.ROOT, pid))
+            val groups = observations.groupBy { it.responder }
+            val attributed = if (groups.keys.any { it != null }) groups.filterKeys { it != null } else groups
+            for ((responder, rows) in attributed) {
+                if (responder != null && byResponder.isNotEmpty() && pid !in byResponder[responder].orEmpty()) continue
+                // Conflicting values from the same or unidentified responder
+                // cannot be promoted into a single trusted measurement.
+                val data = rows.map { it.bytes }.distinct().singleOrNull() ?: continue
+                values += decode(pid, data).map { it.copy(responder = responder) }
+            }
         }
         return values
     }
@@ -422,11 +439,17 @@ class Obd2FeatureEngine(
         }
 
     suspend fun readReadiness(): String? {
-        val data = CamaroUdsProtocol.parsePidBytes(ask("0101"), "01")?.asList() ?: return null
-        if (data.size != 4) return null
-        val mil = (data[0] and 0x80) != 0
-        val dtcCount = data[0] and 0x7F
-        return "MIL=${if (mil) "ON" else "OFF"}; DTC_COUNT=$dtcCount; RAW=${data.joinToString(" ") { "%02X".format(Locale.US, it) }}"
+        val grouped = CamaroUdsProtocol.parsePidObservations(ask("0101"), "01")
+            .filter { it.bytes.size == 4 }.groupBy { it.responder }
+        val sources = if (grouped.keys.any { it != null }) grouped.filterKeys { it != null } else grouped
+        return sources.flatMap { (responder, rows) ->
+            rows.map { it.bytes }.distinct().map { data ->
+                val mil = (data[0] and 0x80) != 0
+                val dtcCount = data[0] and 0x7F
+                val prefix = responder?.let { "CAN $it: " }.orEmpty()
+                "${prefix}MIL=${if (mil) "ON" else "OFF"}; DTC_COUNT=$dtcCount; RAW=${data.joinToString(" ") { "%02X".format(Locale.US, it) }}"
+            }
+        }.joinToString("\n").ifBlank { null }
     }
 
     /** CAN Mode 06 is a separate namespace from Mode 01 PIDs.
@@ -501,8 +524,11 @@ class Obd2FeatureEngine(
         physicalCanResponder: String? = null,
         readDtcRecords: suspend () -> PhysicalObdDtcSnapshot
     ): ObdScanReport {
-        val supported = discoverSupportedPids()
-        val live = readLiveData(supported)
+        val discovery = discoverPidAvailability()
+        val supported = discovery.supported
+        val live = readLiveData(supported, discovery.byResponder).map {
+            if (physicalCanResponder != null && it.responder == null) it.copy(responder = physicalCanResponder) else it
+        }
         val dtcSnapshot = readDtcRecords()
         val freezeFrameDtc = readFreezeFrameDtc()
         val freezeFrameSupported = if (freezeFrameDtc != null) discoverFreezeFrameSupportedPids() else emptySet()
@@ -844,6 +870,10 @@ class Obd2FeatureEngine(
             0x61 -> "Driver demand engine torque" to ((a - 125).toDouble() to "%")
             0x62 -> "Actual engine torque" to ((a - 125).toDouble() to "%")
             0x63 -> "Engine reference torque" to ((word() ?: return emptyList()).toDouble() to "Nm")
+            0xA6 -> {
+                if (data.size != 4) return emptyList()
+                "Odometer" to (data.fold(0L) { acc, byte -> (acc shl 8) or byte.toLong() } / 10.0 to "km")
+            }
             else -> return emptyList()
         }
         return value(decoded.first, decoded.second.first, decoded.second.second)
