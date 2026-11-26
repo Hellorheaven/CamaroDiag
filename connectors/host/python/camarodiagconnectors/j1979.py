@@ -20,7 +20,7 @@ def physical_pair(tx: int, rx: int) -> bool:
     if not 0 <= tx <= 0x1FFFFFFF or (tx & ~0xFF00) != 0x18DA00F1:
         return False
     address = (tx >> 8) & 0xFF
-    return address not in (0xF1, 0xFE, 0xFF) and rx == 0x18DAF100 | address
+    return address not in (0xF1, 0xFE, 0xFF) and rx == (0x18DAF100 | address)
 
 
 def allowed_read(request: bytes) -> bool:
@@ -101,6 +101,28 @@ def _validate(request: bytes, response: bytes) -> str | None:
             raise ValueError("Zero DTC within declared records")
     elif request[0] in (1, 2, 6, 8, 9) and len(response) <= len(request):
         raise ValueError("No diagnostic data")
+    if request[0] in (1, 2):
+        pid = request[1]
+        # Known common widths; unlisted PID data stays raw. Mode 02 PID 02
+        # is the two-byte triggering DTC, not a Mode 01 fuel-system value.
+        lengths = {
+            **dict.fromkeys((0x01, 0x24, 0x25, 0x28, 0x29, 0x34, 0x35,
+                             0x38, 0x39, 0xA6), 4),
+            **dict.fromkeys((0x0C, 0x10, 0x14, 0x15, 0x16, 0x17, 0x1F,
+                             0x42, 0x43, 0x44), 2),
+            **dict.fromkeys((0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A,
+                             0x0B, 0x0D, 0x0E, 0x0F, 0x11, 0x13,
+                             0x1D, 0x45, 0x46, 0x47, 0x48, 0x49,
+                             0x4A, 0x4B, 0x4C, 0x52, 0x5B), 1),
+        }
+        width = (4 if pid % 32 == 0 else
+                 2 if request[0] == 2 and pid == 2 else lengths.get(pid))
+        if width is not None and len(response) != len(request) + width:
+            raise ValueError("Wrong PID data width")
+    if request[0] == 9 and request[1] in (4, 6, 10):
+        width = {4: 16, 6: 4, 10: 20}[request[1]]
+        if len(response) < 3 or response[2] == 0 or len(response) != 3 + response[2] * width:
+            raise ValueError("Invalid Mode 09 record count")
     return None
 
 
