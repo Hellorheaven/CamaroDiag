@@ -31,7 +31,7 @@ class J1979ReadEvidence {
   // reported as correlated raw records, not validated decoded measurements.
   static size_t pidWidth(uint8_t pid){
     switch(pid){
-      case 0x01:return 4;
+      case 0x01:case 0xa6:return 4;
       case 0x0c:case 0x10:case 0x1f:case 0x21:case 0x22:case 0x23:
       case 0x31:case 0x32:case 0x3c:case 0x3d:case 0x3e:case 0x3f:
       case 0x42:case 0x43:case 0x44:case 0x4d:case 0x4e:case 0x53:

@@ -291,8 +291,10 @@ def scan(exchange: Exchange, *, budget: float = 180.0,
     vin = read(b"\x09\x02", decode_vin)
     for mode in (3, 7, 10):
         read(bytes((mode,)))
+    def odometer(response: bytes):
+        return {"name": "odometer", "number": int.from_bytes(response[2:], "big") / 10.0, "unit": "km"}
     for pid in inventory(1):
-        read(bytes((1, pid)))
+        read(bytes((1, pid)), odometer if pid == 0xA6 else None)
 
     def freeze_trigger(response: bytes) -> int:
         if len(response) != 5:

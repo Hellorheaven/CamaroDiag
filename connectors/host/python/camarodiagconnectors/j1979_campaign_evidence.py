@@ -56,7 +56,7 @@ def _positive_state(req, res):
     if pid % 32 == 0:
         return 1 if len(res) == offset + 4 and not (pid == 0xE0 and res[-1] & 1) else None
     if mode in (1, 2):
-        width = 2 if mode == 2 and pid == 2 else 4 if pid == 1 else 1 if pid in _ONE else 2 if pid in _TWO else 0
+        width = 2 if mode == 2 and pid == 2 else 4 if pid in (1, 0xA6) else 1 if pid in _ONE else 2 if pid in _TWO else 0
         return (1 if len(res) == offset + width else None) if width else (2 if len(res) > offset else None)
     if mode == 6:
         return 1 if len(res) >= 10 and (len(res)-1) % 9 == 0 and all(
@@ -142,6 +142,9 @@ def _measurement(req, res):
         0x62: ("actual-engine-torque", float(a) - 125, "%"),
         0x63: ("engine-reference-torque", a * 256.0 + b, "Nm"),
     }
+    if pid == 0xA6:
+        return {"mode": mode, "pid": pid, "name": "odometer",
+                "number": int.from_bytes(res[offset:offset+4], "big") / 10.0, "unit": "km"}
     if pid not in values:
         return None
     name, number, unit = values[pid]
@@ -396,7 +399,8 @@ def decode(stream):
                 req, res = body[8:8+req_len], body[8+req_len:]
                 if not _read_only(req):
                     raise ValueError("Unexpected mutating request in evidence")
-                if state in (1, 2) and _positive_state(req, res) != state:
+                if state in (1, 2) and _positive_state(req, res) != state and not (
+                            state == 2 and len(req) >= 2 and req[0] in (1, 2) and req[1] == 0xA6 and _positive_state(req, res) == 1):
                     raise ValueError("Response shape or claimed evidence status is inconsistent")
                 if state == 3 and (len(res) != 3 or res[:2] != bytes((0x7F, req[0]))
                                    or res[2] in (0, 0x78)):

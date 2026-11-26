@@ -1,3 +1,7 @@
+## J1979 — kilométrage total standard PID A6 (26/11/2026)
+
+- Alignement du firmware, des hôtes CU/1 Java/.NET/Python, du pont Windows et du scan SocketCAN sur le PID A6 déjà décodé par Android : 4 octets non signés big-endian, 0,1 km, aucune lecture si non annoncé, refus des longueurs invalides. Les anciennes observations RAW ne deviennent pas automatiquement des mesures. Tests de largeur, scaling et overflow écrits, non exécutés. Ne pas confondre kilométrage déclaré par ECU avec kilométrage certifié. C6/J1979 ouverts, aucune CI intermédiaire, fusion ou Release.
+
 ## Méthode de développement — lots quadruplés (26/11/2026)
 
 - **Décision propriétaire 26/11/2026 — quadrupler la taille des lots de développement.** Viser un volume fonctionnel environ quatre fois supérieur aux reprises récentes, en enchaînant les implémentations de bout en bout (transport, logique, interfaces, exports, erreurs, tests écrits et documentation) tant que les capacités de la session le permettent. Ne pas s'arrêter à un nombre prédéfini de commits ou de lignes ; ne pas gonfler artificiellement le volume, ne pas fragmenter un changement cohérent, ne pas différer un travail réalisable. Publier les modifications réellement réalisées et indiquer les limites effectives si l'objectif n'est pas atteint. Respecter la PR unique, un chantier et un protocole actifs, les protections et consentements, et l'interdiction de lancer des validations intermédiaires. Aucun merge ni Release sans accord.

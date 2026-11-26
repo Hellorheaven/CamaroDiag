@@ -73,6 +73,7 @@ internal static class J1979CampaignSemantics
             0x61 => new(mode,pid,"driver-demand-engine-torque",(double)a - 125,"%"),
             0x62 => new(mode,pid,"actual-engine-torque",(double)a - 125,"%"),
             0x63 => new(mode,pid,"engine-reference-torque",a * 256d + b,"Nm"),
+            0xA6 => new(mode,pid,"odometer",System.Buffers.Binary.BinaryPrimitives.ReadUInt32BigEndian(res.AsSpan(offset,4))/10d,"km"),
             _=>null
         };
     }
@@ -102,6 +103,8 @@ internal static class J1979CampaignSemantics
     }
     internal sealed record SupportedPage(int Mode,int Base,IReadOnlyList<int> SupportedIds,bool HasNextPage);
     internal sealed record FreezeTrigger(bool Present,string? Dtc);
+    private static bool LegacyRawOdometer(byte[] req,byte[] res)=>
+        req.Length>=2&&(req[0] is 1 or 2)&&req[1]==0xA6&&Positive(req,res)==1;
     internal sealed class Step {
         public int Sequence{get;}
         public string RequestHex{get;}
@@ -113,7 +116,7 @@ internal static class J1979CampaignSemantics
         internal byte[] Response{get;}
         internal Step(int seq,int state,long duration,byte[] req,byte[] res){
             if(!ReadOnly(req)||state is <1 or >5||(state<=3)!=(res.Length>0)||
-               (state<=2&&Positive(req,res)!=state)||
+               (state<=2&&Positive(req,res)!=state&&!(state==2&&LegacyRawOdometer(req,res)))||
                (state==3&&(res.Length!=3||res[0]!=0x7f||res[1]!=req[0]||res[2] is 0 or 0x78)))
                 throw new IOException("CJ/1 application evidence inconsistent");
             Sequence=seq;State=state;DurationMs=duration;Request=req.ToArray();Response=res.ToArray();
@@ -199,7 +202,7 @@ internal static class J1979CampaignSemantics
         if(m==2&&(r.Length<3||r[2]!=req[2]))return 0;
         if(pid%32==0)return r.Length==off+4&&!(pid==224&&(r[^1]&1)!=0)?1:0;
         if(m is 1 or 2){
-            int width=m==2&&pid==2?2:pid==1?4:One.Contains(pid)?1:Two.Contains(pid)?2:0;
+            int width=m==2&&pid==2?2:(pid==1||pid==0xA6)?4:One.Contains(pid)?1:Two.Contains(pid)?2:0;
             return width>0?(r.Length==off+width?1:0):(r.Length>off?2:0);
         }
         if(m==6){

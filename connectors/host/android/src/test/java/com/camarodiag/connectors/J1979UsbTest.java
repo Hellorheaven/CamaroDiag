@@ -113,6 +113,10 @@ public final class J1979UsbTest {
         assert freeze.present&&freeze.dtc.equals("P0123");
         assert !new J1979CampaignSemantics.Step(17,1,1,new byte[]{2,2,0},
             hex("4202000000")).freezeTrigger().present;
+        J1979CampaignSemantics.Step odo=new J1979CampaignSemantics.Step(18,1,1,hex("01A6"),hex("41A60012D687"));
+        assert odo.measurement().number==123456.7&&odo.measurement().unit.equals("km");
+        assert new J1979CampaignSemantics.Step(19,1,1,hex("01A6"),hex("41A6FFFFFFFF")).measurement().number==429496729.5;
+        assert new J1979CampaignSemantics.Step(20,2,1,hex("01A6"),hex("41A60012D687")).measurement()==null;
         Sim partial=new Sim(concat(challenge,Arrays.copyOf(capture,capture.length-1)));
         raw=new ByteArrayOutputStream();
         result=new J1979UsbCapture(partial).runRequest(hello,10000,key,raw);

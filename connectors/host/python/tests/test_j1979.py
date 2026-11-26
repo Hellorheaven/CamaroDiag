@@ -57,6 +57,18 @@ class J1979Tests(unittest.TestCase):
         self.assertEqual(100, steps["0601"]["decoded"][0]["raw"])
         self.assertNotIn("0801", sent)
 
+    def test_odometer_only_when_advertised_and_exact_width(self):
+        replies = dict(REPLIES, **{"0100": bytes.fromhex("410000000001"),
+            "0120": bytes.fromhex("412000000001"), "0140": bytes.fromhex("414000000001"),
+            "0160": bytes.fromhex("416000000001"), "0180": bytes.fromhex("418000000001"),
+            "01A0": bytes.fromhex("41A004000000"), "01A6": bytes.fromhex("41A60012D687")})
+        result = scan(lambda req, _: replies[req.hex().upper()])
+        odo = next(row for row in result["steps"] if row["request_hex"] == "01A6")
+        self.assertEqual({"name": "odometer", "number": 123456.7, "unit": "km"}, odo["decoded"])
+        replies["01A6"] = bytes.fromhex("41A60012D6")
+        result = scan(lambda req, _: replies[req.hex().upper()])
+        self.assertEqual("FAILED", next(row for row in result["steps"] if row["request_hex"] == "01A6")["status"])
+
     def test_malformed_or_unfinished_replies(self):
         overrides = dict(REPLIES, **{"0902": b"\x49\x02\x01",
                          "03": b"\x43\x01\x00\x00",

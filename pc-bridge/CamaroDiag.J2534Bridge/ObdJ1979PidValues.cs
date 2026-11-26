@@ -14,6 +14,7 @@ internal static class ObdJ1979PidValues
 
     internal static int? DataLength(byte pid) => pid switch
     {
+        0xA6 => 4,
         0x0C or 0x10 or 0x1F or 0x21 or 0x22 or 0x23 or 0x31 or
             0x32 or 0x3C or 0x3D or 0x3E or 0x3F or 0x42 or 0x43 or
             0x44 or 0x4D or 0x4E or 0x53 or 0x54 or 0x59 or 0x5D or
@@ -48,7 +49,7 @@ internal static class ObdJ1979PidValues
         if (values.Length != needed)
             throw new InvalidDataException("Incorrect byte count for the selected SAE J1979 PID.");
         var a = values[0];
-        var b = needed == 2 ? values[1] : (byte)0;
+        var b = needed >= 2 ? values[1] : (byte)0;
         var (name, number, unit) = pid switch
         {
             0x04 => ("calculated-engine-load", a * 100d / 255, "%"),
@@ -109,6 +110,7 @@ internal static class ObdJ1979PidValues
             0x61 => ("driver-demand-engine-torque", (double)a - 125, "%"),
             0x62 => ("actual-engine-torque", (double)a - 125, "%"),
             0x63 => ("engine-reference-torque", a * 256d + b, "Nm"),
+            0xA6 => ("odometer", System.Buffers.Binary.BinaryPrimitives.ReadUInt32BigEndian(values)/10d, "km"),
             _ => throw new InvalidOperationException("Unknown PID formula.")
         };
         return new(request[0], pid, name, number, unit);

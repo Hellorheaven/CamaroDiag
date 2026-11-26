@@ -91,6 +91,8 @@ public final class J1979CampaignSemantics {
             case 0x61:return new Measurement(mode,pid,"driver-demand-engine-torque",(double)a - 125,"%");
             case 0x62:return new Measurement(mode,pid,"actual-engine-torque",(double)a - 125,"%");
             case 0x63:return new Measurement(mode,pid,"engine-reference-torque",a * 256d + b,"Nm");
+            case 0xA6:return new Measurement(mode,pid,"odometer",
+                (a*16777216L+b*65536L+u(res[offset+2])*256L+u(res[offset+3]))/10d,"km");
             default:return null;
         }
     }
@@ -157,6 +159,11 @@ public final class J1979CampaignSemantics {
                 digits.charAt(a&15),digits.charAt(b>>>4),digits.charAt(b&15)}):null;
         }
     }
+    // Old CU/1 captures recorded this now-known width as RAW. Keep the
+    // historical state, do not silently upgrade it into a measurement.
+    private static boolean legacyRawOdometer(byte[] req,byte[] res){
+        return req.length>=2&&(u(req[0])==1||u(req[0])==2)&&u(req[1])==0xA6&&positive(req,res)==1;
+    }
     public static final class Step {
         public final int sequence;
         public final String requestHex,responseHex,status;
@@ -165,7 +172,7 @@ public final class J1979CampaignSemantics {
         private final byte[] request,response;
         Step(int seq,int state,long duration,byte[] req,byte[] res)throws IOException{
             if(!readOnly(req)||state<1||state>5||(state<=3)!=(res.length>0)||
-               (state<=2&&positive(req,res)!=state)||
+               (state<=2&&positive(req,res)!=state&&!(state==2&&legacyRawOdometer(req,res)))||
                (state==3&&(res.length!=3||u(res[0])!=0x7f||res[1]!=req[0]||u(res[2])==0||u(res[2])==0x78)))
                 throw new IOException("CJ/1 application evidence inconsistent");
             sequence=seq;this.state=state;durationMs=duration;request=req.clone();response=res.clone();
@@ -250,7 +257,7 @@ public final class J1979CampaignSemantics {
         if(m==2&&(r.length<3||r[2]!=req[2]))return 0;
         if(pid%32==0)return r.length==off+4&&!(pid==224&&(r[r.length-1]&1)!=0)?1:0;
         if(m==1||m==2){
-            int width=m==2&&pid==2?2:pid==1?4:Arrays.binarySearch(ONE,pid)>=0?1:Arrays.binarySearch(TWO,pid)>=0?2:0;
+            int width=m==2&&pid==2?2:(pid==1||pid==0xA6)?4:Arrays.binarySearch(ONE,pid)>=0?1:Arrays.binarySearch(TWO,pid)>=0?2:0;
             return width>0?(r.length==off+width?1:0):(r.length>off?2:0);
         }
         if(m==6){

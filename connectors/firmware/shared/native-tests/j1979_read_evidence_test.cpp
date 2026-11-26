@@ -41,6 +41,9 @@ int main(){
   const uint8_t coolant[]={1,5},goodCoolant[]={0x41,5,90},badCoolant[]={0x41,5,90,0};
   assert(E::classify(V::ClassicCan,coolant,2,goodCoolant,3)==R::Positive);
   assert(E::classify(V::ClassicCan,coolant,2,badCoolant,4)==R::Invalid);
+  const uint8_t odometer[]={1,0xa6},odoReply[]={0x41,0xa6,0x00,0x12,0xd6,0x87};
+  assert(E::classify(V::ClassicCan,odometer,2,odoReply,sizeof(odoReply))==R::Positive);
+  assert(E::classify(V::ClassicCan,odometer,2,odoReply,sizeof(odoReply)-1)==R::Invalid);
   const uint8_t unknown[]={1,0xa1},raw[]={0x41,0xa1,1,2},echoOnly[]={0x41,0xa1};
   assert(E::classify(V::ClassicCan,unknown,2,raw,4)==R::Raw);
   assert(E::classify(V::ClassicCan,unknown,2,echoOnly,2)==R::Invalid);
