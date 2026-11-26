@@ -74,7 +74,9 @@ data class FunctionalTestState(
     val rawObdExchanges: List<String> = emptyList(),
     val protocol: FunctionalProtocol? = null,
     val obdScan: com.camarodiag.gen5.data.obd.ObdScanReport? = null,
-    val doIpTarget: DoIpFunctionalTarget? = null
+    val doIpTarget: DoIpFunctionalTarget? = null,
+    val evapCampaign: Boolean = false,
+    val evapResult: com.camarodiag.gen5.data.obd.ObdEvapResult? = null
 ) {
     val canExport: Boolean get() = !running && finishedAtMillis != null && context != null && checks.isNotEmpty()
 }
@@ -141,6 +143,37 @@ object FunctionalTestPlanner {
     ).map { (id, en, fr) ->
         FunctionalTestCheck("protocol:$id", "protocol", en, fr, FunctionalTestOutcome.NOT_TESTED,
             "No verified response in this campaign.", "Aucune réponse vérifiée dans cette campagne.")
+    }
+
+    fun evapChecks(): List<FunctionalTestCheck> = listOf(
+        FunctionalTestCheck("protocol:08-evap-ack", "protocol",
+            "EVAP request acknowledgment", "Acquittement de la demande EVAP",
+            FunctionalTestOutcome.NOT_TESTED, "No verified acknowledgment.", "Aucun acquittement vérifié."),
+        FunctionalTestCheck("protocol:08-evap-completion", "protocol",
+            "EVAP monitor completion", "Fin du moniteur EVAP",
+            FunctionalTestOutcome.NOT_TESTED, "Separate monitor evidence required.", "Preuve distincte du moniteur requise.")
+    )
+
+    fun evapResults(state: FunctionalTestState,
+        result: com.camarodiag.gen5.data.obd.ObdEvapResult): FunctionalTestState {
+        val status = when (result.outcome) {
+            "ACKNOWLEDGED" -> FunctionalTestOutcome.PASSED
+            "REFUSED", "UNCERTAIN" -> FunctionalTestOutcome.FAILED
+            else -> FunctionalTestOutcome.NOT_TESTED
+        }
+        val (en, fr) = when (result.outcome) {
+            "ACKNOWLEDGED" -> "ECU accepted the request; monitor completion not verified." to
+                "Demande acquittée ; fin du moniteur non vérifiée."
+            "REFUSED" -> "ECU refused the test request." to "Demande refusée par le calculateur."
+            "UNCERTAIN" -> "Transmission or response uncertain; do not retry automatically." to
+                "Transmission ou réponse incertaine ; ne pas relancer automatiquement."
+            else -> "Preconditions not verified; no test command attempted." to
+                "Conditions non vérifiées ; aucune commande de test tentée."
+        }
+        return state.copy(evapResult = result,
+            context = state.context?.copy(observedVin = result.observedVin),
+            checks = updated(state.checks, "protocol:08-evap-ack", status, en, fr),
+            rawObdExchanges = result.exchanges.map { "> ${it.requestHex} -> ${it.responseHex ?: "?"}" })
     }
 
     fun j1979Checks(): List<FunctionalTestCheck> = listOf(
