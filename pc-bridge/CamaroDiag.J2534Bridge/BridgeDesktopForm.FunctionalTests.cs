@@ -12,6 +12,8 @@ internal sealed partial class BridgeDesktopForm
 
     private readonly Button functionalGoogleSignIn = Button("Se connecter avec Google");
     private readonly Button functionalRunAll = Button("Tout lancer");
+    private readonly Button functionalRunJ1979 = Button(J1979RecipeText("Run"));
+    private WindowsJ1979Report? completedJ1979;
     private readonly Button functionalCancel = Button("Arrêter");
     private readonly Button functionalExport = Button("Exporter JSON");
     private readonly CheckBox functionalEcmProfileConfirmed = new()
@@ -59,6 +61,7 @@ internal sealed partial class BridgeDesktopForm
             FlowDirection = FlowDirection.LeftToRight, Dock = DockStyle.Fill
         };
         actions.Controls.Add(functionalRunAll);
+        actions.Controls.Add(functionalRunJ1979);
         actions.Controls.Add(functionalCancel);
         actions.Controls.Add(functionalExport);
         WideRow(fields, actions, 48);
@@ -73,9 +76,10 @@ internal sealed partial class BridgeDesktopForm
 
         functionalGoogleSignIn.Click += async (_, _) => await FunctionalGoogleSignInAsync();
         functionalRunAll.Click += async (_, _) => await RunAllWindowsFunctionalTestsAsync();
+        functionalRunJ1979.Click += async (_, _) => await RunWindowsJ1979Async();
         functionalCancel.Click += (_, _) => functionalCancellation?.Cancel();
         functionalExport.Click += (_, _) => ExportWindowsFunctionalResults();
-        functionalRunAll.Enabled = functionalCancel.Enabled = functionalExport.Enabled = false;
+        functionalRunAll.Enabled = functionalRunJ1979.Enabled = functionalCancel.Enabled = functionalExport.Enabled = false;
         layout.Controls.Add(fields, 0, 0);
         layout.Controls.Add(functionalResults, 0, 1);
         tab.Controls.Add(layout);
@@ -87,14 +91,16 @@ internal sealed partial class BridgeDesktopForm
         if (functionalCancellation is not null) return;
         functionalGoogleSignIn.Enabled = false;
         functionalAuthentication.Text = "Connexion Google dans le navigateur système...";
-        functionalRunAll.Enabled = false;
+        functionalRunAll.Enabled = functionalRunJ1979.Enabled = functionalExport.Enabled = false;
+        completedJ1979 = null;
+        completedFunctionalChecks = [];
         functionalAuthorizedUntil = DateTimeOffset.MinValue;
         try
         {
             functionalAuthorizedUntil = await DesktopOwnerGoogleAuth.SignInAsync();
             functionalAuthentication.Text =
                 "Compte Google autorisé par Firebase (session privée de 10 min maximum).";
-            functionalRunAll.Enabled = true;
+            functionalRunAll.Enabled = functionalRunJ1979.Enabled = true;
         }
         catch (Exception)
         {
@@ -113,7 +119,7 @@ internal sealed partial class BridgeDesktopForm
         if (functionalCancellation is not null) return;
         if (DateTimeOffset.UtcNow >= functionalAuthorizedUntil)
         {
-            functionalRunAll.Enabled = false;
+            functionalRunAll.Enabled = functionalRunJ1979.Enabled = false;
             functionalAuthentication.Text = "Session expirée : reconnectez votre compte Google.";
             return;
         }
@@ -149,7 +155,9 @@ internal sealed partial class BridgeDesktopForm
         }
 
         busy = true;
-        functionalRunAll.Enabled = functionalGoogleSignIn.Enabled = functionalExport.Enabled = false;
+        completedJ1979 = null;
+        completedFunctionalChecks = [];
+        functionalRunAll.Enabled = functionalRunJ1979.Enabled = functionalGoogleSignIn.Enabled = functionalExport.Enabled = false;
         functionalCancel.Enabled = true;
         functionalCancellation = new CancellationTokenSource();
         var cancellation = functionalCancellation;
@@ -184,7 +192,7 @@ internal sealed partial class BridgeDesktopForm
             busy = false;
             functionalCancel.Enabled = false;
             functionalGoogleSignIn.Enabled = true;
-            functionalRunAll.Enabled = DateTimeOffset.UtcNow < functionalAuthorizedUntil;
+            functionalRunAll.Enabled = functionalRunJ1979.Enabled = DateTimeOffset.UtcNow < functionalAuthorizedUntil;
         }
     }
 
@@ -303,8 +311,13 @@ internal sealed partial class BridgeDesktopForm
 
     private void ExportWindowsFunctionalResults()
     {
-        if (DateTimeOffset.UtcNow >= functionalAuthorizedUntil || completedFunctionalChecks.Count == 0)
+        if (DateTimeOffset.UtcNow >= functionalAuthorizedUntil) return;
+        if (completedJ1979 is not null)
+        {
+            ExportWindowsJ1979(completedJ1979);
             return;
+        }
+        if (completedFunctionalChecks.Count == 0) return;
         using var dialog = new SaveFileDialog
         {
             Filter = "Rapport JSON (*.json)|*.json",
