@@ -1380,6 +1380,44 @@ class DoIpTests(unittest.TestCase):
         wire.recv.assert_not_called()
         client.close.assert_not_called()
 
+    def test_idle_header_nack_is_not_attributed_to_unsent_request(self):
+        client = Session.__new__(Session)
+        client.tester, client.ecu = 0x0E80, 0x1234
+        client.timeout = client.p2 = client.p2_star = 2
+        client._operation_lock = threading.Lock()
+        client._busy = False
+        client._socket, peer = socket.socketpair()
+        client.gateway, client.tls, client.trace = GATEWAY, False, None
+        peer.settimeout(2)
+        try:
+            peer.sendall(encode(2, 0, bytes((2,))))
+            with self.assertRaises(DoIpError) as failure:
+                client.exchange(bytes.fromhex("22F190"))
+            self.assertNotIsInstance(failure.exception, TransportRefusal)
+            self.assertIsNone(client._socket)
+            self.assertEqual(peer.recv(1), b"")
+        finally:
+            client.close()
+            peer.close()
+
+    def test_cli_single_operation_refusal_has_no_success_output(self):
+        from contextlib import redirect_stdout
+        from camarodiagconnectors.doip_cli import main
+        for error, reason, code in (
+                (TransportRefusal("diagnostic_nack", 6), "diagnostic_nack", 6),
+                (NegativeResponse(0x22, 0x31), "uds_negative_response", 0x31)):
+            stderr, stdout = io.StringIO(), io.StringIO()
+            with patch("camarodiagconnectors.doip_cli.run", side_effect=error), \
+                 redirect_stderr(stderr), redirect_stdout(stdout):
+                with self.assertRaises(SystemExit) as failure:
+                    main()
+            self.assertEqual(failure.exception.code, 2)
+            self.assertEqual(stdout.getvalue(), "")
+            report = json.loads(stderr.getvalue().splitlines()[0])["diagnostic_error"]
+            self.assertEqual(report["reason"], reason)
+            self.assertEqual(report["failure_code"], code)
+            self.assertFalse(report["complete"])
+
     def test_wire_refusal_is_correlated_and_retires_session_without_retry(self):
         request = bytes.fromhex("22F190")
         for scenario in ("header", "diagnostic", "wrong_echo", "wrong_address", "bad_positive"):
