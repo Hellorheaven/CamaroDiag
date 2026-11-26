@@ -18,6 +18,7 @@ internal static class NativeE39SavedBlockAssessment
         NativeE39FileWriteJournal.CompletionState JournalState)
     {
         internal bool PhysicalRestoreQualified => false;
+        internal string? SnapshotSha256 { get; init; }
     }
 
     internal sealed record TargetMetadata(bool Verified, string? Family,
@@ -231,7 +232,10 @@ internal static class NativeE39SavedBlockAssessment
                 throw new InvalidDataException("ECU journal changed during inspection.");
             }
             return new Result(true, expected.Count,
-                verified.OrderBy(b => b.Address).ToArray(), "", state);
+                verified.OrderBy(b => b.Address).ToArray(), "", state)
+            {
+                SnapshotSha256 = ComputeSnapshotDigest(snapshot, envelopeHashes)
+            };
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException or
             InvalidDataException or JsonException or KeyNotFoundException or
@@ -252,6 +256,27 @@ internal static class NativeE39SavedBlockAssessment
             }
             return new Result(false, expected.Count, [], error.Message, state);
         }
+    }
+
+    // Bind the exact journal and complete sector envelopes, not only
+    // decoded addresses, data hashes or the completion-state enum.
+    internal static string ComputeSnapshotDigest(byte[] journal,
+        IReadOnlyDictionary<string, byte[]> envelopeHashes)
+    {
+        using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        hash.AppendData(SHA256.HashData(journal));
+        Span<byte> length = stackalloc byte[4];
+        foreach (var pair in envelopeHashes.OrderBy(x => Path.GetFileName(x.Key), StringComparer.Ordinal))
+        {
+            var name = Encoding.UTF8.GetBytes(Path.GetFileName(pair.Key));
+            if (pair.Value.Length != 32 || name.Length == 0)
+                throw new InvalidDataException("Invalid sector envelope digest.");
+            System.Buffers.Binary.BinaryPrimitives.WriteInt32LittleEndian(length, name.Length);
+            hash.AppendData(length);
+            hash.AppendData(name);
+            hash.AppendData(pair.Value);
+        }
+        return Convert.ToHexString(hash.GetHashAndReset());
     }
 
     private static bool HasDuplicateProperties(JsonElement element)
