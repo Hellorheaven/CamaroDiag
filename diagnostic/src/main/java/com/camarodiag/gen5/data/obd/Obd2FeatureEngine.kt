@@ -107,7 +107,8 @@ data class ObdScanReport(
     val anonymousLegacyVinCandidate: String? = null,
     // Distinguish verified empty results from absent evidence.
     val pidInventoryComplete: Boolean? = null,
-    val verifiedDtcModes: Set<Int> = emptySet()
+    val verifiedDtcModes: Set<Int> = emptySet(),
+    val nativeUsbEvidence: String? = null
 ) {
     /** Missing and explicitly unavailable modes must both remain unknown. */
     val unverifiedDtcModes: Set<Int> get() = setOf(3, 7, 10).filterTo(linkedSetOf()) {

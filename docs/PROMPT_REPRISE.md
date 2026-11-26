@@ -1,3 +1,7 @@
+## J1979 — projection du scan natif vers le modèle Scan OBD (26/11/2026)
+
+- Conversion locale de la capture CU/1 authentifiée, non annulée, cohérente et VIN concordant vers ObdScanReport limité au seul calculateur physique choisi. PID, mesures Mode 01, DTC distincts des modes inconnus, identité, freeze frame, inventaires et réponses brutes conservés ; export Scan OBD embarque le JSON natif original. Pas d'autorisation d'écriture, pas d'attribution à d'autres calculateurs. Régressions écrites non exécutées ; branchement UI à poursuivre. C6/J1979 ouverts, aucun test intermédiaire, fusion ou Release.
+
 ## J1979 — inventaires et freeze frame visibles (26/11/2026)
 
 - Pages annoncées Modes 01/02/06/08/09 et DTC déclencheur des données figées visibles Android/Windows, ressources FR/EN ; Android recalcule les identifiants et le DTC depuis la réponse brute avant affichage, distingue aucun déclencheur et indisponible. Aucun identifiant de continuation présenté comme commande disponible. Régression écrite non exécutée. C6/J1979 ouverts, aucun test intermédiaire, fusion ou Release.

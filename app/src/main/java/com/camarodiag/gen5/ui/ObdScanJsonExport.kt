@@ -95,6 +95,7 @@ internal object ObdScanJsonExport {
             } ?: JSONObject.NULL)
             put("monitorTestRaw", report.monitorTestRaw ?: JSONObject.NULL)
             put("rawLog", JSONArray(report.rawLog))
+            put("nativeUsbEvidence", report.nativeUsbEvidence?.let { JSONObject(it) } ?: JSONObject.NULL)
         }.toString(2)
     }
 }
