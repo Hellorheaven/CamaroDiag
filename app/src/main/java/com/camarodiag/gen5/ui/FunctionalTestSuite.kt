@@ -86,7 +86,9 @@ data class FunctionalTestState(
     val evapCampaign: Boolean = false,
     val evapResult: com.camarodiag.gen5.data.obd.ObdEvapResult? = null,
     val clearCampaign: Boolean = false,
-    val clearResult: com.camarodiag.gen5.data.obd.ObdClearRecipeResult? = null
+    val clearResult: com.camarodiag.gen5.data.obd.ObdClearRecipeResult? = null,
+    val legacyTarget: com.camarodiag.gen5.data.obd.LegacyMutationTarget? = null,
+    val legacyResult: com.camarodiag.gen5.data.obd.LegacyMutationResult? = null
 ) {
     val canExport: Boolean get() = !running && finishedAtMillis != null && context != null && checks.isNotEmpty()
 }
@@ -153,6 +155,46 @@ object FunctionalTestPlanner {
     ).map { (id, en, fr) ->
         FunctionalTestCheck("protocol:$id", "protocol", en, fr, FunctionalTestOutcome.NOT_TESTED,
             "No verified response in this campaign.", "Aucune réponse vérifiée dans cette campagne.")
+    }
+
+    fun legacyMutationChecks(): List<FunctionalTestCheck> = listOf(
+        Triple("scope","Documented response scope and VIN","Sources documentées et VIN"),
+        Triple("baseline","Durable initial evidence","Preuves initiales sauvegardées"),
+        Triple("ack","Operation acknowledgment","Acquittement de la demande"),
+        Triple("readback","Confirmed and pending DTC readback","Relecture défauts confirmés et en attente"),
+        Triple("remaining","Absence of confirmed and pending DTC on documented sources","Absence de défauts confirmés et en attente sur les sources documentées"),
+        Triple("evap","EVAP leak test completion","Fin du test de fuite EVAP")
+    ).map { (key,en,fr) -> FunctionalTestCheck("legacy:$key","protocol",en,fr,
+        FunctionalTestOutcome.NOT_TESTED,"No verified evidence.","Aucune preuve vérifiée.") }
+
+    fun legacyMutationResults(state: FunctionalTestState,
+        result: com.camarodiag.gen5.data.obd.LegacyMutationResult,
+        baselineSaved: Boolean): FunctionalTestState {
+        var checks = state.checks
+        fun mark(key: String, status: FunctionalTestOutcome, en: String, fr: String) {
+            checks = updated(checks,"legacy:$key",status,en,fr)
+        }
+        if (baselineSaved && result.observedVin != null)
+            mark("scope",FunctionalTestOutcome.PASSED,"Documented scope and VIN checked; not exhaustive.",
+                "Sources documentées et VIN contrôlés ; couverture non exhaustive.")
+        if (baselineSaved) mark("baseline",FunctionalTestOutcome.PASSED,"Initial report stored locally.","Rapport initial enregistré localement.")
+        if (result.outcome in setOf("ACKNOWLEDGED","ACKNOWLEDGED_READBACK","ACKNOWLEDGED_PARTIAL"))
+            mark("ack",FunctionalTestOutcome.PASSED,"Expected acknowledgments observed.","Acquittements attendus observés.")
+        else if (result.attempted) mark("ack",FunctionalTestOutcome.FAILED,
+            "Missing or uncertain acknowledgment; no retry.","Acquittement manquant ou incertain ; aucune répétition.")
+        val allRead = result.target.clear && result.after.isNotEmpty() &&
+            result.after.values.all { it["03"] != null && it["07"] != null }
+        if (allRead) {
+            mark("readback",FunctionalTestOutcome.PASSED,"Both modes observed on documented sources.",
+                "Les deux modes relus sur les sources documentées.")
+            val empty = result.after.values.all { it["03"].orEmpty().isEmpty() && it["07"].orEmpty().isEmpty() }
+            mark("remaining",if (empty) FunctionalTestOutcome.PASSED else FunctionalTestOutcome.FAILED,
+                if (empty) "No confirmed or pending DTC observed on documented sources." else "DTCs remain.",
+                if (empty) "Aucun défaut confirmé ou en attente observé sur les sources documentées." else "Des défauts subsistent.")
+        }
+        return state.copy(checks=checks,legacyResult=result,
+            context=state.context?.copy(observedVin=result.observedVin),
+            rawObdExchanges=result.observations.map { "${it.stage} > ${it.request} -> ${it.response ?: "?"}" })
     }
 
     fun clearChecks(): List<FunctionalTestCheck> = listOf(
