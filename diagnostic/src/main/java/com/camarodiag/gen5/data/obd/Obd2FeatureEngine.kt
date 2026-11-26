@@ -406,17 +406,26 @@ class Obd2FeatureEngine(
         readVinRecord(3500L) ?: readVinRecord(5000L)
     }
 
-    suspend fun readCalibrationIds(): List<String> = withHeaderlessRecords {
-        decodeAsciiRecords(ask("0904"), 0x49, 0x04, 16)
+    // Some functional Mode 09 replies interleave numbered blocks from
+    // several ECUs once headers are removed. Never guess their association.
+    // A single retry with headers restores the source information.
+    private suspend fun readIdentityField(command: String, decode: (String) -> List<String>): List<String> {
+        val first = withHeaderlessRecords { decode(ask(command, 3500L)) }
+        if (first.isNotEmpty() || !physicalElmHeaders) return first
+        // withHeaderlessRecords restored ATH1/ATS0 in its finally block.
+        val retry = ask(command, 3500L)
+        if (!ObdNumberedIdentityFrames.hasPhysicalHeaders(retry)) return emptyList()
+        return decode(retry)
     }
 
-    suspend fun readCalibrationVerificationNumbers(): List<String> = withHeaderlessRecords {
-        decodeHexRecords(ask("0906"), 0x49, 0x06, 4)
-    }
+    suspend fun readCalibrationIds(): List<String> =
+        readIdentityField("0904") { decodeAsciiRecords(it, 0x49, 0x04, 16) }
 
-    suspend fun readEcuName(): List<String> = withHeaderlessRecords {
-        decodeAsciiRecords(ask("090A"), 0x49, 0x0A, 20)
-    }
+    suspend fun readCalibrationVerificationNumbers(): List<String> =
+        readIdentityField("0906") { decodeHexRecords(it, 0x49, 0x06, 4) }
+
+    suspend fun readEcuName(): List<String> =
+        readIdentityField("090A") { decodeAsciiRecords(it, 0x49, 0x0A, 20) }
     /** Reads standardized OBD identity fields independently; unsupported optional records do not abort the read. */
     suspend fun readEcuIdentification(): ObdEcuIdentification {
         val responders = readOrDefault(emptyList()) { discoverFunctionalObdResponders() }

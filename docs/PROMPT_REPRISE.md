@@ -1,3 +1,7 @@
+## PR117 — identité Mode 09 multicalculateur après retour Mach-E (26/11/2026)
+
+- C6 : lorsque les CAL ID, CVN ou noms ECU ne peuvent être décodés sans en-têtes, nouvelle interrogation bornée en conservant les en-têtes CAN restaurés. Réassemblage ISO-TP classique indépendant par adresse, refus des trames tronquées, séquences incohérentes et blocs intercalés sans provenance. Le VIN existant reste sur son parcours éprouvé. Les identités ne sont pas attribuées à un nom de module OEM sans profil. Régressions sur réponses synthétiques intercalées (format observé dans les traces Mach-E), non exécutées. Aucun checkpoint.
+
 ## PR117 — odomètre Mach-E et identité réelle du véhicule (26/11/2026)
 
 - C6 : audit ELM lit le VIN réel avant et après A6/D3 dans une session exclusive, refuse un changement de VIN et ne substitue plus le VIN du garage à une identité non observée. J2534 conserve sa lecture kilométrique sans attribution VIN tant que la transaction ne fournit pas cette preuve. Le VIN réel non-Camaro remplace le descriptif Camaro dans le bandeau de connexion après scan/audit ; modules GM non vérifiés retirés de la liste, sans modifier le véhicule du garage. L'observation est invalidée sur changement de connexion/contexte. Le rapport conserve toutes les preuves ; l'écran odomètre masque les sources indisponibles lorsqu'une valeur est exploitable et distingue valeur déclarée d'une vérification indépendante. Ressources FR/EN. Pas de compilation/test ; la protection exhaustive de toutes les fonctions GM et le VIN J2534 atomique restent à compléter.
