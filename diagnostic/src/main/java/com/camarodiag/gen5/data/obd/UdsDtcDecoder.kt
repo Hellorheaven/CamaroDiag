@@ -82,6 +82,14 @@ data class UdsDtcReport(
 
 data class UdsDtcCountReport(val availabilityMask: Int, val formatIdentifier: Int, val count: Int)
 
+data class UdsDtcFilter(val requestedMask: Int, val availabilityMask: Int) {
+    init { require(requestedMask in 0..255 && availabilityMask in 0..255) }
+    val effectiveMask: Int get() = requestedMask and availabilityMask
+    val available: Boolean get() = effectiveMask != 0
+    // A filtered or entirely unavailable read must not erase the existing ECU list.
+    val canReplaceInventory: Boolean get() = requestedMask == 255 && available
+}
+
 data class UdsDtcDetail(val dtc: Int, val status: Int, val records: ByteArray)
 
 data class UdsSnapshotReference(val dtc: Int, val record: Int)

@@ -1,3 +1,7 @@
+## PR117 — disponibilité des filtres DTC Android (26/11/2026)
+
+- C6/DoIP : Android affiche le masque effectif pour les résultats DTC 19/01 et 19/02, y compris les listes de mémoire et historiques filtrées. Les états DTC sont traduits FR/EN en ne décodant que les bits disponibles ; le code et l'octet bruts restent affichés. Une lecture sans bit disponible ne remplace plus l'inventaire précédent du calculateur, en DoIP et sur le parcours UDS CAN. Une requête filtrée ne remplace pas l'inventaire complet. Tests de politique écrits, non exécutés ; aucun checkpoint.
+
 ## PR117 — masques DTC structurés Connectors DoIP (26/11/2026)
 
 - C6/DoIP : les opérations 19/01 et 19/02 UDS/OBDonUDS des Connectors retournent le masque effectif et la disponibilité du filtre ; les listes 19/02 exposent en plus les identifiants des bits d'état normalisés, sans perdre l'octet brut. Filtre vide distinct d'un résultat sans défaut sur un filtre disponible, masques invalides refusés avant émission. Documentation CLI FR/EN et régressions écrites, non exécutées. Aucun checkpoint.

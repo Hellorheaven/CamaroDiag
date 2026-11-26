@@ -41,6 +41,10 @@ import com.camarodiag.gen5.data.obd.CalibrationTableCodec
 import com.camarodiag.gen5.data.obd.ObdbCamaroSignalSet
 import com.camarodiag.gen5.data.obd.CamaroSignalCatalog
 import com.camarodiag.gen5.data.obd.toDiagnosticDtc
+import com.camarodiag.gen5.data.obd.UdsDtcFilter
+import com.camarodiag.gen5.data.obd.UdsDtcReport
+import com.camarodiag.gen5.data.obd.UdsDtcCountReport
+import com.camarodiag.gen5.data.obd.DecodedUdsDtcRecord
 import com.camarodiag.gen5.data.obd.ObdDtc
 import com.camarodiag.gen5.data.obd.ObdScanReport
 import com.camarodiag.gen5.data.obd.ObdTransportFailurePolicy
@@ -1671,9 +1675,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val module = "DoIP 0x" + ecu.uppercase()
                 val report = result.dtcs
                 // A filtered report is not a complete replacement of the ECU's DTC list.
-                if (report != null && mask == 255 && operation == DoIpDirectRead.Operation.DTC) {
+                if (report != null && operation == DoIpDirectRead.Operation.DTC &&
+                    UdsDtcFilter(mask, report.statusAvailabilityMask).canReplaceInventory) {
                     val mapped = report.records.map { it.toDiagnosticDtc(module) }
-                    _dtcs.value = _dtcs.value.filterNot { it.module == module } + mapped
+                    _dtcs.update { old -> if (current()) old.filterNot { it.module == module } + mapped else old }
                 }
                 val count = result.dtcCount
                 val detail = result.dtcDetail
@@ -1753,12 +1758,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         val count = legacy.count
                         val detail = legacy.detail
                         heading + "\n" + when {
-                            list != null -> localizedContext.getString(R.string.cal_doip_filtered_dtc_result,
-                                list.records.size, mask, list.statusAvailabilityMask) + list.records.joinToString("\n", prefix = "\n") {
-                                "0x%06X — 0x%02X".format(it.rawDtc, it.statusByte)
-                            }
-                            count != null -> localizedContext.getString(R.string.cal_doip_count_result,
-                                count.count, mask, count.availabilityMask, count.formatIdentifier)
+                            list != null -> renderUdsDtcList(list, mask)
+                            count != null -> renderUdsDtcCount(count, mask)
                             detail != null -> localizedContext.getString(R.string.cal_doip_detail_result, detail.dtc, detail.status,
                                 detail.records.joinToString(" ") { "%02X".format(it.toInt() and 255) })
                             else -> error("Missing legacy DTC result")
@@ -1778,10 +1779,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         val list = memoryReport.list
                         val memoryDetailResult = memoryReport.detail
                         heading + "\n" + when {
-                            list != null -> localizedContext.getString(R.string.cal_doip_filtered_dtc_result,
-                                list.records.size, didHex.take(2).toInt(16), list.statusAvailabilityMask) + list.records.joinToString("\n", prefix = "\n") {
-                                "0x%06X — 0x%02X".format(it.rawDtc, it.statusByte)
-                            }
+                            list != null -> renderUdsDtcList(list, didHex.take(2).toInt(16))
                             memoryDetailResult != null -> localizedContext.getString(R.string.cal_doip_detail_result,
                                 memoryDetailResult.dtc, memoryDetailResult.status,
                                 memoryDetailResult.records.joinToString(" ") { "%02X".format(it.toInt() and 255) })
@@ -1790,8 +1788,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     }
                     detail != null -> localizedContext.getString(R.string.cal_doip_detail_result,
                         detail.dtc, detail.status, detail.records.joinToString(" ") { "%02X".format(it.toInt() and 255) })
-                    count != null -> localizedContext.getString(R.string.cal_doip_count_result,
-                        count.count, mask, count.availabilityMask, count.formatIdentifier)
+                    count != null -> renderUdsDtcCount(count, mask)
                     result.samples.isNotEmpty() -> localizedContext.getString(R.string.cal_doip_monitor_complete, result.samples.size)
                     operation in setOf(DoIpDirectRead.Operation.FIRST_FAILED_DTC, DoIpDirectRead.Operation.FIRST_CONFIRMED_DTC,
                         DoIpDirectRead.Operation.RECENT_FAILED_DTC, DoIpDirectRead.Operation.RECENT_CONFIRMED_DTC) && report != null -> {
@@ -1802,7 +1799,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             else -> R.string.cal_doip_recent_confirmed
                         })
                         title + ": " + (report.records.singleOrNull()?.let {
-                            "0x%06X — 0x%02X".format(it.rawDtc, it.statusByte)
+                            renderUdsDtcRecord(it, report.statusAvailabilityMask)
                         } ?: localizedContext.getString(R.string.cal_doip_no_historical_dtc))
                     }
                     operation in setOf(DoIpDirectRead.Operation.SUPPORTED_DTCS, DoIpDirectRead.Operation.PERMANENT_DTCS) && report != null ->
@@ -1810,7 +1807,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             R.string.cal_doip_permanent_result else R.string.cal_doip_supported_result,
                             report.records.size, report.statusAvailabilityMask) +
                             report.records.joinToString(separator = "\n", prefix = "\n") {
-                                "0x%06X — 0x%02X".format(it.rawDtc, it.statusByte)
+                                renderUdsDtcRecord(it, report.statusAvailabilityMask)
                             }
                     result.severityReport != null -> requireNotNull(result.severityReport).let { report ->
                         if (report.count != null)
@@ -1831,11 +1828,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         localizedContext.getString(R.string.cal_doip_snapshot_index_result, rows.size) +
                             rows.joinToString(separator = "\n", prefix = "\n") { "0x%06X — 0x%02X".format(it.dtc, it.record) }
                     }
-                    report != null -> localizedContext.getString(R.string.cal_doip_filtered_dtc_result,
-                        report.records.size, mask, report.statusAvailabilityMask) +
-                        report.records.joinToString(separator = "\n", prefix = "\n") {
-                            "0x" + it.rawDtc.toString(16).uppercase().padStart(6, '0')
-                        }
+                    report != null -> renderUdsDtcList(report, mask)
                     operation == DoIpDirectRead.Operation.VIN -> result.vin.orEmpty()
                     else -> result.data?.joinToString(" ") { "%02X".format(it.toInt() and 255) }.orEmpty()
                 }
@@ -2249,6 +2242,39 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    private fun renderUdsDtcRecord(record: DecodedUdsDtcRecord, availability: Int): String {
+        val keys = intArrayOf(R.string.cal_uds_bit_failed, R.string.cal_uds_bit_failed_cycle,
+            R.string.cal_uds_bit_pending, R.string.cal_uds_bit_confirmed,
+            R.string.cal_uds_bit_incomplete_since_clear, R.string.cal_uds_bit_failed_since_clear,
+            R.string.cal_uds_bit_incomplete_cycle, R.string.cal_uds_bit_warning)
+        val labels = keys.mapIndexedNotNull { bit, key ->
+            if ((record.statusByte and availability and (1 shl bit)) != 0) localizedContext.getString(key) else null
+        }
+        val state = when {
+            availability == 0 -> localizedContext.getString(R.string.cal_uds_status_unavailable)
+            labels.isEmpty() -> localizedContext.getString(R.string.cal_uds_status_none_asserted)
+            else -> labels.joinToString(", ")
+        }
+        return "0x%06X — 0x%02X — %s".format(record.rawDtc, record.statusByte, state)
+    }
+
+    private fun renderUdsDtcFilter(filter: UdsDtcFilter): String =
+        "\n" + localizedContext.getString(R.string.cal_uds_effective_mask, filter.effectiveMask) +
+            if (filter.available) "" else "\n" + localizedContext.getString(R.string.cal_uds_filter_unavailable)
+
+    private fun renderUdsDtcList(report: UdsDtcReport, requestedMask: Int): String =
+        localizedContext.getString(R.string.cal_doip_filtered_dtc_result,
+            report.records.size, requestedMask, report.statusAvailabilityMask) +
+            renderUdsDtcFilter(UdsDtcFilter(requestedMask, report.statusAvailabilityMask)) +
+            report.records.joinToString(separator = "", prefix = "") {
+                "\n" + renderUdsDtcRecord(it, report.statusAvailabilityMask)
+            }
+
+    private fun renderUdsDtcCount(report: UdsDtcCountReport, requestedMask: Int): String =
+        localizedContext.getString(R.string.cal_doip_count_result,
+            report.count, requestedMask, report.availabilityMask, report.formatIdentifier) +
+            renderUdsDtcFilter(UdsDtcFilter(requestedMask, report.availabilityMask))
+
     /** Reads UDS ReadDTCInformation (0x19/0x02) from the selected physical ECU. */
     fun readUdsDtcs(requestCanIdHex: String, responseCanIdHex: String, protocolNumberText: String) {
         if (!requirePremiumLicense()) return
@@ -2297,14 +2323,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             ?: "DTC constructeur brut $rawCode ; aucune définition vérifiée n'est chargée pour ce calculateur."
                     )
                 }
-                _dtcs.value = _dtcs.value.filterNot { it.module == moduleId } + mappedDtcs
-                val rendered = if (report.records.isEmpty()) {
-                    localizedContext.getString(R.string.vm_no_dtcs_returned, responseCanIdHex.uppercase())
-                } else {
-                    report.records.joinToString("\n") { record ->
-                        "${record.code}  status=0x${record.statusByte.toString(16).uppercase().padStart(2, '0')}"
-                    }
-                }
+                if (UdsDtcFilter(255, report.statusAvailabilityMask).canReplaceInventory)
+                    _dtcs.update { old -> if (current()) old.filterNot { it.module == moduleId } + mappedDtcs else old }
+                val rendered = renderUdsDtcList(report, 255)
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     isUdsReading = false,
                     udsDtcResponse = rendered,

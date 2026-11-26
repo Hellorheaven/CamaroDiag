@@ -233,6 +233,24 @@ class UdsDtcDecoderTest {
         assertTrue(runCatching { UdsDtcDecoder.decodeSnapshotIndex(byteArrayOf(0x59, 3, 1, 2, 3, 4, 1, 2, 3, 4)) }.isFailure)
     }
 
+    @Test fun dtcFilterDistinguishesUnavailableAndPartialQueriesFromInventoryReads() {
+        val unavailable = UdsDtcFilter(255, 0)
+        assertEquals(0, unavailable.effectiveMask)
+        assertFalse(unavailable.available)
+        assertFalse(unavailable.canReplaceInventory)
+        val disjoint = UdsDtcFilter(0x80, 1)
+        assertEquals(0, disjoint.effectiveMask)
+        assertFalse(disjoint.canReplaceInventory)
+        val partial = UdsDtcFilter(0x05, 0x0D)
+        assertEquals(5, partial.effectiveMask)
+        assertTrue(partial.available)
+        assertFalse(partial.canReplaceInventory)
+        val all = UdsDtcFilter(255, 0x0D)
+        assertTrue(all.canReplaceInventory)
+        assertEquals(0x0D, all.effectiveMask)
+        assertTrue(runCatching { UdsDtcFilter(256, 0) }.isFailure)
+    }
+
     @Test fun standardStatusReportAcceptsNoDtcAndRejectsInventedFormatByte() {
         val empty = UdsDtcDecoder.decodeStatusMaskReport(byteArrayOf(0x7F), 0xFF)
         assertNull(empty.formatIdentifier)
