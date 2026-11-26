@@ -1,0 +1,150 @@
+name: Publish PR117 signed Android APK (without merge)
+
+# One-shot opt-in release candidate. This workflow lives on main but builds an
+# explicitly pinned PR117 source revision. It does not merge or delete anything.
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/release-pr117-apk.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr117-release-apk
+  cancel-in-progress: false
+
+env:
+  SOURCE_SHA: '26009f1b5025b70dff18f0d7ab5ba1b5e6eed092'
+  APK_TAG: 'v2.0.46-pr117-26009f1'
+  RELEASE_PATCH: '46'
+
+jobs:
+  build-untrusted-source:
+    name: Build PR117 APK without production signing secrets
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout pinned PR117 source (NOT main)
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+          persist-credentials: false
+      - name: Verify source revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          test "$(sed -n 's/^VERSION_PREFIX=//p' version.properties | head -1)" = '2.0'
+          echo "Source: $SOURCE_SHA"
+      - name: Set up JDK 17
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: '8.11.1'
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+        with:
+          cmdline-tools-version: 14742923
+          packages: "platform-tools platforms;android-36 build-tools;36.0.0"
+      - name: Create disposable build-only keystore
+        shell: bash
+        run: |
+          set -euo pipefail
+          keytool -genkeypair -keystore app/release.jks -alias ephemeral \
+            -storepass temporary-build -keypass temporary-build \
+            -keyalg RSA -keysize 2048 -validity 2 \
+            -dname "CN=Ephemeral PR117 Build"
+      - name: Assemble minified release APK without release keys
+        shell: bash
+        env:
+          SIGNING_STORE_PASSWORD: temporary-build
+          SIGNING_KEY_ALIAS: ephemeral
+          SIGNING_KEY_PASSWORD: temporary-build
+        run: |
+          set -euo pipefail
+          gradle wrapper --gradle-version 8.11.1
+          chmod +x gradlew
+          ./gradlew :app:assembleRelease -PreleasePatch="$RELEASE_PATCH" --stacktrace --warning-mode=fail
+          test -s app/build/outputs/apk/release/CamaroDiag-release.apk
+      - name: Upload intermediate package (NOT a release)
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr117-intermediate-apk
+          path: app/build/outputs/apk/release/CamaroDiag-release.apk
+          retention-days: 1
+          if-no-files-found: error
+
+  sign-and-publish:
+    name: Sign with existing production key and publish prerelease
+    needs: build-untrusted-source
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download assembled APK without running PR code
+        uses: actions/download-artifact@v4
+        with:
+          name: pr117-intermediate-apk
+          path: unsigned-stage
+      - name: Prepare Android signing tool
+        uses: android-actions/setup-android@v4
+        with:
+          cmdline-tools-version: 14742923
+          packages: "build-tools;36.0.0"
+      - name: Re-sign APK with protected release key
+        env:
+          SIGNING_KEYSTORE_BASE64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
+          SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
+          SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
+          SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s unsigned-stage/CamaroDiag-release.apk
+          test -n "$SIGNING_KEYSTORE_BASE64"
+          test -n "$SIGNING_STORE_PASSWORD"
+          test -n "$SIGNING_KEY_ALIAS"
+          test -n "$SIGNING_KEY_PASSWORD"
+          printf '%s' "$SIGNING_KEYSTORE_BASE64" | base64 --decode > release.jks
+          test -s release.jks
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" sign \
+            --ks release.jks \
+            --ks-key-alias "$SIGNING_KEY_ALIAS" \
+            --ks-pass env:SIGNING_STORE_PASSWORD \
+            --key-pass env:SIGNING_KEY_PASSWORD \
+            --out CamaroDiag-release.apk unsigned-stage/CamaroDiag-release.apk
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify \
+            --Werr --verbose CamaroDiag-release.apk
+          sha256sum CamaroDiag-release.apk
+          rm -f release.jks
+      - name: Publish APK in repository GitHub Releases (no merge)
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          if gh release view "$APK_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Refusing to replace existing release $APK_TAG" >&2
+            exit 1
+          fi
+          cat > release-notes.md <<EOF
+          Signed Android **release-build APK** from PR #117 source \`$SOURCE_SHA\`.
+
+          - Compiled from the pinned \`chore/unified-ci\` revision, **not** the \`main\` source tree.
+          - Published in the repository's GitHub Releases without merging/closing PR #117 or deleting its branch.
+          - Build type: optimized release, production signing key. Version: 2.0.46 (code 63).
+          - **Testing release candidate**: unfinished C6 and hardware capabilities are not validated; do not use for ECU programming.
+          - Android compilation and APK signature verification occurred in this workflow; this is not a C6 closure validation.
+          EOF
+          gh release create "$APK_TAG" "CamaroDiag-release.apk#CamaroDiag-release.apk" \
+            --repo "$GITHUB_REPOSITORY" --target "$SOURCE_SHA" \
+            --title "CamaroDiag v2.0.46 • PR117 APK de test" \
+            --notes-file release-notes.md --prerelease
