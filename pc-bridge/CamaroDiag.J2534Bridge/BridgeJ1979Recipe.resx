@@ -39,4 +39,11 @@
   <data name="ClearOutcome_REFUSED" xml:space="preserve"><value>Reset request refused by ECU.</value></data>
   <data name="ClearOutcome_UNCERTAIN" xml:space="preserve"><value>Reset state uncertain — do not repeat automatically.</value></data>
   <data name="ClearOutcome_NOT_TESTED" xml:space="preserve"><value>Conditions not verified; no reset request attempted.</value></data>
+  <data name="LegacyRun" xml:space="preserve"><value>J1979 legacy</value></data>
+  <data name="LegacyCancel" xml:space="preserve"><value>Cancel</value></data>
+  <data name="LegacyVariant" xml:space="preserve"><value>Documented protocol</value></data>
+  <data name="LegacySource" xml:space="preserve"><value>ECU response source (hex)</value></data>
+  <data name="LegacyConfirmProfile" xml:space="preserve"><value>I verified the protocol, adapter and ECU response source.</value></data>
+  <data name="LegacyScope" xml:space="preserve"><value>Functional reads, filtered to the selected response source. Not a whole-vehicle scan. No reset or control test.</value></data>
+  <data name="LegacyPrerequisites" xml:space="preserve"><value>Select a J2534 adapter and stop the bridge and console before running the legacy test.</value></data>
 </root>
