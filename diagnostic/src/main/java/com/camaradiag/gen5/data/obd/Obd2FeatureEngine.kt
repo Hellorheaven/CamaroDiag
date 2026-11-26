@@ -4,6 +4,8 @@ import java.util.Locale
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.currentCoroutineContext
 
 /** A single-command OBD transport. Implement with Bluetooth/USB/Wi-Fi ELM or a documented provider. */
 fun interface ObdCommandChannel {
@@ -69,7 +71,10 @@ data class ObdScanReport(
     val rawLog: List<String>,
     val freezeFrameDtc: ObdDtc? = null,
     val physicalCanResponder: String? = null,
-    val unavailableDtcModes: Set<Int> = emptySet()
+    val unavailableDtcModes: Set<Int> = emptySet(),
+    val supportedPidsByResponder: Map<String, Set<Int>> = emptyMap(),
+    val firstUnresolvedPid: Int? = null,
+    val pidAttributionIncomplete: Boolean = false
 )
 
 /**
@@ -218,15 +223,17 @@ class Obd2FeatureEngine(
 
     /** Reads Mode 01 supported-PID bitmaps (PID 00, 20, ... E0). */
     data class PidDiscovery(val supported: Set<Int>, val firstUnresolvedPid: Int?,
-        val byResponder: Map<String, Set<Int>> = emptyMap())
+        val byResponder: Map<String, Set<Int>> = emptyMap(),
+        val attributionIncomplete: Boolean = false)
 
     suspend fun discoverSupportedPids(): Set<Int> = discoverPidAvailability().supported
 
     suspend fun discoverPidAvailability(primaryPowertrainResponderOnly: Boolean = false): PidDiscovery {
         val supported = linkedSetOf<Int>()
         val byResponder = linkedMapOf<String, MutableSet<Int>>()
+        var attributionIncomplete = false
         fun result(unresolved: Int?) = PidDiscovery(supported.toSet(), unresolved,
-            byResponder.mapValues { it.value.toSet() })
+            byResponder.mapValues { it.value.toSet() }, attributionIncomplete)
         var expectedResponders: Set<String?>? = null
         var firstUnresolved: Int? = null
         var basePid = 0x00
@@ -238,15 +245,16 @@ class Obd2FeatureEngine(
                 .groupBy { it.responder }
             val candidates = if (grouped.keys.any { it != null }) grouped.filterKeys { it != null } else grouped
             val valid = candidates.mapNotNull { (address, rows) ->
-                val bitmaps = rows.map { it.bytes }.distinct()
-                val bitmap = bitmaps.singleOrNull() ?: if (address == null &&
-                    !primaryPowertrainResponderOnly && bitmaps.isNotEmpty()) {
-                    // A functional request may receive multiple anonymous ECU
-                    // bitmaps. Their union is an inventory, not ECU attribution.
-                    List(4) { index -> bitmaps.fold(0) { acc, bytes -> acc or bytes[index] } }
-                } else null
-                bitmap?.let { address to it }
+                val distinct = rows.map { it.bytes }.distinct()
+                if (address == null && distinct.size > 1 && !primaryPowertrainResponderOnly) {
+                    // Without headers, multiple functional replies cannot be
+                    // tied to ECUs. Their OR is only a union of advertised PIDs,
+                    // never the support bitmap of a single ECU.
+                    attributionIncomplete = true
+                    address to List(4) { index -> distinct.fold(0) { mask, bytes -> mask or bytes[index] } }
+                } else distinct.singleOrNull()?.let { address to it }
             }.toMap()
+            if (candidates.keys.any { it == null }) attributionIncomplete = true
             val expected = expectedResponders
             val accepted = if (expected == null) valid else valid.filterKeys { it in expected }
             if (accepted.isEmpty() || (expected != null && !accepted.keys.containsAll(expected)) ||
@@ -256,7 +264,6 @@ class Obd2FeatureEngine(
             if (accepted.isEmpty()) return result(firstUnresolved)
             val next = linkedSetOf<String?>()
             for ((address, bytes) in accepted) {
-                // Preserve positive, empty bitmaps as evidence for this ECU.
                 if (address != null) byResponder.getOrPut(address) { linkedSetOf() }
                 for (bit in 0 until 31) {
                     val mask = 1 shl (7 - (bit % 8))
@@ -306,8 +313,10 @@ class Obd2FeatureEngine(
             val groups = observations.groupBy { it.responder }
             val attributed = if (groups.keys.any { it != null }) groups.filterKeys { it != null } else groups
             for ((responder, rows) in attributed) {
-                if (byResponder.isNotEmpty() &&
-                    (responder == null || pid !in byResponder[responder].orEmpty())) continue
+                if (responder != null && byResponder.isNotEmpty() && pid !in byResponder[responder].orEmpty()) continue
+                // Once support has been attributed to physical addresses, an
+                // anonymous reply cannot be credited to any of those ECUs.
+                if (responder == null && byResponder.isNotEmpty()) continue
                 // Conflicting values from the same or unidentified responder
                 // cannot be promoted into a single trusted measurement.
                 val data = rows.map { it.bytes }.distinct().singleOrNull() ?: continue
@@ -481,14 +490,34 @@ class Obd2FeatureEngine(
     /** CAN Mode 06 is a separate namespace from Mode 01 PIDs.
      * Query only MIDs actually advertised by a valid support bitmap.
      * Report encoded words and UASID; do not invent engineering units or pass/fail. */
-    suspend fun readMonitorTests(): String? = withHeaderlessRecords {
+    suspend fun readMonitorTests(): String? =
+        readMonitorTests(20_000L) { System.nanoTime() / 1_000_000L }
+
+    /** A shared request budget, not a new 2.5 s budget for every advertised MID.
+     * The channel must honor the supplied timeout; ELM setup/restore is outside
+     * this budget and still executes under the exclusive session. */
+    internal suspend fun readMonitorTests(
+        budgetMs: Long,
+        monotonicMs: () -> Long
+    ): String? = withHeaderlessRecords {
+        require(budgetMs > 0)
+        val started = monotonicMs()
+        suspend fun request(mid: Int): String? {
+            currentCoroutineContext().ensureActive()
+            val remaining = budgetMs - (monotonicMs() - started)
+            if (remaining <= 0) return null
+            val response = ask("06%02X".format(Locale.ROOT, mid), minOf(2500L, remaining))
+            currentCoroutineContext().ensureActive()
+            return response
+        }
+
         val supported = linkedSetOf<Int>()
         var baseMid = 0
         var discovered = false
         var incomplete = false
         for (pageIndex in 0 until 8) {
-            val response = ask("06%02X".format(Locale.ROOT, baseMid), 2500L)
-            val page = ObdCanMonitorRecords.support(response, baseMid)
+            val response = request(baseMid)
+            val page = response?.let { ObdCanMonitorRecords.support(it, baseMid) }
             if (page == null) {
                 if (discovered) incomplete = true
                 break
@@ -500,15 +529,26 @@ class Obd2FeatureEngine(
         }
         if (!discovered) return@withHeaderlessRecords null
         val result = mutableListOf<String>()
-        for (mid in supported) {
-            val records = ObdCanMonitorRecords.results(ask("06%02X".format(Locale.ROOT, mid), 2500L), mid)
+        val mids = supported.toList()
+        for ((index, mid) in mids.withIndex()) {
+            val response = request(mid)
+            if (response == null) {
+                incomplete = true
+                result += "UNQUERIED_MIDS=" + mids.drop(index).joinToString(",") {
+                    "%02X".format(Locale.ROOT, it)
+                }
+                break
+            }
+            val records = ObdCanMonitorRecords.results(response, mid)
             if (records.isNullOrEmpty()) {
                 incomplete = true
                 result += "MID=%02X: N/A".format(Locale.ROOT, mid)
             } else result += records.map { it.rawText() }
         }
-        if (result.isEmpty()) return@withHeaderlessRecords null
+        // A valid empty support bitmap is evidence, unlike no response.
+        if (result.isEmpty()) result += "DISCOVERED_MIDS=0"
         if (incomplete) result += "PARTIAL"
+        currentCoroutineContext().ensureActive()
         result.joinToString("\n")
     }
 
@@ -583,7 +623,11 @@ class Obd2FeatureEngine(
             rawLog = log.toList(),
             freezeFrameDtc = freezeFrameDtc,
             physicalCanResponder = physicalCanResponder,
-            unavailableDtcModes = dtcSnapshot.unavailableModes
+            unavailableDtcModes = dtcSnapshot.unavailableModes,
+            supportedPidsByResponder = if (physicalCanResponder != null)
+                mapOf(physicalCanResponder to supported) else discovery.byResponder,
+            firstUnresolvedPid = discovery.firstUnresolvedPid,
+            pidAttributionIncomplete = physicalCanResponder == null && discovery.attributionIncomplete
         )
     }
 
@@ -698,6 +742,16 @@ class Obd2FeatureEngine(
     ): List<ObdDtc>? {
         val lines = response.lineSequence().map { it.trim().removeSuffix(">").trim().uppercase(Locale.ROOT) }
             .filter { it.isNotEmpty() }.toList()
+        // Physical multi-frame CAN replies retain their responder while
+        // reassembling ISO-TP. Never decode a first/consecutive frame alone.
+        if (ObdNumberedDtcRecords.hasMultiFrame(response, positiveService)) {
+            val records = ObdNumberedDtcRecords.parsePhysical(response, positiveService) ?: return null
+            val positive = records.filter { it.firstOrNull() == positiveService }
+            if (positive.isEmpty() || positive.any { !ObdNumberedDtcRecords.validPositive(it, positiveService) })
+                return null
+            return positive.flatMap { decodeSingleDtcPayload(it.drop(1), status).orEmpty() }
+                .distinctBy(ObdDtc::code)
+        }
         // Numbered ELM blocks must be complete, separately framed and
         // internally consistent. They contain CAN DTC counts, not legacy pairs.
         if (':' in response) {
