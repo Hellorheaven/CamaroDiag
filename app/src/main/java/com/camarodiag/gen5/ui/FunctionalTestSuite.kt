@@ -173,6 +173,7 @@ object FunctionalTestPlanner {
         mark("freeze", report.freezeFrameDtc != null && report.freezeFrameSupportComplete == true &&
             report.freezeFrameReads.isNotEmpty() && report.freezeFrameReads.all { it.verifiedBytes != null })
         mark("monitor", report.monitorTestRaw?.let { it.isNotBlank() && "PARTIAL" !in it && "N/A" !in it } == true)
+        mark("05", report.mode05?.let { it.complete && it.hasTestResults } == true)
         val counts = mapOf(3 to report.confirmedDtcs.size, 7 to report.pendingDtcs.size, 10 to report.permanentDtcs.size)
             .mapValues { (mode, count) -> count.takeUnless { mode in report.unavailableDtcModes } }
         rows = withDtcModeEvidence(rows, counts)
