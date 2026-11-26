@@ -10,6 +10,38 @@ import org.junit.Test
 class Obd2FeatureEngineTest {
 
     @Test
+    fun functionalAnonymousBitmapUnionDoesNotInventEcuAttribution() = runBlocking {
+        val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+            when (command) {
+                "0100" -> "410008000000\r410000100000"
+                else -> "NO DATA"
+            }
+        })
+        val result = engine.discoverPidAvailability()
+        assertEquals(setOf(5, 12), result.supported)
+        assertTrue(result.byResponder.isEmpty())
+        val primary = engine.discoverPidAvailability(primaryPowertrainResponderOnly = true)
+        assertTrue(primary.supported.isEmpty())
+        assertEquals(1, primary.firstUnresolvedPid)
+    }
+
+    @Test
+    fun attributedPidInventoryRejectsAnonymousAndUnadvertisedMeasurements() = runBlocking {
+        val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+            when (command) {
+                "0100" -> "7E8 06 41 00 00 10 00 00\r7E9 06 41 00 00 00 00 00"
+                "010C" -> "410C1AF8"
+                else -> "NO DATA"
+            }
+        })
+        val result = engine.discoverPidAvailability()
+        assertEquals(setOf(12), result.byResponder["7E8"])
+        assertEquals(emptySet<Int>(), result.byResponder["7E9"])
+        assertTrue(engine.readLiveData(result.supported, result.byResponder).isEmpty())
+    }
+
+
+    @Test
     fun physicalScanNeverIssuesElmOrFunctionalDiscoveryCommands() = runBlocking {
         val commands = mutableListOf<String>()
         val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
