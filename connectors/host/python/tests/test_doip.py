@@ -717,6 +717,45 @@ class DoIpTests(unittest.TestCase):
                     self.assertEqual(summaries[0]["commands_completed"], expected_count)
                 client.exchange_sequence.assert_called_once()
 
+    def test_cli_sequence_rejects_gateway_drift_after_tcp_close(self):
+        from dataclasses import replace
+        changed = replace(GATEWAY, gid="010000000000")
+        events = []
+        def discovery(*args, **kwargs):
+            events.append("gateway")
+            return changed if events.count("gateway") == 3 else GATEWAY
+
+        args = ["--host", GATEWAY.host, "--vin", VIN, "--tester", "0E80",
+                "--ecu", "1234", "--tcp", "sequence", "--commands", "22F187"]
+        with patch("camarodiagconnectors.doip_cli.discover", side_effect=discovery), \
+             patch("camarodiagconnectors.doip_cli.confirm_commands", return_value=True), \
+             patch("camarodiagconnectors.doip_cli.sys.stdin.isatty", return_value=True), \
+             patch("camarodiagconnectors.doip_cli.Session") as session:
+            client = session.return_value.__enter__.return_value
+            client.verify_vin.return_value = VIN
+            def reply(commands, on_reply, *, expected_vin):
+                self.assertEqual(expected_vin, VIN)
+                self.assertEqual(commands, (bytes.fromhex("22F187"),))
+                on_reply(1, bytes.fromhex("62F18701"))
+                return [bytes.fromhex("62F18701")]
+            client.exchange_sequence.side_effect = reply
+            def close(*_):
+                events.append("tcp_close")
+                return False
+            session.return_value.__exit__.side_effect = close
+            stderr = io.StringIO()
+            with redirect_stderr(stderr), self.assertRaises(DoIpError):
+                run(args)
+            self.assertEqual(events, ["gateway", "gateway", "tcp_close", "gateway"])
+            reports = [json.loads(row) for row in stderr.getvalue().splitlines()
+                       if row.startswith("{")]
+            self.assertEqual(reports[0]["sequence_progress"]["commands_completed"], 1)
+            summary = reports[-1]["sequence_summary"]
+            self.assertEqual(summary["commands_completed"], 1)
+            self.assertFalse(summary["sequence_complete"])
+            self.assertFalse(summary["complete"])
+            client.exchange_sequence.assert_called_once()
+
     def test_sequence_requires_two_separate_confirmations(self):
         commands = parse_commands("22 F1 90;19 01 FF")
         self.assertEqual(commands, (bytes.fromhex("22F190"), bytes.fromhex("1901FF")))
