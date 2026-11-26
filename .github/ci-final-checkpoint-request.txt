@@ -14,3 +14,12 @@ criteria:
 - Debug Android/Windows/Connectors full validation with warnings treated as failures
 - No ECU hardware, bench, vehicle or Release tests at this stage
 C6 overall stays open; do not close other protocols or workstreams.
+
+attempt: 2 -- correction group after initial final gate
+previous_gate_sha: 09ff9fc32eb990f11ea337552ea97ac35f9ff2d5
+initial_gate: https://github.com/Hellorheaven/CamaroDiag/actions/runs/45799247412
+corrected:
+- Python: explicit two-DID monitoring fixture and per-ECU/final gateway revalidation expectations
+- Windows: eliminate Span-across-await and duplicate C# test variable declaration
+- Android: preserve two different DoIP extended-record labels under unique FR/EN resource keys
+correction_commits: 904fb7285775b354e6f1648d709a70840bfe0d5e, 64dc33b3eabb8a7c557868bc014f79a8330d43c6
