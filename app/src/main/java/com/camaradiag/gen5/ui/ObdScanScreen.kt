@@ -204,6 +204,14 @@ fun ObdScanScreen(
                     InfoLine(stringResource(R.string.obd_cvn), report.calibrationVerificationNumbers.joinToString(" | ").ifBlank { unavailable })
                     InfoLine(stringResource(R.string.obd_ecu_name), report.ecuNames.joinToString(" | ").ifBlank { unavailable })
                     InfoLine(stringResource(R.string.obd_supported_pids), report.supportedPids.size.toString())
+                    report.supportedPidsByResponder.toSortedMap().forEach { (address, pids) ->
+                        InfoLine(stringResource(R.string.obd_pid_count_by_ecu, address), pids.size.toString())
+                    }
+                    if (report.pidAttributionIncomplete)
+                        Text(stringResource(R.string.obd_pid_attribution_incomplete), color = CamaroAmber, fontSize = 11.sp)
+                    report.firstUnresolvedPid?.let { pid ->
+                        Text(stringResource(R.string.obd_pid_discovery_partial, pid), color = CamaroAmber, fontSize = 11.sp)
+                    }
                     InfoLine(
                         stringResource(R.string.obd_responding_can_ids),
                         report.respondingEcuAddresses.joinToString(", ").ifBlank { stringResource(R.string.obd_none_identified) }
@@ -368,6 +376,7 @@ private fun localizedObdPidName(pid: Int): String = when (pid) {
     0x49 -> stringResource(R.string.live_pid_app_d)
     0x4A -> stringResource(R.string.live_pid_app_e)
     0xA6 -> stringResource(R.string.obd_pid_odometer)
+    0x5B -> stringResource(R.string.live_pid_hybrid_bat_life)
     0x52 -> stringResource(R.string.live_pid_ethanol)
     else -> stringResource(R.string.obd_pid_generic, pid)
 }
