@@ -5,8 +5,14 @@ import com.camarodiag.gen5.domain.model.ModuleStatus
 
 enum class FunctionalTestOutcome { PASSED, FAILED, NOT_TESTED }
 
-enum class FunctionalProtocol(val id: String, val title: String, val implemented: Boolean = false) {
+enum class FunctionalProtocol(val id: String, val title: String, val implemented: Boolean = false,
+    val expectedLegacyElmProtocol: Int? = null) {
     J1979("SAE-J1979", "SAE J1979 — OBD-II", true),
+    J1979_PWM("SAE-J1979-J1850-PWM", "SAE J1979 — J1850 PWM", true, 1),
+    J1979_VPW("SAE-J1979-J1850-VPW", "SAE J1979 — J1850 VPW", true, 2),
+    J1979_ISO9141("SAE-J1979-ISO9141-2", "SAE J1979 — ISO 9141-2", true, 3),
+    J1979_KWP_SLOW("SAE-J1979-KWP-SLOW", "SAE J1979 — KWP slow init", true, 4),
+    J1979_KWP_FAST("SAE-J1979-KWP-FAST", "SAE J1979 — KWP fast init", true, 5),
     DOIP("ISO-13400", "ISO 13400 — DoIP", true),
     J1979_2("SAE-J1979-2", "SAE J1979-2 — OBDonUDS"),
     UDS("ISO-14229", "ISO 14229 — UDS"),
@@ -33,7 +39,9 @@ enum class FunctionalProtocol(val id: String, val title: String, val implemented
     J2534_1("SAE-J2534-1", "SAE J2534-1"),
     J2534_2("SAE-J2534-2", "SAE J2534-2"),
     RP1210("SAE-RP1210", "SAE RP1210"),
-    D_PDU("ISO-22900-2", "ISO 22900-2 — D-PDU API")
+    D_PDU("ISO-22900-2", "ISO 22900-2 — D-PDU API");
+
+    val isJ1979Recipe: Boolean get() = this == J1979 || expectedLegacyElmProtocol != null
 }
 
 data class DoIpFunctionalTarget(
@@ -221,6 +229,7 @@ object FunctionalTestPlanner {
     }
 
     fun j1979Checks(): List<FunctionalTestCheck> = listOf(
+        Triple("transport", "Negotiated diagnostic transport", "Transport diagnostique négocié"),
         Triple("vin", "Mode 09 VIN", "Mode 09 VIN"),
         Triple("info", "Mode 09 supported information types", "Types d’informations mode 09"),
         Triple("pids", "Mode 01 PID inventory", "Inventaire PID mode 01"),
@@ -254,7 +263,15 @@ object FunctionalTestPlanner {
             if (ok) rows = updated(rows, "protocol:$key", FunctionalTestOutcome.PASSED,
                 "Verified positive diagnostic response.", "Réponse diagnostique positive vérifiée.")
         }
-        mark("vin", com.camarodiag.gen5.domain.model.VehicleVinMatcher.normalize(report.vin) != null)
+        val expected = state.protocol?.expectedLegacyElmProtocol
+        val actual = report.negotiatedElmProtocol
+        if (expected != null && actual != expected) {
+            rows = updated(rows, "protocol:transport", FunctionalTestOutcome.FAILED,
+                "Selected legacy protocol not verified.", "Protocole legacy sélectionné non vérifié.")
+            return state.copy(checks = rows, obdScan = report, rawObdExchanges = report.rawLog)
+        }
+        mark("transport", actual != null || report.physicalCanResponder != null)
+        mark("vin", com.camaradiag.gen5.domain.model.VehicleVinMatcher.normalize(report.vin) != null)
         mark("info", report.vehicleInfoSupportComplete == true)
         mark("pids", report.firstUnresolvedPid == null && report.mode01Reads.isNotEmpty())
         mark("live", report.liveData.isNotEmpty())
