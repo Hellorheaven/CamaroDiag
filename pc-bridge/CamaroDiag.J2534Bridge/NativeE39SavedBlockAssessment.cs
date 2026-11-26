@@ -101,9 +101,10 @@ internal static class NativeE39SavedBlockAssessment
         var crcReceipts = new HashSet<uint>();
         var destructiveStarted = false;
         var verified = new List<Block>();
+        byte[]? snapshot = null;
         try
         {
-            var snapshot = ReadBoundedFile(journalPath, MaximumJournalBytes);
+            snapshot = ReadBoundedFile(journalPath, MaximumJournalBytes);
             state = NativeE39FileWriteJournal.InspectSnapshot(snapshot).State;
             var text = StrictUtf8.GetString(snapshot);
             if (text.Length == 0 || text[^1] != '\n')
@@ -234,6 +235,19 @@ internal static class NativeE39SavedBlockAssessment
             InvalidDataException or JsonException or KeyNotFoundException or
             ArgumentException or FormatException or OverflowException)
         {
+            // Preserve the interruption state only if the audited journal
+            // bytes remain stable, even when a sector check failed first.
+            try
+            {
+                if (snapshot is null ||
+                    !snapshot.AsSpan().SequenceEqual(ReadBoundedFile(journalPath, MaximumJournalBytes)))
+                    state = NativeE39FileWriteJournal.CompletionState.Interrupted;
+            }
+            catch (Exception rereadError) when (rereadError is IOException or
+                UnauthorizedAccessException or InvalidDataException or ArgumentException)
+            {
+                state = NativeE39FileWriteJournal.CompletionState.Interrupted;
+            }
             return new Result(false, expected.Count, [], error.Message, state);
         }
     }
