@@ -31,16 +31,21 @@ internal static class NativeE39RecoveryImageAssessment
 
             // The original E39/E39A BIN must be complete; no implicit padding,
             // truncation, variable-length calibration file or synthetic offset.
-            byte[] image;
-            using (var source = File.OpenRead(originalImagePath))
+            byte[] ReadOriginal()
             {
+                if ((File.GetAttributes(originalImagePath) &
+                    (FileAttributes.ReparsePoint | FileAttributes.Directory)) != 0)
+                    throw new InvalidDataException("Expected an unlinked original BIN.");
+                using var source = File.OpenRead(originalImagePath);
                 if (source.Length != NativeE39ImageInspector.ImageBytes)
                     throw new InvalidDataException("Expected an exact full-size E39 original BIN.");
-                image = new byte[NativeE39ImageInspector.ImageBytes];
-                source.ReadExactly(image);
+                var bytes = new byte[NativeE39ImageInspector.ImageBytes];
+                source.ReadExactly(bytes);
                 if (source.ReadByte() != -1)
                     throw new InvalidDataException("Original BIN changed while being read.");
+                return bytes;
             }
+            var image = ReadOriginal();
             var digest = Convert.ToHexString(SHA256.HashData(image));
             if (!digest.Equals(target.OriginalImageSha256, StringComparison.OrdinalIgnoreCase))
                 throw new InvalidDataException(
@@ -65,6 +70,17 @@ internal static class NativeE39RecoveryImageAssessment
             }
             if (verified == 0)
                 throw new InvalidDataException("No physical ECU sectors to compare.");
+            currentAddress = null;
+            // Bind the result to the same original image and manifest, not
+            // to a later file selected under the same path.
+            if (!CryptographicOperations.FixedTimeEquals(SHA256.HashData(image),
+                    SHA256.HashData(ReadOriginal())) ||
+                NativeE39SavedBlockAssessment.InspectTargetMetadata(journalPath) != target)
+                throw new InvalidDataException("Original BIN or ECU metadata changed during inspection.");
+            var final = NativeE39SavedBlockAssessment.Inspect(journalPath);
+            if (!final.Verified || final.JournalState != physical.JournalState ||
+                !final.Blocks.SequenceEqual(physical.Blocks))
+                throw new InvalidDataException("Physical backup evidence changed during original comparison.");
             return new Report(true, verified, "");
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException or
