@@ -21,6 +21,43 @@ internal object NativeUsbFunctionalEvidence {
     ).map { (key,en,fr) -> FunctionalTestCheck("native:$key","protocol",en,fr,
         FunctionalTestOutcome.NOT_TESTED,"No verified evidence.","Aucune preuve vérifiée.") }
 
+    data class Measurement(val mode: Int, val pid: Int, val name: String, val number: Double, val unit: String)
+    data class DiagnosticValues(val observedVin: String?, val dtcs: Map<Int, List<String>?>,
+        val measurements: List<Measurement>)
+
+    /** Only a coherent authenticated-session report can feed the value display.
+     * Missing mode evidence remains null, never an empty fault list. */
+    fun diagnosticValues(report: JSONObject): DiagnosticValues? {
+        if (!report.optBoolean("device_credential_authenticated") ||
+            !report.optBoolean("capture_integrity_verified")) return null
+        val steps = report.optJSONArray("steps") ?: return null
+        val vin = report.optString("observed_vin").takeIf { it.matches(Regex("[A-HJ-NPR-Z0-9]{17}")) }
+        val dtcs = linkedMapOf<Int, List<String>?>(3 to null, 7 to null, 10 to null)
+        val measured = linkedMapOf<Pair<Int, Int>, Measurement>()
+        for (i in 0 until steps.length()) {
+            val step = steps.optJSONObject(i) ?: continue
+            if (step.optString("status") != "PASSED") continue
+            val request = step.optString("request_hex")
+            if (request in setOf("03","07","0A")) {
+                val mode = request.toInt(16)
+                val codes = step.optJSONArray("dtc_codes") ?: continue
+                val list = (0 until codes.length()).map { codes.optString(it) }
+                if (list.all { it.matches(Regex("[PCBU][0-3][0-9A-F]{3}")) }) dtcs[mode] = list
+            }
+            val value = step.optJSONObject("measurement") ?: continue
+            val mode = value.optInt("mode",-1)
+            val pid = value.optInt("pid",-1)
+            val name = value.optString("name")
+            val unit = value.optString("unit")
+            val number = value.optDouble("number",Double.NaN)
+            if (mode !in setOf(1,2) || pid !in 1..255 || pid%32==0 ||
+                request != "%02X%02X%s".format(java.util.Locale.ROOT,mode,pid,if(mode==2) "00" else "") ||
+                !number.isFinite() || name.isBlank() || unit.isBlank()) continue
+            measured[mode to pid] = Measurement(mode,pid,name,number,unit)
+        }
+        return DiagnosticValues(vin,dtcs,measured.values.sortedWith(compareBy({ it.mode },{ it.pid })))
+    }
+
     fun results(state: FunctionalTestState, report: JSONObject): FunctionalTestState {
         val auth = report.optBoolean("device_credential_authenticated")
         val consistent = auth && report.optBoolean("capture_integrity_verified")

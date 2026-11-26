@@ -106,7 +106,22 @@ internal sealed partial class BridgeDesktopForm
             text.AppendLine("VIN: "+(result.ObservedVin??J1979RecipeText("Unavailable")));
             if(!vinMatches)text.AppendLine(J1979RecipeText("NativeUsbVinMismatch"));
             foreach(var step in result.Steps)
+            {
                 text.AppendLine($"{step.RequestHex} [{step.Status}] {step.ResponseHex}");
+                if(!outcome.cancelled&&result.DeviceCredentialAuthenticated&&result.CaptureIntegrityVerified)
+                {
+                    if(step.PidMeasurement is { } measurement)
+                        text.AppendLine($"  {measurement.Name}: {measurement.Number.ToString("0.###",CultureInfo.CurrentCulture)} {measurement.Unit}");
+                    if(step.DtcCodes is { } codes)
+                        text.AppendLine("  "+(codes.Count==0?J1979RecipeText("NativeUsbZeroDtc"):string.Join(", ",codes)));
+                    if(step.NegativeResponseCode is { } nrc)
+                        text.AppendLine($"  NRC 0x{nrc:X2}");
+                }
+            }
+            if(!outcome.cancelled&&result.CaptureIntegrityVerified)
+                foreach(string mode in new[]{"03","07","0A"})
+                    if(!result.Steps.Any(s=>s.RequestHex==mode&&s.DtcCodes is not null))
+                        text.AppendLine(mode+": "+J1979RecipeText("Unavailable"));
             text.AppendLine(J1979RecipeText("NativeUsbProvenance"));
             text.AppendLine(reportPath);text.AppendLine(rawPath);
             functionalResults.Text=text.ToString();

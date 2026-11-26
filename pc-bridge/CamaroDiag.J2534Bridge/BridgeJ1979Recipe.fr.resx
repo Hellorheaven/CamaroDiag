@@ -70,4 +70,5 @@
   <data name="NativeUsbConfirm" xml:space="preserve"><value>Carte qualifiée et profil ECM documenté, véhicule immobilisé. Lancer la lecture sur {0}, VIN {1}, CAN {2}/{3} ?</value></data>
   <data name="NativeUsbVinMismatch" xml:space="preserve"><value>VIN indisponible ou différent du véhicule sélectionné.</value></data>
   <data name="NativeUsbProvenance" xml:space="preserve"><value>Preuves enregistrées uniquement ; provenance physique non établie.</value></data>
+  <data name="NativeUsbZeroDtc" xml:space="preserve"><value>0 code vérifié</value></data>
 </root>

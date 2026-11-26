@@ -13,4 +13,11 @@
     <string name="functional_native_usb_run">Lancer la recette USB</string>
     <string name="functional_native_usb_disconnected">Déconnectez les autres adaptateurs et arrêtez les opérations en cours.</string>
     <string name="functional_native_usb_incomplete">Campagne USB incomplète ou VIN non confirmé.</string>
+    <string name="functional_native_usb_values">Valeurs ECU observées</string>
+    <string name="functional_native_usb_observed_vin">VIN observé : %1$s</string>
+    <string name="functional_native_usb_dtc_confirmed">Défauts confirmés (03)</string>
+    <string name="functional_native_usb_dtc_pending">Défauts en attente (07)</string>
+    <string name="functional_native_usb_dtc_permanent">Défauts permanents (0A)</string>
+    <string name="functional_native_usb_dtc_zero">0 code vérifié</string>
+    <string name="functional_native_usb_pid">Mode %1$s • PID %2$s</string>
 </resources>

@@ -326,6 +326,45 @@ fun FunctionalTestsScreen(
                 }
             }
         }
+        val values = state.nativeUsbEvidence?.let { raw ->
+            runCatching { NativeUsbFunctionalEvidence.diagnosticValues(org.json.JSONObject(raw)) }.getOrNull()
+        }
+        if (values != null) {
+            item {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                        Text(stringResource(R.string.functional_native_usb_values),style=MaterialTheme.typography.titleMedium)
+                        Text(stringResource(R.string.functional_native_usb_observed_vin,
+                            values.observedVin ?: stringResource(R.string.obd_not_available)))
+                        for ((mode,codes) in values.dtcs) {
+                            val caption = when(mode) {
+                                3 -> R.string.functional_native_usb_dtc_confirmed
+                                7 -> R.string.functional_native_usb_dtc_pending
+                                else -> R.string.functional_native_usb_dtc_permanent
+                            }
+                            Text(stringResource(caption)+": "+when {
+                                codes == null -> stringResource(R.string.obd_not_available)
+                                codes.isEmpty() -> stringResource(R.string.functional_native_usb_dtc_zero)
+                                else -> codes.joinToString(", ")
+                            })
+                        }
+                    }
+                }
+            }
+            items(values.measurements,key={ "native-value:"+it.mode+":"+it.pid }) { value ->
+                Card(modifier=Modifier.fillMaxWidth()) {
+                    Column(modifier=Modifier.padding(12.dp)) {
+                        Text(stringResource(R.string.functional_native_usb_pid,
+                            "%02X".format(java.util.Locale.ROOT,value.mode),
+                            "%02X".format(java.util.Locale.ROOT,value.pid)))
+                        Text(value.name,style=MaterialTheme.typography.bodySmall)
+                        Text(java.text.NumberFormat.getNumberInstance().apply {
+                            maximumFractionDigits=3
+                        }.format(value.number)+" "+value.unit,style=MaterialTheme.typography.titleMedium)
+                    }
+                }
+            }
+        }
         item { Spacer(Modifier.height(12.dp)) }
     }
 }

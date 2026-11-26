@@ -13,4 +13,11 @@
     <string name="functional_native_usb_run">Run USB test</string>
     <string name="functional_native_usb_disconnected">Disconnect other adapters and stop active operations.</string>
     <string name="functional_native_usb_incomplete">USB campaign incomplete or VIN not confirmed.</string>
+    <string name="functional_native_usb_values">Observed ECU values</string>
+    <string name="functional_native_usb_observed_vin">Observed VIN: %1$s</string>
+    <string name="functional_native_usb_dtc_confirmed">Confirmed DTCs (03)</string>
+    <string name="functional_native_usb_dtc_pending">Pending DTCs (07)</string>
+    <string name="functional_native_usb_dtc_permanent">Permanent DTCs (0A)</string>
+    <string name="functional_native_usb_dtc_zero">0 verified codes</string>
+    <string name="functional_native_usb_pid">Mode %1$s • PID %2$s</string>
 </resources>

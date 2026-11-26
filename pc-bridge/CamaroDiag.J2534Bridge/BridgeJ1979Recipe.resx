@@ -70,4 +70,5 @@
   <data name="NativeUsbConfirm" xml:space="preserve"><value>Qualified board and documented ECM profile, vehicle stationary. Read-only test on {0}, VIN {1}, CAN {2}/{3}?</value></data>
   <data name="NativeUsbVinMismatch" xml:space="preserve"><value>VIN unavailable or does not match the selected vehicle.</value></data>
   <data name="NativeUsbProvenance" xml:space="preserve"><value>Recorded evidence only; physical provenance not established.</value></data>
+  <data name="NativeUsbZeroDtc" xml:space="preserve"><value>0 verified codes</value></data>
 </root>
