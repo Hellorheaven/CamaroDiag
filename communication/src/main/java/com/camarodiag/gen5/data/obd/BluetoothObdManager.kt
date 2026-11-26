@@ -496,8 +496,15 @@ class BluetoothObdManager(context: Context) {
         val transmitProbeResp = probeCommand("0100", 12_000L)
         val protocolNumberResponse = probeCommand("ATDPN")
         val reportedProtocol = ElmObdSessionProfile.parseProtocolNumber(protocolNumberResponse)
-        val selectedProfile = ElmObdSessionProfile.fromObservation(reportedProtocol,
-            CamaroUdsProtocol.parsePidBytes(transmitProbeResp, "00")?.size == 4)
+        val positivePid00 = if (reportedProtocol != null && reportedProtocol in 1..5) {
+            // Headered legacy replies carry a three-byte network header and
+            // checksum, not CAN framing. Verify before retaining the route.
+            runCatching {
+                ElmLegacyResponseFrames.decode(reportedProtocol,"0100",transmitProbeResp)
+                    .any { it.payload.size == 6 && it.payload.take(2) == listOf(0x41,0) }
+            }.getOrDefault(false)
+        } else CamaroUdsProtocol.parsePidBytes(transmitProbeResp,"00")?.size == 4
+        val selectedProfile = ElmObdSessionProfile.fromObservation(reportedProtocol,positivePid00)
 
         val capabilities = CamaroUdsProtocol.evaluateAdapterProbe(
             deviceName = deviceName,
