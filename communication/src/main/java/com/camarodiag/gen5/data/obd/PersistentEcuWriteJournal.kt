@@ -1,7 +1,11 @@
 package com.camarodiag.gen5.data.obd
 
 import java.io.File
-import java.io.FileOutputStream
+import java.nio.ByteBuffer
+import java.nio.channels.FileChannel
+import java.nio.file.Files
+import java.nio.file.LinkOption
+import java.nio.file.StandardOpenOption
 import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
 import java.util.Base64
@@ -10,7 +14,7 @@ import java.util.Base64
  * Crash-auditable, append-only journal for an eventual hardware-validated ECU write.
  *
  * The caller must place [file] in app-private persistent storage (not Downloads
- * or the cache). Each record is physically flushed with FileDescriptor.sync()
+ * or the cache). Each record is flushed with FileChannel.force(true)
  * BEFORE the engine is allowed to erase a sector. A new file is required for
  * every programming attempt: an old or tampered journal is never overwritten.
  *
@@ -84,11 +88,14 @@ class PersistentEcuWriteJournal private constructor(
             "The persistent journal directory must already exist."
         }
         if (writable) {
-            check(file.createNewFile()) {
-                "Refusing to overwrite or append to an earlier ECU write journal."
-            }
             val bytes = (header + "\n").toByteArray(StandardCharsets.UTF_8)
-            durableAppend(bytes)
+            FileChannel.open(file.toPath(), StandardOpenOption.CREATE_NEW,
+                StandardOpenOption.WRITE, LinkOption.NOFOLLOW_LINKS).use { channel ->
+                writeAndForce(channel, bytes)
+            }
+            check(readBoundedSnapshot()?.contentEquals(bytes)==true) {
+                "New ECU journal could not be independently verified."
+            }
             expectedLength = bytes.size.toLong()
             expectedTailHash = sha256(header)
         }
@@ -135,7 +142,7 @@ class PersistentEcuWriteJournal private constructor(
             }
             try {
                 check(file.length() == expectedLength) { "Journal changed before append." }
-                durableAppend(bytes)
+                durableAppend(checkNotNull(raw), bytes)
                 expectedLength += bytes.size
                 expectedTailHash = checksum
             } catch (error: Exception) {
@@ -243,19 +250,20 @@ class PersistentEcuWriteJournal private constructor(
     }
 
     private fun readBoundedSnapshot(): ByteArray? {
-        if (!file.isFile) return null
-        val length = file.length()
+        if (!Files.isRegularFile(file.toPath(), LinkOption.NOFOLLOW_LINKS)) return null
+        return FileChannel.open(file.toPath(), StandardOpenOption.READ,
+            LinkOption.NOFOLLOW_LINKS).use { channel -> readSnapshot(channel) }
+    }
+
+    private fun readSnapshot(channel: FileChannel): ByteArray? {
+        val length=channel.size()
         if (length !in 1..MAX_JOURNAL_BYTES) return null
-        return file.inputStream().use { input ->
-            val bytes = ByteArray(length.toInt())
-            var offset = 0
-            while (offset < bytes.size) {
-                val count = input.read(bytes, offset, bytes.size - offset)
-                if (count <= 0) return@use null
-                offset += count
-            }
-            if (input.read() != -1) null else bytes
-        }
+        channel.position(0)
+        val bytes=ByteArray(length.toInt())
+        val buffer=ByteBuffer.wrap(bytes)
+        while(buffer.hasRemaining()) if(channel.read(buffer)<=0) return null
+        if(channel.read(ByteBuffer.allocate(1))!=-1 || channel.size()!=length) return null
+        return bytes
     }
 
     private fun inspectLocked(
@@ -297,12 +305,36 @@ class PersistentEcuWriteJournal private constructor(
         return sequence.audit(count, lastStage)
     }
 
-    private fun durableAppend(bytes: ByteArray) {
-        FileOutputStream(file, true).use { stream ->
-            stream.write(bytes)
-            // If fsync fails, the caller MUST stop before erasing the next sector.
-            stream.fd.sync()
+    private fun durableAppend(expected: ByteArray, bytes: ByteArray) {
+        check(Files.isRegularFile(file.toPath(), LinkOption.NOFOLLOW_LINKS)) {
+            "The active journal is not a regular file."
         }
+        // Compare and append through the same descriptor. Never follow a substituted symlink.
+        FileChannel.open(file.toPath(), StandardOpenOption.READ, StandardOpenOption.WRITE,
+            LinkOption.NOFOLLOW_LINKS).use { channel ->
+            check(readSnapshot(channel)?.contentEquals(expected)==true) {
+                "The opened ECU journal differs from the verified snapshot."
+            }
+            channel.position(expected.size.toLong())
+            writeAndForce(channel, bytes)
+            check(readSnapshot(channel)?.let { actual ->
+                actual.size==expected.size+bytes.size &&
+                    expected.indices.all { actual[it]==expected[it] } &&
+                    bytes.indices.all { actual[expected.size+it]==bytes[it] }
+            }==true) { "Durable journal readback differs from the expected append." }
+        }
+        // Reopen the pathname: a replacement during the append must not be accepted.
+        check(readBoundedSnapshot()?.let { actual ->
+            actual.size==expected.size+bytes.size &&
+                expected.indices.all { actual[it]==expected[it] } &&
+                bytes.indices.all { actual[expected.size+it]==bytes[it] }
+        }==true) { "Journal pathname no longer contains the durable accepted record." }
+    }
+
+    private fun writeAndForce(channel: FileChannel, bytes: ByteArray) {
+        val buffer=ByteBuffer.wrap(bytes)
+        while(buffer.hasRemaining()) check(channel.write(buffer)>0) { "Journal write stalled." }
+        channel.force(true)
     }
 
     private fun encoded(text: String): String =

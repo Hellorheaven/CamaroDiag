@@ -1,3 +1,7 @@
+## C6 — journal Android : création et append vérifiés sur descripteur (26/11/2026)
+
+- CREATE_NEW atomique, aucun suivi de lien symbolique en création/lecture/append ; comparaison de l'instantané attendu sur le descripteur qui écrit, force(true), relecture exacte sur ce descripteur et réouverture du chemin avant de confirmer. Une divergence invalide la session, même si le fichier est ensuite restauré. Régression de redirection symbolique et restauration écrite (non exécutée). Pas de garantie contre toutes les races ni de validation matérielle. C6/J1979 ouverts ; aucun flash, test intermédiaire, merge ou Release.
+
 ## J1979 — identification Mode 09 affichée (26/11/2026)
 
 - Recettes Android et Windows : affichage CALID, CVN, nom ECU, ressources FR/EN. Android recoupe les valeurs avec la réponse brute et vérifie les longueurs, les caractères et le padding ; les valeurs contradictoires restent absentes de l'écran. Régression UI ajoutée, non exécutée. Aucun test intermédiaire, fusion ou Release ; C6/J1979 ouverts.
