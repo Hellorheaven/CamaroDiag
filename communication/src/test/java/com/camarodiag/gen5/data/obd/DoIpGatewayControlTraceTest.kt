@@ -547,6 +547,44 @@ class DoIpGatewayControlTraceTest {
             assertTrue(runCatching { DoIpDirectRead.parseCommand(invalid) }.isFailure)
     }
 
+    @Test fun inventoryStopsWhenDiagnosticTraceSinkFails(): Unit = runBlocking {
+        val loopback = InetAddress.getByName("127.0.0.1")
+        DatagramSocket(0, loopback).use { udp ->
+            java.net.ServerSocket(0, 1, loopback).use { tcp ->
+                udp.soTimeout = 3000
+                tcp.soTimeout = 3000
+                val worker = Executors.newSingleThreadExecutor()
+                try {
+                    val server = worker.submit {
+                        repeat(2) { respond(udp, pdu(255, 1), identity()) }
+                        tcp.accept().use { peer ->
+                            peer.soTimeout = 3000
+                            val input = java.io.DataInputStream(peer.getInputStream())
+                            val output = peer.getOutputStream()
+                            val routing = ByteArray(15).also { input.readFully(it) }
+                            assertArrayEquals(pdu(2, 5, byteArrayOf(0x0E, 0x80.toByte(), 0, 0, 0, 0, 0)), routing)
+                            output.write(pdu(2, 6, byteArrayOf(0x0E, 0x80.toByte(), 0x10, 0, 0x10, 0, 0, 0, 0)))
+                            output.flush()
+                            val request = ByteArray(15).also { input.readFully(it) }
+                            assertArrayEquals(pdu(2, 0x8001, byteArrayOf(0x0E, 0x80.toByte(),
+                                0x12, 0x34, 0x22, 0xF1.toByte(), 0x90.toByte())), request)
+                            assertEquals(-1, input.read())
+                        }
+                    }
+                    val target = DoIpDirectRead.Target.parse("127.0.0.1", "0E80", "1234", vin, false)
+                    val failure = java.io.IOException("Evidence sink failed")
+                    val result = runCatching { DoIpDirectRead.inventoryAt(target, listOf(0x1234, 0x1235),
+                        DoIpDirectRead.SessionOptions(timeoutMs = 1000),
+                        onTrace = { _, _ -> throw failure },
+                        udpPort = udp.localPort, tcpPort = tcp.localPort) }
+                    server.get(5, TimeUnit.SECONDS)
+                    assertTrue(result.exceptionOrNull() is DoIpDirectRead.InventoryTraceException)
+                    assertSame(failure, result.exceptionOrNull()?.cause)
+                } finally { worker.shutdownNow() }
+            }
+        }
+    }
+
     @Test fun explicitInventoryRejectsDuplicateAndImplicitRanges() = runBlocking {
         assertEquals(listOf(0x1234, 0x1235), DoIpDirectRead.parseInventoryAddresses("1234,1235"))
         for (invalid in listOf("", "1234,1234", "1234-1235", "123", (0..16).joinToString(",") { "%04X".format(it) })) {

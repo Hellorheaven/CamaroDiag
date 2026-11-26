@@ -785,14 +785,36 @@ object DoIpDirectRead {
     suspend fun inventory(target: Target, addresses: List<Int>, options: SessionOptions,
         clientTls: DoIpClientTls? = null, onTrace: (Target, Trace) -> Unit = { _, _ -> },
         onControlTrace: (ControlTrace) -> Unit = {}, current: () -> Boolean = { true },
-        obd: Boolean = false): List<InventoryEntry> {
+        obd: Boolean = false): List<InventoryEntry> = inventoryAt(target, addresses, options,
+        clientTls, onTrace, onControlTrace, current, obd)
+
+    internal class InventoryTraceException(cause: Exception) :
+        IllegalStateException("DoIP inventory trace failed.", cause)
+
+    internal suspend fun inventoryAt(target: Target, addresses: List<Int>, options: SessionOptions,
+        clientTls: DoIpClientTls? = null, onTrace: (Target, Trace) -> Unit = { _, _ -> },
+        onControlTrace: (ControlTrace) -> Unit = {}, current: () -> Boolean = { true },
+        obd: Boolean = false, udpPort: Int = DOIP_UDP_PORT,
+        tcpPort: Int = if (target.tls) 3496 else 13400): List<InventoryEntry> {
+        require(udpPort in 1..65535 && tcpPort in 1..65535)
+        require((udpPort == DOIP_UDP_PORT && tcpPort == (if (target.tls) 3496 else 13400)) ||
+            (target.address.isLoopbackAddress && !target.tls)) { "Custom DoIP ports are restricted to local TCP simulation." }
+        fun observe(action: () -> Unit) {
+            try { action() }
+            catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+            catch (error: Exception) { throw InventoryTraceException(error) }
+        }
+        val control: (ControlTrace) -> Unit = { event -> observe { onControlTrace(event) } }
         val frozen = addresses.toList()
         require(validVin(target.expectedVin) && frozen.size in 1..16 &&
             frozen.distinct().size == frozen.size && frozen.all { it in 0..65535 && it != target.tester })
         check(current())
-        val gateway = discover(target.address, target.expectedVin, options.timeoutMs, onControlTrace, current = current)
+        val gateway = discover(target.address, target.expectedVin, options.timeoutMs, control,
+            port = udpPort, current = current)
         requireGatewayIdentity(target, gateway)
-        require(gateway.vin == target.expectedVin) { "Inventory requires a matching gateway VIN." }
+        require(gateway.vin == target.expectedVin && gateway.logicalAddress != target.tester) {
+            "Inventory requires a matching gateway VIN and distinct tester address."
+        }
         val results = mutableListOf<InventoryEntry>()
         for (ecu in frozen) {
             check(current())
@@ -800,9 +822,12 @@ object DoIpDirectRead {
                 "%04X".format(target.tester), "%04X".format(ecu), target.expectedVin, target.tls,
                 gateway.logicalAddress, gateway)
             try {
-                val result = read(selected, if (obd) Operation.OBD_IDENTIFY else Operation.VIN, timeoutMs = options.timeoutMs,
-                    sessionOptions = options, clientTls = clientTls, isReadContextCurrent = current,
-                    onControlTrace = onControlTrace, onTrace = { onTrace(selected, it) })
+                val result = readAt(selected, if (obd) Operation.OBD_IDENTIFY else Operation.VIN,
+                    timeoutMs = options.timeoutMs, sessionOptions = options, clientTls = clientTls,
+                    isReadContextCurrent = current, onControlTrace = control,
+                    onTrace = { event -> observe { onTrace(selected, event) } },
+                    udpPort = udpPort, tcpPort = tcpPort)
+                check(current())
                 require(result.vin == target.expectedVin)
                 results += InventoryEntry(ecu, result.vin, if (obd) requireNotNull(result.obdProtocolValue) else null)
             } catch (error: javax.net.ssl.SSLException) {
@@ -819,7 +844,8 @@ object DoIpDirectRead {
                 results += InventoryEntry(ecu, null)
             }
             check(current())
-            val observed = discover(target.address, target.expectedVin, options.timeoutMs, onControlTrace, current = current)
+            val observed = discover(target.address, target.expectedVin, options.timeoutMs, control,
+                port = udpPort, current = current)
             require(gateway.matchesIdentity(observed)) { "Gateway changed during ECU inventory." }
         }
         check(current())

@@ -1,3 +1,7 @@
+## PR117 — arrêt de l'inventaire Android en cas de perte de journal (26/11/2026)
+
+- C6/DoIP : les callbacks de trace UDP/TCP/TLS d'un inventaire Android sont isolés des exceptions de transport. Un échec du journal ne devient plus une ligne ECU indisponible et interrompt les interrogations suivantes. L'annulation reste une annulation ; contrôle du contexte avant publication, testeur distinct de la passerelle. Point d'entrée interne à ports personnalisés limité au loopback TCP pour la régression écrite, non exécutée. Aucun checkpoint.
+
 ## PR117 — attribution des échecs de journal pendant inventaire Windows (26/11/2026)
 
 - C6/DoIP : une exception du callback de trace TCP/TLS est distinguée d'une erreur réseau, y compris lorsqu'elle est de type IOException. L'inventaire n'enchaîne plus les ECU après une erreur de journal constatée durant une transaction ; un résultat vérifié n'est ajouté qu'après fermeture de sa session afin d'éviter une double ligne si la fermeture échoue. Annulation revérifiée avant publication. Régression loopback écrite, non exécutée ; aucun checkpoint.
