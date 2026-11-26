@@ -49,6 +49,215 @@ class DoIpGatewayControlTraceTest {
         assertTrue(runCatching { DoIpDirectRead.SessionOptions.parse("5000", "100", "2000", "00", "0102") }.isFailure)
     }
 
+    @Test fun backupOnlyPublishesVerifiedBatchesAndStableGateway(): Unit = runBlocking {
+        val loopback = InetAddress.getByName("127.0.0.1")
+        fun bytes(value: String) = value.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
+        val scope = DoIpMemoryBackup.Scope(vin, 0x1000, 0x0E80, 0x1234, 0x1235,
+            "A1B2", 0x100, 4, 2, "CALIBRATION")
+        scope.copy(length = 8192, blockSize = 1).validateCapture()
+        scope.copy(length = 8192 * 256, blockSize = 256).validateCapture()
+        val archiveOnly = scope.copy(length = 8193, blockSize = 1)
+        archiveOnly.validate()
+        assertFalse(archiveOnly.canCapture())
+        assertTrue(runCatching { archiveOnly.validateCapture() }.isFailure)
+        for (scenario in listOf("success", "identity-changed", "gateway-changed")) {
+            DatagramSocket(0, loopback).use { udp ->
+                java.net.ServerSocket(0, 1, loopback).use { tcp ->
+                    udp.soTimeout = 5000
+                    tcp.soTimeout = 5000
+                    val worker = Executors.newSingleThreadExecutor()
+                    try {
+                        val server = worker.submit {
+                            respond(udp, pdu(255, 1), identity())
+                            tcp.accept().use { socket ->
+                                socket.soTimeout = 5000
+                                val input = java.io.DataInputStream(socket.getInputStream())
+                                val output = socket.getOutputStream()
+                                fun receive(type: Int, expected: ByteArray) {
+                                    val header = ByteArray(8).also { input.readFully(it) }
+                                    val size = ByteBuffer.wrap(header).getInt(4)
+                                    assertTrue(size in 0..65536)
+                                    val payload = ByteArray(size).also { input.readFully(it) }
+                                    assertArrayEquals(pdu(2, type, expected), header + payload)
+                                }
+                                fun send(type: Int, body: ByteArray) {
+                                    output.write(pdu(2, type, body)); output.flush()
+                                }
+                                fun diagnostic(request: String, reply: ByteArray) {
+                                    receive(0x8001, bytes("0E801234" + request))
+                                    send(0x8001, bytes("12340E80") + reply)
+                                }
+                                fun readVin() = diagnostic("22F190", bytes("62F190") + vin.toByteArray(Charsets.US_ASCII))
+                                fun readIdentity(matches: Boolean = true) {
+                                    readVin()
+                                    diagnostic("221235", bytes(if (matches) "621235A1B2" else "621235A1B3"))
+                                }
+                                receive(5, bytes("0E800000000000"))
+                                send(6, bytes("0E8010001000000000"))
+                                readVin()
+                                val passes = if (scenario == "identity-changed") 1 else 2
+                                repeat(passes) {
+                                    readIdentity()
+                                    diagnostic("23140000010002", bytes("630102"))
+                                    diagnostic("23140000010202", bytes("630304"))
+                                    readIdentity(scenario != "identity-changed")
+                                }
+                                if (scenario != "identity-changed") readIdentity()
+                                // The routed socket must be closed before final UDP discovery.
+                                assertEquals(-1, input.read())
+                            }
+                            if (scenario != "identity-changed") {
+                                val announcement = identity()
+                                if (scenario == "gateway-changed") announcement[8 + 19] = 1
+                                respond(udp, pdu(255, 1), announcement)
+                            }
+                        }
+                        val target = DoIpDirectRead.Target.parse("127.0.0.1", "0E80", "1234", vin, false)
+                        val progress = mutableListOf<Pair<Int, Int>>()
+                        val result = runCatching {
+                            DoIpDirectRead.readAt(target, DoIpDirectRead.Operation.BACKUP,
+                                timeoutMs = 2000, backupScope = scope,
+                                onBackupProgress = { pass, offset -> progress += pass to offset },
+                                udpPort = udp.localPort, tcpPort = tcp.localPort)
+                        }
+                        server.get(6, TimeUnit.SECONDS)
+                        if (scenario == "success") {
+                            val capture = checkNotNull(result.getOrThrow().capture)
+                            assertArrayEquals(bytes("01020304"), capture.first)
+                            assertArrayEquals(capture.first, capture.second)
+                            assertNotSame(capture.first, capture.second)
+                        } else assertTrue(result.isFailure)
+                        assertEquals(if (scenario == "identity-changed") emptyList<Pair<Int, Int>>()
+                            else listOf(1 to 4, 2 to 4), progress)
+                    } finally { worker.shutdownNow() }
+                }
+            }
+        }
+    }
+
+    @Test fun archiveReaderComparesBinaryEntriesInEitherOrderAndRejectsInvalidLengths() {
+        val first = ByteArray(2 * 1024 * 1024 + 1) { (it % 251).toByte() }
+        fun archive(original: ByteArray, verification: ByteArray,
+            reversed: Boolean = false, extra: Boolean = false): ByteArray {
+            val output = java.io.ByteArrayOutputStream()
+            java.util.zip.ZipOutputStream(output).use { zip ->
+                fun entry(name: String, data: ByteArray) {
+                    zip.putNextEntry(java.util.zip.ZipEntry(name))
+                    zip.write(data)
+                    zip.closeEntry()
+                }
+                if (reversed) entry("verification.bin", verification) else entry("original.bin", original)
+                entry("manifest.json", "{}".toByteArray())
+                if (reversed) entry("original.bin", original) else entry("verification.bin", verification)
+                if (extra) entry("unexpected.bin", byteArrayOf(1))
+            }
+            return output.toByteArray()
+        }
+        fun read(bytes: ByteArray) = DoIpMemoryBackup.readArchiveContents(bytes.inputStream(), first.size)
+        val normal = read(archive(first, first.copyOf()))
+        val reversed = read(archive(first, first.copyOf(), reversed = true))
+        assertEquals(normal.sha256, reversed.sha256)
+        assertEquals("{}", normal.manifest.toString(Charsets.UTF_8))
+        val changed = first.copyOf().also { it[it.lastIndex] = 99 }
+        assertTrue(runCatching { read(archive(first, changed)) }.isFailure)
+        assertTrue(runCatching { read(archive(first, first.copyOf(first.size - 1))) }.isFailure)
+        assertTrue(runCatching { read(archive(first.copyOf(first.size + 1), first)) }.isFailure)
+        assertTrue(runCatching { read(archive(first, first, extra = true)) }.isFailure)
+    }
+
+    @Test fun archiveReaderAndStagedVerifierRejectIncompleteOrContradictoryZipDirectory() {
+        val scope = DoIpMemoryBackup.Scope(vin, 0x1000, 0x0E80, 0x1234, 0x1235,
+            "A1B2", 0x100, 4, 2, "CALIBRATION")
+        val data = byteArrayOf(1, 2, 3, 4)
+        val capture = DoIpMemoryBackup.createCapture(scope, data, data.copyOf())
+        val output = java.io.ByteArrayOutputStream()
+        DoIpMemoryBackup.write(output, capture)
+        val valid = output.toByteArray()
+        val end = valid.size - 22
+        val directory = java.nio.ByteBuffer.wrap(valid, end + 16, 4)
+            .order(java.nio.ByteOrder.LITTLE_ENDIAN).int
+        assertTrue(directory > 0 && directory < end)
+        DoIpMemoryBackup.readArchiveContents(valid.inputStream(), scope.length)
+        DoIpMemoryBackup.verifyStaged(valid.inputStream(), capture)
+        fun rejected(bytes: ByteArray) {
+            assertTrue(runCatching {
+                DoIpMemoryBackup.readArchiveContents(bytes.inputStream(), scope.length)
+            }.isFailure)
+            assertTrue(runCatching {
+                DoIpMemoryBackup.verifyStaged(bytes.inputStream(), capture)
+            }.isFailure)
+        }
+        rejected(valid.copyOf(directory)) // complete local files, no central directory
+        rejected(valid.copyOf(valid.size - 1))
+        rejected(valid + byteArrayOf(0x41))
+        // Modify only central metadata; local compressed bytes and CRC are unchanged.
+        for (offset in listOf(10, 16, 20, 24, 34)) {
+            rejected(valid.copyOf().also {
+                val index = directory + offset
+                it[index] = (it[index].toInt() xor 1).toByte()
+            })
+        }
+        rejected(valid.copyOf().also {
+            for (index in directory + 42 until directory + 46) it[index] = 0xFF.toByte()
+        })
+    }
+
+    @Test fun queuedUnsolicitedResponseCannotSatisfyNextDidRequest(): Unit = runBlocking {
+        val loopback = InetAddress.getByName("127.0.0.1")
+        fun bytes(value: String) = value.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
+        DatagramSocket(0, loopback).use { udp ->
+            java.net.ServerSocket(0, 1, loopback).use { tcp ->
+                udp.soTimeout = 5000
+                tcp.soTimeout = 5000
+                val worker = Executors.newSingleThreadExecutor()
+                val queued = java.util.concurrent.CountDownLatch(1)
+                try {
+                    val server = worker.submit {
+                        respond(udp, pdu(255, 1), identity())
+                        tcp.accept().use { socket ->
+                            socket.soTimeout = 5000
+                            val input = java.io.DataInputStream(socket.getInputStream())
+                            val output = socket.getOutputStream()
+                            fun receive(type: Int, body: ByteArray) {
+                                val header = ByteArray(8).also { input.readFully(it) }
+                                val size = ByteBuffer.wrap(header).getInt(4)
+                                assertTrue(size in 0..65536)
+                                val payload = ByteArray(size).also { input.readFully(it) }
+                                assertArrayEquals(pdu(2, type, body), header + payload)
+                            }
+                            receive(5, bytes("0E800000000000"))
+                            output.write(pdu(2, 6, bytes("0E8010001000000000")))
+                            output.flush()
+                            receive(0x8001, bytes("0E80123422F190"))
+                            val verified = pdu(2, 0x8001, bytes("12340E8062F190") + vin.toByteArray(Charsets.US_ASCII))
+                            val unsolicited = pdu(2, 0x8001, bytes("12340E8062F187AABB"))
+                            output.write(verified + unsolicited)
+                            output.flush()
+                            queued.countDown()
+                            assertEquals("No second diagnostic request may be transmitted", -1, input.read())
+                        }
+                    }
+                    val target = DoIpDirectRead.Target.parse("127.0.0.1", "0E80", "1234", vin, false)
+                    val events = mutableListOf<DoIpDirectRead.Trace>()
+                    val wireTrace = mutableListOf<DoIpDirectRead.ControlTrace>()
+                    val result = runCatching {
+                        DoIpDirectRead.readAt(target, DoIpDirectRead.Operation.DID, did = 0xF187,
+                            timeoutMs = 2000, udpPort = udp.localPort, tcpPort = tcp.localPort,
+                            onTrace = {
+                                events += it
+                                if (it.direction == "RX") assertTrue(queued.await(2, TimeUnit.SECONDS))
+                            }, onControlTrace = { wireTrace += it })
+                    }
+                    server.get(6, TimeUnit.SECONDS)
+                    assertTrue(result.isFailure)
+                    assertEquals(listOf("22F190"), events.filter { it.direction == "TX" }.map { it.payloadHex })
+                    assertTrue(wireTrace.any { it.direction == "RX" && it.payloadHex ==
+                        hex(pdu(2, 0x8001, bytes("12340E8062F187AABB"))) })
+                } finally { worker.shutdownNow() }
+            }
+        }
+    }
+
     @Test fun discoverySourceRequiresExpectedIpv6Scope() {
         val raw = InetAddress.getByName("fe80::2").address
         val matched = java.net.Inet6Address.getByAddress(null, raw, 3)
@@ -179,6 +388,9 @@ class DoIpGatewayControlTraceTest {
                 assertTrue(result.isFailure)
                 assertEquals(listOf("TX", "RX"), events.map { it.direction })
                 assertEquals(hex(negative), events.last().payloadHex)
+                val refusal = result.exceptionOrNull() as DoIpDirectRead.Refusal
+                assertEquals(DoIpDirectRead.RefusalLayer.HEADER, refusal.layer)
+                assertEquals(1, refusal.code)
             } finally {
                 executor.shutdownNow()
             }
@@ -581,6 +793,125 @@ class DoIpGatewayControlTraceTest {
                     assertTrue(result.exceptionOrNull() is DoIpDirectRead.InventoryTraceException)
                     assertSame(failure, result.exceptionOrNull()?.cause)
                 } finally { worker.shutdownNow() }
+            }
+        }
+    }
+
+    @Test fun doIpTransportRefusalsPreserveLayerAndRetireConnection(): Unit = runBlocking {
+        val loopback = InetAddress.getByName("127.0.0.1")
+        fun bytes(value: String) = value.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
+        for (scenario in listOf("routing", "diagnostic", "wrong-echo", "wrong-address", "bad-positive")) {
+            DatagramSocket(0, loopback).use { udp ->
+                java.net.ServerSocket(0, 1, loopback).use { tcp ->
+                    udp.soTimeout = 3000
+                    tcp.soTimeout = 3000
+                    val worker = Executors.newSingleThreadExecutor()
+                    try {
+                        val server = worker.submit {
+                            respond(udp, pdu(255, 1), identity())
+                            tcp.accept().use { socket ->
+                                socket.soTimeout = 3000
+                                val input = java.io.DataInputStream(socket.getInputStream())
+                                val output = socket.getOutputStream()
+                                assertArrayEquals(pdu(2, 5, bytes("0E800000000000")),
+                                    ByteArray(15).also { input.readFully(it) })
+                                output.write(pdu(2, 6, bytes(if (scenario == "routing")
+                                    "0E8010000600000000" else "0E8010001000000000")))
+                                output.flush()
+                                if (scenario != "routing") {
+                                    assertArrayEquals(pdu(2, 0x8001, bytes("0E80123422F190")),
+                                        ByteArray(15).also { input.readFully(it) })
+                                    val body = when (scenario) {
+                                        "wrong-echo" -> "12340E800619"
+                                        "wrong-address" -> "12350E800622"
+                                        else -> "12340E800622"
+                                    }
+                                    output.write(pdu(2, if (scenario == "bad-positive") 0x8002 else 0x8003, bytes(body)))
+                                    output.flush()
+                                }
+                                assertEquals("Rejected exchange must close without retry", -1, input.read())
+                            }
+                        }
+                        val target = DoIpDirectRead.Target.parse("127.0.0.1", "0E80", "1234", vin, false)
+                        val result = runCatching { DoIpDirectRead.readAt(target, DoIpDirectRead.Operation.VIN,
+                            timeoutMs = 1500, udpPort = udp.localPort, tcpPort = tcp.localPort) }
+                        server.get(5, TimeUnit.SECONDS)
+                        assertTrue(result.isFailure)
+                        val error = result.exceptionOrNull()
+                        if (scenario == "routing" || scenario == "diagnostic") {
+                            val refusal = error as DoIpDirectRead.Refusal
+                            assertEquals(if (scenario == "routing") DoIpDirectRead.RefusalLayer.ROUTING
+                                else DoIpDirectRead.RefusalLayer.DIAGNOSTIC_ACK, refusal.layer)
+                            assertEquals(6, refusal.code)
+                        } else assertFalse(error is DoIpDirectRead.Refusal)
+                    } finally { worker.shutdownNow() }
+                }
+            }
+        }
+    }
+
+    @Test fun inventoryProgressRequiresClosedSocketAndStableGateway(): Unit = runBlocking {
+        val loopback = InetAddress.getByName("127.0.0.1")
+        fun bytes(value: String) = value.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
+        for (drift in listOf(false, true)) {
+            DatagramSocket(0, loopback).use { udp ->
+                java.net.ServerSocket(0, 1, loopback).use { tcp ->
+                    udp.soTimeout = 5000
+                    tcp.soTimeout = 5000
+                    val worker = Executors.newSingleThreadExecutor()
+                    val closed = java.util.concurrent.atomic.AtomicInteger()
+                    val progress = mutableListOf<List<DoIpDirectRead.InventoryEntry>>()
+                    try {
+                        val server = worker.submit {
+                            respond(udp, pdu(255, 1), identity())
+                            for (ecu in if (drift) listOf("1234") else listOf("1234", "1235")) {
+                                respond(udp, pdu(255, 1), identity())
+                                tcp.accept().use { socket ->
+                                    socket.soTimeout = 5000
+                                    val input = java.io.DataInputStream(socket.getInputStream())
+                                    val output = socket.getOutputStream()
+                                    assertArrayEquals(pdu(2, 5, bytes("0E800000000000")),
+                                        ByteArray(15).also { input.readFully(it) })
+                                    output.write(pdu(2, 6, bytes("0E8010001000000000")))
+                                    output.flush()
+                                    assertArrayEquals(pdu(2, 0x8001, bytes("0E80" + ecu + "22F190")),
+                                        ByteArray(15).also { input.readFully(it) })
+                                    val reply = if (ecu == "1234") bytes("62F190") + vin.toByteArray(Charsets.US_ASCII)
+                                        else bytes("7F2231")
+                                    output.write(pdu(2, 0x8001, bytes(ecu + "0E80") + reply))
+                                    output.flush()
+                                    assertEquals(-1, input.read())
+                                    closed.incrementAndGet()
+                                }
+                                val observed = identity().also { if (drift) it[8 + 19] = 1 }
+                                respond(udp, pdu(255, 1), observed)
+                            }
+                        }
+                        val target = DoIpDirectRead.Target.parse("127.0.0.1", "0E80", "1234", vin, false)
+                        val result = runCatching {
+                            DoIpDirectRead.inventoryAt(target, listOf(0x1234, 0x1235),
+                                DoIpDirectRead.SessionOptions(2000),
+                                udpPort = udp.localPort, tcpPort = tcp.localPort,
+                                onProgress = { rows, total ->
+                                    assertEquals(2, total)
+                                    assertEquals(rows.size, closed.get())
+                                    progress += rows
+                                })
+                        }
+                        server.get(8, TimeUnit.SECONDS)
+                        if (drift) {
+                            assertTrue(result.isFailure)
+                            assertTrue(progress.isEmpty())
+                        } else {
+                            val rows = result.getOrThrow()
+                            assertEquals(listOf(1, 2), progress.map { it.size })
+                            assertEquals(vin, rows.first().vin)
+                            assertEquals(DoIpDirectRead.InventoryFailure.NEGATIVE_RESPONSE, rows.last().failure)
+                            assertEquals(0x31, rows.last().failureCode)
+                            assertEquals(rows, progress.last())
+                        }
+                    } finally { worker.shutdownNow() }
+                }
             }
         }
     }

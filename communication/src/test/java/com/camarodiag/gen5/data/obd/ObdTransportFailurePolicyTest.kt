@@ -35,6 +35,15 @@ class ObdTransportFailurePolicyTest {
     }
 
     @Test
+    fun timedOutNativeWriteExplicitlyRetiresTheSocketButNotItsReplacement() {
+        val timeout = SocketTimeoutException("native write timeout")
+        val closed = ObdTransportDisconnectedException("socket retired", timeout)
+        assertTrue(ObdTransportFailurePolicy.isConnectionLoss(closed))
+        assertTrue(ObdTransportFailurePolicy.isConnectionLoss(IllegalStateException("wrapped", closed)))
+        assertFalse(ObdTransportFailurePolicy.isConnectionLoss(ObdSupersededSessionException(closed)))
+    }
+
+    @Test
     fun wrappedIoFailureStillReportsPhysicalDisconnect() {
         assertTrue(ObdTransportFailurePolicy.isConnectionLoss(
             IllegalStateException("transport operation failed", EOFException("peer closed"))
