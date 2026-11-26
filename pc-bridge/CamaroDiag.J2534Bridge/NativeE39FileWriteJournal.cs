@@ -19,6 +19,7 @@ internal sealed class NativeE39FileWriteJournal :
     private readonly SemaphoreSlim gate = new(1, 1);
     private bool disposed;
     private bool appendFailed;
+    private bool backupInvalidated;
     private readonly Dictionary<string, (int Length, byte[] Hash)> savedEnvelopes =
         new(StringComparer.Ordinal);
 
@@ -65,7 +66,7 @@ internal sealed class NativeE39FileWriteJournal :
         try
         {
             ObjectDisposedException.ThrowIf(disposed, this);
-            if (appendFailed)
+            if (appendFailed || backupInvalidated)
                 throw new IOException("Interrupted journal cannot accept physical backup data.");
             if (!backupDirectoryCreated)
             {
@@ -110,7 +111,7 @@ internal sealed class NativeE39FileWriteJournal :
         try
         {
             ObjectDisposedException.ThrowIf(disposed, this);
-            if (appendFailed || !backupDirectoryCreated || savedEnvelopes.Count == 0 ||
+            if (appendFailed || backupInvalidated || !backupDirectoryCreated || savedEnvelopes.Count == 0 ||
                 (File.GetAttributes(backupDirectory) & FileAttributes.ReparsePoint) != 0)
                 throw new InvalidDataException("Original sector backup is unavailable.");
             void RequireInventory()
@@ -146,6 +147,12 @@ internal sealed class NativeE39FileWriteJournal :
             RequireInventory();
             token.ThrowIfCancellationRequested();
         }
+        catch
+        {
+            // Keep journal append available for the terminal RecoveryRequired marker.
+            backupInvalidated = true;
+            throw;
+        }
         finally { gate.Release(); }
     }
 
@@ -159,6 +166,8 @@ internal sealed class NativeE39FileWriteJournal :
             ObjectDisposedException.ThrowIf(disposed, this);
             if (appendFailed)
                 throw new IOException("Previous journal append failed; retain the interrupted journal for assessment.");
+            if (backupInvalidated && evidence.Phase != NativeE39WriteSequence.Phase.RecoveryRequired)
+                throw new InvalidDataException("Original sector backup session was invalidated.");
             var entry = JsonSerializer.Serialize(new
             {
                 Schema = 3,

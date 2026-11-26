@@ -1,3 +1,7 @@
+## C6 — invalidation de la session de sauvegarde E39 (26/11/2026)
+
+- Android : création atomique CREATE_NEW sans suivi de lien symbolique, synchronisation du même descripteur, relectures NOFOLLOW_LINKS. Windows et Android : une anomalie lors de la relecture des originaux invalide définitivement l'objet de transaction, même si les fichiers redeviennent identiques ; nouvelle transaction et nouvelle autorisation nécessaires. Windows permet encore la journalisation RecoveryRequired, refuse les autres phases après invalidation. Tests de corruption puis restauration, ajout/retrait de fichier et refus Completed écrits sans exécution. Ne garantit pas l'absence de toutes les races de fichiers ni la durabilité matérielle ; aucun flash ni CI, C6/J1979 ouverts, pas de fusion/Release.
+
 ## J1979 — couverture observée et annulation de recette native (26/11/2026)
 
 - Les exports USB Android/Windows et décodeur Python distinguent par mode les observations tentées, positives, brutes, négatives, expirées ou échouées. Ces compteurs ne prouvent ni la couverture complète du service ni la réussite d'un moniteur. Android ne publie plus de valeurs validées après annulation/révocation et classe une réponse DTC négative ou expirée comme échec de la lecture, non comme absence de test. Le VIN non vérifié reste dans la trace brute, pas dans le contexte de recette. Régressions écrites, non exécutées. C6/J1979 ouverts ; aucun déclenchement de CI, merge ou Release.

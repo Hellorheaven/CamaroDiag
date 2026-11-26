@@ -207,6 +207,24 @@ internal static class NativeE39FileWriteJournalSelfTests
                     originalSha, CancellationToken.None).GetAwaiter().GetResult());
             tests++;
             liveBackup.DisposeAsync().AsTask().GetAwaiter().GetResult();
+            File.Delete(path);
+            Directory.Delete(path + ".blocks", recursive:true);
+            var invalidated = new NativeE39FileWriteJournal(path);
+            try {
+                physicalBytes[0] ^= 0xFF;
+                invalidated.PreserveOriginalBlockAsync(0x20000u,physicalBytes,originalSha,CancellationToken.None).GetAwaiter().GetResult();
+                invalidated.RequireOriginalBlocksIntactAsync(CancellationToken.None).GetAwaiter().GetResult();
+                var intact = File.ReadAllBytes(physicalFile);
+                var changed = intact.ToArray();changed[^1] ^= 1;File.WriteAllBytes(physicalFile,changed);
+                AssertThrows<InvalidDataException>(()=>invalidated.RequireOriginalBlocksIntactAsync(CancellationToken.None).GetAwaiter().GetResult());
+                File.WriteAllBytes(physicalFile,intact);
+                AssertThrows<InvalidDataException>(()=>invalidated.RequireOriginalBlocksIntactAsync(CancellationToken.None).GetAwaiter().GetResult());
+                AssertThrows<InvalidDataException>(()=>invalidated.AppendAsync(new(NativeE39WriteSequence.Phase.Completed,0,"not allowed"),CancellationToken.None).GetAwaiter().GetResult());
+                invalidated.AppendAsync(new(NativeE39WriteSequence.Phase.RecoveryRequired,0x20000,"backup changed"),CancellationToken.None).GetAwaiter().GetResult();
+                tests+=3;
+            }finally{invalidated.DisposeAsync().AsTask().GetAwaiter().GetResult();}
+            Assert(NativeE39FileWriteJournal.Inspect(path)==NativeE39FileWriteJournal.CompletionState.RecoveryRequired,
+                "Detected backup change permanently invalidates session while allowing recovery evidence");
         }
         finally
         {
