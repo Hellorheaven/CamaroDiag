@@ -678,11 +678,15 @@ object DoIpDirectRead {
             if (type != 0x8001) recordControl("TX", pdu)
             remaining(deadline)
         }
-        private fun receive(deadline: Long): Frame {
-            val header = readExact(8, deadline)
+        private fun receive(deadline: Long, first: Int? = null, idle: Boolean = false): Frame {
+            val header = if (first == null) readExact(8, deadline)
+                else byteArrayOf(first.toByte()) + readExact(7, deadline)
             val data = readExact(length(header), deadline)
             val frame = parseFrame(header, data)
-            if (frame.type != 0x8001) recordControl("RX", header + data)
+            // A diagnostic PDU received while idle has no UDS request to
+            // attribute it to. Keep the complete wire frame in the trace.
+            if (idle || frame.type != 0x8001) recordControl("RX", header + data)
+            remaining(deadline)
             require(frame.version == gateway.version) { "DoIP protocol version changed." }
             if (frame.type == 0) throw IOException("DoIP generic negative acknowledgement.")
             return frame
@@ -725,17 +729,35 @@ object DoIpDirectRead {
                 check(isReadContextCurrent()) { "DoIP operation context changed." }
                 if (first < 0) throw EOFException("DoIP socket closed between samples.")
                 val frameEnd = deadline(frameTimeoutMs)
-                val header = byteArrayOf(first.toByte()) + readExact(7, frameEnd)
-                val data = readExact(length(header), frameEnd)
-                val frame = parseFrame(header, data)
-                if (frame.type != 0x8001) recordControl("RX", header + data)
-                require(frame.version == gateway.version && alive(frame, frameEnd)) {
+                val frame = receive(frameEnd, first, idle = true)
+                require(alive(frame, frameEnd)) {
                     "Unsolicited DoIP message between samples."
                 }
             }
         }
+        /** Consume only already available frames before sending a new request.
+         * On TLS, available() may not expose bytes still in the encrypted
+         * socket; use a bounded probe. This is not a transaction identifier
+         * and cannot disambiguate a late identical reply racing a new request. */
+        private fun drainBeforeExchange(end: Long) {
+            val stream = socket.getInputStream()
+            while (true) {
+                check(isReadContextCurrent()) { "DoIP operation context changed." }
+                remaining(end)
+                if (socket !is SSLSocket && stream.available() == 0) return
+                socket.soTimeout = minOf(remaining(end), 1)
+                val first = try { stream.read() } catch (_: SocketTimeoutException) {
+                    check(isReadContextCurrent()) { "DoIP operation context changed." }
+                    return
+                }
+                if (first < 0) throw EOFException("DoIP socket closed before next exchange.")
+                val frame = receive(end, first, idle = true)
+                require(alive(frame, end)) { "Unsolicited DoIP message before next request." }
+            }
+        }
         fun exchange(request: ByteArray, timeout: Int, overallDeadline: Long? = null): ByteArray {
             val end = minOf(deadline(timeout), overallDeadline ?: Long.MAX_VALUE)
+            drainBeforeExchange(end)
             send(0x8001, addr(target.tester) + addr(target.ecu) + request, end)
             record("TX", request)
             var responseEnd = responseDeadline(end, System.nanoTime(), options.p2Ms)
