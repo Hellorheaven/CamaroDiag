@@ -51,6 +51,8 @@ internal sealed partial class BridgeDesktopForm
                         NativeE39FileWriteJournal.InspectDetailed(dialog.FileName));
                     var savedBlocks = await Task.Run(() =>
                         NativeE39SavedBlockAssessment.Inspect(dialog.FileName));
+                    var target = await Task.Run(() =>
+                        NativeE39SavedBlockAssessment.InspectTargetMetadata(dialog.FileName));
                     var lines = new List<string>
                     {
                         "Fichier : " + Path.GetFileName(dialog.FileName),
@@ -70,6 +72,10 @@ internal sealed partial class BridgeDesktopForm
                     if (report.PossiblyIncompleteAddress is uint address)
                         lines.Add($"Secteur potentiellement incomplet : 0x{address:X8}");
                     lines.Add("");
+                    lines.Add("Identité déclarée dans le dossier de récupération : " +
+                        (target.Verified ? $"{target.Family} · VIN {target.Vin} · OSID {target.OsId}" :
+                            "NON VÉRIFIÉE (" + target.Problem + ")"));
+                    lines.Add("La déclaration sauvegardée ne remplace pas une identification ECU en direct.");
                     lines.Add("Sauvegardes PHYSIQUES des secteurs originaux : " +
                         (savedBlocks.Verified ? "INTÈGRES" : "NON VÉRIFIÉES"));
                     lines.Add($"Secteurs originaux contrôlés : {savedBlocks.Blocks.Count}/{savedBlocks.ExpectedSectors}");

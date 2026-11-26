@@ -16,6 +16,79 @@ internal static class NativeE39SavedBlockAssessment
         internal bool PhysicalRestoreQualified => false;
     }
 
+    internal sealed record TargetMetadata(bool Verified, string? Family,
+        string? Vin, uint? OsId, string Problem);
+
+    /// <summary>
+    /// Verify the separately persisted target manifest before using its
+    /// VIN/OSID as recovery context. A coherent manifest is NOT a current
+    /// physical identity measurement or a cryptographic provenance signature.
+    /// Older journals without this sidecar remain inspectable but unbound.
+    /// </summary>
+    internal static TargetMetadata InspectTargetMetadata(string journalPath)
+    {
+        try
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(journalPath);
+            var path = journalPath + ".meta.json";
+            using var source = File.OpenRead(path);
+            if (source.Length is < 1 or > 16384)
+                throw new InvalidDataException("Invalid ECU target metadata length.");
+            var bytes = new byte[checked((int)source.Length)];
+            source.ReadExactly(bytes);
+            if (source.ReadByte() != -1)
+                throw new InvalidDataException("ECU metadata changed during inspection.");
+            using var document = JsonDocument.Parse(bytes);
+            var root = document.RootElement;
+            if (root.ValueKind != JsonValueKind.Object)
+                throw new InvalidDataException("ECU target metadata is not a JSON object.");
+
+            var names = new HashSet<string>(StringComparer.Ordinal)
+            {
+                "Schema", "Utc", "Family", "ExpectedVin", "ExpectedOsId",
+                "ProfileSha256", "DriverSha256", "RegistryView",
+                "OriginalSha256", "TargetSha256", "KernelSha256"
+            };
+            foreach (var property in root.EnumerateObject())
+                if (!names.Remove(property.Name))
+                    throw new InvalidDataException("Unexpected or duplicated ECU target metadata.");
+            if (names.Count != 0 || root.GetProperty("Schema").GetInt32() != 1)
+                throw new InvalidDataException("Incomplete or unsupported ECU target metadata.");
+            string Value(string field) => root.GetProperty(field).GetString()
+                ?? throw new InvalidDataException("Missing ECU target property: " + field);
+            string Digest(string field)
+            {
+                var digest = Value(field);
+                if (digest.Length != 64 || !digest.All(Uri.IsHexDigit))
+                    throw new InvalidDataException("Invalid ECU target hash: " + field);
+                return digest;
+            }
+            var family = Value("Family");
+            var vin = Value("ExpectedVin");
+            var osid = root.GetProperty("ExpectedOsId").GetUInt32();
+            var registry = Value("RegistryView");
+            var timestamp = Value("Utc");
+            if (family is not ("E39" or "E39A") ||
+                !System.Text.RegularExpressions.Regex.IsMatch(vin,
+                    @"\A[A-HJ-NPR-Z0-9]{17}\z") ||
+                osid == 0 || registry is not ("Registry32" or "Registry64") ||
+                !DateTimeOffset.TryParse(timestamp, out _))
+                throw new InvalidDataException("Unusable ECU VIN, family, OSID or profile metadata.");
+            _ = Digest("ProfileSha256");
+            _ = Digest("DriverSha256");
+            _ = Digest("OriginalSha256");
+            _ = Digest("TargetSha256");
+            _ = Digest("KernelSha256");
+            return new TargetMetadata(true, family, vin, osid, "");
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or
+            InvalidDataException or JsonException or KeyNotFoundException or
+            ArgumentException or FormatException or OverflowException)
+        {
+            return new TargetMetadata(false, null, null, null, error.Message);
+        }
+    }
+
     internal static Result Inspect(string journalPath)
     {
         var state = NativeE39FileWriteJournal.InspectDetailed(journalPath).State;

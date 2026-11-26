@@ -80,6 +80,28 @@ internal static class EcuPostFlashAssessmentSelfTests
                     0x20000, sha), CancellationToken.None).GetAwaiter().GetResult();
             }
             finally { journal.DisposeAsync().AsTask().GetAwaiter().GetResult(); }
+            var metadataPath = journalPath + ".meta.json";
+            var metadata = System.Text.Json.JsonSerializer.Serialize(new
+            {
+                Schema = 1, Utc = DateTimeOffset.UtcNow,
+                Family = "E39", ExpectedVin = vin, ExpectedOsId = 12664221u,
+                ProfileSha256 = sha, DriverSha256 = sha,
+                RegistryView = "Registry64", OriginalSha256 = sha,
+                TargetSha256 = sha, KernelSha256 = sha
+            });
+            File.WriteAllText(metadataPath, metadata);
+            var inspectedTarget = NativeE39SavedBlockAssessment.InspectTargetMetadata(journalPath);
+            Check(inspectedTarget.Verified && inspectedTarget.Family == "E39" &&
+                inspectedTarget.Vin == vin && inspectedTarget.OsId == 12664221u,
+                "Saved VIN and firmware identifiers are parsed from bounded offline metadata");
+            File.WriteAllText(metadataPath, metadata.Replace(vin, "INVALID_TARGET_VIN"));
+            Check(!NativeE39SavedBlockAssessment.InspectTargetMetadata(journalPath).Verified,
+                "Changed or malformed ECU target identity cannot validate recovery metadata");
+            File.WriteAllText(metadataPath, metadata.Replace("\"Schema\":1",
+                "\"Schema\":1,\"Schema\":1"));
+            Check(!NativeE39SavedBlockAssessment.InspectTargetMetadata(journalPath).Verified,
+                "Duplicate target metadata fields cannot masquerade as original qualification");
+            File.WriteAllText(metadataPath, metadata);
             var saved = NativeE39SavedBlockAssessment.Inspect(journalPath);
             Check(saved.Verified && saved.Blocks.Count == 1 &&
                 !saved.PhysicalRestoreQualified, "Original PHYSICAL sector saved and verified.");

@@ -253,6 +253,11 @@ internal static class Program
             else Console.WriteLine("Journal sequence is incomplete, invalid, or contains an explicit recovery marker.");
             if (report.PossiblyIncompleteAddress is uint address)
                 Console.WriteLine($"Potentially incomplete sector: 0x{address:X8}");
+            var target = NativeE39SavedBlockAssessment.InspectTargetMetadata(args[1]);
+            Console.WriteLine("Target recovery metadata: " +
+                (target.Verified ? $"VIN {target.Vin}; ECU {target.Family}; OSID {target.OsId}" :
+                    "UNVERIFIED (" + target.Problem + ")"));
+            Console.WriteLine("Metadata is an offline target hint, not current live ECU identity.");
             var backups = NativeE39SavedBlockAssessment.Inspect(args[1]);
             Console.WriteLine($"Verified original ECU backup sectors: {backups.Blocks.Count}/{backups.ExpectedSectors}");
             Console.WriteLine("Physical sector backups: " +
@@ -267,7 +272,9 @@ internal static class Program
             }
             else Console.Error.WriteLine("Physical backup error: " + backups.Problem);
             Console.WriteLine("Offline evidence only; no ECU contact, reset, programming or automatic restoration.");
-            if (!report.RequiresAssessment && backups.Verified) return 0;
+            if (!report.RequiresAssessment && backups.Verified && target.Verified) return 0;
+            if (!target.Verified)
+                Console.Error.WriteLine("Original ECU identity metadata unavailable; verify VIN/OSID independently.");
             if (!backups.Verified)
                 Console.Error.WriteLine("Physical originals incomplete or changed; do NOT attempt restoration.");
 
