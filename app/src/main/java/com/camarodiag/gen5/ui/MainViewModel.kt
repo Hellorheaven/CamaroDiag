@@ -4641,6 +4641,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      * A consent dialog from an older revision can never authorize a write.
      */
     private fun nextConnectionGeneration(): Long {
+        if(_obdScanReport.value?.nativeUsbEvidence!=null) {
+            _obdScanReport.value=null
+            _obdScanMessage.value=null
+        }
         resetLiveAndDtcEvidence()
         invalidateEnhancedUdsReads()
         val next = ++connectionAttemptGeneration
@@ -5352,11 +5356,26 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         device: android.hardware.usb.UsbDevice,
         target: com.camarodiag.gen5.data.obd.CamaroDiagConnectorNativeCampaign.Target,
         keyUri: Uri, confirmedConnection: Long, confirmedVehicle: VehicleProfile
+    ) = runNativeUsbCampaign(device,target,keyUri,confirmedConnection,confirmedVehicle,false)
+
+    fun runNativeUsbObdScan(
+        device: android.hardware.usb.UsbDevice,
+        target: com.camarodiag.gen5.data.obd.CamaroDiagConnectorNativeCampaign.Target,
+        keyUri: Uri, confirmedConnection: Long, confirmedVehicle: VehicleProfile
+    ) {
+        if (!requirePremiumLicense()) return
+        runNativeUsbCampaign(device,target,keyUri,confirmedConnection,confirmedVehicle,true)
+    }
+
+    private fun runNativeUsbCampaign(
+        device: android.hardware.usb.UsbDevice,
+        target: com.camarodiag.gen5.data.obd.CamaroDiagConnectorNativeCampaign.Target,
+        keyUri: Uri, confirmedConnection: Long, confirmedVehicle: VehicleProfile, publishScan:Boolean
     ) {
         if (!target.valid || target.connectionGeneration != maxOf(1L,confirmedConnection) ||
             confirmedConnection != connectionAttemptGeneration || confirmedVehicle != _vehicle.value ||
             target.vehicle != confirmedVehicle.vin || target.connector != device.deviceName) return
-        if (_adapter.value.tier != AdapterTier.DISCONNECTED || _isBusy.value ||
+        if (_adapter.value.tier != AdapterTier.DISCONNECTED || _isBusy.value || _isObdScanning.value ||
             _calibrationWorkspace.value.isJ2534BridgeConnected ||
             functionalTestJob?.isCompleted == false || nativeFunctionalCleanup?.isCompleted == false ||
             connectionAttemptJob?.isCompleted == false || enhancedUdsJob?.isCompleted == false ||
@@ -5374,12 +5393,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             connection == connectionAttemptGeneration && confirmedVehicle == _vehicle.value &&
             FirebaseAuth.getInstance().currentUser?.uid == owner
         val job = viewModelScope.launch(start = CoroutineStart.LAZY) {
-            if (!confirmFunctionalTestOwner(owner) || !current()) return@launch
+            if (!confirmFunctionalTestOwner(owner) || !current()) {
+                if(publishScan&&current()) _obdScanMessage.value=localizedContext.getString(R.string.functional_tests_denied)
+                return@launch
+            }
+            if(publishScan&&!hasPremiumLicense()) return@launch
             val context = getApplication<Application>()
             val usb = context.getSystemService(android.hardware.usb.UsbManager::class.java) ?: return@launch
             _functionalTestState.value = FunctionalTestState(running=true,startedAtMillis=System.currentTimeMillis(),
                 protocol=FunctionalProtocol.J1979,checks=NativeUsbFunctionalEvidence.initial(),
                 context=FunctionalTestContext(confirmedVehicle.vin,device.deviceName,"NATIVE_USB_CU1",connection))
+            if(publishScan) {
+                _isObdScanning.value=true
+                _obdScanReport.value=null
+                _obdScanMessage.value=null
+            }
             beginBusyOperation()
             try {
                 val json = withContext(Dispatchers.IO) {
@@ -5409,14 +5437,31 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         result.context?.observedVin == confirmedVehicle.vin
                     _functionalTestState.value = result.copy(error=if (complete) null else
                         localizedContext.getString(R.string.functional_native_usb_incomplete))
+                    if(publishScan&&hasPremiumLicense()) {
+                        val scan=NativeUsbObdScanProjection.project(json,confirmedVehicle.vin,approved.tx,approved.rx,approved.extended)
+                        _obdScanReport.value=scan
+                        // A single-ECU capture must not replace global DTCs, establish
+                        // an active connection or authorize Camaro-specific operations.
+                        _obdScanMessage.value=localizedContext.getString(when {
+                            scan==null -> R.string.functional_native_usb_scan_rejected
+                            complete -> R.string.functional_native_usb_scan_complete
+                            else -> R.string.functional_native_usb_scan_partial
+                        })
+                    }
                 }
-            } catch (cancelled: CancellationException) { throw cancelled }
+            } catch (cancelled: CancellationException) {
+                if(publishScan&&isCurrentAccountGeneration(account)&&connection==connectionAttemptGeneration)
+                    _obdScanMessage.value=localizedContext.getString(R.string.functional_tests_cancelled)
+                throw cancelled
+            }
             catch (_: Exception) {
+                if(publishScan&&current()) _obdScanMessage.value=localizedContext.getString(R.string.functional_native_usb_scan_rejected)
                 if (current()) _functionalTestState.update {
                     it.copy(error=localizedContext.getString(R.string.functional_native_usb_incomplete))
                 }
             } finally {
                 endBusyOperation()
+                if(publishScan&&isCurrentAccountGeneration(account)) _isObdScanning.value=false
                 if (execution == functionalTestGeneration && isCurrentAccountGeneration(account))
                     _functionalTestState.update { it.copy(running=false,finishedAtMillis=System.currentTimeMillis(),
                         error=if (current()) it.error else localizedContext.getString(R.string.functional_tests_cancelled)) }
@@ -6065,7 +6110,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun runFullObdScan() {
         if (!requirePremiumLicense()) return
-        if (_isObdScanning.value) return
+        if (_isObdScanning.value || nativeFunctionalCleanup?.isCompleted==false) return
         val startedGeneration = accountSessionGeneration
         val connection = connectionAttemptGeneration
         val selectedVin = _vehicle.value.vin

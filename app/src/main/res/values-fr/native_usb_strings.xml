@@ -56,4 +56,11 @@
     <string name="functional_native_usb_inventory_next">Suite annoncée</string>
     <string name="functional_native_usb_freeze_trigger">Défaut déclencheur des données figées</string>
     <string name="functional_native_usb_freeze_absent">Aucun défaut déclencheur annoncé</string>
+    <string name="functional_native_usb_scan_title">Scan OBD USB natif</string>
+    <string name="functional_native_usb_scan_run">Scanner le calculateur sélectionné</string>
+    <string name="functional_native_usb_scan_scope">Instantané d’un seul calculateur · pas de connexion continue</string>
+    <string name="functional_native_usb_scan_complete">Scan USB natif terminé.</string>
+    <string name="functional_native_usb_scan_partial">Scan USB natif partiel. Les données non observées restent indisponibles.</string>
+    <string name="functional_native_usb_scan_rejected">Aucun instantané ECU concordant et vérifié. Voir les résultats de recette.</string>
+    <string name="functional_native_usb_scan_stop">Arrêter le scan USB natif</string>
 </resources>

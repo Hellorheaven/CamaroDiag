@@ -26,7 +26,8 @@ import com.camarodiag.gen5.domain.model.VehicleProfile
 @Composable
 internal fun NativeUsbFunctionalPanel(
     enabled: Boolean, generation: Long, vehicle: VehicleProfile,
-    onRun: (UsbDevice, CamaroDiagConnectorNativeCampaign.Target, Uri, Long, VehicleProfile) -> Unit
+    onRun: (UsbDevice, CamaroDiagConnectorNativeCampaign.Target, Uri, Long, VehicleProfile) -> Unit,
+    asScan:Boolean=false
 ) {
     val context = LocalContext.current
     val manager = context.getSystemService(UsbManager::class.java)
@@ -66,7 +67,7 @@ internal fun NativeUsbFunctionalPanel(
         CamaroDiagConnectorNativeCampaign.Target(control.id, data.id, request, response,
             extended, 60000, vehicle.vin, "ECM", device.deviceName, maxOf(1L,generation)) else null
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text(stringResource(R.string.functional_native_usb_title))
+        Text(stringResource(if(asScan) R.string.functional_native_usb_scan_title else R.string.functional_native_usb_title))
         Box {
             OutlinedButton(onClick = { refresh(); menu = true }, enabled = enabled,
                 modifier = Modifier.fillMaxWidth()) {
@@ -116,6 +117,6 @@ internal fun NativeUsbFunctionalPanel(
                 onRun(device, target, uri, generation, vehicle)
             }
         }, enabled = enabled && granted && confirmed && credential != null && target?.valid == true,
-            modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.functional_native_usb_run)) }
+            modifier = Modifier.fillMaxWidth()) { Text(stringResource(if(asScan) R.string.functional_native_usb_scan_run else R.string.functional_native_usb_run)) }
     }
 }

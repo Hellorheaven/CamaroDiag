@@ -1,3 +1,7 @@
+## J1979 — scan OBD courant Android via CU/1 (26/11/2026)
+
+- Écran Scan OBD : lancement du scan USB natif avec le même sélecteur, consentement local, credential et contrôle propriétaire que la recette. Instantané mono-ECU distinct d'une connexion continue, arrêt, messages partiel/rejet/terminé, choix de capteurs transitoire et export Scan OBD standard incluant capture JSON. Publication uniquement VIN concordant, génération et compte courants ; ne remplace pas les DTC globaux ni ne débloque les opérations Camaro. Invalidation sur nouvelle génération. Régressions de projection écrites au lot précédent, non exécutées. C6/J1979 ouverts ; aucun test intermédiaire, fusion ou Release.
+
 ## J1979 — projection du scan natif vers le modèle Scan OBD (26/11/2026)
 
 - Conversion locale de la capture CU/1 authentifiée, non annulée, cohérente et VIN concordant vers ObdScanReport limité au seul calculateur physique choisi. PID, mesures Mode 01, DTC distincts des modes inconnus, identité, freeze frame, inventaires et réponses brutes conservés ; export Scan OBD embarque le JSON natif original. Pas d'autorisation d'écriture, pas d'attribution à d'autres calculateurs. Régressions écrites non exécutées ; branchement UI à poursuivre. C6/J1979 ouverts, aucun test intermédiaire, fusion ou Release.

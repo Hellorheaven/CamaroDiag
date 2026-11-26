@@ -787,7 +787,14 @@ fun CamaroDiagApp(
                     accountUid = accountUid,
                     savedVehicleId = selectedSavedVehicleId,
                     onRunScan = { viewModel.runFullObdScan() },
-                    onExport = { report -> withExportFolder { viewModel.exportFullObdScan(report) } }
+                    onExport = { report -> withExportFolder { viewModel.exportFullObdScan(report) } },
+                    nativeUsbPanel = if(ownerTestsAllowed && adapter.tier==AdapterTier.DISCONNECTED &&
+                        !calibrationWorkspace.isJ2534BridgeConnected) {
+                        { NativeUsbFunctionalPanel(!isBusy&&!isObdScanning&&!functionalTests.running,connectionGeneration,
+                            vehicle,viewModel::runNativeUsbObdScan,asScan=true) }
+                    } else null,
+                    onStopNativeScan = if(functionalTests.running && isObdScanning &&
+                        functionalTests.context?.transport=="NATIVE_USB_CU1") viewModel::cancelFunctionalTests else null
                 )
                 DiagTab.CALIBRATION -> CalibrationWorkspaceScreen(
                     state = calibrationWorkspace,

@@ -65,9 +65,13 @@ fun ObdScanScreen(
     accountUid: String?,
     savedVehicleId: String?,
     onRunScan: () -> Unit,
-    onExport: ((ObdScanReport) -> Unit)? = null
+    onExport: ((ObdScanReport) -> Unit)? = null,
+    nativeUsbPanel: (@Composable () -> Unit)? = null,
+    onStopNativeScan: (() -> Unit)? = null
 ) {
     val unavailable = stringResource(R.string.obd_not_available)
+    val nativeSnapshot=report?.nativeUsbEvidence!=null
+    val sensorSelectionAvailable=isConnected||nativeSnapshot
 
     val context = LocalContext.current
     val preferences = remember(context) {
@@ -79,7 +83,7 @@ fun ObdScanScreen(
         ?.takeIf { it.matches(Regex("[A-HJ-NPR-Z0-9]{17}")) && !simulatedReport }
     // Only the physically observed VIN identifies a persistent selection.
     // The selected garage vehicle may differ from the connected vehicle.
-    val vehicleIdentity = vehicleKey?.let { "vin_$it" }
+    val vehicleIdentity = vehicleKey?.takeUnless { nativeSnapshot }?.let { "vin_$it" }
     val preferenceKey = SensorSelectionScope.key(accountUid, vehicleIdentity)
     val storedPids = remember(preferenceKey, preferences) {
         preferenceKey?.let { preferences.getString(it, null)?.split(",")?.mapNotNull(String::toIntOrNull) }
@@ -93,10 +97,10 @@ fun ObdScanScreen(
     var sensorQuery by remember(preferenceKey, transientReport) { mutableStateOf("") }
     var chosenPids by remember(preferenceKey, transientReport) { mutableStateOf(storedPids.orEmpty()) }
     var selectionApplied by remember(preferenceKey, transientReport) { mutableStateOf(storedPids != null) }
-    LaunchedEffect(isConnected, isScanning, measuredPids) {
-        if (!isConnected || isScanning || measuredPids.isEmpty()) choosingSensors = false
+    LaunchedEffect(sensorSelectionAvailable, isScanning, measuredPids) {
+        if (!sensorSelectionAvailable || isScanning || measuredPids.isEmpty()) choosingSensors = false
     }
-    if (choosingSensors && report != null && isConnected && !isScanning && measuredPids.isNotEmpty()) {
+    if (choosingSensors && report != null && sensorSelectionAvailable && !isScanning && measuredPids.isNotEmpty()) {
         var pendingPids by remember(preferenceKey, choosingSensors, measuredPids) {
             mutableStateOf((if (selectionApplied) chosenPids else report.liveData.map { it.pid })
                 .filter { it in measuredPids }.distinct())
@@ -191,7 +195,12 @@ fun ObdScanScreen(
                         Text(stringResource(R.string.obd_export_full_scan))
                     }
                 }
-                if (!isConnected) Text(
+                if (isScanning && onStopNativeScan!=null) {
+                    Button(onClick=onStopNativeScan,modifier=Modifier.fillMaxWidth()) {
+                        Text(stringResource(R.string.functional_native_usb_scan_stop))
+                    }
+                }
+                if (!isConnected && nativeUsbPanel==null && !nativeSnapshot) Text(
                     stringResource(R.string.obd_connect_adapter_notice),
                     color = CamaroAmber, fontSize = 12.sp
                 )
@@ -201,7 +210,11 @@ fun ObdScanScreen(
             }
         }
 
+        nativeUsbPanel?.let { panel -> item { panel() } }
         if (report != null) {
+            if(nativeSnapshot) item {
+                Text(stringResource(R.string.functional_native_usb_scan_scope),color=CamaroAmber,fontWeight=FontWeight.Bold)
+            }
             val isSimulated = report.adapterInfo["IDENTIFICATION"].orEmpty()
                 .contains("SIMULATED", ignoreCase = true)
             if (isSimulated) {
@@ -272,7 +285,7 @@ fun ObdScanScreen(
                 SectionTitle(stringResource(R.string.obd_returned_live_data))
             }
             item {
-                Button(onClick = { choosingSensors = true }, enabled = measuredPids.isNotEmpty() && isConnected && !isScanning, modifier = Modifier.fillMaxWidth()) {
+                Button(onClick = { choosingSensors = true }, enabled = measuredPids.isNotEmpty() && sensorSelectionAvailable && !isScanning, modifier = Modifier.fillMaxWidth()) {
                     Text(stringResource(R.string.obd_choose_sensors))
                 }
             }
@@ -327,7 +340,7 @@ fun ObdScanScreen(
                     item { Text(stringResource(R.string.obd_no_dtcs), color = OkGreen) }
                 }
             } else {
-                val matchesVehicle = ObdDtcGuidancePolicy.hasMatchedEcm(
+                val matchesVehicle = !nativeSnapshot && ObdDtcGuidancePolicy.hasMatchedEcm(
                     selectedVin = vehicle.vin,
                     reportedVin = report.vin,
                     responderAddresses = report.respondingEcuAddresses,

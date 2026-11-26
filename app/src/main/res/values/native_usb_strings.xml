@@ -56,4 +56,11 @@
     <string name="functional_native_usb_inventory_next">Continuation advertised</string>
     <string name="functional_native_usb_freeze_trigger">Freeze-frame trigger</string>
     <string name="functional_native_usb_freeze_absent">No freeze-frame trigger reported</string>
+    <string name="functional_native_usb_scan_title">Native USB OBD scan</string>
+    <string name="functional_native_usb_scan_run">Scan selected ECU</string>
+    <string name="functional_native_usb_scan_scope">Single ECU snapshot · no continuous connection</string>
+    <string name="functional_native_usb_scan_complete">Native USB scan completed.</string>
+    <string name="functional_native_usb_scan_partial">Partial native USB scan. Unobserved data remains unavailable.</string>
+    <string name="functional_native_usb_scan_rejected">No verified matching ECU snapshot. See functional test results.</string>
+    <string name="functional_native_usb_scan_stop">Stop native USB scan</string>
 </resources>
