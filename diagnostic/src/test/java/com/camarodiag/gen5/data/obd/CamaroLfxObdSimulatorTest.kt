@@ -54,7 +54,9 @@ class CamaroLfxObdSimulatorTest {
         assertTrue(report.adapterInfo["DESCRIPTION"].orEmpty().contains("Offline Simulator"))
         assertTrue(report.readiness.orEmpty().contains("MIL=OFF"))
         assertTrue(report.readiness.orEmpty().contains("DTC_COUNT=2"))
-        assertTrue(report.liveData.any { it.pid == 0x0C && it.value == "750.00" })
+        assertTrue(report.liveData.any {
+            it.pid == 0x0C && it.value == "750.00" && it.responder == "7E8"
+        })
         assertTrue(report.liveData.any { it.pid == 0x22 && it.value == "79.00" })
         assertTrue(report.liveData.any { it.pid == 0x24 && it.name.contains("Bank 1 sensor 1") })
         assertEquals("P0171", report.freezeFrameDtc?.code)
