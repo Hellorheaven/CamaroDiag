@@ -46,4 +46,6 @@
   <data name="LegacyConfirmProfile" xml:space="preserve"><value>Je confirme le protocole, l’interface et la source de réponse du calculateur.</value></data>
   <data name="LegacyScope" xml:space="preserve"><value>Lectures fonctionnelles filtrées sur la source sélectionnée. Pas de scan global véhicule, d’effacement ni d’actionnement.</value></data>
   <data name="LegacyPrerequisites" xml:space="preserve"><value>Sélectionnez une interface J2534, arrêtez le pont et fermez la console avant la recette legacy.</value></data>
+  <data name="LegacyDiscover" xml:space="preserve"><value>Découvrir les sources</value></data>
+  <data name="LegacyDiscoveryScope" xml:space="preserve"><value>Sources observées sur le PID 00 ; ni couverture exhaustive du réseau ni identité constructeur établie.</value></data>
 </root>
