@@ -36,7 +36,8 @@ class LegacyMutationTests(unittest.TestCase):
 
     def recipe(self, p=2, operation="clear", wrong_vin=False, moving=False,
                extra=False, fail_save=False, missing_ack=False, fail_after=False,
-               second_evap_source=False, ok=True, yes=True):
+               second_evap_source=False, ok=True, yes=True,
+               missing_pending=False, residual_pending=False):
         attempted = False
         saved = False
         sent = []
@@ -53,7 +54,9 @@ class LegacyMutationTests(unittest.TestCase):
                 "0901": encode((0x10,"490105")),
                 "0902": encode(*[(0x10,bytes((0x49,2,i+1))+vin[i*4:i*4+4]) for i in range(5)]),
                 "03": encode((0x10,"43000000000000" if attempted else "43012300000000"),(0x11,"43000000000000")),
-                "07": encode((0x10,"47000000000000"),(0x11,"47000000000000")),
+                "07": encode((0x10,"47000000000000"),
+                             *(([(0x11,"47012300000000" if attempted and residual_pending else "47000000000000")])
+                               if not (attempted and missing_pending) else [])),
                 "0A": encode((0x10,"4A012300000000")),
                 "0101": encode((0x10,"410100000000")),
                 "010D": encode((0x10,"410D01" if moving else "410D00")),
@@ -106,6 +109,18 @@ class LegacyMutationTests(unittest.TestCase):
         for kwargs,outcome in (({"missing_ack":True},"UNCERTAIN"),({"fail_after":True},"ACKNOWLEDGED_PARTIAL")):
             result,sent=self.recipe(**kwargs)
             self.assertEqual(outcome,result["outcome"])
+            self.assertEqual(1,sent.count("04"))
+
+    def test_pending_readback_partial_or_residual(self):
+        for p in range(1,6):
+            result,sent=self.recipe(p,missing_pending=True)
+            self.assertEqual("ACKNOWLEDGED_PARTIAL",result["outcome"])
+            self.assertEqual("PENDING_READBACK_UNAVAILABLE",result["reason"])
+            self.assertIsNone(result["after_dtcs"]["11"]["07"])
+            self.assertEqual(1,sent.count("04"))
+            result,sent=self.recipe(p,residual_pending=True)
+            self.assertEqual("DTCS_STILL_PRESENT",result["reason"])
+            self.assertEqual(["P0123"],result["after_dtcs"]["11"]["07"])
             self.assertEqual(1,sent.count("04"))
 
     def test_evap_is_preparation_not_leak_test(self):

@@ -178,10 +178,13 @@ internal static class ObdJ1979LegacyMutation
             {
                 Snapshot("AFTER",after,afterModes);
                 if (completeAck && after.Values.All(x => x is not null))
-                    return Finish("ACKNOWLEDGED_READBACK",
-                        afterModes.Values.Any(m => m["03"]!.Length > 0 || m["07"] is { Length: > 0 })
-                            ? "DTCS_STILL_PRESENT" :
-                        afterModes.Values.Any(m => m["07"] is null) ? "PENDING_READBACK_UNAVAILABLE" : null);
+                {
+                    if (afterModes.Values.Any(m => m["03"]!.Length > 0 || m["07"] is { Length: > 0 }))
+                        return Finish("ACKNOWLEDGED_READBACK", "DTCS_STILL_PRESENT");
+                    if (afterModes.Values.Any(m => m["07"] is null))
+                        return Finish("ACKNOWLEDGED_PARTIAL", "PENDING_READBACK_UNAVAILABLE");
+                    return Finish("ACKNOWLEDGED_READBACK");
+                }
             }
             else if (completeAck) return Finish("ACKNOWLEDGED","LEAK_TEST_NOT_PERFORMED");
             return Finish(completeAck ? "ACKNOWLEDGED_PARTIAL" : "UNCERTAIN",

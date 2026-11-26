@@ -15,7 +15,7 @@ internal static class ObdJ1979LegacyMutationSelfTests
         var fragments=vinData.Chunk(4).Select((data,i)=>new byte[]{0x49,2,(byte)(i+1),..data}).ToArray();
         int sends=0;
         bool saved=false,reset=false,failSave=false,moving=false,extra=false,missingAck=false,failAfter=false,wrongVin=false;
-        bool secondEvapSource=false;
+        bool secondEvapSource=false, missingPending=false, residualPending=false;
         var seen=new List<string>();
         ObdLegacyJ2534Transport.Exchange Response(string request,params (byte Source,byte[] Data)[] rows) =>
             new(request,rows.Select((x,i)=>new ObdLegacyJ2534Transport.Packet(x.Source,
@@ -34,7 +34,10 @@ internal static class ObdJ1979LegacyMutationSelfTests
                     Data:wrongVin&&i==4 ? new byte[]{0x49,2,5,0x33,0x34,0x35,0x37}:r)).ToArray()),
                 "03" => reset ? Response(hex,(0x10,[0x43,0,0,0,0,0,0]),(0x11,[0x43,0,0,0,0,0,0])) :
                     Response(hex,(0x10,[0x43,1,0x23,0,0,0,0]),(0x11,[0x43,0,0,0,0,0,0])),
-                "07" => Response(hex,(0x10,[0x47,0,0,0,0,0,0])),
+                "07" => missingPending && reset ? Response(hex,(0x10,[0x47,0,0,0,0,0,0])) :
+                    Response(hex,(0x10,[0x47,0,0,0,0,0,0]),
+                        (0x11,[0x47,residualPending && reset ? (byte)1 : (byte)0,
+                            residualPending && reset ? (byte)0x23 : (byte)0,0,0,0,0])),
                 "0A" => Response(hex,(0x10,[0x4A,1,0x23,0,0,0,0])),
                 "0101" => Response(hex,(0x10,[0x41,1,0,0,0,0])),
                 "010D" => Response(hex,(0x10,[0x41,0x0D,moving?(byte)1:(byte)0])),
@@ -69,6 +72,23 @@ internal static class ObdJ1979LegacyMutationSelfTests
             good.AfterConfirmed["10"]!.Length==0,"before and after source evidence");
         Check(good.Observations.Any(x=>x.Stage=="AFTER" && x.RequestHex=="0A"),"permanent raw evidence retained");
         Check(!good.WholeVehicleCoverageVerified,"no exhaustive scope claim");
+        Check(ObdJ1979LegacyMutationCli.ExitCode(ObdJ1979LegacyMutation.Operation.Clear,good)==0,
+            "complete clean readback exit success");
+        missingPending=true;
+        var partial=Run();
+        Check(partial.Outcome=="ACKNOWLEDGED_PARTIAL" && partial.Reason=="PENDING_READBACK_UNAVAILABLE" &&
+            partial.AfterDtcs["11"]["07"] is null && sends==1 &&
+            ObdJ1979LegacyMutationCli.ExitCode(ObdJ1979LegacyMutation.Operation.Clear,partial)==7,
+            "missing pending readback is partial, not successful");
+        missingPending=false;
+        residualPending=true;
+        var residual=Run();
+        Check(residual.Reason=="DTCS_STILL_PRESENT" && sends==1 &&
+            ObdJ1979LegacyMutationCli.ExitCode(ObdJ1979LegacyMutation.Operation.Clear,residual)==7,
+            "pending DTC still present is non-success");
+        residualPending=false;
+        Check(ObdJ1979LegacyMutationCli.ExitCode(ObdJ1979LegacyMutation.Operation.Clear,null)==7,
+            "missing result is non-success");
         moving=true;Check(Run().Outcome=="NOT_TESTED"&&sends==0,"moving blocks");moving=false;
         extra=true;Check(Run().Outcome=="NOT_TESTED"&&sends==0,"unexpected responder blocks");extra=false;
         wrongVin=true;Check(Run().Outcome=="NOT_TESTED"&&sends==0,"wrong VIN blocks");wrongVin=false;
@@ -79,6 +99,9 @@ internal static class ObdJ1979LegacyMutationSelfTests
             "additional advertised TID blocks");secondEvapSource=false;
         var evap=Run(ObdJ1979LegacyMutation.Operation.EvapPreparation);
         Check(evap.Outcome=="ACKNOWLEDGED"&&evap.Reason=="LEAK_TEST_NOT_PERFORMED"&&sends==1,"preparation is not a leak test");
+        Check(ObdJ1979LegacyMutationCli.ExitCode(ObdJ1979LegacyMutation.Operation.EvapPreparation,evap)==0 &&
+            ObdJ1979LegacyMutationCli.ExitCode(ObdJ1979LegacyMutation.Operation.Clear,evap)==7,
+            "EVAP ACK only succeeds for preparation, never for clear");
         foreach(var approval in new[]{(true,false),(false,true)})
         {
             try

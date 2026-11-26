@@ -1,3 +1,8 @@
+## J1979 — cohérence des verdicts legacy Windows et Python (26/11/2026)
+
+- Windows et Python : alignement sur Android, absence de relecture Mode 07 après ACK et Mode 03 propre = ACKNOWLEDGED_PARTIAL / PENDING_READBACK_UNAVAILABLE. Un DTC confirmé ou en attente encore présent conserve DTCS_STILL_PRESENT. CLI Windows : code 0 uniquement pour la relecture complète propre ou l'ACK de préparation EVAP explicitement limité à cette opération ; motif affiché. Aucun réessai ajouté.
+- Régressions Windows et Python écrites pour réponse en attente absente, DTC en attente persistant, succès de relecture et distinction EVAP/effacement ; pas exécutées. J1979 et C6 restent ouverts, DoIP terminé logiciellement sur SHA historique, C8 dernier. Aucun lancement de CI, fusion ou Release.
+
 ## J1979 / C6 — découverte Android, clôture de capture et intégrité de preuve (26/11/2026)
 
 - Android : découverte legacy PID00 distincte après campagne de lecture de variante confirmée, sous session ELM exclusive ; ATDPN fixe concordant, en-têtes et CRC/checksum vérifiés, restauration du profil ou déconnexion. Sources observées et bitmap, doublons identiques conservés, contradictions et refus distingués ; JSON et cartes de résultats, aucune sélection automatique du calculateur moteur ni preuve exhaustive. Tests cinq variantes ajoutés.

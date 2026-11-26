@@ -111,6 +111,18 @@ internal static class ObdJ1979LegacyMutationCli
         return report;
     }
 
+    // An ACK alone is not proof of clear/readback success. EVAP preparation
+    // has a separate, explicitly limited success outcome.
+    internal static int ExitCode(ObdJ1979LegacyMutation.Operation operation,
+        ObdJ1979LegacyMutation.Result? result) => operation switch
+    {
+        ObdJ1979LegacyMutation.Operation.Clear when result is
+            { Outcome: "ACKNOWLEDGED_READBACK", Reason: null } => 0,
+        ObdJ1979LegacyMutation.Operation.EvapPreparation when result is
+            { Outcome: "ACKNOWLEDGED", Reason: "LEAK_TEST_NOT_PERFORMED" } => 0,
+        _ => 7
+    };
+
     internal static int Run(string[] args)
     {
         try
@@ -135,8 +147,8 @@ internal static class ObdJ1979LegacyMutationCli
             {
                 var report = Execute(adapters[options.AdapterIndex],options,true,true,cancel.Token.ThrowIfCancellationRequested);
                 Console.WriteLine(report.Result?.Outcome ?? report.Error ?? "NOT_TESTED");
-                return report.Result?.Outcome is "ACKNOWLEDGED" or "ACKNOWLEDGED_READBACK" &&
-                    report.Result.Reason != "DTCS_STILL_PRESENT" ? 0 : 7;
+                if (report.Result?.Reason is { } reason) Console.WriteLine(reason);
+                return ExitCode(options.Operation, report.Result);
             }
             finally { Console.CancelKeyPress -= handler; }
         }

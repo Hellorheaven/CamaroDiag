@@ -166,8 +166,11 @@ def mutation_recipe(protocol, read, protocol_check, transmit, *, operation, expe
             # Missing optional legacy Mode 07/0A remains explicitly null.
             if complete_ack and all(modes["03"] is not None for modes in after.values()):
                 residual = any(modes["03"] or modes["07"] for modes in after.values())
-                return finish("ACKNOWLEDGED_READBACK", "DTCS_STILL_PRESENT" if residual else
-                              "PENDING_READBACK_UNAVAILABLE" if any(modes["07"] is None for modes in after.values()) else None)
+                if residual:
+                    return finish("ACKNOWLEDGED_READBACK", "DTCS_STILL_PRESENT")
+                if any(modes["07"] is None for modes in after.values()):
+                    return finish("ACKNOWLEDGED_PARTIAL", "PENDING_READBACK_UNAVAILABLE")
+                return finish("ACKNOWLEDGED_READBACK")
         elif complete_ack:
             return finish("ACKNOWLEDGED", "LEAK_TEST_NOT_PERFORMED")
         return finish("ACKNOWLEDGED_PARTIAL" if complete_ack else "UNCERTAIN", "MISSING_OR_CONFLICTING_EVIDENCE")
