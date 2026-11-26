@@ -392,10 +392,22 @@ def _run(argv: Sequence[str] | None, resources: ExitStack,
     if scope is not None and gateway.logical_address != scope["Gateway"]:
         raise DoIpError(tr("Observed gateway differs from profile", "La passerelle observée diffère du profil"))
     if targets is not None:
+        def inventory_progress(rows, total):
+            # Stderr carries intermediate evidence; stdout remains one final
+            # JSON document, emitted only after ExitStack closes the journal.
+            print(json.dumps({"inventory_progress": {
+                "vin": o.vin, "gateway": asdict(gateway), "tester": o.tester,
+                "transport": "TCP" if o.tcp else "TLS",
+                "identification": "F802/F810" if o.action == "obd-ecu-inventory" else "F190",
+                "examined_count": len(rows), "requested_count": total,
+                "verified_count": sum(row["status"] == "vin_verified" for row in rows),
+                "target": rows[-1], "complete": False,
+                "physical_qualification": False}}), file=sys.stderr, flush=True)
         return result | inventory_ecus(gateway, o.vin, o.tester, targets, tls=not o.tcp,
             timeout=o.timeout, trace=trace, context=context, p2=p2, p2_star=p2_star,
             routing_type=o.routing_activation_type or 0, routing_oem_data=o.routing_oem_data,
-            obd=o.action == "obd-ecu-inventory", target_trace=target_trace)
+            obd=o.action == "obd-ecu-inventory", target_trace=target_trace,
+            on_progress=inventory_progress)
     if commands is not None and not confirm_commands(commands, gateway, o.tester, o.ecu,
             not o.tcp, input, lambda line: print(line, file=sys.stderr), fr):
         return result | {"cancelled": True, "commands_sent": 0}
