@@ -19,8 +19,10 @@ internal static class ObdJ1979LegacyMutation
     internal static Result Run(Operation operation, string expectedVin, byte engineSource,
         IReadOnlyCollection<byte> documentedSources, bool warningAcknowledged, bool confirmedYes,
         Action requireActive, Func<byte[],int,ObdLegacyJ2534Transport.Exchange> read,
-        Func<Operation,ObdLegacyJ2534Transport.Exchange> transmit)
+        Func<Operation,ObdLegacyJ2534Transport.Exchange> transmit,
+        Action<Result> saveBaseline)
     {
+        ArgumentNullException.ThrowIfNull(saveBaseline);
         if (!Enum.IsDefined(operation) || !warningAcknowledged || !confirmedYes ||
             !System.Text.RegularExpressions.Regex.IsMatch(expectedVin ?? "", @"\A[A-HJ-NPR-Z0-9]{17}\z") ||
             documentedSources.Count is < 1 or > 32 || documentedSources.Any(s => s is 0 or 0xF1 or 0xFF) ||
@@ -32,7 +34,7 @@ internal static class ObdJ1979LegacyMutation
         var before = expected.Order().ToDictionary(Key, _ => (string[]?)null);
         var after = expected.Order().ToDictionary(Key, _ => (string[]?)null);
         var observations = new List<Observation>();
-        bool attempted = false;
+        bool attempted = false, completeAck = false;
         string? vin = null;
         Result Finish(string outcome, string? reason = null) => new(outcome, reason, vin, attempted,
             expected.Order().Select(Key).ToArray(), acknowledgments, before, after, observations.ToArray());
@@ -135,6 +137,11 @@ internal static class ObdJ1979LegacyMutation
             }
             if (!Scope() || !Zero(0x0D,[0x41,0x0D,0]) || !Zero(0x0C,[0x41,0x0C,0,0]))
                 return Finish("NOT_TESTED","STATIONARY_OR_SCOPE_UNVERIFIED");
+            // Persist the actual initial evidence before the write boundary.
+            // Recheck authorization and fresh stationary state after disk I/O.
+            saveBaseline(Finish("BASELINE_SAVED"));
+            if (!Zero(0x0D,[0x41,0x0D,0]) || !Zero(0x0C,[0x41,0x0C,0,0]))
+                return Finish("NOT_TESTED","STATIONARY_EVIDENCE_CHANGED");
             requireActive();
             attempted = true;
             byte[] request = operation == Operation.Clear ? [4] : [8,1,0,0,0,0,0];
@@ -150,7 +157,7 @@ internal static class ObdJ1979LegacyMutation
                     rows.Length == 1 && rows[0].Length == 3 && rows[0][0] == 0x7F &&
                     rows[0][1] == request[0] && rows[0][2] is not (0 or 0x78) ? $"REFUSED_{rows[0][2]:X2}" : "UNCERTAIN";
             }
-            bool completeAck = reply.Replies.All(p => ackSources.Contains(p.Source)) &&
+            completeAck = reply.Replies.All(p => ackSources.Contains(p.Source)) &&
                 ackSources.All(s => acknowledgments[Key(s)] == "ACKNOWLEDGED");
             if (operation == Operation.Clear)
             {
@@ -159,12 +166,14 @@ internal static class ObdJ1979LegacyMutation
                     return Finish("ACKNOWLEDGED_READBACK",after.Values.Any(x => x!.Length > 0) ? "DTCS_STILL_PRESENT" : null);
             }
             else if (completeAck) return Finish("ACKNOWLEDGED","LEAK_TEST_NOT_PERFORMED");
-            return Finish("UNCERTAIN","MISSING_OR_CONFLICTING_EVIDENCE");
+            return Finish(completeAck ? "ACKNOWLEDGED_PARTIAL" : "UNCERTAIN",
+                "MISSING_OR_CONFLICTING_EVIDENCE");
         }
         catch (Exception error) when (error is IOException or InvalidDataException or TimeoutException or
             OperationCanceledException or InvalidOperationException)
         {
-            return Finish(attempted ? "UNCERTAIN" : "NOT_TESTED",error.GetType().Name);
+            return Finish(completeAck ? "ACKNOWLEDGED_PARTIAL" :
+                attempted ? "UNCERTAIN" : "NOT_TESTED",error.GetType().Name);
         }
     }
 }
