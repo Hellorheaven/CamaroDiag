@@ -18,10 +18,16 @@ class J1979UsbCampaign {
     virtual InterfaceEvidence currentEvidence(const Profile& profile)=0;
     // True only if the authorized host and local operator are still present.
     virtual bool currentHost()=0;
+    // Preflight evidence describes a qualified electrical configuration,
+    // including stable supply, without requiring an enabled CAN channel.
+    // Only this call may start the channel, under the exclusive lease.
+    // A false return may still mean partial activation: stop is mandatory.
+    virtual bool startReadChannel(const Profile& profile,
+        const HostSessionArbiter::Lease& lease)=0;
     // Stop and verify a quiescent channel, including pending TX. No auto-recovery.
     virtual bool stopAndVerifyQuiescent()=0;
   };
-  enum class Outcome { Denied, Complete, Partial, EvidenceLost, QuiescenceUnverified };
+  enum class Outcome { Denied, Complete, Partial, EvidenceLost, QuiescenceUnverified, StartFailed };
   struct Report {
     Outcome outcome=Outcome::Denied;
     J1979CanCampaign::Summary campaign;
@@ -34,7 +40,9 @@ class J1979UsbCampaign {
     if(!J1979CanReadSession::physicalPair(profile.tx,profile.rx,profile.extended)||
        profile.budgetMs<1||profile.budgetMs>600000u||!owner.currentHost())return report;
     HostSessionArbiter::Lease lease;
-    if(!arbiter.acquire(HostInterface::NativeUsb,owner.currentEvidence(profile),lease))return report;
+    const auto admission=owner.currentEvidence(profile);
+    if(admission.recoveryPending){arbiter.latchRecovery();return report;}
+    if(!arbiter.acquire(HostInterface::NativeUsb,admission,lease))return report;
     class GuardedLink final:public J1979CanReadLink {
      public:
       GuardedLink(HostSessionArbiter& a,Owner& o,J1979CanReadLink& h,
@@ -82,7 +90,11 @@ class J1979UsbCampaign {
     } output(link,writer,arbiter,owner,profile,lease);
 
     J1979CampaignEvidence stream(output);
-    const bool started=link.active()&&stream.begin(profile.tx,profile.rx,profile.extended,profile.budgetMs);
+    // Never start an electrical channel before exclusive ownership. Recheck
+    // authorization immediately before and after the hardware start.
+    const bool channelStarted=link.admitted()&&owner.startReadChannel(profile,lease);
+    const bool started=channelStarted&&link.active()&&
+      stream.begin(profile.tx,profile.rx,profile.extended,profile.budgetMs);
     if(started)report.campaign=J1979CanCampaign::run(link,profile.tx,profile.rx,profile.extended,
         profile.budgetMs,stream,scratch);
     // Never publish a complete capture while physical shutdown is unverified.
@@ -97,7 +109,8 @@ class J1979UsbCampaign {
       arbiter.latchRecovery();report.outcome=Outcome::EvidenceLost;return report;
     }
     output.afterVerifiedStop();
-    if(!started||!output.permitted()||!stream.finish(report.campaign))
+    if(!channelStarted)report.outcome=Outcome::StartFailed;
+    else if(!started||!output.permitted()||!stream.finish(report.campaign))
       report.outcome=Outcome::EvidenceLost;
     else report.outcome=report.campaign.end==J1979CanCampaign::End::Complete?
       Outcome::Complete:Outcome::Partial;

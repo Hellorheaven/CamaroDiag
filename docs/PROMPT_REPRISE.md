@@ -1,3 +1,7 @@
+## J1979 / C6 — ouverture électrique sous bail exclusif (26/11/2026)
+
+- Connectors : ajout du point d'entrée startReadChannel au propriétaire matériel, exclusivement après acquisition du bail et recontrôle d'autorisation. Démarrage partiel/échoué, révocation pendant démarrage ou arrêt non prouvé imposent nettoyage et, si nécessaire, verrou de récupération partagé. Aucun TX ni résumé avant ouverture autorisée. Régressions de concurrence, démarrage échoué, révocation, arrêt non vérifié et récupération préexistante ajoutées, non exécutées. La carte Rev A0 documente CAN sur STM32, pas sur les GPIO ESP32 ; aucun câblage inventé ni activation firmware de découverte. L'implémentation du propriétaire matériel/dispatch réel reste ouverte. Aucun test, CI, merge ni Release.
+
 ## J1979 — cohérence IHM et JSON du Scan OBD (26/11/2026)
 
 - Android : l'écran Scan OBD et l'export utilisent désormais les mêmes modes DTC non vérifiés que la recette fonctionnelle ; un rapport vide sans preuves ne peut plus afficher « aucun DTC » en vert. Les codes effectivement présents restent affichés avec les modes indisponibles. Un inventaire PID absent ou sans réponse initiale est affiché indisponible plutôt que zéro. Régressions du modèle ajoutées, non exécutées. J1979/C6 restent ouverts ; aucune CI ni Release.
