@@ -405,10 +405,21 @@ def _run(argv: Sequence[str] | None, resources: ExitStack,
     if scope is not None and gateway.logical_address != scope["Gateway"]:
         raise DoIpError(tr("Observed gateway differs from profile", "La passerelle observée diffère du profil"))
     if targets is not None:
+        def on_inventory_progress(rows, total):
+            # Published rows are still provisional until all target sockets,
+            # gateway revalidations and trace resources have closed cleanly.
+            progress = {"vin": o.vin, "tester": o.tester,
+                        "gateway_logical_address": gateway.logical_address,
+                        "gateway_host": gateway.host, "transport": "TCP" if o.tcp else "TLS",
+                        "service_protocol": "OBDonUDS" if o.action == "obd-ecu-inventory" else "UDS",
+                        "requested_targets": total, "targets_completed": len(rows),
+                        "targets": rows, "complete": False}
+            print(json.dumps({"inventory_progress": progress}), file=sys.stderr, flush=True)
         return result | inventory_ecus(gateway, o.vin, o.tester, targets, tls=not o.tcp,
             timeout=o.timeout, trace=trace, context=context, p2=p2, p2_star=p2_star,
             routing_type=o.routing_activation_type or 0, routing_oem_data=o.routing_oem_data,
-            obd=o.action == "obd-ecu-inventory", target_trace=target_trace)
+            obd=o.action == "obd-ecu-inventory", target_trace=target_trace,
+            on_progress=on_inventory_progress)
     if commands is not None and not confirm_commands(commands, gateway, o.tester, o.ecu,
             not o.tcp, input, lambda line: print(line, file=sys.stderr), fr):
         return result | {"cancelled": True, "commands_sent": 0}
