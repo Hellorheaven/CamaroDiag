@@ -702,6 +702,14 @@ fun CamaroDiagApp(
                 DiagTab.FUNCTIONAL_TESTS -> {
                     if (ownerTestsAllowed) FunctionalTestsScreen(
                         state = functionalTests,
+                        vehicle = vehicle,
+                        connectionGeneration = connectionGeneration,
+                        evapAvailable = adapter.supportsCanHeaders &&
+                            adapter.acceptedElmProtocols.any { it in 6..9 } &&
+                            adapter.tier != AdapterTier.DISCONNECTED,
+                        onRunEvap = { approval, epoch, profile ->
+                            viewModel.runFunctionalEvapTest(approval, epoch, profile)
+                        },
                         onRunAll = { viewModel.runFunctionalTests() },
                         onRunProtocol = { protocol, target -> viewModel.runFunctionalTests(protocol, target) },
                         onStop = { viewModel.cancelFunctionalTests() },
