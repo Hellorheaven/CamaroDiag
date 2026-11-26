@@ -982,7 +982,7 @@ object DoIpDirectRead {
             EcuWriteConsentFlow.requireCurrentForTransmit(requireNotNull(approval), isContextCurrent)
         }
         if (backupScope != null) {
-            backupScope.validate()
+            backupScope.validateCapture()
             require(backupScope.vin == target.expectedVin && backupScope.tester == target.tester && backupScope.ecu == target.ecu)
         }
         val budget = if (operation == Operation.BACKUP) 600_000L
