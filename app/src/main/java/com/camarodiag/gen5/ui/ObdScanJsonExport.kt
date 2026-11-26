@@ -21,6 +21,10 @@ internal object ObdScanJsonExport {
             put("ecuNames", JSONArray(report.ecuNames))
             put("respondingEcuAddresses", JSONArray(report.respondingEcuAddresses))
             put("physicalCanResponder", report.physicalCanResponder ?: JSONObject.NULL)
+            put("negotiatedElmProtocol", report.negotiatedElmProtocol ?: JSONObject.NULL)
+            put("anonymousLegacyVinCandidate", report.anonymousLegacyVinCandidate ?: JSONObject.NULL)
+            put("legacyResponderAttribution", if (report.negotiatedElmProtocol?.let { it in 1..5 } == true)
+                "ANONYMOUS" else JSONObject.NULL)
             put("supportedPids", JSONArray(report.supportedPids.sorted()))
             put("supportedPidsByResponder", JSONObject().apply {
                 report.supportedPidsByResponder.toSortedMap().forEach { (address, pids) ->
