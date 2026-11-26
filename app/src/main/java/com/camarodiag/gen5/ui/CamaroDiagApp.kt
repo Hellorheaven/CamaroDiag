@@ -709,6 +709,9 @@ fun CamaroDiagApp(
                         onRunEvap = { approval, epoch, profile ->
                             viewModel.runFunctionalEvapTest(approval, epoch, profile)
                         },
+                        onRunClear = { approval, epoch, profile ->
+                            viewModel.runFunctionalClearTest(approval, epoch, profile)
+                        },
                         onRunAll = { viewModel.runFunctionalTests() },
                         onRunProtocol = { protocol, target -> viewModel.runFunctionalTests(protocol, target) },
                         onStop = { viewModel.cancelFunctionalTests() },
