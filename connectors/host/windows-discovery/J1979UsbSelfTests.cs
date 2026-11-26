@@ -37,6 +37,8 @@ internal static class J1979UsbSelfTests
         var result=new J1979UsbCapture(good).RunRequest(hello,10000,key,raw);
         Require(result.DeviceCredentialAuthenticated&&result.FrameIntegrityVerified&&result.CaptureIntegrityVerified&&!result.PhysicalVehicleVerified&&good.Closed&&good.Writes==2);
         Require(raw.ToArray().SequenceEqual(capture));
+        Require(J1979NativeReport.VinMatch(result,null)=="NOT_REQUESTED");
+        Require(J1979NativeReport.VinMatch(result,"1G1FA1RXXR0123456")=="UNVERIFIED");
         using(var json=new MemoryStream()){
             J1979NativeReport.Write(json,result,"test","synthetic","ECM","sim",0x7e0,0x7e8,false,10000,0,"sim.cj");
             using var document=System.Text.Json.JsonDocument.Parse(json.ToArray());

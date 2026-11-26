@@ -1,3 +1,7 @@
+## J1979 — comparaison VIN et cohérence des rapports USB (26/11/2026)
+
+- Android et Windows GUI enregistrent le VIN déclaré et l'état MATCH/MISMATCH/UNVERIFIED ; CLI Windows et Python live/offline acceptent désormais --vin facultatif et retournent un code non nul si la comparaison demandée échoue. Python conserve le préfixe de rapport en cas d'échec de persistance et invalide son intégrité. La comparaison ne prouve pas la provenance physique. Régressions écrites, aucune exécution. C6/J1979 ouverts ; pas de CI, merge ou Release.
+
 ## C6 — invalidation de la session de sauvegarde E39 (26/11/2026)
 
 - Android : création atomique CREATE_NEW sans suivi de lien symbolique, synchronisation du même descripteur, relectures NOFOLLOW_LINKS. Windows et Android : une anomalie lors de la relecture des originaux invalide définitivement l'objet de transaction, même si les fichiers redeviennent identiques ; nouvelle transaction et nouvelle autorisation nécessaires. Windows permet encore la journalisation RecoveryRequired, refuse les autres phases après invalidation. Tests de corruption puis restauration, ajout/retrait de fichier et refus Completed écrits sans exécution. Ne garantit pas l'absence de toutes les races de fichiers ni la durabilité matérielle ; aucun flash ni CI, C6/J1979 ouverts, pas de fusion/Release.

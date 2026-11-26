@@ -136,6 +136,14 @@ object CamaroDiagConnectorNativeCampaign {
             put("evidence_authenticated", false)
             put("physical_vehicle_verified", false)
             put("observed_vin", vin ?: JSONObject.NULL)
+            val expectedVin = target.vehicle.takeIf { it.matches(Regex("[A-HJ-NPR-Z0-9]{17}")) }
+            put("declared_vin", expectedVin ?: JSONObject.NULL)
+            put("vin_match", when {
+                expectedVin == null -> "NOT_REQUESTED"
+                !authenticated || !semantic || vin == null -> "UNVERIFIED"
+                vin == expectedVin -> "MATCH"
+                else -> "MISMATCH"
+            })
             put("steps", JSONArray().apply {
                 steps.forEach { step ->
                     put(JSONObject().apply {

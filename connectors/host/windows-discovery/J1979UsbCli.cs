@@ -16,10 +16,10 @@ internal static class J1979UsbCli
         bool ext=false;
         for(int i=0;i<args.Length;i++){
             if(args[i]=="--extended"){if(ext)return 2;ext=true;continue;}
-            if(!required.Contains(args[i])||i+1==args.Length||!values.TryAdd(args[i],args[i+1]))return 2;
+            if((!required.Contains(args[i])&&args[i]!="--vin")||i+1==args.Length||!values.TryAdd(args[i],args[i+1]))return 2;
             i++;
         }
-        if(values.Count!=required.Count||!OperatingSystem.IsWindows()||
+        if(!required.All(values.ContainsKey)||!OperatingSystem.IsWindows()||
            !Regex.IsMatch(values["--port"],@"\ACOM[1-9][0-9]{0,3}\z",RegexOptions.IgnoreCase|RegexOptions.CultureInvariant)||
            !int.TryParse(values["--budget-ms"],NumberStyles.None,CultureInfo.InvariantCulture,out int budget)||
            !Hex(values["--tx"],out uint tx)||!Hex(values["--rx"],out uint rx)||
@@ -28,6 +28,8 @@ internal static class J1979UsbCli
             string value=values[name];
             if(string.IsNullOrWhiteSpace(value)||value.Length>256||value.Any(char.IsControl))return 2;
         }
+        string? expectedVin=values.GetValueOrDefault("--vin")?.Trim().ToUpperInvariant();
+        if(expectedVin is not null&&!Regex.IsMatch(expectedVin,@"\A[A-HJ-NPR-Z0-9]{17}\z"))return 2;
         string keyPath=Path.GetFullPath(values["--key-file"]),capturePath=Path.GetFullPath(values["--capture"]),
             reportPath=Path.GetFullPath(values["--output"]);
         if(new[]{keyPath,capturePath,reportPath}.Distinct(StringComparer.OrdinalIgnoreCase).Count()!=3)return 2;
@@ -54,10 +56,11 @@ internal static class J1979UsbCli
             }
             J1979NativeReport.Write(output,result,typeof(J1979UsbCli).Assembly.GetName().Version?.ToString()??"",
                 values["--vehicle"],values["--ecu"],values["--connector"],tx,rx,ext,budget,timer.ElapsedMilliseconds,
-                Path.GetFileName(capturePath));
+                Path.GetFileName(capturePath),expectedVin:expectedVin);
             output.Flush(flushToDisk:true);
             Console.WriteLine("Raw CJ/1 and diagnostic evidence saved. Physical provenance not established.");
-            return result.CaptureIntegrityVerified&&result.Summary?.End=="COMPLETE"?0:2;
+            return result.CaptureIntegrityVerified&&result.Summary?.End=="COMPLETE"&&
+                (expectedVin is null||J1979NativeReport.VinMatch(result,expectedVin)=="MATCH")?0:2;
         }catch(Exception error) when(error is IOException or UnauthorizedAccessException or ArgumentException or TimeoutException or InvalidOperationException){
             Console.Error.WriteLine("CU/1 failed: "+error.Message);return 2;
         }finally{CryptographicOperations.ZeroMemory(key);}

@@ -5,9 +5,14 @@ namespace CamaroDiagConnectors.Windows;
 
 internal static class J1979NativeReport
 {
+    internal static string VinMatch(J1979UsbCapture.Result result,string? expectedVin,bool cancelled=false)=>
+        expectedVin is null?"NOT_REQUESTED":cancelled||!result.DeviceCredentialAuthenticated||
+        !result.CaptureIntegrityVerified||result.ObservedVin is null?"UNVERIFIED":
+        string.Equals(result.ObservedVin,expectedVin,StringComparison.Ordinal)?"MATCH":"MISMATCH";
+
     internal static void Write(Stream output,J1979UsbCapture.Result result,string hostVersion,
         string vehicle,string ecu,string connector,uint tx,uint rx,bool extended,int budget,
-        long durationMs,string rawCaptureName,bool cancelled=false)
+        long durationMs,string rawCaptureName,bool cancelled=false,string? expectedVin=null)
     {
         JsonSerializer.Serialize(output,new{
             schema="camarodiag-functional-j1979-native-usb-v1",protocol="SAE-J1979",
@@ -17,6 +22,7 @@ internal static class J1979NativeReport
             extended,budget_ms=budget,device_credential_authenticated=result.DeviceCredentialAuthenticated,
             frame_integrity_verified=result.FrameIntegrityVerified,capture_integrity_verified=result.CaptureIntegrityVerified&&!cancelled,
             evidence_authenticated=false,physical_vehicle_verified=false,observed_vin=result.ObservedVin,cancelled,
+            declared_vin=expectedVin,vin_match=VinMatch(result,expectedVin,cancelled),
             steps=result.Steps.Select(s=>new{sequence=s.Sequence,request_hex=s.RequestHex,response_hex=s.ResponseHex,
                 status=s.Status,duration_ms=s.DurationMs,dtc_codes=s.DtcCodes,
                 negative_response_code=s.NegativeResponseCode,

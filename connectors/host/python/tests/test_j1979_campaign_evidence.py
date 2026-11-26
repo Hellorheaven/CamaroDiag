@@ -6,7 +6,7 @@ import tempfile
 import unittest
 import zlib
 
-from camarodiagconnectors.j1979_campaign_evidence import decode
+from camarodiagconnectors.j1979_campaign_evidence import decode, vin_match
 from camarodiagconnectors.j1979_campaign_capture_cli import run
 
 
@@ -146,16 +146,30 @@ class CaptureTests(unittest.TestCase):
         initial_refused += summary(2, end=2, flags=0, steps=1, positive=0, negative=1)
         self.assertTrue(decode(io.BytesIO(initial_refused))["capture_integrity_verified"])
 
+    def test_vin_comparison_is_separate_from_capture_integrity_and_auth(self):
+        report = decode(io.BytesIO(CAPTURE))
+        self.assertEqual("NOT_REQUESTED", vin_match(report, None))
+        self.assertEqual("MATCH", vin_match(report, VIN.decode()))
+        self.assertEqual("MISMATCH", vin_match(report, "1FA6P8TH0L5100000"))
+        self.assertEqual("UNVERIFIED", vin_match(report, VIN.decode(), require_device_auth=True))
+        report["device_credential_authenticated"] = True
+        self.assertEqual("MATCH", vin_match(report, VIN.decode(), require_device_auth=True))
+        report["capture_integrity_verified"] = False
+        self.assertEqual("UNVERIFIED", vin_match(report, VIN.decode()))
+        with self.assertRaises(ValueError):
+            vin_match(report, "invalid")
+
     def test_cli_new_file_and_declared_labels(self):
         with tempfile.TemporaryDirectory() as folder:
             source = Path(folder) / "capture.cj"
             target = Path(folder) / "report.json"
             source.write_bytes(CAPTURE)
             args = ["--input", str(source), "--output", str(target), "--vehicle", "Camaro 2012",
-                    "--ecu", "ECM", "--connector", "bench"]
+                    "--ecu", "ECM", "--connector", "bench", "--vin", VIN.decode()]
             result = run(args)
             self.assertEqual(result, json.loads(target.read_text()))
             self.assertEqual("Camaro 2012", result["declared_vehicle"])
+            self.assertEqual("MATCH", result["vin_match"])
             self.assertFalse(result["hardware_provenance_verified"])
             with self.assertRaises(FileExistsError):
                 run(args)

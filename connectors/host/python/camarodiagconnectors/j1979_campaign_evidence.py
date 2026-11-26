@@ -248,6 +248,21 @@ def _verify_campaign(steps, end, flags):
         raise ValueError("Campaign summary inconsistent with recorded steps")
 
 
+def vin_match(report, expected_vin, *, require_device_auth=False):
+    """Compare declared and observed VIN without certifying physical provenance."""
+    if expected_vin is None:
+        return "NOT_REQUESTED"
+    if not re.fullmatch(r"[A-HJ-NPR-Z0-9]{17}", expected_vin):
+        raise ValueError("Expected VIN must contain 17 valid characters")
+    observed = report.get("observed_vin")
+    if (not report.get("capture_integrity_verified") or report.get("cancelled")
+            or require_device_auth and not report.get("device_credential_authenticated")
+            or not isinstance(observed, str)
+            or not re.fullmatch(r"[A-HJ-NPR-Z0-9]{17}", observed)):
+        return "UNVERIFIED"
+    return "MATCH" if observed == expected_vin else "MISMATCH"
+
+
 def service_observations(steps):
     """Counts of observed requests, not protocol coverage or monitor outcomes."""
     result = []

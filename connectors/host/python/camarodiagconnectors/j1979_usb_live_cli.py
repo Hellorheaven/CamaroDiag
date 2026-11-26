@@ -5,12 +5,14 @@ import argparse
 from datetime import datetime, timezone
 import json
 import os
+import re
 from pathlib import Path
 import sys
 
 from . import __version__
 from .j1979_usb_live import run_campaign
 from .j1979_usb_auth import hello
+from .j1979_campaign_evidence import service_observations, vin_match
 
 
 def run(argv=None):
@@ -23,11 +25,15 @@ def run(argv=None):
     parser.add_argument("--extended", action="store_true")
     parser.add_argument("--budget-ms", type=int, default=60000)
     parser.add_argument("--vehicle", required=True)
+    parser.add_argument("--vin", help="Expected VIN; mismatched or unverified VIN fails the requested comparison")
     parser.add_argument("--ecu", required=True)
     parser.add_argument("--connector", required=True)
     parser.add_argument("--capture", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args(argv)
+    expected_vin = args.vin.strip().upper() if args.vin is not None else None
+    if expected_vin is not None and not re.fullmatch(r"[A-HJ-NPR-Z0-9]{17}", expected_vin):
+        parser.error("Expected VIN must contain 17 valid characters")
     for value in (args.vehicle, args.ecu, args.connector):
         if not value.strip() or len(value) > 256 or any(ord(c) < 32 for c in value):
             parser.error("Nonempty bounded declared labels required")
@@ -58,10 +64,16 @@ def run(argv=None):
                 raw.flush()
                 os.fsync(raw.fileno())
         except (OSError, ValueError) as exc:
-            report = {"schema": "camarodiag-functional-j1979-embedded-evidence-v1",
-                      "protocol": "SAE-J1979", "source": "LIVE_USB_CU1",
-                      "capture_integrity_verified": False, "physical_vehicle_verified": False,
-                      "steps": [], "summary": None, "error": str(exc)}
+            if report is None:
+                report = {"schema": "camarodiag-functional-j1979-embedded-evidence-v1",
+                          "protocol": "SAE-J1979", "source": "LIVE_USB_CU1",
+                          "device_credential_authenticated": False, "evidence_authenticated": False,
+                          "physical_vehicle_verified": False, "observed_vin": None,
+                          "steps": [], "summary": None}
+            report.update(capture_integrity_verified=False, error=str(exc))
+        report.setdefault("service_observations", service_observations(report["steps"]))
+        report.update(declared_vin=expected_vin,
+                      vin_match=vin_match(report, expected_vin, require_device_auth=True))
         report.update(host_version=__version__, declared_vehicle=args.vehicle,
             declared_ecu=args.ecu, declared_connector=args.connector,
             inspected_at_utc=datetime.now(timezone.utc).isoformat(),
@@ -81,7 +93,8 @@ def main():
         raise SystemExit(2) from exc
     print(json.dumps({"capture_integrity_verified": report["capture_integrity_verified"],
                       "steps": len(report["steps"]), "error": report["error"]}))
-    if not report["capture_integrity_verified"] or report["summary"]["end"] != "COMPLETE":
+    if (not report["capture_integrity_verified"] or report["summary"]["end"] != "COMPLETE"
+            or report["vin_match"] not in ("NOT_REQUESTED", "MATCH")):
         raise SystemExit(2)
 
 

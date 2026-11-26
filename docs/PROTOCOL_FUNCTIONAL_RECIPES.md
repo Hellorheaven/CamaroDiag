@@ -124,3 +124,7 @@ Sur firmware et carte qualifiés uniquement, avec clé hôte provisionnée local
 
 ### USB natif — interprétation des compteurs par mode / native USB service observations
 `service_observations` contient les compteurs `attempted`, `passed`, `raw`, `negative`, `timeout`, `failed` pour les modes 01, 02, 03, 06, 07, 08, 09 et 0A. Ils décrivent les étapes enregistrées (y compris le préfixe d'une capture incomplète), non une validation exhaustive du mode ; consulter les flags d'intégrité et la raison d'arrêt. `passed` indique une réponse de forme positive vérifiée, jamais le succès d'un moniteur ni une preuve de véhicule physique. Le Mode 08 reste uniquement un inventaire dans cette campagne. / Counts describe recorded requests, not service coverage or monitor outcomes. Consult integrity, cancellation and stop reason; an absent response is not zero faults.
+
+
+### Comparaison VIN USB / USB VIN comparison
+Les CLI Windows et Python acceptent `--vin` suivi d'un VIN attendu (17 caractères). Les rapports distinguent `declared_vin`, `observed_vin` et `vin_match` (`MATCH`, `MISMATCH`, `UNVERIFIED`, `NOT_REQUESTED`). Une comparaison demandée non confirmée produit un code de sortie non nul ; les traces sont conservées. La comparaison hors ligne n'authentifie pas le boîtier ou la voiture. / Optional expected VIN comparison is separate from campaign integrity and physical provenance.

@@ -92,14 +92,14 @@ internal sealed partial class BridgeDesktopForm
                     }
                     bool cancelled=!Current();
                     J1979NativeReport.Write(json,result,typeof(BridgeDesktopForm).Assembly.GetName().Version?.ToString()??"",
-                        vin,"ECM",portName,tx,rx,extended,budget,timer.ElapsedMilliseconds,Path.GetFileName(rawPath),cancelled);
+                        vin,"ECM",portName,tx,rx,extended,budget,timer.ElapsedMilliseconds,Path.GetFileName(rawPath),cancelled,expectedVin:vin);
                     json.Flush(flushToDisk:true);
                     return (result,cancelled);
                 }finally{CryptographicOperations.ZeroMemory(key);}
             });
             if(IsDisposed||Disposing)return;
             var result=outcome.result;
-            bool vinMatches=result.ObservedVin==vin;
+            bool vinMatches=J1979NativeReport.VinMatch(result,vin,outcome.cancelled)=="MATCH";
             bool complete=!outcome.cancelled&&result.DeviceCredentialAuthenticated&&result.CaptureIntegrityVerified&&
                 result.Summary?.End=="COMPLETE"&&vinMatches;
             var text=new StringBuilder(J1979RecipeText(complete?"Completed":"Partial")).AppendLine();
