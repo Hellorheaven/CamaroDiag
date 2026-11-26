@@ -34,7 +34,7 @@ Exemples :
   --probe-drivers             Liste des pilotes J2534 Windows, sans accès calculateur.
   --discover-connector COM5   Découverte série CD/1 d'une carte prototype isolée.
   --inspect-write-journal attempt.jsonl
-                              Analyse d'un journal hors ligne, sans reprise ou effacement.
+                              Vérifie journal, sauvegardes physiques et géométrie hors ligne ; aucune restauration.
   --port 35001                Démarre le pont J2534 local avec appairage TLS.
                               Une vérification de mise à jour peut avoir lieu.
                               Ne jamais exposer ce port sur Internet.

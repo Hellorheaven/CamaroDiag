@@ -1,3 +1,9 @@
+## PR117 — C6 : vérification physique des sauvegardes dans la console Windows (26/11/2026)
+
+- **Commit `26dc559`** : `--inspect-write-journal` inspecte le journal et les blocs originaux physiquement sauvegardés, signale les fichiers absents/modifiés, retourne un résultat non positif si les sauvegardes d'une transaction achevée sont manquantes. L'onglet Windows « Récupération ECU » affiche les secteurs originaux, tailles et SHA-256 avec un contrôle hors ligne des bornes d'effacement du silicium MPC5566.
+- **Limitation non contournée :** la géométrie silicium cohérente n'atteste pas que la carte E39/E39A, le constructeur ou le chemin de récupération matériel sont qualifiés ; aucun effacement, reflash, restauration ou accès réseau n'est réalisé par cet inspecteur.
+- Documentation utilisateur FR/EN et tests de cohérence géométrique écrits, non exécutés. La clôture de C6 et la campagne de validation restent à réaliser.
+
 ## PR117 — C6 : annulation fail-closed et verrou pilote J2534 (26/11/2026)
 
 - **PR #117, branche `chore/unified-ci`, C6 toujours actif.** Commits `6cef80e`, `4998f61`, `8fbdfa6` et cette reprise : annulation contrôlée aux frontières du pilote ECU et du journal durable, sans autoriser de commande tardive si le pilote retourne après annulation.

@@ -34,7 +34,7 @@ Examples:
   --probe-drivers             Inspect installed Windows J2534 drivers; no ECU.
   --discover-connector COM5   USB serial CD/1 discovery only, isolated prototype.
   --inspect-write-journal attempt.jsonl
-                              Inspect an offline write journal; never recover or erase.
+                              Inspect journal, physical backups and sector geometry offline; never erase or restore.
   --port 35001                Start the TLS-paired LAN bridge using a selected J2534 driver.
                               It may check for app updates; never forward the LAN port to the Internet.
   --allow-obd-clear           Explicitly enable OBD DTC clear on this local bridge run.
