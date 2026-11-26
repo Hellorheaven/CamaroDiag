@@ -1,5 +1,9 @@
 # DoIP ISO 13400 — couverture logicielle et recette Release
 
+## Validation logicielle du 26 novembre 2026
+
+**DoIP ISO 13400 — validation logicielle réussie.** Campagne de clôture [#45805147429](https://github.com/Hellorheaven/CamaroDiag/actions/runs/45805147429), SHA testé `e3b5f2a5a0ef704da7a5d622ef8b11116f337d96`. Le job Android `testDebugUnitTest lintDebug app:assembleDebug`, le pont Windows Debug/autotests, les suites Python Connectors 3.11/3.12/3.13, les contrôles ECU natifs, client USB et firmware ESP32/STM32 sont tous réussis. Les essais matériels sur réseau/passerelle, ECU, certificat OEM et restauration restent à qualifier lors de la recette Release ; **C6 reste actif** et le volet programmation complète n'est pas déclaré fonctionnel sur du matériel réel.
+
 ## Français
 
 Le pont Windows CamaroDiag utilise le transport standard **Diagnostics over IP (DoIP)** pour échanger des requêtes UDS avec une passerelle connue. L'existence du transport DoIP ne garantit ni compatibilité constructeur, ni programmation de calculateur, ni accès aux services protégés.
