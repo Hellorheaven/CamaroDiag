@@ -51,7 +51,8 @@ internal object PhysicalRecoveryFolder {
             Files.isRegularFile(file.toPath(), java.nio.file.LinkOption.NOFOLLOW_LINKS))
         val digest = MessageDigest.getInstance("SHA-256")
         var count = 0L
-        file.inputStream().use { input ->
+        // The open itself must refuse symlinks, not only the preceding check.
+        Files.newInputStream(file.toPath(), java.nio.file.LinkOption.NOFOLLOW_LINKS).use { input ->
             val buffer = ByteArray(8192)
             while (true) {
                 active()
@@ -169,6 +170,7 @@ internal object PhysicalRecoveryFolder {
             }
             fun verifyStaging() {
                 active()
+                check(Files.isDirectory(staging.toPath(), java.nio.file.LinkOption.NOFOLLOW_LINKS))
                 check(staging.list()?.toSet() == setOf(name, "$name.blocks"))
                 check(Files.isDirectory(blockDir.toPath(), java.nio.file.LinkOption.NOFOLLOW_LINKS))
                 check(blockDir.list()?.toSet() == files.map { it.name }.toSet())
@@ -183,7 +185,21 @@ internal object PhysicalRecoveryFolder {
             active()
             return result
         } finally {
-            staging.deleteRecursively()
+            // Do not traverse an unexpected symbolic-link directory when
+            // cleaning private staged recovery evidence.
+            Files.walkFileTree(staging.toPath(), object : java.nio.file.SimpleFileVisitor<java.nio.file.Path>() {
+                override fun visitFile(file: java.nio.file.Path,
+                    attrs: java.nio.file.attribute.BasicFileAttributes): java.nio.file.FileVisitResult {
+                    Files.deleteIfExists(file)
+                    return java.nio.file.FileVisitResult.CONTINUE
+                }
+                override fun postVisitDirectory(dir: java.nio.file.Path,
+                    exc: java.io.IOException?): java.nio.file.FileVisitResult {
+                    if (exc != null) throw exc
+                    Files.deleteIfExists(dir)
+                    return java.nio.file.FileVisitResult.CONTINUE
+                }
+            })
         }
     }
 }
