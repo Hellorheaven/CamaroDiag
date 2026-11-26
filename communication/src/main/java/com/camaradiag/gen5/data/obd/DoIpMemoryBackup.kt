@@ -183,10 +183,28 @@ object DoIpMemoryBackup {
             values["transport"] == "DoIP" && values["coverage"] == "SCOPED_REGION_ONLY" &&
             values["origin"] == "REPORTED_HARDWARE_READ")
         require(values["sha256"] == archive.sha256)
-        return Verification(scope, archive.sha256, Instant.parse(values.getValue("capturedAtUtc")))
+        val timestamp = values.getValue("capturedAtUtc")
+        require(timestamp.matches(Regex("""[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\.[0-9]{1,9})?(?:Z|[+-][0-9]{2}:[0-9]{2})""")))
+        return Verification(scope, archive.sha256, Instant.parse(timestamp))
     }
 
     internal data class ArchiveContents(val manifest: ByteArray, val sha256: String)
+
+    private fun compareEntry(input: InputStream, expected: ByteArray) {
+        val buffer = ByteArray(8192)
+        val source = java.io.DataInputStream(input)
+        var offset = 0
+        while (offset < expected.size) {
+            val count = minOf(buffer.size, expected.size - offset)
+            source.readFully(buffer, 0, count)
+            for (index in 0 until count)
+                require(buffer[index] == expected[offset + index]) {
+                    "DoIP archive bytes differ."
+                }
+            offset += count
+        }
+        require(input.read() == -1) { "Oversized DoIP archive entry." }
+    }
 
     /** Keep at most one region in memory. Compare the other ZIP entry byte for
      * byte in bounded chunks, regardless of entry order; never extract paths. */
@@ -215,19 +233,7 @@ object DoIpMemoryBackup {
                         require(zip.read() == -1) { "Oversized DoIP archive region." }
                         reference = data
                     } else {
-                        val buffer = ByteArray(8192)
-                        val source = java.io.DataInputStream(zip)
-                        var offset = 0
-                        while (offset < length) {
-                            val count = minOf(buffer.size, length - offset)
-                            source.readFully(buffer, 0, count)
-                            for (index in 0 until count)
-                                require(buffer[index] == first[offset + index]) {
-                                    "Independent memory reads differ."
-                                }
-                            offset += count
-                        }
-                        require(zip.read() == -1) { "Oversized DoIP archive region." }
+                        compareEntry(zip, first)
                     }
                 }
                 zip.closeEntry()
@@ -252,7 +258,8 @@ object DoIpMemoryBackup {
                 val entry = zip.nextEntry ?: break
                 val data = expected.remove(entry.name) ?: error("Unexpected or duplicate DoIP archive entry.")
                 guarded.beginLocalEntry(entry)
-                require(!entry.isDirectory && MessageDigest.isEqual(readBounded(zip, data.size), data))
+                require(!entry.isDirectory)
+                compareEntry(zip, data)
                 zip.closeEntry()
                 guarded.finishLocalEntry(entry)
                 seen += entry.name
