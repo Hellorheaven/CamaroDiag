@@ -62,12 +62,14 @@ internal sealed partial class BridgeDesktopForm
         };
         actions.Controls.Add(functionalRunAll);
         actions.Controls.Add(functionalRunJ1979);
-        actions.Controls.Add(functionalRunLegacy);
         actions.Controls.Add(functionalCancel);
         actions.Controls.Add(functionalExport);
         WideRow(fields, actions, 48);
         Row(fields, "VIN", functionalEvapVin, functionalRunEvap, 48);
-        WideRow(fields, functionalRunClear, 42);
+        var extraRecipes = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.LeftToRight };
+        extraRecipes.Controls.Add(functionalRunClear);
+        extraRecipes.Controls.Add(functionalRunLegacy);
+        WideRow(fields, extraRecipes, 42);
         WideRow(fields, new Label
         {
             Text = "Le bouton « Tout lancer » ne programme, n'efface et ne commande " +
