@@ -22,6 +22,9 @@ MAX_SECONDS = 600
 
 
 def capture_region(session: Session, scope: dict, progress=lambda *_: None) -> tuple[bytes, bytes]:
+    # Keep the approved flat profile stable even if a progress callback changes
+    # the caller's original dictionary.
+    scope = dict(scope)
     if (session.gateway.vin != scope["Vin"] or
         session.gateway.logical_address != scope["Gateway"] or
         session.tester != scope["Tester"] or session.ecu != scope["Ecu"]):
@@ -37,9 +40,9 @@ def capture_region(session: Session, scope: dict, progress=lambda *_: None) -> t
 
     def identity():
         check_deadline()
-        session.verify_vin(scope["Vin"])
+        session.verify_vin(scope["Vin"], overall_deadline=end)
         check_deadline()
-        if session.read_did(scope["IdentityDid"]).hex().upper() != scope["IdentityHex"]:
+        if session.read_did(scope["IdentityDid"], overall_deadline=end).hex().upper() != scope["IdentityHex"]:
             raise DoIpError("ECU identity differs from the memory profile")
         check_deadline()
 
@@ -49,20 +52,20 @@ def capture_region(session: Session, scope: dict, progress=lambda *_: None) -> t
         blocks = 0
         while len(data) < length:
             check_deadline()
-            if blocks and blocks % 32 == 0:
-                identity()
             count = min(block, length - len(data))
             address = scope["Start"] + len(data)
             size_bytes = 1 if count <= 255 else 2
             req = bytes((0x23, (size_bytes << 4) | 4)) + address.to_bytes(4, "big") + count.to_bytes(size_bytes, "big")
-            reply = session.exchange(req)
+            reply = session.exchange(req, overall_deadline=end)
             check_deadline()
             if len(reply) != count + 1 or reply[0] != 0x63:
                 raise DoIpError("Incomplete memory response")
             data.extend(reply[1:])
             blocks += 1
             if blocks % 32 == 0 or len(data) == length:
+                identity()
                 progress(index, len(data), length)
+                check_deadline()
         return bytes(data)
 
     try:
