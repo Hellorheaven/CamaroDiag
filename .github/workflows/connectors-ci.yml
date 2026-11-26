@@ -46,6 +46,8 @@ jobs:
           /tmp/interprocessor_link_test
           g++ -std=c++11 -Wall -Wextra -Werror -pedantic connectors/firmware/shared/native-tests/j1979_interprocessor_read_test.cpp -o /tmp/j1979_interprocessor_read_test
           /tmp/j1979_interprocessor_read_test
+          g++ -std=c++11 -Wall -Wextra -Werror -pedantic connectors/firmware/shared/native-tests/j1979_spi_transport_test.cpp -o /tmp/j1979_spi_transport_test
+          /tmp/j1979_spi_transport_test
           g++ -std=c++11 -Wall -Wextra -Werror -pedantic connectors/firmware/shared/native-tests/isotp_observer_test.cpp -o /tmp/isotp_observer_test
           /tmp/isotp_observer_test
           g++ -std=c++11 -Wall -Wextra -Werror -pedantic connectors/firmware/shared/native-tests/j1979_read_evidence_test.cpp -o /tmp/j1979_read_evidence_test

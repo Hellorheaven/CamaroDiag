@@ -1,3 +1,7 @@
+## J1979 / C6 — transport SPI CI/2 en deux phases (26/11/2026)
+
+- Transport maître borné (requête CS puis réponse CS, READY bas/haut/bas, CRC et corrélation, aucun rejeu) ; machine esclave armant les buffers avant publication READY, exécution endpoint en tâche, refus transfert partiel/dummy non nul, expiration et callback de défaut. Adaptateur ESP32 Arduino SPI concret sur instance et GPIO déjà configurés par propriétaire qualifié ; pas d'initialisation de broches ni d'OE. SPIClass synchrone sous exclusivité, pas de garantie temps réel si pilote bloqué. Rev A0 ne définit pas de READY validé : aucun choix de broche ni activation. Tests natifs de transport, phases et défauts inscrits au gate, non exécutés. Reste adaptateur esclave HAL, FDCAN, propriétaire matériel et USB. J1979/C6 ouverts, aucune CI, fusion ni Release.
+
 ## J1979 — liaison des preuves CI/2 au profil CAN exact (26/11/2026)
 
 - Le client fixe la paire TX/RX et la variante 11/29 bits, le moteur vérifie cette paire avant la campagne et chaque requête CI/2 la transporte pour vérification indépendante par le STM32 avant toute émission. Profil divergent refusé sans TX, aucune attribution au mauvais ECU. Régressions des divergences client/campagne et client/endpoint écrites. CI/2 encore interne non déployé ; aucun test, compilation, fusion ni Release. J1979/C6 ouverts.
