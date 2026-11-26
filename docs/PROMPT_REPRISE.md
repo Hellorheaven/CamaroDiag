@@ -1,3 +1,7 @@
+## J1979 — preuve explicite des inventaires et DTC Android (26/11/2026)
+
+- Scan OBD : champ explicite pidInventoryComplete, modes DTC réellement vérifiés et export JSON enrichi. Inventaire vide vérifié distinct d'un inventaire absent ; aucun PASS DTC zéro sans mode effectivement répondu. La recette accepte un bitmap vide valide, distingue attribution ECU incomplète et ne valide pas un transport sur simple identifiant sans réponse initiale. Continuation E0 impossible marquée non résolue (E1). Régressions moteur et recette fonctionnelle écrites, non exécutées. J1979/C6 ouverts, aucune CI, fusion ou Release.
+
 ## C6 — verrou de récupération partagé après arrêt USB (26/11/2026)
 
 - Connectors : si le propriétaire matériel indique une récupération non résolue après arrêt ou export, l'arbitre partagé reste verrouillé au lieu de simplement libérer le bail. Un autre hôte ne peut pas contourner ce verrou par un nouveau bail. Régression native pour un hôte alternatif ajoutée, non exécutée. Un flux CJ/1 éventuellement déjà écrit avant une révocation ne constitue pas une authentification matérielle. Aucune activation physique, CI, fusion ou Release.

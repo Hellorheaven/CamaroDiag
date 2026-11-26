@@ -19,6 +19,37 @@ class FunctionalTestSuiteTest {
         assertTrue(FunctionalTestPlanner.j1979Checks().any { it.key == "protocol:04" })
     }
 
+    @Test fun j1979RequiresExplicitInventoryAndDtcEvidence() {
+        val state = FunctionalTestState(protocol = FunctionalProtocol.J1979,
+            checks = FunctionalTestPlanner.j1979Checks())
+        val report = com.camarodiag.gen5.data.obd.ObdScanReport(
+            supportedPids = emptySet(), liveData = emptyList(), confirmedDtcs = emptyList(),
+            pendingDtcs = emptyList(), permanentDtcs = emptyList(), vin = null,
+            calibrationIds = emptyList(), calibrationVerificationNumbers = emptyList(),
+            ecuNames = emptyList(), readiness = null, freezeFrame = emptyMap(), monitorTestRaw = null,
+            adapterInfo = emptyMap(), respondingEcuAddresses = listOf("7E8"),
+            rawLog = emptyList(), physicalCanResponder = "7E8")
+        fun outcome(snapshot: FunctionalTestState, key: String) =
+            snapshot.checks.single { it.key == key }.outcome
+        val missing = FunctionalTestPlanner.j1979Results(state,report)
+        assertEquals(FunctionalTestOutcome.NOT_TESTED,outcome(missing,"protocol:transport"))
+        assertEquals(FunctionalTestOutcome.NOT_TESTED,outcome(missing,"protocol:pids"))
+        assertEquals(FunctionalTestOutcome.NOT_TESTED,outcome(missing,"service:dtc-mode:03"))
+        val empty = FunctionalTestPlanner.j1979Results(state,report.copy(
+            pidInventoryComplete=true,verifiedDtcModes=setOf(3)))
+        assertEquals(FunctionalTestOutcome.PASSED,outcome(empty,"protocol:transport"))
+        assertEquals(FunctionalTestOutcome.PASSED,outcome(empty,"protocol:pids"))
+        assertEquals(FunctionalTestOutcome.NOT_TESTED,outcome(empty,"protocol:live"))
+        assertEquals(FunctionalTestOutcome.PASSED,outcome(empty,"service:dtc-mode:03"))
+        assertEquals(FunctionalTestOutcome.NOT_TESTED,outcome(empty,"service:dtc-mode:07"))
+        val unresolved = FunctionalTestPlanner.j1979Results(state,report.copy(
+            pidInventoryComplete=false,firstUnresolvedPid=0xE1))
+        assertEquals(FunctionalTestOutcome.NOT_TESTED,outcome(unresolved,"protocol:pids"))
+        val noInitial = FunctionalTestPlanner.j1979Results(state,report.copy(
+            pidInventoryComplete=false,firstUnresolvedPid=1))
+        assertEquals(FunctionalTestOutcome.NOT_TESTED,outcome(noInitial,"protocol:transport"))
+    }
+
     @Test fun emptyMonitorInventoryIsNotAMonitorResult() {
         val evidence = FunctionalTestPlanner::monitorEvidence
         assertEquals(true to false, evidence("DISCOVERED_MIDS=0"))

@@ -104,7 +104,10 @@ data class ObdScanReport(
     val mode05: ObdMode05Report? = null,
     val mode08: ObdMode08Inventory? = null,
     val negotiatedElmProtocol: Int? = null,
-    val anonymousLegacyVinCandidate: String? = null
+    val anonymousLegacyVinCandidate: String? = null,
+    // Distinguish verified empty results from absent evidence.
+    val pidInventoryComplete: Boolean? = null,
+    val verifiedDtcModes: Set<Int> = emptySet()
 )
 
 /**
@@ -310,7 +313,8 @@ class Obd2FeatureEngine(
             expectedResponders = next
             basePid += 0x20
         }
-        return result(firstUnresolved)
+        // E0 continuation cannot lead to another one-byte bitmap PID.
+        return result(firstUnresolved ?: 0xE1)
     }
 
     /**
@@ -797,7 +801,9 @@ class Obd2FeatureEngine(
             mode05 = mode05,
             mode08 = mode08,
             negotiatedElmProtocol = protocolNumber.takeIf { discovery.firstUnresolvedPid != 1 },
-            anonymousLegacyVinCandidate = vehicleInfo.anonymousVin
+            anonymousLegacyVinCandidate = vehicleInfo.anonymousVin,
+            pidInventoryComplete = discovery.firstUnresolvedPid == null,
+            verifiedDtcModes = dtcSnapshot.modeCounts.filterValues { it != null }.keys.toSet()
         )
     }
 

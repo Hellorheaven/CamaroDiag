@@ -314,10 +314,17 @@ object FunctionalTestPlanner {
                 "Selected legacy protocol not verified.", "Protocole legacy sélectionné non vérifié.")
             return state.copy(checks = rows, obdScan = report, rawObdExchanges = report.rawLog)
         }
-        mark("transport", actual != null || report.physicalCanResponder != null)
+        mark("transport", report.pidInventoryComplete != null && report.firstUnresolvedPid != 1 &&
+            (actual?.let { it in 1..9 } == true || report.physicalCanResponder != null))
         mark("vin", com.camaradiag.gen5.domain.model.VehicleVinMatcher.normalize(report.vin) != null)
         mark("info", report.vehicleInfoSupportComplete == true)
-        mark("pids", report.firstUnresolvedPid == null && report.mode01Reads.isNotEmpty())
+        if (report.pidInventoryComplete == true && report.firstUnresolvedPid == null) {
+            rows = updated(rows, "protocol:pids", FunctionalTestOutcome.PASSED,
+                if (report.pidAttributionIncomplete) "Verified advertised PID union; ECU attribution incomplete."
+                else "Verified PID inventory.",
+                if (report.pidAttributionIncomplete) "Union des PID annoncés vérifiée ; attribution ECU incomplète."
+                else "Inventaire PID vérifié.")
+        }
         mark("live", report.liveData.isNotEmpty())
         mark("readiness", !report.readiness.isNullOrBlank())
         mark("freeze", report.freezeFrameDtc != null && report.freezeFrameSupportComplete == true &&
@@ -328,7 +335,9 @@ object FunctionalTestPlanner {
         mark("05", report.mode05?.let { it.complete && it.hasTestResults } == true)
         mark("08-inventory", report.mode08?.complete == true)
         val counts = mapOf(3 to report.confirmedDtcs.size, 7 to report.pendingDtcs.size, 10 to report.permanentDtcs.size)
-            .mapValues { (mode, count) -> count.takeUnless { mode in report.unavailableDtcModes } }
+            .mapValues { (mode, count) -> count.takeIf {
+                mode in report.verifiedDtcModes && mode !in report.unavailableDtcModes
+            } }
         rows = withDtcModeEvidence(rows, counts)
         return withObservedIdentity(state.copy(checks = rows, obdScan = report, rawObdExchanges = report.rawLog), report.vin)
     }

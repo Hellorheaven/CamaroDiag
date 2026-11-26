@@ -32,6 +32,8 @@ internal object ObdScanJsonExport {
                 }
             })
             put("firstUnresolvedPid", report.firstUnresolvedPid ?: JSONObject.NULL)
+            put("pidInventoryComplete", report.pidInventoryComplete ?: JSONObject.NULL)
+            put("verifiedDtcModes", JSONArray(report.verifiedDtcModes.sorted()))
             put("pidAttributionIncomplete", report.pidAttributionIncomplete)
             put("liveData", JSONArray(report.liveData.map { value ->
                 JSONObject().put("pid", value.pid).put("name", value.name)

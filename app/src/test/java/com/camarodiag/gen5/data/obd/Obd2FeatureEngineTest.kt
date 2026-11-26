@@ -129,6 +129,8 @@ class Obd2FeatureEngineTest {
             }
         }
         assertEquals(setOf(3), report.unavailableDtcModes)
+        assertEquals(setOf(7,10), report.verifiedDtcModes)
+        assertEquals(true, report.pidInventoryComplete)
         assertEquals("P0100", report.pendingDtcs.single().code)
     }
 
@@ -482,6 +484,19 @@ class Obd2FeatureEngineTest {
         assertEquals(emptyList<ObdDtc>(), modes[3])
         assertNull(modes[7])
         assertEquals(emptyList<ObdDtc>(), modes[10])
+    }
+
+    @Test
+    fun terminalBitmapContinuationRemainsUnresolved() = runBlocking {
+        val requested = mutableListOf<String>()
+        val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+            requested += command
+            "41" + command.substring(2) + "00000001"
+        })
+        val result = engine.discoverPidAvailability()
+        assertEquals(listOf("0100","0120","0140","0160","0180","01A0","01C0","01E0"),requested)
+        assertEquals(0xE1,result.firstUnresolvedPid)
+        assertTrue(result.supported.isEmpty())
     }
 
     @Test
