@@ -97,19 +97,29 @@ internal static class DoIpBackupCli
             var timeout = TimeSpan.FromMilliseconds(options.TimeoutMs);
             var target = new StandardProtocolCli.DoIpOptions(host, scope.Tester, scope.Ecu,
                 Array.Empty<byte>(), options.TimeoutMs, options.Tls);
-            using var journal = options.TraceFile is null ? null :
-                new StandardProtocolCli.DoIpTraceJournal(options.TraceFile, target);
-            var gateway = await DoIpVehicleDiscovery.DiscoverAsync(host, timeout, cancellation.Token,
-                vin: scope.Vin, trace: journal is null ? null : journal.RecordDatagram);
-            if (gateway.Vin != scope.Vin || gateway.LogicalAddress != scope.Gateway)
-                throw new UnauthorizedAccessException("DoIP gateway differs from the approved backup profile.");
-            await DoIpVehicleDiscovery.RequireCurrentIdentityAsync(gateway, timeout, cancellation.Token,
-                trace: journal is null ? null : journal.RecordDatagram);
-            var capture = await DoIpScopedBackup.ReadObservedAsync(gateway, address, scope,
-                options.Tls, timeout, cancellation.Token, (pass, count) =>
-                    Console.WriteLine(string.Format(DoIpConsolePresentation.Text("BackupProgress"),
-                        pass, count, scope.Length)), options.Certificate,
-                trace: journal is null ? null : journal.Record, options: options.Session);
+            DoIpScopedBackup.Capture capture;
+            using (var journal = options.TraceFile is null ? null :
+                new StandardProtocolCli.DoIpTraceJournal(options.TraceFile, target))
+            {
+                var gateway = await DoIpVehicleDiscovery.DiscoverAsync(host, timeout, cancellation.Token,
+                    vin: scope.Vin, trace: journal is null ? null : journal.RecordDatagram);
+                if (gateway.Vin != scope.Vin || gateway.LogicalAddress != scope.Gateway)
+                    throw new UnauthorizedAccessException("DoIP gateway differs from the approved backup profile.");
+                await DoIpVehicleDiscovery.RequireCurrentIdentityAsync(gateway, timeout, cancellation.Token,
+                    trace: journal is null ? null : journal.RecordDatagram);
+                capture = await DoIpScopedBackup.ReadObservedAsync(gateway, address, scope,
+                    options.Tls, timeout, cancellation.Token, (pass, count) =>
+                        Console.WriteLine(string.Format(DoIpConsolePresentation.Text("BackupProgress"),
+                            pass, count, scope.Length)), options.Certificate,
+                    trace: journal is null ? null : journal.Record, options: options.Session);
+                await DoIpVehicleDiscovery.RequireCurrentIdentityAsync(gateway, timeout, cancellation.Token,
+                    trace: journal is null ? null : journal.RecordDatagram);
+            }
+            // Do not publish an archive if the diagnostic or trace resources failed
+            // to close, or the selected profile changed during acquisition.
+            cancellation.Token.ThrowIfCancellationRequested();
+            if (DoIpBackupScope.Load(options.Profile) != scope)
+                throw new InvalidDataException("DoIP backup profile changed during acquisition.");
             DoIpScopedBackup.SaveNew(options.Archive, capture, cancellation.Token);
             Console.WriteLine(string.Format(DoIpConsolePresentation.Text("BackupSaved"),
                 scope.Length, capture.Sha256, options.Archive));
