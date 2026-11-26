@@ -338,7 +338,7 @@ internal sealed partial class J2534Device : IDisposable
         // A response from the right CAN ID but another DID is stale.
         var echoLength = request[0] switch
         {
-            0x01 or 0x06 or 0x09 or 0x1A => 1,
+            0x01 or 0x06 or 0x08 or 0x09 or 0x1A => 1,
             0x02 => 2,
             0x22 => 2,
             0x10 or 0x19 or 0x3E => 1,
