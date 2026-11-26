@@ -358,6 +358,21 @@ fun ObdScanScreen(
                 }
             }
 
+            report.mode05?.let { mode ->
+                item {
+                    InfoCard(title = stringResource(R.string.obd_mode05_results)) {
+                        if (!mode.complete)
+                            Text(stringResource(R.string.obd_mode05_partial), color = CamaroAmber, fontSize = 11.sp)
+                        Text(stringResource(R.string.obd_mode05_raw_notice), color = TextMuted, fontSize = 11.sp)
+                        mode.reads.forEach { read ->
+                            InfoLine(read.command, read.positiveRecords.takeIf { it.isNotEmpty() }
+                                ?.joinToString("\n") { record -> record.joinToString(" ") { "%02X".format(it) } }
+                                ?: stringResource(R.string.obd_not_available))
+                        }
+                    }
+                }
+            }
+
             item {
                 InfoCard(title = stringResource(R.string.obd_mode06_results)) {
                     Text(report.monitorTestRaw ?: stringResource(R.string.obd_not_available),
