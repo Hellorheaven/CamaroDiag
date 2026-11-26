@@ -161,6 +161,16 @@ object FunctionalTestPlanner {
             "No verified response in this campaign.", "Aucune réponse vérifiée dans cette campagne.")
     }
 
+    internal fun monitorEvidence(raw: String?): Pair<Boolean, Boolean> {
+        val monitor = raw.orEmpty()
+        val complete = monitor.isNotBlank() && "PARTIAL" !in monitor && "N/A" !in monitor
+        val hasResults = monitor.lineSequence().any {
+            (it.startsWith("MID=") || it.startsWith("TID=")) && " RAW=" in it
+        }
+        val emptyInventory = monitor == "DISCOVERED_MIDS=0" || monitor == "DISCOVERED_TIDS=0"
+        return (complete && (emptyInventory || hasResults)) to (complete && hasResults)
+    }
+
     fun j1979Results(state: FunctionalTestState, report: com.camarodiag.gen5.data.obd.ObdScanReport): FunctionalTestState {
         var rows = state.checks
         fun mark(key: String, ok: Boolean) {
@@ -174,15 +184,9 @@ object FunctionalTestPlanner {
         mark("readiness", !report.readiness.isNullOrBlank())
         mark("freeze", report.freezeFrameDtc != null && report.freezeFrameSupportComplete == true &&
             report.freezeFrameReads.isNotEmpty() && report.freezeFrameReads.all { it.verifiedBytes != null })
-        val monitor = report.monitorTestRaw.orEmpty()
-        val monitorComplete = monitor.isNotBlank() &&
-            "PARTIAL" !in monitor && "N/A" !in monitor
-        mark("monitor-inventory", monitorComplete)
-        // A positive empty inventory proves discovery, not an actual
-        // monitor result. Never promote the physical results row on it.
-        mark("monitor", monitorComplete && monitor.lineSequence().any {
-            (it.startsWith("MID=") || it.startsWith("TID=")) && " RAW=" in it
-        })
+        val (inventoryProved, resultsProved) = monitorEvidence(report.monitorTestRaw)
+        mark("monitor-inventory", inventoryProved)
+        mark("monitor", resultsProved)
         mark("05", report.mode05?.let { it.complete && it.hasTestResults } == true)
         mark("08-inventory", report.mode08?.complete == true)
         val counts = mapOf(3 to report.confirmedDtcs.size, 7 to report.pendingDtcs.size, 10 to report.permanentDtcs.size)
