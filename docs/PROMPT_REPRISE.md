@@ -1,3 +1,7 @@
+## PR117 — fermeture et publication DoIP Connectors Python (26/11/2026)
+
+- Le transport vérifie que le socket reste courant après chaque callback de trace TX/RX et que le délai reste respecté après décodage final. Une fermeture déclenchée par l'observateur du dernier RX ne valide pas la réponse ni un nouvel échange ; une erreur de close ne conserve pas un socket réutilisable. Régressions TCP loopback et fermeture en erreur ajoutées, non exécutées. Aucun checkpoint.
+
 ## PR117 — frontière de fin de transaction DoIP Windows (26/11/2026)
 
 - C6/DoIP : le transport Windows contrôle de nouveau l'annulation et le délai global sous verrou au moment de rendre le socket disponible après une réponse finale. Une réponse devenue hors délai ou annulée retire la connexion, sans réémission. Le contrôle s'applique également juste avant l'écriture après acquisition du verrou TX. Régression TCP loopback d'annulation au dernier RX ajoutée, non exécutée. Aucun checkpoint.

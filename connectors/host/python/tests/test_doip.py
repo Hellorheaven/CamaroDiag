@@ -1249,6 +1249,53 @@ class DoIpTests(unittest.TestCase):
                          "--ecu", "1234", *args])
             discover.assert_not_called()
 
+    def test_session_closed_by_final_rx_observer_cannot_publish_or_replay(self):
+        with socket.socket() as listener:
+            listener.bind(("127.0.0.1", 0))
+            listener.listen(1)
+            listener.settimeout(3)
+            errors = []
+            def peer():
+                try:
+                    with listener.accept()[0] as sock:
+                        sock.settimeout(3)
+                        self.assertEqual(receive(sock), (2, 5, TESTER + bytes(5)))
+                        sock.sendall(encode(2, 6, TESTER + ECU + b"\x10" + bytes(4)))
+                        self.assertEqual(receive(sock), (2, 0x8001, TESTER + ECU + bytes.fromhex("22F190")))
+                        sock.sendall(encode(2, 0x8001, ECU + TESTER + bytes.fromhex("62F190") + VIN.encode()))
+                        self.assertEqual(sock.recv(1), b"")
+                except BaseException as error:
+                    errors.append(error)
+            thread = threading.Thread(target=peer)
+            thread.start()
+            try:
+                with Session(GATEWAY, 0xE80, 0x1234, tls=False, port=listener.getsockname()[1]) as client:
+                    def observer(direction, transport, host, raw):
+                        if direction == "RX" and raw[4:8] == "8001":
+                            client.close()
+                    client.trace = observer
+                    with self.assertRaises(DoIpError):
+                        client.exchange(bytes.fromhex("22F190"))
+                    with self.assertRaises(DoIpError):
+                        client.exchange(bytes.fromhex("22F190"))
+            finally:
+                thread.join(4)
+            self.assertFalse(thread.is_alive())
+            if errors:
+                raise errors[0]
+
+    def test_failed_close_still_retires_session(self):
+        client = Session.__new__(Session)
+        wire = unittest.mock.Mock()
+        wire.close.side_effect = OSError("close failed")
+        client._socket = wire
+        with self.assertRaises(OSError):
+            client.close()
+        with self.assertRaises(DoIpError):
+            client._wire()
+        client.close()
+        wire.close.assert_called_once()
+
     def test_session_trace_pending_ack_alive_and_count(self):
         with socket.socket() as listener:
             listener.bind(("127.0.0.1", 0))

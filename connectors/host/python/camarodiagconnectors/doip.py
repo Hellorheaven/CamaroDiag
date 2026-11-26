@@ -767,9 +767,10 @@ class Session:
         self.close()
 
     def close(self):
-        if self._socket is not None:
-            self._socket.close()
-            self._socket = None
+        # Retire the session even if closing the operating-system socket fails.
+        wire, self._socket = self._socket, None
+        if wire is not None:
+            wire.close()
 
     def _wire(self) -> socket.socket:
         if self._socket is None:
@@ -782,6 +783,8 @@ class Session:
         wire.settimeout(remaining(deadline))
         wire.sendall(raw)
         _emit(self.trace, "TX", "TLS" if self.tls else "TCP", self.gateway.host, raw)
+        if self._socket is not wire:
+            raise DoIpError("Session closed during DoIP transmission")
         remaining(deadline)
 
     def _read_exact(self, count: int, deadline: float) -> bytes:
@@ -797,10 +800,14 @@ class Session:
         return bytes(data)
 
     def _receive(self, deadline: float, first: bytes = b"") -> tuple[int, bytes]:
+        wire = self._wire()
         raw_header = first + self._read_exact(8 - len(first), deadline)
         version, kind, length = header(raw_header)
         body = self._read_exact(length, deadline)
         _emit(self.trace, "RX", "TLS" if self.tls else "TCP", self.gateway.host, raw_header + body)
+        if self._socket is not wire:
+            raise DoIpError("Session closed during DoIP reception")
+        remaining(deadline)
         if version != self.gateway.version or kind == 0:
             raise DoIpError("DoIP version changed or generic negative acknowledgement")
         return kind, body
@@ -872,7 +879,9 @@ class Session:
                         response_deadline = min(deadline, time.monotonic() + self.p2_star)
                         continue
                     raise NegativeResponse(reply[1], reply[2])
-                return positive(request, reply)
+                result = positive(request, reply)
+                remaining(response_deadline)
+                return result
         except BaseException:
             self.close()
             raise
