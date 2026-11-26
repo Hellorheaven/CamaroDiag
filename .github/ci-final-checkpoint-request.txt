@@ -23,3 +23,11 @@ corrected:
 - Windows: eliminate Span-across-await and duplicate C# test variable declaration
 - Android: preserve two different DoIP extended-record labels under unique FR/EN resource keys
 correction_commits: 904fb7285775b354e6f1648d709a70840bfe0d5e, 64dc33b3eabb8a7c557868bc014f79a8330d43c6
+
+attempt: 3 -- second grouped closure fixes
+previous_gate_sha: 7c78d134deaf50a08253af02550839353721ed66
+previous_gate: https://github.com/Hellorheaven/CamaroDiag/actions/runs/45799781302
+corrected:
+- Windows DoIpVinReader: all fifteen decoder lambdas separate awaited byte array acquisition from ReadOnlySpan decoder arguments, plus VIN and DID decode
+- Android diagnostic Mode06: ObdCanMonitorRecords source and test use canonical Kotlin package, preserving referenced identity reassembler
+correction_commits: f80bb2ba516dbf796804d21f308a9bcf8a903b69, c4b750b7d3a90714298dc99535bb160afc8a0a07
