@@ -27,4 +27,16 @@
   <data name="EvapOutcome_REFUSED" xml:space="preserve"><value>ECU refused the test request.</value></data>
   <data name="EvapOutcome_UNCERTAIN" xml:space="preserve"><value>Test request state uncertain — do not repeat automatically.</value></data>
   <data name="EvapOutcome_NOT_TESTED" xml:space="preserve"><value>Preconditions not verified; no test request sent.</value></data>
+  <data name="ClearRun" xml:space="preserve"><value>Mode 04 — emissions DTC reset</value></data>
+  <data name="ClearVinRequired" xml:space="preserve"><value>Enter the documented 17-character VIN of the vehicle to test.</value></data>
+  <data name="ClearWarning" xml:space="preserve"><value>This reset can erase emissions faults, freeze-frame data and readiness information. Export the original evidence first. Follow the manufacturer's procedure with vehicle stationary and engine stopped. Never use this test to conceal an unresolved fault. No automatic retry.</value></data>
+  <data name="ClearConfirm" xml:space="preserve"><value>Request a single emissions diagnostic reset on VIN {0}, physical CAN {1}/{2}?</value></data>
+  <data name="ClearRunning" xml:space="preserve"><value>Recording pre-reset evidence and checking conditions.</value></data>
+  <data name="ClearExpired" xml:space="preserve"><value>Authorization expired. Reset state may be uncertain; do not repeat automatically.</value></data>
+  <data name="ClearNotCompletion" xml:space="preserve"><value>Permanent DTCs are observed, never assumed erased. An ACK does not prove all ECU faults are absent.</value></data>
+  <data name="ClearOutcome_ACKNOWLEDGED_READBACK" xml:space="preserve"><value>Reset acknowledged; confirmed and pending DTC modes reread.</value></data>
+  <data name="ClearOutcome_ACKNOWLEDGED_PARTIAL" xml:space="preserve"><value>Reset acknowledged; readback incomplete.</value></data>
+  <data name="ClearOutcome_REFUSED" xml:space="preserve"><value>Reset request refused by ECU.</value></data>
+  <data name="ClearOutcome_UNCERTAIN" xml:space="preserve"><value>Reset state uncertain — do not repeat automatically.</value></data>
+  <data name="ClearOutcome_NOT_TESTED" xml:space="preserve"><value>Conditions not verified; no reset request attempted.</value></data>
 </root>
