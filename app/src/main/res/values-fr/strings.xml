@@ -1198,6 +1198,12 @@
     <string name="cal_doip_inventory">Inventaire explicite des ECU</string>
     <string name="cal_doip_inventory_addresses">Adresses ECU (hex, séparées par virgules)</string>
     <string name="cal_doip_inventory_result">Inventaire terminé : %1$d/%2$d VIN vérifiés</string>
+    <string name="cal_doip_inventory_progress">Inventaire en cours : %1$d/%2$d VIN vérifiés (partiel)</string>
+    <string name="cal_doip_inventory_reason_vin">VIN différent du véhicule sélectionné</string>
+    <string name="cal_doip_inventory_reason_protocol">Identification du protocole ECU invalide ou instable</string>
+    <string name="cal_doip_inventory_reason_nrc">Réponse diagnostique négative du calculateur</string>
+    <string name="cal_doip_inventory_reason_timeout">Délai de réponse dépassé</string>
+    <string name="cal_doip_inventory_reason_io">Échec de communication ou de vérification de l’identité</string>
     <string name="cal_doip_inventory_verified">ECU 0x%1$04X : VIN vérifié (%2$s)</string>
     <string name="cal_doip_inventory_unverified">ECU 0x%1$04X : non vérifié (absence non prouvée)</string>
     <string name="cal_doip_obd_inventory">Inventaire ECU OBDonUDS</string>
