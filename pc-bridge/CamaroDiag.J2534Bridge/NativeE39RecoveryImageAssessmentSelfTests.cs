@@ -59,6 +59,15 @@ internal static class NativeE39RecoveryImageAssessmentSelfTests
             Check(pass.Verified && pass.VerifiedSectors == 1 && pass.FailedSectorAddress is null,
                 "Full original BIN and live ECU saved sector bytes match the same evidence");
 
+            var blockDirectory = journalPath + ".blocks";
+            var unexpectedDirectory = Path.Combine(blockDirectory, "unexpected");
+            Directory.CreateDirectory(unexpectedDirectory);
+            Check(!NativeE39SavedBlockAssessment.Inspect(journalPath).Verified,
+                "Unexpected directory is not ignored in the physical backup inventory");
+            Directory.Delete(unexpectedDirectory);
+            Check(NativeE39SavedBlockAssessment.Inspect(journalPath).Verified,
+                "Original unmodified inventory still verifies");
+
             var changed = image.ToArray();
             changed[0x40000] ^= 1; // untouched region: full BIN SHA must still match
             File.WriteAllBytes(imagePath, changed);
