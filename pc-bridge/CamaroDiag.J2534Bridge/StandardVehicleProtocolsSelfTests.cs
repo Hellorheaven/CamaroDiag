@@ -334,6 +334,29 @@ internal static class StandardVehicleProtocolsSelfTests
             DoIpCodec.Encode(DoIpCodec.EntityStatusResponse, [0, 1, 1])));
         Check(true, "DoIP generic NACK classifier leaves ordinary messages untouched.");
 
+        void CheckRefusal(Action operation, string layer, byte code)
+        {
+            DoIpTransportRefusal? refusal = null;
+            try { operation(); }
+            catch (DoIpTransportRefusal error) { refusal = error; }
+            Check(refusal is not null && refusal.Layer == layer && refusal.Code == code,
+                "Preserve correlated DoIP refusal layer and code.");
+        }
+        CheckRefusal(() => DoIpCodec.RequireNoGenericNack(nackReason), "header_nack", 2);
+        CheckRefusal(() => DoIpCodec.RequireRoutingActive(DoIpCodec.Decode(DoIpCodec.Encode(
+            DoIpCodec.RoutingActivationResponse, [0x0E, 0x80, 0x12, 0x34, 0x06, 0, 0, 0, 0])),
+            0x0E80), "routing_denied", 6);
+        var correlatedRefusal = DoIpCodec.Decode(DoIpCodec.Encode(DoIpCodec.DiagnosticNegativeAck,
+            [0x12, 0x34, 0x0E, 0x80, 0x06, 0x22, 0xF1]));
+        CheckRefusal(() => DoIpCodec.IsCorrelatedDiagnosticAck(correlatedRefusal, 0x0E80, 0x1234,
+            [0x22, 0xF1, 0x90]), "diagnostic_nack", 6);
+        Check(!DoIpCodec.IsCorrelatedDiagnosticAck(correlatedRefusal, 0x0E80, 0x1235,
+            [0x22, 0xF1, 0x90]), "Wrong-address refusal must not be attributed to selected ECU.");
+        Check(!DoIpCodec.IsCorrelatedDiagnosticAck(correlatedRefusal, 0x0E80, 0x1234,
+            [0x19, 0x02, 0xFF]), "Wrong echoed request cannot establish a refusal for current operation.");
+        Reject<InvalidDataException>(() => DoIpCodec.ParseEntityStatus(DoIpCodec.Decode(DoIpCodec.Encode(
+            DoIpCodec.EntityStatusResponse, [0, 1, 2]))), "Impossible gateway socket count rejected.");
+
         var statusRequest = DoIpCodec.Decode(DoIpCodec.Encode(
             DoIpCodec.EntityStatusRequest, []));
         Check(statusRequest.Type == 0x4001 &&
