@@ -50,6 +50,18 @@ internal static class ObdJ1979FunctionalScanSelfTests
             () => {}, TimeSpan.FromMinutes(1));
         Assert(malformed.Steps.Single(x => x.RequestHex == "0100").Status == "FAILED", "wrong identifier rejected");
         Assert(malformed.ObservedVin is null, "missing VIN not inferred");
+        var faultCalls = 0;
+        var partial = ObdJ1979FunctionalScan.Run((request, _) =>
+        {
+            faultCalls++;
+            if (faultCalls == 1)
+                return [0x49, 2, 1, ..System.Text.Encoding.ASCII.GetBytes("1G1FA1RXXR0123456")];
+            throw new IOException("Disconnected");
+        }, () => {}, TimeSpan.FromMinutes(1));
+        Assert(faultCalls == 2 && !partial.Completed && partial.StopReason == "TRANSPORT_ERROR",
+            "terminal transport failure stops all following requests");
+        Assert(partial.ObservedVin == "1G1FA1RXXR0123456" && partial.Steps.Count == 2 &&
+            partial.Steps[1].Status == "FAILED", "partial evidence retained");
         var tx = 0;
         try
         {
