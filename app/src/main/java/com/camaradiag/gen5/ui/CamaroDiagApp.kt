@@ -14,6 +14,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.semantics.Role
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -1517,7 +1519,9 @@ fun LiveDataScreen(
             preferences.getString(key, null)?.split(",")?.filter(String::isNotBlank)?.toSet()
         }
     }
-    var selectedPidIds by remember(storageKey) {
+    // Without a verified VIN, a selection belongs only to this connection.
+    val transientConnection = connectionGeneration.takeIf { storageKey == null }
+    var selectedPidIds by remember(storageKey, transientConnection) {
         mutableStateOf<Set<String>?>(storedSelection)
     }
     var choosingSensors by remember(storageKey, connectionGeneration) { mutableStateOf(false) }
@@ -1579,9 +1583,12 @@ fun LiveDataScreen(
     val activePidIds = (selectedPidIds ?: allPidIds).intersect(allPidIds)
     val visiblePids = pids.filter { it.id in activePidIds }
 
-    if (choosingSensors) {
-        var sensorQuery by remember(storageKey, choosingSensors) { mutableStateOf("") }
-        var pendingIds by remember(storageKey, choosingSensors) {
+    LaunchedEffect(allPidIds) {
+        if (allPidIds.isEmpty()) choosingSensors = false
+    }
+    if (choosingSensors && allPidIds.isNotEmpty()) {
+        var sensorQuery by remember(storageKey, connectionGeneration, choosingSensors) { mutableStateOf("") }
+        var pendingIds by remember(storageKey, connectionGeneration, choosingSensors) {
             mutableStateOf(activePidIds)
         }
         AlertDialog(
@@ -1605,10 +1612,14 @@ fun LiveDataScreen(
                             key = { it.id }
                         ) { signal ->
                             Row(
-                                Modifier.fillMaxWidth().clickable {
-                                    pendingIds = if (signal.id in pendingIds) pendingIds - signal.id
-                                        else pendingIds + signal.id
-                                },
+                                Modifier.fillMaxWidth().toggleable(
+                                    value = signal.id in pendingIds,
+                                    role = Role.Checkbox,
+                                    onValueChange = { checked ->
+                                        pendingIds = if (checked) pendingIds + signal.id
+                                            else pendingIds - signal.id
+                                    }
+                                ),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Checkbox(
