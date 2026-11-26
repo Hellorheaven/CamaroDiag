@@ -65,6 +65,10 @@ internal static class NativeE39RecoveryImageAssessmentSelfTests
                 modifiedMetadata.MetadataSnapshotSha256 != initialMetadata.MetadataSnapshotSha256,
                 "A metadata-only change is detectable even when parsed identity remains unchanged");
             File.WriteAllText(metadataPath, unchangedMetadata);
+            File.WriteAllText(metadataPath, unchangedMetadata.Replace("\"Schema\":1", "\"Schema\":\"1\""));
+            Check(!NativeE39SavedBlockAssessment.InspectTargetMetadata(journalPath).Verified,
+                "A wrong JSON value type fails closed instead of throwing");
+            File.WriteAllText(metadataPath, unchangedMetadata);
 
             var pass = NativeE39RecoveryImageAssessment.Inspect(journalPath, imagePath);
             Check(pass.Verified && pass.VerifiedSectors == 1 && pass.FailedSectorAddress is null,
