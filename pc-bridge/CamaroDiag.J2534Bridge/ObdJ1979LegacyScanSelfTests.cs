@@ -52,7 +52,7 @@ internal static class ObdJ1979LegacyScanSelfTests
             byte[] pwmWithIfr = [0x41,0x6B,source,0x41,0,0x80,0,0,0,0xF1];
             var withIfr = J2534StandardChannel.DecodeReceiveData(2, 0, 2, pwmWithIfr, 10, 9, true);
             var pwmPacket = ObdLegacyJ2534Transport.Decode(pwm, source, withIfr);
-            Check(pwmPacket?.InFrameResponseHex == "F1" && pwmPacket.Payload.Length == 6,
+            Check(pwmPacket is { InFrameResponseHex: "F1" } && pwmPacket.Payload.Length == 6,
                 "PWM IFR never interpreted as payload");
             Reject(() => J2534StandardChannel.DecodeReceiveData(2, 0, 2, pwmWithIfr, 10, 9), "opt-in IFR only");
             Reject(() => J2534StandardChannel.DecodeReceiveData(1, 0, 2, pwmWithIfr, 10, 9, true), "IFR not allowed for VPW");
