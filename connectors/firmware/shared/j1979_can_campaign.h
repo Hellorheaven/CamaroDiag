@@ -14,6 +14,9 @@ class J1979CanCampaign {
     End end=End::LinkFault;
     uint32_t steps=0, positive=0, raw=0, negative=0, timeout=0;
     bool transportObserved=false;
+    bool pidInventoryComplete=false,freezeTriggerObserved=false,freezeFramePresent=false;
+    bool freezeInventoryComplete=false,monitorInventoryComplete=false;
+    bool controlInventoryComplete=false,identityInventoryComplete=false;
   };
   class Sink {
    public:
@@ -59,7 +62,7 @@ class J1979CanCampaign {
     const uint8_t dtcModes[]={3,7,10};
     for(uint8_t mode:dtcModes)read(&mode,1);
 
-    auto inventory=[&](uint8_t mode,bool firstCached,bool readMembers)->void {
+    auto inventory=[&](uint8_t mode,bool firstCached,bool readMembers)->bool {
       const size_t requestSize=mode==2?3:2;
       const size_t offset=mode==2?3:2;
       for(unsigned base=0;base<=0xe0&&s.end==End::Complete;base+=32){
@@ -67,7 +70,7 @@ class J1979CanCampaign {
         uint8_t req[]={mode,static_cast<uint8_t>(base),0};
         if(firstCached&&base==0)std::memcpy(bitmap,initial,4);
         else{
-          if(!read(req,requestSize))break;
+          if(!read(req,requestSize))return false;
           std::memcpy(bitmap,scratch.response+offset,4);
         }
         if(readMembers)for(unsigned bit=0;bit<31&&s.end==End::Complete;++bit){
@@ -77,16 +80,20 @@ class J1979CanCampaign {
           if((mode==9&&req[1]==2)||(mode==2&&req[1]==2))continue;
           read(req,requestSize);
         }
-        if(!(bitmap[3]&1u))break;
+        if(!(bitmap[3]&1u))return s.end==End::Complete;
       }
+      return false;
     };
-    inventory(1,true,true);
+    s.pidInventoryComplete=inventory(1,true,true);
     const uint8_t trigger[]={2,2,0};
-    if(read(trigger,3)&&(scratch.response[3]||scratch.response[4]))
-      inventory(2,false,true);
-    inventory(6,false,true);
-    inventory(8,false,false); // only support bitmaps, never control actions
-    inventory(9,false,true);
+    s.freezeTriggerObserved=read(trigger,3);
+    if(s.freezeTriggerObserved){
+      s.freezeFramePresent=scratch.response[3]||scratch.response[4];
+      if(s.freezeFramePresent)s.freezeInventoryComplete=inventory(2,false,true);
+    }
+    s.monitorInventoryComplete=inventory(6,false,true);
+    s.controlInventoryComplete=inventory(8,false,false); // no control actions
+    s.identityInventoryComplete=inventory(9,false,true);
     return s;
   }
 };
