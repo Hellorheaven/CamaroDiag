@@ -38,6 +38,12 @@ int main(){
   const uint8_t info[]={9,0},legacyInfo[]={0x49,0,1,0xc0,0,0,0};
   assert(E::classify(V::Legacy,info,2,legacyInfo,7)==R::Positive);
   assert(E::classify(V::ClassicCan,info,2,legacyInfo,7)==R::Invalid);
+  const uint8_t coolant[]={1,5},goodCoolant[]={0x41,5,90},badCoolant[]={0x41,5,90,0};
+  assert(E::classify(V::ClassicCan,coolant,2,goodCoolant,3)==R::Positive);
+  assert(E::classify(V::ClassicCan,coolant,2,badCoolant,4)==R::Invalid);
+  const uint8_t unknown[]={1,0xa1},raw[]={0x41,0xa1,1,2},echoOnly[]={0x41,0xa1};
+  assert(E::classify(V::ClassicCan,unknown,2,raw,4)==R::Raw);
+  assert(E::classify(V::ClassicCan,unknown,2,echoOnly,2)==R::Invalid);
   const uint8_t finalPage[]={1,0xe0},badNext[]={0x41,0xe0,0,0,0,1};
   assert(E::classify(V::ClassicCan,finalPage,2,badNext,6)==R::Invalid);
   // Feed only captured synthetic frames through the passive observer.
