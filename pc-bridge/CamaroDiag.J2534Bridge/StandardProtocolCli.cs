@@ -1874,6 +1874,7 @@ internal static class StandardProtocolCli
         {
             var timeout = TimeSpan.FromMilliseconds(o.TimeoutMs);
             int count;
+            DoIpSequenceProgress activeProgress;
             {
             // Only publish completion after both transport and trace journal
             // have closed successfully. Individual replies remain provisional.
@@ -1892,7 +1893,7 @@ internal static class StandardProtocolCli
                 return 2;
             progress = new DoIpSequenceProgress(sequence.Vin, o.Host, gateway.LogicalAddress,
                 o.Tester, o.Ecu, o.UseTls, sequence.Commands.Length);
-            var activeProgress = progress;
+            activeProgress = progress;
             cancellation.Token.ThrowIfCancellationRequested();
             await DoIpVehicleDiscovery.RequireCurrentIdentityAsync(gateway, timeout, cancellation.Token,
                 trace: journal is null ? null : journal.RecordDatagram);
