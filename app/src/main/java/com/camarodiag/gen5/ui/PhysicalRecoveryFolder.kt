@@ -8,6 +8,7 @@ import com.camarodiag.gen5.data.obd.EcuProgrammingDriverContract
 import com.camarodiag.gen5.data.obd.EcuWriteTransaction
 import java.io.File
 import java.nio.file.Files
+import java.security.MessageDigest
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 
@@ -30,7 +31,12 @@ internal object PhysicalRecoveryFolder {
             name.matches(Regex("[A-Za-z0-9._-]+"))
     internal fun journalName(files: Set<String>, directories: Set<String>): String? =
         files.filter { safeName(it) && "$it.blocks" in directories }.singleOrNull()
-    private data class Entry(val name: String, val id: String, val directory: Boolean)
+    internal data class Entry(val name: String, val id: String, val directory: Boolean)
+    internal fun uniqueEntries(rows: List<Entry>): Boolean =
+        rows.all { it.id.isNotBlank() } && rows.map { it.name }.distinct().size == rows.size &&
+            rows.map { it.id }.distinct().size == rows.size
+    internal fun sameInventory(before: List<Entry>, after: List<Entry>): Boolean =
+        uniqueEntries(before) && uniqueEntries(after) && before.toSet() == after.toSet()
 
     suspend fun inspect(
         resolver: ContentResolver, tree: Uri, cacheDir: File, identity: PhysicalRecoveryIdentity,
@@ -52,23 +58,27 @@ internal object PhysicalRecoveryFolder {
                     rows += Entry(cursor.getString(1), cursor.getString(0),
                         cursor.getString(2) == DocumentsContract.Document.MIME_TYPE_DIR)
                 }
-                check(rows.map { it.name }.distinct().size == rows.size)
+                check(uniqueEntries(rows)) { "Ambiguous recovery document inventory." }
                 rows
             }
         }
-        val root = children(DocumentsContract.getTreeDocumentId(tree))
+        val rootId = DocumentsContract.getTreeDocumentId(tree)
+        val root = children(rootId)
         val name = requireNotNull(journalName(root.filterNot { it.directory }.map { it.name }.toSet(),
             root.filter { it.directory }.map { it.name }.toSet()))
         val journal = root.single { it.name == name && !it.directory }
         val blocks = root.single { it.name == "$name.blocks" && it.directory }
         val files = children(blocks.id)
+        check(files.none { it.id == journal.id || it.id == blocks.id || it.id == rootId })
         check(files.isNotEmpty() && files.all { !it.directory && safeName(it.name) && it.name.endsWith(".ecu-block") })
         val staging = Files.createTempDirectory(cacheDir.toPath(), "ecu-inspection-").toFile()
         var total = 0L
         try {
+            val digests = mutableMapOf<Entry, ByteArray>()
             fun copy(entry: Entry, destination: File, max: Long) {
                 val uri = DocumentsContract.buildDocumentUriUsingTree(tree, entry.id)
                 var count = 0L
+                val digest = MessageDigest.getInstance("SHA-256")
                 requireNotNull(resolver.openInputStream(uri)).use { input ->
                     destination.outputStream().use { output ->
                         val buffer = ByteArray(8192)
@@ -80,17 +90,51 @@ internal object PhysicalRecoveryFolder {
                             count += n
                             total += n
                             check(count <= max && total <= MAX_TOTAL)
+                            digest.update(buffer, 0, n)
                             output.write(buffer, 0, n)
                         }
                     }
                 }
                 check(count > 0)
+                digests[entry] = digest.digest()
+            }
+            // SAF has no portable stable inode guarantee. Re-read the same
+            // source document IDs with a separate bounded pass and compare
+            // their bytes before accepting the copied evidence.
+            fun verifySource(entry: Entry, max: Long) {
+                val uri = DocumentsContract.buildDocumentUriUsingTree(tree, entry.id)
+                val digest = MessageDigest.getInstance("SHA-256")
+                var count = 0L
+                requireNotNull(resolver.openInputStream(uri)).use { input ->
+                    val buffer = ByteArray(8192)
+                    while (true) {
+                        active()
+                        val n = input.read(buffer)
+                        if (n < 0) break
+                        check(n > 0)
+                        count += n
+                        check(count <= max)
+                        digest.update(buffer, 0, n)
+                    }
+                }
+                check(count > 0 && MessageDigest.isEqual(digests.getValue(entry), digest.digest())) {
+                    "Recovery source changed during import."
+                }
             }
             val journalFile = File(staging, name)
             val blockDir = File(staging, "$name.blocks")
             check(blockDir.mkdir())
             copy(journal, journalFile, MAX_JOURNAL)
             files.forEach { copy(it, File(blockDir, it.name), MAX_BLOCK) }
+            active()
+            check(sameInventory(root, children(rootId)) && sameInventory(files, children(blocks.id))) {
+                "Recovery source inventory changed during import."
+            }
+            files.forEach { verifySource(it, MAX_BLOCK) }
+            verifySource(journal, MAX_JOURNAL)
+            check(sameInventory(root, children(rootId)) && sameInventory(files, children(blocks.id))) {
+                "Recovery source inventory changed during verification."
+            }
             active()
             return EcuWriteTransaction.inspectRecoveryEvidence(journalFile, identity.target(), identity.vin, ::active)
                 .also { active() }
