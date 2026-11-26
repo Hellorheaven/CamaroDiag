@@ -318,6 +318,8 @@
     <string name="live_pid_oil_demo">Pression huile (DÉMO)</string>
     <string name="live_pid_stft">Correction carburant court terme B1</string>
     <string name="live_pid_stft_demo">Correction carburant B1 (DÉMO)</string>
+    <string name="live_pid_odometer">Kilométrage total OBD (PID A6)</string>
+    <string name="live_pid_hybrid_bat_life">Durée de vie restante déclarée de la batterie hybride (PID 5B)</string>
     <string name="live_pid_bat">Tension calculateur</string>
     <string name="live_pid_bat_demo">Tension calculateur (DÉMO)</string>
     <string name="live_pid_speed">Vitesse véhicule</string>

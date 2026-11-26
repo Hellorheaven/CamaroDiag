@@ -1,3 +1,7 @@
+## PR117 — A6 et libellés réels dans les données temps réel (26/11/2026)
+
+- C6 : odomètre A6 en temps réel seulement lorsqu'annoncé et effectivement lu, décodage quatre octets non signé /10, km/miles, source stable existante. Traductions A6 et PID 5B dans le catalogue, le scan et les cartes ; 5B n'est ni SOC traction ni mesure certifiée de santé. Cartes temps réel réutilisent les libellés localisés et indiquent le répondant physique. Les préférences de capteurs ne sont persistées que pour le VIN observé et ne contaminent plus le garage Camaro lors d'un essai Ford. Régressions catalogue écrites, non exécutées. Aucun checkpoint.
+
 ## PR117 — découverte PID multiréponses et attribution Mach-E (26/11/2026)
 
 - C6 : la découverte fonctionnelle sans en-têtes fusionne les bitmaps valides en union, sans prétendre connaître le calculateur d'origine ; elle ne valide pas une enquête limitée au groupe motopropulseur en cas de bitmaps anonymes contradictoires. Les réponses physiques conservent les ensembles par ECU, y compris les ensembles vides. Une mesure anonyme ne complète pas un catalogue attribué. Le scan affiche la couverture par répondant, l'attribution incomplète et la première page non résolue. Régression avec les six bitmaps réels Mach-E et le PID A6, non exécutée. Aucun checkpoint.

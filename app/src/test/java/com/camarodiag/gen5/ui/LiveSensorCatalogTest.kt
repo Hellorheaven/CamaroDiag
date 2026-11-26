@@ -12,6 +12,11 @@ class LiveSensorCatalogTest {
         assertEquals(catalog.size, catalog.map { it.id }.distinct().size)
         assertTrue(catalog.all { it.labelEn.isNotBlank() && it.labelFr.isNotBlank() })
         assertTrue(catalog.any { it.id == "ETHANOL" })
+        assertTrue(catalog.any { it.id == "ODOMETER" })
+        assertTrue(catalog.any { it.id == "HYBRID_BAT_LIFE" })
+        assertTrue(LiveSensorCatalog.availableEntries(emptyList()).none {
+            it.id in setOf("ODOMETER", "HYBRID_BAT_LIFE")
+        })
         assertTrue(catalog.any { it.id == "WBO2_B2S1" })
     }
 

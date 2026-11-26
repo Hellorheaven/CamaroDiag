@@ -318,6 +318,8 @@
     <string name="live_pid_oil_demo">Oil pressure (DEMO)</string>
     <string name="live_pid_stft">Short-term fuel trim B1</string>
     <string name="live_pid_stft_demo">Short-term fuel trim B1 (DEMO)</string>
+    <string name="live_pid_odometer">Total OBD odometer (PID A6)</string>
+    <string name="live_pid_hybrid_bat_life">Reported hybrid battery remaining life (PID 5B)</string>
     <string name="live_pid_bat">Control module voltage</string>
     <string name="live_pid_bat_demo">Control module voltage (DEMO)</string>
     <string name="live_pid_speed">Vehicle speed</string>

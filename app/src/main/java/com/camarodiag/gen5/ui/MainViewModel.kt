@@ -5886,6 +5886,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                                     val v = (b[0] * 256 + b[1]) / 1000.0
                                     values += LivePidValue("BAT", "Control Module Voltage", "Tension calculateur", v, "V", v, "V", 9.0, 16.0, push("BAT", v))
                                 }
+                                read("A6")?.takeIf { it.size == 4 }?.let { b ->
+                                    val km = b.fold(0L) { acc, byte -> (acc shl 8) or byte.toLong() } / 10.0
+                                    values += LivePidValue("ODOMETER", "OBD total odometer (PID A6)",
+                                        "Kilométrage total OBD (PID A6)", km, "km",
+                                        km / 1.609344, "mi", 0.0, maxOf(1.0, km * 1.05), push("ODOMETER", km))
+                                }
                                 read("5B")?.singleOrNull()?.let { b ->
                                     val v = b * 100.0 / 255.0
                                     values += LivePidValue("HYBRID_BAT_LIFE",

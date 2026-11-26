@@ -73,8 +73,10 @@ fun ObdScanScreen(
     val vehicleKey = report?.vin?.trim()?.uppercase()?.takeIf { it.length == 17 }
     // An unknown VIN must never share a persistent selection with another vehicle.
     // A saved garage profile provides a stable identity before the ECU VIN is read.
-    val vehicleIdentity = savedVehicleId?.takeIf(String::isNotBlank)?.let { "garage_$it" }
-        ?: vehicleKey?.let { "vin_$it" }
+    val vehicleIdentity = vehicleKey?.let { observed ->
+        if (observed == vehicle.vin.trim().uppercase() && !savedVehicleId.isNullOrBlank())
+            "garage_$savedVehicleId" else "vin_$observed"
+    }
     val preferenceKey = SensorSelectionScope.key(accountUid, vehicleIdentity)
     val storedPids = remember(preferenceKey, preferences) {
         preferenceKey?.let { preferences.getString(it, null)?.split(",")?.mapNotNull(String::toIntOrNull) }
@@ -373,6 +375,7 @@ private fun localizedObdPidName(pid: Int): String = when (pid) {
     0x49 -> stringResource(R.string.live_pid_app_d)
     0x4A -> stringResource(R.string.live_pid_app_e)
     0xA6 -> stringResource(R.string.obd_pid_odometer)
+    0x5B -> stringResource(R.string.live_pid_hybrid_bat_life)
     0x52 -> stringResource(R.string.live_pid_ethanol)
     else -> stringResource(R.string.obd_pid_generic, pid)
 }

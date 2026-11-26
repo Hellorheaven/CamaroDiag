@@ -700,10 +700,10 @@ fun CamaroDiagApp(
                     recording = liveRecording,
                     telemetryMessage = liveTelemetryMessage,
                     accountUid = accountUid,
-                    vehicleIdentity = selectedSavedVehicleId?.let { "garage_$it" }
-                        ?: vehicle.vin.trim().uppercase(Locale.ROOT)
-                            .takeIf { it.matches(Regex("[A-HJ-NPR-Z0-9]{17}")) }
-                            ?.let { "vin_$it" },
+                    vehicleIdentity = observedStandardVin?.let { observed ->
+                        if (VehicleVinMatcher.normalize(vehicle.vin) == observed && selectedSavedVehicleId != null)
+                            "garage_$selectedSavedVehicleId" else "vin_$observed"
+                    },
                     detectedSensors = detectedLiveSensors,
                     connectionGeneration = connectionGeneration,
                     onToggleStream = { viewModel.toggleLiveStream() },
@@ -1532,6 +1532,8 @@ fun LiveDataScreen(
         "STFT" to R.string.live_pid_stft,
         "LTFT" to R.string.live_pid_ltft,
         "BAT" to R.string.live_pid_bat,
+        "HYBRID_BAT_LIFE" to R.string.live_pid_hybrid_bat_life,
+        "ODOMETER" to R.string.live_pid_odometer,
         "SPD" to R.string.live_pid_speed,
         "TPS" to R.string.live_pid_throttle,
         "LOAD" to R.string.live_pid_load,
@@ -1623,9 +1625,10 @@ fun LiveDataScreen(
             },
             confirmButton = {
                 TextButton(onClick = {
-                    selectedPidIds = pendingIds.toSet()
+                    val accepted = pendingIds.intersect(allPidIds)
+                    selectedPidIds = accepted
                     storageKey?.let { key ->
-                        preferences.edit { putString(key, pendingIds.sorted().joinToString(",")) }
+                        preferences.edit { putString(key, accepted.sorted().joinToString(",")) }
                     }
                     choosingSensors = false
                 }) { Text(stringResource(R.string.obd_sensor_ok)) }
@@ -1726,7 +1729,15 @@ fun LiveDataScreen(
             Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
                 Column(Modifier.padding(14.dp)) {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Bottom) {
-                        Text(localizedLivePidLabel(pid), color = TextMuted, fontSize = 13.sp)
+                        val source = Regex("\\[([0-9A-F]{3}|[0-9A-F]{8})\\]$").find(pid.labelEn)?.groupValues?.get(1)
+                        val label = if (pid.labelEn.contains("(DEMO)", ignoreCase = true))
+                            localizedLivePidLabel(pid)
+                        else sensorLabels[pid.id] ?: localizedLivePidLabel(pid)
+                        Column(Modifier.weight(1f)) {
+                            Text(label, color = TextMuted, fontSize = 13.sp)
+                            source?.let { Text(stringResource(R.string.obd_value_source, it),
+                                color = TextMuted, fontSize = 11.sp) }
+                        }
                         Text(
                             text = "${String.format(Locale.getDefault(), "%.1f", displayVal)} $displayUnit",
                             fontSize = 22.sp,
