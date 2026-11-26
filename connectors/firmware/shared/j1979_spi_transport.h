@@ -102,7 +102,7 @@ class SpiSlave {
       std::memset(rx_,0,Size);
       if(!port_.arm(tx_,rx_,Size)||!port_.admitted())return fail();
       phase_=Phase::Response;armedAt_=port_.monotonicMs();port_.ready(true);
-      return true;
+      return port_.admitted()||fail();
     }
     for(uint8_t byte:rx_)if(byte)return fail();
     if(endpoint_.closed())return fail();
@@ -114,7 +114,7 @@ class SpiSlave {
     std::memset(tx_,0,Size);std::memset(rx_,0,Size);
     if(!port_.admitted()||!port_.arm(tx_,rx_,Size)||!port_.admitted())return fail();
     phase_=Phase::Request;armedAt_=port_.monotonicMs();port_.ready(false);
-    return true;
+    return port_.admitted()||fail();
   }
   bool fail(){if(phase_!=Phase::Closed){phase_=Phase::Closed;port_.fault();}return false;}
   SpiSlavePort& port_;Endpoint& endpoint_;

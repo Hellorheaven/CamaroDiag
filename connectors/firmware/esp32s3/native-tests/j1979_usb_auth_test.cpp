@@ -1,4 +1,5 @@
-#include "../src/j1979_usb_auth.h"
+#include "../src/j1979_usb_service.h"
+#include <vector>
 #include <cassert>
 using namespace cd;
 using Auth=J1979UsbAuthSession;
@@ -65,6 +66,35 @@ struct Fixture {
     return auth.execute(proof,sizeof(proof),arbiter,owner,link,writer,scratch);
   }
 };
+struct Channel final:J1979UsbService::Channel {
+  explicit Channel(Fixture& f):fixture(f){}
+  Fixture& fixture;std::vector<uint8_t> output;
+  unsigned reads=0,closes=0,writes=0;
+  bool truncate=false,disconnectAfterChallenge=false,failEvidence=false;
+  bool present()override{return fixture.sec.present&&closes==0;}
+  uint32_t monotonicMs()override{return fixture.sec.now;}
+  bool readExact(uint8_t* out,size_t n,uint32_t)override{
+    ++reads;
+    if(reads==1&&n==Auth::HelloSize){std::memcpy(out,fixture.hello,n);return true;}
+    if(reads!=2||n!=Auth::ProofSize||truncate)return false;
+    out[0]='C';out[1]='U';out[2]=1;out[3]=3;
+    uint8_t transcript[Auth::TranscriptSize]{};transcript[0]=0x43;
+    std::memcpy(transcript+1,fixture.hello+4,45);std::memcpy(transcript+46,output.data()+4,32);
+    return fixture.sec.hmac(transcript,sizeof(transcript),out+4);
+  }
+  bool writeExact(const uint8_t* in,size_t n,uint32_t)override{
+    ++writes;
+    if(failEvidence&&writes>1)return false;
+    output.insert(output.end(),in,in+n);
+    if(disconnectAfterChallenge&&writes==1)fixture.sec.present=false;
+    return true;
+  }
+  void close()override{++closes;}
+  J1979UsbCampaign::Report serve(){
+    return J1979UsbService::serve(*this,fixture.sec,fixture.arbiter,fixture.owner,
+      fixture.link,fixture.scratch);
+  }
+};
 int main(){
   using O=J1979UsbCampaign::Outcome;
   Fixture good;assert(good.begin()&&good.owner.starts==0);
@@ -81,4 +111,15 @@ int main(){
   assert(disconnected.execute().outcome==O::Denied&&disconnected.owner.starts==0);
   Fixture invalid;invalid.hello[8]=0xe9;
   assert(!invalid.begin()&&invalid.owner.starts==0);
+  Fixture serviced;Channel channel(serviced);
+  assert(channel.serve().outcome==O::Partial&&channel.reads==2&&channel.closes==1);
+  assert(channel.output.size()>Auth::ChallengeSize&&serviced.owner.starts==1&&serviced.owner.stops==1);
+  assert(!serviced.sec.granted);
+  Fixture shortProof;Channel shortChannel(shortProof);shortChannel.truncate=true;
+  assert(shortChannel.serve().outcome==O::Denied&&shortProof.owner.starts==0&&shortChannel.closes==1);
+  Fixture gone;Channel goneChannel(gone);goneChannel.disconnectAfterChallenge=true;
+  assert(goneChannel.serve().outcome==O::Denied&&gone.owner.starts==0&&goneChannel.closes==1);
+  Fixture noOutput;Channel broken(noOutput);broken.failEvidence=true;
+  assert(broken.serve().outcome==O::EvidenceLost&&noOutput.owner.starts==1&&noOutput.owner.stops==1);
+  assert(noOutput.link.exchanges==0&&broken.closes==1&&!noOutput.sec.granted);
 }
