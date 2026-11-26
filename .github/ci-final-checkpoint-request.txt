@@ -39,3 +39,12 @@ corrected:
 - Windows simulated DoIP ECU self-tests: six Decoders now consume byte arrays after await, preventing ReadOnlySpan across await
 - Android diagnostic unit tests: LFX simulated Obd2FeatureEngine uses explicit ObdCommandChannel constructor (new optional Boolean second argument)
 commits: 9fca7331b027f116569eb67f56fe6aec92242aa5, be041ae30259e6d7fe4dbaa8e722cc50f5c067ad
+
+attempt: 5 -- regrouped self-test and simulator fixes
+previous_gate_sha: 3b7bf0f10fcfb6246a1645ba7cd91db8db0ded62
+previous_gate: https://github.com/Hellorheaven/CamaroDiag/actions/runs/45801451727
+corrected:
+- Windows DoIP diagnostic sequence self-test must inspect custom 22 1234 frame with generic ReadAsync, not F190-only helper
+- Simulator LFX Mode01 replies inherit the same synthetic physical responder 7E8 advertised in support bitmap; no anonymous live data in physically attributed scan
+- Simulator test now explicitly requires stable physical responder for synthetic RPM evidence
+commits: e10c7de09024b7a2d061011adb664a6b7ec9c859, 77535af20df3a6f0a3e630a549b67c5f53f88990, 553f0130791adfe4aee7e94ac76f3c834e3668e9
