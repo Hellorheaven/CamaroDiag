@@ -154,6 +154,13 @@ object CamaroDiagConnectorNativeCampaign {
                         put("duration_ms", step.durationMs)
                         put("dtc_codes", step.dtcCodes()?.let { JSONArray(it) } ?: JSONObject.NULL)
                         put("negative_response_code", step.negativeResponseCode() ?: JSONObject.NULL)
+                        put("monitor_records", step.monitorRecords()?.let { values ->
+                            JSONArray().apply { values.forEach { value ->
+                                put(JSONObject().put("monitor_id", value.monitorId).put("test_id", value.testId)
+                                    .put("unit_scaling_id", value.unitScalingId).put("value_encoded", value.valueEncoded)
+                                    .put("minimum_encoded", value.minimumEncoded).put("maximum_encoded", value.maximumEncoded))
+                            } }
+                        } ?: JSONObject.NULL)
                         put("measurement", step.measurement()?.let { value ->
                             JSONObject().put("mode", value.mode).put("pid", value.pid)
                                 .put("name", value.name).put("number", value.number).put("unit", value.unit)

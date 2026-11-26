@@ -9,6 +9,7 @@ internal static class J1979CampaignSemantics
     private static readonly HashSet<int> One=[4,5,6,7,8,9,10,11,13,14,15,17,19,29,44,45,46,47,48,51,69,70,71,72,73,74,75,76,82,90,91,92,97,98];
     private static readonly HashSet<int> Two=[12,16,31,33,34,35,49,50,60,61,62,63,66,67,68,77,78,83,84,89,93,94,99];
     internal sealed record Measurement(int Mode,int Pid,string Name,double Number,string Unit);
+    internal sealed record MonitorRecord(int MonitorId,int TestId,int UnitScalingId,int ValueEncoded,int MinimumEncoded,int MaximumEncoded);
     // Match the existing bridge's explicit classic SAE J1979 PID formulas.
     private static Measurement? DecodeMeasurement(byte[] req,byte[] res){
         int mode=req[0];
@@ -107,6 +108,16 @@ internal static class J1979CampaignSemantics
         }
         internal int? NegativeResponseCode=>State==3?Response[2]:null;
         internal Measurement? PidMeasurement=>State==1?DecodeMeasurement(Request,Response):null;
+        internal IReadOnlyList<MonitorRecord>? MonitorRecords {
+            get {
+                if(State!=1||Request[0]!=6||Request[1]%32==0)return null;
+                var records=new List<MonitorRecord>();
+                int Word(int i)=>Response[i]*256+Response[i+1];
+                for(int i=1;i<Response.Length;i+=9)
+                    records.Add(new(Response[i],Response[i+1],Response[i+2],Word(i+3),Word(i+5),Word(i+7)));
+                return records.AsReadOnly();
+            }
+        }
         internal string? ObservedVin=>State==1&&Request.AsSpan().SequenceEqual(new byte[]{9,2})?Encoding.ASCII.GetString(Response,3,17):null;
     }
     internal sealed record Summary(string End,int Flags,int Steps);

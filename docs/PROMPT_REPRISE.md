@@ -1,3 +1,7 @@
+## J1979 — résultats Mode 06 natifs structurés (26/11/2026)
+
+- Les trois hôtes CU/1 exposent désormais les enregistrements CAN Mode 06 positifs vérifiés : MID, TID, identifiant d'unité/échelle et mots valeur/min/max encodés. Bitmaps, NRC et timeout restent sans enregistrement ; aucune unité, comparaison ni réussite de moniteur inventée en l'absence de table SAE applicable. Export JSON Android/Windows/Python, régressions de deux enregistrements et distinction bitmap écrites sans exécution. C6/J1979 toujours en cours ; aucun merge, Release ou CI intermédiaire.
+
 ## J1979 — annulation CLI et échéances USB (26/11/2026)
 
 - Python : interruption opérateur conservée comme résultat annulé, préfixe CJ/1 conservé, échéance vérifiée avant/après les deux écritures et la lecture finale, aucun renvoi automatique. Windows : Ctrl+C révoque la session série sans tuer immédiatement le processus, export JSON annulé, conservation des observations déjà acquises lors d'une erreur de synchronisation disque/fermeture. Régressions Python écrites, non exécutées ; clôture logicielle J1979/C6 toujours ouverte, aucun test intermédiaire ni Release.

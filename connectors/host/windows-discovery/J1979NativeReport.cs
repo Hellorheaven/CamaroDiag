@@ -26,6 +26,8 @@ internal static class J1979NativeReport
             steps=result.Steps.Select(s=>new{sequence=s.Sequence,request_hex=s.RequestHex,response_hex=s.ResponseHex,
                 status=s.Status,duration_ms=s.DurationMs,dtc_codes=s.DtcCodes,
                 negative_response_code=s.NegativeResponseCode,
+                monitor_records=s.MonitorRecords?.Select(m=>new{monitor_id=m.MonitorId,test_id=m.TestId,
+                    unit_scaling_id=m.UnitScalingId,value_encoded=m.ValueEncoded,minimum_encoded=m.MinimumEncoded,maximum_encoded=m.MaximumEncoded}),
                 measurement=s.PidMeasurement is { } value?new {
                     mode=value.Mode,pid=value.Pid,name=value.Name,number=value.Number,unit=value.Unit
                 }:null}),

@@ -79,6 +79,13 @@ public final class J1979UsbTest {
         J1979CampaignSemantics.Step denied=new J1979CampaignSemantics.Step(4,3,1,new byte[]{7},new byte[]{0x7f,7,0x11});
         assert denied.dtcCodes()==null&&denied.negativeResponseCode()==0x11;
         assert new J1979CampaignSemantics.Step(5,1,1,new byte[]{10},new byte[]{0x4a,0}).dtcCodes().isEmpty();
+        J1979CampaignSemantics.Step monitor=new J1979CampaignSemantics.Step(9,1,1,new byte[]{6,1},
+            hex("4601010212340000FFFF01030280000001FFFE"));
+        assert monitor.monitorRecords().size()==2;
+        assert monitor.monitorRecords().get(0).valueEncoded==0x1234;
+        assert monitor.monitorRecords().get(1).minimumEncoded==1;
+        assert monitor.monitorRecords().get(1).maximumEncoded==65534;
+        assert new J1979CampaignSemantics.Step(9,1,1,new byte[]{6,0},hex("460080000000")).monitorRecords()==null;
         Sim partial=new Sim(concat(challenge,Arrays.copyOf(capture,capture.length-1)));
         raw=new ByteArrayOutputStream();
         result=new J1979UsbCapture(partial).runRequest(hello,10000,key,raw);

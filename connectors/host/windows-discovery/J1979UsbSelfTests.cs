@@ -70,6 +70,10 @@ internal static class J1979UsbSelfTests
         var denied=new J1979CampaignSemantics.Step(4,3,1,[7],[0x7f,7,0x11]);
         Require(denied.DtcCodes is null&&denied.NegativeResponseCode==0x11);
         Require(new J1979CampaignSemantics.Step(5,1,1,[10],[0x4a,0]).DtcCodes!.Count==0);
+        var monitor=new J1979CampaignSemantics.Step(9,1,1,[6,1],Convert.FromHexString("4601010212340000FFFF01030280000001FFFE"));
+        Require(monitor.MonitorRecords is {Count:2} records&&records[0].ValueEncoded==0x1234&&
+            records[1].MinimumEncoded==1&&records[1].MaximumEncoded==65534);
+        Require(new J1979CampaignSemantics.Step(9,1,1,[6,0],Convert.FromHexString("460080000000")).MonitorRecords is null);
         var partial=new Sim([.. challenge,.. capture[..^1]]);using var partialRaw=new MemoryStream();
         result=new J1979UsbCapture(partial).RunRequest(hello,10000,key,partialRaw);
         Require(result.DeviceCredentialAuthenticated&&!result.FrameIntegrityVerified&&partial.Closed&&partialRaw.Length==capture.Length-1);

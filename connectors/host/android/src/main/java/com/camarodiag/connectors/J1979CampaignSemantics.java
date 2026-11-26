@@ -94,6 +94,16 @@ public final class J1979CampaignSemantics {
             default:return null;
         }
     }
+    /** Encoded CAN Mode 06 record; no scaling or pass/fail inferred. */
+    public static final class MonitorRecord {
+        public final int monitorId,testId,unitScalingId,valueEncoded,minimumEncoded,maximumEncoded;
+        MonitorRecord(byte[] data,int i){
+            monitorId=u(data[i]);testId=u(data[i+1]);unitScalingId=u(data[i+2]);
+            valueEncoded=u(data[i+3])*256+u(data[i+4]);
+            minimumEncoded=u(data[i+5])*256+u(data[i+6]);
+            maximumEncoded=u(data[i+7])*256+u(data[i+8]);
+        }
+    }
     public static final class Step {
         public final int sequence;
         public final String requestHex,responseHex,status;
@@ -125,6 +135,12 @@ public final class J1979CampaignSemantics {
         /** NRC is meaningful only on a verified terminal negative response. */
         public Integer negativeResponseCode(){return state==3?u(response[2]):null;}
         public Measurement measurement(){return state==1?J1979CampaignSemantics.measurement(request,response):null;}
+        public List<MonitorRecord> monitorRecords(){
+            if(state!=1||u(request[0])!=6||u(request[1])%32==0)return null;
+            List<MonitorRecord> records=new ArrayList<>();
+            for(int i=1;i<response.length;i+=9)records.add(new MonitorRecord(response,i));
+            return Collections.unmodifiableList(records);
+        }
         public String observedVin(){return state==1&&Arrays.equals(request,new byte[]{9,2})?
             new String(response,3,17,StandardCharsets.US_ASCII):null;}
     }

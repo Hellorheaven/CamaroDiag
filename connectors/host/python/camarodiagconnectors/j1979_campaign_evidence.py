@@ -148,6 +148,19 @@ def _measurement(req, res):
     return {"mode": mode, "pid": pid, "name": name, "number": number, "unit": unit}
 
 
+def _monitor_records(req, res):
+    # Only called for a shape-validated positive CAN Mode 06 response.
+    if req[0] != 6 or req[1] % 32 == 0:
+        return None
+    records = []
+    for offset in range(1, len(res), 9):
+        mid, tid, uas, value, minimum, maximum = struct.unpack_from(">BBBHHH", res, offset)
+        records.append({"monitor_id": mid, "test_id": tid, "unit_scaling_id": uas,
+                        "value_encoded": value, "minimum_encoded": minimum,
+                        "maximum_encoded": maximum})
+    return records
+
+
 def _exact(stream, size):
     chunks = bytearray()
     while len(chunks) < size:
@@ -330,7 +343,8 @@ def decode(stream):
                     "response_hex": res.hex().upper() if res else None, "status": status,
                     "duration_ms": elapsed, "dtc_codes": dtc_codes,
                     "negative_response_code": res[2] if state == 3 else None,
-                    "measurement": _measurement(req, res) if state == 1 else None})
+                    "measurement": _measurement(req, res) if state == 1 else None,
+                    "monitor_records": _monitor_records(req, res) if state == 1 else None})
                 continue
             if kind != 3 or length != 22:
                 raise ValueError("Unexpected evidence record")

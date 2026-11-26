@@ -82,6 +82,24 @@ class CaptureTests(unittest.TestCase):
         self.assertIsNone(report["steps"][0]["measurement"])
         self.assertIsNone(report["steps"][7]["measurement"])
 
+    def test_mode06_monitor_records_preserve_encoded_unsigned_words(self):
+        tail = (step(6, b"\x02\x02\x00", bytes.fromhex("4202000000")) +
+                step(7, b"\x06\x00", bytes.fromhex("460080000000")) +
+                step(8, b"\x06\x01", bytes.fromhex("4601010212340000FFFF01030280000001FFFE")) +
+                step(9, b"\x08\x00", bytes.fromhex("480000000000")) +
+                step(10, b"\x09\x00", bytes.fromhex("490000000000")))
+        report = decode(io.BytesIO(start() + INITIAL + IDENTITY + DTC + tail +
+            summary(11, flags=231, steps=10, positive=10)))
+        self.assertTrue(report["capture_integrity_verified"])
+        self.assertIsNone(report["steps"][6]["monitor_records"])
+        records = report["steps"][7]["monitor_records"]
+        self.assertEqual(2, len(records))
+        self.assertEqual(0x1234, records[0]["value_encoded"])
+        self.assertEqual(0x8000, records[1]["value_encoded"])
+        self.assertEqual(1, records[1]["minimum_encoded"])
+        self.assertEqual(65534, records[1]["maximum_encoded"])
+        self.assertNotIn("passed", records[0])
+
     def test_corruption_and_truncation_keep_prefix(self):
         for tail in (IDENTITY[:-1], IDENTITY[:-1] + bytes([IDENTITY[-1] ^ 1])):
             report = decode(io.BytesIO(start() + INITIAL + tail))
