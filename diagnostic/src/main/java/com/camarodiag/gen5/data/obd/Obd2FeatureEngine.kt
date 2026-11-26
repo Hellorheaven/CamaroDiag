@@ -4,6 +4,8 @@ import java.util.Locale
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.currentCoroutineContext
 
 /** A single-command OBD transport. Implement with Bluetooth/USB/Wi-Fi ELM or a documented provider. */
 fun interface ObdCommandChannel {
@@ -488,14 +490,34 @@ class Obd2FeatureEngine(
     /** CAN Mode 06 is a separate namespace from Mode 01 PIDs.
      * Query only MIDs actually advertised by a valid support bitmap.
      * Report encoded words and UASID; do not invent engineering units or pass/fail. */
-    suspend fun readMonitorTests(): String? = withHeaderlessRecords {
+    suspend fun readMonitorTests(): String? =
+        readMonitorTests(20_000L) { System.nanoTime() / 1_000_000L }
+
+    /** A shared request budget, not a new 2.5 s budget for every advertised MID.
+     * The channel must honor the supplied timeout; ELM setup/restore is outside
+     * this budget and still executes under the exclusive session. */
+    internal suspend fun readMonitorTests(
+        budgetMs: Long,
+        monotonicMs: () -> Long
+    ): String? = withHeaderlessRecords {
+        require(budgetMs > 0)
+        val started = monotonicMs()
+        suspend fun request(mid: Int): String? {
+            currentCoroutineContext().ensureActive()
+            val remaining = budgetMs - (monotonicMs() - started)
+            if (remaining <= 0) return null
+            val response = ask("06%02X".format(Locale.ROOT, mid), minOf(2500L, remaining))
+            currentCoroutineContext().ensureActive()
+            return response
+        }
+
         val supported = linkedSetOf<Int>()
         var baseMid = 0
         var discovered = false
         var incomplete = false
         for (pageIndex in 0 until 8) {
-            val response = ask("06%02X".format(Locale.ROOT, baseMid), 2500L)
-            val page = ObdCanMonitorRecords.support(response, baseMid)
+            val response = request(baseMid)
+            val page = response?.let { ObdCanMonitorRecords.support(it, baseMid) }
             if (page == null) {
                 if (discovered) incomplete = true
                 break
@@ -507,15 +529,26 @@ class Obd2FeatureEngine(
         }
         if (!discovered) return@withHeaderlessRecords null
         val result = mutableListOf<String>()
-        for (mid in supported) {
-            val records = ObdCanMonitorRecords.results(ask("06%02X".format(Locale.ROOT, mid), 2500L), mid)
+        val mids = supported.toList()
+        for ((index, mid) in mids.withIndex()) {
+            val response = request(mid)
+            if (response == null) {
+                incomplete = true
+                result += "UNQUERIED_MIDS=" + mids.drop(index).joinToString(",") {
+                    "%02X".format(Locale.ROOT, it)
+                }
+                break
+            }
+            val records = ObdCanMonitorRecords.results(response, mid)
             if (records.isNullOrEmpty()) {
                 incomplete = true
                 result += "MID=%02X: N/A".format(Locale.ROOT, mid)
             } else result += records.map { it.rawText() }
         }
-        if (result.isEmpty()) return@withHeaderlessRecords null
+        // A valid empty support bitmap is evidence, unlike no response.
+        if (result.isEmpty()) result += "DISCOVERED_MIDS=0"
         if (incomplete) result += "PARTIAL"
+        currentCoroutineContext().ensureActive()
         result.joinToString("\n")
     }
 

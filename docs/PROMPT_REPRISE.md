@@ -1,3 +1,7 @@
+## PR117 — restauration du budget Mode 06 et preuve de réponse (26/11/2026)
+
+- C6 : réintégration de la version bornée du Mode 06 (budget partagé 20 s, annulation, MID non interrogés et résultat partiel), absente du blob courant après réconciliation des modifications parallèles. Les nouveaux parcours PID par répondant, A6 et identité sont préservés. Le bitmap réel Mach-E 460000000001 déclenche une tentative de page 0620 ; sans réponse valide, le résultat reste partiel et ne prétend pas que les tests sont absents. Les régressions existantes ObdCanMonitorRecordsTest couvrent ces cas ; non exécutées. Aucun checkpoint.
+
 ## PR117 — A6 et libellés réels dans les données temps réel (26/11/2026)
 
 - C6 : odomètre A6 en temps réel seulement lorsqu'annoncé et effectivement lu, décodage quatre octets non signé /10, km/miles, source stable existante. Traductions A6 et PID 5B dans le catalogue, le scan et les cartes ; 5B n'est ni SOC traction ni mesure certifiée de santé. Cartes temps réel réutilisent les libellés localisés et indiquent le répondant physique. Les préférences de capteurs ne sont persistées que pour le VIN observé et ne contaminent plus le garage Camaro lors d'un essai Ford. Régressions catalogue écrites, non exécutées. Aucun checkpoint.
