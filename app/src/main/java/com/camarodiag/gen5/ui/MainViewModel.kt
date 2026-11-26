@@ -5184,7 +5184,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             } catch (error: Exception) {
                 if (current()) {
                     reportConnectionLoss(error)
-                    _connectionMessage.value = localizedContext.getString(R.string.msg_dtc_clear_failed)
+                    _connectionMessage.value = localizedContext.getString(
+                        if (error is com.camarodiag.gen5.data.obd.ObdStationaryEvidenceRequiredException)
+                            R.string.msg_dtc_clear_stationary_required else R.string.msg_dtc_clear_failed)
+                    _dtcScanNotice.value = _connectionMessage.value
                 }
             } finally {
                 endBusyOperation()
