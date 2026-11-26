@@ -1,6 +1,6 @@
 #pragma once
 #include "interprocessor_link.h"
-#include "j1979_can_read_exchange.h"
+#include "j1979_can_campaign.h"
 
 namespace cd { namespace readlink {
 // CI/2 application mailbox. Separate from CI/1 discovery; no implicit upgrade.
@@ -118,21 +118,35 @@ class Endpoint {
 class Transport {
  public:
   virtual ~Transport()=default;
+  virtual bool active()=0;
+  virtual uint32_t monotonicMs()=0;
   virtual bool exchange(const uint8_t* request,uint8_t* response,uint32_t timeoutMs)=0;
 };
-class Client {
+class Client final:public J1979CanCampaign::ApplicationLink {
  public:
   explicit Client(Transport& transport):transport_(transport){}
   Client(const Client&)=delete;
   Client& operator=(const Client&)=delete;
   bool closed()const{return closed_;}
+  bool active()override{return !closed_&&transport_.active();}
+  uint32_t monotonicMs()override{return transport_.monotonicMs();}
+  void exchange(const uint8_t* req,size_t n,uint32_t timeout,Exchange::Result& out)override{
+    if(timeout>4000u||!read(req,n,uint16_t(timeout),out)){
+      out.state=State::Fault;out.responseSize=0;closed_=true;
+    }
+  }
   bool read(const uint8_t* req,size_t n,uint16_t timeout,Exchange::Result& out){
     out.state=State::Fault;out.responseSize=0;out.elapsedMs=0;
-    if(closed_||!req||n>7||timeout<1||timeout>4000||
+    if(!active()||!req||n>7||timeout<2||timeout>4000||
        !J1979ReadEvidence::readRequest(J1979ReadEvidence::Variant::ClassicCan,req,n))return fail();
     Packet p,r;p.op=Op::Read;p.length=uint8_t(n+2);
-    put16(p.body,timeout);std::memcpy(p.body+2,req,n);
-    if(!request(p,Op::Result,r,uint32_t(timeout)+100u)||r.length!=7||
+    // Reserve part of the absolute exchange budget for mailbox overhead.
+    // Every chunk shares the same deadline; no per-fragment extension.
+    const uint32_t started=monotonicMs();
+    const uint16_t reserve=timeout>400?100:uint16_t(timeout/2);
+    const uint16_t vehicleTimeout=uint16_t(timeout-reserve);
+    put16(p.body,vehicleTimeout);std::memcpy(p.body+2,req,n);
+    if(!request(p,Op::Result,r,started,timeout)||r.length!=7||
        r.body[0]<1||r.body[0]>5)return fail();
     const uint8_t state=r.body[0];const size_t total=get16(r.body+1);
     if(total>4095||(state<=3)!=(total>0))return fail();
@@ -140,7 +154,7 @@ class Client {
     size_t offset=0;
     while(offset<total){
       Packet fetch,chunk;fetch.op=Op::Fetch;fetch.length=2;put16(fetch.body,uint16_t(offset));
-      if(!request(fetch,Op::Chunk,chunk,100u)||chunk.length<=2||
+      if(!request(fetch,Op::Chunk,chunk,started,timeout)||chunk.length<=2||
          get16(chunk.body)!=offset)return fail();
       const size_t count=chunk.length-2;
       const size_t remaining=total-offset;
@@ -156,10 +170,13 @@ class Client {
   }
  private:
   bool fail(){closed_=true;return false;}
-  bool request(Packet& p,Op expected,Packet& r,uint32_t timeout){
-    if(closed_)return false;
+  bool request(Packet& p,Op expected,Packet& r,uint32_t started,uint32_t budget){
+    if(!active())return fail();
+    const uint32_t elapsed=uint32_t(monotonicMs()-started);
+    if(elapsed>=budget)return fail();
     p.seq=next_;uint8_t tx[Size]{},rx[Size]{};
-    if(!encode(p,tx,Size)||!transport_.exchange(tx,rx,timeout)||
+    if(!encode(p,tx,Size)||!transport_.exchange(tx,rx,budget-elapsed)||
+       !transport_.active()||uint32_t(monotonicMs()-started)>=budget||
        !decode(rx,Size,r)||r.op!=expected||r.seq!=next_)return fail();
     if(next_==0xffffu)closed_=true;else ++next_;
     return true;

@@ -24,7 +24,32 @@ class J1979CanCampaign {
     virtual bool observation(const uint8_t* request,size_t requestSize,
                              const Exchange::Result& reply)=0;
   };
+  // Application-level boundary: the local CAN link or a remote processor
+  // must deliver a correlated response and enforce the read-only policy.
+  class ApplicationLink {
+   public:
+    virtual ~ApplicationLink()=default;
+    virtual bool active()=0;
+    virtual uint32_t monotonicMs()=0;
+    virtual void exchange(const uint8_t* request,size_t size,uint32_t timeout,
+                          Exchange::Result& result)=0;
+  };
   static Summary run(J1979CanReadLink& link,uint32_t tx,uint32_t rx,bool extended,
+                     uint32_t budgetMs,Sink& sink,Exchange::Result& scratch){
+    class Local final:public ApplicationLink {
+     public:
+      Local(J1979CanReadLink& l,uint32_t tx,uint32_t rx,bool ext):l_(l),tx_(tx),rx_(rx),ext_(ext){}
+      bool active()override{return l_.active();}
+      uint32_t monotonicMs()override{return l_.monotonicMs();}
+      void exchange(const uint8_t* req,size_t n,uint32_t timeout,Exchange::Result& result)override{
+        Exchange::run(l_,tx_,rx_,ext_,req,n,timeout,result);
+      }
+     private:
+      J1979CanReadLink& l_;uint32_t tx_,rx_;bool ext_;
+    } local(link,tx,rx,extended);
+    return runApplication(local,tx,rx,extended,budgetMs,sink,scratch);
+  }
+  static Summary runApplication(ApplicationLink& link,uint32_t tx,uint32_t rx,bool extended,
                      uint32_t budgetMs,Sink& sink,Exchange::Result& scratch){
     Summary s;
     if(budgetMs<1||budgetMs>600000u||
@@ -36,7 +61,21 @@ class J1979CanCampaign {
       const uint32_t elapsed=uint32_t(link.monotonicMs()-started);
       if(elapsed>=budgetMs){s.end=End::Budget;return false;}
       const uint32_t remaining=budgetMs-elapsed;
-      Exchange::run(link,tx,rx,extended,request,size,remaining<1800u?remaining:1800u,scratch);
+      scratch.state=State::Fault;scratch.responseSize=0;scratch.elapsedMs=0;
+      if(link.active())link.exchange(request,size,remaining<1800u?remaining:1800u,scratch);
+      // Independently check the application result before using its bytes
+      // as bitmap or identity evidence, even for an alternate transport.
+      using R=J1979ReadEvidence::Result;
+      if(scratch.state==State::Positive||scratch.state==State::Raw||scratch.state==State::Negative){
+        const auto shape=scratch.responseSize<=sizeof(scratch.response)?
+          J1979ReadEvidence::classify(J1979ReadEvidence::Variant::ClassicCan,
+            request,size,scratch.response,scratch.responseSize):static_cast<R>(255);
+        if((scratch.state==State::Positive&&shape!=R::Positive)||
+           (scratch.state==State::Raw&&shape!=R::Raw)||
+           (scratch.state==State::Negative&&shape!=R::Negative)){
+          scratch.state=State::Fault;scratch.responseSize=0;
+        }
+      }else scratch.responseSize=0;
       ++s.steps;
       switch(scratch.state){
         case State::Positive:++s.positive;break;

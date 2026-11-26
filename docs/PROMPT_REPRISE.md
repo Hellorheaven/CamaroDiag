@@ -1,3 +1,7 @@
+## J1979 — raccordement de CI/2 à la campagne commune (26/11/2026)
+
+- Le moteur de campagne accepte désormais un transport applicatif corrélé en plus du CAN local. Client CI/2 raccordé directement à ce contrat, contrôle indépendant des formes de réponse avant lecture des bitmaps, budget absolu partagé par la requête et tous les fragments. Régression campagne complète sur boucle interprocesseur et expiration pendant récupération de fragments, non exécutée. Aucun démarrage matériel ni authentification USB ajouté. J1979/C6 ouverts ; pas de CI, fusion ou Release.
+
 ## J1979 / C6 — boîte aux lettres lecture ESP32–STM32 CI/2 (26/11/2026)
 
 - Nouveau codec fixe CI/2 distinct de CI/1 découverte, client et endpoint d'échanges applicatifs J1979 CAN physique. L'endpoint local exécute le noyau ISO-TP sur un canal qualifié fourni ; pas de CAN brut ni de mutateur. CRC, séquence, corrélation, fragments de réponse jusqu'à 4095 octets, validation indépendante de forme et verrouillage sur erreur sans réessai. Tests natifs de boucle, refus Mode04, rejeu, CRC et révocation inscrits au gate, non exécutés. Pas de SPI GPIO ni de FDCAN activé, ni authentification déduite du CRC. Restent transport SPI matériel, propriétaire STM32, raccordement USB et qualification. J1979/C6 ouverts, aucune CI, fusion ni Release.
