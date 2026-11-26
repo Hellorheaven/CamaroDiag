@@ -782,9 +782,18 @@ internal static class DoIpVinReader
             !DoIpVehicleDiscovery.IsVehicleVin(gateway.Vin))
             throw new ArgumentException("A valid observed VIN and explicit command are required.");
         var fixedCommand = command.ToArray();
-        await using var transport = await ConnectObservedAsync(gateway, address, tester,
-            ecu, useTls, timeout, token, certificate, trace, options);
-        return await ExchangeVerifiedAsync(transport, gateway, fixedCommand, timeout, token);
+        byte[] reply;
+        await using (var transport = await ConnectObservedAsync(gateway, address, tester,
+            ecu, useTls, timeout, token, certificate, trace, options))
+        {
+            reply = await ExchangeVerifiedAsync(transport, gateway, fixedCommand, timeout, token);
+        }
+        // The last observed gateway must still be selected after socket
+        // shutdown; raw UDS operations are never replayed to recover.
+        token.ThrowIfCancellationRequested();
+        await DoIpVehicleDiscovery.RequireCurrentIdentityAsync(gateway, timeout, token);
+        token.ThrowIfCancellationRequested();
+        return reply;
     }
 
     internal static async Task<int> ExchangeSequenceObservedAsync(
@@ -839,10 +848,20 @@ internal static class DoIpVinReader
     internal static async Task<byte[]> ExchangeVerifiedAsync(DoIpDiagnosticTransport transport,
         DoIpVehicleDiscovery.Identity gateway, byte[] command, TimeSpan timeout, CancellationToken token)
     {
-        var fixedCommand = command.ToArray();
-        _ = await VerifyObservedVinAsync(transport, gateway, timeout, token, null, null);
-        token.ThrowIfCancellationRequested();
-        return await transport.ExchangeUdsAsync(fixedCommand, timeout, token);
+        // One confirmed command is still one atomic ECU operation. Its F190
+        // identity check may not be separated from TX by another caller.
+        ArgumentNullException.ThrowIfNull(command);
+        byte[]? verifiedReply = null;
+        var count = await ExchangeSequenceVerifiedAsync(transport, gateway,
+            new[] { command.ToArray() }, timeout, token, (index, reply) =>
+            {
+                if (index != 1 || verifiedReply is not null)
+                    throw new InvalidDataException("Unexpected DoIP command response order.");
+                verifiedReply = reply.ToArray();
+            });
+        if (count != 1 || verifiedReply is null)
+            throw new InvalidDataException("Incomplete verified DoIP command.");
+        return verifiedReply;
     }
 
     internal static async Task<ObdOnUdsServices.DtcCountReport> CountObservedGatewayDtcsAsync(
