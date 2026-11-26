@@ -1,5 +1,6 @@
 #pragma once
 #include "j1979_usb_auth.h"
+#include "j1979_read_guard.h"
 
 namespace cd {
 // One local operator-approved session, bound to an immutable connection and
@@ -28,8 +29,11 @@ class J1979LocalUsbOwner final:public J1979UsbAuthSession::Security,
     virtual bool stopAndVerify()=0;
     virtual void latchRecovery()=0;
   };
-  J1979LocalUsbOwner(Board& board,HostSessionArbiter& arbiter,const Profile& approved)
-    :board_(board),arbiter_(arbiter),profile_(approved),initial_(board.snapshot(approved)){}
+  J1979LocalUsbOwner(Board& board,HostSessionArbiter& arbiter,J1979ReadGuard& durable,
+      const Profile& approved)
+    :board_(board),arbiter_(arbiter),durable_(durable),profile_(approved),initial_(board.snapshot(approved)){
+    if(!durable_.inspect()){board_.latchRecovery();arbiter_.latchRecovery();}
+  }
   J1979LocalUsbOwner(const J1979LocalUsbOwner&)=delete;
   J1979LocalUsbOwner& operator=(const J1979LocalUsbOwner&)=delete;
   bool connectionPresent()override{
@@ -73,6 +77,9 @@ class J1979LocalUsbOwner final:public J1979UsbAuthSession::Security,
   bool startReadChannel(const Profile& p,const HostSessionArbiter::Lease& lease)override{
     if(attempted_||!granted_||lease.mode!=HostInterface::NativeUsb||
        !localApproval(p)||!arbiter_.allowsRead(lease,currentEvidence(p)))return false;
+    if(!durable_.begin()){
+      failedStop_=true;board_.latchRecovery();arbiter_.latchRecovery();return false;
+    }
     attempted_=true;
     return board_.start(p,lease.generation)&&localApproval(p)&&
       arbiter_.allowsRead(lease,currentEvidence(p));
@@ -83,8 +90,8 @@ class J1979LocalUsbOwner final:public J1979UsbAuthSession::Security,
     // Never stop a different owner's channel if this session never tried
     // to start. A partially failed start still requires a verified stop.
     if(!attempted_)return true;
-    if(!board_.stopAndVerify()){
-      failedStop_=true;board_.latchRecovery();arbiter_.latchRecovery();return false;
+    if(!board_.stopAndVerify()||!durable_.finishVerified()){
+      durable_.uncertain();failedStop_=true;board_.latchRecovery();arbiter_.latchRecovery();return false;
     }
     stopped_=true;return true;
   }
@@ -104,7 +111,8 @@ class J1979LocalUsbOwner final:public J1979UsbAuthSession::Security,
       s.connection==initial_.connection&&s.credential==initial_.credential&&
       s.approval==initial_.approval;
   }
-  Board& board_;HostSessionArbiter& arbiter_;const Profile profile_;const Snapshot initial_;
+  Board& board_;HostSessionArbiter& arbiter_;J1979ReadGuard& durable_;
+  const Profile profile_;const Snapshot initial_;
   bool granted_=false,revoked_=false,attempted_=false,stopped_=false,failedStop_=false;
 };
 }

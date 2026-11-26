@@ -1,3 +1,7 @@
+## C6 / J1979 — verrou électrique durable NVS avant ouverture (26/11/2026)
+
+- Journal séparé du flash ECU : état Clean/Active avec génération et CRC ; marqueur Active durabilisé et relu AVANT démarrage électrique, retour Clean uniquement après arrêt physique vérifié dans la même session. NVS absent/corrompu, état Active au reboot, écriture incertaine et débordement verrouillent. Le propriétaire USB utilise ce garde obligatoirement ; aucun effacement ni remise à zéro via l'API. Provisionnement initial Clean et résolution recovery restent à réaliser sous procédure locale qualifiée ; le firmware de découverte ne les expose pas. Tests natifs de redémarrage, corruption, panne disque et démarrage/arrêt écrits, non exécutés. J1979/C6 ouverts ; aucun test, CI, fusion ni Release.
+
 ## J1979 / C6 — propriétaire local USB et liaison des générations (26/11/2026)
 
 - Propriétaire concret de politique J1979 : génération de connexion, clé et consentement local figées ; profil CAN ET budget exacts ; preuve locale d'entropie avant nonce ; droit USB accordé une fois ; démarrage seulement sous bail natif ; arrêt même après activation partielle, révocation et verrou partagé sur arrêt incertain. Aucun arrêt de canal appartenant à un autre hôte. Tests natifs écrits (générations, profil, entropie, concurrence, démarrage partiel et récupération). Interface de carte à implémenter sur preuves électriques réelles, pas de qualification inventée. Aucune CI ni fusion/Release. J1979/C6 ouverts.

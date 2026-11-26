@@ -17,10 +17,19 @@ struct Board final:Owner::Board {
   bool stopAndVerify()override{++stops;return stopOk;}
   void latchRecovery()override{++latches;value.recovery=true;}
 };
+struct MemoryStore final:J1979ReadGuard::Store {
+  uint8_t bytes[J1979ReadGuard::Size]{};bool writable=true;unsigned writes=0;
+  MemoryStore(){J1979ReadGuard::Record r;assert(J1979ReadGuard::encode(r,bytes,sizeof(bytes)));}
+  bool read(uint8_t* data,size_t n)override{if(n!=sizeof(bytes))return false;std::memcpy(data,bytes,n);return true;}
+  bool writeVerified(const uint8_t* data,size_t n)override{
+    ++writes;if(!writable||n!=sizeof(bytes))return false;std::memcpy(bytes,data,n);return true;
+  }
+};
 struct Fixture {
-  Board board;HostSessionArbiter arbiter;Owner::Profile profile;Owner owner;
+  Board board;HostSessionArbiter arbiter;MemoryStore store;J1979ReadGuard durable;
+  Owner::Profile profile;Owner owner;
   static Owner::Profile make(){Owner::Profile p;p.tx=0x7e0;p.rx=0x7e8;p.budgetMs=10000;return p;}
-  Fixture():profile(make()),owner(board,arbiter,profile){}
+  Fixture():durable(store),profile(make()),owner(board,arbiter,durable,profile){}
   bool lease(HostSessionArbiter::Lease& l){
     return owner.grantRead(profile)&&arbiter.acquire(HostInterface::NativeUsb,owner.currentEvidence(profile),l);
   }
@@ -52,6 +61,12 @@ int main(){
   ++revoked.board.value.approval;
   assert(!revoked.owner.spiAdmitted());
   revoked.owner.revokeRead();assert(revoked.board.stops==1);
+  Fixture noDurable;noDurable.store.writable=false;
+  assert(noDurable.lease(l)&&!noDurable.owner.startReadChannel(noDurable.profile,l));
+  assert(noDurable.board.starts==0&&noDurable.arbiter.recoveryRequired());
+  Fixture stopDisk;assert(stopDisk.lease(l)&&stopDisk.owner.startReadChannel(stopDisk.profile,l));
+  stopDisk.store.writable=false;
+  assert(!stopDisk.owner.stopAndVerifyQuiescent()&&stopDisk.board.stops==1&&stopDisk.arbiter.recoveryRequired());
   Fixture busy;HostSessionArbiter::Lease otherLease;
   auto evidence=busy.owner.currentEvidence(busy.profile);evidence.authenticated=true;
   assert(busy.arbiter.acquire(HostInterface::PcBridge,evidence,otherLease));
