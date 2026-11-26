@@ -262,23 +262,29 @@ internal static class Program
             Console.WriteLine($"Verified original ECU backup sectors: {backups.Blocks.Count}/{backups.ExpectedSectors}");
             Console.WriteLine("Physical sector backups: " +
                 (backups.Verified ? "integrity verified" : "UNVERIFIED"));
+            var geometryConsistent = backups.Verified &&
+                EcuPostFlashAssessment.MatchesSiliconEraseGeometry(backups.Blocks);
             if (backups.Verified)
             {
                 Console.WriteLine("Known MPC5566 silicon erase boundaries: " +
-                    (EcuPostFlashAssessment.MatchesSiliconEraseGeometry(backups.Blocks)
+                    (geometryConsistent
                         ? "consistent (not ECU board qualification)" : "mismatch / not qualified"));
                 foreach (var block in backups.Blocks)
                     Console.WriteLine($"  0x{block.Address:X8}  {block.Length} bytes  SHA-256 {block.OriginalSha256}");
             }
             else Console.Error.WriteLine("Physical backup error: " + backups.Problem);
             Console.WriteLine("Offline evidence only; no ECU contact, reset, programming or automatic restoration.");
-            if (!report.RequiresAssessment && backups.Verified && target.Verified) return 0;
+            if (!report.RequiresAssessment && backups.Verified && target.Verified &&
+                geometryConsistent) return 0;
             if (!target.Verified)
                 Console.Error.WriteLine("Original ECU identity metadata unavailable; verify VIN/OSID independently.");
             if (!backups.Verified)
                 Console.Error.WriteLine("Physical originals incomplete or changed; do NOT attempt restoration.");
-
-            Console.Error.WriteLine("No completed transaction recorded. Preserve the original backup and journal.");
+            if (backups.Verified && !geometryConsistent)
+                Console.Error.WriteLine("Saved sectors do not match known silicon erase geometry; no restoration qualified.");
+            Console.Error.WriteLine(report.RequiresAssessment
+                ? "The ECU write journal does not prove a completed transaction; preserve its recovery evidence."
+                : "The ECU write journal is complete, but offline recovery evidence is incomplete or inconsistent.");
             return 8;
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException or ArgumentException

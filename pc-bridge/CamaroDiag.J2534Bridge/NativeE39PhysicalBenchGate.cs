@@ -6,8 +6,9 @@ namespace CamaroDiag.J2534Bridge;
 /// <summary>
 /// Dedicated E39 bench writer admission for the physical J2534 driver.
 /// The operating system owns the open file lock for the *entire* asynchronous
-/// read, programming and journal flush. A separate process using CamaroDiag
-/// cannot open the same vendor DLL for another destructive bench session.
+/// read, programming and journal flush. Other CamaroDiag processes sharing
+/// the same Windows user profile cannot independently reserve the same vendor
+/// DLL for a second destructive bench session.
 /// Different installed driver paths remain independent.
 ///
 /// Standard J2534 discovery does not identify which of several devices behind
