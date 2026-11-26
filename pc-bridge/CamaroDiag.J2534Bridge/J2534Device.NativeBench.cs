@@ -41,6 +41,10 @@ internal sealed partial class J2534Device
         ArgumentNullException.ThrowIfNull(scope);
         ArgumentNullException.ThrowIfNull(policy);
         ArgumentNullException.ThrowIfNull(journal);
+        // Reserve the installed J2534 driver BEFORE any ECU identity, power,
+        // physical backup or programming I/O. Separate ITransport objects alone
+        // do not protect a device opened again by another local process.
+        using var exclusiveDriver = NativeE39PhysicalBenchGate.Acquire(adapter);
         using var verifiedDriver = NativeE39PhysicalAdmission.OpenVerifiedDriverLease(adapter, scope, channel);
         NativeE39BackupQualification.RequireFullScope(scope);
         if (scope.ExpectedVin != policy.Session.ExpectedVin || scope.ProtocolNumber is not (33 or 34))

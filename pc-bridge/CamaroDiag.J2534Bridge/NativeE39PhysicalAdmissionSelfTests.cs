@@ -29,6 +29,31 @@ internal static class NativeE39PhysicalAdmissionSelfTests
             }
             Match(adapter,channel);
             Check(true,"Exact test driver/channel admitted");
+
+            // The same installed driver must not be independently opened by
+            // two bench workflows, including distinct J2534 wrapper objects.
+            // Other vendor DLLs are independent, and abort releases the lease.
+            using (var exclusive = NativeE39PhysicalBenchGate.Acquire(adapter))
+            {
+                bool busy = false;
+                try { using var rejected = NativeE39PhysicalBenchGate.Acquire(adapter); }
+                catch (InvalidOperationException) { busy = true; }
+                Check(busy, "Concurrent bench operation is denied for the same vendor DLL");
+
+                var otherDll = Path.Combine(Path.GetDirectoryName(path)!,
+                    Path.GetFileName(path) + ".other");
+                File.WriteAllBytes(otherDll, sample);
+                try
+                {
+                    using var another = NativeE39PhysicalBenchGate.Acquire(
+                        adapter with { FunctionLibrary = otherDll });
+                    Check(true, "Independent vendor DLL can run alongside locked adapter");
+                }
+                finally { File.Delete(otherDll); }
+            }
+            using (var reopened = NativeE39PhysicalBenchGate.Acquire(adapter))
+                Check(true, "Exclusive bench lease is released after operation");
+
             using (var lease = NativeE39PhysicalAdmission.OpenVerifiedDriverLease(adapter,scope,channel))
             {
                 if (OperatingSystem.IsWindows())
