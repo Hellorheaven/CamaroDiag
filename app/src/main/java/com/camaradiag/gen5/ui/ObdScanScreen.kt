@@ -15,7 +15,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
@@ -70,11 +69,13 @@ fun ObdScanScreen(
     val preferences = remember(context) {
         context.getSharedPreferences("obd_sensor_selection", android.content.Context.MODE_PRIVATE)
     }
-    val vehicleKey = report?.vin?.trim()?.uppercase()?.takeIf { it.length == 17 }
-    // An unknown VIN must never share a persistent selection with another vehicle.
-    // A saved garage profile provides a stable identity before the ECU VIN is read.
-    val vehicleIdentity = savedVehicleId?.takeIf(String::isNotBlank)?.let { "garage_$it" }
-        ?: vehicleKey?.let { "vin_$it" }
+    val simulatedReport = report?.adapterInfo?.get("IDENTIFICATION").orEmpty()
+        .contains("SIMULATED", ignoreCase = true)
+    val vehicleKey = report?.vin?.trim()?.uppercase(java.util.Locale.ROOT)
+        ?.takeIf { it.matches(Regex("[A-HJ-NPR-Z0-9]{17}")) && !simulatedReport }
+    // Only the physically observed VIN identifies a persistent selection.
+    // The selected garage vehicle may differ from the connected vehicle.
+    val vehicleIdentity = vehicleKey?.let { "vin_$it" }
     val preferenceKey = SensorSelectionScope.key(accountUid, vehicleIdentity)
     val storedPids = remember(preferenceKey, preferences) {
         preferenceKey?.let { preferences.getString(it, null)?.split(",")?.mapNotNull(String::toIntOrNull) }
@@ -82,10 +83,12 @@ fun ObdScanScreen(
     val catalogPids = report?.liveData.orEmpty().map { it.pid }.distinct().sorted()
     val sensorNames = catalogPids.associateWith { localizedObdPidName(it) }
     val measuredPids = report?.liveData.orEmpty().map { it.pid }.toSet()
-    var choosingSensors by rememberSaveable(preferenceKey) { mutableStateOf(false) }
-    var sensorQuery by rememberSaveable(preferenceKey) { mutableStateOf("") }
-    var chosenPids by rememberSaveable(preferenceKey) { mutableStateOf(storedPids.orEmpty()) }
-    var selectionApplied by rememberSaveable(preferenceKey) { mutableStateOf(storedPids != null) }
+    // When no physical VIN is known, keep the selection in this report only.
+    val transientReport = report.takeIf { preferenceKey == null }
+    var choosingSensors by remember(preferenceKey, transientReport) { mutableStateOf(false) }
+    var sensorQuery by remember(preferenceKey, transientReport) { mutableStateOf("") }
+    var chosenPids by remember(preferenceKey, transientReport) { mutableStateOf(storedPids.orEmpty()) }
+    var selectionApplied by remember(preferenceKey, transientReport) { mutableStateOf(storedPids != null) }
     if (choosingSensors && report != null) {
         var pendingPids by remember(preferenceKey, choosingSensors, measuredPids) {
             mutableStateOf((if (selectionApplied) chosenPids else report.liveData.map { it.pid })
@@ -232,7 +235,7 @@ fun ObdScanScreen(
                 SectionTitle(stringResource(R.string.obd_returned_live_data))
             }
             item {
-                Button(onClick = { choosingSensors = true }, modifier = Modifier.fillMaxWidth()) {
+                Button(onClick = { choosingSensors = true }, enabled = measuredPids.isNotEmpty() && isConnected && !isScanning, modifier = Modifier.fillMaxWidth()) {
                     Text(stringResource(R.string.obd_choose_sensors))
                 }
             }
@@ -473,8 +476,9 @@ private fun DtcResultCard(
             verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 Text(dtc.code, color = statusColor, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                Text(stringResource(R.string.obd_powertrain_ecm),
-                    color = TextMuted, fontSize = 10.sp)
+                // A generic OBD DTC has no physical module attribution here.
+                // Text(stringResource(R.string.obd_powertrain_ecm),
+                //     color = TextMuted, fontSize = 10.sp)
             }
             Text(status, color = statusColor, fontWeight = FontWeight.SemiBold, fontSize = 11.sp)
         }
