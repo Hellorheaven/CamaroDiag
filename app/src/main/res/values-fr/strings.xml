@@ -1030,6 +1030,7 @@
     <string name="cal_doip_backup_profile">Charger le profil mémoire DoIP</string>
     <string name="cal_doip_backup_scope">VIN %1$s · ECU %2$s · 0x%3$s · %4$d octets</string>
     <string name="cal_doip_backup">Sauvegarder la zone ECU</string>
+    <string name="cal_doip_backup_limit">Ce profil permet de vérifier une archive existante, mais son acquisition dépasse la limite de 8 192 blocs par lecture.</string>
     <string name="cal_doip_backup_confirm">Lire deux fois cette zone ? VIN %1$s, ECU %2$s, adresse 0x%3$s, %4$d octets. Aucune écriture ECU.</string>
     <string name="cal_doip_backup_saved">Sauvegarde de zone vérifiée : %1$d octets. SHA-256 %2$s. %3$s</string>
     <string name="cal_doip_profile_failed">Profil mémoire invalide ou VIN différent.</string>
