@@ -1,3 +1,7 @@
+## J1979 / C6 — point d'entrée USB authentifié CU/1 (26/11/2026)
+
+- Contrat dédié hors découverte : challenge à deux nonces, preuves HMAC-SHA256 client/boîtier distinctes liées au profil CAN et budget, expiration 30 s, autorisation locale et présence USB revérifiées, challenge consommé une seule fois et révocation en sortie. Adaptateur cryptographique ESP32 mbedTLS + nonce matériel sous précondition entropie qualifiée ; aucun secret en dur. Codec Python de génération demande et vérification de preuve du boîtier. Tests natifs structurels et Python HMAC écrits, non exécutés. Provisionnement des clés, liaison au propriétaire USB réel, preuve entropie et câblage restent ouverts ; main découverte inchangé, aucune revendication de sécurité déployée. Aucun test, CI, fusion ni Release.
+
 ## C6 — relecture intégrale des enveloppes et plages Android (26/11/2026)
 
 - Inspection des sauvegardes physiques : SHA-256 de l'enveloppe complète pendant la lecture initiale, puis relecture bornée de chaque enveloppe et comparaison, indépendamment des métadonnées fichier. Inventaire et journal revérifiés en dernier. Refus de plages chevauchantes au sein d'une région, négatives ou overflow, et contrôle d'overflow dès la persistance. Aucun plan mémoire OEM inventé. Régressions de modification de même taille/date, chevauchement des secteurs journalisés et débordement ajoutées, non exécutées. C6/J1979 ouverts ; aucun test, CI, fusion ni Release.
