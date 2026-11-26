@@ -794,7 +794,9 @@ object DoIpDirectRead {
         }
     }
 
-    data class InventoryEntry(val ecu: Int, val vin: String?, val protocolValue: Int? = null)
+    enum class InventoryFailure { VIN_MISMATCH, PROTOCOL_IDENTITY, NEGATIVE_RESPONSE, TIMEOUT, COMMUNICATION }
+    data class InventoryEntry(val ecu: Int, val vin: String?, val protocolValue: Int? = null,
+        val failure: InventoryFailure? = null)
     private class EcuVinMismatch : IllegalArgumentException("ECU VIN differs from selected vehicle or gateway.")
     private class EcuObdIdentityMismatch : IllegalArgumentException("Invalid or unstable ECU protocol identification.")
 
@@ -809,8 +811,10 @@ object DoIpDirectRead {
     suspend fun inventory(target: Target, addresses: List<Int>, options: SessionOptions,
         clientTls: DoIpClientTls? = null, onTrace: (Target, Trace) -> Unit = { _, _ -> },
         onControlTrace: (ControlTrace) -> Unit = {}, current: () -> Boolean = { true },
-        obd: Boolean = false): List<InventoryEntry> = inventoryAt(target, addresses, options,
-        clientTls, onTrace, onControlTrace, current, obd)
+        obd: Boolean = false,
+        onProgress: (List<InventoryEntry>, Int) -> Unit = { _, _ -> }): List<InventoryEntry> =
+        inventoryAt(target, addresses, options, clientTls, onTrace, onControlTrace, current, obd,
+            onProgress = onProgress)
 
     internal class InventoryTraceException(cause: Exception) :
         IllegalStateException("DoIP inventory trace failed.", cause)
@@ -819,7 +823,8 @@ object DoIpDirectRead {
         clientTls: DoIpClientTls? = null, onTrace: (Target, Trace) -> Unit = { _, _ -> },
         onControlTrace: (ControlTrace) -> Unit = {}, current: () -> Boolean = { true },
         obd: Boolean = false, udpPort: Int = DOIP_UDP_PORT,
-        tcpPort: Int = if (target.tls) 3496 else 13400): List<InventoryEntry> {
+        tcpPort: Int = if (target.tls) 3496 else 13400,
+        onProgress: (List<InventoryEntry>, Int) -> Unit = { _, _ -> }): List<InventoryEntry> {
         require(udpPort in 1..65535 && tcpPort in 1..65535)
         require((udpPort == DOIP_UDP_PORT && tcpPort == (if (target.tls) 3496 else 13400)) ||
             (target.address.isLoopbackAddress && !target.tls)) { "Custom DoIP ports are restricted to local TCP simulation." }
@@ -859,21 +864,28 @@ object DoIpDirectRead {
             } catch (error: DoIpClientCertificateException) {
                 throw error
             } catch (_: EcuVinMismatch) {
-                results += InventoryEntry(ecu, null)
+                results += InventoryEntry(ecu, null, failure = InventoryFailure.VIN_MISMATCH)
             } catch (_: EcuObdIdentityMismatch) {
-                results += InventoryEntry(ecu, null)
+                results += InventoryEntry(ecu, null, failure = InventoryFailure.PROTOCOL_IDENTITY)
             } catch (_: UdsNegativeResponseException) {
-                results += InventoryEntry(ecu, null)
+                results += InventoryEntry(ecu, null, failure = InventoryFailure.NEGATIVE_RESPONSE)
+            } catch (_: SocketTimeoutException) {
+                results += InventoryEntry(ecu, null, failure = InventoryFailure.TIMEOUT)
             } catch (_: IOException) {
-                results += InventoryEntry(ecu, null)
+                results += InventoryEntry(ecu, null, failure = InventoryFailure.COMMUNICATION)
             }
             check(current())
             val observed = discover(target.address, target.expectedVin, options.timeoutMs, control,
                 port = udpPort, current = current)
             require(gateway.matchesIdentity(observed)) { "Gateway changed during ECU inventory." }
+            check(current())
+            // Publish a detached snapshot only after the ECU socket closed
+            // and gateway revalidation succeeded. A callback failure aborts
+            // the inventory, rather than being classified as an ECU failure.
+            observe { onProgress(results.toList(), frozen.size) }
         }
         check(current())
-        return results
+        return results.toList()
     }
 
     /** One explicitly addressed operation. Unknown vehicle VIN cannot authorize
