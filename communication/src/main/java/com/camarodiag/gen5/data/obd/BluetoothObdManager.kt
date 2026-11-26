@@ -98,6 +98,11 @@ class BluetoothObdManager(context: Context) {
                 it.supportsCanHeaders
             } == true
 
+    val isElmEvapCandidate: Boolean
+        get() = !isDemoMode && !isSimulationActive && !isJ2534BridgeConnected() &&
+            isElmUdsReadCandidate && standardElmProfile.protocol in 6..9 &&
+            standardElmProfile.protocol in availableRawCanProfiles()
+
     /** Accepted physical configurations for the implemented classical CAN console.
      * Other adapter capabilities are not silently converted to classical CAN. */
     fun availableRawCanProfiles(): Set<Int> {
