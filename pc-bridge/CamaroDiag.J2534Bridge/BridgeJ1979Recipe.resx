@@ -48,4 +48,15 @@
   <data name="LegacyPrerequisites" xml:space="preserve"><value>Select a J2534 adapter and stop the bridge and console before running the legacy test.</value></data>
   <data name="LegacyDiscover" xml:space="preserve"><value>Discover sources</value></data>
   <data name="LegacyDiscoveryScope" xml:space="preserve"><value>Sources observed during PID 00 discovery; no whole-network coverage or OEM module identity is established.</value></data>
+  <data name="LegacyMutationRun" xml:space="preserve"><value>Legacy — reset / EVAP</value></data>
+  <data name="LegacyMutationProfile" xml:space="preserve"><value>I verified the vehicle protocol, engine ECU and all documented emissions response sources.</value></data>
+  <data name="LegacyMutationScope" xml:space="preserve"><value>Functional request to the vehicle: all relevant ECUs, including silent ones, may be affected. A response filter cannot limit this scope.</value></data>
+  <data name="LegacyMutationNext" xml:space="preserve"><value>Continue</value></data>
+  <data name="LegacyMutationOperation" xml:space="preserve"><value>Separate operation</value></data>
+  <data name="LegacyMutationEngine" xml:space="preserve"><value>Engine response source (hex)</value></data>
+  <data name="LegacyMutationSources" xml:space="preserve"><value>Documented sources (comma-separated)</value></data>
+  <data name="LegacyMutationNewFile" xml:space="preserve"><value>Choose a new output path and a new baseline path.</value></data>
+  <data name="LegacyMutationConfirm" xml:space="preserve"><value>Confirm one vehicle-wide functional request on VIN {0}, {1}, documented sources {2}? Other ECUs may also be affected.</value></data>
+  <data name="LegacyMutationUncertain" xml:space="preserve"><value>Campaign interrupted, unavailable or uncertain. Inspect saved evidence; do not retry automatically.</value></data>
+  <data name="LegacyMutationSaved" xml:space="preserve"><value>Final report saved at:</value></data>
 </root>
