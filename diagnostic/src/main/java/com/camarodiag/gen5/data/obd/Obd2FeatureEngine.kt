@@ -100,7 +100,8 @@ data class ObdScanReport(
     val freezeFrameResponder: String? = null,
     val vehicleInfoSupportedTypes: Set<Int> = emptySet(),
     val vehicleInfoSupportComplete: Boolean? = null,
-    val vehicleInfoReads: List<ObdVehicleInfoRead> = emptyList()
+    val vehicleInfoReads: List<ObdVehicleInfoRead> = emptyList(),
+    val mode05: ObdMode05Report? = null
 )
 
 /**
@@ -705,7 +706,16 @@ class Obd2FeatureEngine(
         val cvns = readCalibrationVerificationNumbers()
         val ecuNames = readEcuName()
         val readiness = readReadiness()
-        val mode06 = readMonitorTests()
+        // Query the negotiated ELM protocol after a vehicle exchange. Do not
+        // issue legacy oxygen monitor requests on a CAN or unidentified link.
+        val protocolNumber = if (physicalCanResponder == null)
+            ObdLegacyOxygenTests.protocolNumber(ask("ATDPN")) else null
+        val legacy = protocolNumber != null && protocolNumber in 1..5
+        val mode05 = if (protocolNumber != null && legacy) withHeaderlessRecords {
+            ObdLegacyOxygenTests.scan(protocolNumber, { command, timeout -> ask(command, timeout) })
+        } else null
+        // The existing Mode 06 reader implements the CAN record layout only.
+        val mode06 = if (legacy) null else readMonitorTests()
         return ObdScanReport(
             supportedPids = supported,
             liveData = live,
@@ -736,7 +746,8 @@ class Obd2FeatureEngine(
             freezeFrameResponder = if (freezeFrameSourcePinned) freezeFrameSource ?: physicalCanResponder else null,
             vehicleInfoSupportedTypes = vehicleInfo.supported,
             vehicleInfoSupportComplete = vehicleInfo.complete,
-            vehicleInfoReads = vehicleInfo.reads
+            vehicleInfoReads = vehicleInfo.reads,
+            mode05 = mode05
         )
     }
 
