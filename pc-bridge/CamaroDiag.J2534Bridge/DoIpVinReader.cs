@@ -818,16 +818,12 @@ internal static class DoIpVinReader
     {
         ArgumentNullException.ThrowIfNull(onReply);
         var frozen = FreezeCommands(commands);
-        _ = await VerifyObservedVinAsync(transport, gateway, timeout, token, null, null);
-        for (var i = 0; i < frozen.Length; i++)
-        {
-            token.ThrowIfCancellationRequested();
-            var reply = await transport.ExchangeUdsAsync(frozen[i], timeout, token, p2Timeout, p2StarTimeout);
-            token.ThrowIfCancellationRequested();
-            onReply(i + 1, reply.ToArray());
-        }
-        token.ThrowIfCancellationRequested();
-        return frozen.Length;
+        if (gateway.Vin is null || !DoIpVehicleDiscovery.IsVehicleVin(gateway.Vin))
+            throw new InvalidDataException("A verified gateway VIN is required for a DoIP sequence.");
+        // VIN verification and the approved commands now share one transport
+        // ownership window: another diagnostic caller cannot interleave.
+        return await transport.ExchangeSequenceAsync(
+            frozen, gateway.Vin, timeout, token, onReply, p2Timeout, p2StarTimeout);
     }
 
     internal static async Task<byte[]> ExchangeVerifiedAsync(DoIpDiagnosticTransport transport,
