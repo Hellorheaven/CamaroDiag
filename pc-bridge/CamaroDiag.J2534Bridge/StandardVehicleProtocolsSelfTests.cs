@@ -1205,7 +1205,7 @@ internal static class StandardVehicleProtocolsSelfTests
             "--doip-version", "3", "--tls", "true",
             "--rx-file", "ecu-response-new.bin", "--payload", "22F810"]);
         Check(versionedDoIp.Version == 3 && versionedDoIp.UseTls &&
-            versionedDoIp.ReceiveFile == "ecu-response-new.bin",
+            versionedDoIp.ReceiveFile == Path.GetFullPath("ecu-response-new.bin"),
             "Secure DoIP protocol version 0x03 and unique binary reply are selectable.");
         Reject<ArgumentException>(() => StandardProtocolCli.ParseDoIp([
             StandardProtocolCli.DoIpCommand, "--host", "gateway.example.org",
