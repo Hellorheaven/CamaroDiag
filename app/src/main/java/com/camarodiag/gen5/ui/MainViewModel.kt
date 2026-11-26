@@ -1434,13 +1434,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 DoIpDirectRead.RefusalLayer.ROUTING -> R.string.cal_doip_inventory_reason_routing
                 DoIpDirectRead.RefusalLayer.DIAGNOSTIC_ACK -> R.string.cal_doip_inventory_reason_ack
             }
-            is com.camaradiag.gen5.data.obd.UdsNegativeResponseException -> R.string.cal_doip_inventory_reason_nrc
+            is com.camarodiag.gen5.data.obd.UdsNegativeResponseException -> R.string.cal_doip_inventory_reason_nrc
             is java.net.SocketTimeoutException -> R.string.cal_doip_inventory_reason_timeout
             else -> fallback
         })
         val code = when (error) {
             is DoIpDirectRead.Refusal -> error.code
-            is com.camaradiag.gen5.data.obd.UdsNegativeResponseException -> error.negativeResponseCode
+            is com.camarodiag.gen5.data.obd.UdsNegativeResponseException -> error.negativeResponseCode
             else -> null
         }
         return base + (code?.let { " (0x%02X)".format(java.util.Locale.ROOT, it) } ?: "")

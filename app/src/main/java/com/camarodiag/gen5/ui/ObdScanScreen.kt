@@ -1,6 +1,7 @@
 package com.camarodiag.gen5.ui
 
 import androidx.core.content.edit
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
