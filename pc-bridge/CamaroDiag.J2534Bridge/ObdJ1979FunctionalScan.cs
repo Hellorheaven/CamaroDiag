@@ -50,6 +50,11 @@ internal static class ObdJ1979FunctionalScan
                         "NOT_TESTED", $"NRC_{reply.NegativeResponseCode:X2}", timer.ElapsedMilliseconds));
                     return null;
                 }
+                // Unknown records must still carry data beyond the echoed
+                // identifier (and frame number for Mode 02).
+                if (request[0] is 1 or 2 or 9 &&
+                    response.Length <= (request[0] == 2 ? 3 : 2))
+                    throw new InvalidDataException("Missing diagnostic record data.");
                 var detail = decode is null
                     ? ObdJ1979Interpretation.Interpret(request, response).Description
                     : decode(response);
