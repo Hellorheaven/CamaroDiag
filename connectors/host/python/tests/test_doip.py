@@ -316,9 +316,36 @@ class DoIpTests(unittest.TestCase):
             session.return_value.__exit__.side_effect = lambda *_: events.append("close")
             result = inventory_ecus(GATEWAY, VIN, 0x0E80, (0x1234, 0x1235), on_progress=progress)
         self.assertEqual(events, ["gateway", "close", "gateway", ("progress", 1, None),
-                                  "close", "gateway", ("progress", 2, "timeout")])
+                                  "gateway", "close", "gateway", ("progress", 2, "timeout")])
         self.assertEqual(result["targets"][0]["status"], "vin_verified")
         self.assertEqual(result["targets"][1]["reason"], "timeout")
+
+    def test_cli_inventory_emits_only_provisional_verified_target_progress(self):
+        args = ["--host", GATEWAY.host, "--vin", VIN, "--tester", "0E80",
+                "ecu-inventory", "--ecus", "1234,1235"]
+        def fake_inventory(*_, **kwargs):
+            callback = kwargs["on_progress"]
+            callback([{"ecu": "1234", "status": "vin_verified", "vin": VIN}], 2)
+            callback([{"ecu": "1234", "status": "vin_verified", "vin": VIN},
+                      {"ecu": "1235", "status": "unverified",
+                       "reason": "diagnostic_nack", "failure_code": 6}], 2)
+            return {"vin": VIN, "complete": True, "verified_count": 1,
+                    "targets": [{"ecu": "1234", "status": "vin_verified", "vin": VIN},
+                                {"ecu": "1235", "status": "unverified",
+                                 "reason": "diagnostic_nack", "failure_code": 6}]}
+        stream = io.StringIO()
+        with patch("camarodiagconnectors.doip_cli.discover", return_value=GATEWAY), \
+             patch("camarodiagconnectors.doip_cli.inventory_ecus",
+                   side_effect=fake_inventory), redirect_stderr(stream):
+            result = run(args)
+        self.assertTrue(result["complete"])
+        events = [json.loads(line)["inventory_progress"] for line in stream.getvalue().splitlines()
+                  if line.startswith("{") and "inventory_progress" in line]
+        self.assertEqual([event["targets_completed"] for event in events], [1, 2])
+        self.assertTrue(all(not event["complete"] and event["requested_targets"] == 2
+                            and event["vin"] == VIN for event in events))
+        self.assertEqual(events[1]["targets"][1]["reason"], "diagnostic_nack")
+        self.assertEqual(events[1]["targets"][1]["failure_code"], 6)
 
     def test_inventory_drift_prevents_progress_and_next_target(self):
         from dataclasses import replace
