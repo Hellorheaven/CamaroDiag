@@ -172,8 +172,10 @@ internal sealed class J2534StandardChannel : IDisposable
         if (count != 1) throw new IOException("Vendor J2534 driver queued no frame.");
     }
 
-    internal sealed record Frame(uint ProtocolId, uint RxStatus, uint Timestamp,
-        byte[] Data, byte[]? InFrameResponse = null);
+    internal sealed record Frame(uint ProtocolId, uint RxStatus, uint Timestamp, byte[] Data)
+    {
+        public byte[]? InFrameResponse { get; init; }
+    }
 
     // SAE J2534-1 04.04 can expose PWM IFR bytes after ExtraDataIndex.
     // The opt-in is confined to the legacy campaign. Keep application bytes
@@ -190,8 +192,10 @@ internal sealed class J2534StandardChannel : IDisposable
         if (!allowPwmIfr || protocol != J1850Pwm || extraIndex < 4)
             throw new InvalidDataException("Unexpected extra data in J2534 receive frame.");
         var offset = (int)extraIndex;
-        return new(protocol, status, timestamp, data.AsSpan(0, offset).ToArray(),
-            data.AsSpan(offset, size - offset).ToArray());
+        return new Frame(protocol, status, timestamp, data.AsSpan(0, offset).ToArray())
+        {
+            InFrameResponse = data.AsSpan(offset, size - offset).ToArray()
+        };
     }
 
     internal Frame? Receive(int timeoutMs = 1000) => Receive(timeoutMs, false);
