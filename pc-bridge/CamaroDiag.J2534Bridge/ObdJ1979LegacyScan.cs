@@ -33,7 +33,8 @@ internal static class ObdJ1979LegacyScan
         byte[][] Read(byte[] request, Func<byte[], bool> valid, bool single = false)
         {
             if (stop is not null) return [];
-            requireActive();
+            try { requireActive(); }
+            catch (OperationCanceledException) { stop = "CANCELLED"; return []; }
             if (!ObdLegacyJ2534Transport.AllowsRead(request))
                 throw new InvalidOperationException("Non-read request in legacy campaign.");
             var remaining = budget - timer.Elapsed;
@@ -71,7 +72,11 @@ internal static class ObdJ1979LegacyScan
                 steps.Add(new(hex, result.TxHex, evidence, "PASSED", null, watch.ElapsedMilliseconds));
                 return packets;
             }
-            catch (OperationCanceledException) { throw; }
+            catch (OperationCanceledException)
+            {
+                stop = "CANCELLED";
+                steps.Add(new(hex, result?.TxHex, evidence, "NOT_TESTED", stop, watch.ElapsedMilliseconds));
+            }
             catch (TimeoutException)
             {
                 steps.Add(new(hex, result?.TxHex, evidence, "NOT_TESTED", "TIMEOUT", watch.ElapsedMilliseconds));
@@ -160,7 +165,8 @@ internal static class ObdJ1979LegacyScan
             {
                 var bytes = fragments.SelectMany(x => x.Skip(3)).ToArray();
                 var calibrationIds = bytes.Chunk(16).Select(x => Encoding.ASCII.GetString(x).TrimEnd(' ', '\0')).ToArray();
-                if (calibrationIds.All(x => x.Length > 0 && x.All(c => c is >= ' ' and <= '~')))
+                if (bytes.All(x => x == 0 || x is >= 0x20 and <= 0x7E) &&
+                    calibrationIds.All(x => x.Length > 0 && x.All(c => c is >= ' ' and <= '~')))
                     steps[^1] = steps[^1] with { Detail = string.Join(",", calibrationIds) };
                 else steps[^1] = steps[^1] with { Status = "FAILED", Detail = "INVALID_CALID_RECORD" };
             }
@@ -219,7 +225,8 @@ internal static class ObdJ1979LegacyScan
         foreach (byte tid in Inventory(6, 3, 0xFF, page => [6, page]))
             Read([6, tid], r => r.Length == 7 && r[0] == 0x46 && r[1] == tid);
         _ = Inventory(8, 3, 0, page => [8, page, 0, 0, 0, 0, 0]);
-        requireActive();
+        try { requireActive(); }
+        catch (OperationCanceledException) { stop ??= "CANCELLED"; }
         return Finish();
     }
 }
