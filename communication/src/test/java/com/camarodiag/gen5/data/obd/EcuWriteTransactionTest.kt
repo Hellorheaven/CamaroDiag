@@ -197,6 +197,74 @@ class EcuWriteTransactionTest {
         assertEquals(1, driver.eraseCalls)
     }
 
+    @Test fun cancelledSupplyObservationNeverProceedsToEcuIdentity() = runBlocking {
+        val device = FakeDriver(original, expectedIdentity)
+        val operation = async(start = CoroutineStart.UNDISPATCHED) {
+            EcuWriteExecutionEngine(
+                device, EcuWriteTransaction.Journal {},
+                EcuWriteTransaction.PowerMonitor {
+                    currentCoroutineContext().cancel()
+                    true // Deliberately ignore cancellation and return a valid-looking voltage.
+                }
+            ).run(request())
+        }
+        try {
+            operation.await()
+            org.junit.Assert.fail("Cancelled power observation must abort before ECU traffic")
+        } catch (_: CancellationException) {
+            // Operation cancellation is deliberately propagated, never converted to success.
+        }
+        assertEquals(0, device.reads)
+        assertEquals(0, device.eraseCalls)
+        assertEquals(0, device.writeCalls)
+    }
+
+    @Test fun cancelledLatePhysicalReadNeverStartsNextEcuReadOrErase() = runBlocking {
+        val device = FakeDriver(original, expectedIdentity)
+        val operation = async(start = CoroutineStart.UNDISPATCHED) {
+            val context = currentCoroutineContext()
+            device.afterRead = { context.cancel() }
+            EcuWriteExecutionEngine(
+                device, EcuWriteTransaction.Journal {},
+                EcuWriteTransaction.PowerMonitor { true }
+            ).run(request())
+        }
+        try {
+            operation.await()
+            org.junit.Assert.fail("Cancelled physical read must not resume ECU preflight")
+        } catch (_: CancellationException) {
+            // First physical read returned data; no further ECU operation is allowed.
+        }
+        assertEquals(1, device.reads)
+        assertEquals(0, device.eraseCalls)
+        assertEquals(0, device.writeCalls)
+    }
+
+    @Test fun cancellationDuringBaselineEvidenceDoesNotStartNextSectorOrErase() = runBlocking {
+        val device = FakeDriver(original, expectedIdentity)
+        val phases = mutableListOf<EcuWriteTransaction.Stage>()
+        val operation = async(start = CoroutineStart.UNDISPATCHED) {
+            EcuWriteExecutionEngine(
+                device,
+                EcuWriteTransaction.Journal { record ->
+                    phases += record.stage
+                    if (record.stage == EcuWriteTransaction.Stage.BASELINE_CHECKED) {
+                        currentCoroutineContext().cancel()
+                    }
+                    // I/O returns normally even after cancellation.
+                },
+                EcuWriteTransaction.PowerMonitor { true }
+            ).run(request())
+        }
+        try {
+            operation.await()
+            org.junit.Assert.fail("Cancelled baseline journal cannot authorize erase")
+        } catch (_: CancellationException) { }
+        assertEquals(listOf(EcuWriteTransaction.Stage.BASELINE_CHECKED), phases)
+        assertEquals(0, device.eraseCalls)
+        assertEquals(0, device.writeCalls)
+    }
+
     @Test fun cancellationReturnedByNonCooperativeJournalCannotErase() = runBlocking {
         val device = FakeDriver(original, expectedIdentity)
         val phases = mutableListOf<EcuWriteTransaction.Stage>()

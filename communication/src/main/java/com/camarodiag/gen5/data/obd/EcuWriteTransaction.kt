@@ -209,6 +209,35 @@ internal class EcuWriteExecutionEngine(
     // injects a durable, file-backed store that fsyncs live ECU bytes.
     private val physicalBlockBackup: EcuPhysicalBlockBackup = InMemoryEcuPhysicalBlockBackup()
 ) {
+    /**
+     * Every hardware/storage suspension point is a cancellation boundary.
+     * Some vendor drivers and durable sinks ignore cancellation until they
+     * return; the next ECU command must never follow their late result.
+     */
+    private suspend fun <T> boundary(operation: suspend () -> T): T {
+        currentCoroutineContext().ensureActive()
+        val result = operation()
+        currentCoroutineContext().ensureActive()
+        return result
+    }
+
+    private suspend fun supplyStable(): Boolean = boundary { powerMonitor.isStable() }
+    private suspend fun liveIdentity(): EcuProgrammingDriverContract.Identity =
+        boundary { driver.identify() }
+    private suspend fun physicalRead(region: EcuProgrammingDriverContract.RegionRequest): ByteArray =
+        boundary { driver.read(region) }
+    private suspend fun independentRead(region: EcuProgrammingDriverContract.RegionRequest): ByteArray =
+        boundary { driver.independentReadback(region) }
+    private suspend fun savePhysical(
+        region: EcuProgrammingDriverContract.RegionRequest, physical: ByteArray, digest: String
+    ) = boundary { physicalBlockBackup.preserve(region, physical, digest) }
+    private suspend fun recordEvidence(record: EcuWriteTransaction.Record) =
+        boundary { journal.append(record) }
+    private suspend fun eraseSector(region: EcuProgrammingDriverContract.RegionRequest) =
+        boundary { driver.erase(region) }
+    private suspend fun writeUnit(region: EcuProgrammingDriverContract.RegionRequest, bytes: ByteArray) =
+        boundary { driver.write(region, bytes) }
+
     private companion object {
         // Identity semantics: even a driver overriding equals/hashCode owns
         // its own physical communication context. Entries live only while an
@@ -285,25 +314,25 @@ internal class EcuWriteExecutionEngine(
                     request.region, address, length.toLong()
                 )
                 val expected = original.copyOfRange(offset, offset + length)
-                if (!powerMonitor.isStable() || driver.identify() != request.expectedIdentity) return false
+                if (!supplyStable() || liveIdentity() != request.expectedIdentity) return false
                 if (doubleRead) {
-                    if (!driver.read(region).contentEquals(expected) ||
-                        !powerMonitor.isStable() || driver.identify() != request.expectedIdentity
+                    if (!physicalRead(region).contentEquals(expected) ||
+                        !supplyStable() || liveIdentity() != request.expectedIdentity
                     ) return false
                 }
-                if (!driver.independentReadback(region).contentEquals(expected) ||
-                    !powerMonitor.isStable() || driver.identify() != request.expectedIdentity
+                if (!independentRead(region).contentEquals(expected) ||
+                    !supplyStable() || liveIdentity() != request.expectedIdentity
                 ) return false
             }
             return true
         }
         try {
-            if (!powerMonitor.isStable()) {
+            if (!supplyStable()) {
                 return EcuWriteTransaction.Outcome(
                     EcuWriteTransaction.Status.STOPPED_REQUIRES_ASSESSMENT
                 )
             }
-            val identity = driver.identify()
+            val identity = liveIdentity()
             if (identity != request.expectedIdentity) {
                 return EcuWriteTransaction.Outcome(
                     EcuWriteTransaction.Status.STOPPED_REQUIRES_ASSESSMENT
@@ -322,7 +351,7 @@ internal class EcuWriteExecutionEngine(
                 val region = EcuProgrammingDriverContract.RegionRequest(
                     request.region, sector.absoluteAddress, sector.originalBytes.size.toLong()
                 )
-                if (!powerMonitor.isStable() || driver.identify() != request.expectedIdentity) {
+                if (!supplyStable() || liveIdentity() != request.expectedIdentity) {
                     return EcuWriteTransaction.Outcome(
                         EcuWriteTransaction.Status.STOPPED_REQUIRES_ASSESSMENT,
                         verifiedSectors = verified, failedAddress = currentAddress
@@ -330,12 +359,12 @@ internal class EcuWriteExecutionEngine(
                 }
                 // Physical bytes captured from ECU itself, distinct from the
                 // input BIN. Both acquisitions must match before backup is saved.
-                val physicalBytes = driver.read(region)
+                val physicalBytes = physicalRead(region)
                 if (!physicalBytes.contentEquals(sector.originalBytes) ||
-                    !powerMonitor.isStable() || driver.identify() != request.expectedIdentity ||
-                    !driver.independentReadback(region).contentEquals(sector.originalBytes) ||
-                    !powerMonitor.isStable() ||
-                    driver.identify() != request.expectedIdentity
+                    !supplyStable() || liveIdentity() != request.expectedIdentity ||
+                    !independentRead(region).contentEquals(sector.originalBytes) ||
+                    !supplyStable() ||
+                    liveIdentity() != request.expectedIdentity
                 ) {
                     return EcuWriteTransaction.Outcome(
                         EcuWriteTransaction.Status.STOPPED_REQUIRES_ASSESSMENT,
@@ -343,8 +372,8 @@ internal class EcuWriteExecutionEngine(
                         failedAddress = currentAddress
                     )
                 }
-                physicalBlockBackup.preserve(region, physicalBytes, sector.originalSha256)
-                journal.append(
+                savePhysical(region, physicalBytes, sector.originalSha256)
+                recordEvidence(
                     EcuWriteTransaction.Record(
                         EcuWriteTransaction.Stage.BASELINE_CHECKED,
                         request.region, sector.absoluteAddress,
@@ -357,8 +386,8 @@ internal class EcuWriteExecutionEngine(
                 val region = EcuProgrammingDriverContract.RegionRequest(
                     request.region, sector.absoluteAddress, sector.patchedBytes.size.toLong()
                 )
-                if (!powerMonitor.isStable() ||
-                    driver.identify() != request.expectedIdentity
+                if (!supplyStable() ||
+                    liveIdentity() != request.expectedIdentity
                 ) {
                     // An adapter can reconnect to a different controller mid-run.
                     // Never erase the next sector without confirming the live ECU.
@@ -369,8 +398,8 @@ internal class EcuWriteExecutionEngine(
                 }
                 // Recheck bytes immediately before erasing the next sector:
                 // previous sector programming may have modified this one.
-                if (!driver.independentReadback(region).contentEquals(sector.originalBytes) ||
-                    !powerMonitor.isStable() || driver.identify() != request.expectedIdentity
+                if (!independentRead(region).contentEquals(sector.originalBytes) ||
+                    !supplyStable() || liveIdentity() != request.expectedIdentity
                 ) {
                     return EcuWriteTransaction.Outcome(
                         EcuWriteTransaction.Status.STOPPED_REQUIRES_ASSESSMENT,
@@ -384,7 +413,7 @@ internal class EcuWriteExecutionEngine(
                     request.layout, request.region, original, updated, sector, region
                 )
                 // Journal must accept the irreversible step before any erase.
-                journal.append(
+                recordEvidence(
                     EcuWriteTransaction.Record(
                         EcuWriteTransaction.Stage.BEFORE_ERASE,
                         request.region, sector.absoluteAddress,
@@ -393,7 +422,7 @@ internal class EcuWriteExecutionEngine(
                 )
                 // Durable storage and readback may take time. Recheck power
                 // after journal I/O before issuing the destructive operation.
-                if (!powerMonitor.isStable() || driver.identify() != request.expectedIdentity) {
+                if (!supplyStable() || liveIdentity() != request.expectedIdentity) {
                     return EcuWriteTransaction.Outcome(
                         EcuWriteTransaction.Status.STOPPED_REQUIRES_ASSESSMENT,
                         verifiedSectors = verified, failedAddress = currentAddress
@@ -402,7 +431,7 @@ internal class EcuWriteExecutionEngine(
                 // A journal/power/identity provider may complete despite a
                 // cancelled coroutine. Cancellation must win before erase.
                 currentCoroutineContext().ensureActive()
-                driver.erase(region)
+                eraseSector(region)
                 currentCoroutineContext().ensureActive()
                 val unitBytes = request.layout.programBlockBytes
                 for (offset in sector.patchedBytes.indices step unitBytes) {
@@ -411,8 +440,8 @@ internal class EcuWriteExecutionEngine(
                     // An adapter can reconnect or switch controller between
                     // programming units. Re-identify before every write, not
                     // merely before erasing the sector.
-                    if (!powerMonitor.isStable() ||
-                        driver.identify() != request.expectedIdentity
+                    if (!supplyStable() ||
+                        liveIdentity() != request.expectedIdentity
                     ) {
                         return EcuWriteTransaction.Outcome(
                             EcuWriteTransaction.Status.STOPPED_REQUIRES_ASSESSMENT,
@@ -429,24 +458,24 @@ internal class EcuWriteExecutionEngine(
                     // An adapter may ignore cancellation while answering
                     // earlier reads. Never transmit this unit after cancellation.
                     currentCoroutineContext().ensureActive()
-                    driver.write(unit, outgoing)
+                    writeUnit(unit, outgoing)
                     currentCoroutineContext().ensureActive()
                 }
                 currentAddress = sector.absoluteAddress
                 // Last unit of a sector has no subsequent write preflight.
                 // Check power and live identity before starting readback too.
-                if (!powerMonitor.isStable() ||
-                    driver.identify() != request.expectedIdentity ||
-                    !driver.independentReadback(region).contentEquals(sector.patchedBytes) ||
-                    !powerMonitor.isStable() ||
-                    driver.identify() != request.expectedIdentity
+                if (!supplyStable() ||
+                    liveIdentity() != request.expectedIdentity ||
+                    !independentRead(region).contentEquals(sector.patchedBytes) ||
+                    !supplyStable() ||
+                    liveIdentity() != request.expectedIdentity
                 ) {
                     return EcuWriteTransaction.Outcome(
                         EcuWriteTransaction.Status.STOPPED_REQUIRES_ASSESSMENT,
                         verifiedSectors = verified, failedAddress = currentAddress
                     )
                 }
-                journal.append(
+                recordEvidence(
                     EcuWriteTransaction.Record(
                         EcuWriteTransaction.Stage.VERIFIED_AFTER_WRITE,
                         request.region, sector.absoluteAddress,
@@ -463,18 +492,18 @@ internal class EcuWriteExecutionEngine(
                 val region = EcuProgrammingDriverContract.RegionRequest(
                     request.region, sector.absoluteAddress, sector.patchedBytes.size.toLong()
                 )
-                if (!powerMonitor.isStable() ||
-                    driver.identify() != request.expectedIdentity ||
-                    !driver.independentReadback(region).contentEquals(sector.patchedBytes) ||
-                    !powerMonitor.isStable() ||
-                    driver.identify() != request.expectedIdentity
+                if (!supplyStable() ||
+                    liveIdentity() != request.expectedIdentity ||
+                    !independentRead(region).contentEquals(sector.patchedBytes) ||
+                    !supplyStable() ||
+                    liveIdentity() != request.expectedIdentity
                 ) {
                     return EcuWriteTransaction.Outcome(
                         EcuWriteTransaction.Status.STOPPED_REQUIRES_ASSESSMENT,
                         verifiedSectors = verified, failedAddress = currentAddress
                     )
                 }
-                journal.append(
+                recordEvidence(
                     EcuWriteTransaction.Record(
                         EcuWriteTransaction.Stage.FINAL_READBACK_VERIFIED,
                         request.region, sector.absoluteAddress,
@@ -482,14 +511,14 @@ internal class EcuWriteExecutionEngine(
                     )
                 )
             }
-            if (!powerMonitor.isStable() || driver.identify() != request.expectedIdentity) {
+            if (!supplyStable() || liveIdentity() != request.expectedIdentity) {
                 return EcuWriteTransaction.Outcome(
                     EcuWriteTransaction.Status.STOPPED_REQUIRES_ASSESSMENT,
                     verifiedSectors = verified, failedAddress = currentAddress
                 )
             }
             if (!verifyUntouchedSectors(doubleRead = false) ||
-                !powerMonitor.isStable() || driver.identify() != request.expectedIdentity
+                !supplyStable() || liveIdentity() != request.expectedIdentity
             ) {
                 return EcuWriteTransaction.Outcome(
                     EcuWriteTransaction.Status.STOPPED_REQUIRES_ASSESSMENT,
@@ -502,7 +531,7 @@ internal class EcuWriteExecutionEngine(
             // Cancellation after a non-cooperative final read or journal
             // observer must not publish a successful completed transaction.
             currentCoroutineContext().ensureActive()
-            journal.append(EcuWriteTransaction.Record(
+            recordEvidence(EcuWriteTransaction.Record(
                 EcuWriteTransaction.Stage.TRANSACTION_COMPLETED,
                 request.region, last.absoluteAddress, last.originalSha256, last.updatedSha256
             ))
