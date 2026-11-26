@@ -86,6 +86,10 @@ Les commandes `dtcs`, `obd-dtcs`, `count` et `obd-count` indiquent `effective_ma
 
 The `dtcs`, `obd-dtcs`, `count` and `obd-count` commands include `effective_mask` (requested AND available mask) and `filter_available`. An unavailable filter cannot establish absence of faults. Listed DTCs include standard `status_flags` identifiers alongside the raw status; these are not OEM fault descriptions.
 
+Les rapports WWH 19/42, 19/55 et 19/56 exposent également les états normalisés. Seul 19/42 indique les masques effectifs d'état et de sévérité, car lui seul transmet ces filtres. Les octets de sévérité restent bruts.
+
+WWH reports 19/42, 19/55 and 19/56 also expose standard status flags. Only 19/42 reports effective status and severity masks, because only this request transmits these filters. Severity bytes remain raw.
+
 ```bash
 python -m camarodiagconnectors.doip_cli --host 192.0.2.10 --vin 1G1FA1RXXR0123456 --tester 0E80 --ecu 1234 supported-dtcs
 python -m camarodiagconnectors.doip_cli --host 192.0.2.10 --vin 1G1FA1RXXR0123456 --tester 0E80 --ecu 1234 permanent-dtcs

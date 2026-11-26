@@ -1,3 +1,7 @@
+## PR117 — états WWH et filtres effectivement transmis (26/11/2026)
+
+- C6/DoIP Connectors : les rapports WWH 19/42, 19/55 et 19/56 exposent les états normalisés selon le masque disponible, en conservant les octets bruts. 19/42 distingue les intersections effectives des filtres d'état et de sévérité ; aucun filtre artificiel n'est attribué aux requêtes 19/55 et 19/56. Documentation FR/EN et régressions écrites, non exécutées. Aucun checkpoint.
+
 ## PR117 — cohérence du comptage DTC Windows et Android (26/11/2026)
 
 - C6/DoIP : le comptage Windows 19/01 affiche aussi le masque effectif et signale un filtre indisponible, y compris si le compteur est nul. Régression FR/EN écrite. Ajustement de compatibilité Kotlin du rendu des états Android (liste d'identifiants de ressources, concaténation explicite). Aucune compilation ni test exécuté.

@@ -1530,12 +1530,20 @@ class Session:
                       "severity_availability_mask": reply[4] if subfunction == 0x42 else None,
                       "dtc_format_identifier": reply[5] if subfunction == 0x42 else reply[4],
                       "records": []}
+            if subfunction == 0x42:
+                # Only 0x42 sends status and severity masks. The other
+                # services must not be presented as filtered by CLI defaults.
+                report.update(dtc_filter(status_mask, reply[3]))
+                report["requested_severity_mask"] = severity_mask
+                report["effective_severity_mask"] = severity_mask & reply[4]
+                report["severity_filter_available"] = bool(severity_mask & reply[4])
             if subfunction == 0x56:
                 report["readiness_group"] = readiness_group
             for offset in range(start, len(reply), width):
                 index = offset + (1 if subfunction == 0x42 else 0)
                 report["records"].append({"dtc": reply[index:index+3].hex().upper(),
-                    "status": reply[index+3], "severity": reply[offset] if width == 5 else None})
+                    "status": reply[index+3], "severity": reply[offset] if width == 5 else None,
+                    "status_flags": dtc_status_flags(reply[index+3], reply[3])})
             if not self.read_obd(expected)["obd_on_uds"]:
                 raise DoIpError("OBDonUDS identification changed during DTC read")
             return report

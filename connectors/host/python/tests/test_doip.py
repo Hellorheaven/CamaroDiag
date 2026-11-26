@@ -1122,8 +1122,34 @@ class DoIpTests(unittest.TestCase):
                 result = fake.wwh_dtcs(VIN, subfunction, status_mask=8, readiness_group=group)
                 fake.exchange.assert_called_once_with(bytes.fromhex(request))
                 self.assertEqual(fake.read_obd.call_count, 2)
-                self.assertEqual(result["records"], [{"dtc": "123456", "status": 8, "severity": severity}])
+                self.assertEqual(result["records"], [{"dtc": "123456", "status": 8,
+                    "severity": severity, "status_flags": ["confirmed_dtc"]}])
+                if subfunction == 0x42:
+                    self.assertEqual(result["effective_mask"], 8)
+                    self.assertEqual(result["effective_severity_mask"], 0xFC)
+                    self.assertTrue(result["filter_available"])
+                    self.assertTrue(result["severity_filter_available"])
+                else:
+                    self.assertNotIn("effective_mask", result)
+                    self.assertNotIn("effective_severity_mask", result)
                 fake.close.assert_not_called()
+        # Zero intersection is not evidence of a clean emissions system.
+        fake = Session.__new__(Session)
+        fake.read_obd = unittest.mock.Mock(return_value={"obd_on_uds": True})
+        fake.exchange = unittest.mock.Mock(return_value=bytes.fromhex("594233010104"))
+        fake.close = unittest.mock.Mock()
+        result = fake.wwh_dtcs(VIN, 0x42, status_mask=8, severity_mask=0x80)
+        self.assertFalse(result["filter_available"])
+        self.assertFalse(result["severity_filter_available"])
+        self.assertEqual(result["records"], [])
+        fake.exchange.assert_called_once_with(bytes.fromhex("1942338008"))
+        fake.close.assert_not_called()
+        # The raw status stays available for evidence; unsupported bits are
+        # deliberately not interpreted as confirmed or pending faults.
+        fake.exchange.return_value = bytes.fromhex("595533010412345608")
+        result = fake.wwh_dtcs(VIN, 0x55)
+        self.assertEqual(result["records"][0]["status"], 8)
+        self.assertEqual(result["records"][0]["status_flags"], [])
         for reply in ("595633FF041312345608", "595633FF0412123456", "595634FF0412"):
             fake = Session.__new__(Session)
             fake.read_obd = unittest.mock.Mock(return_value={"obd_on_uds": True})
