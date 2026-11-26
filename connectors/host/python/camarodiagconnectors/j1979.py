@@ -58,7 +58,22 @@ class LinuxIsoTp:
         if not allowed_read(request) or not 0 < timeout <= 2.5:
             raise ValueError("Unsupported request or timeout")
         deadline = time.monotonic() + timeout
-        self._socket.settimeout(timeout)
+        # Discard previously queued completed ISO-TP messages before TX.
+        # A continuously busy queue cannot establish a fresh exchange.
+        self._socket.setblocking(False)
+        for _ in range(64):
+            try:
+                self._socket.recv(_MAX_PAYLOAD + 1)
+            except BlockingIOError:
+                break
+            if time.monotonic() >= deadline:
+                raise OSError("Stale ISO-TP receive queue did not drain")
+        else:
+            raise OSError("Stale ISO-TP receive queue exceeded bound")
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise OSError("No time remains for a fresh ISO-TP exchange")
+        self._socket.settimeout(remaining)
         if self._socket.send(request) != len(request):
             raise OSError("Incomplete ISO-TP request")
         pending = 0
