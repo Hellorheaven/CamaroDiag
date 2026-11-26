@@ -75,6 +75,32 @@ internal static class NativeE39RecoveryImageAssessmentSelfTests
                 "Full original BIN and live ECU saved sector bytes match the same evidence");
 
             var blockDirectory = journalPath + ".blocks";
+            var originalEvidence = NativeE39SavedBlockAssessment.Inspect(journalPath);
+            Check(originalEvidence.Verified && originalEvidence.SnapshotSha256 is { Length: 64 },
+                "Exact journal and sector-envelope digest available");
+            var journalBytes = File.ReadAllText(journalPath);
+            File.WriteAllText(journalPath, journalBytes.Replace("\"Detail\":", "\"Detail\" :"));
+            var changedJournal = NativeE39SavedBlockAssessment.Inspect(journalPath);
+            Check(changedJournal.Verified && changedJournal.JournalState == originalEvidence.JournalState &&
+                changedJournal.Blocks.SequenceEqual(originalEvidence.Blocks) &&
+                changedJournal.SnapshotSha256 != originalEvidence.SnapshotSha256,
+                "Journal-only formatting change detected despite identical decoded records");
+            File.WriteAllText(journalPath, journalBytes);
+            var blockPath = Directory.GetFiles(blockDirectory).Single();
+            var originalEnvelope = File.ReadAllBytes(blockPath);
+            var cut = Array.IndexOf(originalEnvelope, (byte)'\n');
+            var changedEnvelope = System.Text.Encoding.UTF8.GetBytes(
+                System.Text.Encoding.UTF8.GetString(originalEnvelope, 0, cut) + " \n")
+                .Concat(originalEnvelope.Skip(cut + 1)).ToArray();
+            File.WriteAllBytes(blockPath, changedEnvelope);
+            var changedHeader = NativeE39SavedBlockAssessment.Inspect(journalPath);
+            Check(changedHeader.Verified && changedHeader.Blocks.SequenceEqual(originalEvidence.Blocks) &&
+                changedHeader.SnapshotSha256 != originalEvidence.SnapshotSha256,
+                "Sector envelope metadata-only change detected");
+            File.WriteAllBytes(blockPath, originalEnvelope);
+            Check(NativeE39SavedBlockAssessment.Inspect(journalPath).SnapshotSha256 ==
+                originalEvidence.SnapshotSha256, "Snapshot digest is reproducible");
+
             var unexpectedDirectory = Path.Combine(blockDirectory, "unexpected");
             Directory.CreateDirectory(unexpectedDirectory);
             Check(!NativeE39SavedBlockAssessment.Inspect(journalPath).Verified,
