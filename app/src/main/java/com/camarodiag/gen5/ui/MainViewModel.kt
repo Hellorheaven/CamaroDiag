@@ -5152,15 +5152,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     _dtcs.value = emptyList()
                     _connectionMessage.value = localizedContext.getString(R.string.msg_dtc_demo_cleared)
                 } else if (obdManager.isJ2534StandardObdClearAvailable()) {
-                    obdManager.clearJ2534StandardDtcs(approval) {
+                    val snapshot = obdManager.clearJ2534StandardDtcs(approval) {
                         EcuWriteConsentFlow.requireCurrentForTransmit(approval) { current() }
                     }
                     if (!current()) return@launch
-                    // Mode 04 does not erase permanent emissions DTCs. Preserve
-                    // all other module records and require a new scan to refresh.
-                    _dtcs.value = StandardObdDtcInventory.afterClear(_dtcs.value, obdManager.standardObdDtcModule())
-                    _dtcScanNotice.value = null
-                    _connectionMessage.value = null
+                    publishClearReadback(snapshot)
                 } else if (!obdManager.isObdCommandChannelAvailable) {
                     _connectionMessage.value = when {
                         obdManager.isJ2534StandardObdAvailable() ->
@@ -5170,19 +5166,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         else -> localizedContext.getString(R.string.msg_dtc_clear_adapter_required)
                     }
                 } else {
-                    val response = obdManager.sendAtCommand("04", 2500L) {
+                    val result = obdManager.clearElmStandardDtcs(approval) {
                         EcuWriteConsentFlow.requireCurrentForTransmit(approval) { current() }
                     }
                     if (!current()) return@launch
-                    if (com.camarodiag.gen5.data.obd.StandardObdClearEvidence.acknowledged(response)) {
-                        // SAE Mode 04 clears standardized emissions DTCs only.
-                        // Preserve enhanced UDS records from other ECUs: no GM UDS clear is issued here.
-                        // A functional ACK does not establish that every ECU
-                        // cleared its records. Keep the old snapshot until rescanned.
-                        _dtcScanNotice.value = null
-                        _connectionMessage.value = null
+                    val snapshot = result.snapshot
+                    if (snapshot != null) {
+                        publishClearReadback(snapshot)
                     } else {
-                        _connectionMessage.value = localizedContext.getString(R.string.msg_dtc_clear_not_confirmed, response)
+                        _connectionMessage.value = localizedContext.getString(
+                            R.string.msg_dtc_clear_not_confirmed, result.rawResponse)
+                        _dtcScanNotice.value = _connectionMessage.value
                     }
                 }
             } catch (cancelled: CancellationException) {
@@ -5196,6 +5190,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 endBusyOperation()
             }
         }
+    }
+
+    /** Replace only modes positively reread after an ACK; permanent records
+     * are never inferred erased, and unrelated enhanced ECU rows survive. */
+    private fun publishClearReadback(snapshot: com.camarodiag.gen5.data.obd.PhysicalObdDtcSnapshot) {
+        replaceStandardDtcRecords(snapshot.records, snapshot.unavailableModes)
+        val message = localizedContext.getString(
+            R.string.msg_dtc_clear_readback,
+            snapshot.confirmed?.size?.toString() ?: localizedContext.getString(R.string.obd_not_available),
+            snapshot.pending?.size?.toString() ?: localizedContext.getString(R.string.obd_not_available),
+            snapshot.permanent?.size?.toString() ?: localizedContext.getString(R.string.obd_not_available)
+        )
+        _connectionMessage.value = message
+        _dtcScanNotice.value = message
     }
 
     fun runMileageAudit() {
