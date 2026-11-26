@@ -549,7 +549,13 @@ class BluetoothObdManager(context: Context) {
      * Runs a multi-command OBD transaction without allowing live telemetry or
      * another diagnostic action to interleave adapter setup and response parsing.
      */
-    suspend fun <T> withObdCommandSession(block: suspend (Obd2FeatureEngine) -> T): T {
+    suspend fun <T> withObdCommandSession(block: suspend (Obd2FeatureEngine) -> T): T =
+        withGuardedObdCommandSession({}, block)
+
+    private suspend fun <T> withGuardedObdCommandSession(
+        beforeCommand: (String) -> Unit,
+        block: suspend (Obd2FeatureEngine) -> T
+    ): T {
         val requestedEpoch = transportSessionEpoch.capture()
         check(isObdCommandChannelAvailable) {
             "No ELM/OBD-II command channel is available on the active transport."
@@ -562,7 +568,8 @@ class BluetoothObdManager(context: Context) {
             }
             val engine = Obd2FeatureEngine(
                 ObdCommandChannel { command, timeoutMs ->
-                    sendAtCommandInternal(command, timeoutMs, expectedEpoch = requestedEpoch, preserveLines = true)
+                    sendAtCommandInternal(command, timeoutMs, expectedEpoch = requestedEpoch, preserveLines = true,
+                        beforeTransmit = { beforeCommand(command) })
                 },
                 physicalElmHeaders = true
             )
@@ -854,20 +861,41 @@ class BluetoothObdManager(context: Context) {
     suspend fun clearJ2534StandardDtcs(
         approval: EcuWriteConsentFlow.Approval,
         beforeTransmit: () -> Unit
-    ) {
+    ): PhysicalObdDtcSnapshot {
         require(approval.warningAcknowledged && approval.confirmedYes) {
             "Risk notice OK and separate YES are required before clearing ECU DTCs."
         }
         val epoch = transportSessionEpoch.capture()
         check(isJ2534StandardObdClearAvailable())
-        commandSessionMutex.withLock {
+        return commandSessionMutex.withLock {
             transportSessionEpoch.requireQueuedCurrent(epoch)
             check(isJ2534StandardObdClearAvailable())
-            checkNotNull(j2534BridgeTransport).clearStandardObdDtcs(approval) {
+            val bridge = checkNotNull(j2534BridgeTransport)
+            bridge.clearStandardObdDtcs(approval) {
                 transportSessionEpoch.requireQueuedCurrent(epoch)
                 beforeTransmit()
             }
             transportSessionEpoch.requireQueuedCurrent(epoch)
+            beforeTransmit()
+            val snapshot = bridge.readStandardObdDtcs()
+            transportSessionEpoch.requireQueuedCurrent(epoch)
+            snapshot
+        }
+    }
+
+    /** Mode 04 is never retried. The ACK and fresh DTC reads use one reserved
+     * adapter session; only the actual command boundary consumes consent. */
+    suspend fun clearElmStandardDtcs(
+        approval: EcuWriteConsentFlow.Approval,
+        requireCurrent: () -> Unit
+    ): StandardObdClearResult {
+        require(approval.warningAcknowledged && approval.confirmedYes)
+        return withGuardedObdCommandSession({ command ->
+            requireCurrent()
+            if (command == "04")
+                EcuWriteConsentFlow.requireCurrentForTransmit(approval) { true }
+        }) { engine ->
+            engine.clearStandardDtcsAndReadBack(approval)
         }
     }
 
