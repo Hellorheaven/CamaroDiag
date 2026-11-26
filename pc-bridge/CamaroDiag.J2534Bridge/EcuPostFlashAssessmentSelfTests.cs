@@ -41,6 +41,24 @@ internal static class EcuPostFlashAssessmentSelfTests
         }).Status == EcuPostFlashAssessment.Verdict.Failed,
             "Sector readback mismatch does not pass.");
 
+        var flashBlocks = NativeMpc5566FlashMap.Blocks();
+        var qualifiedGeometry = flashBlocks.First(b => b.Start == 0x20000u);
+        var knownLength = checked((int)(qualifiedGeometry.EndExclusive - qualifiedGeometry.Start));
+        var previewBlock = new NativeE39SavedBlockAssessment.Block(
+            qualifiedGeometry.Start, knownLength, new string('A', 64));
+        Check(EcuPostFlashAssessment.MatchesSiliconEraseGeometry([previewBlock]),
+            "Exact known silicon erase boundary is accepted for offline consistency only");
+        Check(!EcuPostFlashAssessment.MatchesSiliconEraseGeometry([
+            previewBlock with { Length = knownLength / 2 }
+        ]), "Fragment of silicon erase sector is not a valid restore geometry");
+        Check(!EcuPostFlashAssessment.MatchesSiliconEraseGeometry([
+            previewBlock with { Address = previewBlock.Address + 8u }
+        ]), "Misaligned physical sector address is rejected");
+        Check(!EcuPostFlashAssessment.MatchesSiliconEraseGeometry([previewBlock, previewBlock]),
+            "Duplicate original ECU backup sector is rejected");
+        Check(!EcuPostFlashAssessment.MatchesSiliconEraseGeometry([]),
+            "No physical backups is not a valid restore geometry");
+
         var folder = Path.Combine(Path.GetTempPath(),
             "camarodiag-restoration-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(folder);

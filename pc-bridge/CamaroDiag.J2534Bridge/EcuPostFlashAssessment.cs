@@ -67,6 +67,23 @@ internal static class EcuPostFlashAssessment
     }
 
     /// <summary>
+    /// Compare archived, verified physical blocks with known MPC5566 silicon
+    /// erase geometry. This is an OFFLINE consistency check, NEVER a claim
+    /// that the installed ECU uses this board/recovery configuration.
+    /// Partial (interrupted) transactions may have only some sectors.
+    /// </summary>
+    internal static bool MatchesSiliconEraseGeometry(
+        IReadOnlyList<NativeE39SavedBlockAssessment.Block> blocks)
+    {
+        if (blocks.Count == 0 || blocks.Select(b => b.Address).Distinct().Count() != blocks.Count)
+            return false;
+        var expected = NativeMpc5566FlashMap.Blocks()
+            .ToDictionary(b => b.Start, b => checked((int)(b.EndExclusive - b.Start)));
+        return blocks.All(block =>
+            expected.TryGetValue(block.Address, out var length) && block.Length == length);
+    }
+
+    /// <summary>
     /// Build a byte-accurate OFFLINE preview. The actual qualified ECU writer
     /// must first independently prove live ECU identity, firmware, original
     /// target sector geometry, programming power and recovery bootloader.

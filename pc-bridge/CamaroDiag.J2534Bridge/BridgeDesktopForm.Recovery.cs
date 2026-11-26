@@ -75,6 +75,15 @@ internal sealed partial class BridgeDesktopForm
                     lines.Add($"Secteurs originaux contrôlés : {savedBlocks.Blocks.Count}/{savedBlocks.ExpectedSectors}");
                     if (!savedBlocks.Verified)
                         lines.Add("Anomalie sauvegarde : " + savedBlocks.Problem);
+                    else
+                    {
+                        lines.Add("Géométrie secteurs silicium MPC5566 : " +
+                            (EcuPostFlashAssessment.MatchesSiliconEraseGeometry(savedBlocks.Blocks)
+                                ? "COHÉRENTE (non qualifiée pour cette carte ECU)"
+                                : "INCOHÉRENTE / NON QUALIFIÉE"));
+                        foreach (var block in savedBlocks.Blocks)
+                            lines.Add($"Original 0x{block.Address:X8} · {block.Length} octets · SHA-256 {block.OriginalSha256}");
+                    }
                     lines.Add("Aucun secteur ne sera restauré automatiquement.");
                     lines.Add("Recette véhicule après écriture : identité ECU, checksum OEM, DTC avant/après, " +
                         "démarrage, ralenti, contrôles statiques, essai conduit par l'opérateur.");

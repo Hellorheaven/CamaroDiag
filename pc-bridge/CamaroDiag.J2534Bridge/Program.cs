@@ -253,8 +253,24 @@ internal static class Program
             else Console.WriteLine("Journal sequence is incomplete, invalid, or contains an explicit recovery marker.");
             if (report.PossiblyIncompleteAddress is uint address)
                 Console.WriteLine($"Potentially incomplete sector: 0x{address:X8}");
-            Console.WriteLine("Offline evidence only; this command does not contact, reset or program an ECU.");
-            if (!report.RequiresAssessment) return 0;
+            var backups = NativeE39SavedBlockAssessment.Inspect(args[1]);
+            Console.WriteLine($"Verified original ECU backup sectors: {backups.Blocks.Count}/{backups.ExpectedSectors}");
+            Console.WriteLine("Physical sector backups: " +
+                (backups.Verified ? "integrity verified" : "UNVERIFIED"));
+            if (backups.Verified)
+            {
+                Console.WriteLine("Known MPC5566 silicon erase boundaries: " +
+                    (EcuPostFlashAssessment.MatchesSiliconEraseGeometry(backups.Blocks)
+                        ? "consistent (not ECU board qualification)" : "mismatch / not qualified"));
+                foreach (var block in backups.Blocks)
+                    Console.WriteLine($"  0x{block.Address:X8}  {block.Length} bytes  SHA-256 {block.OriginalSha256}");
+            }
+            else Console.Error.WriteLine("Physical backup error: " + backups.Problem);
+            Console.WriteLine("Offline evidence only; no ECU contact, reset, programming or automatic restoration.");
+            if (!report.RequiresAssessment && backups.Verified) return 0;
+            if (!backups.Verified)
+                Console.Error.WriteLine("Physical originals incomplete or changed; do NOT attempt restoration.");
+
             Console.Error.WriteLine("No completed transaction recorded. Preserve the original backup and journal.");
             return 8;
         }
