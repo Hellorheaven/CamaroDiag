@@ -1896,13 +1896,14 @@ internal static class StandardProtocolCli
             cancellation.Token.ThrowIfCancellationRequested();
             await DoIpVehicleDiscovery.RequireCurrentIdentityAsync(gateway, timeout, cancellation.Token,
                 trace: journal is null ? null : journal.RecordDatagram);
-            await using var transport = await DoIpDiagnosticTransport.ConnectAsync(
+            await using (var transport = await DoIpDiagnosticTransport.ConnectAsync(
                 o.Host, o.Tester, o.Ecu, timeout, cancellation.Token,
                 useTls: o.UseTls, protocolVersion: gateway.ProtocolVersion,
                 clientCertificateThumbprint: o.ClientCertificateThumbprint,
                 activationType: o.RoutingActivationType, activationOemData: o.RoutingOemData,
                 expectedGatewayAddress: gateway.LogicalAddress,
-                trace: journal is null ? null : journal.Record);
+                trace: journal is null ? null : journal.Record))
+            {
             count = await DoIpVinReader.ExchangeSequenceVerifiedAsync(transport, gateway,
                 sequence.Commands, timeout, cancellation.Token, (index, reply) =>
                 {
@@ -1913,6 +1914,11 @@ internal static class StandardProtocolCli
                         index, Convert.ToHexString(reply)));
                 },
                 TimeSpan.FromMilliseconds(o.DoIpP2Ms), TimeSpan.FromMilliseconds(o.DoIpP2StarMs));
+            }
+            // The final gateway check runs only after the diagnostic socket
+            // has been disposed and before the optional trace closes.
+            await DoIpVehicleDiscovery.RequireCurrentIdentityAsync(gateway, timeout,
+                cancellation.Token, trace: journal is null ? null : journal.RecordDatagram);
             }
             if (count != activeProgress.CommandsCompleted)
                 throw new InvalidDataException("DoIP sequence reply count changed.");
