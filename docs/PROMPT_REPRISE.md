@@ -1,3 +1,7 @@
+## PR117 — découverte PID multiréponses et attribution Mach-E (26/11/2026)
+
+- C6 : la découverte fonctionnelle sans en-têtes fusionne les bitmaps valides en union, sans prétendre connaître le calculateur d'origine ; elle ne valide pas une enquête limitée au groupe motopropulseur en cas de bitmaps anonymes contradictoires. Les réponses physiques conservent les ensembles par ECU, y compris les ensembles vides. Une mesure anonyme ne complète pas un catalogue attribué. Le scan affiche la couverture par répondant, l'attribution incomplète et la première page non résolue. Régression avec les six bitmaps réels Mach-E et le PID A6, non exécutée. Aucun checkpoint.
+
 ## PR117 — VIN et odomètre sur canal J2534 (26/11/2026)
 
 - C6 : lecture Mode 09 PID 02 avant/après les PID kilométriques sur le même canal physique J2534 sous verrou de session et contrôle d'époque. Décodage VIN strict, aucune attribution si une des deux lectures est indisponible, refus de VIN contradictoires. A6/D3 gardent leur décodage et l'absence de VIN n'est pas remplacée par le profil du garage. Régressions écrites, non exécutées. Aucun checkpoint.

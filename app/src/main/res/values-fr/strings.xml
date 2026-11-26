@@ -527,6 +527,9 @@
     <string name="mileage_details_unavailable">Les détails techniques ne sont pas disponibles pour cette source.</string>
     <string name="mileage_caveat_unavailable">Aucune information localisée supplémentaire n’est disponible pour cette source.</string>
     <string name="obd_temperature_encoding_limit">Limite de codage (brut %1$s) : température physique non confirmée.</string>
+    <string name="obd_pid_count_by_ecu">PID annoncés par %1$s</string>
+    <string name="obd_pid_attribution_incomplete">Prise en charge cumulée des réponses anonymes ; attribution aux calculateurs incomplète.</string>
+    <string name="obd_pid_discovery_partial">Découverte des PID incomplète à partir de 0x%1$02X.</string>
     <string name="obd_value_source">Répondant CAN %1$s</string>
     <string name="obd_pid_standard">Norme OBD</string>
     <string name="obd_pid_runtime">Durée depuis le démarrage</string>

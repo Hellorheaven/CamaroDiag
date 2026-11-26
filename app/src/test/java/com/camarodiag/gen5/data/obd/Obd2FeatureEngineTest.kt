@@ -226,6 +226,14 @@ class Obd2FeatureEngineTest {
         })
         val rows = engine.readLiveData(setOf(5, 0x31, 0xA6, 0x1C))
         assertEquals(setOf("7E8", "7EA", "7EC"), rows.filter { it.pid == 5 }.map { it.responder }.toSet())
+        val temperatures = rows.filter { it.pid == 5 }.associateBy { it.responder }
+        assertEquals("215.00", temperatures["7E8"]?.value)
+        assertEquals(true, temperatures["7E8"]?.temperatureAtEncodingLimit)
+        assertEquals("-40.00", temperatures["7EA"]?.value)
+        assertEquals(true, temperatures["7EA"]?.temperatureAtEncodingLimit)
+        assertEquals("15.00", temperatures["7EC"]?.value)
+        assertEquals(false, temperatures["7EC"]?.temperatureAtEncodingLimit)
+        assertEquals(false, rows.single { it.pid == 0xA6 }.temperatureAtEncodingLimit)
         assertEquals("77655.10", rows.single { it.pid == 0xA6 }.value)
         assertEquals("14653.00", rows.single { it.pid == 0x31 }.value)
         assertEquals(listOf(3), rows.single { it.pid == 0x1C }.raw)
@@ -351,6 +359,46 @@ class Obd2FeatureEngineTest {
         })
 
         assertTrue(engine.discoverFunctionalObdResponders().isEmpty())
+    }
+
+    @Test
+    fun machEHeaderlessBitmapsRemainAUnionNotOneEcu() = runBlocking {
+        val replies = mapOf(
+            "0100" to "410098180013 410000000000 410098180003 410098180003 4100AA082013",
+            "0120" to "412080018001 412080018001 412080018001 41208003A001",
+            "0140" to "4140D4C08001 414040800000 414040800000 414040800020",
+            "0160" to "416002000001",
+            "0180" to "418000000049",
+            "01A0" to "41A004000000",
+            "01A6" to "41A6000BD967",
+            "0105" to "4105FF 410500 410537 4105FF"
+        )
+        val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ -> replies[command] ?: "NO DATA" })
+        val result = engine.discoverPidAvailability()
+        assertTrue(result.attributionIncomplete)
+        assertTrue(result.byResponder.isEmpty())
+        assertTrue(0xA6 in result.supported)
+        assertNull(result.firstUnresolvedPid)
+        val measured = engine.readLiveData(result.supported)
+        assertEquals("77655.10", measured.single { it.pid == 0xA6 }.value)
+        assertTrue(measured.none { it.pid == 5 }) // anonymous conflicting values
+        assertTrue(engine.discoverPidAvailability(primaryPowertrainResponderOnly = true).supported.isEmpty())
+    }
+
+    @Test
+    fun taggedBitmapsKeepEmptyResponderAndRejectAnonymousMeasurement() = runBlocking {
+        val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+            when (command) {
+                "0100" -> "7E8 06 41 00 08 00 00 00\r7EA 06 41 00 00 00 00 00"
+                "0105" -> "410537"
+                else -> "NO DATA"
+            }
+        })
+        val result = engine.discoverPidAvailability()
+        assertEquals(setOf(5), result.byResponder["7E8"])
+        assertEquals(emptySet<Int>(), result.byResponder["7EA"])
+        assertFalse(result.attributionIncomplete)
+        assertTrue(engine.readLiveData(result.supported, result.byResponder).isEmpty())
     }
 
     @Test

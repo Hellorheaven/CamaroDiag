@@ -17,7 +17,14 @@ data class ObdValue(
     val unit: String = "",
     val raw: List<Int>,
     val responder: String? = null
-)
+) {
+    /** A value at the encoded temperature limit is not automatically a
+     * sensor failure or valid physical temperature. Retain the evidence. */
+    val temperatureAtEncodingLimit: Boolean get() = when (pid) {
+        0x05, 0x0F, 0x46, 0x5C -> raw.singleOrNull() in setOf(0, 255)
+        else -> false
+    }
+}
 
 data class ObdDtc(val code: String, val status: String)
 
@@ -62,7 +69,10 @@ data class ObdScanReport(
     val rawLog: List<String>,
     val freezeFrameDtc: ObdDtc? = null,
     val physicalCanResponder: String? = null,
-    val unavailableDtcModes: Set<Int> = emptySet()
+    val unavailableDtcModes: Set<Int> = emptySet(),
+    val supportedPidsByResponder: Map<String, Set<Int>> = emptyMap(),
+    val firstUnresolvedPid: Int? = null,
+    val pidAttributionIncomplete: Boolean = false
 )
 
 /**
@@ -211,15 +221,17 @@ class Obd2FeatureEngine(
 
     /** Reads Mode 01 supported-PID bitmaps (PID 00, 20, ... E0). */
     data class PidDiscovery(val supported: Set<Int>, val firstUnresolvedPid: Int?,
-        val byResponder: Map<String, Set<Int>> = emptyMap())
+        val byResponder: Map<String, Set<Int>> = emptyMap(),
+        val attributionIncomplete: Boolean = false)
 
     suspend fun discoverSupportedPids(): Set<Int> = discoverPidAvailability().supported
 
     suspend fun discoverPidAvailability(primaryPowertrainResponderOnly: Boolean = false): PidDiscovery {
         val supported = linkedSetOf<Int>()
         val byResponder = linkedMapOf<String, MutableSet<Int>>()
+        var attributionIncomplete = false
         fun result(unresolved: Int?) = PidDiscovery(supported.toSet(), unresolved,
-            byResponder.mapValues { it.value.toSet() })
+            byResponder.mapValues { it.value.toSet() }, attributionIncomplete)
         var expectedResponders: Set<String?>? = null
         var firstUnresolved: Int? = null
         var basePid = 0x00
@@ -231,8 +243,16 @@ class Obd2FeatureEngine(
                 .groupBy { it.responder }
             val candidates = if (grouped.keys.any { it != null }) grouped.filterKeys { it != null } else grouped
             val valid = candidates.mapNotNull { (address, rows) ->
-                rows.map { it.bytes }.distinct().singleOrNull()?.let { address to it }
+                val distinct = rows.map { it.bytes }.distinct()
+                if (address == null && distinct.size > 1 && !primaryPowertrainResponderOnly) {
+                    // Without headers, multiple functional replies cannot be
+                    // tied to ECUs. Their OR is only a union of advertised PIDs,
+                    // never the support bitmap of a single ECU.
+                    attributionIncomplete = true
+                    address to List(4) { index -> distinct.fold(0) { mask, bytes -> mask or bytes[index] } }
+                } else distinct.singleOrNull()?.let { address to it }
             }.toMap()
+            if (candidates.keys.any { it == null }) attributionIncomplete = true
             val expected = expectedResponders
             val accepted = if (expected == null) valid else valid.filterKeys { it in expected }
             if (accepted.isEmpty() || (expected != null && !accepted.keys.containsAll(expected)) ||
@@ -242,6 +262,7 @@ class Obd2FeatureEngine(
             if (accepted.isEmpty()) return result(firstUnresolved)
             val next = linkedSetOf<String?>()
             for ((address, bytes) in accepted) {
+                if (address != null) byResponder.getOrPut(address) { linkedSetOf() }
                 for (bit in 0 until 31) {
                     val mask = 1 shl (7 - (bit % 8))
                     if ((bytes[bit / 8] and mask) != 0) {
@@ -291,6 +312,9 @@ class Obd2FeatureEngine(
             val attributed = if (groups.keys.any { it != null }) groups.filterKeys { it != null } else groups
             for ((responder, rows) in attributed) {
                 if (responder != null && byResponder.isNotEmpty() && pid !in byResponder[responder].orEmpty()) continue
+                // Once support has been attributed to physical addresses, an
+                // anonymous reply cannot be credited to any of those ECUs.
+                if (responder == null && byResponder.isNotEmpty()) continue
                 // Conflicting values from the same or unidentified responder
                 // cannot be promoted into a single trusted measurement.
                 val data = rows.map { it.bytes }.distinct().singleOrNull() ?: continue
@@ -566,7 +590,11 @@ class Obd2FeatureEngine(
             rawLog = log.toList(),
             freezeFrameDtc = freezeFrameDtc,
             physicalCanResponder = physicalCanResponder,
-            unavailableDtcModes = dtcSnapshot.unavailableModes
+            unavailableDtcModes = dtcSnapshot.unavailableModes,
+            supportedPidsByResponder = if (physicalCanResponder != null)
+                mapOf(physicalCanResponder to supported) else discovery.byResponder,
+            firstUnresolvedPid = discovery.firstUnresolvedPid,
+            pidAttributionIncomplete = physicalCanResponder == null && discovery.attributionIncomplete
         )
     }
 
