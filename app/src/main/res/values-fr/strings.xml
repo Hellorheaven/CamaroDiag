@@ -1293,8 +1293,8 @@
     <string name="functional_evap_run">Mode 08 — EVAP</string>
     <string name="functional_evap_scope">Test indépendant du calculateur CAN physique ; disponible uniquement sur une interface ELM/STN compatible.</string>
     <string name="functional_evap_profile">Je confirme le calculateur moteur principal et le VIN sélectionné : %1$s</string>
-    <string name="functional_evap_warning">Respectez la procédure EVAP du constructeur. Véhicule immobilisé, moteur arrêté, local ventilé et conditions de sécurité réunies. Le calculateur peut refuser le test. Aucune répétition automatique.</string>
-    <string name="functional_evap_confirm">Demander une seule fois le test EVAP sur le véhicule %1$s ?</string>
+    <string name="functional_evap_warning">Cette demande prépare les conditions du test de fuite EVAP sans réaliser le test. Respectez la procédure EVAP du constructeur. Véhicule immobilisé, moteur arrêté, local ventilé et conditions de sécurité réunies. Le calculateur peut refuser le test. Aucune répétition automatique.</string>
+    <string name="functional_evap_confirm">Demander une seule fois la préparation du test EVAP sur le véhicule %1$s ?</string>
     <string name="functional_evap_ok">OK</string>
     <string name="functional_evap_yes">Oui</string>
     <string name="functional_evap_cancel">Annuler</string>
