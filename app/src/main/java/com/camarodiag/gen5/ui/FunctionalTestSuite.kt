@@ -89,7 +89,8 @@ data class FunctionalTestState(
     val clearResult: com.camarodiag.gen5.data.obd.ObdClearRecipeResult? = null,
     val legacyTarget: com.camarodiag.gen5.data.obd.LegacyMutationTarget? = null,
     val legacyBaseline: com.camarodiag.gen5.data.obd.LegacyMutationResult? = null,
-    val legacyResult: com.camarodiag.gen5.data.obd.LegacyMutationResult? = null
+    val legacyResult: com.camarodiag.gen5.data.obd.LegacyMutationResult? = null,
+    val legacyDiscovery: com.camarodiag.gen5.data.obd.LegacySourceDiscovery? = null
 ) {
     val canExport: Boolean get() = !running && finishedAtMillis != null && context != null && checks.isNotEmpty()
 }
@@ -330,6 +331,33 @@ object FunctionalTestPlanner {
             .mapValues { (mode, count) -> count.takeUnless { mode in report.unavailableDtcModes } }
         rows = withDtcModeEvidence(rows, counts)
         return withObservedIdentity(state.copy(checks = rows, obdScan = report, rawObdExchanges = report.rawLog), report.vin)
+    }
+
+    fun withLegacyDiscovery(state: FunctionalTestState,
+        discovery: com.camarodiag.gen5.data.obd.LegacySourceDiscovery): FunctionalTestState {
+        val rows = state.checks.filterNot { it.group == "legacy_responder" }
+        val observations = discovery.sources.map { source ->
+            val outcome = when (source.status) {
+                "PASSED" -> FunctionalTestOutcome.PASSED
+                "FAILED" -> FunctionalTestOutcome.FAILED
+                else -> FunctionalTestOutcome.NOT_TESTED
+            }
+            FunctionalTestCheck("legacy-responder:${source.source}","legacy_responder",
+                "Legacy emissions source ${source.source}","Source antipollution legacy ${source.source}",
+                outcome,
+                "Response header and checksum checked; OEM identity and whole-vehicle coverage not established.",
+                "En-tête et contrôle d’intégrité vérifiés ; identité constructeur et couverture globale non établies.")
+        }
+        val discoveryCheck = FunctionalTestCheck("legacy-responder:discovery","legacy_responder",
+            "Legacy responder discovery","Découverte des répondants legacy",
+            if (discovery.error != null) FunctionalTestOutcome.FAILED
+            else if (discovery.verifiedSources.isNotEmpty()) FunctionalTestOutcome.PASSED
+            else FunctionalTestOutcome.NOT_TESTED,
+            "Observed sources only; no automatic engine selection.",
+            "Sources observées uniquement ; aucune sélection automatique du moteur.")
+        return state.copy(legacyDiscovery=discovery,checks=rows+discoveryCheck+observations,
+            rawObdExchanges=state.rawObdExchanges+listOf("> 0100 -> ${discovery.rawResponse}",
+                "> ATDPN -> ${discovery.rawProtocolResponse}"))
     }
 
     /** Bound owner-only diagnostic evidence, without creating synthetic replies. */
