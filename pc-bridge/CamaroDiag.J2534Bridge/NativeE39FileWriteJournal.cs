@@ -163,6 +163,16 @@ internal sealed class NativeE39FileWriteJournal :
             try { source.ReadExactly(snapshot); }
             catch (EndOfStreamException) { return new(CompletionState.Interrupted, false); }
         }
+        return InspectSnapshot(snapshot);
+    }
+
+    /// <summary>Inspect exactly the bytes used by the caller to verify sector
+    /// evidence; no second journal read and no inference about a live ECU.</summary>
+    internal static Inspection InspectSnapshot(byte[] snapshot)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        if (snapshot.Length == 0) return new(CompletionState.NoEvents, true);
+        if (snapshot.Length > MaximumJournalBytes) return new(CompletionState.Interrupted, false);
         string text;
         try { text = new UTF8Encoding(false, true).GetString(snapshot); }
         catch (DecoderFallbackException) { return new(CompletionState.Interrupted, false); }
