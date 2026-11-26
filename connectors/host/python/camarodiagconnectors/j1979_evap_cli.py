@@ -29,14 +29,14 @@ def run(argv=None, *, prompt=input) -> dict:
     if not re.fullmatch(r"[A-HJ-NPR-Z0-9]{17}", args.vin):
         parser.error("Expected a documented 17-character VIN")
     warning = (
-        "Respectez la procédure constructeur. Véhicule immobilisé, moteur arrêté, "
+        "Cette demande prépare les conditions EVAP sans réaliser le test de fuite. Respectez la procédure constructeur. Véhicule immobilisé, moteur arrêté, "
         "local ventilé et conditions de sécurité réunies. Une seule demande de test. OK : "
         if args.fr else
-        "Follow the manufacturer's test procedure. Stationary vehicle, engine stopped, "
+        "This request prepares EVAP leak-test conditions; it does not perform the test. Follow the manufacturer's test procedure. Stationary vehicle, engine stopped, "
         "ventilated area and safe conditions. One test request only. Type OK: ")
-    confirmation = (f"Confirmer le test EVAP sur {args.vin}, {args.tx:X}/{args.rx:X} ? OUI/NON : "
+    confirmation = (f"Confirmer la préparation du test EVAP sur {args.vin}, {args.tx:X}/{args.rx:X} ? OUI/NON : "
                     if args.fr else
-                    f"Confirm EVAP test on {args.vin}, {args.tx:X}/{args.rx:X}? YES/NO: ")
+                    f"Confirm EVAP test conditions on {args.vin}, {args.tx:X}/{args.rx:X}? YES/NO: ")
     try:
         if prompt(warning).strip().upper() != "OK":
             return {"outcome": "NOT_TESTED", "reason": "CANCELLED"}
