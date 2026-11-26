@@ -33,6 +33,7 @@ internal static class NativeE39BenchWorkflowSelfTests
         internal int Erases, IdentityReads, Frames;
         internal bool AlterSecondIdentity, CorruptAfterWrite;
         internal Func<CancellationToken, Task>? BeforeFirstIdentity;
+        internal CancellationTokenSource? CancelAfterFlashRead;
         private bool corruptDone, running;
         public async Task<NativeGmlanIdentification.Identity> ReadIdentityAsync(CancellationToken token)
         {
@@ -76,6 +77,9 @@ internal static class NativeE39BenchWorkflowSelfTests
                 int size = BinaryPrimitives.ReadUInt16BigEndian(request.AsSpan(6,2));
                 reply = new byte[size+1]; reply[0] = 0x63;
                 Buffer.BlockCopy(Memory,address,reply,1,size);
+                // Model a non-cooperative transport that completes a read after
+                // the caller has already canceled the operation.
+                CancelAfterFlashRead?.Cancel();
             }
             else if (request[0] == 0x3D && request[1] == 2)
             {
@@ -147,6 +151,17 @@ internal static class NativeE39BenchWorkflowSelfTests
         var mismatch = new Bench(original,id); mismatch.Memory[0x100] ^= 1;
         Reject<InvalidDataException>(() => Execute(mismatch,new Journal(),policy,backup));
         Check(mismatch.Erases == 0,"Full preflight mismatch outside planned sector prevents erase");
+        using (var canceled = new CancellationTokenSource())
+        {
+            var lateRead = new Bench(original, id) { CancelAfterFlashRead = canceled };
+            var lateJournal = new Journal();
+            Reject<OperationCanceledException>(() =>
+                NativeE39BenchWorkflow.RunAsync(lateRead, lateJournal, policy, backup,
+                    original, target, kernel, canceled.Token).GetAwaiter().GetResult());
+            Check(lateRead.Erases == 0 &&
+                lateJournal.Events.All(e => e.Phase != NativeE39WriteSequence.Phase.Completed),
+                "Late successful ECU read after cancellation cannot authorize erase or completion");
+        }
         var normal = new Bench(original,id); var normalJournal = new Journal();
         var result = Execute(normal,normalJournal,policy,backup);
         Check(result.SectorsWritten == 1 && normal.Memory.SequenceEqual(target),"Whole workflow programs target");
