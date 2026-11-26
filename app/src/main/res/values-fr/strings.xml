@@ -75,7 +75,7 @@
     <string name="adapter_section_title">Interfaces OBD-II : Bluetooth, USB et Wi-Fi</string>
     <string name="connection_busy">Connexion ou opération en cours…</string>
     <string name="swcan_wiring_verified">SW-CAN câblage vérifié (Pin 1)</string>
-    <string name="long_response_mode">Réponses longues (ATAL)</string>
+    <string name="long_response_mode">Lire les réponses diagnostiques longues (ATAL)</string>
     <string name="paired_bluetooth_devices">Appareils Bluetooth Appairés</string>
     <string name="common_refresh">Actualiser</string>
     <string name="adapter_none_detected">Aucun adaptateur détecté. Les OBDLink MX+, MX, LX et autres Bluetooth classiques doivent être appairés ; le CX est recherché en BLE à proximité.</string>
@@ -319,7 +319,7 @@
     <string name="live_pid_stft">Correction carburant court terme B1</string>
     <string name="live_pid_stft_demo">Correction carburant B1 (DÉMO)</string>
     <string name="live_pid_odometer">Kilométrage total OBD (PID A6)</string>
-    <string name="live_pid_hybrid_bat_life">Durée de vie restante déclarée de la batterie hybride (PID 5B)</string>
+    <string name="live_pid_hybrid_bat_life">Niveau restant déclaré batterie de traction (PID 5B)</string>
     <string name="live_pid_bat">Tension calculateur</string>
     <string name="live_pid_bat_demo">Tension calculateur (DÉMO)</string>
     <string name="live_pid_speed">Vitesse véhicule</string>
@@ -1012,7 +1012,7 @@
     <string name="can_console_history_recent_scope">Historique à l’écran : 300 événements récents au maximum. Le flux RX brut peut être archivé séparément ; les anciens TX ne sont pas conservés.</string>
     <string name="can_console_bitrate_changed">CAN %1$d kbit/s</string>
     <string name="can_console_capture_profile">Capture CAN %1$d kbit/s, %2$d bits</string>
-    <string name="adapter_can_headers">En-têtes CAN</string>
+    <string name="adapter_can_headers">Afficher les adresses des émetteurs CAN</string>
     <string name="adapter_config_accepted">Configurations acceptées (non validées sur véhicule) : %1$s</string>
     <string name="cal_choose_compatible_profile">Sélectionner un profil CAN compatible</string>
     <string name="cal_doip_title">DoIP direct</string>
@@ -1216,7 +1216,7 @@
     <string name="cal_doip_inventory_obd_unknown">ECU 0x%1$04X : OBDonUDS non identifié (F810 = 0x%2$02X)</string>
     <string name="auth_startup_validation_timeout">La vérification de la session prend trop de temps. Vérifiez votre connexion Internet puis réessayez.</string>
     <string name="adapter_can_tx_label">Émission de trames CAN</string>
-    <string name="adapter_capability_detected">Détecté</string>
+    <string name="adapter_capability_detected">Pris en charge</string>
     <string name="adapter_capability_unverified">Non confirmé</string>
     <string name="modules_no_observed_responders">Aucun répondant enregistré. Lancez un scan OBD.</string>
     <string name="modules_obd_responders">Calculateurs répondants OBD</string>

@@ -564,9 +564,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private var liveEvidenceGeneration = 0L
     private val _observedStandardVin = MutableStateFlow<String?>(null)
     val observedStandardVin: StateFlow<String?> = _observedStandardVin.asStateFlow()
+    private val _observedObdResponders = MutableStateFlow<List<String>>(emptyList())
+    val observedObdResponders: StateFlow<List<String>> = _observedObdResponders.asStateFlow()
 
     private fun resetLiveAndDtcEvidence() {
         _observedStandardVin.value = null
+        _observedObdResponders.value = emptyList()
         liveEvidenceGeneration++
         _livePids.value = emptyList()
         _detectedLiveSensors.value = emptyList()
@@ -580,6 +583,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val recordedLiveSamples = mutableListOf<RecordedLiveSample>()
     private var recordingObservedVin: String? = null
+    private var recordingEvidenceGeneration: Long = -1L
     private val maxLiveRecordingSamples = 10_000
     private val _liveRecordingState = MutableStateFlow(LiveRecordingState())
     val liveRecordingState: StateFlow<LiveRecordingState> = _liveRecordingState.asStateFlow()
@@ -4839,6 +4843,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
         recordedLiveSamples.clear()
         recordingObservedVin = _observedStandardVin.value
+        recordingEvidenceGeneration = liveEvidenceGeneration
         _isStreamingLive.value = true
         val now = System.currentTimeMillis()
         _liveRecordingState.value = LiveRecordingState(
@@ -4909,7 +4914,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         // Once samples exist, never relabel them with a later VIN.
         if (recordingObservedVin == null && recordedLiveSamples.isEmpty())
             recordingObservedVin = _observedStandardVin.value
-        if (_observedStandardVin.value != recordingObservedVin) {
+        if (recordingEvidenceGeneration != liveEvidenceGeneration || _observedStandardVin.value != recordingObservedVin) {
             stopLiveRecording()
             _liveRecordingState.update { it.copy(message = localizedContext.getString(R.string.live_recording_identity_changed)) }
             return
@@ -5586,6 +5591,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _obdScanReport.value = report
                 if (!obdManager.isSimulationActive && !obdManager.isDemoMode) {
                     _observedStandardVin.value = VehicleVinMatcher.normalize(report.vin)
+                    _observedObdResponders.value = report.respondingEcuAddresses.distinct().sorted()
                     if (!VehicleVinMatcher.admitsCamaroSpecificRead(selectedVin, report.vin))
                         _modules.value = emptyList()
                 }
@@ -5733,6 +5739,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     val comparison = VehicleVinMatcher.compare(profile.vin, identity.vin)
                     if (!sourceWasSimulated && !obdManager.isSimulationActive && !obdManager.isDemoMode) {
                         _observedStandardVin.value = VehicleVinMatcher.normalize(identity.vin)
+                        _observedObdResponders.value = identity.respondingEcuAddresses.distinct().sorted()
                         if (!VehicleVinMatcher.admitsCamaroSpecificRead(profile.vin, identity.vin))
                             _modules.value = emptyList()
                     }
@@ -6022,8 +6029,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                                 read("5B")?.singleOrNull()?.let { b ->
                                     val v = b * 100.0 / 255.0
                                     values += LivePidValue("HYBRID_BAT_LIFE",
-                                        "Hybrid battery pack remaining life (PID 5B)",
-                                        "Durée de vie restante batterie hybride (PID 5B)",
+                                        "Reported traction battery remaining (PID 5B)",
+                                        "Niveau restant déclaré batterie de traction (PID 5B)",
                                         v, "%", v, "%", 0.0, 100.0, push("HYBRID_BAT_LIFE", v))
                                 }
                                 if (batchEvidenceGeneration != liveEvidenceGeneration) continue

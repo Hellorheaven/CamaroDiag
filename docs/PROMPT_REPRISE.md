@@ -1,3 +1,9 @@
+## Retour propriétaire — suivi des correctifs Mach-E (26/11/2026)
+
+- PID Mode 01 5B : le propriétaire confirme que 71,37 % correspond au SOC de sa Mach-E, non au SOH. Libellé générique neutre dans live, catalogue et scan ; définition spécifique par modèle à qualifier via #42, ne pas généraliser le SOC à tout véhicule. Aucun VIN réel ajouté au dépôt.
+- Menu calculateurs : remonte désormais les répondants observés lors de l'identification initiale sans imposer un scan complet ou les tests propriétaire ; état invalidé par génération de preuve, pas d'identité OEM inventée. Sélection live : case directement interactive et texte cliquable, seulement signaux mesurés. Enregistrement CSV : arrêt si génération de preuve change même si VIN inconnu.
+- Capacités CAN : libellés compréhensibles FR/EN. Export JSON complet des commits précédents conservé. Aucun test/CI intermédiaire ; qualification physique sur Release autorisée.
+
 ## Retour propriétaire Android / ELM327 sur Mach-E — 26/11/2026
 
 - Deux exports fonctionnels identiques : 27 PID annoncés, répondants 7E8/7EA/7EC/7EE/7EF, VIN Ford lu, modes DTC 03/07/0A positifs sans code. CSV 51 valeurs / 12 paramètres, VIN vide et profil Camaro erroné. Ne pas déduire l'identité OEM des adresses ni l'état de santé batterie de PID 5B.

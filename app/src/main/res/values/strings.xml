@@ -75,7 +75,7 @@
     <string name="adapter_section_title">Bluetooth OBD-II Adapter &amp; CAN Probe</string>
     <string name="connection_busy">Connection or operation in progress…</string>
     <string name="swcan_wiring_verified">SW-CAN wiring verified (Pin 1)</string>
-    <string name="long_response_mode">Long response mode (ATAL)</string>
+    <string name="long_response_mode">Read long diagnostic responses (ATAL)</string>
     <string name="paired_bluetooth_devices">Paired Bluetooth Devices</string>
     <string name="common_refresh">Refresh</string>
     <string name="adapter_none_detected">No adapter detected. Pair OBDLink MX+, MX, LX and other Classic Bluetooth adapters; CX is discovered nearby over BLE.</string>
@@ -319,7 +319,7 @@
     <string name="live_pid_stft">Short-term fuel trim B1</string>
     <string name="live_pid_stft_demo">Short-term fuel trim B1 (DEMO)</string>
     <string name="live_pid_odometer">Total OBD odometer (PID A6)</string>
-    <string name="live_pid_hybrid_bat_life">Reported hybrid battery remaining life (PID 5B)</string>
+    <string name="live_pid_hybrid_bat_life">Reported traction battery remaining (PID 5B)</string>
     <string name="live_pid_bat">Control module voltage</string>
     <string name="live_pid_bat_demo">Control module voltage (DEMO)</string>
     <string name="live_pid_speed">Vehicle speed</string>
@@ -1009,7 +1009,7 @@
     <string name="can_console_history_recent_scope">On-screen history: up to 300 recent events. The complete raw RX stream may be archived separately; older TX entries are not retained.</string>
     <string name="can_console_bitrate_changed">CAN %1$d kbit/s</string>
     <string name="can_console_capture_profile">CAN capture %1$d kbit/s, %2$d-bit</string>
-    <string name="adapter_can_headers">CAN headers</string>
+    <string name="adapter_can_headers">Display CAN sender addresses</string>
     <string name="adapter_config_accepted">Accepted configurations (not verified on vehicle): %1$s</string>
     <string name="cal_choose_compatible_profile">Select a compatible CAN profile</string>
     <string name="cal_doip_title">Direct DoIP</string>
@@ -1213,7 +1213,7 @@
     <string name="cal_doip_inventory_obd_unknown">ECU 0x%1$04X: OBDonUDS not identified (F810 = 0x%2$02X)</string>
     <string name="auth_startup_validation_timeout">Session verification timed out. Check your internet connection and retry.</string>
     <string name="adapter_can_tx_label">CAN frame transmission</string>
-    <string name="adapter_capability_detected">Detected</string>
+    <string name="adapter_capability_detected">Supported</string>
     <string name="adapter_capability_unverified">Not confirmed</string>
     <string name="modules_no_observed_responders">No ECU response recorded. Run an OBD scan.</string>
     <string name="modules_obd_responders">Observed OBD responders</string>

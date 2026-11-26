@@ -14,8 +14,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.ui.semantics.Role
-import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -206,6 +204,7 @@ fun CamaroDiagApp(
     val liveTelemetryMessage by viewModel.liveTelemetryMessage.collectAsState()
     val mileageReport by viewModel.mileageReport.collectAsState()
     val observedStandardVin by viewModel.observedStandardVin.collectAsState()
+    val observedObdResponders by viewModel.observedObdResponders.collectAsState()
     val savedSessions by viewModel.savedSessions.collectAsState()
     val calibrationWorkspace by viewModel.calibrationWorkspace.collectAsState()
     val liveCanMonitorState by viewModel.liveCanMonitorState.collectAsState()
@@ -677,7 +676,7 @@ fun CamaroDiagApp(
                 DiagTab.MODULES -> ModulesScreen(
                     modules, obdScanReport, isObdScanning, { viewModel.runFullObdScan() },
                     FunctionalTestPlanner.currentResponders(functionalTests, connectionGeneration, vehicle.vin),
-                    obdScanMessage
+                    obdScanMessage, observedObdResponders
                 )
                 DiagTab.LICENSE -> {
                     if (LicenseRolloutConfig.ENABLED) {
@@ -1440,9 +1439,10 @@ fun ModulesScreen(
     scanning: Boolean = false,
     onScan: (() -> Unit)? = null,
     testedResponders: List<String> = emptyList(),
-    scanMessage: String? = null
+    scanMessage: String? = null,
+    observedResponders: List<String> = emptyList()
 ) {
-    val respondingAddresses = (report?.respondingEcuAddresses ?: testedResponders).distinct().sorted()
+    val respondingAddresses = (report?.respondingEcuAddresses ?: (observedResponders + testedResponders)).distinct().sorted()
     LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item {
             SectionTitle(stringResource(R.string.modules_vehicle_title))
@@ -1652,22 +1652,12 @@ fun LiveDataScreen(
                             },
                             key = { it.id }
                         ) { signal ->
-                            Row(
-                                Modifier.fillMaxWidth().toggleable(
-                                    value = signal.id in pendingIds,
-                                    role = Role.Checkbox,
-                                    onValueChange = { checked ->
-                                        pendingIds = if (checked) pendingIds + signal.id
-                                            else pendingIds - signal.id
-                                    }
-                                ),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Checkbox(
-                                    checked = signal.id in pendingIds,
-                                    onCheckedChange = null
-                                )
-                                Column {
+                            val updateChecked: (Boolean) -> Unit = { checked ->
+                                pendingIds = if (checked) pendingIds + signal.id else pendingIds - signal.id
+                            }
+                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                Checkbox(checked = signal.id in pendingIds, onCheckedChange = updateChecked)
+                                Column(Modifier.weight(1f).clickable { updateChecked(signal.id !in pendingIds) }) {
                                     Text(sensorLabels[signal.id] ?: signal.id)
                                     Text(signal.id, color = TextMuted, fontSize = 11.sp)
                                     // Only session-observed signals are listed; no disabled catalogue rows.

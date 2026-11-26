@@ -22,7 +22,7 @@ internal object LiveSensorCatalog {
         LiveSensorDefinition("LTFT_B2", "Long-term fuel trim bank 2", "Correction carburant long terme banc 2"),
         LiveSensorDefinition("BAT", "Control module voltage", "Tension calculateur"),
         LiveSensorDefinition("ODOMETER", "OBD total odometer (PID A6)", "Kilométrage total OBD (PID A6)"),
-        LiveSensorDefinition("HYBRID_BAT_LIFE", "Hybrid battery pack remaining life (PID 5B)", "Durée de vie restante batterie hybride (PID 5B)"),
+        LiveSensorDefinition("HYBRID_BAT_LIFE", "Reported traction battery remaining (PID 5B)", "Niveau restant déclaré batterie de traction (PID 5B)"),
         LiveSensorDefinition("SPD", "Vehicle speed", "Vitesse du véhicule"),
         LiveSensorDefinition("TPS", "Throttle position", "Position du papillon"),
         LiveSensorDefinition("REL_TPS", "Relative throttle position", "Position relative du papillon"),

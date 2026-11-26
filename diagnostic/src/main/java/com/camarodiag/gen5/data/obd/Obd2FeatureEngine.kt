@@ -942,7 +942,7 @@ class Obd2FeatureEngine(
             }
             0x59 -> "Fuel rail absolute pressure" to ((word() ?: return emptyList()) * 10.0 to "kPa")
             0x5A -> "Relative accelerator pedal position" to (percent(a) to "%")
-            0x5B -> "Hybrid battery pack remaining life" to (percent(a) to "%")
+            0x5B -> "Reported traction battery remaining" to (percent(a) to "%")
             0x5C -> "Engine oil temperature" to ((a - 40).toDouble() to "°C")
             0x5D -> "Fuel injection timing" to (((word() ?: return emptyList()) / 128.0) - 210.0 to "°")
             0x5E -> "Engine fuel rate" to ((word() ?: return emptyList()) / 20.0 to "L/h")
