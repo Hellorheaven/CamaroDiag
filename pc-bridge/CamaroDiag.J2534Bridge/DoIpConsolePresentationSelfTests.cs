@@ -14,6 +14,43 @@ internal static class DoIpConsolePresentationSelfTests
             if (!condition) throw new InvalidOperationException("DoIP console: " + name);
         }
 
+        var events = new List<string>();
+        var snapshots = new List<IReadOnlyList<DoIpVinReader.InventoryEntry>>();
+        var inventoryRows = DoIpVinReader.CollectInventoryAsync(new ushort[] { 0x1234, 0x1235 },
+            () => { events.Add("gateway"); return Task.CompletedTask; },
+            ecu =>
+            {
+                events.Add($"query-and-close:{ecu:X4}");
+                return ecu == 0x1234
+                    ? Task.FromResult(new DoIpVinReader.InventoryEntry(ecu, "1G1FA1RXXR0123456", null))
+                    : Task.FromException<DoIpVinReader.InventoryEntry>(new TimeoutException());
+            }, CancellationToken.None, (rows, total) =>
+            {
+                Check(total == 2, "Inventory retains requested target count.");
+                snapshots.Add(rows);
+                events.Add($"progress:{rows.Count}");
+            }).GetAwaiter().GetResult();
+        Check(events.SequenceEqual(new[] { "gateway", "query-and-close:1234", "gateway", "progress:1",
+            "query-and-close:1235", "gateway", "progress:2" }), "Inventory publishes only after gateway validation.");
+        Check(snapshots[0].Count == 1 && snapshots[1].Count == 2 &&
+            inventoryRows[0].Vin is not null && inventoryRows[1].Reason == "timeout",
+            "Inventory snapshots are independent and preserve failure cause.");
+        var gatewayChecks = 0;
+        var queried = 0;
+        var published = 0;
+        var driftRejected = false;
+        try
+        {
+            _ = DoIpVinReader.CollectInventoryAsync(new ushort[] { 0x1234, 0x1235 },
+                () => ++gatewayChecks == 2
+                    ? Task.FromException(new InvalidDataException("Gateway changed")) : Task.CompletedTask,
+                ecu => { queried++; return Task.FromResult(new DoIpVinReader.InventoryEntry(ecu, null, "timeout")); },
+                CancellationToken.None, (_, _) => published++).GetAwaiter().GetResult();
+        }
+        catch (InvalidDataException) { driftRejected = true; }
+        Check(driftRejected && queried == 1 && published == 0,
+            "Gateway drift prevents row publication and further ECU interrogation.");
+
         var progress = new DoIpMonitoringProgress(2);
         progress.RecordVerified(1);
         Check(!progress.Complete && progress.VerifiedSamples == 1, "Verified partial capture.");
