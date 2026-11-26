@@ -223,6 +223,39 @@ class Obd2FeatureEngineTest {
     }
 
     @Test
+    fun fullScanRunsMode05OnlyOnNegotiatedLegacyProtocol() = runBlocking {
+        suspend fun scan(protocol: String): Pair<ObdScanReport, List<String>> {
+            val commands = mutableListOf<String>()
+            val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+                commands += command
+                when (command) {
+                    "ATDPN" -> protocol
+                    "0100" -> "410000002000"
+                    "0113" -> "411301"
+                    "050001" -> "45000180000000"
+                    "050101" -> "4501015A"
+                    else -> "NO DATA"
+                }
+            })
+            return engine.fullReadOnlyScan() to commands
+        }
+        val (legacy, legacyCommands) = scan("A3")
+        assertEquals(3, legacy.mode05?.protocolNumber)
+        assertTrue(legacy.mode05?.hasTestResults == true)
+        assertTrue(legacy.mode05?.complete == true)
+        assertTrue(legacyCommands.containsAll(listOf("050001", "050101")))
+        assertFalse(legacyCommands.any { it.startsWith("06") })
+        val (can, canCommands) = scan("A6")
+        assertNull(can.mode05)
+        assertFalse(canCommands.any { it.startsWith("05") })
+        assertTrue("0600" in canCommands)
+        val (unknown, unknownCommands) = scan("NO DATA")
+        assertNull(unknown.mode05)
+        assertFalse(unknownCommands.any { it.startsWith("05") })
+        Unit
+    }
+
+    @Test
     fun mode09InventoryReadsOnlyAdvertisedExtraInformationTypes() = runBlocking {
         val commands = mutableListOf<String>()
         val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
