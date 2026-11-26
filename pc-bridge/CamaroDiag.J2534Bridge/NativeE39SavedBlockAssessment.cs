@@ -8,6 +8,10 @@ namespace CamaroDiag.J2534Bridge;
 /// Valid backup files are NOT evidence that a dead ECU is physically recoverable.</summary>
 internal static class NativeE39SavedBlockAssessment
 {
+    private const int MaximumJournalBytes = 8 * 1024 * 1024;
+    private const int MaximumSectorFileBytes = 1024 * 1024 + 1024;
+    private static readonly UTF8Encoding StrictUtf8 = new(false, true);
+
     internal sealed record Block(uint Address, int Length, string OriginalSha256);
     internal sealed record Result(bool Verified, int ExpectedSectors,
         IReadOnlyList<Block> Blocks, string Problem,
@@ -89,31 +93,61 @@ internal static class NativeE39SavedBlockAssessment
         }
     }
 
+    /// <summary>
+    /// Compare the original bytes saved to disk with the exact prepared and
+    /// physically verified original SHA-256 events. An interrupted transaction
+    /// may still have valid original blocks, but a missing receipt is not proof
+    /// that those files were durably checked before the erase phase.
+    /// </summary>
     internal static Result Inspect(string journalPath)
     {
         var state = NativeE39FileWriteJournal.InspectDetailed(journalPath).State;
         var expected = new Dictionary<uint, string>();
+        var physicalReceipts = new HashSet<uint>();
         var verified = new List<Block>();
         try
         {
-            if (new FileInfo(journalPath).Length > 16 * 1024 * 1024)
-                throw new InvalidDataException("Journal exceeds inspection limit.");
-            foreach (var line in File.ReadLines(journalPath))
+            var snapshot = ReadBoundedFile(journalPath, MaximumJournalBytes);
+            var text = StrictUtf8.GetString(snapshot);
+            if (text.Length == 0 || text[^1] != '\n')
+                throw new InvalidDataException("The journal has an incomplete final record.");
+            // Inspect one immutable bounded snapshot; never mix a partially
+            // appended record with sector files from a different journal read.
+            foreach (var line in text[..^1].Split('\n'))
             {
-                if (string.IsNullOrWhiteSpace(line)) continue;
+                if (line.Length == 0)
+                    throw new InvalidDataException("Unexpected empty ECU journal record.");
                 using var entry = JsonDocument.Parse(line);
                 var root = entry.RootElement;
-                if (!root.TryGetProperty("Phase", out var phase) ||
-                    phase.GetString() != "Prepared") continue;
+                if (root.ValueKind != JsonValueKind.Object ||
+                    HasDuplicateProperties(root) ||
+                    root.GetProperty("Schema").GetInt32() != 3)
+                    throw new InvalidDataException("Invalid ECU journal record.");
+                var phase = root.GetProperty("Phase").GetString();
+                if (phase is not ("Prepared" or "OriginalBytesVerified"))
+                    continue;
                 var address = root.GetProperty("Address").GetUInt32();
                 var hash = root.GetProperty("Detail").GetString();
-                if (hash is null || hash.Length != 64 ||
-                    !hash.All(Uri.IsHexDigit) ||
-                    !expected.TryAdd(address, hash.ToUpperInvariant()))
-                    throw new InvalidDataException("Invalid or duplicated original ECU sector.");
+                if (hash is null || hash.Length != 64 || !hash.All(Uri.IsHexDigit))
+                    throw new InvalidDataException("Invalid original-sector SHA-256 receipt.");
+                if (phase == "Prepared")
+                {
+                    if (!expected.TryAdd(address, hash.ToUpperInvariant()))
+                        throw new InvalidDataException("Duplicated prepared original-sector address.");
+                }
+                else
+                {
+                    if (!expected.TryGetValue(address, out var plannedHash) ||
+                        !hash.Equals(plannedHash, StringComparison.OrdinalIgnoreCase) ||
+                        !physicalReceipts.Add(address))
+                        throw new InvalidDataException(
+                            "Physical original-sector receipt is absent, altered or duplicated.");
+                }
             }
-            if (expected.Count == 0)
-                throw new InvalidDataException("No prepared sectors in the journal.");
+            if (expected.Count == 0 || physicalReceipts.Count != expected.Count)
+                throw new InvalidDataException(
+                    "Not all original ECU sectors have durable physical-read evidence.");
+
             var dir = journalPath + ".blocks";
             if (!Directory.Exists(dir))
                 throw new InvalidDataException("Physical ECU sector backup directory missing.");
@@ -123,15 +157,16 @@ internal static class NativeE39SavedBlockAssessment
             var observed = new HashSet<uint>();
             foreach (var file in files)
             {
-                if (new FileInfo(file).Length > 1024 * 1024 + 1024)
-                    throw new InvalidDataException("Physical backup file is too large.");
-                var data = File.ReadAllBytes(file);
+                var data = ReadBoundedFile(file, MaximumSectorFileBytes);
                 var newline = Array.IndexOf(data, (byte)'\n');
                 if (newline is < 1 or > 1024)
                     throw new InvalidDataException("Invalid physical backup metadata.");
-                var metadata = new UTF8Encoding(false, true).GetString(data, 0, newline);
+                var metadata = StrictUtf8.GetString(data, 0, newline);
                 using var envelope = JsonDocument.Parse(metadata);
                 var header = envelope.RootElement;
+                if (header.ValueKind != JsonValueKind.Object ||
+                    HasDuplicateProperties(header) || header.EnumerateObject().Count() != 5)
+                    throw new InvalidDataException("Physical backup metadata contains ambiguous fields.");
                 var address = header.GetProperty("Address").GetUInt32();
                 var length = header.GetProperty("Length").GetInt32();
                 var hash = header.GetProperty("OriginalSha256").GetString();
@@ -144,22 +179,42 @@ internal static class NativeE39SavedBlockAssessment
                     !string.Equals(Path.GetFileName(file),
                         $"{address:X8}-{length}.ecu-block", StringComparison.Ordinal) ||
                     !observed.Add(address))
-                    throw new InvalidDataException("Backup address, region, sector size or metadata mismatch.");
+                    throw new InvalidDataException(
+                        "Backup address, region, sector size or metadata mismatch.");
                 var onDiskHash = Convert.ToHexString(
                     SHA256.HashData(data.AsSpan(newline + 1)));
                 if (onDiskHash != journalHash)
-                    throw new InvalidDataException("Physical saved ECU bytes do not match their hash.");
+                    throw new InvalidDataException(
+                        "Physical saved ECU bytes do not match their recorded SHA-256.");
                 verified.Add(new Block(address, length, onDiskHash));
             }
             return new Result(true, expected.Count,
                 verified.OrderBy(b => b.Address).ToArray(), "", state);
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or
             InvalidDataException or JsonException or KeyNotFoundException or
-            ArgumentException or FormatException)
+            ArgumentException or FormatException or OverflowException)
         {
-            return new Result(false, expected.Count, [], ex.Message, state);
+            return new Result(false, expected.Count, [], error.Message, state);
         }
+    }
+
+    private static bool HasDuplicateProperties(JsonElement element)
+    {
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        return element.EnumerateObject().Any(property => !seen.Add(property.Name));
+    }
+
+    private static byte[] ReadBoundedFile(string path, int maximumBytes)
+    {
+        using var source = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+        if (source.Length is < 1 || source.Length > maximumBytes)
+            throw new InvalidDataException("Recovery evidence file exceeds supported bounds.");
+        var data = new byte[checked((int)source.Length)];
+        source.ReadExactly(data);
+        if (source.ReadByte() != -1)
+            throw new InvalidDataException("Recovery evidence changed while being read.");
+        return data;
     }
 
     internal static byte[] ReadPhysicalOriginal(string journalPath, Block descriptor)
@@ -169,8 +224,23 @@ internal static class NativeE39SavedBlockAssessment
             throw new InvalidDataException("Incomplete or changed physical-sector backups.");
         var name = Path.Combine(journalPath + ".blocks",
             $"{descriptor.Address:X8}-{descriptor.Length}.ecu-block");
-        var file = File.ReadAllBytes(name);
+        // The file may have been swapped or expanded since Inspect(). The
+        // second acquisition must be independently bounded and rechecked.
+        var file = ReadBoundedFile(name, MaximumSectorFileBytes);
         var cut = Array.IndexOf(file, (byte)'\n');
+        if (cut is < 1 or > 1024)
+            throw new InvalidDataException("Saved-sector metadata is missing on second read.");
+        using var document = JsonDocument.Parse(StrictUtf8.GetString(file, 0, cut));
+        var header = document.RootElement;
+        if (header.ValueKind != JsonValueKind.Object || HasDuplicateProperties(header) ||
+            header.EnumerateObject().Count() != 5 ||
+            header.GetProperty("Schema").GetInt32() != 1 ||
+            header.GetProperty("Region").GetString() != "E39_MAIN_FLASH" ||
+            header.GetProperty("Address").GetUInt32() != descriptor.Address ||
+            header.GetProperty("Length").GetInt32() != descriptor.Length ||
+            !string.Equals(header.GetProperty("OriginalSha256").GetString(),
+                descriptor.OriginalSha256, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidDataException("Physical-sector metadata changed during preview.");
         var original = file.AsSpan(cut + 1).ToArray();
         if (original.Length != descriptor.Length ||
             Convert.ToHexString(SHA256.HashData(original)) != descriptor.OriginalSha256)

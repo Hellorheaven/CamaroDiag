@@ -127,6 +127,32 @@ internal static class EcuPostFlashAssessmentSelfTests
                 new Dictionary<uint,int> { [0x20000] = 32 }),
                 "Wrong erase-sector size forbids restoration preview.");
             var blockFile = Path.Combine(journalPath + ".blocks", "00020000-64.ecu-block");
+            var knownGoodBlock = File.ReadAllBytes(blockFile);
+            var lineEnd = Array.IndexOf(knownGoodBlock, (byte)'\n');
+            var originalBlockHeader = System.Text.Encoding.UTF8.GetString(knownGoodBlock, 0, lineEnd);
+            void ChangeBlockHeader(string changed)
+            {
+                var prefix = System.Text.Encoding.UTF8.GetBytes(changed + "\n");
+                File.WriteAllBytes(blockFile, prefix.Concat(original).ToArray());
+            }
+            ChangeBlockHeader(originalBlockHeader.Replace("\"Schema\":1",
+                "\"Schema\":1,\"Schema\":1"));
+            Check(!NativeE39SavedBlockAssessment.Inspect(journalPath).Verified,
+                "Duplicate physical-block JSON keys cannot be treated as original proof");
+            ChangeBlockHeader(originalBlockHeader.Replace("\"Schema\":1",
+                "\"Schema\":1,\"Unexpected\":true"));
+            Check(!NativeE39SavedBlockAssessment.Inspect(journalPath).Verified,
+                "Additional physical-block metadata fields are rejected");
+            File.WriteAllBytes(blockFile, knownGoodBlock);
+            var journalText = File.ReadAllText(journalPath);
+            File.WriteAllText(journalPath, journalText.Replace(
+                "\"Phase\":\"OriginalBytesVerified\"",
+                "\"Phase\":\"OriginalCrcVerified\""));
+            Check(!NativeE39SavedBlockAssessment.Inspect(journalPath).Verified,
+                "Original-block bytes alone cannot substitute for a durable physical-read receipt");
+            File.WriteAllText(journalPath, journalText);
+            Check(NativeE39SavedBlockAssessment.Inspect(journalPath).Verified,
+                "Untampered original-sector receipt and disk backup remain valid");
             var tampered = File.ReadAllBytes(blockFile);
             tampered[^1] ^= 0x02;
             File.WriteAllBytes(blockFile, tampered);
