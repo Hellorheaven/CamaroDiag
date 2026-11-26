@@ -1283,4 +1283,7 @@
     <string name="obd_mode05_partial">Incomplete test inventory or response.</string>
     <string name="obd_mode05_raw_notice">Encoded test results; monitor completion and ECU attribution are not established.</string>
     <string name="msg_dtc_clear_readback">Reset acknowledged. Fresh DTC read: confirmed %1$s; pending %2$s; permanent %3$s.</string>
+    <string name="obd_mode08_inventory">Mode 08 — advertised control tests</string>
+    <string name="obd_mode08_partial">Control test inventory incomplete or unavailable.</string>
+    <string name="obd_mode08_no_execution">No control test executed.</string>
 </resources>
