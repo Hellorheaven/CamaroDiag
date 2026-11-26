@@ -1,3 +1,7 @@
+## PR117 — qualification des températures extrêmes OBD (26/11/2026)
+
+- C6 : les PID température à un octet 05/0F/46/5C signalent explicitement les limites de codage 00/FF dans le scan, en conservant valeur décodée, brut et adresse du répondant. Ne pas assimiler arbitrairement ces valeurs à un capteur absent ni à une température physique confirmée. Régression Mach-E 215/-40/15 °C enrichie, non exécutée. Aucun checkpoint.
+
 ## PR117 — admission des fonctions OEM après retour Mach-E (26/11/2026)
 
 - C6 : les lectures catalogue OBDb Camaro, enquête LFX et identification GMLAN exigent un VIN Camaro candidat observé sur connexion physique, concordant avec le profil sélectionné. Les vérifications sont répétées pendant les parcours concernés ; les diagnostics génériques restent distincts. Le VIN observé est actualisé aussi lors de l'identification initiale et manuelle, pas uniquement au scan complet. Les topologies incompatibles ne sont pas conservées. Régressions de la politique VIN écrites, non exécutées. Ce contrôle n'est pas une autorisation d'écriture ni une preuve de calibration. Aucun checkpoint.

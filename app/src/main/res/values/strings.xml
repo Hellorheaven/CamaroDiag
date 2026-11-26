@@ -523,6 +523,7 @@
     <string name="mileage_source_generic">Source %1$s</string>
     <string name="mileage_details_unavailable">Technical details are unavailable for this source.</string>
     <string name="mileage_caveat_unavailable">No additional localized information is available for this source.</string>
+    <string name="obd_temperature_encoding_limit">Encoding limit (raw %1$s): physical temperature not confirmed.</string>
     <string name="obd_value_source">CAN responder %1$s</string>
     <string name="obd_pid_standard">OBD standard</string>
     <string name="obd_pid_runtime">Run time since engine start</string>

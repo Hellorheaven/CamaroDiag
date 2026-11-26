@@ -526,6 +526,7 @@
     <string name="mileage_source_generic">Source %1$s</string>
     <string name="mileage_details_unavailable">Les détails techniques ne sont pas disponibles pour cette source.</string>
     <string name="mileage_caveat_unavailable">Aucune information localisée supplémentaire n’est disponible pour cette source.</string>
+    <string name="obd_temperature_encoding_limit">Limite de codage (brut %1$s) : température physique non confirmée.</string>
     <string name="obd_value_source">Répondant CAN %1$s</string>
     <string name="obd_pid_standard">Norme OBD</string>
     <string name="obd_pid_runtime">Durée depuis le démarrage</string>
