@@ -194,6 +194,7 @@ object DoIpMemoryBackup {
         require(length in 1..MAX_BYTES)
         val names = setOf("manifest.json", "original.bin", "verification.bin")
         val seen = mutableSetOf<String>()
+        val evidence = linkedMapOf<String, EcuZipCompletionGuard.EntryEvidence>()
         var manifest: ByteArray? = null
         var reference: ByteArray? = null
         val guarded = EcuZipCompletionGuard(input, MAX_ZIP_BYTES)
@@ -229,8 +230,9 @@ object DoIpMemoryBackup {
                     }
                 }
                 zip.closeEntry()
+                evidence[entry.name] = EcuZipCompletionGuard.EntryEvidence.from(entry)
             }
-            guarded.requireCompletedArchive(seen.toList())
+            guarded.requireCompletedArchive(seen.toList(), evidence)
         }
         require(seen == names)
         return ArchiveContents(requireNotNull(manifest), sha(requireNotNull(reference)))
@@ -242,6 +244,7 @@ object DoIpMemoryBackup {
             "original.bin" to capture.first, "verification.bin" to capture.second)
         val guarded = EcuZipCompletionGuard(input, MAX_ZIP_BYTES)
         val seen = mutableListOf<String>()
+        val evidence = linkedMapOf<String, EcuZipCompletionGuard.EntryEvidence>()
         ZipInputStream(guarded).use { zip ->
             while (true) {
                 val entry = zip.nextEntry ?: break
@@ -249,8 +252,9 @@ object DoIpMemoryBackup {
                 require(!entry.isDirectory && MessageDigest.isEqual(readBounded(zip, data.size), data))
                 zip.closeEntry()
                 seen += entry.name
+                evidence[entry.name] = EcuZipCompletionGuard.EntryEvidence.from(entry)
             }
-            guarded.requireCompletedArchive(seen)
+            guarded.requireCompletedArchive(seen, evidence)
         }
         require(expected.isEmpty()) { "Incomplete DoIP backup." }
     }
