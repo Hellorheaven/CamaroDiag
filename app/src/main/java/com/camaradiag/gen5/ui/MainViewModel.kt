@@ -2034,6 +2034,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         isJ2534MemoryReadAvailable = obdManager.isJ2534MemoryReadAvailable(),
                         j2534BridgeMessage = localizedContext.getString(R.string.vm_j2534_connected, result)
                     )
+                    _isStreamingLive.value = obdManager.isStandardObdReadAvailable()
                 } catch (cancelled: CancellationException) {
                     if (attempt == connectionAttemptGeneration) {
                         _calibrationWorkspace.value = _calibrationWorkspace.value.copy(isJ2534BridgeConnecting = false)
@@ -4532,6 +4533,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             pendingUsbPermissionRetry = null
                             _adapter.value = capabilities
                             if (!discoveryOnly) {
+                                // A new explicitly selected connection begins
+                                // a new read-only live session, even after
+                                // account change or previous link loss.
+                                _isStreamingLive.value = obdManager.isStandardObdReadAvailable()
                                 rememberConnectionProfile(transport, capabilities, endpoint)
                                 refreshTopologyAndDefaults(runInitialScans = true)
                             }
@@ -4709,6 +4714,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val caps = obdManager.activateSimulatedAdapter(preset)
                 if (attempt != connectionAttemptGeneration) return@launch
                 _adapter.value = caps
+                _isStreamingLive.value = true
                 _connectionMessage.value = null
                 refreshTopologyAndDefaults()
             } catch (cancelled: CancellationException) {
@@ -5984,7 +5990,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         nextConnectionGeneration()
         val activeJobs = listOfNotNull(
             canMonitorJob, canRequestJob, detachedCanMonitorJob,
-            detachedCanRequestJob, connectionAttemptJob
+            detachedCanRequestJob, connectionAttemptJob, bluetoothDiscoveryJob
         )
             .distinct()
         canMonitorJob = null
@@ -5992,6 +5998,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         detachedCanMonitorJob = null
         detachedCanRequestJob = null
         connectionAttemptJob = null
+        bluetoothDiscoveryJob = null
         activeJobs.forEach(Job::cancel)
         consoleEventJournal.dispose()
         consoleEventJournalFailed = true
