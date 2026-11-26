@@ -794,6 +794,71 @@ class DoIpGatewayControlTraceTest {
         }
     }
 
+    @Test fun inventoryProgressRequiresClosedSocketAndStableGateway(): Unit = runBlocking {
+        val loopback = InetAddress.getByName("127.0.0.1")
+        fun bytes(value: String) = value.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
+        for (drift in listOf(false, true)) {
+            DatagramSocket(0, loopback).use { udp ->
+                java.net.ServerSocket(0, 1, loopback).use { tcp ->
+                    udp.soTimeout = 5000
+                    tcp.soTimeout = 5000
+                    val worker = Executors.newSingleThreadExecutor()
+                    val closed = java.util.concurrent.atomic.AtomicInteger()
+                    val progress = mutableListOf<List<DoIpDirectRead.InventoryEntry>>()
+                    try {
+                        val server = worker.submit {
+                            respond(udp, pdu(255, 1), identity())
+                            for (ecu in if (drift) listOf("1234") else listOf("1234", "1235")) {
+                                respond(udp, pdu(255, 1), identity())
+                                tcp.accept().use { socket ->
+                                    socket.soTimeout = 5000
+                                    val input = java.io.DataInputStream(socket.getInputStream())
+                                    val output = socket.getOutputStream()
+                                    assertArrayEquals(pdu(2, 5, bytes("0E800000000000")),
+                                        ByteArray(15).also { input.readFully(it) })
+                                    output.write(pdu(2, 6, bytes("0E8010001000000000")))
+                                    output.flush()
+                                    assertArrayEquals(pdu(2, 0x8001, bytes("0E80" + ecu + "22F190")),
+                                        ByteArray(15).also { input.readFully(it) })
+                                    val reply = if (ecu == "1234") bytes("62F190") + vin.toByteArray(Charsets.US_ASCII)
+                                        else bytes("7F2231")
+                                    output.write(pdu(2, 0x8001, bytes(ecu + "0E80") + reply))
+                                    output.flush()
+                                    assertEquals(-1, input.read())
+                                    closed.incrementAndGet()
+                                }
+                                val observed = identity().also { if (drift) it[8 + 19] = 1 }
+                                respond(udp, pdu(255, 1), observed)
+                            }
+                        }
+                        val target = DoIpDirectRead.Target.parse("127.0.0.1", "0E80", "1234", vin, false)
+                        val result = runCatching {
+                            DoIpDirectRead.inventoryAt(target, listOf(0x1234, 0x1235),
+                                DoIpDirectRead.SessionOptions(2000),
+                                udpPort = udp.localPort, tcpPort = tcp.localPort,
+                                onProgress = { rows, total ->
+                                    assertEquals(2, total)
+                                    assertEquals(rows.size, closed.get())
+                                    progress += rows
+                                })
+                        }
+                        server.get(8, TimeUnit.SECONDS)
+                        if (drift) {
+                            assertTrue(result.isFailure)
+                            assertTrue(progress.isEmpty())
+                        } else {
+                            val rows = result.getOrThrow()
+                            assertEquals(listOf(1, 2), progress.map { it.size })
+                            assertEquals(vin, rows.first().vin)
+                            assertEquals(DoIpDirectRead.InventoryFailure.NEGATIVE_RESPONSE, rows.last().failure)
+                            assertEquals(rows, progress.last())
+                        }
+                    } finally { worker.shutdownNow() }
+                }
+            }
+        }
+    }
+
     @Test fun explicitInventoryRejectsDuplicateAndImplicitRanges() = runBlocking {
         assertEquals(listOf(0x1234, 0x1235), DoIpDirectRead.parseInventoryAddresses("1234,1235"))
         for (invalid in listOf("", "1234,1234", "1234-1235", "123", (0..16).joinToString(",") { "%04X".format(it) })) {
