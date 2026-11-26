@@ -44,12 +44,21 @@ internal static class ObdJ1979FunctionalScanSelfTests
         Assert(report.Steps.Single(x => x.RequestHex == "03").Status == "PASSED",
             "positive zero count is evidence");
         Assert(!sent.Contains("020000"), "no freeze-frame inventory without trigger");
+        Assert(report.Inventory.Single(x=>x.Mode==1) is {State:"COMPLETE",VerifiedPages:1} p &&
+            p.AdvertisedIds.SequenceEqual(new[]{1,12}),"Structured advertised PID inventory");
+        Assert(report.Inventory.Single(x=>x.Mode==2).State=="NOT_APPLICABLE","Verified absence distinct from missing");
+        Assert(report.DtcModes.Single(x=>x.Mode==3).Codes?.Count==0 &&
+            report.DtcModes.Single(x=>x.Mode==10).Codes is null,"Positive empty DTC vs unknown");
+        Assert(report.Measurements.Single(x=>x.Pid==12).Number==0,"Decoded zero RPM retained");
+        Assert(report.Steps.Single(x=>x.RequestHex=="0101").ApplicationEvidence?.Readiness?.MilOn==false,
+            "Readiness structured without claiming test results");
 
         var malformed = ObdJ1979FunctionalScan.Run((request, _) =>
             request[0] == 1 ? [0x41, 0x20, 0, 0, 0, 0] : [0x7F, request[0], 0x11],
             () => {}, TimeSpan.FromMinutes(1));
         Assert(malformed.Steps.Single(x => x.RequestHex == "0100").Status == "FAILED", "wrong identifier rejected");
         Assert(malformed.ObservedVin is null, "missing VIN not inferred");
+        Assert(malformed.Inventory.Single(x=>x.Mode==1).State=="UNAVAILABLE","Invalid page is not complete");
         var faultCalls = 0;
         var partial = ObdJ1979FunctionalScan.Run((request, _) =>
         {

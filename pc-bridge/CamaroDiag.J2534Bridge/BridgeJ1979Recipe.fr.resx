@@ -105,4 +105,10 @@
   <data name="NativeUsb_inventory_next" xml:space="preserve"><value>Suite annoncée</value></data>
   <data name="NativeUsb_freeze_trigger" xml:space="preserve"><value>Défaut déclencheur des données figées</value></data>
   <data name="NativeUsb_freeze_absent" xml:space="preserve"><value>Aucun défaut déclencheur annoncé</value></data>
+  <data name="ScanInventory" xml:space="preserve"><value>Inventaire annoncé par service</value></data>
+  <data name="ScanInventoryRow" xml:space="preserve"><value>Mode {0} : {1} identifiants — {2}</value></data>
+  <data name="ScanInventoryComplete" xml:space="preserve"><value>Inventaire complet</value></data>
+  <data name="ScanInventoryPartial" xml:space="preserve"><value>Inventaire partiel ou indisponible</value></data>
+  <data name="ScanInventoryNotApplicable" xml:space="preserve"><value>Aucun déclencheur de données figées</value></data>
+  <data name="ScanDtcMode" xml:space="preserve"><value>Mode DTC {0} : {1}</value></data>
 </root>

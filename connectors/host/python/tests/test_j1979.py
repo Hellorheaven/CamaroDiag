@@ -56,6 +56,15 @@ class J1979Tests(unittest.TestCase):
         self.assertEqual("PASSED", steps["03"]["status"])
         self.assertEqual(100, steps["0601"]["decoded"][0]["raw"])
         self.assertNotIn("0801", sent)
+        inventories = {row["mode"]: row for row in result["inventory"]}
+        self.assertEqual("COMPLETE", inventories[1]["state"])
+        self.assertEqual([1, 12], inventories[1]["advertised_ids"])
+        self.assertEqual("NOT_APPLICABLE", inventories[2]["state"])
+        modes = {row["mode"]: row for row in result["dtc_modes"]}
+        self.assertEqual([], modes[3]["codes"])
+        self.assertIsNone(modes[10]["codes"])
+        self.assertEqual(0, next(row for row in result["measurements"] if row["pid"] == 12)["number"])
+        self.assertFalse(steps["0101"]["application_evidence"]["readiness"]["mil_on"])
 
     def test_odometer_only_when_advertised_and_exact_width(self):
         replies = dict(REPLIES, **{"0100": bytes.fromhex("410000000001"),
@@ -76,6 +85,7 @@ class J1979Tests(unittest.TestCase):
                          "010C": b"\x41\x0d\x00"})
         result = scan(lambda req, _: overrides[req.hex().upper()])
         self.assertIsNone(result["observed_vin"])
+        self.assertIsNone(next(row for row in result["dtc_modes"] if row["mode"] == 3)["codes"])
         steps = {row["request_hex"]: row for row in result["steps"]}
         for key in ("0902", "03", "07", "010C"):
             self.assertEqual("FAILED", steps[key]["status"])

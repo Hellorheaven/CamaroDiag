@@ -186,6 +186,20 @@ internal static class J1979CampaignSemantics
         internal string? ObservedVin=>State==1&&Request.AsSpan().SequenceEqual(new byte[]{9,2})?Encoding.ASCII.GetString(Response,3,17):null;
     }
     internal sealed record Summary(string End,int Flags,int Steps);
+    // A reusable application observation, not proof of a transport or campaign.
+    internal sealed record Observation(string Shape,Measurement? Measurement,IReadOnlyList<string>? DtcCodes,
+        int? NegativeResponseCode,IReadOnlyList<MonitorRecord>? MonitorRecords,VehicleInfo? VehicleInfo,
+        Readiness? Readiness,SupportedPage? SupportedPage,FreezeTrigger? FreezeTrigger,string? ObservedVin);
+    internal static Observation? DecodeObservation(byte[] request,byte[] response){
+        if(!ReadOnly(request)||response.Length is <1 or >4095)return null;
+        int state=response[0]==0x7f?3:Positive(request,response);
+        if(state==0)return null;
+        try{
+            var s=new Step(0,state,0,request,response);
+            return new(s.Status,s.PidMeasurement,s.DtcCodes,s.NegativeResponseCode,s.MonitorRecords,
+                s.Identification,s.MonitorReadiness,s.InventoryPage,s.FreezeFrameTrigger,s.ObservedVin);
+        }catch(IOException){return null;}
+    }
     private static bool ReadOnly(byte[] r){
         if(r.Length==0)return false;int m=r[0];
         return r.Length==1&&(m is 3 or 7 or 10)||r.Length==2&&((m is 1 or 6 or 9)||m==8&&r[1]%32==0)||r.Length==3&&m==2&&r[2]==0;

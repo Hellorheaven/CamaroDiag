@@ -1,3 +1,7 @@
+## J1979 — harmonisation des recettes physiques J2534 et SocketCAN (26/11/2026)
+
+- Le décodeur d'observations CAN du connecteur natif devient réutilisable par les recettes standard Windows et Linux : valeurs numériques, DTC/NRC, readiness, identification, Mode 06, freeze et bitmaps en champs structurés avec brut conservé. Rapport par service des inventaires complets/partiels/indisponibles et absence vérifiée de freeze-frame, indépendant de la simple fin de campagne. DTC zéro distinct d'inconnu, affichage de synthèse Windows FR/EN. Régressions écrites non exécutées. Aucune extension mutatrice ; C6/J1979 ouverts, aucune CI intermédiaire, fusion ou Release.
+
 ## J1979 — valeurs, VIN et DTC relus depuis les octets (26/11/2026)
 
 - Les écrans Android et Scan OBD recalculent le VIN, les listes DTC et les mesures numériques via le décodeur de forme CU/1 commun, rejetant les champs JSON contradictoires ; la réussite DTC nécessite une liste positive vérifiée. Recettes firmware/Python A6 multi-pages et compatibilité ancienne observation RAW écrites, non exécutées. C6/J1979 ouverts ; aucune CI intermédiaire, fusion ou Release.

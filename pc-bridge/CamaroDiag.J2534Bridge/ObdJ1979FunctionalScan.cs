@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using CamaroDiagConnectors.Windows;
 
 namespace CamaroDiag.J2534Bridge;
 
@@ -8,9 +9,43 @@ namespace CamaroDiag.J2534Bridge;
 internal static class ObdJ1979FunctionalScan
 {
     internal sealed record Step(string RequestHex, string? ResponseHex,
-        string Status, string? Detail, long DurationMs);
+        string Status, string? Detail, long DurationMs,
+        J1979CampaignSemantics.Observation? ApplicationEvidence = null);
     internal sealed record Result(string? ObservedVin, IReadOnlyList<Step> Steps,
-        bool Completed, string[] NotExecuted, string? StopReason);
+        bool Completed, string[] NotExecuted, string? StopReason)
+    {
+        public IReadOnlyList<InventorySummary> Inventory => SummarizeInventory(Steps);
+        public IReadOnlyList<DtcModeSummary> DtcModes => new[]{3,7,10}.Select(mode=>{
+            var step=Steps.SingleOrDefault(s=>s.RequestHex==mode.ToString("X2"));
+            return new DtcModeSummary(mode,step?.ApplicationEvidence?.DtcCodes,step?.Status);
+        }).ToArray();
+        public IReadOnlyList<J1979CampaignSemantics.Measurement> Measurements => Steps
+            .Where(s=>s.Status=="PASSED").Select(s=>s.ApplicationEvidence?.Measurement)
+            .OfType<J1979CampaignSemantics.Measurement>().ToArray();
+    }
+    internal sealed record InventorySummary(int Mode,string State,IReadOnlyList<int> AdvertisedIds,int VerifiedPages);
+    internal sealed record DtcModeSummary(int Mode,IReadOnlyList<string>? Codes,string? Status);
+    private static IReadOnlyList<InventorySummary> SummarizeInventory(IReadOnlyList<Step> steps)
+    {
+        var summaries=new List<InventorySummary>();
+        foreach(int mode in new[]{1,2,6,8,9}){
+            var trigger=steps.SingleOrDefault(s=>s.RequestHex=="020200")?.ApplicationEvidence?.FreezeTrigger;
+            if(mode==2&&trigger is {Present:false}){
+                summaries.Add(new(mode,"NOT_APPLICABLE",[],0));continue;
+            }
+            var ids=new SortedSet<int>();int count=0;bool complete=false;
+            for(int page=0;page<=0xE0;page+=32){
+                string req=mode.ToString("X2")+page.ToString("X2")+(mode==2?"00":"");
+                var row=steps.SingleOrDefault(s=>s.RequestHex==req);
+                var evidence=row?.ApplicationEvidence?.SupportedPage;
+                if(row?.Status!="PASSED"||evidence is null||evidence.Mode!=mode||evidence.Base!=page)break;
+                ids.UnionWith(evidence.SupportedIds);count++;
+                if(!evidence.HasNextPage){complete=true;break;}
+            }
+            summaries.Add(new(mode,complete?"COMPLETE":count>0?"PARTIAL":"UNAVAILABLE",ids.ToArray(),count));
+        }
+        return summaries.AsReadOnly();
+    }
 
     internal static Result Run(Func<byte[], int, byte[]> exchange,
         Action requireActive, TimeSpan budget)
@@ -46,10 +81,12 @@ internal static class ObdJ1979FunctionalScan
                 requireActive();
                 var reply = ObdJ1979Transaction.Decode(request, response,
                     expectIdentifierEcho: request.Length >= 2);
+                var application=J1979CampaignSemantics.DecodeObservation(request,response);
+                if(application is null)throw new InvalidDataException("Invalid application record.");
                 if (reply.Kind == ObdJ1979Transaction.ReplyKind.Negative)
                 {
                     steps.Add(new(Convert.ToHexString(request), Convert.ToHexString(response),
-                        "NOT_TESTED", $"NRC_{reply.NegativeResponseCode:X2}", timer.ElapsedMilliseconds));
+                        "NOT_TESTED", $"NRC_{reply.NegativeResponseCode:X2}", timer.ElapsedMilliseconds,application));
                     return null;
                 }
                 // Unknown records must still carry data beyond the echoed
@@ -61,7 +98,7 @@ internal static class ObdJ1979FunctionalScan
                     ? ObdJ1979Interpretation.Interpret(request, response).Description
                     : decode(response);
                 steps.Add(new(Convert.ToHexString(request), Convert.ToHexString(response),
-                    "PASSED", detail, timer.ElapsedMilliseconds));
+                    "PASSED", detail, timer.ElapsedMilliseconds,application));
                 return response;
             }
             catch (OperationCanceledException) { throw; }

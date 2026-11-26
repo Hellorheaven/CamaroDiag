@@ -105,4 +105,10 @@
   <data name="NativeUsb_inventory_next" xml:space="preserve"><value>Continuation advertised</value></data>
   <data name="NativeUsb_freeze_trigger" xml:space="preserve"><value>Freeze-frame trigger</value></data>
   <data name="NativeUsb_freeze_absent" xml:space="preserve"><value>No freeze-frame trigger reported</value></data>
+  <data name="ScanInventory" xml:space="preserve"><value>Advertised inventory by service</value></data>
+  <data name="ScanInventoryRow" xml:space="preserve"><value>Mode {0}: {1} identifiers — {2}</value></data>
+  <data name="ScanInventoryComplete" xml:space="preserve"><value>Complete inventory</value></data>
+  <data name="ScanInventoryPartial" xml:space="preserve"><value>Partial or unavailable inventory</value></data>
+  <data name="ScanInventoryNotApplicable" xml:space="preserve"><value>No freeze-frame trigger</value></data>
+  <data name="ScanDtcMode" xml:space="preserve"><value>DTC mode {0}: {1}</value></data>
 </root>

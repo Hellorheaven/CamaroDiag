@@ -96,6 +96,16 @@ internal sealed partial class BridgeDesktopForm
             var output = new StringBuilder();
             output.AppendLine(J1979RecipeText(result.Completed ? "Completed" : "Partial"));
             output.AppendLine("VIN: " + (result.ObservedVin ?? J1979RecipeText("Unavailable")));
+            output.AppendLine(J1979RecipeText("ScanInventory"));
+            foreach(var item in result.Inventory)
+                output.AppendLine(string.Format(CultureInfo.CurrentUICulture,J1979RecipeText("ScanInventoryRow"),
+                    item.Mode.ToString("X2"),item.AdvertisedIds.Count,J1979RecipeText(item.State switch {
+                        "COMPLETE"=>"ScanInventoryComplete","NOT_APPLICABLE"=>"ScanInventoryNotApplicable",
+                        _=>"ScanInventoryPartial"})));
+            foreach(var dtc in result.DtcModes)
+                output.AppendLine(string.Format(CultureInfo.CurrentUICulture,J1979RecipeText("ScanDtcMode"),
+                    dtc.Mode.ToString("X2"),dtc.Codes is null?J1979RecipeText("Unavailable"):
+                    dtc.Codes.Count==0?J1979RecipeText("NativeUsbZeroDtc"):string.Join(", ",dtc.Codes)));
             foreach (var step in result.Steps)
                 output.AppendLine($"{step.RequestHex} [{step.Status}] {step.ResponseHex} {step.Detail}");
             output.AppendLine(J1979RecipeText("MutationsNotTested"));

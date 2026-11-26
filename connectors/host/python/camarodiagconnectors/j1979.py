@@ -9,6 +9,7 @@ import re
 import socket
 import time
 from collections.abc import Callable
+from .j1979_campaign_evidence import decode_observation, summarize_observations
 
 _MAX_PAYLOAD = 4095
 Exchange = Callable[[bytes, float], bytes]
@@ -241,9 +242,13 @@ def scan(exchange: Exchange, *, budget: float = 180.0,
         begin = clock()
         response = None
         status, detail, result = "NOT_TESTED", None, None
+        application = None
         try:
             response = exchange(request, min(2.5, left))
             detail = _validate(request, response)
+            application = decode_observation(request, response)
+            if application is None:
+                raise ValueError("Invalid application record")
             if detail is None:
                 result = decode(response) if decode else response.hex().upper()
                 status = "PASSED"
@@ -256,6 +261,7 @@ def scan(exchange: Exchange, *, budget: float = 180.0,
         steps.append({"request_hex": request.hex().upper(),
                       "response_hex": response.hex().upper() if response is not None else None,
                       "status": status, "detail": detail, "decoded": result,
+                      "application_evidence": application if status != "FAILED" else None,
                       "duration_ms": round((clock() - begin) * 1000)})
         return result
 
@@ -327,6 +333,7 @@ def scan(exchange: Exchange, *, budget: float = 180.0,
         if info != 2:
             read(bytes((9, info)))
     return {"observed_vin": vin, "steps": steps, "advertised_control_tests": controls,
+            **summarize_observations(steps),
             "completed": stop is None, "stop_reason": stop,
             "duration_ms": round((clock() - started) * 1000),
             "not_executed": ["MODE_04_CLEAR", "MODE_05_LEGACY", "MODE_08_CONTROL"]}

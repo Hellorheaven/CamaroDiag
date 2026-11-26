@@ -236,6 +236,67 @@ def _freeze_trigger(req, res):
             "dtc": f"{'PCBU'[a >> 6]}{(a >> 4) & 3:X}{a & 15:X}{b:02X}" if present else None}
 
 
+def decode_observation(req: bytes, res: bytes):
+    """Typed application evidence for a correlated CAN response.
+    Does not establish transport, campaign integrity or physical provenance.
+    """
+    if not _read_only(req) or not 0 < len(res) <= 4095:
+        return None
+    if res[0] == 0x7F:
+        if len(res) != 3 or res[1] != req[0] or res[2] in (0, 0x78):
+            return None
+        return {"shape": "NEGATIVE", "negative_response_code": res[2]}
+    state = _positive_state(req, res)
+    if state not in (1, 2):
+        return None
+    if state == 2:
+        return {"shape": "RAW"}
+    codes = None
+    if req[0] in (3, 7, 10):
+        codes = [f"{'PCBU'[a >> 6]}{(a >> 4) & 3:X}{a & 15:X}{b:02X}"
+                 for a, b in zip(res[2::2], res[3::2])]
+    return {"shape": "PASSED", "measurement": _measurement(req, res),
+            "dtc_codes": codes, "negative_response_code": None,
+            "monitor_records": _monitor_records(req, res),
+            "vehicle_info": _vehicle_info(req, res), "readiness": _readiness(req, res),
+            "supported_page": _supported_page(req, res), "freeze_trigger": _freeze_trigger(req, res),
+            "observed_vin": res[3:].decode("ascii") if req == b"\x09\x02" else None}
+
+
+def summarize_observations(steps):
+    """Report complete availability chains independently of transport completion."""
+    by_request = {row["request_hex"]: row for row in steps}
+    def evidence(req):
+        row = by_request.get(req, {})
+        return row.get("application_evidence") if row.get("status") == "PASSED" else None
+    inventories = []
+    trigger = (evidence("020200") or {}).get("freeze_trigger")
+    for mode in (1, 2, 6, 8, 9):
+        ids = set()
+        pages = 0
+        complete = False
+        if mode == 2 and trigger and not trigger["present"]:
+            inventories.append({"mode": mode, "state": "NOT_APPLICABLE", "advertised_ids": [], "verified_pages": 0})
+            continue
+        for base in range(0, 256, 32):
+            request = f"{mode:02X}{base:02X}" + ("00" if mode == 2 else "")
+            page = (evidence(request) or {}).get("supported_page")
+            if page is None or page["mode"] != mode or page["base"] != base:
+                break
+            ids.update(page["supported_ids"])
+            pages += 1
+            if not page["has_next_page"]:
+                complete = True
+                break
+        inventories.append({"mode": mode, "state": "COMPLETE" if complete else "PARTIAL" if pages else "UNAVAILABLE",
+                            "advertised_ids": sorted(ids), "verified_pages": pages})
+    dtcs = [{"mode": mode, "codes": (evidence(f"{mode:02X}") or {}).get("dtc_codes"),
+             "status": by_request.get(f"{mode:02X}", {}).get("status")} for mode in (3, 7, 10)]
+    measurements = [row["application_evidence"]["measurement"] for row in steps
+                    if row["status"] == "PASSED" and (row.get("application_evidence") or {}).get("measurement")]
+    return {"inventory": inventories, "dtc_modes": dtcs, "measurements": measurements}
+
+
 def _exact(stream, size):
     chunks = bytearray()
     while len(chunks) < size:
