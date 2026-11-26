@@ -235,7 +235,34 @@ object CamaroUdsProtocol {
         if (!Regex("[0-9A-F]{2}").matches(pidHex)) return emptyList()
         val observations = mutableListOf<PidObservation>()
         val expectedPid = pidHex.toInt(16)
-        val hexPairData = Regex("(?:[0-9A-F]{2}){3,10}")
+        val prefix = if (frame == null) 2 else 3
+        val expectedLength = if (frame != null && expectedPid in setOf(0x02, 0x03)) 2
+            else SafeObdRequestPolicy.expectedMode01DataBytes(expectedPid)
+        fun observation(responder: String?, bytes: List<Int>): PidObservation? {
+            if (primaryPowertrainResponderOnly && responder != null &&
+                responder !in setOf("7E8", "18DAF110")) return null
+            if (bytes.size <= prefix || bytes[0] != service || bytes[1] != expectedPid ||
+                (frame != null && bytes[2] != frame)) return null
+            if (frame != null && expectedLength == null) return null
+            if (expectedLength != null && bytes.size != expectedLength + prefix) return null
+            return PidObservation(responder, bytes.drop(prefix))
+        }
+        val request = "%02X%02X".format(Locale.ROOT, service - 0x40, expectedPid) +
+            (frame?.let { "%02X".format(Locale.ROOT, it) } ?: "")
+        val cleaned = response.lineSequence().filter {
+            it.filterNot(Char::isWhitespace).uppercase(Locale.ROOT) != request
+        }.joinToString("\n")
+        if (ObdNumberedIdentityFrames.hasSegmentedPhysical(cleaned)) {
+            return ObdNumberedIdentityFrames.parseAddressedPhysical(cleaned).orEmpty()
+                .mapNotNull { observation(it.responder, it.bytes) }
+        }
+        // Numbered ELM blocks have no reliable source address; never infer one.
+        if (Regex("(?i)(?:^|\\s)[0-9A-F]:").containsMatchIn(cleaned)) {
+            return ObdNumberedIdentityFrames.parseAll(cleaned).orEmpty()
+                .mapNotNull { observation(null, it) }
+        }
+        // Already assembled payloads from physical providers may exceed one CAN frame.
+        val hexPairData = Regex("(?:[0-9A-F]{2}){3,255}")
         // A Mode 01 reply must use a documented OBD responder header, not
         // arbitrary three hex characters that could be adapter chatter.
         val canHeader = Regex("(?:7E[8-F]|18DAF1[0-9A-F]{2})")
@@ -303,15 +330,9 @@ object CamaroUdsProtocol {
                     else -> continue
                 }
             }
-            if (bytes.size < 3 || bytes[0] != service || bytes[1] != expectedPid) continue
-            val prefix = if (frame == null) 2 else 3
-            if (frame != null && bytes.getOrNull(2) != frame) continue
-            // Mode 02 PID 02 is the triggering DTC; PID 03 is fuel-system status.
-            val expectedLength = if (frame != null && expectedPid in setOf(0x02, 0x03)) 2
-                else SafeObdRequestPolicy.expectedMode01DataBytes(expectedPid)
-            if (frame != null && expectedLength == null) continue
-            if (expectedLength != null && bytes.size != expectedLength + prefix) continue
-            observations += PidObservation(responder, bytes.drop(prefix))
+            // A physical single-frame response cannot carry an unbounded payload.
+            if (responder != null && bytes.size > 7) continue
+            observation(responder, bytes)?.let(observations::add)
         }
         return observations
     }

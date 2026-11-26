@@ -1020,6 +1020,27 @@ class Obd2FeatureEngineTest {
     }
 
     @Test
+    fun multiFramePidEvidenceKeepsRespondersAndRejectsIncompleteSequences() {
+        val first = "7E8 10 0A 41 65 01 02 03 04"
+        val second = "7EA 10 0A 41 65 11 12 13 14"
+        val tailA = "7E8 21 05 06 07 08"
+        val tailB = "7EA 21 15 16 17 18"
+        val observations = CamaroUdsProtocol.parsePidObservations(
+            listOf(first, second, tailB, tailA).joinToString("\r"), "65")
+        assertEquals((1..8).toList(), observations.single { it.responder == "7E8" }.bytes)
+        assertEquals((17..24).toList(), observations.single { it.responder == "7EA" }.bytes)
+        assertTrue(CamaroUdsProtocol.parsePidObservations("$first\r$second\r$tailA", "65").isEmpty())
+        assertTrue(CamaroUdsProtocol.parsePidObservations("$first\r7E8 22 05 06 07 08", "65").isEmpty())
+        assertEquals((1..8).toList(),
+            CamaroUdsProtocol.parsePidObservations("41650102030405060708", "65").single().bytes)
+        val anonymous = CamaroUdsProtocol.parsePidObservations(
+            "00A\r0: 41 65 01 02 03 04\r1: 05 06 07 08", "65").single()
+        assertNull(anonymous.responder)
+        assertEquals((1..8).toList(), anonymous.bytes)
+        assertTrue(CamaroUdsProtocol.parsePidObservations("00A\r0: 41 65 01 02 03 04", "65").isEmpty())
+    }
+
+    @Test
     fun conflictingRawResponsesRemainSeparateAndNeverBecomeValues() = runBlocking {
         val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
             when (command) {

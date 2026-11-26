@@ -24,10 +24,15 @@ internal object ObdNumberedIdentityFrames {
 
     /** Reassemble classic CAN ISO-TP independently by actual responder.
      * Interleaved CFs are never paired using their arrival order alone. */
-    fun parsePhysical(response: String): List<List<Int>>? {
+    data class AddressedRecord(val responder: String, val bytes: List<Int>)
+
+    fun parsePhysical(response: String): List<List<Int>>? =
+        parseAddressedPhysical(response)?.map { it.bytes }
+
+    fun parseAddressedPhysical(response: String): List<AddressedRecord>? {
         data class Pending(val total: Int, val bytes: MutableList<Int>, var sequence: Int = 1)
         val pending = mutableMapOf<String, Pending>()
-        val completed = mutableListOf<List<Int>>()
+        val completed = mutableListOf<AddressedRecord>()
         var seen = false
         for (line in physicalLines(response)) {
             if (line in setOf("SEARCHING...", "0902", "0904", "0906", "090A")) continue
@@ -43,14 +48,14 @@ internal object ObdNumberedIdentityFrames {
             // when it describes all following bytes and the PCI is plausible.
             if (frame.size >= 3 && frame[0] == frame.size - 1 &&
                 frame[1] ushr 4 in 0..2 && (frame.size == 9 ||
-                    frame[1] ushr 4 != 0 || frame[2] == 0x49 || frame[2] == 0x7F)) frame = frame.drop(1)
+                    frame[1] ushr 4 != 0 || frame[2] in setOf(0x41, 0x42, 0x45, 0x46, 0x49, 0x7F))) frame = frame.drop(1)
             if (frame.size !in 2..8) return null
             when (frame[0] ushr 4) {
                 0 -> {
                     if (address in pending) return null
                     val length = frame[0] and 15
                     if (length !in 1..7 || frame.size < length + 1) return null
-                    completed += frame.drop(1).take(length)
+                    completed += AddressedRecord(address, frame.drop(1).take(length))
                 }
                 1 -> {
                     if (address in pending || frame.size != 8) return null
@@ -67,7 +72,7 @@ internal object ObdNumberedIdentityFrames {
                     record.bytes += frame.drop(1).take(take)
                     record.sequence = (record.sequence + 1) and 15
                     if (record.bytes.size == record.total) {
-                        completed += record.bytes.toList()
+                        completed += AddressedRecord(address, record.bytes.toList())
                         pending.remove(address)
                     }
                 }
@@ -75,6 +80,19 @@ internal object ObdNumberedIdentityFrames {
             }
         }
         return completed.takeIf { seen && pending.isEmpty() && it.isNotEmpty() }
+    }
+
+    /** A segmented physical response must not fall back to individual lines.
+     * Check PCI after an optional DLC, including compact ELM headers. */
+    fun hasSegmentedPhysical(response: String): Boolean = physicalLines(response).any { line ->
+        val match = canHeader.find(line) ?: return@any false
+        val body = line.drop(match.value.length).trim().split(Regex("\\s+"))
+        val compact = if (body.firstOrNull()?.matches(Regex("[0-8]")) == true)
+            "0" + body.joinToString("") else body.joinToString("")
+        if (!compact.matches(Regex("(?:[0-9A-F]{2}){2,9}"))) return@any false
+        val bytes = compact.chunked(2).map { it.toInt(16) }
+        bytes[0] ushr 4 in 1..2 ||
+            (bytes.size >= 3 && bytes[0] == bytes.size - 1 && bytes[1] ushr 4 in 1..2)
     }
 
     fun parseAll(response: String): List<List<Int>>? {

@@ -1,3 +1,7 @@
+## SAE J1979 — réponses PID multitrames (26/11/2026)
+
+- Le parseur Mode 01/02 réutilise l'assemblage ISO-TP par répondant pour les réponses segmentées, y compris entrelacées. Aucun repli sur une trame isolée si une séquence est incomplète ; conservation des réponses ELM numérotées sans adresse inventée et des payloads déjà assemblés jusqu'à 255 octets. Les longueurs connues restent contrôlées. Les PID inconnus restent des octets bruts, pas des mesures. Régressions écrites, non exécutées. J1979 en cours ; pas de nouveau protocole actif.
+
 ## C6 — distinction incident mémoire et corruption sauvegarde (26/11/2026)
 
 - Conserver l'avertissement d'interruption si un bloc est corrompu mais le journal strictement identique au snapshot audité. Distinguer secteur d'effacement incertain (adresse et région) du bloc de sauvegarde invalide. Aucun secteur déclaré vérifié si l'ensemble invalide. UI, JSON et régression adaptés. Tests non exécutés. Aucune écriture ECU.
