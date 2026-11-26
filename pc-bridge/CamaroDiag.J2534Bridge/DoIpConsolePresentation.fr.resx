@@ -210,4 +210,8 @@
   <data name="InventoryObdSupported" xml:space="preserve"><value>ECU 0x{0:X4} : OBDonUDS identifié (0x{1:X2})</value></data>
   <data name="InventoryObdUnrecognized" xml:space="preserve"><value>ECU 0x{0:X4} : OBDonUDS non identifié (F810 = 0x{1:X2})</value></data>
   <data name="MonitorPartial" xml:space="preserve"><value>Capture partielle : {0}/{1} échantillons vérifiés.</value></data>
+  <data name="InventoryProgress" xml:space="preserve"><value>Inventaire : {0}/{1} cibles interrogées (partiel)</value></data>
+  <data name="InventoryReasonTimeout" xml:space="preserve"><value>Délai de réponse dépassé.</value></data>
+  <data name="InventoryReasonIdentity" xml:space="preserve"><value>Identité ECU ou réponse diagnostique invalide.</value></data>
+  <data name="InventoryReasonCommunication" xml:space="preserve"><value>Échec de communication ou de vérification de l’identité.</value></data>
 </root>
