@@ -1872,6 +1872,10 @@ internal static class StandardProtocolCli
         try
         {
             var timeout = TimeSpan.FromMilliseconds(o.TimeoutMs);
+            int count;
+            {
+            // Only publish completion after both transport and trace journal
+            // have closed successfully. Individual replies remain provisional.
             using var journal = OpenDoIpTrace(o);
             var gateway = await DoIpVehicleDiscovery.DiscoverAsync(o.Host, timeout,
                 cancellation.Token, vin: sequence.Vin, trace: journal is null ? null : journal.RecordDatagram);
@@ -1895,11 +1899,12 @@ internal static class StandardProtocolCli
                 activationType: o.RoutingActivationType, activationOemData: o.RoutingOemData,
                 expectedGatewayAddress: gateway.LogicalAddress,
                 trace: journal is null ? null : journal.Record);
-            var count = await DoIpVinReader.ExchangeSequenceVerifiedAsync(transport, gateway,
+            count = await DoIpVinReader.ExchangeSequenceVerifiedAsync(transport, gateway,
                 sequence.Commands, timeout, cancellation.Token, (index, reply) =>
                     Console.WriteLine(string.Format(DoIpConsolePresentation.Text("SequenceReply"),
                         index, Convert.ToHexString(reply))),
                 TimeSpan.FromMilliseconds(o.DoIpP2Ms), TimeSpan.FromMilliseconds(o.DoIpP2StarMs));
+            }
             Console.WriteLine(string.Format(DoIpConsolePresentation.Text("SequenceComplete"), count));
             return 0;
         }
