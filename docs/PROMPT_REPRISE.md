@@ -1,3 +1,7 @@
+## J1979 / C6 — pilotes STM32 HAL et cycle de session local (26/11/2026)
+
+- Lot intégré : adaptateur FDCAN classique sous canal exclusif déjà qualifié, contrôle flags d'erreurs, événements d'émission corrélés (pas simple enqueue), RX borné et aucun retry ; SPI esclave HAL IT sous preuve indépendante NSS/horloges, vérification du transfert complet, interlock avant abort. Coordinateur STM32 de session unique, qualification préalable, arrêt vérifié et verrou recovery. Le build STM32 inclut le module HAL FDCAN ; recette native du cycle ajoutée au gate, non exécutée. Aucun choix de GPIO/bitrate/READY ni activation dans main ; reste le propriétaire de carte mesuré, le câblage et le dispatch USB authentifié. API HAL consultée chez ST, compilation à la clôture. J1979/C6 ouverts, aucune CI, fusion ni Release.
+
 ## J1979 / C6 — campagne USB déportée via transport applicatif (26/11/2026)
 
 - Le propriétaire USB peut désormais exécuter la campagne sur client CI/2 sans passer par CAN local, sous le même bail, la même vérification de profil, les mêmes gardes d'admission et l'arrêt vérifié avant résumé CJ/1. Les gardes CAN locales restent au niveau trame ; le transport distant doit contrôler ses propres transactions et le STM32 son admission locale. Tests de succès, profil divergent et révocation déportée écrits. Correction du calcul de délai SPI pour éviter un sous-dépassement si l'horloge avance entre deux lectures. Aucun dispatch USB ni activation matérielle, aucun test exécuté, CI, fusion ou Release.
