@@ -145,6 +145,7 @@ object FunctionalTestPlanner {
 
     fun j1979Checks(): List<FunctionalTestCheck> = listOf(
         Triple("vin", "Mode 09 VIN", "Mode 09 VIN"),
+        Triple("info", "Mode 09 supported information types", "Types d’informations mode 09"),
         Triple("pids", "Mode 01 PID inventory", "Inventaire PID mode 01"),
         Triple("live", "Mode 01 measurements", "Mesures mode 01"),
         Triple("readiness", "Mode 01 readiness", "Moniteurs mode 01"),
@@ -165,6 +166,7 @@ object FunctionalTestPlanner {
                 "Verified positive diagnostic response.", "Réponse diagnostique positive vérifiée.")
         }
         mark("vin", com.camarodiag.gen5.domain.model.VehicleVinMatcher.normalize(report.vin) != null)
+        mark("info", report.vehicleInfoSupportComplete == true)
         mark("pids", report.firstUnresolvedPid == null && report.mode01Reads.isNotEmpty())
         mark("live", report.liveData.isNotEmpty())
         mark("readiness", !report.readiness.isNullOrBlank())

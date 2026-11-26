@@ -60,6 +60,12 @@ internal object ObdScanJsonExport {
                 JSONObject().put("pid", read.pid).put("rawResponse", read.rawResponse)
                     .put("verifiedBytes", read.verifiedBytes?.let { JSONArray(it) } ?: JSONObject.NULL)
             }))
+            put("vehicleInfoSupportedTypes", JSONArray(report.vehicleInfoSupportedTypes.sorted()))
+            put("vehicleInfoSupportComplete", report.vehicleInfoSupportComplete ?: JSONObject.NULL)
+            put("vehicleInfoReads", JSONArray(report.vehicleInfoReads.map { read ->
+                JSONObject().put("infoType", read.infoType).put("rawResponse", read.rawResponse)
+                    .put("positiveRecords", JSONArray(read.positiveRecords.map { JSONArray(it) }))
+            }))
             put("monitorTestRaw", report.monitorTestRaw ?: JSONObject.NULL)
             put("rawLog", JSONArray(report.rawLog))
         }.toString(2)

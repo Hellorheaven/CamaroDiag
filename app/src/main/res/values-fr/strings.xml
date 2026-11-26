@@ -1277,4 +1277,7 @@
     <string name="cal_recovery_export">Exporter la vérification JSON</string>
     <string name="cal_recovery_export_success">Vérification exportée : %1$s</string>
     <string name="cal_recovery_export_failed">Impossible d’exporter la vérification de récupération.</string>
+    <string name="obd_mode09_types">Types d’informations véhicule annoncés</string>
+    <string name="obd_mode09_partial">Inventaire des informations véhicule incomplet ou non pris en charge.</string>
+    <string name="obd_mode09_raw">Mode 09 type %1$02X — réponse brute</string>
 </resources>

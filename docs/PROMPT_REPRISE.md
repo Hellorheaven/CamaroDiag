@@ -1,3 +1,7 @@
+## SAE J1979 — inventaire Mode 09 et données constructeur brutes (26/11/2026)
+
+- Scan complet : bitmaps 0900/continuations, union annoncée (pas une attribution par ECU), lecture des InfoTypes supplémentaires annoncés, conservation des réponses et enregistrements bruts. VIN/CAL ID/CVN/nom gardent les lecteurs existants et leur repli. Export JSON, écran et recette fonctionnelle distincte ; transport physique J2534 autorise les lectures Mode 09 de deux octets sans étendre les écritures. Régressions Android/Windows écrites, non exécutées. Limites : pas de décodage IUPR ni de preuve individuelle par ECU à ce stade. Référence SAE J1979/ISO 15031-5, https://phprell.github.io/obd-diag/en/technik/dienste.html.
+
 ## C6 — export de preuve de récupération Android (26/11/2026)
 
 - Export JSON dédié de l'inspection hors ligne, succès ou échec, identité, état journal, adresse incertaine, secteur/adresse/taille/SHA-256 pour tous les blocs, erreur et version. Garde compte/profil de preuve avant publication, aucun octet original ni autorisation de restauration exportés. Aucun nouveau test exécuté.

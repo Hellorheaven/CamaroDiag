@@ -390,7 +390,7 @@ class J2534BridgeTransport(
                 2 -> payload.size == 3 && payload[2] == 0.toByte()
                 3,7,10 -> payload.size == 1
                 6 -> payload.size == 2
-                9 -> payload.size == 2 && (payload[1].toInt() and 0xFF) in setOf(2,4,6,10)
+                9 -> payload.size == 2
                 else -> false
             }) { "Unsupported physical OBD scan command." }
             val reply = exchange(payload, timeout)

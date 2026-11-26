@@ -220,6 +220,16 @@ fun ObdScanScreen(
                     InfoLine(stringResource(R.string.obd_cal_id), report.calibrationIds.joinToString(" | ").ifBlank { unavailable })
                     InfoLine(stringResource(R.string.obd_cvn), report.calibrationVerificationNumbers.joinToString(" | ").ifBlank { unavailable })
                     InfoLine(stringResource(R.string.obd_ecu_name), report.ecuNames.joinToString(" | ").ifBlank { unavailable })
+                    if (report.vehicleInfoSupportComplete != null) {
+                        InfoLine(stringResource(R.string.obd_mode09_types),
+                            report.vehicleInfoSupportedTypes.sorted().joinToString(" ") { "%02X".format(it) }.ifBlank { unavailable })
+                        if (report.vehicleInfoSupportComplete == false)
+                            Text(stringResource(R.string.obd_mode09_partial), color = CamaroAmber, fontSize = 11.sp)
+                        report.vehicleInfoReads.filter { it.infoType % 32 != 0 }.forEach { read ->
+                            Text(stringResource(R.string.obd_mode09_raw, read.infoType), fontSize = 11.sp)
+                            Text(read.rawResponse.take(1024), fontFamily = FontFamily.Monospace, fontSize = 11.sp)
+                        }
+                    }
                     InfoLine(stringResource(R.string.obd_supported_pids), report.supportedPids.size.toString())
                     report.supportedPidsByResponder.toSortedMap().forEach { (address, pids) ->
                         InfoLine(stringResource(R.string.obd_pid_count_by_ecu, address), pids.size.toString())

@@ -418,6 +418,9 @@ internal static class BridgeSelfTests
 
         Assert(StandardObdPhysicalPolicy.AllowsRead([2,2,0]), "Standard freeze-frame DTC request");
         Assert(StandardObdPhysicalPolicy.AllowsRead([6,0]), "Standard Mode 06 supported monitor query");
+        Assert(StandardObdPhysicalPolicy.AllowsRead([9,0]), "Mode 09 information inventory");
+        Assert(StandardObdPhysicalPolicy.AllowsRead([9,8]), "Mode 09 advertised information read");
+        Assert(!StandardObdPhysicalPolicy.AllowsRead([9,8,0]), "Malformed Mode 09 rejected");
         Assert(!StandardObdPhysicalPolicy.AllowsRead([2,2,1]), "Only freeze frame 00 is scoped");
         Assert(StandardObdPhysicalPolicy.AllowsRead([6,1]), "Standard monitor read supported");
         Assert(StandardObdPhysicalPolicy.AllowsRead([6,0xE0]), "Monitor continuation bitmap supported");

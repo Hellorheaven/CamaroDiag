@@ -223,6 +223,43 @@ class Obd2FeatureEngineTest {
     }
 
     @Test
+    fun mode09InventoryReadsOnlyAdvertisedExtraInformationTypes() = runBlocking {
+        val commands = mutableListOf<String>()
+        val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+            commands += command
+            when (command) {
+                "0100" -> "410000000000"
+                "0900" -> "490041000000"
+                "0908" -> "49080100010002"
+                else -> "NO DATA"
+            }
+        })
+        val report = engine.fullReadOnlyScan()
+        assertEquals(setOf(2,8), report.vehicleInfoSupportedTypes)
+        assertEquals(true, report.vehicleInfoSupportComplete)
+        assertEquals(listOf(0x49,8,1,0,1,0,2), report.vehicleInfoReads.single { it.infoType == 8 }.positiveRecords.single())
+        assertFalse("090B" in commands)
+        assertEquals(1, commands.count { it == "0902" })
+        Unit
+    }
+
+    @Test
+    fun mode09MissingContinuationIsNotACompleteInventory() = runBlocking {
+        val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+            when (command) {
+                "0100" -> "410000000000"
+                "0900" -> "490000000001"
+                else -> "NO DATA"
+            }
+        })
+        val report = engine.fullReadOnlyScan()
+        assertEquals(false, report.vehicleInfoSupportComplete)
+        assertTrue(report.vehicleInfoSupportedTypes.isEmpty())
+        assertEquals(listOf(0,0x20), report.vehicleInfoReads.map { it.infoType })
+        Unit
+    }
+
+    @Test
     fun decodesMode09CalibrationIdAndCvnRecords() = runBlocking {
         val commands = mutableListOf<String>()
         val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->

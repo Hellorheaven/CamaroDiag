@@ -69,6 +69,8 @@ data class ObdMode01Read(
 
 data class ObdFreezeFrameRead(val pid: Int, val rawResponse: String, val verifiedBytes: List<Int>?)
 
+data class ObdVehicleInfoRead(val infoType: Int, val rawResponse: String, val positiveRecords: List<List<Int>>)
+
 data class ObdScanReport(
     val supportedPids: Set<Int>,
     val liveData: List<ObdValue>,
@@ -95,7 +97,10 @@ data class ObdScanReport(
     val freezeFrameSupportedPids: Set<Int> = emptySet(),
     val freezeFrameReads: List<ObdFreezeFrameRead> = emptyList(),
     val freezeFrameSupportComplete: Boolean? = null,
-    val freezeFrameResponder: String? = null
+    val freezeFrameResponder: String? = null,
+    val vehicleInfoSupportedTypes: Set<Int> = emptySet(),
+    val vehicleInfoSupportComplete: Boolean? = null,
+    val vehicleInfoReads: List<ObdVehicleInfoRead> = emptyList()
 )
 
 /**
@@ -627,6 +632,45 @@ class Obd2FeatureEngine(
             })
     }
 
+    private data class VehicleInfoInventory(val supported: Set<Int>, val complete: Boolean,
+        val reads: List<ObdVehicleInfoRead>)
+
+    /** The union is only an inventory, not proof that every ECU supports each type.
+     * Preserve complete records separately; no invented units or counter labels. */
+    private suspend fun discoverVehicleInfo(): VehicleInfoInventory = withHeaderlessRecords {
+        val supported = linkedSetOf<Int>()
+        val reads = mutableListOf<ObdVehicleInfoRead>()
+        var complete = false
+        for (base in 0..0xE0 step 0x20) {
+            currentCoroutineContext().ensureActive()
+            val response = ask("09%02X".format(Locale.ROOT, base), 2500L)
+            val records = ObdNumberedIdentityFrames.parseAll(response).orEmpty()
+                .filter { it.size == 6 && it[0] == 0x49 && it[1] == base }
+            reads += ObdVehicleInfoRead(base, response, records)
+            if (records.isEmpty()) break
+            for (record in records) {
+                for (bit in 0 until 31) {
+                    if ((record[2 + bit / 8] and (1 shl (7 - bit % 8))) != 0)
+                        supported += base + bit + 1
+                }
+            }
+            if (records.none { (it[5] and 1) != 0 }) {
+                complete = true
+                break
+            }
+        }
+        // These four identity records are acquired by the existing verified
+        // VIN/CAL ID/CVN/ECU-name readers, including their fallback formatting.
+        for (type in supported.filterNot { it in setOf(2,4,6,10) }.sorted()) {
+            currentCoroutineContext().ensureActive()
+            val response = ask("09%02X".format(Locale.ROOT, type), 2500L)
+            val records = ObdNumberedIdentityFrames.parseAll(response).orEmpty()
+                .filter { it.size > 2 && it[0] == 0x49 && it[1] == type }
+            reads += ObdVehicleInfoRead(type, response, records)
+        }
+        VehicleInfoInventory(supported, complete, reads)
+    }
+
     private suspend fun collectReadOnlyScan(
         adapter: Map<String, String>,
         respondingEcus: List<String>,
@@ -641,6 +685,7 @@ class Obd2FeatureEngine(
         val freezeFrameSupported = if (freezeFrameDtc != null) discoverFreezeFrameSupportedPids() else emptySet()
         val (freeze, freezeReads) = if (freezeFrameDtc != null) collectFreezeFrameReads(freezeFrameSupported)
             else emptyMap<Int, List<Int>>() to emptyList<ObdFreezeFrameRead>()
+        val vehicleInfo = discoverVehicleInfo()
         val vin = readVin()
         val calIds = readCalibrationIds()
         val cvns = readCalibrationVerificationNumbers()
@@ -674,7 +719,10 @@ class Obd2FeatureEngine(
             freezeFrameSupportedPids = freezeFrameSupported,
             freezeFrameReads = freezeReads,
             freezeFrameSupportComplete = freezeFrameSupportComplete,
-            freezeFrameResponder = if (freezeFrameSourcePinned) freezeFrameSource ?: physicalCanResponder else null
+            freezeFrameResponder = if (freezeFrameSourcePinned) freezeFrameSource ?: physicalCanResponder else null,
+            vehicleInfoSupportedTypes = vehicleInfo.supported,
+            vehicleInfoSupportComplete = vehicleInfo.complete,
+            vehicleInfoReads = vehicleInfo.reads
         )
     }
 
