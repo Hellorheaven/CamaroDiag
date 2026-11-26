@@ -5659,6 +5659,76 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun canRunFunctionalEvapTest(): Boolean = obdManager.isElmEvapCandidate
 
+    fun functionalLegacyMutationProtocol(): Int? = obdManager.legacyMutationProtocol
+
+    fun runFunctionalLegacyMutation(target: com.camarodiag.gen5.data.obd.LegacyMutationTarget,
+        approval: EcuWriteConsentFlow.Approval, confirmedConnection: Long, confirmedVehicle: VehicleProfile) {
+        if (!target.valid || !approval.warningAcknowledged || !approval.confirmedYes ||
+            confirmedConnection != connectionAttemptGeneration || confirmedVehicle != _vehicle.value ||
+            !confirmedVehicle.vin.matches(Regex("[A-HJ-NPR-Z0-9]{17}")) ||
+            functionalTestJob?.isCompleted == false || enhancedUdsJob?.isCompleted == false ||
+            _liveCanMonitorState.value.isCapturing || _liveCanMonitorState.value.isSendingRequest ||
+            obdManager.legacyMutationProtocol != target.protocol) return
+        val account = authenticatedAccountUid ?: return
+        val accountGeneration = accountSessionGeneration
+        val execution = ++functionalTestGeneration
+        val immutableTarget = target.copy(sources=target.sources.toList())
+        fun current() = execution == functionalTestGeneration &&
+            isCurrentAccountGeneration(accountGeneration) && authenticatedAccountUid == account &&
+            confirmedConnection == connectionAttemptGeneration && confirmedVehicle == _vehicle.value
+        functionalTestJob = viewModelScope.launch {
+            if (!confirmFunctionalTestOwner(account) || !current()) return@launch
+            val started = System.currentTimeMillis()
+            val protocol = FunctionalProtocol.entries.single { it.expectedLegacyElmProtocol == immutableTarget.protocol }
+            _functionalTestState.value = FunctionalTestState(running=true,startedAtMillis=started,
+                checks=FunctionalTestPlanner.legacyMutationChecks(),
+                context=FunctionalTestContext(confirmedVehicle.vin,_adapter.value.deviceName,
+                    obdManager.currentTransportKind,confirmedConnection),
+                protocol=protocol,legacyTarget=immutableTarget)
+            var baselineSaved = false
+            try {
+                val result = obdManager.runElmLegacyMutation(immutableTarget,confirmedVehicle.vin,approval,::current) { baseline ->
+                    withContext(Dispatchers.IO) {
+                        check(current())
+                        val directory = File(getApplication<Application>().filesDir,"legacy-mutation-evidence")
+                        check(directory.isDirectory || directory.mkdirs())
+                        val file = File(directory,"legacy-$started-${java.util.UUID.randomUUID()}.baseline.json")
+                        val json = LegacyMutationEvidenceJson.encode(baseline)
+                            .put("schema","camarodiag-j1979-legacy-baseline-v1")
+                            .put("expectedVin",confirmedVehicle.vin)
+                            .put("appVersion",com.camarodiag.gen5.BuildConfig.VERSION_NAME)
+                            .put("createdAtMillis",System.currentTimeMillis())
+                        check(file.createNewFile())
+                        try {
+                            java.io.FileOutputStream(file).use {
+                                it.write(json.toString(2).toByteArray(Charsets.UTF_8))
+                                it.flush()
+                                it.fd.sync()
+                            }
+                            check(current())
+                        } catch (error: Exception) {
+                            file.delete()
+                            throw error
+                        }
+                    }
+                    baselineSaved = true
+                }
+                if (current()) _functionalTestState.value = FunctionalTestPlanner.legacyMutationResults(
+                    _functionalTestState.value,result,baselineSaved)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                if (current()) _functionalTestState.update {
+                    it.copy(error=localizedContext.getString(R.string.functional_legacy_mutation_uncertain))
+                }
+            } finally {
+                if (execution == functionalTestGeneration && isCurrentAccountGeneration(accountGeneration))
+                    _functionalTestState.update { it.copy(running=false,finishedAtMillis=System.currentTimeMillis(),
+                        error=if (!current()) localizedContext.getString(R.string.functional_legacy_mutation_uncertain) else it.error) }
+            }
+        }
+    }
+
     fun runFunctionalEvapTest(approval: EcuWriteConsentFlow.Approval, confirmedConnection: Long,
         confirmedVehicle: VehicleProfile) =
         runFunctionalObdMutation(approval, confirmedConnection, confirmedVehicle, clear = false)
@@ -5725,6 +5795,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 running = false,
                 finishedAtMillis = System.currentTimeMillis(),
                 error = localizedContext.getString(when {
+                    _functionalTestState.value.legacyTarget != null -> R.string.functional_legacy_mutation_uncertain
                     _functionalTestState.value.clearCampaign -> R.string.functional_clear_uncertain
                     _functionalTestState.value.evapCampaign -> R.string.functional_evap_uncertain
                     else -> R.string.functional_tests_cancelled
@@ -5744,6 +5815,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val evidenceContext = snapshot.context ?: return@launch
             val json = JSONObject()
                 .put("schema", when {
+                    snapshot.legacyTarget != null -> "camarodiag-functional-j1979-legacy-mutation-v1"
                     snapshot.clearCampaign -> "camarodiag-functional-j1979-clear-v1"
                     snapshot.evapCampaign -> "camarodiag-functional-j1979-evap-v1"
                     else -> "camarodiag-functional-test-v1"
@@ -5762,6 +5834,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 .put("connectionGeneration", evidenceContext.connectionGeneration)
                 .put("completedWithoutError", snapshot.error == null)
                 .put("warning", when {
+                    snapshot.legacyTarget != null -> "Functional vehicle-wide scope; silent ECUs may be affected. No automatic retry or whole-vehicle coverage claim."
                     snapshot.clearCampaign -> "Mode 04 ACK is not evidence of all faults being absent. Permanent DTCs are observed only. Do not retry uncertain commands automatically."
                     snapshot.evapCampaign -> "EVAP acknowledgment is not monitor completion. Do not retry uncertain commands automatically."
                     else -> "NOT_TESTED is not a PASS. No write or actuation was tested."
@@ -5818,7 +5891,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         }))
                 } ?: JSONObject.NULL)
             }
-            val exportName = if (snapshot.clearCampaign) "CamaroDiag_SAE-J1979_CLEAR_${snapshot.startedAtMillis}.json"
+            snapshot.legacyTarget?.let { target ->
+                json.put("legacyMutation",snapshot.legacyResult?.let(LegacyMutationEvidenceJson::encode) ?: JSONObject.NULL)
+                    .put("legacyOperation",if (target.clear) "CLEAR" else "EVAP_PREPARATION")
+                    .put("legacyProtocol",target.protocol).put("wholeVehicleCoverageVerified",false)
+            }
+            val exportName = if (snapshot.legacyTarget != null)
+                "CamaroDiag_SAE-J1979_LEGACY_${snapshot.legacyTarget.protocol}_${if (snapshot.legacyTarget.clear) "CLEAR" else "EVAP"}_${snapshot.startedAtMillis}.json"
+                else if (snapshot.clearCampaign) "CamaroDiag_SAE-J1979_CLEAR_${snapshot.startedAtMillis}.json"
                 else if (snapshot.evapCampaign) "CamaroDiag_SAE-J1979_EVAP_${snapshot.startedAtMillis}.json"
                 else snapshot.protocol?.let { "CamaroDiag_protocol_${it.id}_${snapshot.startedAtMillis}.json" } ?: fileName
             try {
