@@ -15,7 +15,7 @@ internal sealed partial class BridgeDesktopForm
         public override string ToString() => Text;
     }
 
-    private (ObdLegacyJ2534Transport.Variant Variant, byte Source)? SelectLegacyRecipe()
+    private (ObdLegacyJ2534Transport.Variant Variant, byte? Source)? SelectLegacyRecipe()
     {
         using var dialog = new Form
         {
@@ -32,8 +32,11 @@ internal sealed partial class BridgeDesktopForm
             new LegacyChoice(4, "ISO 14230-4 (slow init)"),
             new LegacyChoice(5, "ISO 14230-4 (fast init)")
         });
-        var source = new TextBox { MaxLength = 2, CharacterCasing = CharacterCasing.Upper,
-            Dock = DockStyle.Fill };
+        var source = new TextBox { MaxLength = 2, CharacterCasing = CharacterCasing.Upper, Width = 54 };
+        var discover = new CheckBox { Text = J1979RecipeText("LegacyDiscover"), AutoSize = true };
+        var sourceControls = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.LeftToRight };
+        sourceControls.Controls.Add(source);
+        sourceControls.Controls.Add(discover);
         var documented = new CheckBox { Text = J1979RecipeText("LegacyConfirmProfile"),
             Dock = DockStyle.Fill, AutoSize = true };
         var run = new Button { Text = J1979RecipeText("LegacyRun"), AutoSize = true, Enabled = false };
@@ -46,7 +49,7 @@ internal sealed partial class BridgeDesktopForm
         grid.Controls.Add(new Label { Text = J1979RecipeText("LegacyVariant"), Dock = DockStyle.Fill }, 0, 0);
         grid.Controls.Add(variants, 1, 0);
         grid.Controls.Add(new Label { Text = J1979RecipeText("LegacySource"), Dock = DockStyle.Fill }, 0, 1);
-        grid.Controls.Add(source, 1, 1);
+        grid.Controls.Add(sourceControls, 1, 1);
         grid.Controls.Add(documented, 0, 2);
         grid.SetColumnSpan(documented, 2);
         var scope = new Label { Text = J1979RecipeText("LegacyScope"), Dock = DockStyle.Fill };
@@ -63,17 +66,25 @@ internal sealed partial class BridgeDesktopForm
         bool ValidSource(out byte result) =>
             byte.TryParse(source.Text, NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture, out result)
             && source.Text.Length == 2 && result is not (0 or 0xF1 or 0xFF);
-        void RefreshAdmission() => run.Enabled = documented.Checked && variants.SelectedItem is LegacyChoice && ValidSource(out _);
+        void RefreshAdmission()
+        {
+            source.Enabled = !discover.Checked;
+            run.Enabled = documented.Checked && variants.SelectedItem is LegacyChoice &&
+                (discover.Checked || ValidSource(out _));
+        }
         variants.SelectedIndexChanged += (_, _) => RefreshAdmission();
         source.TextChanged += (_, _) => RefreshAdmission();
+        discover.CheckedChanged += (_, _) => RefreshAdmission();
         documented.CheckedChanged += (_, _) => RefreshAdmission();
         run.Click += (_, _) =>
         {
             if (run.Enabled) dialog.DialogResult = DialogResult.OK;
         };
         if (dialog.ShowDialog(this) != DialogResult.OK || !documented.Checked ||
-            variants.SelectedItem is not LegacyChoice choice || !ValidSource(out var ecu))
+            variants.SelectedItem is not LegacyChoice choice)
             return null;
+        if (discover.Checked) return ((ObdLegacyJ2534Transport.Variant)choice.Number, null);
+        if (!ValidSource(out var ecu)) return null;
         return ((ObdLegacyJ2534Transport.Variant)choice.Number, ecu);
     }
 
@@ -121,8 +132,9 @@ internal sealed partial class BridgeDesktopForm
                 return;
             }
             var output = new StringBuilder();
-            output.AppendLine(J1979RecipeText(report.Result?.Completed == true ? "Completed" : "Partial"));
-            output.AppendLine(report.Variant + " / " + report.SelectedResponseSource);
+            output.AppendLine(J1979RecipeText(report.Result?.Completed == true || report.Discovery?.HasVerifiedSource == true
+                ? "Completed" : "Partial"));
+            output.AppendLine(report.Variant + " / " + (report.SelectedResponseSource ?? J1979RecipeText("LegacyDiscover")));
             if (report.InitializationEvidence is not null)
                 output.AppendLine(report.InitializationEvidence);
             output.AppendLine("VIN: " + (report.Result?.ObservedVin ?? J1979RecipeText("Unavailable")));
@@ -134,7 +146,13 @@ internal sealed partial class BridgeDesktopForm
                     foreach (var reply in step.Responses)
                         output.AppendLine($"  {reply.Source}: {reply.RawHex}");
                 }
-            output.AppendLine(J1979RecipeText("LegacyScope"));
+            if (report.Discovery is { } discoveryResult)
+                foreach (var row in discoveryResult.Sources)
+                {
+                    output.AppendLine($"{row.ResponseSource} [{row.Status}] {row.Detail}");
+                    foreach (var reply in row.Records) output.AppendLine($"  {reply.RawHex}");
+                }
+            output.AppendLine(J1979RecipeText(report.Discovery is null ? "LegacyScope" : "LegacyDiscoveryScope"));
             functionalResults.Text = output.ToString();
             completedLegacy = report;
             functionalExport.Enabled = true;
@@ -160,7 +178,8 @@ internal sealed partial class BridgeDesktopForm
         using var dialog = new SaveFileDialog
         {
             Filter = J1979RecipeText("JsonFilter"), AddExtension = true, DefaultExt = "json",
-            FileName = $"CamaroDiag_SAE-J1979_{report.Variant}.json", OverwritePrompt = true
+            FileName = $"CamaroDiag_SAE-J1979_{report.Variant}{(report.Discovery is null ? "" : "_discovery")}.json",
+            OverwritePrompt = true
         };
         if (dialog.ShowDialog(this) != DialogResult.OK ||
             DateTimeOffset.UtcNow >= functionalAuthorizedUntil ||
