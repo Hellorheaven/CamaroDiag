@@ -21,7 +21,8 @@ internal static class NativeE39SavedBlockAssessment
     }
 
     internal sealed record TargetMetadata(bool Verified, string? Family,
-        string? Vin, uint? OsId, string Problem, string? OriginalImageSha256 = null);
+        string? Vin, uint? OsId, string Problem, string? OriginalImageSha256 = null,
+        string? MetadataSnapshotSha256 = null);
 
     /// <summary>
     /// Verify the separately persisted target manifest before using its
@@ -77,7 +78,8 @@ internal static class NativeE39SavedBlockAssessment
             var originalImageSha256 = Digest("OriginalSha256");
             _ = Digest("TargetSha256");
             _ = Digest("KernelSha256");
-            return new TargetMetadata(true, family, vin, osid, "", originalImageSha256);
+            return new TargetMetadata(true, family, vin, osid, "", originalImageSha256,
+                Convert.ToHexString(SHA256.HashData(bytes)));
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException or
             InvalidDataException or JsonException or KeyNotFoundException or
