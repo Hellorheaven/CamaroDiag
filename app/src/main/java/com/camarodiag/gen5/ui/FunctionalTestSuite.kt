@@ -150,6 +150,7 @@ object FunctionalTestPlanner {
         Triple("live", "Mode 01 measurements", "Mesures mode 01"),
         Triple("readiness", "Mode 01 readiness", "Moniteurs mode 01"),
         Triple("freeze", "Mode 02 freeze frame", "Trame figée mode 02"),
+        Triple("monitor-inventory", "Mode 06 monitor inventory", "Inventaire moniteurs mode 06"),
         Triple("monitor", "Mode 06 monitor results", "Résultats moniteurs mode 06"),
         Triple("05", "Mode 05 oxygen sensor tests", "Tests sondes mode 05"),
         Triple("08-inventory", "Mode 08 supported control tests", "Tests de commande annoncés mode 08"),
@@ -173,7 +174,15 @@ object FunctionalTestPlanner {
         mark("readiness", !report.readiness.isNullOrBlank())
         mark("freeze", report.freezeFrameDtc != null && report.freezeFrameSupportComplete == true &&
             report.freezeFrameReads.isNotEmpty() && report.freezeFrameReads.all { it.verifiedBytes != null })
-        mark("monitor", report.monitorTestRaw?.let { it.isNotBlank() && "PARTIAL" !in it && "N/A" !in it } == true)
+        val monitor = report.monitorTestRaw.orEmpty()
+        val monitorComplete = monitor.isNotBlank() &&
+            "PARTIAL" !in monitor && "N/A" !in monitor
+        mark("monitor-inventory", monitorComplete)
+        // A positive empty inventory proves discovery, not an actual
+        // monitor result. Never promote the physical results row on it.
+        mark("monitor", monitorComplete && monitor.lineSequence().any {
+            (it.startsWith("MID=") || it.startsWith("TID=")) && " RAW=" in it
+        })
         mark("05", report.mode05?.let { it.complete && it.hasTestResults } == true)
         mark("08-inventory", report.mode08?.complete == true)
         val counts = mapOf(3 to report.confirmedDtcs.size, 7 to report.pendingDtcs.size, 10 to report.permanentDtcs.size)
