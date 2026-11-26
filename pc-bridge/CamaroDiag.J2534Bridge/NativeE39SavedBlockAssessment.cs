@@ -35,13 +35,7 @@ internal static class NativeE39SavedBlockAssessment
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(journalPath);
             var path = journalPath + ".meta.json";
-            using var source = File.OpenRead(path);
-            if (source.Length is < 1 or > 16384)
-                throw new InvalidDataException("Invalid ECU target metadata length.");
-            var bytes = new byte[checked((int)source.Length)];
-            source.ReadExactly(bytes);
-            if (source.ReadByte() != -1)
-                throw new InvalidDataException("ECU metadata changed during inspection.");
+            var bytes = ReadBoundedFile(path, 16384);
             using var document = JsonDocument.Parse(bytes);
             var root = document.RootElement;
             if (root.ValueKind != JsonValueKind.Object)
@@ -101,7 +95,7 @@ internal static class NativeE39SavedBlockAssessment
     /// </summary>
     internal static Result Inspect(string journalPath)
     {
-        var state = NativeE39FileWriteJournal.InspectDetailed(journalPath).State;
+        var state = NativeE39FileWriteJournal.CompletionState.Interrupted;
         var expected = new Dictionary<uint, string>();
         var physicalReceipts = new HashSet<uint>();
         var crcReceipts = new HashSet<uint>();
@@ -110,6 +104,7 @@ internal static class NativeE39SavedBlockAssessment
         try
         {
             var snapshot = ReadBoundedFile(journalPath, MaximumJournalBytes);
+            state = NativeE39FileWriteJournal.InspectSnapshot(snapshot).State;
             var text = StrictUtf8.GetString(snapshot);
             if (text.Length == 0 || text[^1] != '\n')
                 throw new InvalidDataException("The journal has an incomplete final record.");
@@ -174,15 +169,18 @@ internal static class NativeE39SavedBlockAssessment
                     "Not all original ECU sectors have durable physical-read evidence.");
 
             var dir = journalPath + ".blocks";
-            if (!Directory.Exists(dir))
-                throw new InvalidDataException("Physical ECU sector backup directory missing.");
-            var files = Directory.EnumerateFiles(dir).ToArray();
+            if (!Directory.Exists(dir) ||
+                (File.GetAttributes(dir) & FileAttributes.ReparsePoint) != 0)
+                throw new InvalidDataException("Physical ECU sector backup directory missing or linked.");
+            var files = Directory.EnumerateFileSystemEntries(dir).ToArray();
             if (files.Length != expected.Count)
                 throw new InvalidDataException("Physical backup count differs from the journal.");
             var observed = new HashSet<uint>();
+            var envelopeHashes = new Dictionary<string, byte[]>(StringComparer.Ordinal);
             foreach (var file in files)
             {
                 var data = ReadBoundedFile(file, MaximumSectorFileBytes);
+                envelopeHashes.Add(file, SHA256.HashData(data));
                 var newline = Array.IndexOf(data, (byte)'\n');
                 if (newline is < 1 or > 1024)
                     throw new InvalidDataException("Invalid physical backup metadata.");
@@ -213,6 +211,22 @@ internal static class NativeE39SavedBlockAssessment
                         "Physical saved ECU bytes do not match their recorded SHA-256.");
                 verified.Add(new Block(address, length, onDiskHash));
             }
+            // A journal append or a replacement of a previously inspected
+            // sector invalidates this composite report. Re-read every envelope
+            // and check the full directory inventory before publishing.
+            if ((File.GetAttributes(dir) & FileAttributes.ReparsePoint) != 0 ||
+                !Directory.EnumerateFileSystemEntries(dir).ToHashSet(StringComparer.Ordinal)
+                    .SetEquals(envelopeHashes.Keys))
+                throw new InvalidDataException("Physical backup inventory changed during inspection.");
+            foreach (var (path, hash) in envelopeHashes)
+                if (!CryptographicOperations.FixedTimeEquals(hash,
+                    SHA256.HashData(ReadBoundedFile(path, MaximumSectorFileBytes))))
+                    throw new InvalidDataException("Physical backup changed during inspection.");
+            if (!snapshot.AsSpan().SequenceEqual(ReadBoundedFile(journalPath, MaximumJournalBytes)))
+            {
+                state = NativeE39FileWriteJournal.CompletionState.Interrupted;
+                throw new InvalidDataException("ECU journal changed during inspection.");
+            }
             return new Result(true, expected.Count,
                 verified.OrderBy(b => b.Address).ToArray(), "", state);
         }
@@ -232,6 +246,8 @@ internal static class NativeE39SavedBlockAssessment
 
     private static byte[] ReadBoundedFile(string path, int maximumBytes)
     {
+        if ((File.GetAttributes(path) & (FileAttributes.ReparsePoint | FileAttributes.Directory)) != 0)
+            throw new InvalidDataException("Recovery evidence must be a regular, unlinked file.");
         using var source = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
         if (source.Length is < 1 || source.Length > maximumBytes)
             throw new InvalidDataException("Recovery evidence file exceeds supported bounds.");
