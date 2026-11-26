@@ -14,6 +14,15 @@ class ElmJ1979LegacyMutationTest {
             .joinToString(" ",transform=ElmLegacyResponseFrames::hex)
     }
 
+    @Test fun fixedProtocolMustNotAcceptAutomaticFallback() {
+        for (p in 1..5) {
+            assertEquals(p, ElmLegacyResponseFrames.fixedProtocol("ATDPN\r$p\r>"))
+            assertNull(ElmLegacyResponseFrames.fixedProtocol("A$p"))
+        }
+        for (raw in listOf("6","2\r3","2\rERROR","NO DATA"))
+            assertNull(ElmLegacyResponseFrames.fixedProtocol(raw))
+    }
+
     @Test fun checksumAndSourceAreRequiredForAllFiveProtocols() {
         assertEquals(0x4B,ElmLegacyResponseFrames.checksum(2,"123456789".map(Char::code)))
         for (p in 1..5) {
