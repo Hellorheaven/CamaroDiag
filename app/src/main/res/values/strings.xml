@@ -1286,4 +1286,5 @@
     <string name="obd_mode08_inventory">Mode 08 — advertised control tests</string>
     <string name="obd_mode08_partial">Control test inventory incomplete or unavailable.</string>
     <string name="obd_mode08_no_execution">No control test executed.</string>
+    <string name="msg_dtc_clear_stationary_required">Stop the vehicle and engine. Fresh zero speed and engine RPM readings are required before clearing DTCs.</string>
 </resources>
