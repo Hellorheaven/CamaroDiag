@@ -1094,7 +1094,12 @@ class Obd2FeatureEngine(
             0x2F -> "Fuel tank level" to (percent(a) to "%")
             0x30 -> "Warm-ups since DTC clear" to (a.toDouble() to "count")
             0x31 -> "Distance since DTC clear" to ((word() ?: return emptyList()).toDouble() to "km")
-            0x32 -> "Evaporative system vapour pressure" to (((word() ?: return emptyList()) - 32768) / 4.0 to "Pa")
+            0x32 -> {
+                // SAE J1979 table B23: signed 16-bit, 0.25 Pa per bit.
+                // 0000 = zero; 8000 = -8192 Pa, not a biased unsigned zero.
+                if (data.size != 2) return emptyList()
+                "Evaporative system vapour pressure" to ((word() ?: return emptyList()).toShort().toDouble() / 4.0 to "Pa")
+            }
             0x33 -> "Barometric pressure" to (a.toDouble() to "kPa")
             0x3C, 0x3D, 0x3E, 0x3F -> {
                 val sensor = when (pid) {

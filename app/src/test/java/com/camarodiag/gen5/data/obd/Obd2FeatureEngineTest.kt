@@ -662,15 +662,24 @@ class Obd2FeatureEngineTest {
     }
 
     @Test
-    fun decodesZeroEvaporativeVapourPressureAtTheStandardOffset() = runBlocking {
-        val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
-            if (command == "0132") "4132 8000" else "NO DATA"
-        })
-
-        val value = engine.readLiveData(setOf(0x32)).single()
-
-        assertEquals("0.00", value.value)
-        assertEquals("Pa", value.unit)
+    fun decodesSignedEvaporativeVapourPressureWithoutUnsignedBias() = runBlocking {
+        for ((raw, expected) in listOf(
+            "0000" to "0.00", "0004" to "1.00", "FFFC" to "-1.00",
+            "8000" to "-8192.00", "7FFF" to "8191.75"
+        )) {
+            val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+                if (command == "0132") "4132 $raw" else "NO DATA"
+            })
+            val value = engine.readLiveData(setOf(0x32)).single()
+            assertEquals(expected, value.value)
+            assertEquals("Pa", value.unit)
+        }
+        for (raw in listOf("80", "800000")) {
+            val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+                if (command == "0132") "4132 $raw" else "NO DATA"
+            })
+            assertTrue(engine.readLiveData(setOf(0x32)).isEmpty())
+        }
     }
 
     @Test

@@ -64,6 +64,28 @@ class J2534StandardObdTest {
             J2534StandardObd.pidData(0x0C,bytes(0x41,0x0D,0))
         }
     }
+    @Test fun knownMeasurementWidthsAndFinalPageAreStrict() {
+        val one = listOf(0x13, 0x1D, 0x2C, 0x2D, 0x2E, 0x2F, 0x30, 0x33, 0x5A, 0x5C, 0x61, 0x62)
+        val two = listOf(0x21, 0x22, 0x23, 0x31, 0x32, 0x3C, 0x3D, 0x3E, 0x3F,
+            0x4D, 0x4E, 0x53, 0x54, 0x59, 0x5D, 0x5E, 0x63)
+        for ((width, pids) in listOf(1 to one, 2 to two, 4 to listOf(0xA6))) {
+            for (pid in pids) {
+                val valid = bytes(0x41, pid) + ByteArray(width)
+                assertEquals(width, J2534StandardObd.pidData(pid, valid).size)
+                assertThrows(IllegalArgumentException::class.java) {
+                    J2534StandardObd.pidData(pid, valid.copyOf(valid.size - 1))
+                }
+                assertThrows(IllegalArgumentException::class.java) {
+                    J2534StandardObd.pidData(pid, valid + byteArrayOf(0))
+                }
+            }
+        }
+        assertEquals(setOf(225) to false, J2534StandardObd.supportPage(0xE0, bytes(0x41, 0xE0, 0x80, 0, 0, 0)))
+        assertThrows(IllegalArgumentException::class.java) {
+            J2534StandardObd.supportPage(0xE0, bytes(0x41, 0xE0, 0, 0, 0, 1))
+        }
+    }
+
     @Test fun onlyExplicitUnsupportedNrcMayBeIdentifiedAsSuch() {
         assertTrue(J2534StandardObd.isExplicitlyUnsupported(7,bytes(0x7F,7,0x11)))
         assertFalse(J2534StandardObd.isExplicitlyUnsupported(7,bytes(0x7F,7,0x22)))

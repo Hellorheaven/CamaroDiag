@@ -2372,3 +2372,7 @@ Inspection bornée des entrées, ouverture NOFOLLOW, identité du répertoire et
 
 ### C6 — Cohérence des preuves Windows
 Rapport composite journal/secteurs/manifeste, avec empreinte de journal et contrôle de stabilité, séquence invalide refusée hors marqueur RecoveryRequired conservé. Le rapprochement BIN relit chaque enveloppe avec son empreinte issue d'un seul snapshot et revalide l'ensemble avant restitution, sans rescanner tous les secteurs pour chaque secteur. Tests écrits non exécutés.
+
+
+### SAE J1979 — Cohérence du décodage ELM/J2534
+Le PID 32 est signé sur 16 bits à 0,25 Pa/bit (SAE J1979 APR2002, tableau B23), sans biais de 32768. Contrôle exact des longueurs des PIDs connus côté J2534, rejet du bit de continuation à la page E0. Cas limites et réponses tronquées/surnuméraires ajoutés aux tests non exécutés.
