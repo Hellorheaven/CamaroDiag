@@ -44,10 +44,10 @@ internal static class DoIpVinReader
             throw new ArgumentException("Invalid ECU inventory targets or gateway identity.");
         options?.Validate(timeout);
         var rows = new List<InventoryEntry>();
+        await DoIpVehicleDiscovery.RequireCurrentIdentityAsync(gateway, timeout, token, udpTrace);
         foreach (var ecu in frozen)
         {
             token.ThrowIfCancellationRequested();
-            await DoIpVehicleDiscovery.RequireCurrentIdentityAsync(gateway, timeout, token, udpTrace);
             try
             {
                 InventoryEntry verified;
