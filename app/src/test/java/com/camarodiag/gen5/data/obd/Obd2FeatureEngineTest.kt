@@ -234,6 +234,8 @@ class Obd2FeatureEngineTest {
                     "0113" -> "411301"
                     "050001" -> "45000180000000"
                     "050101" -> "4501015A"
+                    "0600" -> if (protocol == "A3") "4600FF80000000" else "460080000000"
+                    "0601" -> if (protocol == "A3") "46018400100000" else "460101240064000000C8"
                     else -> "NO DATA"
                 }
             })
@@ -244,7 +246,8 @@ class Obd2FeatureEngineTest {
         assertTrue(legacy.mode05?.hasTestResults == true)
         assertTrue(legacy.mode05?.complete == true)
         assertTrue(legacyCommands.containsAll(listOf("050001", "050101")))
-        assertFalse(legacyCommands.any { it.startsWith("06") })
+        assertTrue("0600" in legacyCommands)
+        assertTrue(legacy.monitorTestRaw?.contains("CID=04 LIMIT_TYPE=MIN") == true)
         val (can, canCommands) = scan("A6")
         assertNull(can.mode05)
         assertFalse(canCommands.any { it.startsWith("05") })
