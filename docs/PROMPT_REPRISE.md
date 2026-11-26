@@ -1,3 +1,7 @@
+## C6 — contrôle de fraîcheur des sources SAF après inspection (26/11/2026)
+
+- Android : l'inspection des preuves de récupération relit à nouveau les documents originaux SAF et leur inventaire après l'inspection du cache, avant d'accepter le rapport. Le même vérificateur SHA-256 borné est utilisé pour les lectures source/cache ; annulation, taille erronée ou changement des octets refusés. Contrôle final du cache conservé ; aucune écriture ECU et aucune prétention de snapshot atomique. Régressions sur modification de même taille, troncature, ajout et annulation écrites, non exécutées. Coût : une passe source supplémentaire au maximum borné existant. C6/J1979 ouverts, aucune CI, fusion ou Release.
+
 ## J1979 — cohérence des verdicts legacy Windows et Python (26/11/2026)
 
 - Windows et Python : alignement sur Android, absence de relecture Mode 07 après ACK et Mode 03 propre = ACKNOWLEDGED_PARTIAL / PENDING_READBACK_UNAVAILABLE. Un DTC confirmé ou en attente encore présent conserve DTCS_STILL_PRESENT. CLI Windows : code 0 uniquement pour la relecture complète propre ou l'ACK de préparation EVAP explicitement limité à cette opération ; motif affiché. Aucun réessai ajouté.

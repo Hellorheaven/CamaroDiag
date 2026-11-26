@@ -59,6 +59,25 @@ class PhysicalRecoveryFolderTest {
         }
     }
 
+    @Test fun repeatedSourceVerificationRejectsSameLengthChangesAndTruncation() {
+        val original = byteArrayOf(1, 2, 3, 4)
+        val hash = java.security.MessageDigest.getInstance("SHA-256").digest(original)
+        fun verify(bytes: ByteArray) = PhysicalRecoveryFolder.verifyBytes(
+            bytes.inputStream(), original.size.toLong(), hash) {}
+        verify(original)
+        for (changed in listOf(byteArrayOf(1, 2, 3, 5), byteArrayOf(1, 2, 3),
+            byteArrayOf(1, 2, 3, 4, 5))) {
+            assertThrows(IllegalStateException::class.java) { verify(changed) }
+        }
+        verify(original)
+        var checks = 0
+        assertThrows(java.util.concurrent.CancellationException::class.java) {
+            PhysicalRecoveryFolder.verifyBytes(original.inputStream(), original.size.toLong(), hash) {
+                if (++checks == 2) throw java.util.concurrent.CancellationException()
+            }
+        }
+    }
+
     @Test fun stagingCannotVerifyThroughSymbolicLink() {
         val folder = java.nio.file.Files.createTempDirectory("recovery-test")
         val outside = java.nio.file.Files.createTempFile("original", ".block")

@@ -44,30 +44,36 @@ internal object PhysicalRecoveryFolder {
                 it.size == it.distinct().size
             }
 
+    internal fun verifyBytes(input: java.io.InputStream, expectedSize: Long,
+        expectedHash: ByteArray, active: () -> Unit) {
+        active()
+        check(expectedSize > 0 && expectedHash.size == 32)
+        val digest = MessageDigest.getInstance("SHA-256")
+        var count = 0L
+        val buffer = ByteArray(8192)
+        while (true) {
+            active()
+            val n = input.read(buffer)
+            if (n < 0) break
+            check(n > 0)
+            count += n
+            check(count <= expectedSize)
+            digest.update(buffer, 0, n)
+        }
+        check(count == expectedSize && MessageDigest.isEqual(expectedHash, digest.digest())) {
+            "Recovery evidence bytes changed."
+        }
+        active()
+    }
+
     internal fun verifyStagedFile(file: File, expectedSize: Long, expectedHash: ByteArray,
         active: () -> Unit) {
         active()
-        check(expectedSize > 0 && expectedHash.size == 32 &&
-            Files.isRegularFile(file.toPath(), java.nio.file.LinkOption.NOFOLLOW_LINKS))
-        val digest = MessageDigest.getInstance("SHA-256")
-        var count = 0L
+        check(Files.isRegularFile(file.toPath(), java.nio.file.LinkOption.NOFOLLOW_LINKS))
         // The open itself must refuse symlinks, not only the preceding check.
         Files.newInputStream(file.toPath(), java.nio.file.LinkOption.NOFOLLOW_LINKS).use { input ->
-            val buffer = ByteArray(8192)
-            while (true) {
-                active()
-                val n = input.read(buffer)
-                if (n < 0) break
-                check(n > 0)
-                count += n
-                check(count <= expectedSize)
-                digest.update(buffer, 0, n)
-            }
+            verifyBytes(input, expectedSize, expectedHash, active)
         }
-        check(count == expectedSize && MessageDigest.isEqual(expectedHash, digest.digest())) {
-            "Recovery staging bytes changed."
-        }
-        active()
     }
 
     suspend fun inspect(
@@ -138,23 +144,10 @@ internal object PhysicalRecoveryFolder {
             // their bytes before accepting the copied evidence.
             fun verifySource(entry: Entry, max: Long) {
                 val uri = DocumentsContract.buildDocumentUriUsingTree(tree, entry.id)
-                val digest = MessageDigest.getInstance("SHA-256")
                 val (originalSize, originalHash) = digests.getValue(entry)
-                var count = 0L
+                check(originalSize in 1..max)
                 requireNotNull(resolver.openInputStream(uri)).use { input ->
-                    val buffer = ByteArray(8192)
-                    while (true) {
-                        active()
-                        val n = input.read(buffer)
-                        if (n < 0) break
-                        check(n > 0)
-                        count += n
-                        check(count <= max && count <= originalSize)
-                        digest.update(buffer, 0, n)
-                    }
-                }
-                check(count == originalSize && MessageDigest.isEqual(originalHash, digest.digest())) {
-                    "Recovery source changed during import."
+                    verifyBytes(input, originalSize, originalHash, ::active)
                 }
             }
             val journalFile = File(staging, name)
@@ -162,15 +155,18 @@ internal object PhysicalRecoveryFolder {
             check(blockDir.mkdir())
             copy(journal, journalFile, MAX_JOURNAL)
             files.forEach { copy(it, File(blockDir, it.name), MAX_BLOCK) }
-            active()
-            check(sameInventory(root, children(rootId)) && sameInventory(files, children(blocks.id))) {
-                "Recovery source inventory changed during import."
+            fun verifySourceTree() {
+                active()
+                check(sameInventory(root, children(rootId)) && sameInventory(files, children(blocks.id))) {
+                    "Recovery source inventory changed before verification."
+                }
+                files.forEach { verifySource(it, MAX_BLOCK) }
+                verifySource(journal, MAX_JOURNAL)
+                check(sameInventory(root, children(rootId)) && sameInventory(files, children(blocks.id))) {
+                    "Recovery source inventory changed during verification."
+                }
             }
-            files.forEach { verifySource(it, MAX_BLOCK) }
-            verifySource(journal, MAX_JOURNAL)
-            check(sameInventory(root, children(rootId)) && sameInventory(files, children(blocks.id))) {
-                "Recovery source inventory changed during verification."
-            }
+            verifySourceTree()
             fun verifyStaging() {
                 active()
                 check(Files.isDirectory(staging.toPath(), java.nio.file.LinkOption.NOFOLLOW_LINKS))
@@ -184,6 +180,11 @@ internal object PhysicalRecoveryFolder {
             }
             verifyStaging()
             val result = EcuWriteTransaction.inspectRecoveryEvidence(journalFile, identity.target(), identity.vin, ::active)
+            // The provider may have changed the original documents while the
+            // staged evidence was being inspected. Refuse a stale report.
+            // These bounded independent passes detect observed changes; SAF
+            // still does not provide an atomic or authenticated snapshot.
+            verifySourceTree()
             verifyStaging()
             active()
             return result
