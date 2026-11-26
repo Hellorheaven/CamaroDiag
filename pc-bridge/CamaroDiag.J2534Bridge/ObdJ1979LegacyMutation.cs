@@ -14,7 +14,10 @@ internal static class ObdJ1979LegacyMutation
         IReadOnlyDictionary<string,string> Acknowledgments,
         IReadOnlyDictionary<string,string[]?> BeforeConfirmed,
         IReadOnlyDictionary<string,string[]?> AfterConfirmed,
-        IReadOnlyList<Observation> Observations, bool WholeVehicleCoverageVerified = false);
+        IReadOnlyDictionary<string,Dictionary<string,string[]?>> BeforeDtcs,
+        IReadOnlyDictionary<string,Dictionary<string,string[]?>> AfterDtcs,
+        IReadOnlyList<Observation> Observations, bool WholeVehicleCoverageVerified = false,
+        bool LeakTestPerformed = false);
 
     internal static Result Run(Operation operation, string expectedVin, byte engineSource,
         IReadOnlyCollection<byte> documentedSources, bool warningAcknowledged, bool confirmedYes,
@@ -33,11 +36,19 @@ internal static class ObdJ1979LegacyMutation
         var acknowledgments = expected.Order().ToDictionary(Key, _ => "NOT_TESTED");
         var before = expected.Order().ToDictionary(Key, _ => (string[]?)null);
         var after = expected.Order().ToDictionary(Key, _ => (string[]?)null);
+        var beforeModes = expected.Order().ToDictionary(Key, _ => new Dictionary<string,string[]?>
+            { ["03"]=null, ["07"]=null, ["0A"]=null });
+        var afterModes = expected.Order().ToDictionary(Key, _ => new Dictionary<string,string[]?>
+            { ["03"]=null, ["07"]=null, ["0A"]=null });
         var observations = new List<Observation>();
         bool attempted = false, completeAck = false;
         string? vin = null;
         Result Finish(string outcome, string? reason = null) => new(outcome, reason, vin, attempted,
-            expected.Order().Select(Key).ToArray(), acknowledgments, before, after, observations.ToArray());
+            expected.Order().Select(Key).ToArray(), new Dictionary<string,string>(acknowledgments),
+            new Dictionary<string,string[]?>(before), new Dictionary<string,string[]?>(after),
+            beforeModes.ToDictionary(p=>p.Key,p=>new Dictionary<string,string[]?>(p.Value)),
+            afterModes.ToDictionary(p=>p.Key,p=>new Dictionary<string,string[]?>(p.Value)),
+            observations.ToArray());
 
         byte[][] For(ObdLegacyJ2534Transport.Exchange x, byte source) =>
             x.Replies.Where(p => p.Source == source).Select(p => p.Payload).ToArray();
@@ -65,18 +76,22 @@ internal static class ObdJ1979LegacyMutation
                 return rows.Length == 1 && rows[0].Length == 6 && rows[0][0] == 0x41 && rows[0][1] == 0;
             });
         }
-        void Snapshot(string stage, Dictionary<string,string[]?> target)
+        void Snapshot(string stage, Dictionary<string,string[]?> target,
+            Dictionary<string,Dictionary<string,string[]?>> allModes)
         {
             foreach (byte mode in new byte[] { 3, 7, 10 })
             {
                 var x = Query(stage,[mode]);
-                if (mode != 3) continue;
                 foreach (byte s in expected)
                 {
                     var rows = For(x,s);
-                    if (rows.Length > 0 && rows.All(r => r.Length == 7 && r[0] == 0x43))
-                        target[Key(s)] = rows.SelectMany(r => ObdJ1979Dtc.DecodePairs(r.AsSpan(1)))
+                    if (rows.Length > 0 && rows.All(r => r.Length == 7 && r[0] == mode + 0x40))
+                    {
+                        var codes = rows.SelectMany(r => ObdJ1979Dtc.DecodePairs(r.AsSpan(1)))
                             .Select(c => c.Display).Distinct().ToArray();
+                        allModes[Key(s)][mode.ToString("X2")] = codes;
+                        if (mode == 3) target[Key(s)] = codes;
+                    }
                 }
             }
             Query(stage,[1,1]);
@@ -113,7 +128,7 @@ internal static class ObdJ1979LegacyMutation
             var ackSources = expected.ToHashSet();
             if (operation == Operation.Clear)
             {
-                Snapshot("BEFORE",before);
+                Snapshot("BEFORE",before,beforeModes);
                 // Some legacy ECUs may stay silent when no DTC is stored.
                 // For an optional mutating test we refuse that ambiguity.
                 if (before.Values.Any(x => x is null)) return Finish("NOT_TESTED","BASELINE_UNVERIFIED");
@@ -161,16 +176,19 @@ internal static class ObdJ1979LegacyMutation
                 ackSources.All(s => acknowledgments[Key(s)] == "ACKNOWLEDGED");
             if (operation == Operation.Clear)
             {
-                Snapshot("AFTER",after);
+                Snapshot("AFTER",after,afterModes);
                 if (completeAck && after.Values.All(x => x is not null))
-                    return Finish("ACKNOWLEDGED_READBACK",after.Values.Any(x => x!.Length > 0) ? "DTCS_STILL_PRESENT" : null);
+                    return Finish("ACKNOWLEDGED_READBACK",
+                        afterModes.Values.Any(m => m["03"]!.Length > 0 || m["07"] is { Length: > 0 })
+                            ? "DTCS_STILL_PRESENT" :
+                        afterModes.Values.Any(m => m["07"] is null) ? "PENDING_READBACK_UNAVAILABLE" : null);
             }
             else if (completeAck) return Finish("ACKNOWLEDGED","LEAK_TEST_NOT_PERFORMED");
             return Finish(completeAck ? "ACKNOWLEDGED_PARTIAL" : "UNCERTAIN",
                 "MISSING_OR_CONFLICTING_EVIDENCE");
         }
         catch (Exception error) when (error is IOException or InvalidDataException or TimeoutException or
-            OperationCanceledException or InvalidOperationException)
+            OperationCanceledException or InvalidOperationException or UnauthorizedAccessException)
         {
             return Finish(completeAck ? "ACKNOWLEDGED_PARTIAL" :
                 attempted ? "UNCERTAIN" : "NOT_TESTED",error.GetType().Name);
