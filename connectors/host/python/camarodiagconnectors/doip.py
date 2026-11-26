@@ -673,7 +673,8 @@ def inventory_ecus(gateway: Gateway, expected: str, tester: int, targets: tuple[
                    context: ssl.SSLContext | None = None, p2: float | None = None,
                    p2_star: float | None = None, routing_type: int = 0,
                    routing_oem_data: bytes | None = None, obd: bool = False,
-                   target_trace: InventoryTrace | None = None) -> dict:
+                   target_trace: InventoryTrace | None = None,
+                   on_progress: Callable[[list[dict], int], None] | None = None) -> dict:
     """Identify explicit ECU addresses independently using the requested diagnostic operation."""
     if type(obd) is not bool:
         raise DoIpError("Invalid ECU inventory identification mode")
@@ -735,10 +736,17 @@ def inventory_ecus(gateway: Gateway, expected: str, tester: int, targets: tuple[
             rows.append({"ecu": f"{ecu:04X}", "status": "unverified",
                          "reason": "uds_negative_response", "failure_code": error.code,
                          "nrc": error.code, "requested_service": error.service})
+        except (TimeoutError, socket.timeout):
+            rows.append({"ecu": f"{ecu:04X}", "status": "unverified", "reason": "timeout"})
         except (DoIpError, OSError, EOFError):
             rows.append({"ecu": f"{ecu:04X}", "status": "unverified",
                          "reason": "communication_or_identity_failure"})
-    require_gateway(trace)
+        # Closing the routed socket and verifying the *same* gateway are
+        # prerequisites to exposing this row. The sink is never invoked for
+        # an uncertain target or a substituted gateway.
+        require_gateway(sink)
+        if on_progress is not None:
+            on_progress([dict(row) for row in rows], len(targets))
     return {"vin": expected, "complete": True, "targets": rows,
             "identification": "F802/F810" if obd else "F190",
             "verified_count": sum(row["status"] == "vin_verified" for row in rows),
