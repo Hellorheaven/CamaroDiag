@@ -57,6 +57,9 @@ int main(){
   assert(done.end==C::End::Complete&&done.transportObserved);
   assert(done.steps==sink.count&&done.steps==f.requests.size());
   assert(done.positive==8&&done.negative==3);
+  assert(done.pidInventoryComplete&&done.freezeTriggerObserved&&!done.freezeFramePresent);
+  assert(!done.freezeInventoryComplete&&done.monitorInventoryComplete&&
+         done.controlInventoryComplete&&done.identityInventoryComplete);
   assert(f.requests.front()==std::vector<uint8_t>({1,0}));
   assert(f.requests[1]==std::vector<uint8_t>({9,2}));
   Fake budget;Sink b;
