@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using System.Globalization;
 using System.IO.Compression;
 using System.Net;
@@ -153,6 +154,70 @@ internal static class DoIpScopedBackup
 
     internal sealed record Verification(DoIpBackupScope Scope, string Sha256, DateTimeOffset CapturedAtUtc);
 
+    // .NET 8 ZipArchive does not independently verify CRC on decompression.
+    // Inspect the bounded classic ZIP directory and use its CRCs during reads.
+    private static Dictionary<string, uint> VerifyDirectory(FileStream file)
+    {
+        var size = file.Length;
+        if (size < 22 || size > 2L * NativeScopedMemoryReader.MaximumUiCaptureBytes + 1024 * 1024)
+            throw new InvalidDataException("Invalid DoIP ZIP length.");
+        var tail = new byte[(int)Math.Min(size, 65557)];
+        file.Position = size - tail.Length;
+        file.ReadExactly(tail);
+        var end = -1;
+        for (var i = tail.Length - 22; i >= 0; --i)
+            if (BinaryPrimitives.ReadUInt32LittleEndian(tail.AsSpan(i)) == 0x06054B50 &&
+                i + 22 + BinaryPrimitives.ReadUInt16LittleEndian(tail.AsSpan(i + 20)) == tail.Length)
+            { end = i; break; }
+        if (end < 0) throw new InvalidDataException("Incomplete DoIP ZIP footer.");
+        ushort U16(int offset) => BinaryPrimitives.ReadUInt16LittleEndian(tail.AsSpan(end + offset));
+        uint U32(int offset) => BinaryPrimitives.ReadUInt32LittleEndian(tail.AsSpan(end + offset));
+        var start = U32(16);
+        if (U16(4) != 0 || U16(6) != 0 || U16(8) != 3 || U16(10) != 3 ||
+            (long)start + U32(12) != size - tail.Length + end)
+            throw new InvalidDataException("Invalid DoIP ZIP directory.");
+        var result = new Dictionary<string, uint>(StringComparer.Ordinal);
+        var offsets = new HashSet<uint>();
+        file.Position = start;
+        for (var i = 0; i < 3; i++)
+        {
+            var header = new byte[46];
+            file.ReadExactly(header);
+            ushort H16(int offset) => BinaryPrimitives.ReadUInt16LittleEndian(header.AsSpan(offset));
+            uint H32(int offset) => BinaryPrimitives.ReadUInt32LittleEndian(header.AsSpan(offset));
+            var nameLength = H16(28);
+            var local = H32(42);
+            if (H32(0) != 0x02014B50 || (H16(8) & 1) != 0 || H16(10) is not (0 or 8) ||
+                H16(34) != 0 || nameLength is < 1 or > 128 ||
+                (long)local + 30 > start || !offsets.Add(local) ||
+                file.Position + nameLength + H16(30) + H16(32) > size - tail.Length + end)
+                throw new InvalidDataException("Invalid DoIP ZIP entry metadata.");
+            var nameBytes = new byte[nameLength];
+            file.ReadExactly(nameBytes);
+            var name = System.Text.Encoding.ASCII.GetString(nameBytes);
+            if (nameBytes.Any(value => value > 127) ||
+                name is not ("manifest.json" or "original.bin" or "verification.bin") ||
+                !result.TryAdd(name, H32(16)))
+                throw new InvalidDataException("Unexpected DoIP ZIP entry.");
+            file.Position += H16(30) + H16(32);
+        }
+        if (file.Position != size - tail.Length + end || !offsets.Contains(0))
+            throw new InvalidDataException("Inconsistent DoIP ZIP directory.");
+        file.Position = 0;
+        return result;
+    }
+
+    private static uint UpdateCrc(uint crc, ReadOnlySpan<byte> bytes)
+    {
+        foreach (var value in bytes)
+        {
+            crc ^= value;
+            for (var bit = 0; bit < 8; bit++)
+                crc = (crc & 1) != 0 ? (crc >> 1) ^ 0xEDB88320U : crc >> 1;
+        }
+        return crc;
+    }
+
     internal static Verification VerifyZip(string path, DoIpBackupScope expected, CancellationToken token)
     {
         expected.Validate();
@@ -160,6 +225,7 @@ internal static class DoIpScopedBackup
         if (new FileInfo(path).Length > 2L * NativeScopedMemoryReader.MaximumUiCaptureBytes + 1024 * 1024)
             throw new InvalidDataException("Oversized DoIP backup.");
         using var file = File.OpenRead(path);
+        var crcByName = VerifyDirectory(file);
         using var zip = new ZipArchive(file, ZipArchiveMode.Read);
         if (zip.Entries.Count != 3 || !zip.Entries.Select(e => e.FullName)
             .OrderBy(n => n, StringComparer.Ordinal).SequenceEqual(
@@ -174,7 +240,8 @@ internal static class DoIpScopedBackup
             var data = new byte[checked((int)entry.Length)];
             using var stream = entry.Open();
             stream.ReadExactly(data);
-            if (stream.ReadByte() != -1) throw new InvalidDataException(name);
+            if (stream.ReadByte() != -1 || ~UpdateCrc(uint.MaxValue, data) != crcByName[name])
+                throw new InvalidDataException("DoIP ZIP entry checksum differs: " + name);
             return data;
         }
         using var manifest = JsonDocument.Parse(ReadEntry("manifest.json", 16384));
@@ -194,24 +261,51 @@ internal static class DoIpScopedBackup
         foreach (var field in stored.EnumerateObject())
         {
             if (!scopeFields.Remove(field.Name) || !canonical.TryGetProperty(field.Name, out var value) ||
-                field.Value.GetRawText() != value.GetRawText())
+                field.Value.ValueKind != value.ValueKind ||
+                (value.ValueKind == JsonValueKind.String
+                    ? field.Value.GetString() != value.GetString()
+                    : field.Value.GetRawText() != value.GetRawText()))
                 throw new InvalidDataException("DoIP backup scope differs from the selected profile.");
         }
         if (scopeFields.Count != 0) throw new InvalidDataException("Incomplete DoIP scope.");
-        var first = ReadEntry("original.bin", expected.Length, expected.Length);
-        var second = ReadEntry("verification.bin", expected.Length, expected.Length);
-        var hash = Convert.ToHexString(SHA256.HashData(first));
-        if (!CryptographicOperations.FixedTimeEquals(first, second) ||
+        var first = zip.GetEntry("original.bin")!;
+        var second = zip.GetEntry("verification.bin")!;
+        if (first.Length != expected.Length || second.Length != expected.Length)
+            throw new InvalidDataException("Unexpected DoIP region size.");
+        using var left = first.Open();
+        using var right = second.Open();
+        using var digest = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        var leftBytes = new byte[65536];
+        var rightBytes = new byte[65536];
+        var crc = uint.MaxValue;
+        for (var remaining = expected.Length; remaining > 0;)
+        {
+            token.ThrowIfCancellationRequested();
+            var count = Math.Min(remaining, leftBytes.Length);
+            left.ReadExactly(leftBytes.AsSpan(0, count));
+            right.ReadExactly(rightBytes.AsSpan(0, count));
+            if (!CryptographicOperations.FixedTimeEquals(leftBytes.AsSpan(0, count), rightBytes.AsSpan(0, count)))
+                throw new InvalidDataException("Independent DoIP memory reads differ.");
+            crc = UpdateCrc(crc, leftBytes.AsSpan(0, count));
+            digest.AppendData(leftBytes, 0, count);
+            remaining -= count;
+        }
+        var hash = Convert.ToHexString(digest.GetHashAndReset());
+        if (left.ReadByte() != -1 || right.ReadByte() != -1 ||
+            ~crc != crcByName["original.bin"] || ~crc != crcByName["verification.bin"] ||
             m.GetProperty("sha256").GetString() != hash)
-            throw new InvalidDataException("DoIP backup bytes or SHA-256 do not match.");
-        var date = m.GetProperty("capturedAtUtc").GetDateTimeOffset();
+            throw new InvalidDataException("DoIP backup bytes, CRC or SHA-256 do not match.");
+        var timestamp = m.GetProperty("capturedAtUtc");
+        if (!Regex.IsMatch(timestamp.GetString() ?? "", @"\A[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\.[0-9]{1,9})?(?:Z|[+-][0-9]{2}:[0-9]{2})\z"))
+            throw new InvalidDataException("Invalid DoIP capture timestamp.");
+        var date = timestamp.GetDateTimeOffset();
         token.ThrowIfCancellationRequested();
         return new Verification(expected, hash, date);
     }
 
     internal static void SaveNew(string destination, Capture capture, CancellationToken token)
     {
-        capture.Scope.Validate();
+        ValidateCaptureBudget(capture.Scope);
         var first = capture.First.ToArray();
         var second = capture.Second.ToArray();
         if (ReferenceEquals(capture.First, capture.Second) || first.Length != capture.Scope.Length ||
