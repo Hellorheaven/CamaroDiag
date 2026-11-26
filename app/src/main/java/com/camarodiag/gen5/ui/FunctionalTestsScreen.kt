@@ -35,6 +35,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.LaunchedEffect
 import com.camarodiag.gen5.data.obd.EcuWriteConsentFlow
+import com.camarodiag.gen5.data.obd.LegacyMutationTarget
 import com.camarodiag.gen5.domain.model.VehicleProfile
 
 @Composable
@@ -48,7 +49,9 @@ fun FunctionalTestsScreen(
     connectionGeneration: Long,
     evapAvailable: Boolean,
     onRunEvap: (EcuWriteConsentFlow.Approval, Long, VehicleProfile) -> Unit,
-    onRunClear: (EcuWriteConsentFlow.Approval, Long, VehicleProfile) -> Unit
+    onRunClear: (EcuWriteConsentFlow.Approval, Long, VehicleProfile) -> Unit,
+    legacyAvailableProtocol: Int?,
+    onRunLegacy: (LegacyMutationTarget, EcuWriteConsentFlow.Approval, Long, VehicleProfile) -> Unit
 ) {
     var selected by remember { mutableStateOf(FunctionalProtocol.J1979) }
     var expanded by remember { mutableStateOf(false) }
@@ -62,6 +65,56 @@ fun FunctionalTestsScreen(
     var evapPending by remember { mutableStateOf<Pair<Long, VehicleProfile>?>(null) }
     var evapStep by remember { mutableStateOf(EcuWriteConsentFlow.Step.WARNING) }
     var clearSelected by remember { mutableStateOf(false) }
+    var engineSource by remember { mutableStateOf("") }
+    var documentedSources by remember { mutableStateOf("") }
+    var legacyProfileConfirmed by remember { mutableStateOf(false) }
+    var legacyPending by remember { mutableStateOf<Triple<Long, VehicleProfile, LegacyMutationTarget>?>(null) }
+    var legacyStep by remember { mutableStateOf(EcuWriteConsentFlow.Step.WARNING) }
+    LaunchedEffect(vehicle, connectionGeneration, legacyAvailableProtocol, selected) {
+        legacyPending = null
+        legacyProfileConfirmed = false
+        engineSource = ""
+        documentedSources = ""
+        legacyStep = EcuWriteConsentFlow.Step.WARNING
+    }
+    fun parseSource(value: String): Int? =
+        value.trim().takeIf { it.matches(Regex("[0-9A-Fa-f]{2}")) }?.toIntOrNull(16)
+    val legacyProtocol = selected.expectedLegacyElmProtocol
+    val parsedEngine = parseSource(engineSource)
+    val parsedSources = documentedSources.split(",").map(::parseSource)
+    val legacyTarget = if (legacyProtocol != null && parsedEngine != null && parsedSources.all { it != null })
+        LegacyMutationTarget(legacyProtocol,parsedEngine,parsedSources.filterNotNull(),true) else null
+    val legacyReady = legacyAvailableProtocol == legacyProtocol && legacyTarget?.valid == true &&
+        legacyProfileConfirmed && !state.running && vehicle.vin.matches(Regex("[A-HJ-NPR-Z0-9]{17}"))
+    legacyPending?.let { (epoch, profile, target) ->
+        val warning = legacyStep == EcuWriteConsentFlow.Step.WARNING
+        AlertDialog(
+            onDismissRequest = { legacyPending = null; legacyProfileConfirmed = false },
+            title = { Text(stringResource(if (target.clear) R.string.functional_clear_run else R.string.functional_evap_run)) },
+            text = { Text(if (warning) stringResource(R.string.functional_legacy_mutation_scope) + "\n\n" +
+                stringResource(if (target.clear) R.string.functional_clear_warning else R.string.functional_evap_warning)
+                else stringResource(R.string.functional_legacy_mutation_confirm,profile.vin,
+                    target.sources.joinToString(",") { "%02X".format(java.util.Locale.ROOT,it) })) },
+            confirmButton = { TextButton(onClick = {
+                if (epoch != connectionGeneration || profile != vehicle ||
+                    legacyAvailableProtocol != target.protocol || selected.expectedLegacyElmProtocol != target.protocol ||
+                    legacyTarget?.copy(clear=target.clear) != target || !legacyReady) {
+                    legacyPending = null
+                    legacyProfileConfirmed = false
+                } else if (warning) {
+                    legacyStep = EcuWriteConsentFlow.afterWarningOk(legacyStep)
+                } else {
+                    EcuWriteConsentFlow.approvalForContext(legacyStep,true,epoch,connectionGeneration,profile==vehicle)
+                        ?.let { onRunLegacy(target,it,epoch,profile) }
+                    legacyPending = null
+                    legacyProfileConfirmed = false
+                }
+            }) { Text(stringResource(if (warning) R.string.functional_evap_ok else R.string.functional_evap_yes)) } },
+            dismissButton = { TextButton(onClick = {
+                legacyPending = null
+                legacyProfileConfirmed = false
+            }) { Text(stringResource(if (warning) R.string.functional_evap_cancel else R.string.functional_evap_no)) } })
+    }
     LaunchedEffect(vehicle, connectionGeneration, evapAvailable) {
         evapPending = null
         evapConfirmedProfile = false
@@ -187,6 +240,34 @@ fun FunctionalTestsScreen(
                         Text(stringResource(R.string.functional_clear_run))
                     }
                 }
+                if (legacyProtocol != null) {
+                    Text(stringResource(R.string.functional_legacy_mutation_scope),style=MaterialTheme.typography.bodySmall)
+                    OutlinedTextField(engineSource,{ engineSource=it.uppercase().take(2);legacyProfileConfirmed=false },
+                        label={ Text(stringResource(R.string.functional_legacy_engine_source)) },
+                        singleLine=true,enabled=!state.running,modifier=Modifier.fillMaxWidth())
+                    OutlinedTextField(documentedSources,{ documentedSources=it.uppercase().take(127);legacyProfileConfirmed=false },
+                        label={ Text(stringResource(R.string.functional_legacy_documented_sources)) },
+                        singleLine=true,enabled=!state.running,modifier=Modifier.fillMaxWidth())
+                    Row(verticalAlignment=Alignment.CenterVertically) {
+                        Checkbox(legacyProfileConfirmed,{legacyProfileConfirmed=it},
+                            enabled=legacyAvailableProtocol==legacyProtocol && !state.running)
+                        Text(stringResource(R.string.functional_legacy_mutation_profile,vehicle.vin))
+                    }
+                    OutlinedButton(onClick={
+                        legacyTarget?.let {
+                            legacyStep=EcuWriteConsentFlow.Step.WARNING
+                            legacyPending=Triple(connectionGeneration,vehicle,it.copy(clear=true))
+                        }
+                    },enabled=legacyReady,modifier=Modifier.fillMaxWidth()) { Text(stringResource(R.string.functional_clear_run)) }
+                    OutlinedButton(onClick={
+                        legacyTarget?.let {
+                            legacyStep=EcuWriteConsentFlow.Step.WARNING
+                            legacyPending=Triple(connectionGeneration,vehicle,it.copy(clear=false))
+                        }
+                    },enabled=legacyReady,modifier=Modifier.fillMaxWidth()) { Text(stringResource(R.string.functional_evap_run)) }
+                }
+                state.legacyTarget?.let { Text(stringResource(if (it.clear) R.string.functional_clear_run else R.string.functional_evap_run)) }
+                state.legacyResult?.reason?.let { Text(it,style=MaterialTheme.typography.bodySmall) }
                 state.protocol?.let { Text(stringResource(R.string.functional_protocol_report, it.title)) }
                 if (state.evapCampaign) Text(stringResource(R.string.functional_evap_run))
                 state.evapResult?.reason?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
