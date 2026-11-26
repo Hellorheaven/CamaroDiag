@@ -1,3 +1,7 @@
+## J1979 / C6 — boîte aux lettres lecture ESP32–STM32 CI/2 (26/11/2026)
+
+- Nouveau codec fixe CI/2 distinct de CI/1 découverte, client et endpoint d'échanges applicatifs J1979 CAN physique. L'endpoint local exécute le noyau ISO-TP sur un canal qualifié fourni ; pas de CAN brut ni de mutateur. CRC, séquence, corrélation, fragments de réponse jusqu'à 4095 octets, validation indépendante de forme et verrouillage sur erreur sans réessai. Tests natifs de boucle, refus Mode04, rejeu, CRC et révocation inscrits au gate, non exécutés. Pas de SPI GPIO ni de FDCAN activé, ni authentification déduite du CRC. Restent transport SPI matériel, propriétaire STM32, raccordement USB et qualification. J1979/C6 ouverts, aucune CI, fusion ni Release.
+
 ## C6 — cohérence spatiale des sauvegardes E39 Windows (26/11/2026)
 
 - Inspection des secteurs E39_MAIN_FLASH : rejet des plages qui se chevauchent, débordent de l'image 3 Mio ou présentent une longueur invalide, même avec hashes et reçus individuels cohérents. Plages adjacentes acceptées indépendamment de l'ordre. Régressions journal/enveloppes pour chevauchement, dépassement et overflow écrites. Ce contrôle hors ligne ne prouve ni géométrie d'effacement OEM ni restauration physique. Aucun test exécuté ni CI, fusion ou Release. C6/J1979 restent ouverts.
