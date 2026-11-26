@@ -5513,6 +5513,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         else withRecordedObd { it.fullReadOnlyScan(expectedLegacy) }
                         if (current()) _functionalTestState.value =
                             FunctionalTestPlanner.j1979Results(_functionalTestState.value, report)
+                        if (expectedLegacy != null && current() &&
+                            report.negotiatedElmProtocol == expectedLegacy &&
+                            obdManager.legacyMutationProtocol == expectedLegacy) {
+                            val discovery = obdManager.discoverElmLegacySources(expectedLegacy,::current)
+                            if (current()) _functionalTestState.value =
+                                FunctionalTestPlanner.withLegacyDiscovery(_functionalTestState.value,discovery)
+                        }
                     }
                 } else if (protocol != null || !connected) {
                     if (current()) _functionalTestState.value = _functionalTestState.value.copy(
@@ -5864,6 +5871,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     .put("expectedVin", target.vin))
             }
             snapshot.obdScan?.let { json.put("obdScan", JSONObject(ObdScanJsonExport.encode(it, System.currentTimeMillis()))) }
+            snapshot.legacyDiscovery?.let { discovery ->
+                json.put("legacySourceDiscovery",JSONObject()
+                    .put("selectedProtocol",discovery.protocol)
+                    .put("observedProtocol",discovery.observedProtocol ?: JSONObject.NULL)
+                    .put("rawResponse",discovery.rawResponse)
+                    .put("rawProtocolResponse",discovery.rawProtocolResponse)
+                    .put("wholeVehicleCoverageVerified",false)
+                    .put("error",discovery.error ?: JSONObject.NULL)
+                    .put("verifiedSources",JSONArray(discovery.verifiedSources))
+                    .put("sources",JSONArray(discovery.sources.map {
+                        JSONObject().put("source",it.source).put("status",it.status)
+                            .put("supportedPidBitmap",it.supportedPidBitmap ?: JSONObject.NULL)
+                            .put("rawFrames",JSONArray(it.rawFrames))
+                    })))
+            }
             if (snapshot.evapCampaign) {
                 json.put("monitorCompletionVerified", false)
                 json.put("evap", snapshot.evapResult?.let { result ->
