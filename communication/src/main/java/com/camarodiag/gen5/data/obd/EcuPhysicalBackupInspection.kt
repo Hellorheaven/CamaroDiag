@@ -7,6 +7,7 @@ import java.nio.file.Files
 import java.nio.file.LinkOption
 import java.nio.file.attribute.BasicFileAttributes
 import java.security.MessageDigest
+import java.security.DigestInputStream
 
 /**
  * Read-only inspection of previously persisted physical ECU sector backups.
@@ -48,6 +49,46 @@ object EcuPhysicalBackupInspection {
         val attributes = Files.readAttributes(file.toPath(), BasicFileAttributes::class.java, LinkOption.NOFOLLOW_LINKS)
         check(attributes.isRegularFile && !attributes.isSymbolicLink) { "Expected a regular recovery file." }
         return FileIdentity(attributes.size(), attributes.lastModifiedTime(), attributes.creationTime(), attributes.fileKey())
+    }
+
+    // Different regions may have different address spaces. Within a region
+    // reject overlap, negative addresses and arithmetic overflow without
+    // inventing OEM erase geometry or assuming a universal memory map.
+    internal fun validateRanges(sectors: List<Sector>) {
+        check(sectors.isNotEmpty()) { "No original ECU sector ranges." }
+        for (group in sectors.groupBy { it.region }.values) {
+            var previousEnd = 0L
+            for (sector in group.sortedBy { it.address }) {
+                check(sector.address >= previousEnd && sector.length > 0 &&
+                    sector.address <= Long.MAX_VALUE - sector.length) {
+                    "Original ECU sector ranges overlap or exceed address bounds."
+                }
+                previousEnd = sector.address + sector.length
+            }
+        }
+    }
+
+    private fun envelopeDigest(file: File, expected: FileIdentity, checkActive: () -> Unit): ByteArray {
+        checkActive()
+        check(identity(file) == expected && expected.size in 1L..MAX_BLOCK_FILE_BYTES) {
+            "Saved sector changed during inspection."
+        }
+        val digest = MessageDigest.getInstance("SHA-256")
+        val buffer = ByteArray(8192)
+        DataInputStream(file.inputStream().buffered()).use { input ->
+            var remaining = expected.size
+            while (remaining > 0) {
+                checkActive()
+                val count = minOf(remaining, buffer.size.toLong()).toInt()
+                input.readFully(buffer, 0, count)
+                digest.update(buffer, 0, count)
+                remaining -= count
+            }
+            check(input.read() == -1 && identity(file) == expected) {
+                "Saved sector changed during inspection."
+            }
+        }
+        return digest.digest()
     }
 
     fun inspect(
@@ -113,6 +154,7 @@ object EcuPhysicalBackupInspection {
             }
             val fileIdentities = files.associate { it.name to identity(it) }
             val observed = hashSetOf<Pair<EcuBackupCoverage.Region, Long>>()
+            val envelopeHashes = linkedMapOf<String, ByteArray>()
             for (file in files) {
                 current = null
                 checkActive()
@@ -120,7 +162,8 @@ object EcuPhysicalBackupInspection {
                 check(identity(file) == originalIdentity && originalIdentity.size in 1L..MAX_BLOCK_FILE_BYTES) {
                     "Saved physical ECU block exceeds the supported size."
                 }
-                DataInputStream(file.inputStream().buffered()).use { input ->
+                val envelopeHash = MessageDigest.getInstance("SHA-256")
+                DataInputStream(DigestInputStream(file.inputStream().buffered(), envelopeHash)).use { input ->
                     check(input.readUTF() == "CAMARODIAG-PHYSICAL-BLOCK-V1") {
                         "Unknown original ECU sector file schema."
                     }
@@ -135,7 +178,8 @@ object EcuPhysicalBackupInspection {
                     val size = input.readLong()
                     val originalHash = input.readUTF()
                     val byteLength = input.readInt()
-                    check(size in 1L..MAX_BLOCK_BYTES &&
+                    check(size in 1L..MAX_BLOCK_BYTES && address >= 0 &&
+                        address <= Long.MAX_VALUE - size &&
                         byteLength.toLong() == size &&
                         file.name == "${region.name}-${address.toString(16)}-$size.ecu-block"
                     ) { "Saved sector size, address or file name is invalid." }
@@ -165,8 +209,10 @@ object EcuPhysicalBackupInspection {
                     verified += Sector(region, address, size, actualSha)
                     verifiedBytes = Math.addExact(verifiedBytes, size)
                 }
+                envelopeHashes[file.name] = envelopeHash.digest()
             }
             current = null
+            validateRanges(verified)
             check(observed.size == expectedCount) {
                 "Not every original ECU sector has a matching physical backup."
             }
@@ -177,12 +223,25 @@ object EcuPhysicalBackupInspection {
             // sector was hashed. Recheck the complete directory inventory.
             check(Files.isDirectory(directory.toPath(), LinkOption.NOFOLLOW_LINKS))
             val finalFiles = directory.listFiles() ?: error("Cannot re-enumerate original ECU sectors.")
-            check(finalFiles.map { it.name }.toSet() == fileIdentities.keys &&
-                finalFiles.all {
-                    checkActive()
-                    identity(it) == fileIdentities.getValue(it.name)
-                }) {
+            check(finalFiles.map { it.name }.toSet() == fileIdentities.keys) {
                 "Original ECU sector inventory changed during inspection."
+            }
+            // Metadata alone is insufficient: bytes can change without
+            // modifying the file length or observable timestamps.
+            for (file in finalFiles) {
+                current = verified.firstOrNull {
+                    file.name == "${it.region.name}-${it.address.toString(16)}-${it.length}.ecu-block"
+                }?.address
+                val currentHash = envelopeDigest(file, fileIdentities.getValue(file.name), checkActive)
+                check(MessageDigest.isEqual(envelopeHashes.getValue(file.name), currentHash)) {
+                    "Saved ECU sector envelope changed during inspection."
+                }
+            }
+            current = null
+            check(Files.isDirectory(directory.toPath(), LinkOption.NOFOLLOW_LINKS) &&
+                directory.listFiles()?.map { it.name }?.toSet() == fileIdentities.keys &&
+                data.contentEquals(readSnapshot()) && identity(journalFile) == journalIdentity) {
+                "ECU recovery evidence changed during final inspection."
             }
             checkActive()
             Report(true, expectedCount, verified.sortedWith(compareBy({ it.region.name },

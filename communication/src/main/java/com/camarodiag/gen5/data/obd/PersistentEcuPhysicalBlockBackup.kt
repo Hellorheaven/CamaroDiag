@@ -49,6 +49,7 @@ internal class PersistentEcuPhysicalBlockBackup(
         expectedOriginalSha256: String
     ) {
         require(region.address >= 0 && region.length > 0 &&
+            region.address <= Long.MAX_VALUE - region.length &&
             region.length == physicalBytes.size.toLong() &&
             sha256Hex(physicalBytes).equals(expectedOriginalSha256, ignoreCase = true)) {
             "The live ECU sector differs from the intended original data."

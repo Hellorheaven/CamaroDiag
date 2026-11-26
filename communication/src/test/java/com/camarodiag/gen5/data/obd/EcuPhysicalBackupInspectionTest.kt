@@ -84,6 +84,20 @@ class EcuPhysicalBackupInspectionTest {
             assertTrue(modifiedDuringInspection.sectors.isEmpty())
             val original = files[0].readBytes()
             val changed = original.copyOf().also { it[it.lastIndex] = (it.last() + 1).toByte() }
+            // Restore the same modification timestamp and byte count.
+            // A stale success must be impossible even when the identity
+            // metadata is unchanged on the filesystem.
+            val sameStamp = Files.getLastModifiedTime(files[0].toPath())
+            var contentChecks = 0
+            val hiddenChange = EcuPhysicalBackupInspection.inspect(journalFile, target, vin) {
+                if (++contentChecks == 6) {
+                    files[0].writeBytes(changed)
+                    Files.setLastModifiedTime(files[0].toPath(), sameStamp)
+                }
+            }
+            assertFalse(hiddenChange.verified)
+            assertTrue(hiddenChange.sectors.isEmpty())
+            files[0].writeBytes(original)
             files[0].writeBytes(changed)
             val tampered = EcuPhysicalBackupInspection.inspect(journalFile, target, vin)
             assertFalse(tampered.verified)
@@ -157,6 +171,44 @@ class EcuPhysicalBackupInspectionTest {
             assertFalse(PersistentEcuWriteJournal.inspectSnapshot(file, target, vin,
                 after.copyOf(after.size - 1)).valid)
         } finally { directory.deleteRecursively() }
+        Unit
+    }
+
+    @Test fun overlappingAndOverflowingSectorRangesAreRejected() {
+        val region = EcuBackupCoverage.Region.CALIBRATION
+        fun sector(address: Long, length: Long) = EcuPhysicalBackupInspection.Sector(
+            region, address, length, "a".repeat(64))
+        EcuPhysicalBackupInspection.validateRanges(listOf(sector(16, 8), sector(8, 8)))
+        for (invalid in listOf(
+            listOf(sector(8, 8), sector(15, 8)),
+            listOf(sector(-1, 8)),
+            listOf(sector(Long.MAX_VALUE - 3, 8)),
+            listOf(sector(0, 0))
+        )) {
+            assertTrue(runCatching { EcuPhysicalBackupInspection.validateRanges(invalid) }.isFailure)
+        }
+    }
+
+    @Test fun offlineInspectorRejectsOverlappingIndividuallyVerifiedSectors() = runBlocking {
+        val dir = Files.createTempDirectory("camarodiag-ecu-overlap").toFile()
+        try {
+            val file = File(dir, "attempt.journal")
+            val journal = PersistentEcuWriteJournal(file, target, vin)
+            val store = PersistentEcuPhysicalBlockBackup(file, target, vin)
+            for (address in listOf(0x1000L, 0x1004L)) {
+                val region = EcuProgrammingDriverContract.RegionRequest(
+                    EcuBackupCoverage.Region.CALIBRATION, address, 8)
+                val bytes = ByteArray(8) { it.toByte() }
+                val sha = EcuBenchExpertPlan.sha256Hex(bytes)
+                store.preserve(region, bytes, sha)
+                journal.append(EcuWriteTransaction.Record(
+                    EcuWriteTransaction.Stage.BASELINE_CHECKED, region.region,
+                    address, sha, "a".repeat(64)))
+            }
+            val report = EcuPhysicalBackupInspection.inspect(file, target, vin)
+            assertFalse(report.verified)
+            assertTrue(report.sectors.isEmpty())
+        } finally { dir.deleteRecursively() }
         Unit
     }
 
