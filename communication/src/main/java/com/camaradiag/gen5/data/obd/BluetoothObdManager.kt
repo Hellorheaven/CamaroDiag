@@ -551,6 +551,10 @@ class BluetoothObdManager(context: Context) {
             return CamaroUdsProtocol.parsePidObservations(raw, pidHex)
         }
         return readElmPidWithInventory(pid) { response, inventory ->
+            if (response.equals("NO_SOCKET", ignoreCase = true) ||
+                response.contains("UNABLE TO CONNECT", ignoreCase = true)) {
+                throw ObdTransportDisconnectedException("Live OBD transport is disconnected")
+            }
             inventory.accept(pid, CamaroUdsProtocol.parsePidObservations(response, pidHex))
         }.orEmpty()
     }
