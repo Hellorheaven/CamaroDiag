@@ -215,6 +215,12 @@ internal static class StandardVehicleProtocols
 /// ISO 13400-2 DoIP transport PDU. Framing does not authenticate a DoIP
 /// endpoint and is never sufficient authority for an ECU write.
 /// </summary>
+internal sealed class DoIpTransportRefusal(string layer, byte code, string message) : IOException(message)
+{
+    internal string Layer { get; } = layer;
+    internal byte Code { get; } = code;
+}
+
 internal static class DoIpCodec
 {
     internal const byte Version = 0x02;
@@ -281,7 +287,7 @@ internal static class DoIpCodec
             4 => "invalid payload length",
             _ => "unknown"
         };
-        throw new IOException(
+        throw new DoIpTransportRefusal("header_nack", message.Payload[0],
             $"DoIP generic header NACK 0x{message.Payload[0]:X2} ({reason}).");
     }
 
@@ -365,7 +371,7 @@ internal static class DoIpCodec
     {
         var code = ReadRoutingActivationCode(response, testerAddress);
         if (code != 0x10)
-            throw new IOException(
+            throw new DoIpTransportRefusal("routing_denied", code,
                 code == 0x11 ?
                     "DoIP routing awaits vehicle-side confirmation; not yet active." :
                     $"DoIP routing denied or unsupported response code 0x{code:X2}.");
@@ -421,7 +427,8 @@ internal static class DoIpCodec
              !request.StartsWith(echoed)))
             return false;
         if (response.Type == DiagnosticNegativeAck)
-            throw new IOException($"DoIP gateway negative ACK code 0x{response.Payload[4]:X2}.");
+            throw new DoIpTransportRefusal("diagnostic_nack", response.Payload[4],
+                $"DoIP gateway negative ACK code 0x{response.Payload[4]:X2}.");
         if (response.Payload[4] != 0x00)
             throw new InvalidDataException(
                 "DoIP positive diagnostic acknowledgement must use code 0x00.");
