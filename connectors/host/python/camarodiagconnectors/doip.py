@@ -357,9 +357,9 @@ def status(gateway: Gateway, power: bool = False, timeout: float = 3,
         raise DoIpError("Gateway identity changed before control query")
     request = encode(gateway.version, 0x4003 if power else 0x4001)
     version, kind, body = decode(_udp(gateway.host, request, timeout, trace, port))
-    require_no_header_nack(kind, body)
     if version != gateway.version:
         raise DoIpError("Gateway version changed")
+    require_no_header_nack(kind, body)
     if power:
         if kind != 0x4004 or len(body) != 1 or body[0] not in (0, 1, 2):
             raise DoIpError("Invalid diagnostic power mode")
