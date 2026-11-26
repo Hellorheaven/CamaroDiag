@@ -2450,6 +2450,17 @@ internal static class StandardProtocolCli
             InvalidDataException or TimeoutException or
             System.Security.Authentication.AuthenticationException or FormatException or OverflowException or InvalidOperationException)
         {
+            if (ex is DoIpTransportRefusal refusal)
+                Console.Error.WriteLine(System.Text.Json.JsonSerializer.Serialize(new
+                {
+                    diagnostic_error = new { reason = refusal.Layer, failure_code = refusal.Code, complete = false }
+                }));
+            else if (ex is UdsServiceRefusal uds)
+                Console.Error.WriteLine(System.Text.Json.JsonSerializer.Serialize(new
+                {
+                    diagnostic_error = new { reason = "uds_negative_response", failure_code = uds.Code,
+                        nrc = uds.Code, requested_service = uds.Service, complete = false }
+                }));
             Console.Error.WriteLine("DoIP exchange failed: " + ex.Message);
             return 6;
         }
