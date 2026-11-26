@@ -704,9 +704,8 @@ fun CamaroDiagApp(
                         state = functionalTests,
                         vehicle = vehicle,
                         connectionGeneration = connectionGeneration,
-                        evapAvailable = adapter.supportsCanHeaders &&
-                            adapter.acceptedElmProtocols.any { it in 6..9 } &&
-                            adapter.tier != AdapterTier.DISCONNECTED,
+                        evapAvailable = adapter.tier != AdapterTier.DISCONNECTED &&
+                            !calibrationWorkspace.isJ2534BridgeConnected && viewModel.canRunFunctionalEvapTest(),
                         onRunEvap = { approval, epoch, profile ->
                             viewModel.runFunctionalEvapTest(approval, epoch, profile)
                         },
