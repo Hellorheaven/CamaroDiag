@@ -15,6 +15,8 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
@@ -36,10 +38,17 @@ fun FunctionalTestsScreen(
     onRunAll: () -> Unit,
     onStop: () -> Unit,
     onExport: () -> Unit,
-    onRunProtocol: (FunctionalProtocol) -> Unit
+    onRunProtocol: (FunctionalProtocol, DoIpFunctionalTarget?) -> Unit
 ) {
     var selected by remember { mutableStateOf(FunctionalProtocol.J1979) }
     var expanded by remember { mutableStateOf(false) }
+    var host by remember { mutableStateOf("") }
+    var tester by remember { mutableStateOf("") }
+    var ecu by remember { mutableStateOf("") }
+    var vin by remember { mutableStateOf("") }
+    var tls by remember { mutableStateOf(true) }
+    var physical by remember { mutableStateOf(false) }
+    val doIp = DoIpFunctionalTarget(host.trim(), tester, ecu, vin, tls, physical)
     val fr = LocalConfiguration.current.locales[0].language == "fr"
     val passed = state.checks.count { it.outcome == FunctionalTestOutcome.PASSED }
     val failed = state.checks.count { it.outcome == FunctionalTestOutcome.FAILED }
@@ -63,7 +72,34 @@ fun FunctionalTestsScreen(
                     }
                 }
                 if (selected == FunctionalProtocol.J1979) Text(stringResource(R.string.functional_j1979_candidates))
-                Button(onClick = { onRunProtocol(selected) }, enabled = !state.running && selected.implemented,
+                if (selected == FunctionalProtocol.DOIP) {
+                    Text(stringResource(R.string.functional_doip_candidates))
+                    OutlinedTextField(host, { host = it.take(80); physical = false },
+                        label = { Text(stringResource(R.string.functional_doip_host)) }, enabled = !state.running,
+                        singleLine = true, modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(tester, { tester = it.uppercase().take(4); physical = false },
+                        label = { Text(stringResource(R.string.functional_doip_tester)) }, enabled = !state.running,
+                        singleLine = true, modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(ecu, { ecu = it.uppercase().take(4); physical = false },
+                        label = { Text(stringResource(R.string.functional_doip_ecu)) }, enabled = !state.running,
+                        singleLine = true, modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(vin, { vin = it.uppercase().take(17); physical = false },
+                        label = { Text(stringResource(R.string.functional_doip_vin)) }, enabled = !state.running,
+                        singleLine = true, modifier = Modifier.fillMaxWidth())
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(tls, { tls = it; physical = false }, enabled = !state.running)
+                        Text(stringResource(R.string.functional_doip_tls))
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(physical, { physical = it }, enabled = !state.running)
+                        Text(stringResource(R.string.functional_doip_confirm))
+                    }
+                }
+                Button(onClick = {
+                    onRunProtocol(selected, doIp.takeIf { selected == FunctionalProtocol.DOIP })
+                    if (selected == FunctionalProtocol.DOIP) physical = false
+                }, enabled = !state.running && selected.implemented &&
+                    (selected != FunctionalProtocol.DOIP || doIp.valid),
                     modifier = Modifier.fillMaxWidth()) {
                     Text(stringResource(R.string.functional_protocol_run))
                 }

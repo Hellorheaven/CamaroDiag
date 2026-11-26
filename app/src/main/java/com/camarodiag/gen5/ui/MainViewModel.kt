@@ -1195,7 +1195,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // Cancellation propagates through the adapter session and prevents queued
     // work or returned bytes from being attached to a replacement vehicle.
     private fun launchEnhancedUdsRead(journalDoIp: Boolean = false, block: suspend (() -> Boolean) -> Unit) {
-        if (enhancedUdsJob?.isActive == true) return
+        if (enhancedUdsJob?.isActive == true || functionalTestJob?.isCompleted == false) return
         if (journalDoIp && (_liveCanMonitorState.value.isCapturing || _liveCanMonitorState.value.isSendingRequest ||
                 canMonitorJob?.isCompleted == false || canRequestJob?.isCompleted == false ||
                 detachedCanMonitorJob?.isCompleted == false || detachedCanRequestJob?.isCompleted == false)) return
@@ -5271,9 +5271,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
 
-    fun runFunctionalTests(protocol: FunctionalProtocol? = null) {
+    fun runFunctionalTests(protocol: FunctionalProtocol? = null, doIpTarget: DoIpFunctionalTarget? = null) {
         if (protocol != null && !protocol.implemented) return
-        if (functionalTestJob?.isActive == true) return
+        if (protocol == FunctionalProtocol.DOIP && doIpTarget?.valid != true) return
+        if (functionalTestJob?.isCompleted == false || enhancedUdsJob?.isCompleted == false ||
+            _liveCanMonitorState.value.isCapturing || _liveCanMonitorState.value.isSendingRequest) return
         val accountUid = authenticatedAccountUid ?: return
         val sessionGeneration = accountSessionGeneration
         val connection = connectionAttemptGeneration
@@ -5302,9 +5304,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             else emptyList()
             _functionalTestState.value = FunctionalTestState(
                 running = true, startedAtMillis = System.currentTimeMillis(),
-                checks = if (protocol == FunctionalProtocol.J1979) FunctionalTestPlanner.j1979Checks()
-                    else FunctionalTestPlanner.initial(topology, transport, connected),
-                context = FunctionalTestContext(selectedVin, adapterName, transport, connection), protocol = protocol
+                checks = when (protocol) {
+                    FunctionalProtocol.J1979 -> FunctionalTestPlanner.j1979Checks()
+                    FunctionalProtocol.DOIP -> FunctionalTestPlanner.doIpChecks()
+                    else -> FunctionalTestPlanner.initial(topology, transport, connected)
+                },
+                context = if (protocol == FunctionalProtocol.DOIP)
+                    FunctionalTestContext(requireNotNull(doIpTarget).vin, "Direct Ethernet", "DOIP", connection)
+                    else FunctionalTestContext(selectedVin, adapterName, transport, connection),
+                protocol = protocol, doIpTarget = doIpTarget
             )
             fun current(): Boolean = execution == functionalTestGeneration &&
                 isCurrentAccountGeneration(sessionGeneration) &&
@@ -5351,7 +5359,80 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
             try {
-                if (protocol == FunctionalProtocol.J1979 && connected && obdManager.isStandardObdReadAvailable()) {
+                if (protocol == FunctionalProtocol.DOIP) {
+                    val input = requireNotNull(doIpTarget)
+                    DoIpDirectRead.Target.parse(input.host, input.tester, input.ecu, input.vin, input.tls)
+                    val trace = java.util.Collections.synchronizedList(mutableListOf<String>())
+                    fun control(pdu: DoIpDirectRead.ControlTrace) {
+                        trace.add("${pdu.observedAtUtcMillis} ${pdu.transport} ${pdu.direction} ${pdu.payloadHex}")
+                    }
+                    fun diagnostic(pdu: DoIpDirectRead.Trace) {
+                        trace.add("${pdu.observedAtUtcMillis} UDS ${pdu.direction} ${pdu.payloadHex}")
+                    }
+                    fun publishTrace() {
+                        if (current()) _functionalTestState.update {
+                            it.copy(rawObdExchanges = synchronized(trace) { trace.toList() })
+                        }
+                    }
+                    try {
+                        var gateway: DoIpDirectRead.Gateway? = null
+                        checkRead("protocol:discovery") {
+                            val result = DoIpDirectRead.inspectGateway(input.host, input.vin,
+                                DoIpDirectRead.GatewayOperation.DISCOVER, onControlTrace = ::control)
+                            require(result.gateway.vin == input.vin) { "Gateway VIN not verified" }
+                            gateway = result.gateway
+                            "Gateway VIN verified; address %04X".format(result.gateway.logicalAddress) to
+                                "VIN passerelle vérifié ; adresse %04X".format(result.gateway.logicalAddress)
+                        }
+                        publishTrace()
+                        gateway?.let { observed ->
+                            val target = DoIpDirectRead.Target.parse(input.host, input.tester, input.ecu,
+                                input.vin, input.tls, observed.logicalAddress, observed)
+                            checkRead("protocol:status") {
+                                val status = requireNotNull(DoIpDirectRead.inspectGateway(input.host, input.vin,
+                                    DoIpDirectRead.GatewayOperation.STATUS, selectedGateway = observed,
+                                    onControlTrace = ::control).status)
+                                "Sockets ${status.currentSockets}/${status.maxSockets}" to
+                                    "Sockets ${status.currentSockets}/${status.maxSockets}"
+                            }
+                            publishTrace()
+                            checkRead("protocol:power") {
+                                val power = requireNotNull(DoIpDirectRead.inspectGateway(input.host, input.vin,
+                                    DoIpDirectRead.GatewayOperation.POWER, selectedGateway = observed,
+                                    onControlTrace = ::control).power)
+                                "Power mode response: $power" to "Réponse mode alimentation : $power"
+                            }
+                            publishTrace()
+                            var verifiedVin: String? = null
+                            checkRead("protocol:vin") {
+                                val result = DoIpDirectRead.read(target, DoIpDirectRead.Operation.VIN,
+                                    onTrace = ::diagnostic, onControlTrace = ::control, isReadContextCurrent = ::current)
+                                require(result.vin == input.vin)
+                                verifiedVin = result.vin
+                                if (current()) _functionalTestState.update { state ->
+                                    state.copy(context = state.context?.copy(observedVin = result.vin))
+                                }
+                                "ECU VIN verified: ${result.vin}" to "VIN ECU vérifié : ${result.vin}"
+                            }
+                            publishTrace()
+                            if (verifiedVin != null) {
+                                checkRead("protocol:dtc_count") {
+                                    val result = DoIpDirectRead.read(target, DoIpDirectRead.Operation.DTC_COUNT,
+                                        onTrace = ::diagnostic, onControlTrace = ::control, isReadContextCurrent = ::current)
+                                    require(result.vin == verifiedVin && result.dtcCount != null)
+                                    "Valid DTC count response." to "Réponse de comptage DTC valide."
+                                }
+                                publishTrace()
+                                checkRead("protocol:dtcs") {
+                                    val result = DoIpDirectRead.read(target, DoIpDirectRead.Operation.DTC,
+                                        onTrace = ::diagnostic, onControlTrace = ::control, isReadContextCurrent = ::current)
+                                    require(result.vin == verifiedVin && result.dtcs != null)
+                                    "Valid DTC read; no clear." to "Lecture DTC valide ; sans effacement."
+                                }
+                            }
+                        }
+                    } finally { publishTrace() }
+                } else if (protocol == FunctionalProtocol.J1979 && connected && obdManager.isStandardObdReadAvailable()) {
                     val report = if (obdManager.isJ2534StandardObdAvailable()) obdManager.fullJ2534StandardObdScan()
                         else withRecordedObd { it.fullReadOnlyScan() }
                     if (current()) _functionalTestState.value = FunctionalTestPlanner.j1979Results(_functionalTestState.value, report)
@@ -5500,8 +5581,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun cancelFunctionalTests() {
         functionalTestGeneration++
+        // Retain the cancelled job until transport cleanup actually finishes.
         functionalTestJob?.cancel()
-        functionalTestJob = null
         if (_functionalTestState.value.running) {
             _functionalTestState.value = _functionalTestState.value.copy(
                 running = false,
@@ -5550,6 +5631,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             json.put("checks", checks)
             json.put("rawObdExchanges", JSONArray(snapshot.rawObdExchanges))
             json.put("error", snapshot.error ?: JSONObject.NULL)
+            snapshot.doIpTarget?.let { target ->
+                json.put("doIp", JSONObject().put("host", target.host).put("tester", target.tester)
+                    .put("ecu", target.ecu).put("tls", target.tls)
+                    .put("physicalVehicleDeclaredByOperator", target.physicalVehicleConfirmed)
+                    .put("expectedVin", target.vin))
+            }
             snapshot.obdScan?.let { json.put("obdScan", JSONObject(ObdScanJsonExport.encode(it, System.currentTimeMillis()))) }
             val exportName = snapshot.protocol?.let { "CamaroDiag_protocol_${it.id}_${snapshot.startedAtMillis}.json" } ?: fileName
             try {

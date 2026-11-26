@@ -7,7 +7,7 @@ enum class FunctionalTestOutcome { PASSED, FAILED, NOT_TESTED }
 
 enum class FunctionalProtocol(val id: String, val title: String, val implemented: Boolean = false) {
     J1979("SAE-J1979", "SAE J1979 — OBD-II", true),
-    DOIP("ISO-13400", "ISO 13400 — DoIP"),
+    DOIP("ISO-13400", "ISO 13400 — DoIP", true),
     J1979_2("SAE-J1979-2", "SAE J1979-2 — OBDonUDS"),
     UDS("ISO-14229", "ISO 14229 — UDS"),
     CAN("CAN-CLASSIC", "CAN 11/29 bit"),
@@ -34,6 +34,15 @@ enum class FunctionalProtocol(val id: String, val title: String, val implemented
     J2534_2("SAE-J2534-2", "SAE J2534-2"),
     RP1210("SAE-RP1210", "SAE RP1210"),
     D_PDU("ISO-22900-2", "ISO 22900-2 — D-PDU API")
+}
+
+data class DoIpFunctionalTarget(
+    val host: String, val tester: String, val ecu: String, val vin: String,
+    val tls: Boolean, val physicalVehicleConfirmed: Boolean
+) {
+    val valid: Boolean get() = physicalVehicleConfirmed && host.isNotBlank() &&
+        tester.matches(Regex("[0-9A-Fa-f]{4}")) && ecu.matches(Regex("[0-9A-Fa-f]{4}")) &&
+        !tester.equals(ecu, true) && vin.matches(Regex("[A-HJ-NPR-Z0-9]{17}"))
 }
 
 data class FunctionalTestCheck(
@@ -64,7 +73,8 @@ data class FunctionalTestState(
     val context: FunctionalTestContext? = null,
     val rawObdExchanges: List<String> = emptyList(),
     val protocol: FunctionalProtocol? = null,
-    val obdScan: com.camarodiag.gen5.data.obd.ObdScanReport? = null
+    val obdScan: com.camarodiag.gen5.data.obd.ObdScanReport? = null,
+    val doIpTarget: DoIpFunctionalTarget? = null
 ) {
     val canExport: Boolean get() = !running && finishedAtMillis != null && context != null && checks.isNotEmpty()
 }
@@ -118,6 +128,19 @@ object FunctionalTestPlanner {
             )
         }
         return connectorRows + moduleRows + services
+    }
+
+    fun doIpChecks(): List<FunctionalTestCheck> = listOf(
+        Triple("discovery", "UDP gateway identification", "Identification passerelle UDP"),
+        Triple("status", "Gateway status", "État de la passerelle"),
+        Triple("power", "Diagnostic power mode", "Mode alimentation diagnostic"),
+        Triple("vin", "TCP / TLS routing and ECU VIN", "Routage TCP / TLS et VIN ECU"),
+        Triple("dtc_count", "UDS DTC count", "Nombre de défauts UDS"),
+        Triple("dtcs", "UDS DTC read", "Lecture des défauts UDS"),
+        Triple("write", "Write / recovery (separate test)", "Écriture / restauration (essai distinct)")
+    ).map { (id, en, fr) ->
+        FunctionalTestCheck("protocol:$id", "protocol", en, fr, FunctionalTestOutcome.NOT_TESTED,
+            "No verified response in this campaign.", "Aucune réponse vérifiée dans cette campagne.")
     }
 
     fun j1979Checks(): List<FunctionalTestCheck> = listOf(

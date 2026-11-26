@@ -1,3 +1,7 @@
+## Recette DoIP Android — 26/11/2026
+
+- Parcours autonome ISO 13400 dans Tests fonctionnels : IP/adresses/VIN explicites, confirmation opérateur réseau physique, TLS configurable sans fallback ; découverte UDP, statut et alimentation, routage et VIN ECU, comptage/lecture DTC après identité confirmée. Export JSON propre avec paramètres et traces horodatées, écriture non testée. Aucun besoin ELM. Candidats Mach-E/X1 sous réserve de confirmation. Les tests de formulaire/planner sont écrits, non exécutés. La déclaration de l'opérateur ne constitue pas une preuve indépendante contre un simulateur. Recette Windows/Connectors et autres variantes à compléter. DoIP clôture logicielle historique inchangée, J1979 reste protocole actif, C6 actif.
+
 ## Recette par protocole — premier parcours Android J1979 (26/11/2026)
 
 - Sélecteur des protocoles/variantes avec état de disponibilité du test distinct du statut logiciel. J1979 : scan physique complet, résultats par mode, export JSON spécifique avec version application, contexte et rapport brut imbriqué. Modes 04/08 non exécutés par ce scan ; 05 et services restant à intégrer. Les autres parcours, dont DoIP, restent à implémenter. Tests écrits/non exécutés. C6 + J1979 actifs ; aucune nouvelle campagne.

@@ -13,9 +13,19 @@ class FunctionalTestSuiteTest {
     @Test fun protocolCampaignsHaveIndependentStableIdentifiers() {
         assertEquals(FunctionalProtocol.entries.size, FunctionalProtocol.entries.map { it.id }.distinct().size)
         assertTrue(FunctionalProtocol.J1979.implemented)
-        assertTrue(!FunctionalProtocol.DOIP.implemented)
+        assertTrue(FunctionalProtocol.DOIP.implemented)
         assertTrue(FunctionalTestPlanner.j1979Checks().all { it.outcome == FunctionalTestOutcome.NOT_TESTED })
         assertTrue(FunctionalTestPlanner.j1979Checks().any { it.key == "protocol:04" })
+    }
+
+    @Test fun doIpCampaignRequiresExplicitIdentityAndPhysicalConfirmation() {
+        val target = DoIpFunctionalTarget("192.0.2.10", "0E80", "1234", "1G1FA1RXXR0123456", true, true)
+        assertTrue(target.valid)
+        assertTrue(!target.copy(physicalVehicleConfirmed = false).valid)
+        assertTrue(!target.copy(vin = "").valid)
+        assertTrue(!target.copy(ecu = target.tester).valid)
+        assertTrue(FunctionalTestPlanner.doIpChecks().all { it.outcome == FunctionalTestOutcome.NOT_TESTED })
+        assertTrue(FunctionalTestPlanner.doIpChecks().any { it.key == "protocol:write" })
     }
 
     @Test fun allKnownTransportsAndEveryModuleAreListed() {

@@ -1265,4 +1265,11 @@
     <string name="functional_protocol_report">Rapport actuel : %1$s</string>
     <string name="functional_protocol_failed">Test du protocole interrompu ou échoué. Exportez les preuves disponibles.</string>
     <string name="functional_j1979_candidates">Camaro en priorité, puis Mach-E, Peugeot 207 CC, Corolla ou BMW X1. Utilisez un adaptateur OBD compatible.</string>
+    <string name="functional_doip_candidates">Mustang Mach-E ou BMW X1, uniquement si DoIP est confirmé pour le calculateur. Utilisez le réseau Ethernet du véhicule, pas un ELM327.</string>
+    <string name="functional_doip_host">IP de la passerelle</string>
+    <string name="functional_doip_tester">Adresse logique testeur (4 chiffres hex.)</string>
+    <string name="functional_doip_ecu">Adresse logique ECU (4 chiffres hex.)</string>
+    <string name="functional_doip_vin">VIN attendu du véhicule</string>
+    <string name="functional_doip_tls">Utiliser TLS (sans repli automatique)</string>
+    <string name="functional_doip_confirm">Je suis connecté au véhicule réel sur son réseau de diagnostic isolé.</string>
 </resources>

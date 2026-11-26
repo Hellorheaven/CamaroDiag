@@ -1262,4 +1262,11 @@
     <string name="functional_protocol_report">Current report: %1$s</string>
     <string name="functional_protocol_failed">Protocol test interrupted or failed. Export available evidence.</string>
     <string name="functional_j1979_candidates">Camaro first, then Mach-E, Peugeot 207 CC, Corolla or BMW X1. Use a compatible OBD adapter.</string>
+    <string name="functional_doip_candidates">Ford Mustang Mach-E or BMW X1, only if DoIP is confirmed for the actual ECU. Use the vehicle Ethernet network, not ELM327.</string>
+    <string name="functional_doip_host">Gateway IP</string>
+    <string name="functional_doip_tester">Tester logical address (4 hex digits)</string>
+    <string name="functional_doip_ecu">ECU logical address (4 hex digits)</string>
+    <string name="functional_doip_vin">Expected vehicle VIN</string>
+    <string name="functional_doip_tls">Use TLS (no automatic fallback)</string>
+    <string name="functional_doip_confirm">I am connected to the actual vehicle on its isolated diagnostic network.</string>
 </resources>
