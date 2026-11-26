@@ -5,9 +5,11 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 import ipaddress
 import re
+import select
 import socket
 import ssl
 import struct
+import threading
 import time
 from typing import Callable
 
@@ -750,6 +752,7 @@ class Session:
         self.p2, self.p2_star = p2, p2_star
         self._socket: socket.socket | None = None
         self._busy = False
+        self._operation_lock = threading.Lock()
         deadline = time.monotonic() + timeout
         wire = socket.create_connection((gateway.host, port or (3496 if tls else 13400)),
                                         timeout=remaining(deadline))
@@ -837,12 +840,40 @@ class Session:
         self._send(8, logical(self.tester), deadline)
         return True
 
+    def _drain_ready(self, deadline: float):
+        """Service already queued control frames before another UDS request.
+        
+        A queued diagnostic response belongs to no outstanding request. This
+        cannot detect every late frame racing the next transmission.
+        """
+        while True:
+            remaining(deadline)
+            wire = self._wire()
+            tls_pending = isinstance(wire, ssl.SSLSocket) and wire.pending() > 0
+            if not tls_pending and not select.select([wire], [], [], 0)[0]:
+                return
+            # TLS control traffic can make the underlying socket readable
+            # without an application byte. Do not wait a full P2 interval.
+            wire.settimeout(min(0.01, remaining(deadline)))
+            try:
+                first = wire.recv(1)
+            except socket.timeout:
+                if isinstance(wire, ssl.SSLSocket):
+                    return
+                raise
+            if not first:
+                raise EOFError("DoIP socket closed before next exchange")
+            kind, body = self._receive(deadline, first)
+            if not self._alive(kind, body, deadline):
+                raise DoIpError("Unexpected diagnostic data before next request")
+
     def wait(self, seconds: float):
         """Answer gateway AliveChecks while idle, without consuming stale UDS replies."""
-        if not 0 <= seconds <= 60 or self._busy:
-            raise DoIpError("Invalid idle interval")
-        end = time.monotonic() + seconds
+        if not 0 <= seconds <= 60 or not self._operation_lock.acquire(blocking=False):
+            raise DoIpError("Invalid or concurrent idle interval")
+        self._busy = True
         try:
+            end = time.monotonic() + seconds
             while True:
                 wire = self._wire()
                 # An expired idle interval before the first byte is normal,
@@ -865,18 +896,22 @@ class Session:
         except BaseException:
             self.close()
             raise
+        finally:
+            self._busy = False
+            self._operation_lock.release()
 
     def exchange(self, request: bytes, *, overall_deadline: float | None = None) -> bytes:
         """Generic transport; optional caller deadline also bounds P2/P2*."""
         request = bytes(request)
-        if not 1 <= len(request) <= 4091 or self._busy:
+        if not 1 <= len(request) <= 4091 or not self._operation_lock.acquire(blocking=False):
             raise DoIpError("Invalid or concurrent diagnostic request")
         self._busy = True
-        deadline = time.monotonic() + self.timeout
-        if overall_deadline is not None:
-            deadline = min(deadline, overall_deadline)
-        expected = logical(self.ecu) + logical(self.tester)
         try:
+            deadline = time.monotonic() + self.timeout
+            if overall_deadline is not None:
+                deadline = min(deadline, overall_deadline)
+            expected = logical(self.ecu) + logical(self.tester)
+            self._drain_ready(deadline)
             self._send(0x8001, logical(self.tester) + logical(self.ecu) + request, deadline)
             response_deadline = min(deadline, time.monotonic() + self.p2)
             while True:
@@ -906,6 +941,7 @@ class Session:
             raise
         finally:
             self._busy = False
+            self._operation_lock.release()
 
     def exchange_sequence(self, commands: tuple[bytes, ...], on_reply=lambda *_: None) -> list[bytes]:
         frozen = tuple(bytes(command) for command in commands)
