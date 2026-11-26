@@ -4,7 +4,7 @@ from __future__ import annotations
 import argparse
 from contextlib import ExitStack
 import os
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
 import json
 import ssl
 import sys
@@ -57,6 +57,20 @@ def _trace_sinks(stderr, file):
     return emit, lambda ecu, *event: emit(*event, ecu=ecu)
 
 
+@dataclass(frozen=True)
+class _PendingBackup:
+    result: dict
+    output: Path
+    profile: Path
+    scope: dict
+    first: bytes
+    second: bytes
+
+    def publish(self) -> dict:
+        return self.result | save_capture(self.output, self.profile, self.scope,
+                                          self.first, self.second)
+
+
 def run(argv: Sequence[str] | None = None) -> dict:
     monitor_progress = {}
     try:
@@ -64,6 +78,8 @@ def run(argv: Sequence[str] | None = None) -> dict:
             result = _run(argv, resources, monitor_progress)
         # Neither a session-close error nor a trace-close error may become
         # a complete capture. The final result is assembled after both.
+        if isinstance(result, _PendingBackup):
+            return result.publish()
         if monitor_progress:
             if monitor_progress["verified_samples"] != monitor_progress["requested_samples"]:
                 raise DoIpError("Incomplete DoIP monitoring result")
@@ -79,7 +95,8 @@ def run(argv: Sequence[str] | None = None) -> dict:
         raise
 
 
-def _run(argv: Sequence[str] | None, resources: ExitStack, monitor_progress: dict) -> dict:
+def _run(argv: Sequence[str] | None, resources: ExitStack,
+         monitor_progress: dict) -> dict | _PendingBackup:
     argv = list(sys.argv[1:] if argv is None else argv)
     fr = "--fr" in argv
     def tr(en, french):
@@ -517,7 +534,9 @@ def _run(argv: Sequence[str] | None, resources: ExitStack, monitor_progress: dic
                 print(tr("Pass", "Passe") + f" {index}/2: {offset}/{length}", file=sys.stderr)
             first, second = capture_region(session, scope, progress)
             verify_gateway()
-            return result | save_capture(o.output, o.profile, scope, first, second)
+            # Closing the routed session and trace resources can still fail.
+            # Publication is deferred until run() has closed both successfully.
+            return _PendingBackup(result, o.output, o.profile, dict(scope), first, second)
         if o.action == "vin":
             return result
         raise DoIpError("Unsupported diagnostic action")
