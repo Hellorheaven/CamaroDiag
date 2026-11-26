@@ -5271,7 +5271,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
 
-    fun runFunctionalTests() {
+    fun runFunctionalTests(protocol: FunctionalProtocol? = null) {
+        if (protocol != null && !protocol.implemented) return
         if (functionalTestJob?.isActive == true) return
         val accountUid = authenticatedAccountUid ?: return
         val sessionGeneration = accountSessionGeneration
@@ -5301,8 +5302,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             else emptyList()
             _functionalTestState.value = FunctionalTestState(
                 running = true, startedAtMillis = System.currentTimeMillis(),
-                checks = FunctionalTestPlanner.initial(topology, transport, connected),
-                context = FunctionalTestContext(selectedVin, adapterName, transport, connection)
+                checks = if (protocol == FunctionalProtocol.J1979) FunctionalTestPlanner.j1979Checks()
+                    else FunctionalTestPlanner.initial(topology, transport, connected),
+                context = FunctionalTestContext(selectedVin, adapterName, transport, connection), protocol = protocol
             )
             fun current(): Boolean = execution == functionalTestGeneration &&
                 isCurrentAccountGeneration(sessionGeneration) &&
@@ -5349,7 +5351,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
             try {
-                if (!connected) {
+                if (protocol == FunctionalProtocol.J1979 && connected && obdManager.isStandardObdReadAvailable()) {
+                    val report = if (obdManager.isJ2534StandardObdAvailable()) obdManager.fullJ2534StandardObdScan()
+                        else withRecordedObd { it.fullReadOnlyScan() }
+                    if (current()) _functionalTestState.value = FunctionalTestPlanner.j1979Results(_functionalTestState.value, report)
+                } else if (protocol != null || !connected) {
                     if (current()) _functionalTestState.value = _functionalTestState.value.copy(
                         error = localizedContext.getString(R.string.functional_tests_not_connected)
                     )
@@ -5478,6 +5484,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
+            } catch (_: Exception) {
+                if (current()) _functionalTestState.update { it.copy(error = localizedContext.getString(R.string.functional_protocol_failed)) }
             } finally {
                 if (execution == functionalTestGeneration && isCurrentAccountGeneration(sessionGeneration)) {
                     _functionalTestState.value = _functionalTestState.value.copy(
@@ -5514,6 +5522,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val evidenceContext = snapshot.context ?: return@launch
             val json = JSONObject()
                 .put("schema", "camarodiag-functional-test-v1")
+                .put("protocol", snapshot.protocol?.id ?: JSONObject.NULL)
+                .put("appVersion", com.camarodiag.gen5.BuildConfig.VERSION_NAME)
                 .put("startedAtMillis", snapshot.startedAtMillis)
                 .put("finishedAtMillis", snapshot.finishedAtMillis)
                 .put("vin", evidenceContext.observedVin ?: "")
@@ -5539,8 +5549,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
             json.put("checks", checks)
             json.put("rawObdExchanges", JSONArray(snapshot.rawObdExchanges))
+            json.put("error", snapshot.error ?: JSONObject.NULL)
+            snapshot.obdScan?.let { json.put("obdScan", JSONObject(ObdScanJsonExport.encode(it, System.currentTimeMillis()))) }
+            val exportName = snapshot.protocol?.let { "CamaroDiag_protocol_${it.id}_${snapshot.startedAtMillis}.json" } ?: fileName
             try {
-                val savedPath = CamaroDiagExportStorage.write(getApplication<Application>(), fileName, "application/json",
+                val savedPath = CamaroDiagExportStorage.write(getApplication<Application>(), exportName, "application/json",
                     category = CamaroDiagExportStorage.Category.TESTS, beforePublish = { check(isCurrentAccountGeneration(sessionGeneration) &&
                         authenticatedAccountUid == accountUid && currentLicenseLevel == LicenseLevel.OWNER) }
                 ) { it.write(json.toString(2).toByteArray(Charsets.UTF_8)) }

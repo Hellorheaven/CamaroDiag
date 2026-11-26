@@ -703,6 +703,7 @@ fun CamaroDiagApp(
                     if (ownerTestsAllowed) FunctionalTestsScreen(
                         state = functionalTests,
                         onRunAll = { viewModel.runFunctionalTests() },
+                        onRunProtocol = { protocol -> viewModel.runFunctionalTests(protocol) },
                         onStop = { viewModel.cancelFunctionalTests() },
                         onExport = {
                             withExportFolder {

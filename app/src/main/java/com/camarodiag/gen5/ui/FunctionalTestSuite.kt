@@ -5,6 +5,37 @@ import com.camarodiag.gen5.domain.model.ModuleStatus
 
 enum class FunctionalTestOutcome { PASSED, FAILED, NOT_TESTED }
 
+enum class FunctionalProtocol(val id: String, val title: String, val implemented: Boolean = false) {
+    J1979("SAE-J1979", "SAE J1979 — OBD-II", true),
+    DOIP("ISO-13400", "ISO 13400 — DoIP"),
+    J1979_2("SAE-J1979-2", "SAE J1979-2 — OBDonUDS"),
+    UDS("ISO-14229", "ISO 14229 — UDS"),
+    CAN("CAN-CLASSIC", "CAN 11/29 bit"),
+    CAN_FD("CAN-FD", "CAN-FD"),
+    ISOTP("ISO-15765-2-CAN", "ISO 15765-2 — CAN"),
+    ISOTP_FD("ISO-15765-2-FD", "ISO 15765-2 — CAN-FD"),
+    ISO9141("ISO-9141-2", "ISO 9141-2"),
+    KWP("ISO-14230", "ISO 14230 — KWP2000"),
+    VPW("SAE-J1850-VPW", "SAE J1850 VPW"),
+    PWM("SAE-J1850-PWM", "SAE J1850 PWM"),
+    SWCAN("SAE-J2411", "SAE J2411 — SW-CAN"),
+    GMLAN("GM-GMLAN", "GM GMLAN"),
+    CLASS2("GM-CLASS-2", "GM Class 2"),
+    ALDL("GM-ALDL", "GM ALDL"),
+    LIN("ISO-17987", "ISO 17987 — LIN"),
+    J1939_21("SAE-J1939-21", "SAE J1939-21"),
+    J1939_22("SAE-J1939-22", "SAE J1939-22"),
+    J1939_81("SAE-J1939-81", "SAE J1939-81"),
+    J1708("SAE-J1708", "SAE J1708"),
+    J1587("SAE-J1587", "SAE J1587"),
+    KWP1281("VAG-KWP1281", "VAG KWP1281"),
+    TP20("VAG-TP2-0", "VAG TP2.0"),
+    J2534_1("SAE-J2534-1", "SAE J2534-1"),
+    J2534_2("SAE-J2534-2", "SAE J2534-2"),
+    RP1210("SAE-RP1210", "SAE RP1210"),
+    D_PDU("ISO-22900-2", "ISO 22900-2 — D-PDU API")
+}
+
 data class FunctionalTestCheck(
     val key: String,
     val group: String,
@@ -31,7 +62,9 @@ data class FunctionalTestState(
     val checks: List<FunctionalTestCheck> = emptyList(),
     val error: String? = null,
     val context: FunctionalTestContext? = null,
-    val rawObdExchanges: List<String> = emptyList()
+    val rawObdExchanges: List<String> = emptyList(),
+    val protocol: FunctionalProtocol? = null,
+    val obdScan: com.camarodiag.gen5.data.obd.ObdScanReport? = null
 ) {
     val canExport: Boolean get() = !running && finishedAtMillis != null && context != null && checks.isNotEmpty()
 }
@@ -85,6 +118,39 @@ object FunctionalTestPlanner {
             )
         }
         return connectorRows + moduleRows + services
+    }
+
+    fun j1979Checks(): List<FunctionalTestCheck> = listOf(
+        Triple("vin", "Mode 09 VIN", "Mode 09 VIN"),
+        Triple("pids", "Mode 01 PID inventory", "Inventaire PID mode 01"),
+        Triple("live", "Mode 01 measurements", "Mesures mode 01"),
+        Triple("readiness", "Mode 01 readiness", "Moniteurs mode 01"),
+        Triple("freeze", "Mode 02 freeze frame", "Trame figée mode 02"),
+        Triple("monitor", "Mode 06 monitor results", "Résultats moniteurs mode 06"),
+        Triple("05", "Mode 05 oxygen sensor tests", "Tests sondes mode 05"),
+        Triple("08", "Mode 08 system control (separate test)", "Commande système mode 08 (essai distinct)"),
+        Triple("04", "Mode 04 clear DTCs (separate test)", "Effacement DTC mode 04 (essai distinct)")
+    ).map { (id, en, fr) ->
+        FunctionalTestCheck("protocol:$id", "protocol", en, fr, FunctionalTestOutcome.NOT_TESTED,
+            "No verified response in this campaign.", "Aucune réponse vérifiée dans cette campagne.")
+    }
+
+    fun j1979Results(state: FunctionalTestState, report: com.camarodiag.gen5.data.obd.ObdScanReport): FunctionalTestState {
+        var rows = state.checks
+        fun mark(key: String, ok: Boolean) {
+            if (ok) rows = updated(rows, "protocol:$key", FunctionalTestOutcome.PASSED,
+                "Verified positive diagnostic response.", "Réponse diagnostique positive vérifiée.")
+        }
+        mark("vin", com.camarodiag.gen5.domain.model.VehicleVinMatcher.normalize(report.vin) != null)
+        mark("pids", report.firstUnresolvedPid == null && report.mode01Reads.isNotEmpty())
+        mark("live", report.liveData.isNotEmpty())
+        mark("readiness", !report.readiness.isNullOrBlank())
+        mark("freeze", report.freezeFrameDtc != null && report.freezeFrame.isNotEmpty())
+        mark("monitor", report.monitorTestRaw?.let { it.isNotBlank() && "PARTIAL" !in it && "N/A" !in it } == true)
+        val counts = mapOf(3 to report.confirmedDtcs.size, 7 to report.pendingDtcs.size, 10 to report.permanentDtcs.size)
+            .mapValues { (mode, count) -> count.takeUnless { mode in report.unavailableDtcModes } }
+        rows = withDtcModeEvidence(rows, counts)
+        return withObservedIdentity(state.copy(checks = rows, obdScan = report, rawObdExchanges = report.rawLog), report.vin)
     }
 
     /** Bound owner-only diagnostic evidence, without creating synthetic replies. */

@@ -16,6 +16,13 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.foundation.layout.Box
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
@@ -28,8 +35,11 @@ fun FunctionalTestsScreen(
     state: FunctionalTestState,
     onRunAll: () -> Unit,
     onStop: () -> Unit,
-    onExport: () -> Unit
+    onExport: () -> Unit,
+    onRunProtocol: (FunctionalProtocol) -> Unit
 ) {
+    var selected by remember { mutableStateOf(FunctionalProtocol.J1979) }
+    var expanded by remember { mutableStateOf(false) }
     val fr = LocalConfiguration.current.locales[0].language == "fr"
     val passed = state.checks.count { it.outcome == FunctionalTestOutcome.PASSED }
     val failed = state.checks.count { it.outcome == FunctionalTestOutcome.FAILED }
@@ -39,6 +49,25 @@ fun FunctionalTestsScreen(
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(stringResource(R.string.functional_tests_title), style = MaterialTheme.typography.titleLarge)
                 Text(stringResource(R.string.functional_tests_readonly), style = MaterialTheme.typography.bodySmall)
+                Box {
+                    OutlinedButton(onClick = { expanded = true }, enabled = !state.running, modifier = Modifier.fillMaxWidth()) {
+                        Text(selected.title)
+                    }
+                    DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                        FunctionalProtocol.entries.forEach { protocol ->
+                            DropdownMenuItem(text = { Text(protocol.title + if (protocol.implemented) "" else
+                                " — " + stringResource(R.string.functional_protocol_pending)) }, onClick = {
+                                selected = protocol; expanded = false
+                            })
+                        }
+                    }
+                }
+                if (selected == FunctionalProtocol.J1979) Text(stringResource(R.string.functional_j1979_candidates))
+                Button(onClick = { onRunProtocol(selected) }, enabled = !state.running && selected.implemented,
+                    modifier = Modifier.fillMaxWidth()) {
+                    Text(stringResource(R.string.functional_protocol_run))
+                }
+                state.protocol?.let { Text(stringResource(R.string.functional_protocol_report, it.title)) }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                     Button(onClick = onRunAll, enabled = !state.running) {
                         Text(stringResource(R.string.functional_tests_run))

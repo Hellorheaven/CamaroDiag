@@ -1260,4 +1260,9 @@
     <string name="obd_raw_pid_no_value">Aucune réponse positive exploitable</string>
     <string name="obd_raw_pid_undecoded">Aucune valeur décodée vérifiée</string>
     <string name="obd_raw_pid_unattributed">Réponse contradictoire ou non attribuable</string>
+    <string name="functional_protocol_pending">Test à développer</string>
+    <string name="functional_protocol_run">Tester le protocole sélectionné</string>
+    <string name="functional_protocol_report">Rapport actuel : %1$s</string>
+    <string name="functional_protocol_failed">Test du protocole interrompu ou échoué. Exportez les preuves disponibles.</string>
+    <string name="functional_j1979_candidates">Camaro en priorité, puis Mach-E, Peugeot 207 CC, Corolla ou BMW X1. Utilisez un adaptateur OBD compatible.</string>
 </resources>

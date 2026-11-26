@@ -10,6 +10,14 @@ import org.junit.Test
 class FunctionalTestSuiteTest {
     private val modules = CamaroUdsProtocol.buildTopology(VehicleProfile(), AdapterCapabilities())
 
+    @Test fun protocolCampaignsHaveIndependentStableIdentifiers() {
+        assertEquals(FunctionalProtocol.entries.size, FunctionalProtocol.entries.map { it.id }.distinct().size)
+        assertTrue(FunctionalProtocol.J1979.implemented)
+        assertTrue(!FunctionalProtocol.DOIP.implemented)
+        assertTrue(FunctionalTestPlanner.j1979Checks().all { it.outcome == FunctionalTestOutcome.NOT_TESTED })
+        assertTrue(FunctionalTestPlanner.j1979Checks().any { it.key == "protocol:04" })
+    }
+
     @Test fun allKnownTransportsAndEveryModuleAreListed() {
         val rows = FunctionalTestPlanner.initial(modules, "USB", physicalConnection = true)
         assertEquals(5, rows.count { it.group == "connector" })
