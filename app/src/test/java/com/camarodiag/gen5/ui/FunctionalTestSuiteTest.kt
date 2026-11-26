@@ -30,6 +30,18 @@ class FunctionalTestSuiteTest {
         assertEquals(false to false, evidence(null))
     }
 
+    @Test fun legacyRecipesAreDistinctFromGenericTransportProtocols() {
+        val variants = FunctionalProtocol.entries.filter { it.expectedLegacyElmProtocol != null }
+        assertEquals((1..5).toList(), variants.mapNotNull { it.expectedLegacyElmProtocol }.sorted())
+        assertTrue(variants.all { it.implemented && it.isJ1979Recipe })
+        assertEquals(5, variants.map { it.id }.distinct().size)
+        assertFalse(FunctionalProtocol.KWP.implemented)
+        assertFalse(FunctionalProtocol.VPW.implemented)
+        assertFalse(FunctionalProtocol.PWM.implemented)
+        assertFalse(FunctionalProtocol.ISO9141.implemented)
+        assertTrue(FunctionalTestPlanner.j1979Checks().any { it.key == "protocol:transport" })
+    }
+
     @Test fun resetAcknowledgmentDoesNotProveAllFaultsAbsent() {
         val vin = "1G1FA1RXXR0123456"
         val state = FunctionalTestState(clearCampaign = true,
