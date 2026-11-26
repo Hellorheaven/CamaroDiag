@@ -23,6 +23,25 @@ class ElmJ1979LegacyMutationTest {
             assertNull(ElmLegacyResponseFrames.fixedProtocol(raw))
     }
 
+    @Test fun readOnlyDiscoveryDoesNotSelectAnEngineOrMergeConflicts() {
+        for (p in 1..5) {
+            val first=frame(p,0x10,listOf(0x41,0,0x80,0,0,0))
+            val second=frame(p,0x11,listOf(0x41,0,0x40,0,0,0))
+            val conflict=frame(p,0x11,listOf(0x41,0,0x20,0,0,0))
+            val negative=frame(p,0x12,listOf(0x7F,1,0x11))
+            val raw=listOf(first,first,second,conflict,negative).joinToString("\r")
+            val result=ElmLegacyResponseFrames.discover(p,raw,p.toString())
+            assertEquals(listOf("10"),result.verifiedSources)
+            assertEquals("80000000",result.sources.first().supportedPidBitmap)
+            assertEquals("FAILED",result.sources[1].status)
+            assertEquals(2,result.sources[1].rawFrames.size)
+            assertEquals("NOT_TESTED",result.sources[2].status)
+            assertTrue(ElmLegacyResponseFrames.discover(p,raw,"A$p").verifiedSources.isEmpty())
+            assertTrue(ElmLegacyResponseFrames.discover(p,raw+"\rNO DATA",p.toString()).verifiedSources.isEmpty())
+            assertTrue(ElmLegacyResponseFrames.discover(p,"NO DATA",p.toString()).verifiedSources.isEmpty())
+        }
+    }
+
     @Test fun checksumAndSourceAreRequiredForAllFiveProtocols() {
         assertEquals(0x4B,ElmLegacyResponseFrames.checksum(2,"123456789".map(Char::code)))
         for (p in 1..5) {
