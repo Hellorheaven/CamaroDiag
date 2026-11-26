@@ -238,7 +238,14 @@ class Obd2FeatureEngine(
                 .groupBy { it.responder }
             val candidates = if (grouped.keys.any { it != null }) grouped.filterKeys { it != null } else grouped
             val valid = candidates.mapNotNull { (address, rows) ->
-                rows.map { it.bytes }.distinct().singleOrNull()?.let { address to it }
+                val bitmaps = rows.map { it.bytes }.distinct()
+                val bitmap = bitmaps.singleOrNull() ?: if (address == null &&
+                    !primaryPowertrainResponderOnly && bitmaps.isNotEmpty()) {
+                    // A functional request may receive multiple anonymous ECU
+                    // bitmaps. Their union is an inventory, not ECU attribution.
+                    List(4) { index -> bitmaps.fold(0) { acc, bytes -> acc or bytes[index] } }
+                } else null
+                bitmap?.let { address to it }
             }.toMap()
             val expected = expectedResponders
             val accepted = if (expected == null) valid else valid.filterKeys { it in expected }
@@ -249,6 +256,8 @@ class Obd2FeatureEngine(
             if (accepted.isEmpty()) return result(firstUnresolved)
             val next = linkedSetOf<String?>()
             for ((address, bytes) in accepted) {
+                // Preserve positive, empty bitmaps as evidence for this ECU.
+                if (address != null) byResponder.getOrPut(address) { linkedSetOf() }
                 for (bit in 0 until 31) {
                     val mask = 1 shl (7 - (bit % 8))
                     if ((bytes[bit / 8] and mask) != 0) {
@@ -297,7 +306,8 @@ class Obd2FeatureEngine(
             val groups = observations.groupBy { it.responder }
             val attributed = if (groups.keys.any { it != null }) groups.filterKeys { it != null } else groups
             for ((responder, rows) in attributed) {
-                if (responder != null && byResponder.isNotEmpty() && pid !in byResponder[responder].orEmpty()) continue
+                if (byResponder.isNotEmpty() &&
+                    (responder == null || pid !in byResponder[responder].orEmpty())) continue
                 // Conflicting values from the same or unidentified responder
                 // cannot be promoted into a single trusted measurement.
                 val data = rows.map { it.bytes }.distinct().singleOrNull() ?: continue
