@@ -53,8 +53,8 @@ class ElmJ1979LegacyMutationTest {
                         if (extra) "\r"+encode(0x12 to listOf(0x41,0,0x80,0,0,0)) else ""
                     "0901" -> encode(0x10 to listOf(0x49,1,5))
                     "0902" -> encode(*parts.map { 0x10 to it }.toTypedArray())
-                    "03" -> encode(0x10 to if (attempted) listOf(0x43,0,0,0,0,0,0)
-                        else listOf(0x43,1,0x23,0,0,0,0),0x11 to listOf(0x43,0,0,0,0,0,0))
+                    "03" -> encode(0x10 to (if (attempted) listOf(0x43,0,0,0,0,0,0)
+                        else listOf(0x43,1,0x23,0,0,0,0)),0x11 to listOf(0x43,0,0,0,0,0,0))
                     "07" -> if (missingPending && attempted) "NO DATA" else
                         encode(0x10 to listOf(0x47,0,0,0,0,0,0),0x11 to listOf(0x47,0,0,0,0,0,0))
                     "0A" -> encode(0x10 to listOf(0x4A,1,0x23,0,0,0,0))
