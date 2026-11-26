@@ -8,6 +8,73 @@ internal static class J1979CampaignSemantics
     private static readonly string[] Ends=["","COMPLETE","INITIAL_UNVERIFIED","BUDGET","LINK_FAULT","SINK_STOPPED"];
     private static readonly HashSet<int> One=[4,5,6,7,8,9,10,11,13,14,15,17,19,29,44,45,46,47,48,51,69,70,71,72,73,74,75,76,82,90,91,92,97,98];
     private static readonly HashSet<int> Two=[12,16,31,33,34,35,49,50,60,61,62,63,66,67,68,77,78,83,84,89,93,94,99];
+    internal sealed record Measurement(int Mode,int Pid,string Name,double Number,string Unit);
+    // Match the existing bridge's explicit classic SAE J1979 PID formulas.
+    private static Measurement? DecodeMeasurement(byte[] req,byte[] res){
+        int mode=req[0];
+        if(mode is not (1 or 2))return null;
+        int pid=req[1],offset=mode==2?3:2;
+        if(res.Length<=offset)return null;
+        int a=res[offset],b=res.Length>offset+1?res[offset+1]:0;
+        return pid switch {
+            0x04 => new(mode,pid,"calculated-engine-load",a * 100d / 255,"%"),
+            0x05 => new(mode,pid,"coolant-temperature",(double)a - 40,"degC"),
+            0x06 => new(mode,pid,"short-term-fuel-trim-bank-1",a * 100d / 128 - 100,"%"),
+            0x07 => new(mode,pid,"long-term-fuel-trim-bank-1",a * 100d / 128 - 100,"%"),
+            0x08 => new(mode,pid,"short-term-fuel-trim-bank-2",a * 100d / 128 - 100,"%"),
+            0x09 => new(mode,pid,"long-term-fuel-trim-bank-2",a * 100d / 128 - 100,"%"),
+            0x0C => new(mode,pid,"engine-rpm",(a * 256d + b) / 4,"rpm"),
+            0x0D => new(mode,pid,"vehicle-speed",(double)a,"km/h"),
+            0x0E => new(mode,pid,"timing-advance",a / 2d - 64,"degBTDC"),
+            0x0F => new(mode,pid,"intake-air-temperature",(double)a - 40,"degC"),
+            0x10 => new(mode,pid,"mass-air-flow",(a * 256d + b) / 100,"g/s"),
+            0x11 => new(mode,pid,"throttle-position",a * 100d / 255,"%"),
+            0x1F => new(mode,pid,"engine-runtime",a * 256d + b,"s"),
+            0x2F => new(mode,pid,"fuel-tank-level",a * 100d / 255,"%"),
+            0x33 => new(mode,pid,"barometric-pressure",(double)a,"kPa"),
+            0x42 => new(mode,pid,"control-module-voltage",(a * 256d + b) / 1000,"V"),
+            0x46 => new(mode,pid,"ambient-air-temperature",(double)a - 40,"degC"),
+            0x52 => new(mode,pid,"ethanol-content",a * 100d / 255,"%"),
+            0x5C => new(mode,pid,"engine-oil-temperature",(double)a - 40,"degC"),
+            0x5E => new(mode,pid,"engine-fuel-rate",(a * 256d + b) / 20,"L/h"),
+            0x0A => new(mode,pid,"fuel-pressure-gauge",a * 3d,"kPa"),
+            0x0B => new(mode,pid,"intake-manifold-absolute-pressure",(double)a,"kPa"),
+            0x21 => new(mode,pid,"distance-with-mil-on",a * 256d + b,"km"),
+            0x22 => new(mode,pid,"fuel-rail-pressure-relative-vacuum",(a * 256d + b) * 0.079,"kPa"),
+            0x23 => new(mode,pid,"fuel-rail-pressure-direct-injection",(a * 256d + b) * 10,"kPa"),
+            0x2C => new(mode,pid,"commanded-egr",a * 100d / 255,"%"),
+            0x2D => new(mode,pid,"egr-error",(a - 128) * 100d / 128,"%"),
+            0x2E => new(mode,pid,"commanded-evaporative-purge",a * 100d / 255,"%"),
+            0x30 => new(mode,pid,"warm-ups-since-dtc-clear",(double)a,"count"),
+            0x31 => new(mode,pid,"distance-since-dtc-clear",a * 256d + b,"km"),
+            0x32 => new(mode,pid,"evap-vapor-pressure",unchecked((short)(a * 256 + b)) / 4d,"Pa"),
+            0x3C => new(mode,pid,"catalyst-temperature-bank-1-sensor-1",(a * 256d + b) / 10 - 40,"degC"),
+            0x3D => new(mode,pid,"catalyst-temperature-bank-2-sensor-1",(a * 256d + b) / 10 - 40,"degC"),
+            0x3E => new(mode,pid,"catalyst-temperature-bank-1-sensor-2",(a * 256d + b) / 10 - 40,"degC"),
+            0x3F => new(mode,pid,"catalyst-temperature-bank-2-sensor-2",(a * 256d + b) / 10 - 40,"degC"),
+            0x43 => new(mode,pid,"absolute-engine-load",(a * 256d + b) * 100 / 255,"%"),
+            0x44 => new(mode,pid,"commanded-equivalence-ratio",(a * 256d + b) / 32768,"ratio"),
+            0x45 => new(mode,pid,"relative-throttle-position",a * 100d / 255,"%"),
+            0x47 => new(mode,pid,"absolute-throttle-position-b",a * 100d / 255,"%"),
+            0x48 => new(mode,pid,"absolute-throttle-position-c",a * 100d / 255,"%"),
+            0x49 => new(mode,pid,"accelerator-pedal-position-d",a * 100d / 255,"%"),
+            0x4A => new(mode,pid,"accelerator-pedal-position-e",a * 100d / 255,"%"),
+            0x4B => new(mode,pid,"accelerator-pedal-position-f",a * 100d / 255,"%"),
+            0x4C => new(mode,pid,"commanded-throttle-actuator",a * 100d / 255,"%"),
+            0x4D => new(mode,pid,"time-run-with-mil-on",a * 256d + b,"min"),
+            0x4E => new(mode,pid,"time-since-dtc-clear",a * 256d + b,"min"),
+            0x53 => new(mode,pid,"absolute-evap-vapor-pressure",(a * 256d + b) / 200,"kPa"),
+            0x54 => new(mode,pid,"evap-vapor-pressure-offset",(a * 256d + b) - 32767,"Pa"),
+            0x59 => new(mode,pid,"fuel-rail-pressure-absolute",(a * 256d + b) * 10,"kPa"),
+            0x5A => new(mode,pid,"relative-accelerator-pedal-position",a * 100d / 255,"%"),
+            0x5B => new(mode,pid,"hybrid-battery-pack-remaining-life",a * 100d / 255,"%"),
+            0x5D => new(mode,pid,"fuel-injection-timing",((a * 256d + b) - 26880) / 128,"deg"),
+            0x61 => new(mode,pid,"driver-demand-engine-torque",(double)a - 125,"%"),
+            0x62 => new(mode,pid,"actual-engine-torque",(double)a - 125,"%"),
+            0x63 => new(mode,pid,"engine-reference-torque",a * 256d + b,"Nm"),
+            _=>null
+        };
+    }
     internal sealed class Step {
         public int Sequence{get;}
         public string RequestHex{get;}
@@ -39,6 +106,7 @@ internal static class J1979CampaignSemantics
             }
         }
         internal int? NegativeResponseCode=>State==3?Response[2]:null;
+        internal Measurement? PidMeasurement=>State==1?DecodeMeasurement(Request,Response):null;
         internal string? ObservedVin=>State==1&&Request.AsSpan().SequenceEqual(new byte[]{9,2})?Encoding.ASCII.GetString(Response,3,17):null;
     }
     internal sealed record Summary(string End,int Flags,int Steps);

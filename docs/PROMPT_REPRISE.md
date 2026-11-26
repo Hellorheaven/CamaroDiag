@@ -1,3 +1,7 @@
+## J1979 — mesures PID numériques dans les rapports natifs (26/11/2026)
+
+- Réutilisation des 55 formules explicitement définies dans ObdJ1979PidValues : Mode 01/02 uniquement sur réponse positive validée, unité, PID, valeur et mode ; pas de valeur pour PID brut/inconnu, inventaire ni déclencheur freeze. Export commun Android/Windows/Python, régressions RPM, température freeze et PID inconnu écrites, non exécutées. C6/J1979 ouverts, aucune CI/fusion/Release.
+
 ## J1979 — décodage DTC et NRC commun aux captures natives (26/11/2026)
 
 - Exports Android, Windows et Python enrichis par étape : DTC SAE à cinq caractères (P/C/B/U), NRC terminal, différence explicite entre liste vide vérifiée et absence de réponse positive. Aucune traduction OEM inventée. Tests de quatre familles, réponse négative et zéro défaut rédigés sans exécution. C6/J1979 ouverts, aucune CI/fusion/Release.

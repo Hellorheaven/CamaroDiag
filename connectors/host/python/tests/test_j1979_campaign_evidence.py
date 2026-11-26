@@ -60,6 +60,22 @@ class CaptureTests(unittest.TestCase):
         self.assertEqual(0x11, report["steps"][3]["negative_response_code"])
         self.assertEqual([], report["steps"][4]["dtc_codes"])
 
+    def test_numeric_pid_measurement_only_for_verified_known_definitions(self):
+        initial = step(1, b"\x01\x00", bytes.fromhex("410008100000"))
+        rpm = step(7, b"\x01\x0C", bytes.fromhex("410C1AF8"))
+        coolant = step(6, b"\x01\x05", bytes.fromhex("41055A"))
+        tail = (step(8, b"\x02\x02\x00", bytes.fromhex("4202000000")) +
+                step(9, b"\x06\x00", bytes.fromhex("460000000000")) +
+                step(10, b"\x08\x00", bytes.fromhex("480000000000")) +
+                step(11, b"\x09\x00", bytes.fromhex("490000000000")))
+        report = decode(io.BytesIO(start() + initial + IDENTITY + DTC + coolant + rpm + tail +
+            summary(12, flags=231, steps=11, positive=11)))
+        self.assertTrue(report["capture_integrity_verified"])
+        self.assertEqual(50, report["steps"][5]["measurement"]["number"])
+        self.assertEqual(1726, report["steps"][6]["measurement"]["number"])
+        self.assertIsNone(report["steps"][0]["measurement"])
+        self.assertIsNone(report["steps"][7]["measurement"])
+
     def test_corruption_and_truncation_keep_prefix(self):
         for tail in (IDENTITY[:-1], IDENTITY[:-1] + bytes([IDENTITY[-1] ^ 1])):
             report = decode(io.BytesIO(start() + INITIAL + tail))

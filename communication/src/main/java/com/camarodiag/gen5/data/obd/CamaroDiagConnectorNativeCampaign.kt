@@ -131,6 +131,10 @@ object CamaroDiagConnectorNativeCampaign {
                         put("duration_ms", step.durationMs)
                         put("dtc_codes", step.dtcCodes()?.let { JSONArray(it) } ?: JSONObject.NULL)
                         put("negative_response_code", step.negativeResponseCode() ?: JSONObject.NULL)
+                        put("measurement", step.measurement()?.let { value ->
+                            JSONObject().put("mode", value.mode).put("pid", value.pid)
+                                .put("name", value.name).put("number", value.number).put("unit", value.unit)
+                        } ?: JSONObject.NULL)
                     })
                 }
             })

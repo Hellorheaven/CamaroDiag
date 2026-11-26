@@ -52,6 +52,11 @@ internal static class J1979UsbSelfTests
         using var incompleteRaw=new MemoryStream();
         result=new J1979UsbCapture(incomplete).RunRequest(hello,10000,key,incompleteRaw);
         Require(!result.CaptureIntegrityVerified&&result.Steps.Count==1);
+        var rpm=new J1979CampaignSemantics.Step(6,1,1,[1,12],[0x41,12,0x1a,0xf8]);
+        Require(rpm.PidMeasurement is { Number:1726, Unit:"rpm" });
+        var freeze=new J1979CampaignSemantics.Step(7,1,1,[2,5,0],[0x42,5,0,90]);
+        Require(freeze.PidMeasurement is { Mode:2,Number:50 });
+        Require(new J1979CampaignSemantics.Step(8,2,1,[1,0xa1],[0x41,0xa1,1]).PidMeasurement is null);
         var codes=new J1979CampaignSemantics.Step(3,1,1,[3],[0x43,4,1,0x23,0x45,0x67,0x89,0xab,0xcd,0xef]);
         Require(codes.DtcCodes!.SequenceEqual(new[]{"P0123","C0567","B09AB","U0DEF"}));
         var denied=new J1979CampaignSemantics.Step(4,3,1,[7],[0x7f,7,0x11]);

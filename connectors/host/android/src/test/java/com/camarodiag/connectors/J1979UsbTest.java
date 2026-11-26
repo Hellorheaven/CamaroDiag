@@ -65,6 +65,14 @@ public final class J1979UsbTest {
         Sim missing=new Sim(concat(challenge,start,frame(2,1,initial),frame(3,2,missingSummary)));
         result=new J1979UsbCapture(missing).runRequest(hello,10000,key,new ByteArrayOutputStream());
         assert !result.captureIntegrityVerified&&result.steps.size()==1;
+        J1979CampaignSemantics.Step rpm=new J1979CampaignSemantics.Step(6,1,1,new byte[]{1,12},
+            new byte[]{0x41,12,0x1a,(byte)0xf8});
+        assert rpm.measurement().number==1726&&rpm.measurement().unit.equals("rpm");
+        J1979CampaignSemantics.Step freeze=new J1979CampaignSemantics.Step(7,1,1,new byte[]{2,5,0},
+            new byte[]{0x42,5,0,90});
+        assert freeze.measurement().mode==2&&freeze.measurement().number==50;
+        assert new J1979CampaignSemantics.Step(8,2,1,new byte[]{1,(byte)0xa1},
+            new byte[]{0x41,(byte)0xa1,1}).measurement()==null;
         J1979CampaignSemantics.Step codes=new J1979CampaignSemantics.Step(3,1,1,new byte[]{3},
             new byte[]{0x43,4,1,0x23,0x45,0x67,(byte)0x89,(byte)0xab,(byte)0xcd,(byte)0xef});
         assert codes.dtcCodes().equals(java.util.Arrays.asList("P0123","C0567","B09AB","U0DEF"));

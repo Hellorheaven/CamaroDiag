@@ -20,6 +20,80 @@ public final class J1979CampaignSemantics {
         for(int i=0;i<data.length;i++){out[i*2]=digits.charAt(u(data[i])>>>4);out[i*2+1]=digits.charAt(u(data[i])&15);}
         return new String(out);
     }
+    public static final class Measurement {
+        public final int mode,pid;
+        public final String name,unit;
+        public final double number;
+        Measurement(int mode,int pid,String name,double number,String unit){
+            this.mode=mode;this.pid=pid;this.name=name;this.number=number;this.unit=unit;
+        }
+    }
+    // Same explicitly defined formulas as ObdJ1979PidValues in the PC bridge.
+    private static Measurement measurement(byte[] req,byte[] res){
+        int mode=u(req[0]);
+        if(mode!=1&&mode!=2)return null;
+        int pid=u(req[1]),offset=mode==2?3:2;
+        if(res.length<=offset)return null;
+        int a=u(res[offset]),b=res.length>offset+1?u(res[offset+1]):0;
+        switch(pid){
+            case 0x04:return new Measurement(mode,pid,"calculated-engine-load",a * 100d / 255,"%");
+            case 0x05:return new Measurement(mode,pid,"coolant-temperature",(double)a - 40,"degC");
+            case 0x06:return new Measurement(mode,pid,"short-term-fuel-trim-bank-1",a * 100d / 128 - 100,"%");
+            case 0x07:return new Measurement(mode,pid,"long-term-fuel-trim-bank-1",a * 100d / 128 - 100,"%");
+            case 0x08:return new Measurement(mode,pid,"short-term-fuel-trim-bank-2",a * 100d / 128 - 100,"%");
+            case 0x09:return new Measurement(mode,pid,"long-term-fuel-trim-bank-2",a * 100d / 128 - 100,"%");
+            case 0x0C:return new Measurement(mode,pid,"engine-rpm",(a * 256d + b) / 4,"rpm");
+            case 0x0D:return new Measurement(mode,pid,"vehicle-speed",(double)a,"km/h");
+            case 0x0E:return new Measurement(mode,pid,"timing-advance",a / 2d - 64,"degBTDC");
+            case 0x0F:return new Measurement(mode,pid,"intake-air-temperature",(double)a - 40,"degC");
+            case 0x10:return new Measurement(mode,pid,"mass-air-flow",(a * 256d + b) / 100,"g/s");
+            case 0x11:return new Measurement(mode,pid,"throttle-position",a * 100d / 255,"%");
+            case 0x1F:return new Measurement(mode,pid,"engine-runtime",a * 256d + b,"s");
+            case 0x2F:return new Measurement(mode,pid,"fuel-tank-level",a * 100d / 255,"%");
+            case 0x33:return new Measurement(mode,pid,"barometric-pressure",(double)a,"kPa");
+            case 0x42:return new Measurement(mode,pid,"control-module-voltage",(a * 256d + b) / 1000,"V");
+            case 0x46:return new Measurement(mode,pid,"ambient-air-temperature",(double)a - 40,"degC");
+            case 0x52:return new Measurement(mode,pid,"ethanol-content",a * 100d / 255,"%");
+            case 0x5C:return new Measurement(mode,pid,"engine-oil-temperature",(double)a - 40,"degC");
+            case 0x5E:return new Measurement(mode,pid,"engine-fuel-rate",(a * 256d + b) / 20,"L/h");
+            case 0x0A:return new Measurement(mode,pid,"fuel-pressure-gauge",a * 3d,"kPa");
+            case 0x0B:return new Measurement(mode,pid,"intake-manifold-absolute-pressure",(double)a,"kPa");
+            case 0x21:return new Measurement(mode,pid,"distance-with-mil-on",a * 256d + b,"km");
+            case 0x22:return new Measurement(mode,pid,"fuel-rail-pressure-relative-vacuum",(a * 256d + b) * 0.079,"kPa");
+            case 0x23:return new Measurement(mode,pid,"fuel-rail-pressure-direct-injection",(a * 256d + b) * 10,"kPa");
+            case 0x2C:return new Measurement(mode,pid,"commanded-egr",a * 100d / 255,"%");
+            case 0x2D:return new Measurement(mode,pid,"egr-error",(a - 128) * 100d / 128,"%");
+            case 0x2E:return new Measurement(mode,pid,"commanded-evaporative-purge",a * 100d / 255,"%");
+            case 0x30:return new Measurement(mode,pid,"warm-ups-since-dtc-clear",(double)a,"count");
+            case 0x31:return new Measurement(mode,pid,"distance-since-dtc-clear",a * 256d + b,"km");
+            case 0x32:return new Measurement(mode,pid,"evap-vapor-pressure",((short)(a * 256 + b)) / 4d,"Pa");
+            case 0x3C:return new Measurement(mode,pid,"catalyst-temperature-bank-1-sensor-1",(a * 256d + b) / 10 - 40,"degC");
+            case 0x3D:return new Measurement(mode,pid,"catalyst-temperature-bank-2-sensor-1",(a * 256d + b) / 10 - 40,"degC");
+            case 0x3E:return new Measurement(mode,pid,"catalyst-temperature-bank-1-sensor-2",(a * 256d + b) / 10 - 40,"degC");
+            case 0x3F:return new Measurement(mode,pid,"catalyst-temperature-bank-2-sensor-2",(a * 256d + b) / 10 - 40,"degC");
+            case 0x43:return new Measurement(mode,pid,"absolute-engine-load",(a * 256d + b) * 100 / 255,"%");
+            case 0x44:return new Measurement(mode,pid,"commanded-equivalence-ratio",(a * 256d + b) / 32768,"ratio");
+            case 0x45:return new Measurement(mode,pid,"relative-throttle-position",a * 100d / 255,"%");
+            case 0x47:return new Measurement(mode,pid,"absolute-throttle-position-b",a * 100d / 255,"%");
+            case 0x48:return new Measurement(mode,pid,"absolute-throttle-position-c",a * 100d / 255,"%");
+            case 0x49:return new Measurement(mode,pid,"accelerator-pedal-position-d",a * 100d / 255,"%");
+            case 0x4A:return new Measurement(mode,pid,"accelerator-pedal-position-e",a * 100d / 255,"%");
+            case 0x4B:return new Measurement(mode,pid,"accelerator-pedal-position-f",a * 100d / 255,"%");
+            case 0x4C:return new Measurement(mode,pid,"commanded-throttle-actuator",a * 100d / 255,"%");
+            case 0x4D:return new Measurement(mode,pid,"time-run-with-mil-on",a * 256d + b,"min");
+            case 0x4E:return new Measurement(mode,pid,"time-since-dtc-clear",a * 256d + b,"min");
+            case 0x53:return new Measurement(mode,pid,"absolute-evap-vapor-pressure",(a * 256d + b) / 200,"kPa");
+            case 0x54:return new Measurement(mode,pid,"evap-vapor-pressure-offset",(a * 256d + b) - 32767,"Pa");
+            case 0x59:return new Measurement(mode,pid,"fuel-rail-pressure-absolute",(a * 256d + b) * 10,"kPa");
+            case 0x5A:return new Measurement(mode,pid,"relative-accelerator-pedal-position",a * 100d / 255,"%");
+            case 0x5B:return new Measurement(mode,pid,"hybrid-battery-pack-remaining-life",a * 100d / 255,"%");
+            case 0x5D:return new Measurement(mode,pid,"fuel-injection-timing",((a * 256d + b) - 26880) / 128,"deg");
+            case 0x61:return new Measurement(mode,pid,"driver-demand-engine-torque",(double)a - 125,"%");
+            case 0x62:return new Measurement(mode,pid,"actual-engine-torque",(double)a - 125,"%");
+            case 0x63:return new Measurement(mode,pid,"engine-reference-torque",a * 256d + b,"Nm");
+            default:return null;
+        }
+    }
     public static final class Step {
         public final int sequence;
         public final String requestHex,responseHex,status;
@@ -50,6 +124,7 @@ public final class J1979CampaignSemantics {
         }
         /** NRC is meaningful only on a verified terminal negative response. */
         public Integer negativeResponseCode(){return state==3?u(response[2]):null;}
+        public Measurement measurement(){return state==1?J1979CampaignSemantics.measurement(request,response):null;}
         public String observedVin(){return state==1&&Arrays.equals(request,new byte[]{9,2})?
             new String(response,3,17,StandardCharsets.US_ASCII):null;}
     }

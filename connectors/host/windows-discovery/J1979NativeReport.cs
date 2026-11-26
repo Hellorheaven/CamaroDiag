@@ -19,7 +19,10 @@ internal static class J1979NativeReport
             evidence_authenticated=false,physical_vehicle_verified=false,observed_vin=result.ObservedVin,cancelled,
             steps=result.Steps.Select(s=>new{sequence=s.Sequence,request_hex=s.RequestHex,response_hex=s.ResponseHex,
                 status=s.Status,duration_ms=s.DurationMs,dtc_codes=s.DtcCodes,
-                negative_response_code=s.NegativeResponseCode}),
+                negative_response_code=s.NegativeResponseCode,
+                measurement=s.PidMeasurement is { } value?new {
+                    mode=value.Mode,pid=value.Pid,name=value.Name,number=value.Number,unit=value.Unit
+                }:null}),
             summary=result.Summary is { } summary?new{
                 end=summary.End,steps=summary.Steps,
                 transport_observed=(summary.Flags&1)!=0,pid_inventory_complete=(summary.Flags&2)!=0,

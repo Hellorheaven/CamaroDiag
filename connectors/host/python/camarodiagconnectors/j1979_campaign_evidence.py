@@ -71,6 +71,83 @@ def _positive_state(req, res):
     return None
 
 
+def _measurement(req, res):
+    """Selected classic Mode 01/02 numeric definitions; no OEM inference."""
+    mode = req[0]
+    if mode not in (1, 2):
+        return None
+    pid = req[1]
+    offset = 3 if mode == 2 else 2
+    if len(res) <= offset:
+        return None
+    a = res[offset]
+    b = res[offset + 1] if len(res) > offset + 1 else 0
+    signed = a * 256 + b
+    if signed >= 32768:
+        signed -= 65536
+    values = {
+        0x04: ("calculated-engine-load", a * 100.0 / 255, "%"),
+        0x05: ("coolant-temperature", float(a) - 40, "degC"),
+        0x06: ("short-term-fuel-trim-bank-1", a * 100.0 / 128 - 100, "%"),
+        0x07: ("long-term-fuel-trim-bank-1", a * 100.0 / 128 - 100, "%"),
+        0x08: ("short-term-fuel-trim-bank-2", a * 100.0 / 128 - 100, "%"),
+        0x09: ("long-term-fuel-trim-bank-2", a * 100.0 / 128 - 100, "%"),
+        0x0C: ("engine-rpm", (a * 256.0 + b) / 4, "rpm"),
+        0x0D: ("vehicle-speed", float(a), "km/h"),
+        0x0E: ("timing-advance", a / 2.0 - 64, "degBTDC"),
+        0x0F: ("intake-air-temperature", float(a) - 40, "degC"),
+        0x10: ("mass-air-flow", (a * 256.0 + b) / 100, "g/s"),
+        0x11: ("throttle-position", a * 100.0 / 255, "%"),
+        0x1F: ("engine-runtime", a * 256.0 + b, "s"),
+        0x2F: ("fuel-tank-level", a * 100.0 / 255, "%"),
+        0x33: ("barometric-pressure", float(a), "kPa"),
+        0x42: ("control-module-voltage", (a * 256.0 + b) / 1000, "V"),
+        0x46: ("ambient-air-temperature", float(a) - 40, "degC"),
+        0x52: ("ethanol-content", a * 100.0 / 255, "%"),
+        0x5C: ("engine-oil-temperature", float(a) - 40, "degC"),
+        0x5E: ("engine-fuel-rate", (a * 256.0 + b) / 20, "L/h"),
+        0x0A: ("fuel-pressure-gauge", a * 3.0, "kPa"),
+        0x0B: ("intake-manifold-absolute-pressure", float(a), "kPa"),
+        0x21: ("distance-with-mil-on", a * 256.0 + b, "km"),
+        0x22: ("fuel-rail-pressure-relative-vacuum", (a * 256.0 + b) * 0.079, "kPa"),
+        0x23: ("fuel-rail-pressure-direct-injection", (a * 256.0 + b) * 10, "kPa"),
+        0x2C: ("commanded-egr", a * 100.0 / 255, "%"),
+        0x2D: ("egr-error", (a - 128) * 100.0 / 128, "%"),
+        0x2E: ("commanded-evaporative-purge", a * 100.0 / 255, "%"),
+        0x30: ("warm-ups-since-dtc-clear", float(a), "count"),
+        0x31: ("distance-since-dtc-clear", a * 256.0 + b, "km"),
+        0x32: ("evap-vapor-pressure", signed / 4.0, "Pa"),
+        0x3C: ("catalyst-temperature-bank-1-sensor-1", (a * 256.0 + b) / 10 - 40, "degC"),
+        0x3D: ("catalyst-temperature-bank-2-sensor-1", (a * 256.0 + b) / 10 - 40, "degC"),
+        0x3E: ("catalyst-temperature-bank-1-sensor-2", (a * 256.0 + b) / 10 - 40, "degC"),
+        0x3F: ("catalyst-temperature-bank-2-sensor-2", (a * 256.0 + b) / 10 - 40, "degC"),
+        0x43: ("absolute-engine-load", (a * 256.0 + b) * 100 / 255, "%"),
+        0x44: ("commanded-equivalence-ratio", (a * 256.0 + b) / 32768, "ratio"),
+        0x45: ("relative-throttle-position", a * 100.0 / 255, "%"),
+        0x47: ("absolute-throttle-position-b", a * 100.0 / 255, "%"),
+        0x48: ("absolute-throttle-position-c", a * 100.0 / 255, "%"),
+        0x49: ("accelerator-pedal-position-d", a * 100.0 / 255, "%"),
+        0x4A: ("accelerator-pedal-position-e", a * 100.0 / 255, "%"),
+        0x4B: ("accelerator-pedal-position-f", a * 100.0 / 255, "%"),
+        0x4C: ("commanded-throttle-actuator", a * 100.0 / 255, "%"),
+        0x4D: ("time-run-with-mil-on", a * 256.0 + b, "min"),
+        0x4E: ("time-since-dtc-clear", a * 256.0 + b, "min"),
+        0x53: ("absolute-evap-vapor-pressure", (a * 256.0 + b) / 200, "kPa"),
+        0x54: ("evap-vapor-pressure-offset", (a * 256.0 + b) - 32767, "Pa"),
+        0x59: ("fuel-rail-pressure-absolute", (a * 256.0 + b) * 10, "kPa"),
+        0x5A: ("relative-accelerator-pedal-position", a * 100.0 / 255, "%"),
+        0x5B: ("hybrid-battery-pack-remaining-life", a * 100.0 / 255, "%"),
+        0x5D: ("fuel-injection-timing", ((a * 256.0 + b) - 26880) / 128, "deg"),
+        0x61: ("driver-demand-engine-torque", float(a) - 125, "%"),
+        0x62: ("actual-engine-torque", float(a) - 125, "%"),
+        0x63: ("engine-reference-torque", a * 256.0 + b, "Nm"),
+    }
+    if pid not in values:
+        return None
+    name, number, unit = values[pid]
+    return {"mode": mode, "pid": pid, "name": name, "number": number, "unit": unit}
+
+
 def _exact(stream, size):
     chunks = bytearray()
     while len(chunks) < size:
@@ -225,7 +302,8 @@ def decode(stream):
                 report["steps"].append({"sequence": seq, "request_hex": req.hex().upper(),
                     "response_hex": res.hex().upper() if res else None, "status": status,
                     "duration_ms": elapsed, "dtc_codes": dtc_codes,
-                    "negative_response_code": res[2] if state == 3 else None})
+                    "negative_response_code": res[2] if state == 3 else None,
+                    "measurement": _measurement(req, res) if state == 1 else None})
                 continue
             if kind != 3 or length != 22:
                 raise ValueError("Unexpected evidence record")
