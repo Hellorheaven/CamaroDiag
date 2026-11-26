@@ -1289,4 +1289,5 @@
     <string name="obd_mode08_inventory">Mode 08 — tests de commande annoncés</string>
     <string name="obd_mode08_partial">Inventaire des tests incomplet ou indisponible.</string>
     <string name="obd_mode08_no_execution">Aucun test de commande exécuté.</string>
+    <string name="msg_dtc_clear_stationary_required">Immobilisez le véhicule et arrêtez le moteur. Une nouvelle lecture de vitesse et de régime à zéro est requise avant effacement.</string>
 </resources>
