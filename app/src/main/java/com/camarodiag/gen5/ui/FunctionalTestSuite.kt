@@ -76,7 +76,9 @@ data class FunctionalTestState(
     val obdScan: com.camarodiag.gen5.data.obd.ObdScanReport? = null,
     val doIpTarget: DoIpFunctionalTarget? = null,
     val evapCampaign: Boolean = false,
-    val evapResult: com.camarodiag.gen5.data.obd.ObdEvapResult? = null
+    val evapResult: com.camarodiag.gen5.data.obd.ObdEvapResult? = null,
+    val clearCampaign: Boolean = false,
+    val clearResult: com.camarodiag.gen5.data.obd.ObdClearRecipeResult? = null
 ) {
     val canExport: Boolean get() = !running && finishedAtMillis != null && context != null && checks.isNotEmpty()
 }
@@ -143,6 +145,48 @@ object FunctionalTestPlanner {
     ).map { (id, en, fr) ->
         FunctionalTestCheck("protocol:$id", "protocol", en, fr, FunctionalTestOutcome.NOT_TESTED,
             "No verified response in this campaign.", "Aucune réponse vérifiée dans cette campagne.")
+    }
+
+    fun clearChecks(): List<FunctionalTestCheck> = listOf(
+        Triple("baseline", "Confirmed DTC baseline", "Défauts confirmés avant effacement"),
+        Triple("ack", "Mode 04 acknowledgment", "Acquittement Mode 04"),
+        Triple("readback", "Confirmed and pending readback", "Relecture défauts confirmés et en attente"),
+        Triple("remaining", "Confirmed and pending DTCs absent", "Absence de défauts confirmés et en attente"),
+        Triple("permanent", "Permanent DTC readback", "Relecture des défauts permanents")
+    ).map { (id, en, fr) -> FunctionalTestCheck("protocol:04-$id", "protocol", en, fr,
+        FunctionalTestOutcome.NOT_TESTED, "No verified evidence.", "Aucune preuve vérifiée.") }
+
+    fun clearResults(state: FunctionalTestState,
+        result: com.camarodiag.gen5.data.obd.ObdClearRecipeResult): FunctionalTestState {
+        var rows = state.checks
+        fun mark(id: String, status: FunctionalTestOutcome, en: String, fr: String) {
+            rows = updated(rows, "protocol:04-$id", status, en, fr)
+        }
+        fun observed(id: String, records: List<String>?) {
+            if (records != null) mark(id, FunctionalTestOutcome.PASSED,
+                "Verified records: ${records.size}.", "Défauts relus : ${records.size}.")
+        }
+        observed("baseline", result.beforeDtcs["03"])
+        if (result.acknowledged) mark("ack", FunctionalTestOutcome.PASSED,
+            "Exact Mode 04 acknowledgment.", "Acquittement exact Mode 04.")
+        else if (result.attempted) mark("ack", FunctionalTestOutcome.FAILED,
+            "Refused or uncertain; no automatic retry.", "Refus ou état incertain ; aucune répétition automatique.")
+        val confirmed = result.afterDtcs["03"]
+        val pending = result.afterDtcs["07"]
+        if (result.acknowledged && confirmed != null && pending != null) {
+            mark("readback", FunctionalTestOutcome.PASSED,
+                "Both modes positively reread.", "Les deux modes ont été relus positivement.")
+            val empty = confirmed.isEmpty() && pending.isEmpty()
+            mark("remaining", if (empty) FunctionalTestOutcome.PASSED else FunctionalTestOutcome.FAILED,
+                if (empty) "No confirmed or pending DTC observed on selected ECU." else "DTCs remain present.",
+                if (empty) "Aucun défaut confirmé ou en attente sur le calculateur sélectionné." else "Des défauts subsistent.")
+        }
+        observed("permanent", result.afterDtcs["0A"])
+        return state.copy(clearResult = result, checks = rows,
+            context = state.context?.copy(observedVin = result.observedVin),
+            rawObdExchanges = result.observations.map {
+                "${it.stage} > ${it.requestHex} -> ${it.responseHex ?: "?"}"
+            })
     }
 
     fun evapChecks(): List<FunctionalTestCheck> = listOf(
