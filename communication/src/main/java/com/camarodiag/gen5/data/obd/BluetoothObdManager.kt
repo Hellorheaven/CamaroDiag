@@ -990,7 +990,7 @@ class BluetoothObdManager(context: Context) {
                             "010D","010C","08000000000000"))
                         exchange(command)
                     },
-                    observedProtocol = { ElmObdSessionProfile.parseProtocolNumber(exchange("ATDPN")) },
+                    observedProtocol = { ElmLegacyResponseFrames.fixedProtocol(exchange("ATDPN")) },
                     transmit = {
                         check(!attempted)
                         attempted = true
