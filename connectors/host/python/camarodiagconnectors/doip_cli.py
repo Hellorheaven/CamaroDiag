@@ -73,9 +73,10 @@ class _PendingBackup:
 
 def run(argv: Sequence[str] | None = None) -> dict:
     monitor_progress = {}
+    sequence_progress = {}
     try:
         with ExitStack() as resources:
-            result = _run(argv, resources, monitor_progress)
+            result = _run(argv, resources, monitor_progress, sequence_progress)
         # Neither a session-close error nor a trace-close error may become
         # a complete capture. The final result is assembled after both.
         if isinstance(result, _PendingBackup):
@@ -84,6 +85,11 @@ def run(argv: Sequence[str] | None = None) -> dict:
             if monitor_progress["verified_samples"] != monitor_progress["requested_samples"]:
                 raise DoIpError("Incomplete DoIP monitoring result")
             result |= monitor_progress | {"capture_complete": True}
+        if sequence_progress:
+            if sequence_progress["commands_completed"] != sequence_progress["requested_commands"]:
+                raise DoIpError("Incomplete DoIP command sequence")
+            # Completion is only published after session and trace close succeeded.
+            result |= {"sequence_complete": True}
         return result
     except BaseException:
         if monitor_progress:
@@ -92,11 +98,18 @@ def run(argv: Sequence[str] | None = None) -> dict:
                                   {"capture_complete": False}}), file=sys.stderr, flush=True)
             except (OSError, ValueError):
                 pass  # Keep the original operation failure if stderr also failed.
+        if sequence_progress:
+            try:
+                print(json.dumps({"sequence_summary": sequence_progress |
+                                  {"sequence_complete": False, "complete": False}}),
+                      file=sys.stderr, flush=True)
+            except (OSError, ValueError):
+                pass  # Preserve the original failure even if stderr also fails.
         raise
 
 
 def _run(argv: Sequence[str] | None, resources: ExitStack,
-         monitor_progress: dict) -> dict | _PendingBackup:
+         monitor_progress: dict, sequence_progress: dict) -> dict | _PendingBackup:
     argv = list(sys.argv[1:] if argv is None else argv)
     fr = "--fr" in argv
     def tr(en, french):
@@ -424,6 +437,12 @@ def _run(argv: Sequence[str] | None, resources: ExitStack,
 
     # Recheck the selected endpoint after preparation (and consent for raw sequences).
     verify_gateway()
+    if commands is not None:
+        sequence_progress.update(vin=o.vin, ecu=o.ecu, tester=o.tester,
+                                 gateway_logical_address=gateway.logical_address,
+                                 gateway_host=gateway.host, transport="TCP" if o.tcp else "TLS",
+                                 service_protocol="UDS", requested_commands=len(commands),
+                                 commands_completed=0)
     with Session(gateway, o.tester, o.ecu, tls=not o.tcp, timeout=o.timeout,
                  trace=trace, context=context, p2=p2, p2_star=p2_star,
                  routing_type=o.routing_activation_type or 0,
@@ -523,9 +542,18 @@ def _run(argv: Sequence[str] | None, resources: ExitStack,
         vin = session.verify_vin(o.vin)
         result |= {"vin": vin, "ecu": o.ecu, "tester": o.tester, "tls": not o.tcp}
         if commands is not None:
-            # Preserve each completed response even if a later command fails.
+            # A successful reply is partial until *all* commands, the routed
+            # socket and the optional trace file have closed cleanly.
             def on_reply(index, reply):
-                print(json.dumps({"index": index, "response": reply.hex().upper()}), file=sys.stderr)
+                if index != sequence_progress["commands_completed"] + 1 or index > len(commands):
+                    raise DoIpError("Unexpected DoIP sequence reply index")
+                event = dict(sequence_progress)
+                event["commands_completed"] = index
+                print(json.dumps({"sequence_progress": event |
+                                  {"index": index, "response": reply.hex().upper(),
+                                   "partial": True, "complete": False}}),
+                      file=sys.stderr, flush=True)
+                sequence_progress["commands_completed"] = index
             replies = session.exchange_sequence(commands, on_reply)
             return result | {"responses": [reply.hex().upper() for reply in replies],
                              "commands_completed": len(replies)}
