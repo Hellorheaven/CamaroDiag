@@ -30,6 +30,34 @@ class FunctionalTestSuiteTest {
         assertEquals(false to false, evidence(null))
     }
 
+    @Test fun resetAcknowledgmentDoesNotProveAllFaultsAbsent() {
+        val vin = "1G1FA1RXXR0123456"
+        val state = FunctionalTestState(clearCampaign = true,
+            checks = FunctionalTestPlanner.clearChecks(),
+            context = FunctionalTestContext(vin, "ELM", "USB", 1))
+        val result = com.camarodiag.gen5.data.obd.ObdClearRecipeResult(
+            "ACKNOWLEDGED_PARTIAL", true, true, vin, "READBACK_UNAVAILABLE",
+            emptyList(), mapOf("03" to listOf("P0123")),
+            mapOf("03" to null, "07" to emptyList(), "0A" to listOf("P0123")),
+            6, "7E0", "7E8")
+        fun outcome(snapshot: FunctionalTestState, key: String) =
+            snapshot.checks.single { it.key == "protocol:04-$key" }.outcome
+        val partial = FunctionalTestPlanner.clearResults(state, result)
+        assertEquals(FunctionalTestOutcome.PASSED, outcome(partial, "ack"))
+        assertEquals(FunctionalTestOutcome.NOT_TESTED, outcome(partial, "readback"))
+        assertEquals(FunctionalTestOutcome.NOT_TESTED, outcome(partial, "remaining"))
+        assertEquals(FunctionalTestOutcome.PASSED, outcome(partial, "permanent"))
+        val residual = FunctionalTestPlanner.clearResults(state, result.copy(
+            outcome = "ACKNOWLEDGED_READBACK", reason = "DTCS_STILL_PRESENT",
+            afterDtcs = mapOf("03" to listOf("P0123"), "07" to emptyList(), "0A" to listOf("P0123"))))
+        assertEquals(FunctionalTestOutcome.PASSED, outcome(residual, "readback"))
+        assertEquals(FunctionalTestOutcome.FAILED, outcome(residual, "remaining"))
+        val zero = FunctionalTestPlanner.clearResults(state, result.copy(
+            outcome = "ACKNOWLEDGED_READBACK", reason = null,
+            afterDtcs = mapOf("03" to emptyList(), "07" to emptyList(), "0A" to listOf("P0123"))))
+        assertEquals(FunctionalTestOutcome.PASSED, outcome(zero, "remaining"))
+    }
+
     @Test fun evapAcknowledgmentNeverPassesMonitorCompletion() {
         val vin = "1G1FA1RXXR0123456"
         val state = FunctionalTestState(evapCampaign = true,
