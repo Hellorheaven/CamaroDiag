@@ -2356,6 +2356,8 @@ internal static class StandardProtocolCli
                             verified_count = partial.Count(entry => entry.Vin is not null),
                             target = new { ecu = $"{row.Ecu:X4}", vin = row.Vin,
                                 status = row.Vin is null ? "unverified" : "vin_verified", reason = row.Reason,
+                    failure_code = row.FailureCode, requested_service = row.RequestedService,
+                    nrc = row.Reason == "uds_negative_response" ? row.FailureCode : null,
                                 protocol_value = row.ProtocolValue,
                                 obd_on_uds = row.ProtocolValue.HasValue ? row.ProtocolValue == 1 : (bool?)null },
                             complete = false, physical_qualification = false
@@ -2373,6 +2375,8 @@ internal static class StandardProtocolCli
                 obd_on_uds_count = inventory.Obd ? rows.Count(row => row.ProtocolValue == 1) : (int?)null,
                 targets = rows.Select(row => new { ecu = $"{row.Ecu:X4}", vin = row.Vin,
                     status = row.Vin is null ? "unverified" : "vin_verified", reason = row.Reason,
+                    failure_code = row.FailureCode, requested_service = row.RequestedService,
+                    nrc = row.Reason == "uds_negative_response" ? row.FailureCode : null,
                     protocol_value = row.ProtocolValue, obd_on_uds = row.ProtocolValue.HasValue ? row.ProtocolValue == 1 : (bool?)null }),
                 physical_qualification = false
             }));
