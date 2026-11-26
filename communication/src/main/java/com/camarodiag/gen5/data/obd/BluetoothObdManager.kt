@@ -936,6 +936,78 @@ class BluetoothObdManager(context: Context) {
             ElmJ1979ClearRecipe.run(protocol, expectedVin, guard, exchange)
         }
 
+    val legacyMutationProtocol: Int?
+        get() = standardElmProfile.protocol.takeIf { it in 1..5 &&
+            isElmUdsReadCandidate && !isDemoMode && !isSimulationActive && !isJ2534BridgeConnected() }
+
+    suspend fun runElmLegacyMutation(target: LegacyMutationTarget, expectedVin: String,
+        approval: EcuWriteConsentFlow.Approval, isCurrent: () -> Boolean,
+        saveBaseline: suspend (LegacyMutationResult) -> Unit): LegacyMutationResult {
+        require(target.valid && approval.warningAcknowledged && approval.confirmedYes)
+        require(expectedVin.matches(Regex("[A-HJ-NPR-Z0-9]{17}")))
+        val epoch = transportSessionEpoch.capture()
+        val original = standardElmProfile
+        fun guard() {
+            transportSessionEpoch.requireQueuedCurrent(epoch)
+            EcuWriteConsentFlow.requireCurrentForTransmit(approval,isCurrent)
+        }
+        return commandSessionMutex.withLock {
+            guard()
+            check(legacyMutationProtocol == target.protocol && standardElmProfile == original)
+            try {
+                val header = when (target.protocol) {
+                    1 -> "616AF1"
+                    4,5 -> "C033F1"
+                    else -> "686AF1"
+                }
+                for (command in listOf("ATSP${target.protocol}", "ATE0", "ATL0", "ATH1", "ATS1", "ATSH $header")) {
+                    guard()
+                    val response = sendAtCommandInternal(command,1500L,expectedEpoch=epoch,
+                        preserveLines=true,beforeTransmit=::guard)
+                    check(CanConsoleAdapterRestorationPolicy.accepted(response)) {
+                        "ELM rejected legacy header configuration."
+                    }
+                }
+                suspend fun exchange(command: String): String {
+                    guard()
+                    return sendAtCommandInternal(command,4000L,expectedEpoch=epoch,
+                        preserveLines=true,beforeTransmit=::guard)
+                }
+                var attempted = false
+                ElmJ1979LegacyMutation.run(target,expectedVin,::guard,
+                    read = { command ->
+                        check(command in setOf("0100","0901","0902","03","07","0A","0101",
+                            "010D","010C","08000000000000"))
+                        exchange(command)
+                    },
+                    observedProtocol = { ElmObdSessionProfile.parseProtocolNumber(exchange("ATDPN")) },
+                    transmit = {
+                        check(!attempted)
+                        attempted = true
+                        exchange(if (target.clear) "04" else "08010000000000")
+                    },
+                    saveBaseline = saveBaseline)
+            } finally {
+                withContext(NonCancellable) {
+                    if (transportSessionEpoch.isCurrent(epoch)) {
+                        var restored = true
+                        for (command in original.restoreCommands()) {
+                            val response = runCatching {
+                                sendAtCommandInternal(command,1500L,expectedEpoch=epoch)
+                            }.getOrNull()
+                            if (response == null || !CanConsoleAdapterRestorationPolicy.accepted(response))
+                                restored = false
+                        }
+                        if (!restored) {
+                            disconnectIfCurrent(epoch)
+                            throw CanAdapterRestorationException(activeTransport)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     private suspend fun <T> withPrimaryObdMutationSession(expectedVin: String,
         approval: EcuWriteConsentFlow.Approval, isCurrent: () -> Boolean, mutation: String,
         recipe: suspend (Int, () -> Unit, suspend (ByteArray) -> ByteArray) -> T): T {
