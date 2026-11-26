@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="functional_native_usb_title">Connectors USB — J1979 test</string>
+    <string name="functional_native_usb_select">Select USB device</string>
+    <string name="functional_native_usb_permission">Grant USB permission</string>
+    <string name="functional_native_usb_interfaces">Missing or ambiguous CDC interfaces.</string>
+    <string name="functional_native_usb_tx">CAN TX (hex)</string>
+    <string name="functional_native_usb_rx">CAN RX (hex)</string>
+    <string name="functional_native_usb_extended">29-bit CAN</string>
+    <string name="functional_native_usb_key">Select local key (32 bytes)</string>
+    <string name="functional_native_usb_key_selected">Key selected — change</string>
+    <string name="functional_native_usb_confirm">Qualified board, documented ECM profile, stationary vehicle.</string>
+    <string name="functional_native_usb_run">Run USB test</string>
+    <string name="functional_native_usb_disconnected">Disconnect other adapters and stop active operations.</string>
+    <string name="functional_native_usb_incomplete">USB campaign incomplete or VIN not confirmed.</string>
+</resources>

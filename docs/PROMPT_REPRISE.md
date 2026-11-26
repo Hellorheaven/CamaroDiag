@@ -1,3 +1,7 @@
+## J1979 — recette USB native dans Android (26/11/2026)
+
+- Écran propriétaire Tests fonctionnels : sélection USB et permission explicites, CDC non ambigu, paire CAN saisie, clé locale via sélecteur sans stockage de secret, consentement. ViewModel vérifie propriétaire Firebase, véhicule/génération et absence d'opérations concurrentes, garde le job natif jusqu'à fermeture avant changement de connexion, conserve rapports privés isolés par compte et export JSON individuel. Contrôles distincts auth, intégrité, VIN, inventaires, DTC par mode et provenance non testée. Ressources FR/EN et régressions de classification ajoutées sans exécution. Carte/firmware non qualifiés, aucun test ni CI, aucune fusion/Release.
+
 ## J1979 — export JSON natif détaillé Android/Windows (26/11/2026)
 
 - Raccordement des validateurs natifs aux exports : étapes, requêtes/réponses brutes, VIN observé, durée, résumé, flags et état d'intégrité sémantique. Code retour Windows succès seulement pour une campagne COMPLETE cohérente ; Android expose également captureIntegrityVerified et campaignComplete. Données partielles conservées, signature/provenance physique non déduites. Source Kotlin canonique modifiée depuis son blob exact. Aucun test exécuté ni CI ; J1979/C6 ouverts, aucun merge/Release.

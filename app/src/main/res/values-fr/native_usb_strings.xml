@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="functional_native_usb_title">Connectors USB — recette J1979</string>
+    <string name="functional_native_usb_select">Choisir le périphérique USB</string>
+    <string name="functional_native_usb_permission">Autoriser USB</string>
+    <string name="functional_native_usb_interfaces">Interfaces CDC absentes ou ambiguës.</string>
+    <string name="functional_native_usb_tx">CAN TX (hex)</string>
+    <string name="functional_native_usb_rx">CAN RX (hex)</string>
+    <string name="functional_native_usb_extended">CAN 29 bits</string>
+    <string name="functional_native_usb_key">Choisir la clé locale (32 octets)</string>
+    <string name="functional_native_usb_key_selected">Clé sélectionnée — modifier</string>
+    <string name="functional_native_usb_confirm">Carte qualifiée, profil ECM documenté, véhicule immobilisé.</string>
+    <string name="functional_native_usb_run">Lancer la recette USB</string>
+    <string name="functional_native_usb_disconnected">Déconnectez les autres adaptateurs et arrêtez les opérations en cours.</string>
+    <string name="functional_native_usb_incomplete">Campagne USB incomplète ou VIN non confirmé.</string>
+</resources>

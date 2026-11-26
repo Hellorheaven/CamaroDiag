@@ -546,7 +546,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _functionalTestState = MutableStateFlow(FunctionalTestState())
     val functionalTestState: StateFlow<FunctionalTestState> = _functionalTestState.asStateFlow()
     private var functionalTestJob: Job? = null
-    private var functionalTestGeneration: Long = 0L
+    @Volatile private var functionalTestGeneration: Long = 0L
+    private var nativeFunctionalCleanup: Job? = null
 
     private val _modules = MutableStateFlow<List<EcuModule>>(emptyList())
     val modules: StateFlow<List<EcuModule>> = _modules.asStateFlow()
@@ -2136,6 +2137,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      * before the manager socket/USB handle can be closed.
      */
     fun disconnectSelectedAdapter() {
+        val nativeCleanup = nativeFunctionalCleanup
+        nativeCleanup?.cancel()
         val attempt = nextConnectionGeneration()
         invalidateFuelHistoryForConnectionChange()
         val previousAttempt = connectionAttemptJob
@@ -2146,6 +2149,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             beginBusyOperation()
             try {
                 previousAttempt?.join()
+                nativeCleanup?.join()
                 if (attempt != connectionAttemptGeneration) return@launch
                 val activeMonitor = canMonitorJob
                 val activeRequest = detachCanRequest()
@@ -4654,6 +4658,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         endpoint: String,
         discoveryOnly: Boolean = false
     ) {
+        val nativeCleanup = nativeFunctionalCleanup
+        nativeCleanup?.cancel()
         val attempt = nextConnectionGeneration()
         pendingUsbPermissionRetry = UsbPermissionReconnectPolicy.forSelection(
             transport, endpoint, attempt
@@ -4668,6 +4674,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 // Stop any previously requested BLE scan before opening the socket.
                 previousDiscovery?.join()
+                nativeCleanup?.join()
                 // A cancelled transport handshake may still be closing its
                 // socket. Wait for that cleanup before opening the replacement.
                 previousAttempt?.join()
@@ -5341,6 +5348,85 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
 
+    fun runNativeUsbFunctionalTest(
+        device: android.hardware.usb.UsbDevice,
+        target: com.camarodiag.gen5.data.obd.CamaroDiagConnectorNativeCampaign.Target,
+        keyUri: Uri, confirmedConnection: Long, confirmedVehicle: VehicleProfile
+    ) {
+        if (!target.valid || target.connectionGeneration != maxOf(1L,confirmedConnection) ||
+            confirmedConnection != connectionAttemptGeneration || confirmedVehicle != _vehicle.value ||
+            target.vehicle != confirmedVehicle.vin || target.connector != device.deviceName) return
+        if (_adapter.value.tier != AdapterTier.DISCONNECTED || _isBusy.value ||
+            _calibrationWorkspace.value.isJ2534BridgeConnected ||
+            functionalTestJob?.isCompleted == false || nativeFunctionalCleanup?.isCompleted == false ||
+            connectionAttemptJob?.isCompleted == false || enhancedUdsJob?.isCompleted == false ||
+            canMonitorJob?.isCompleted == false || canRequestJob?.isCompleted == false ||
+            detachedCanMonitorJob?.isCompleted == false || detachedCanRequestJob?.isCompleted == false) {
+            _connectionMessage.value = localizedContext.getString(R.string.functional_native_usb_disconnected)
+            return
+        }
+        val owner = authenticatedAccountUid ?: return
+        val account = accountSessionGeneration
+        val connection = nextConnectionGeneration()
+        val approved = target.copy(connectionGeneration=connection)
+        val execution = ++functionalTestGeneration
+        fun current() = isCurrentAccountGeneration(account) && execution == functionalTestGeneration &&
+            connection == connectionAttemptGeneration && confirmedVehicle == _vehicle.value &&
+            FirebaseAuth.getInstance().currentUser?.uid == owner
+        val job = viewModelScope.launch(start = CoroutineStart.LAZY) {
+            if (!confirmFunctionalTestOwner(owner) || !current()) return@launch
+            val context = getApplication<Application>()
+            val usb = context.getSystemService(android.hardware.usb.UsbManager::class.java) ?: return@launch
+            _functionalTestState.value = FunctionalTestState(running=true,startedAtMillis=System.currentTimeMillis(),
+                protocol=FunctionalProtocol.J1979,checks=NativeUsbFunctionalEvidence.initial(),
+                context=FunctionalTestContext(confirmedVehicle.vin,device.deviceName,"NATIVE_USB_CU1",connection))
+            beginBusyOperation()
+            try {
+                val json = withContext(Dispatchers.IO) {
+                    check(current() && usb.hasPermission(device))
+                    val key = ByteArray(32)
+                    try {
+                        val input = context.contentResolver.openInputStream(keyUri) ?: error("Credential unavailable")
+                        java.io.DataInputStream(input).use {
+                            it.readFully(key)
+                            check(it.read() == -1)
+                        }
+                        check(current())
+                        val accountKey = MessageDigest.getInstance("SHA-256").digest(owner.toByteArray(Charsets.UTF_8))
+                            .joinToString("") { "%02x".format(it) }
+                        val folder = File(context.filesDir,"native-usb-evidence-" + accountKey)
+                        check(folder.isDirectory || folder.mkdirs())
+                        val result = com.camarodiag.gen5.data.obd.CamaroDiagConnectorNativeCampaign.run(
+                            usb,device,approved,key,folder,com.camarodiag.gen5.BuildConfig.VERSION_NAME
+                        ) { generation -> generation == connection && current() }
+                        JSONObject(result.report.readText(Charsets.UTF_8))
+                    } finally { key.fill(0) }
+                }
+                if (current()) {
+                    val result = NativeUsbFunctionalEvidence.results(_functionalTestState.value,json)
+                    val complete = json.optBoolean("capture_integrity_verified") &&
+                        json.optJSONObject("summary")?.optString("end") == "COMPLETE" &&
+                        result.context?.observedVin == confirmedVehicle.vin
+                    _functionalTestState.value = result.copy(error=if (complete) null else
+                        localizedContext.getString(R.string.functional_native_usb_incomplete))
+                }
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (_: Exception) {
+                if (current()) _functionalTestState.update {
+                    it.copy(error=localizedContext.getString(R.string.functional_native_usb_incomplete))
+                }
+            } finally {
+                endBusyOperation()
+                if (execution == functionalTestGeneration && isCurrentAccountGeneration(account))
+                    _functionalTestState.update { it.copy(running=false,finishedAtMillis=System.currentTimeMillis(),
+                        error=if (current()) it.error else localizedContext.getString(R.string.functional_tests_cancelled)) }
+            }
+        }
+        functionalTestJob = job
+        nativeFunctionalCleanup = job
+        job.start()
+    }
+
     fun runFunctionalTests(protocol: FunctionalProtocol? = null, doIpTarget: DoIpFunctionalTarget? = null) {
         if (protocol != null && !protocol.implemented) return
         if (protocol == FunctionalProtocol.DOIP && doIpTarget?.valid != true) return
@@ -5826,6 +5912,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val evidenceContext = snapshot.context ?: return@launch
             val json = JSONObject()
                 .put("schema", when {
+                    snapshot.nativeUsbEvidence != null -> "camarodiag-functional-j1979-native-usb-v1"
                     snapshot.legacyTarget != null -> "camarodiag-functional-j1979-legacy-mutation-v1"
                     snapshot.clearCampaign -> "camarodiag-functional-j1979-clear-v1"
                     snapshot.evapCampaign -> "camarodiag-functional-j1979-evap-v1"
@@ -5863,6 +5950,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
             json.put("checks", checks)
             json.put("rawObdExchanges", JSONArray(snapshot.rawObdExchanges))
+            snapshot.nativeUsbEvidence?.let { json.put("nativeUsb", JSONObject(it)) }
             json.put("error", snapshot.error ?: JSONObject.NULL)
             snapshot.doIpTarget?.let { target ->
                 json.put("doIp", JSONObject().put("host", target.host).put("tester", target.tester)
@@ -5925,7 +6013,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     .put("legacyDocumentedSources",JSONArray(target.sources.map { "%02X".format(java.util.Locale.ROOT,it) }))
                     .put("legacyProtocol",target.protocol).put("wholeVehicleCoverageVerified",false)
             }
-            val exportName = if (snapshot.legacyTarget != null)
+            val exportName = if (snapshot.nativeUsbEvidence != null)
+                "CamaroDiag_SAE-J1979_NATIVE_USB_" + snapshot.startedAtMillis + ".json"
+                else if (snapshot.legacyTarget != null)
                 "CamaroDiag_SAE-J1979_LEGACY_${snapshot.legacyTarget.protocol}_${if (snapshot.legacyTarget.clear) "CLEAR" else "EVAP"}_${snapshot.startedAtMillis}.json"
                 else if (snapshot.clearCampaign) "CamaroDiag_SAE-J1979_CLEAR_${snapshot.startedAtMillis}.json"
                 else if (snapshot.evapCampaign) "CamaroDiag_SAE-J1979_EVAP_${snapshot.startedAtMillis}.json"

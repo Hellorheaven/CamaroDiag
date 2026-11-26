@@ -51,7 +51,10 @@ fun FunctionalTestsScreen(
     onRunEvap: (EcuWriteConsentFlow.Approval, Long, VehicleProfile) -> Unit,
     onRunClear: (EcuWriteConsentFlow.Approval, Long, VehicleProfile) -> Unit,
     legacyAvailableProtocol: Int?,
-    onRunLegacy: (LegacyMutationTarget, EcuWriteConsentFlow.Approval, Long, VehicleProfile) -> Unit
+    onRunLegacy: (LegacyMutationTarget, EcuWriteConsentFlow.Approval, Long, VehicleProfile) -> Unit,
+    nativeUsbEnabled: Boolean,
+    onRunNativeUsb: (android.hardware.usb.UsbDevice, com.camarodiag.gen5.data.obd.CamaroDiagConnectorNativeCampaign.Target,
+        android.net.Uri, Long, VehicleProfile) -> Unit
 ) {
     var selected by remember { mutableStateOf(FunctionalProtocol.J1979) }
     var expanded by remember { mutableStateOf(false) }
@@ -215,6 +218,7 @@ fun FunctionalTestsScreen(
                     Text(stringResource(R.string.functional_protocol_run))
                 }
                 if (selected == FunctionalProtocol.J1979) {
+                    NativeUsbFunctionalPanel(nativeUsbEnabled && !state.running, connectionGeneration, vehicle, onRunNativeUsb)
                     Text(stringResource(R.string.functional_evap_scope), style = MaterialTheme.typography.bodySmall)
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Checkbox(evapConfirmedProfile, { evapConfirmedProfile = it },
