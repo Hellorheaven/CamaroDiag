@@ -64,7 +64,8 @@ fun ObdScanScreen(
     vehicle: VehicleProfile,
     accountUid: String?,
     savedVehicleId: String?,
-    onRunScan: () -> Unit
+    onRunScan: () -> Unit,
+    onExport: ((ObdScanReport) -> Unit)? = null
 ) {
     val unavailable = stringResource(R.string.obd_not_available)
 
@@ -183,6 +184,12 @@ fun ObdScanScreen(
                 ) {
                     if (isScanning) CircularProgressIndicator()
                     else Text(stringResource(R.string.obd_run_full_scan))
+                }
+                if (report != null && onExport != null) {
+                    Button(onClick = { onExport(report) }, enabled = !isScanning,
+                        modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(R.string.obd_export_full_scan))
+                    }
                 }
                 if (!isConnected) Text(
                     stringResource(R.string.obd_connect_adapter_notice),

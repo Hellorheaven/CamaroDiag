@@ -1215,4 +1215,15 @@
     <string name="cal_doip_inventory_obd_supported">ECU 0x%1$04X : OBDonUDS identifié (0x%2$02X)</string>
     <string name="cal_doip_inventory_obd_unknown">ECU 0x%1$04X : OBDonUDS non identifié (F810 = 0x%2$02X)</string>
     <string name="auth_startup_validation_timeout">La vérification de la session prend trop de temps. Vérifiez votre connexion Internet puis réessayez.</string>
+    <string name="adapter_can_tx_label">Émission de trames CAN</string>
+    <string name="adapter_capability_detected">Détecté</string>
+    <string name="adapter_capability_unverified">Non confirmé</string>
+    <string name="modules_no_observed_responders">Aucun répondant enregistré. Lancez un scan OBD.</string>
+    <string name="modules_obd_responders">Calculateurs répondants OBD</string>
+    <string name="modules_oem_identity_unknown">Identité constructeur du calculateur non établie</string>
+    <string name="obd_export_full_scan">Exporter le scan OBD complet (JSON)</string>
+    <string name="obd_export_full_scan_success">Scan OBD complet exporté : %1$s</string>
+    <string name="obd_export_full_scan_failed">Impossible d’exporter le scan OBD.</string>
+    <string name="live_recording_observed_vehicle">Véhicule OBD observé (modèle non vérifié)</string>
+    <string name="live_recording_identity_changed">Enregistrement arrêté : le VIN observé a changé.</string>
 </resources>

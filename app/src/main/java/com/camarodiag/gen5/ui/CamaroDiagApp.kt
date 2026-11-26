@@ -674,7 +674,7 @@ fun CamaroDiagApp(
                     // Physical CDJ/USB checkpoint capture is not implemented (C5): never enable it as a working export.
                     onConnectWifi = { host, port -> viewModel.connectWifi(host, port) }
                 )
-                DiagTab.MODULES -> ModulesScreen(modules)
+                DiagTab.MODULES -> ModulesScreen(modules, obdScanReport, isObdScanning, { viewModel.runFullObdScan() })
                 DiagTab.LICENSE -> {
                     if (LicenseRolloutConfig.ENABLED) {
                         LicenseScreen(licenseLevel, onRefreshLicense)
@@ -755,7 +755,8 @@ fun CamaroDiagApp(
                     vehicle = vehicle,
                     accountUid = accountUid,
                     savedVehicleId = selectedSavedVehicleId,
-                    onRunScan = { viewModel.runFullObdScan() }
+                    onRunScan = { viewModel.runFullObdScan() },
+                    onExport = { report -> withExportFolder { viewModel.exportFullObdScan(report) } }
                 )
                 DiagTab.CALIBRATION -> CalibrationWorkspaceScreen(
                     state = calibrationWorkspace,
@@ -1139,11 +1140,11 @@ fun AdapterScreen(
                             fontSize = 12.sp, color = TextMuted
                         )
                     } else {
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            BadgeChip(stringResource(R.string.adapter_can_headers), adapter.supportsCanHeaders)
-                            BadgeChip("CAN TX", adapter.supportsCanTransmit)
-                            BadgeChip(stringResource(R.string.swcan_wiring_verified), adapter.supportsSwCan)
-                            BadgeChip(stringResource(R.string.long_response_mode), adapter.supportsLongFrames)
+                        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            AdapterCapabilityLine(stringResource(R.string.adapter_can_headers), adapter.supportsCanHeaders)
+                            AdapterCapabilityLine(stringResource(R.string.adapter_can_tx_label), adapter.supportsCanTransmit)
+                            AdapterCapabilityLine(stringResource(R.string.swcan_wiring_verified), adapter.supportsSwCan)
+                            AdapterCapabilityLine(stringResource(R.string.long_response_mode), adapter.supportsLongFrames)
                         }
                     }
                     if (adapter.acceptedElmProtocols.isNotEmpty()) {
@@ -1429,10 +1430,37 @@ fun VehicleControlsScreen(vehicle: VehicleProfile) {
 }
 
 @Composable
-fun ModulesScreen(modules: List<EcuModule>) {
+fun ModulesScreen(
+    modules: List<EcuModule>,
+    report: com.camarodiag.gen5.data.obd.ObdScanReport? = null,
+    scanning: Boolean = false,
+    onScan: (() -> Unit)? = null
+) {
     LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item {
             SectionTitle(stringResource(R.string.modules_vehicle_title))
+            if (onScan != null) {
+                Button(onClick = onScan, enabled = !scanning, modifier = Modifier.fillMaxWidth()) {
+                    Text(stringResource(R.string.obd_run_full_scan))
+                }
+            }
+            if (modules.isEmpty() && report?.respondingEcuAddresses.isNullOrEmpty()) {
+                Text(stringResource(R.string.modules_no_observed_responders), color = TextMuted)
+            }
+        }
+        if (report != null) {
+            item { SectionTitle(stringResource(R.string.modules_obd_responders)) }
+            items(report.respondingEcuAddresses.distinct().sorted()) { address ->
+                Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
+                    Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(address, color = CamaroBlue, fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.modules_oem_identity_unknown), color = TextMuted)
+                        report.supportedPidsByResponder[address]?.let { pids ->
+                            Text(stringResource(R.string.obd_pid_count_by_ecu, address) + ": " + pids.size)
+                        }
+                    }
+                }
+            }
         }
         items(modules) { mod ->
             val statusColor = when (mod.status) {
@@ -3149,6 +3177,15 @@ fun SettingsScreen(
 @Composable
 fun SectionTitle(text: String) {
     Text(text, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+}
+
+@Composable
+private fun AdapterCapabilityLine(label: String, active: Boolean) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.CenterVertically) {
+        Text(label, modifier = Modifier.weight(1f), fontSize = 13.sp)
+        BadgeChip(stringResource(if (active) R.string.adapter_capability_detected else R.string.adapter_capability_unverified), active)
+    }
 }
 
 @Composable

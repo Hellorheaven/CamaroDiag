@@ -579,6 +579,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val liveTelemetryMessage: StateFlow<String?> = _liveTelemetryMessage.asStateFlow()
 
     private val recordedLiveSamples = mutableListOf<RecordedLiveSample>()
+    private var recordingObservedVin: String? = null
     private val maxLiveRecordingSamples = 10_000
     private val _liveRecordingState = MutableStateFlow(LiveRecordingState())
     val liveRecordingState: StateFlow<LiveRecordingState> = _liveRecordingState.asStateFlow()
@@ -4837,6 +4838,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
         recordedLiveSamples.clear()
+        recordingObservedVin = _observedStandardVin.value
         _isStreamingLive.value = true
         val now = System.currentTimeMillis()
         _liveRecordingState.value = LiveRecordingState(
@@ -4869,11 +4871,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 if (_liveRecordingState.value.isRecording) stopLiveRecording()
                 val snapshot = recordedLiveSamples.toList()
                 check(snapshot.isNotEmpty()) { "Aucune donnée enregistrée à exporter." }
+                val observed = recordingObservedVin
                 val v = profile
+                val matched = observed != null && VehicleVinMatcher.admitsCamaroSpecificRead(v.vin, observed)
                 val csv = LiveTelemetryCsv.encode(
                     samples = snapshot,
-                    vin = v.vin,
-                    vehicleLabel = "${v.modelYear} Camaro ${v.engine.rpo} • ${v.generation.label} • ${v.transmission.name}"
+                    vin = observed.orEmpty(),
+                    vehicleLabel = if (matched) "${v.modelYear} Camaro ${v.engine.rpo} • ${v.generation.label} • ${v.transmission.name}"
+                        else localizedContext.getString(R.string.live_recording_observed_vehicle)
                 )
                 val savedPath = CamaroDiagExportStorage.write(getApplication<Application>(), fileName, "text/csv",
                     category = CamaroDiagExportStorage.Category.TELEMETRY, beforePublish = { check(current()) }
@@ -4898,6 +4903,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _liveRecordingState.value = _liveRecordingState.value.copy(
                 message = localizedContext.getString(R.string.msg_live_recording_channel_lost)
             )
+            return
+        }
+        if (_observedStandardVin.value != recordingObservedVin) {
+            stopLiveRecording()
+            _liveRecordingState.update { it.copy(message = localizedContext.getString(R.string.live_recording_identity_changed)) }
             return
         }
         if (values.isEmpty()) return
@@ -5508,6 +5518,31 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 if (isCurrentAccountGeneration(sessionGeneration)) {
                     _connectionMessage.value = localizedContext.getString(R.string.export_folder_failed)
                 }
+            }
+        }
+    }
+
+    fun exportFullObdScan(report: ObdScanReport) {
+        if (!requirePremiumLicense() || _obdScanReport.value !== report) return
+        val owner = authenticatedAccountUid ?: return
+        val account = accountSessionGeneration
+        val connection = connectionAttemptGeneration
+        fun current() = canResumeExport(account, owner) && hasPremiumLicense() &&
+            connection == connectionAttemptGeneration && _obdScanReport.value === report && !_isObdScanning.value
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                check(current())
+                val json = ObdScanJsonExport.encode(report, System.currentTimeMillis())
+                val path = CamaroDiagExportStorage.write(getApplication<Application>(),
+                    "CamaroDiag_OBD_scan_${System.currentTimeMillis()}.json", "application/json",
+                    category = CamaroDiagExportStorage.Category.REPORTS, beforePublish = { check(current()) }) {
+                    it.write(json.toByteArray(Charsets.UTF_8))
+                }
+                if (current()) _obdScanMessage.value = localizedContext.getString(R.string.obd_export_full_scan_success, path)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                if (current()) _obdScanMessage.value = localizedContext.getString(R.string.obd_export_full_scan_failed)
             }
         }
     }

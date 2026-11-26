@@ -1212,4 +1212,15 @@
     <string name="cal_doip_inventory_obd_supported">ECU 0x%1$04X: OBDonUDS identified (0x%2$02X)</string>
     <string name="cal_doip_inventory_obd_unknown">ECU 0x%1$04X: OBDonUDS not identified (F810 = 0x%2$02X)</string>
     <string name="auth_startup_validation_timeout">Session verification timed out. Check your internet connection and retry.</string>
+    <string name="adapter_can_tx_label">CAN frame transmission</string>
+    <string name="adapter_capability_detected">Detected</string>
+    <string name="adapter_capability_unverified">Not confirmed</string>
+    <string name="modules_no_observed_responders">No ECU response recorded. Run an OBD scan.</string>
+    <string name="modules_obd_responders">Observed OBD responders</string>
+    <string name="modules_oem_identity_unknown">Manufacturer ECU identity not established</string>
+    <string name="obd_export_full_scan">Export full OBD scan (JSON)</string>
+    <string name="obd_export_full_scan_success">Full OBD scan exported: %1$s</string>
+    <string name="obd_export_full_scan_failed">Could not export the OBD scan.</string>
+    <string name="live_recording_observed_vehicle">Observed OBD vehicle (model not verified)</string>
+    <string name="live_recording_identity_changed">Recording stopped: observed VIN changed.</string>
 </resources>
