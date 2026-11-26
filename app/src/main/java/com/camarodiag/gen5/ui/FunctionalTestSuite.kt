@@ -345,8 +345,16 @@ object FunctionalTestPlanner {
             FunctionalTestCheck("legacy-responder:${source.source}","legacy_responder",
                 "Legacy emissions source ${source.source}","Source antipollution legacy ${source.source}",
                 outcome,
-                "Response header and checksum checked; OEM identity and whole-vehicle coverage not established.",
-                "En-tête et contrôle d’intégrité vérifiés ; identité constructeur et couverture globale non établies.")
+                when (outcome) {
+                    FunctionalTestOutcome.PASSED -> "Verified PID 00 response; OEM identity and whole-vehicle coverage not established."
+                    FunctionalTestOutcome.FAILED -> "Conflicting or invalid application records; source not verified."
+                    FunctionalTestOutcome.NOT_TESTED -> "Negative response; PID 00 support not verified."
+                },
+                when (outcome) {
+                    FunctionalTestOutcome.PASSED -> "Réponse PID 00 vérifiée ; identité constructeur et couverture globale non établies."
+                    FunctionalTestOutcome.FAILED -> "Réponses contradictoires ou invalides ; source non vérifiée."
+                    FunctionalTestOutcome.NOT_TESTED -> "Réponse négative ; support PID 00 non vérifié."
+                })
         }
         val discoveryCheck = FunctionalTestCheck("legacy-responder:discovery","legacy_responder",
             "Legacy responder discovery","Découverte des répondants legacy",
