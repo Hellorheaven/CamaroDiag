@@ -380,6 +380,18 @@ fun ObdScanScreen(
                 }
             }
 
+            report.mode08?.let { mode ->
+                item {
+                    InfoCard(title = stringResource(R.string.obd_mode08_inventory)) {
+                        if (!mode.complete)
+                            Text(stringResource(R.string.obd_mode08_partial), color = CamaroAmber, fontSize = 11.sp)
+                        Text(mode.supportedTests.sorted().joinToString(", ") { "TID %02X".format(it) }
+                            .ifBlank { stringResource(R.string.obd_not_available) }, color = TextPrimary)
+                        Text(stringResource(R.string.obd_mode08_no_execution), color = TextMuted, fontSize = 11.sp)
+                    }
+                }
+            }
+
             item {
                 InfoCard(title = stringResource(R.string.obd_raw_scan_log)) {
                     report.rawLog.forEach { line ->
