@@ -14,9 +14,13 @@ internal sealed record DoIpBackupScope(string Vin, ushort Gateway, ushort Tester
 {
     internal static DoIpBackupScope Load(string path)
     {
-        if (new FileInfo(path).Length is <= 0 or > 16384)
+        using var file = File.OpenRead(path);
+        if (file.Length is <= 0 or > 16384)
             throw new InvalidDataException("Invalid DoIP backup profile size.");
-        using var doc = JsonDocument.Parse(File.ReadAllText(path));
+        var raw = new byte[(int)file.Length];
+        file.ReadExactly(raw);
+        if (file.ReadByte() != -1) throw new InvalidDataException("DoIP backup profile changed while reading.");
+        using var doc = JsonDocument.Parse(raw);
         var root = doc.RootElement;
         var keys = new HashSet<string>(StringComparer.Ordinal) { "vin", "gateway", "tester", "ecu",
             "identityDid", "identityHex", "startAddress", "lengthBytes", "blockSize", "region" };
@@ -24,10 +28,19 @@ internal sealed record DoIpBackupScope(string Vin, ushort Gateway, ushort Tester
             if (!keys.Remove(property.Name)) throw new InvalidDataException("Unknown or duplicate profile field.");
         if (keys.Count != 0) throw new InvalidDataException("Incomplete DoIP backup profile.");
         string Get(string key) => root.GetProperty(key).GetString() ?? throw new InvalidDataException(key);
-        var scope = new DoIpBackupScope(Get("vin"), DoIpVinReader.ParseLogicalAddress(Get("gateway")),
-            DoIpVinReader.ParseLogicalAddress(Get("tester")), DoIpVinReader.ParseLogicalAddress(Get("ecu")),
-            DoIpVinReader.ParseLogicalAddress(Get("identityDid")), Get("identityHex").ToUpperInvariant(),
-            uint.Parse(Get("startAddress"), NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture),
+        ushort Logical(string key)
+        {
+            var value = Get(key);
+            if (!Regex.IsMatch(value, @"\A[0-9A-Fa-f]{4}\z"))
+                throw new InvalidDataException("Invalid DoIP profile logical address: " + key);
+            return ushort.Parse(value, NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture);
+        }
+        var start = Get("startAddress");
+        if (!Regex.IsMatch(start, @"\A[0-9A-Fa-f]{1,8}\z"))
+            throw new InvalidDataException("Invalid DoIP profile start address.");
+        var scope = new DoIpBackupScope(Get("vin"), Logical("gateway"),
+            Logical("tester"), Logical("ecu"), Logical("identityDid"), Get("identityHex").ToUpperInvariant(),
+            uint.Parse(start, NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture),
             root.GetProperty("lengthBytes").GetInt32(), root.GetProperty("blockSize").GetInt32(), Get("region"));
         scope.Validate();
         return scope;
@@ -37,8 +50,8 @@ internal sealed record DoIpBackupScope(string Vin, ushort Gateway, ushort Tester
     {
         if (!Regex.IsMatch(Vin, @"\A[A-HJ-NPR-Z0-9]{17}\z") || Tester == Ecu || Tester == Gateway ||
             IdentityDid == 0xF190 || IdentityHex.Length is < 2 or > 512 || IdentityHex.Length % 2 != 0 ||
-            !IdentityHex.All(Uri.IsHexDigit) || IdentityHex.All(c => c == '0') ||
-            IdentityHex.All(c => c is 'F' or 'f') ||
+            !Regex.IsMatch(IdentityHex, @"\A[0-9A-F]+\z") || IdentityHex.All(c => c == '0') ||
+            IdentityHex.All(c => c == 'F') ||
             Length is < 1 or > NativeScopedMemoryReader.MaximumUiCaptureBytes ||
             BlockSize is < 1 or > 256 || (ulong)Start + (uint)Length > 0x100000000UL ||
             !J2534MemoryReadScope.IsKnownRegion(Region))
