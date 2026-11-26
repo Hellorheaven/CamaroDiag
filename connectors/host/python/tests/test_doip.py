@@ -1380,6 +1380,54 @@ class DoIpTests(unittest.TestCase):
         wire.recv.assert_not_called()
         client.close.assert_not_called()
 
+    def test_wire_refusal_is_correlated_and_retires_session_without_retry(self):
+        request = bytes.fromhex("22F190")
+        for scenario in ("header", "diagnostic", "wrong_echo", "wrong_address", "bad_positive"):
+            with self.subTest(scenario=scenario):
+                client = Session.__new__(Session)
+                client.tester, client.ecu = 0x0E80, 0x1234
+                client.timeout = client.p2 = client.p2_star = 2
+                client._operation_lock = threading.Lock()
+                client._busy = False
+                client._socket, peer = socket.socketpair()
+                client.gateway, client.tls, client.trace = GATEWAY, False, None
+                peer.settimeout(2)
+                errors = []
+                def server():
+                    try:
+                        self.assertEqual(receive(peer), (2, 0x8001, TESTER + ECU + request))
+                        if scenario == "header":
+                            frame = encode(2, 0, bytes((2,)))
+                        else:
+                            address = bytes.fromhex("1235") if scenario == "wrong_address" else ECU
+                            echo = bytes.fromhex("19") if scenario == "wrong_echo" else request
+                            frame = encode(2, 0x8002 if scenario == "bad_positive" else 0x8003,
+                                           address + TESTER + bytes((6,)) + echo)
+                        peer.sendall(frame)
+                        self.assertEqual(peer.recv(1), b"")
+                    except BaseException as error:
+                        errors.append(error)
+                worker = threading.Thread(target=server)
+                worker.start()
+                try:
+                    with self.assertRaises(DoIpError) as failure:
+                        client.exchange(request)
+                    if scenario in ("header", "diagnostic"):
+                        self.assertIsInstance(failure.exception, TransportRefusal)
+                        self.assertEqual(failure.exception.layer,
+                                         "header_nack" if scenario == "header" else "diagnostic_nack")
+                        self.assertEqual(failure.exception.code, 2 if scenario == "header" else 6)
+                    else:
+                        self.assertNotIsInstance(failure.exception, TransportRefusal)
+                    self.assertIsNone(client._socket)
+                finally:
+                    client.close()
+                    worker.join(3)
+                    peer.close()
+                self.assertFalse(worker.is_alive())
+                if errors:
+                    raise errors[0]
+
     def test_queued_diagnostic_reply_retires_socket_before_next_transmission(self):
         client = Session.__new__(Session)
         client.tester, client.ecu = 0x0E80, 0x1234
@@ -1388,6 +1436,7 @@ class DoIpTests(unittest.TestCase):
         client._busy = False
         client._socket, peer = socket.socketpair()
         client.gateway, client.tls, client.trace = GATEWAY, False, None
+        peer.settimeout(2)
         try:
             peer.sendall(encode(2, 0x8001, ECU + TESTER + bytes.fromhex("62123401")))
             with self.assertRaisesRegex(DoIpError, "before next request"):
