@@ -1,6 +1,8 @@
 package com.camarodiag.gen5.data.obd
 
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 
 /**
  * Guarded, per-erase-sector programming sequence.
@@ -235,6 +237,7 @@ internal class EcuWriteExecutionEngine(
     }
 
     private suspend fun runOwned(input: EcuWriteTransaction.Request): EcuWriteTransaction.Outcome {
+        currentCoroutineContext().ensureActive()
         val request = input.frozen()
         val plan = EcuWriteTransaction.prepare(request)
         if (!plan.canAttemptWithValidatedHardware) {
@@ -396,7 +399,11 @@ internal class EcuWriteExecutionEngine(
                         verifiedSectors = verified, failedAddress = currentAddress
                     )
                 }
+                // A journal/power/identity provider may complete despite a
+                // cancelled coroutine. Cancellation must win before erase.
+                currentCoroutineContext().ensureActive()
                 driver.erase(region)
+                currentCoroutineContext().ensureActive()
                 val unitBytes = request.layout.programBlockBytes
                 for (offset in sector.patchedBytes.indices step unitBytes) {
                     val unitAddress = sector.absoluteAddress + offset
@@ -419,7 +426,11 @@ internal class EcuWriteExecutionEngine(
                     EcuWriteBlockVerifier.requireExactUnit(
                         request.layout, request.region, updated, sector, unit, offset, outgoing
                     )
+                    // An adapter may ignore cancellation while answering
+                    // earlier reads. Never transmit this unit after cancellation.
+                    currentCoroutineContext().ensureActive()
                     driver.write(unit, outgoing)
+                    currentCoroutineContext().ensureActive()
                 }
                 currentAddress = sector.absoluteAddress
                 // Last unit of a sector has no subsequent write preflight.
@@ -488,10 +499,14 @@ internal class EcuWriteExecutionEngine(
             // This terminal marker binds completion to the final sector and
             // must be durably stored before returning a completed outcome.
             val last = preview.affectedSectors.last()
+            // Cancellation after a non-cooperative final read or journal
+            // observer must not publish a successful completed transaction.
+            currentCoroutineContext().ensureActive()
             journal.append(EcuWriteTransaction.Record(
                 EcuWriteTransaction.Stage.TRANSACTION_COMPLETED,
                 request.region, last.absoluteAddress, last.originalSha256, last.updatedSha256
             ))
+            currentCoroutineContext().ensureActive()
             return EcuWriteTransaction.Outcome(
                 EcuWriteTransaction.Status.COMPLETED, verifiedSectors = verified
             )
