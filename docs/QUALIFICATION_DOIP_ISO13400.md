@@ -41,6 +41,10 @@ La commande de diagnostic demande une confirmation explicite avant émission. **
 
 Le CLI `--monitor-did` / `--monitor-dids` et leurs variantes OBDonUDS publient une ligne JSON par échantillon vérifié, avec VIN, passerelle, testeur, ECU, transport et temps écoulé. Le bilan final contient `samples`, `requestedSamples`, `complete` et `status` (`complete`, `canceled`, `failed`). Une capture interrompue conserve les mesures précédemment vérifiées ; elle n'est jamais déclarée complète. La fermeture du transport et du journal éventuel précède le bilan complet. Les lignes d'échantillons restent marquées `partial: true` tant que le bilan n'est pas disponible. Un arrêt brutal du processus peut empêcher l'émission du bilan final ; l'absence de bilan signifie que la complétude n'est pas attestée. La cadence réelle inclut les contrôles d'identité et dépend de la latence ECU.
 
+### Isolation des échanges réseau
+
+Le pont Windows dispose d'un lecteur TCP permanent. Android et Python conservent un propriétaire synchrone de la connexion ; ils traitent les AliveCheck pendant les intervalles de monitoring et contrôlent les trames disponibles avant chaque nouvelle requête UDS. Un diagnostic déjà en attente à cet instant est journalisé sans attribution à la nouvelle requête et entraîne la fermeture de la session. Python sérialise les accès de lecture/écriture et n'ajoute un résultat ECU positif à l'inventaire qu'après fermeture réussie de sa session. Ce contrôle préventif ne garantit pas la détection de toute réponse tardive identique qui arriverait après la nouvelle émission : DoIP ne comporte pas d'identifiant universel de transaction UDS. Les scénarios de régression sont écrits, pas encore exécutés.
+
 ### Sauvegarde mémoire limitée à une zone
 
 Android, le pont Windows et les Connectors Python lisent deux fois la même zone ECU décrite par un profil explicite. Le nombre de blocs est limité à 8 192 par lecture (soit au maximum 2 Mio avec des blocs de 256 octets). La durée globale de lecture est de 600 s ; sur Android elle inclut également l'établissement TCP/TLS et le routage. La découverte UDP initiale, la revalidation finale de la passerelle et l'export ZIP ne sont pas inclus dans ce budget. Le VIN et l'identifiant ECU sont revérifiés après chaque lot de 32 blocs ou fin de passe avant publication de progression, puis avant acceptation des deux lectures. La passerelle est contrôlée à nouveau avant publication, sans réémission automatique ni écriture ECU.
@@ -82,6 +86,10 @@ Automated TCP/UDP tests cover fragmented frames, stale acknowledgments, incorrec
 ### DID monitoring capture
 
 The CLI emits one JSON line per identity-verified sample, including VIN, gateway, tester, ECU, transport and elapsed time. The terminal record contains `samples`, `requestedSamples`, `complete` and `status` (`complete`, `canceled`, `failed`). Interrupted captures retain previously verified samples but are never declared complete. Transport disposal and optional trace journal closure precede successful completion. Sample lines retain `partial: true` until the terminal summary is available. Abrupt process termination can prevent that summary; a missing summary does not establish completeness. Actual sampling cadence includes identity checks and depends on ECU latency.
+
+### Network exchange isolation
+
+Windows uses a continuous TCP reader. Android and Python retain a synchronous connection owner, handle AliveCheck during monitoring intervals and examine available frames before each new UDS request. A diagnostic frame already queued at that boundary is traced without attributing it to the next request, and the session is closed. Python serializes socket ownership and only adds a positive ECU inventory result after successful session closure. This preventive check cannot detect every identical late reply racing a new transmission: DoIP has no universal UDS transaction identifier. Regression scenarios have been written but not run.
 
 ### Scoped memory backup
 
