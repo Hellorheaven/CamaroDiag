@@ -1892,6 +1892,7 @@ internal static class StandardProtocolCli
                 return 2;
             progress = new DoIpSequenceProgress(sequence.Vin, o.Host, gateway.LogicalAddress,
                 o.Tester, o.Ecu, o.UseTls, sequence.Commands.Length);
+            var activeProgress = progress;
             cancellation.Token.ThrowIfCancellationRequested();
             await DoIpVehicleDiscovery.RequireCurrentIdentityAsync(gateway, timeout, cancellation.Token,
                 trace: journal is null ? null : journal.RecordDatagram);
@@ -1907,15 +1908,15 @@ internal static class StandardProtocolCli
                 {
                     // A verified response is still partial until all commands
                     // and both resource disposals have succeeded.
-                    Console.Error.WriteLine(progress.RecordVerified(index, reply));
+                    Console.Error.WriteLine(activeProgress.RecordVerified(index, reply));
                     Console.WriteLine(string.Format(DoIpConsolePresentation.Text("SequenceReply"),
                         index, Convert.ToHexString(reply)));
                 },
                 TimeSpan.FromMilliseconds(o.DoIpP2Ms), TimeSpan.FromMilliseconds(o.DoIpP2StarMs));
             }
-            if (count != progress.CommandsCompleted)
+            if (count != activeProgress.CommandsCompleted)
                 throw new InvalidDataException("DoIP sequence reply count changed.");
-            Console.Error.WriteLine(progress.Summary(complete: true));
+            Console.Error.WriteLine(activeProgress.Summary(complete: true));
             Console.WriteLine(string.Format(DoIpConsolePresentation.Text("SequenceComplete"), count));
             return 0;
         }
