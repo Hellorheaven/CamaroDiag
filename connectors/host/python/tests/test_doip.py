@@ -629,8 +629,9 @@ class DoIpTests(unittest.TestCase):
                 client = session.return_value.__enter__.return_value
                 client.verify_vin.return_value = VIN
                 replies = [bytes.fromhex("62F190"), bytes.fromhex("62F187")]
-                def exchange_sequence(commands, on_reply):
+                def exchange_sequence(commands, on_reply, *, expected_vin=None):
                     self.assertEqual(commands, parse_commands("22F190;22F187"))
+                    self.assertEqual(expected_vin, VIN)
                     on_reply(1, replies[0])
                     if outcome == "second_command_error":
                         raise DoIpError("Second reply unavailable")
@@ -1617,6 +1618,55 @@ class DoIpTests(unittest.TestCase):
         self.assertFalse(client._busy)
         self.assertFalse(client._operation_lock.locked())
         client.close.assert_not_called()
+
+    def test_sequence_vin_is_checked_inside_exclusive_operation_before_first_command(self):
+        client = Session.__new__(Session)
+        client.gateway = GATEWAY
+        client._operation_lock = threading.Lock()
+        client._busy = False
+        client.close = unittest.mock.Mock()
+        command = bytes.fromhex("22F187")
+        vin_reply = bytes.fromhex("62F190") + VIN.encode("ascii")
+        reply = bytes.fromhex("62F187") + b"VERSION"
+        calls = []
+        def exchange(request, **_):
+            self.assertTrue(client._operation_lock.locked())
+            self.assertTrue(client._busy)
+            calls.append(request)
+            return vin_reply if request == bytes.fromhex("22F190") else reply
+        client._exchange_owned = unittest.mock.Mock(side_effect=exchange)
+        progress = []
+        completed = client.exchange_sequence((command,),
+            lambda index, response: progress.append((index, response)),
+            expected_vin=VIN)
+        self.assertEqual(completed, [reply])
+        self.assertEqual(calls, [bytes.fromhex("22F190"), command])
+        self.assertEqual(progress, [(1, reply)])
+        self.assertFalse(client._busy)
+        self.assertFalse(client._operation_lock.locked())
+        client.close.assert_not_called()
+
+    def test_sequence_identity_failure_retires_socket_before_command_tx(self):
+        command = bytes.fromhex("22F187")
+        for observed in (
+                bytes.fromhex("62F190") + VIN[:-1].encode("ascii") + b"7",
+                bytes.fromhex("62F190") + b"SHORT",
+                bytes.fromhex("62F190") + bytes((0xFF,)) * 17):
+            with self.subTest(observed=observed):
+                client = Session.__new__(Session)
+                client.gateway = GATEWAY
+                client._operation_lock = threading.Lock()
+                client._busy = False
+                client.close = unittest.mock.Mock()
+                client._exchange_owned = unittest.mock.Mock(return_value=observed)
+                callback = unittest.mock.Mock()
+                with self.assertRaises(DoIpError):
+                    client.exchange_sequence((command,), callback, expected_vin=VIN)
+                client._exchange_owned.assert_called_once_with(bytes.fromhex("22F190"))
+                callback.assert_not_called()
+                client.close.assert_called_once()
+                self.assertFalse(client._busy)
+                self.assertFalse(client._operation_lock.locked())
 
     def test_sequence_rejects_other_thread_while_first_command_is_pending(self):
         client = Session.__new__(Session)
