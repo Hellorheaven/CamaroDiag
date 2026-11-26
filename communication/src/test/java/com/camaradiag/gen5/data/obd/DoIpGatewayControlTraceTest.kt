@@ -165,6 +165,62 @@ class DoIpGatewayControlTraceTest {
         assertTrue(runCatching { read(archive(first, first, extra = true)) }.isFailure)
     }
 
+    @Test fun queuedUnsolicitedResponseCannotSatisfyNextDidRequest(): Unit = runBlocking {
+        val loopback = InetAddress.getByName("127.0.0.1")
+        fun bytes(value: String) = value.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
+        DatagramSocket(0, loopback).use { udp ->
+            java.net.ServerSocket(0, 1, loopback).use { tcp ->
+                udp.soTimeout = 5000
+                tcp.soTimeout = 5000
+                val worker = Executors.newSingleThreadExecutor()
+                val queued = java.util.concurrent.CountDownLatch(1)
+                try {
+                    val server = worker.submit {
+                        respond(udp, pdu(255, 1), identity())
+                        tcp.accept().use { socket ->
+                            socket.soTimeout = 5000
+                            val input = java.io.DataInputStream(socket.getInputStream())
+                            val output = socket.getOutputStream()
+                            fun receive(type: Int, body: ByteArray) {
+                                val header = ByteArray(8).also { input.readFully(it) }
+                                val size = ByteBuffer.wrap(header).getInt(4)
+                                assertTrue(size in 0..65536)
+                                val payload = ByteArray(size).also { input.readFully(it) }
+                                assertArrayEquals(pdu(2, type, body), header + payload)
+                            }
+                            receive(5, bytes("0E800000000000"))
+                            output.write(pdu(2, 6, bytes("0E8010001000000000")))
+                            output.flush()
+                            receive(0x8001, bytes("0E80123422F190"))
+                            val verified = pdu(2, 0x8001, bytes("12340E8062F190") + vin.toByteArray(Charsets.US_ASCII))
+                            val unsolicited = pdu(2, 0x8001, bytes("12340E8062F187AABB"))
+                            output.write(verified + unsolicited)
+                            output.flush()
+                            queued.countDown()
+                            assertEquals("No second diagnostic request may be transmitted", -1, input.read())
+                        }
+                    }
+                    val target = DoIpDirectRead.Target.parse("127.0.0.1", "0E80", "1234", vin, false)
+                    val events = mutableListOf<DoIpDirectRead.Trace>()
+                    val wireTrace = mutableListOf<DoIpDirectRead.ControlTrace>()
+                    val result = runCatching {
+                        DoIpDirectRead.readAt(target, DoIpDirectRead.Operation.DID, did = 0xF187,
+                            timeoutMs = 2000, udpPort = udp.localPort, tcpPort = tcp.localPort,
+                            onTrace = {
+                                events += it
+                                if (it.direction == "RX") assertTrue(queued.await(2, TimeUnit.SECONDS))
+                            }, onControlTrace = { wireTrace += it })
+                    }
+                    server.get(6, TimeUnit.SECONDS)
+                    assertTrue(result.isFailure)
+                    assertEquals(listOf("22F190"), events.filter { it.direction == "TX" }.map { it.payloadHex })
+                    assertTrue(wireTrace.any { it.direction == "RX" && it.payloadHex ==
+                        hex(pdu(2, 0x8001, bytes("12340E8062F187AABB"))) })
+                } finally { worker.shutdownNow() }
+            }
+        }
+    }
+
     @Test fun discoverySourceRequiresExpectedIpv6Scope() {
         val raw = InetAddress.getByName("fe80::2").address
         val matched = java.net.Inet6Address.getByAddress(null, raw, 3)
