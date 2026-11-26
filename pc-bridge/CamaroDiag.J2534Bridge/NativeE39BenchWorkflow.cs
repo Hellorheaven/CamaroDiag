@@ -142,11 +142,15 @@ internal static class NativeE39BenchWorkflow
         {
             token.ThrowIfCancellationRequested();
             uint? supply = await link.ReadSupplyMillivoltsAsync(token);
+            // Some adapter drivers can return a value after cancellation.
+            // Never treat that late result as a valid preflight or completion.
+            token.ThrowIfCancellationRequested();
             if (!supply.HasValue || supply.Value < options.MinimumSupplyMillivolts ||
                 supply.Value > options.MaximumSupplyMillivolts)
                 throw new IOException("Unsafe supply during complete image verification.");
             int length = Math.Min(chunkSize, expected.Length - offset);
             byte[] actual = await link.ReadFlashBytesAsync((uint)offset, length, token);
+            token.ThrowIfCancellationRequested();
             if (actual.Length != length ||
                 !CryptographicOperations.FixedTimeEquals(actual, expected.AsSpan(offset, length)))
                 throw new InvalidDataException($"Complete native image differs at chunk 0x{offset:X6}.");
