@@ -35,8 +35,7 @@ jobs:
         run: |
           set -euo pipefail
           if gh release view "$STABLE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "Stable release $STABLE_TAG already exists: refusing overwrite." >&2
-            exit 1
+            echo "Stable release $STABLE_TAG exists; verify exact metadata later without overwriting."
           fi
           gh release view "$SOURCE_TAG" --repo "$GITHUB_REPOSITORY" \
             --json isPrerelease,tagName,assets \
@@ -67,12 +66,16 @@ jobs:
           - **Version de test fonctionnel** : C6 et certaines capacités matérielles restent non qualifiés. Ne pas utiliser pour programmer un ECU avant validation.
           - Pas d'installateur Windows dans cette publication Android : dernière version Windows complète v2.0.45.
           EOF
-          gh release create "$STABLE_TAG" CamaroDiag-release.apk \
-            --repo "$GITHUB_REPOSITORY" \
-            --target "$SOURCE_SHA" \
-            --title "CamaroDiag v2.0.46 - APK Android (PR117)" \
-            --notes-file android-release-notes.md \
-            --latest
+          if ! gh release view "$STABLE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create "$STABLE_TAG" CamaroDiag-release.apk \
+              --repo "$GITHUB_REPOSITORY" \
+              --target "$SOURCE_SHA" \
+              --title "CamaroDiag v2.0.46 - APK Android (PR117)" \
+              --notes-file android-release-notes.md \
+              --latest
+          else
+            echo "Existing stable release preserved; no asset replacement."
+          fi
       - name: Verify latest release matches Android updater contract
         shell: bash
         run: |
@@ -81,8 +84,9 @@ jobs:
             gh api "repos/$GITHUB_REPOSITORY/releases/latest" > latest.json
             if jq -e --arg tag "$STABLE_TAG" \
               '.tag_name == $tag and .draft == false and .prerelease == false and
-               (.body | test("Android versionCode\\\\s*:\\\\s*63")) and
+               (.body | contains("Android versionCode: 63")) and
                ([.assets[] | select(.name == "CamaroDiag-release.apk") |
+                 select(.digest == "sha256:2092fb259971319b68fb15d687e1fa5fbb7ab56855ada873ce46425e902f8027") |
                  .browser_download_url] | length == 1)' latest.json >/dev/null; then
               echo "In-app release metadata verified for $STABLE_TAG"
               exit 0
