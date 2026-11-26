@@ -953,18 +953,34 @@ class Session:
             remaining(response_deadline)
             return result
 
-    def exchange_sequence(self, commands: tuple[bytes, ...], on_reply=lambda *_: None) -> list[bytes]:
-        """Execute the entire approved sequence on one exclusive TCP/TLS owner."""
+    def exchange_sequence(self, commands: tuple[bytes, ...], on_reply=lambda *_: None, *,
+                          expected_vin: str | None = None) -> list[bytes]:
+        """One exclusive sequence including the ECU VIN check before command TX."""
         frozen = tuple(bytes(command) for command in commands)
         if (not 1 <= len(frozen) <= 16 or
                 any(not 1 <= len(command) <= 4091 for command in frozen) or
                 sum(map(len, frozen)) > 4091):
             raise DoIpError("Invalid command sequence")
+        if expected_vin is not None and (
+                not valid_vin(expected_vin) or self.gateway.vin != expected_vin):
+            raise DoIpError("Sequence VIN differs from observed gateway")
         if not self._operation_lock.acquire(blocking=False):
             raise DoIpError("Concurrent diagnostic sequence")
         self._busy = True
         replies = []
         try:
+            if expected_vin is not None:
+                # The VIN request and the first approved command share the
+                # same lock. No caller can change the ECU context in between.
+                observed_reply = self._exchange_owned(bytes.fromhex("22F190"))
+                if len(observed_reply) != 20:
+                    raise DoIpError("Malformed ECU VIN during confirmed sequence")
+                try:
+                    observed_vin = observed_reply[3:].decode("ascii")
+                except UnicodeDecodeError as error:
+                    raise DoIpError("Malformed ECU VIN during confirmed sequence") from error
+                if observed_vin != expected_vin:
+                    raise DoIpError("ECU VIN changed before confirmed sequence")
             for index, command in enumerate(frozen, 1):
                 reply = self._exchange_owned(command)
                 replies.append(reply)
