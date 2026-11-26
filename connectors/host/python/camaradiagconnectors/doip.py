@@ -684,7 +684,7 @@ def inventory_ecus(gateway: Gateway, expected: str, tester: int, targets: tuple[
         return sink
 
     require_gateway(sink_for(targets[0]))
-    for ecu in targets:
+    for index, ecu in enumerate(targets):
         sink = sink_for(ecu)
         try:
             with Session(gateway, tester, ecu, tls=tls, timeout=timeout, trace=sink, context=context,
@@ -715,7 +715,9 @@ def inventory_ecus(gateway: Gateway, expected: str, tester: int, targets: tuple[
         except (DoIpError, OSError, EOFError):
             rows.append({"ecu": f"{ecu:04X}", "status": "unverified",
                          "reason": "communication_or_identity_failure"})
-        require_gateway(sink)
+        # This revalidation also prepares the next target. Preserve the
+        # established trace attribution (final check is gateway-wide).
+        require_gateway(sink_for(targets[index + 1]) if index + 1 < len(targets) else trace)
         if on_progress is not None:
             # Do not expose mutable internal rows, or publish before gateway
             # revalidation. Consumer errors terminate the inventory.
