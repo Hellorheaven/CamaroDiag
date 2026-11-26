@@ -72,9 +72,10 @@ internal sealed partial class BridgeDesktopForm
         functionalCancellation = cancellation;
         busy = true;
         completedEvap = null;
+        completedClear = null;
         completedJ1979 = null;
         completedFunctionalChecks = [];
-        functionalRunAll.Enabled = functionalRunJ1979.Enabled = functionalRunEvap.Enabled =
+        functionalRunAll.Enabled = functionalRunJ1979.Enabled = functionalRunEvap.Enabled = functionalRunClear.Enabled =
             functionalGoogleSignIn.Enabled = functionalExport.Enabled = functionalEvapVin.Enabled = false;
         functionalCancel.Enabled = true;
         functionalResults.Text = J1979RecipeText("EvapRunning");
@@ -130,7 +131,7 @@ internal sealed partial class BridgeDesktopForm
             busy = false;
             functionalCancel.Enabled = false;
             functionalGoogleSignIn.Enabled = functionalEvapVin.Enabled = true;
-            functionalRunAll.Enabled = functionalRunJ1979.Enabled = functionalRunEvap.Enabled =
+            functionalRunAll.Enabled = functionalRunJ1979.Enabled = functionalRunEvap.Enabled = functionalRunClear.Enabled =
                 DateTimeOffset.UtcNow < functionalAuthorizedUntil;
         }
     }
