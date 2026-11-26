@@ -323,6 +323,19 @@ class PersistentEcuWriteJournal private constructor(
          * writer, truncating the file, or contacting any hardware. Identity must
          * be supplied independently; a different target is not accepted.
          */
+        /** Verify the exact bytes consumed by a recovery inspector, not a separate file read. */
+        internal fun inspectSnapshot(
+            file: File,
+            target: EcuProgrammingDriverContract.FirmwareTarget,
+            expectedVin: String,
+            raw: ByteArray
+        ): Audit = try {
+            if (raw.size.toLong() !in 1L..MAX_JOURNAL_BYTES) Audit(false, 0)
+            else PersistentEcuWriteJournal(file, target, expectedVin, false).inspectLocked(raw = raw)
+        } catch (_: Exception) {
+            Audit(false, 0)
+        }
+
         fun inspectExisting(
             file: File,
             target: EcuProgrammingDriverContract.FirmwareTarget,

@@ -94,6 +94,24 @@ class EcuPhysicalBackupInspectionTest {
         Unit
     }
 
+    @Test fun auditUsesTheSuppliedSnapshotNotAnotherValidFileRead() = runBlocking {
+        val directory = Files.createTempDirectory("camarodiag-ecu-snapshot").toFile()
+        try {
+            val file = File(directory, "attempt.journal")
+            val journal = PersistentEcuWriteJournal(file, target, vin)
+            val before = file.readBytes()
+            journal.append(EcuWriteTransaction.Record(
+                EcuWriteTransaction.Stage.BASELINE_CHECKED, EcuBackupCoverage.Region.CALIBRATION,
+                0x1000, "a".repeat(64), "b".repeat(64)))
+            val after = file.readBytes()
+            assertEquals(0, PersistentEcuWriteJournal.inspectSnapshot(file, target, vin, before).baselineSectors)
+            assertEquals(1, PersistentEcuWriteJournal.inspectSnapshot(file, target, vin, after).baselineSectors)
+            assertFalse(PersistentEcuWriteJournal.inspectSnapshot(file, target, vin,
+                after.copyOf(after.size - 1)).valid)
+        } finally { directory.deleteRecursively() }
+        Unit
+    }
+
     @Test fun incompleteOrNonexistentJournalIsNeverMistakenForRecoveryProof() {
         val directory = Files.createTempDirectory("camarodiag-ecu-missing").toFile()
         try {

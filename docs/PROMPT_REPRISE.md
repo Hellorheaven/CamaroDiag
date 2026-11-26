@@ -1,3 +1,7 @@
+## Reprise C6 — cohérence du journal de récupération (26/11/2026)
+
+- Après les correctifs Android Mach-E, poursuite C6 : l'inspecteur hors ligne des secteurs physiques vérifie la chaîne SHA-256 sur **les mêmes octets** utilisés pour extraire les baselines ; refuse un journal modifié entre le début et la fin de l'inspection. Régression ajoutée sur snapshots avant/après et troncature. Aucune autorisation d'écriture/restauration déduite, aucune protection existante supprimée. Tests non exécutés avant clôture C6.
+
 ## PR117 — navigation de la cartographie ECU (26/11/2026)
 
 - Ajout du menu de navigation fixe par rubrique (véhicule, identification, signaux, traces, fichiers, éditeur, mémoire, expert, DoIP), suppression du doublon de titre, identification explicite du profil sélectionné et rappel si VIN divergent. Aucun contrôle de sécurité ou opération existante retiré ; DoIP reste repliable et visible pendant découverte/lecture. Non compilé avant clôture du chantier.

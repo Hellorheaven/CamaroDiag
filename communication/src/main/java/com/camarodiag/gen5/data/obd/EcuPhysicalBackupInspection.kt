@@ -46,17 +46,21 @@ object EcuPhysicalBackupInspection {
         val verified = mutableListOf<Sector>()
         var verifiedBytes = 0L
         return try {
-            // The journal header binds ECU family/controller/firmware/VIN, and
-            // its SHA-256 chain rejects altered/truncated or reordered records.
-            val audit = PersistentEcuWriteJournal.inspectExisting(journalFile, target, vin)
-            check(audit.valid) { "ECU journal is missing, altered or out of sequence." }
-            val length = journalFile.length()
-            check(length in 1L..MAX_JOURNAL_BYTES) { "Invalid ECU journal size." }
-            val data = ByteArray(length.toInt())
-            DataInputStream(journalFile.inputStream().buffered()).use { input ->
-                input.readFully(data)
-                check(input.read() == -1) { "ECU journal changed while being inspected." }
+            // Audit exactly the snapshot used to derive the baseline list.
+            // A different read of a changing file must never supply the evidence.
+            fun readSnapshot(): ByteArray {
+                val length = journalFile.length()
+                check(length in 1L..MAX_JOURNAL_BYTES) { "Invalid ECU journal size." }
+                return ByteArray(length.toInt()).also { data ->
+                    DataInputStream(journalFile.inputStream().buffered()).use { input ->
+                        input.readFully(data)
+                        check(input.read() == -1) { "ECU journal changed while being inspected." }
+                    }
+                }
             }
+            val data = readSnapshot()
+            val audit = PersistentEcuWriteJournal.inspectSnapshot(journalFile, target, vin, data)
+            check(audit.valid) { "ECU journal is missing, altered or out of sequence." }
             val records = String(data, StandardCharsets.UTF_8).trimEnd('\n').split('\n')
             val expected = linkedMapOf<Pair<EcuBackupCoverage.Region, Long>, String>()
             for (line in records.drop(1)) {
@@ -132,6 +136,9 @@ object EcuPhysicalBackupInspection {
             }
             check(observed.size == expectedCount) {
                 "Not every original ECU sector has a matching physical backup."
+            }
+            check(data.contentEquals(readSnapshot())) {
+                "ECU journal changed during physical backup inspection."
             }
             Report(true, expectedCount, verified.sortedWith(compareBy({ it.region.name },
                 { it.address })), verifiedBytes, "",
