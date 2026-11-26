@@ -59,6 +59,7 @@ object EcuPhysicalBackupInspection {
         var expectedCount = 0
         var current: Long? = null
         var auditedSnapshot: ByteArray? = null
+        var auditedIdentity: FileIdentity? = null
         var auditedJournal: PersistentEcuWriteJournal.Audit? = null
         val verified = mutableListOf<Sector>()
         var verifiedBytes = 0L
@@ -82,6 +83,7 @@ object EcuPhysicalBackupInspection {
             val audit = PersistentEcuWriteJournal.inspectSnapshot(journalFile, target, vin, data)
             check(audit.valid) { "ECU journal is missing, altered or out of sequence." }
             auditedSnapshot = data
+            auditedIdentity = journalIdentity
             auditedJournal = audit
             val records = String(data, StandardCharsets.UTF_8).trimEnd('\n').split('\n')
             val expected = linkedMapOf<Pair<EcuBackupCoverage.Region, Long>, String>()
@@ -176,9 +178,13 @@ object EcuPhysicalBackupInspection {
             check(Files.isDirectory(directory.toPath(), LinkOption.NOFOLLOW_LINKS))
             val finalFiles = directory.listFiles() ?: error("Cannot re-enumerate original ECU sectors.")
             check(finalFiles.map { it.name }.toSet() == fileIdentities.keys &&
-                finalFiles.all { identity(it) == fileIdentities.getValue(it.name) }) {
+                finalFiles.all {
+                    checkActive()
+                    identity(it) == fileIdentities.getValue(it.name)
+                }) {
                 "Original ECU sector inventory changed during inspection."
             }
+            checkActive()
             Report(true, expectedCount, verified.sortedWith(compareBy({ it.region.name },
                 { it.address })), verifiedBytes, "",
                 uncertainAddress = audit.uncertainAddress,
@@ -190,11 +196,14 @@ object EcuPhysicalBackupInspection {
             checkActive()
             val stableAudit = auditedSnapshot?.let { snapshot ->
                 try {
-                    if (journalFile.length() != snapshot.size.toLong()) null
+                    val before = identity(journalFile)
+                    if (before != auditedIdentity || before.size != snapshot.size.toLong()) null
                     else DataInputStream(journalFile.inputStream().buffered()).use { input ->
                         val again = ByteArray(snapshot.size)
                         input.readFully(again)
-                        if (input.read() == -1 && snapshot.contentEquals(again)) auditedJournal else null
+                        checkActive()
+                        if (input.read() == -1 && snapshot.contentEquals(again) &&
+                            identity(journalFile) == before) auditedJournal else null
                     }
                 } catch (cancelled: java.util.concurrent.CancellationException) {
                     throw cancelled
