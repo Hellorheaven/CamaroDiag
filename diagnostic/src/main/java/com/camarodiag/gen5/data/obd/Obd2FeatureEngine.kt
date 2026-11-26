@@ -393,6 +393,14 @@ class Obd2FeatureEngine(
         ) to proved
     }
 
+    /** Fail closed when either speed or RPM is unavailable or nonzero.
+     * Called immediately before the separately consented Mode 04 operation
+     * within the manager's exclusive command session. No mutation here. */
+    suspend fun hasFreshStationaryEvidence(): Boolean = withHeaderlessRecords {
+        ObdStationaryEvidence.provesZero(0x0D, ask("010D", 1800L)) &&
+            ObdStationaryEvidence.provesZero(0x0C, ask("010C", 1800L))
+    }
+
     /** Per-service observations distinguish a positive zero count from no response. */
     suspend fun readDtcModeEvidence(): Map<Int, List<ObdDtc>?> = withHeaderlessRecords {
         linkedMapOf(
