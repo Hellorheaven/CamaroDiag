@@ -37,6 +37,10 @@ Pour une activation personnalisée, la valeur `0xE0` et les octets `01020304` ci
 
 La commande de diagnostic demande une confirmation explicite avant émission. **Une confirmation seule ne démontre pas l'identité et la sauvegarde des secteurs d'un ECU à programmer.** Les opérations susceptibles de modifier le véhicule doivent respecter l'avertissement OK puis la confirmation indépendante Oui/Non et toutes les vérifications de blocs physiques prévues dans `AGENTS.md`.
 
+### Inventaire des calculateurs
+
+L'inventaire UDS (F190) ou OBDonUDS (F802/F810) interroge uniquement les adresses logiques explicitement sélectionnées. Android et Windows affichent les résultats au fur et à mesure ; les CLI Windows et Python émettent des objets JSON `inventory_progress` sur stderr (avec cible, compteurs et `complete: false`) et conservent le résultat final sur stdout après fermeture du journal. Une ligne n'est publiée qu'après fermeture de sa session et revalidation de l'identité de la passerelle. Une erreur de transport ou d'identification ne prouve pas l'absence de l'ECU. Une interruption ou un changement d'identité ne produit pas de résultat final complet ; les observations antérieures restent partielles, sans autoriser une écriture. Les régressions ont été écrites, pas encore exécutées.
+
 ### Acquisition de données DID
 
 Le CLI `--monitor-did` / `--monitor-dids` et leurs variantes OBDonUDS publient une ligne JSON par échantillon vérifié, avec VIN, passerelle, testeur, ECU, transport et temps écoulé. Le bilan final contient `samples`, `requestedSamples`, `complete` et `status` (`complete`, `canceled`, `failed`). Une capture interrompue conserve les mesures précédemment vérifiées ; elle n'est jamais déclarée complète. La fermeture du transport et du journal éventuel précède le bilan complet. Les lignes d'échantillons restent marquées `partial: true` tant que le bilan n'est pas disponible. Un arrêt brutal du processus peut empêcher l'émission du bilan final ; l'absence de bilan signifie que la complétude n'est pas attestée. La cadence réelle inclut les contrôles d'identité et dépend de la latence ECU.
@@ -82,6 +86,10 @@ Only an explicitly supplied routing activation type (`--routing-activation-type`
 Use `--doip-discover --listen true --listen-ipv6-ifindex 3` for passive multicast, or `--doip-discover --multicast-ipv6-ifindex 3` to send a single UDP identification request to IPv6 `ff02::1`. The network interface index is illustrative and must be selected explicitly. Use `--doip-discover` for unicast/broadcast discovery, `--doip-status` for gateway status and `--doip-exchange` for a confirmed diagnostic exchange; `--uds-p2-ms` and `--uds-p2-star-ms` select independent UDS response windows. TLS never silently falls back to clear TCP.
 
 Automated TCP/UDP tests cover fragmented frames, stale acknowledgments, incorrect SID/protocol version, truncated responses, consistent gateway logical addresses across routing-confirmation replies, optional 13-byte OEM routing replies, repeated pending responses, **read and simulated UDS WriteDataByIdentifier (0x2E) with ACK or negative NRC**, and rejection of plaintext when TLS is selected. They use local simulated gateways and **do not validate any real vehicle, VCI, OEM authentication, BRS, or ECU writing/recovery**. Real-world evidence belongs to the owner-authorized Release acceptance plan (issue #48), after PR #95 closes.
+
+### ECU inventory
+
+UDS (F190) or OBDonUDS (F802/F810) inventory queries only explicitly selected logical addresses. Android and Windows display results progressively; Windows and Python CLIs emit JSON `inventory_progress` objects to stderr (target, counts and `complete: false`) and retain the final stdout result until the journal has closed. A row is published only after its session closes and the gateway identity is checked again. A transport or identification failure does not prove ECU absence. Cancellation or identity drift prevents a complete final result; earlier observations remain partial and do not authorize writing. Regression tests have been written but not executed.
 
 ### DID monitoring capture
 
