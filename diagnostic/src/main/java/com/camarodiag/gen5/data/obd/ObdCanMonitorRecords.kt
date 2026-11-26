@@ -1,4 +1,4 @@
-package com.camaradiag.gen5.data.obd
+package com.camarodiag.gen5.data.obd
 
 import java.util.Locale
 
