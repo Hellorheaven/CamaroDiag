@@ -1,0 +1,16 @@
+scope: protocol
+protocol: DoIP ISO 13400
+branch: chore/unified-ci
+pull_request: 117
+phase: final software acceptance; no claim of hardware qualification
+criteria:
+- UDP vehicle identification (IPv4/IPv6, VIN/EID, versions, gateway identity and status)
+- TCP/TLS routing activation, AliveCheck, diagnostic ACK/NACK, UDS NRC, deadlines and socket retirement
+- Read-only VIN, DID, DTC, ECU inventory and live DID monitoring through Android, Windows GUI/CLI and Python Connectors
+- Confirmed UDS sequence TX: separate OK/YES, immutable bytes, same-session VIN, exclusive route and no automatic retry
+- Sequence success only after TCP/TLS close, stable final gateway identity and trace close; partial failures retained
+- Scoped memory capture, double read, archive hash/CRC and offline integrity on supported platforms
+- Negative, cancellation, timeout, gateway substitution, concurrency and loopback regression suites
+- Debug Android/Windows/Connectors full validation with warnings treated as failures
+- No ECU hardware, bench, vehicle or Release tests at this stage
+C6 overall stays open; do not close other protocols or workstreams.
