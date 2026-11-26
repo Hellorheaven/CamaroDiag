@@ -59,6 +59,32 @@ class PhysicalRecoveryFolderTest {
         }
     }
 
+    @Test fun stagingCannotVerifyThroughSymbolicLink() {
+        val folder = java.nio.file.Files.createTempDirectory("recovery-test")
+        val outside = java.nio.file.Files.createTempFile("original", ".block")
+        val link = folder.resolve("alias.ecu-block")
+        try {
+            val data = byteArrayOf(1,2,3)
+            java.nio.file.Files.write(outside,data)
+            try {
+                java.nio.file.Files.createSymbolicLink(link,outside)
+            } catch (unsupported: UnsupportedOperationException) {
+                org.junit.Assume.assumeNoException(unsupported)
+            } catch (unsupported: java.nio.file.FileSystemException) {
+                org.junit.Assume.assumeNoException(unsupported)
+            }
+            val hash = java.security.MessageDigest.getInstance("SHA-256").digest(data)
+            assertThrows(IllegalStateException::class.java) {
+                PhysicalRecoveryFolder.verifyStagedFile(link.toFile(),3,hash) {}
+            }
+            assertArrayEquals(data,java.nio.file.Files.readAllBytes(outside))
+        } finally {
+            java.nio.file.Files.deleteIfExists(link)
+            java.nio.file.Files.deleteIfExists(folder)
+            java.nio.file.Files.deleteIfExists(outside)
+        }
+    }
+
     @Test fun requiresIndependentCompleteIdentity() {
         val identity = PhysicalRecoveryIdentity("1G1FA1RXXR0123456", "E39", "ECM", "OS-A")
         assertTrue(identity.valid)
