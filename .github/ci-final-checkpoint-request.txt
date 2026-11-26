@@ -31,3 +31,11 @@ corrected:
 - Windows DoIpVinReader: all fifteen decoder lambdas separate awaited byte array acquisition from ReadOnlySpan decoder arguments, plus VIN and DID decode
 - Android diagnostic Mode06: ObdCanMonitorRecords source and test use canonical Kotlin package, preserving referenced identity reassembler
 correction_commits: f80bb2ba516dbf796804d21f308a9bcf8a903b69, c4b750b7d3a90714298dc99535bb160afc8a0a07
+
+attempt: 4 -- grouped third-gate corrections
+previous_gate_sha: 199ac2bdbc9a9e9ad0b9fabec1406efd69966abf
+previous_gate: https://github.com/Hellorheaven/CamaroDiag/actions/runs/45800607732
+corrected:
+- Windows simulated DoIP ECU self-tests: six Decoders now consume byte arrays after await, preventing ReadOnlySpan across await
+- Android diagnostic unit tests: LFX simulated Obd2FeatureEngine uses explicit ObdCommandChannel constructor (new optional Boolean second argument)
+commits: 9fca7331b027f116569eb67f56fe6aec92242aa5, be041ae30259e6d7fe4dbaa8e722cc50f5c067ad
