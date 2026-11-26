@@ -34,6 +34,43 @@ def _read_only(req):
             len(req) == 3 and req[0] == 2 and req[2] == 0)
 
 
+# Mirror the firmware's known application record widths. Unknown PID
+# definitions are retained as RAW only; a capture cannot upgrade them.
+_ONE = {0x04,0x05,0x06,0x07,0x08,0x09,0x0A,0x0B,0x0D,0x0E,0x0F,0x11,
+        0x13,0x1D,0x2C,0x2D,0x2E,0x2F,0x30,0x33,0x45,0x46,0x47,0x48,
+        0x49,0x4A,0x4B,0x4C,0x52,0x5A,0x5B,0x5C,0x61,0x62}
+_TWO = {0x0C,0x10,0x1F,0x21,0x22,0x23,0x31,0x32,0x3C,0x3D,0x3E,0x3F,
+        0x42,0x43,0x44,0x4D,0x4E,0x53,0x54,0x59,0x5D,0x5E,0x63}
+
+
+def _positive_state(req, res):
+    mode = req[0]
+    echo = req[1:] if mode == 2 else req[1:2]
+    if not res.startswith(bytes((mode + 0x40,)) + echo):
+        return None
+    if mode in (3, 7, 10):
+        return 1 if len(res) >= 2 and len(res) == 2 + 2 * res[1] and all(
+            res[i:i+2] != bytes(2) for i in range(2, len(res), 2)) else None
+    pid = req[1]
+    offset = 3 if mode == 2 else 2
+    if pid % 32 == 0:
+        return 1 if len(res) == offset + 4 and not (pid == 0xE0 and res[-1] & 1) else None
+    if mode in (1, 2):
+        width = 2 if mode == 2 and pid == 2 else 4 if pid == 1 else 1 if pid in _ONE else 2 if pid in _TWO else 0
+        return (1 if len(res) == offset + width else None) if width else (2 if len(res) > offset else None)
+    if mode == 6:
+        return 1 if len(res) >= 10 and (len(res)-1) % 9 == 0 and all(
+            res[i] == pid for i in range(1, len(res), 9)) else None
+    if mode == 9:
+        if pid == 2:
+            return 1 if re.fullmatch(rb"\x49\x02\x01[A-HJ-NPR-Z0-9]{17}", res) else None
+        width = {4: 16, 6: 4, 10: 20}.get(pid)
+        if width:
+            return 1 if len(res) >= 3 and res[2] and len(res) == 3 + res[2]*width else None
+        return 2 if len(res) > 2 else None
+    return None
+
+
 def _exact(stream, size):
     chunks = bytearray()
     while len(chunks) < size:
@@ -80,10 +117,8 @@ def decode(stream):
                 req, res = body[8:8+req_len], body[8+req_len:]
                 if not _read_only(req):
                     raise ValueError("Unexpected mutating request in evidence")
-                if state in (1, 2):
-                    echo = req[1:] if req[0] == 2 else req[1:2]
-                    if not res.startswith(bytes((req[0] + 0x40,)) + echo):
-                        raise ValueError("Positive record does not match request")
+                if state in (1, 2) and _positive_state(req, res) != state:
+                    raise ValueError("Response shape or claimed evidence status is inconsistent")
                 if state == 3 and (len(res) != 3 or res[:2] != bytes((0x7F, req[0]))
                                    or res[2] in (0, 0x78)):
                     raise ValueError("Invalid terminal negative record")
