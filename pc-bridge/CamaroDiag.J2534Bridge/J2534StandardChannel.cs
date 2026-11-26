@@ -194,7 +194,9 @@ internal sealed class J2534StandardChannel : IDisposable
             data.AsSpan(offset, size - offset).ToArray());
     }
 
-    internal Frame? Receive(int timeoutMs = 1000, bool allowPwmIfr = false)
+    internal Frame? Receive(int timeoutMs = 1000) => Receive(timeoutMs, false);
+
+    internal Frame? Receive(int timeoutMs, bool allowPwmIfr)
     {
         EnsureConnected();
         if (timeoutMs is < 1 or > 30000)
