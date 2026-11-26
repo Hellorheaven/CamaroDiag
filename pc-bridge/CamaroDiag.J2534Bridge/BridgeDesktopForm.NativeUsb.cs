@@ -76,7 +76,7 @@ internal sealed partial class BridgeDesktopForm
                     }
                     if(!Current())throw new OperationCanceledException();
                     using var json=new FileStream(reportPath,FileMode.CreateNew,FileAccess.Write,FileShare.None);
-                    J1979UsbCapture.Result result;var timer=Stopwatch.StartNew();
+                    J1979UsbCapture.Result result=new(false,false,0,"USB campaign not started");var timer=Stopwatch.StartNew();
                     const int budget=60000;
                     try{
                         using var raw=new FileStream(rawPath,FileMode.CreateNew,FileAccess.Write,FileShare.None);
@@ -88,7 +88,7 @@ internal sealed partial class BridgeDesktopForm
                         result=new J1979UsbCapture(new J1979SerialPortLink(port,Current)).Run(tx,rx,extended,budget,key,raw);
                         raw.Flush(flushToDisk:true);
                     }catch(Exception ex) when(ex is IOException or UnauthorizedAccessException or TimeoutException or InvalidOperationException or OperationCanceledException){
-                        result=new(false,false,0,ex.Message);
+                        result=result with {FrameIntegrityVerified=false,Error=ex.Message,Summary=null};
                     }
                     bool cancelled=!Current();
                     J1979NativeReport.Write(json,result,typeof(BridgeDesktopForm).Assembly.GetName().Version?.ToString()??"",
@@ -114,6 +114,10 @@ internal sealed partial class BridgeDesktopForm
                         text.AppendLine($"  {measurement.Name}: {measurement.Number.ToString("0.###",CultureInfo.CurrentCulture)} {measurement.Unit}");
                     if(step.DtcCodes is { } codes)
                         text.AppendLine("  "+(codes.Count==0?J1979RecipeText("NativeUsbZeroDtc"):string.Join(", ",codes)));
+                    if(step.MonitorRecords is { } monitors)
+                        foreach(var monitor in monitors)
+                            text.AppendLine("  "+string.Format(CultureInfo.CurrentUICulture,J1979RecipeText("NativeUsbMonitorEncoded"),
+                                monitor.MonitorId,monitor.TestId,monitor.UnitScalingId,monitor.ValueEncoded,monitor.MinimumEncoded,monitor.MaximumEncoded));
                     if(step.NegativeResponseCode is { } nrc)
                         text.AppendLine($"  NRC 0x{nrc:X2}");
                 }

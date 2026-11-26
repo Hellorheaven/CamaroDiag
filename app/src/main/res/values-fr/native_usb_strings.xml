@@ -20,4 +20,7 @@
     <string name="functional_native_usb_dtc_permanent">Défauts permanents (0A)</string>
     <string name="functional_native_usb_dtc_zero">0 code vérifié</string>
     <string name="functional_native_usb_pid">Mode %1$s • PID %2$s</string>
+    <string name="functional_native_usb_monitors">Moniteurs OBD — données encodées</string>
+    <string name="functional_native_usb_monitor_id">MID %1$s • TID %2$s • Échelle %3$s</string>
+    <string name="functional_native_usb_monitor_words">Valeur %1$s • Min %2$s • Max %3$s (hex)</string>
 </resources>

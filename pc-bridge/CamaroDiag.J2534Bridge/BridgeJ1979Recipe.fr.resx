@@ -71,4 +71,5 @@
   <data name="NativeUsbVinMismatch" xml:space="preserve"><value>VIN indisponible ou différent du véhicule sélectionné.</value></data>
   <data name="NativeUsbProvenance" xml:space="preserve"><value>Preuves enregistrées uniquement ; provenance physique non établie.</value></data>
   <data name="NativeUsbZeroDtc" xml:space="preserve"><value>0 code vérifié</value></data>
+  <data name="NativeUsbMonitorEncoded" xml:space="preserve"><value>MID {0:X2} • TID {1:X2} • Échelle {2:X2} : valeur {3:X4}, min {4:X4}, max {5:X4} (hex)</value></data>
 </root>

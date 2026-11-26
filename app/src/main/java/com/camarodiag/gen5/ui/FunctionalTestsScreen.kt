@@ -365,6 +365,24 @@ fun FunctionalTestsScreen(
                 }
             }
         }
+        if (values != null && values.monitors.isNotEmpty()) {
+            item { Text(stringResource(R.string.functional_native_usb_monitors),style=MaterialTheme.typography.titleMedium) }
+            items(values.monitors.size,key={ "native-monitor:"+it }) { index ->
+                val monitor=values.monitors[index]
+                Card(modifier=Modifier.fillMaxWidth()) {
+                    Column(modifier=Modifier.padding(12.dp)) {
+                        Text(stringResource(R.string.functional_native_usb_monitor_id,
+                            "%02X".format(java.util.Locale.ROOT,monitor.mid),
+                            "%02X".format(java.util.Locale.ROOT,monitor.tid),
+                            "%02X".format(java.util.Locale.ROOT,monitor.scaling)))
+                        Text(stringResource(R.string.functional_native_usb_monitor_words,
+                            "%04X".format(java.util.Locale.ROOT,monitor.value),
+                            "%04X".format(java.util.Locale.ROOT,monitor.minimum),
+                            "%04X".format(java.util.Locale.ROOT,monitor.maximum)))
+                    }
+                }
+            }
+        }
         item { Spacer(Modifier.height(12.dp)) }
     }
 }

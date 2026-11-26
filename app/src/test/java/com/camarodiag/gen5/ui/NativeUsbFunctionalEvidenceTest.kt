@@ -48,6 +48,16 @@ class NativeUsbFunctionalEvidenceTest {
         assertNull(cancelled.context?.observedVin)
         assertEquals(FunctionalTestOutcome.NOT_TESTED,cancelled.checks.first { it.key=="native:dtc3" }.outcome)
     }
+    @Test fun monitorRowsMustMatchPositiveRawReply() {
+        val input=report(true)
+        val monitor=JSONObject().put("monitor_id",1).put("test_id",1).put("unit_scaling_id",2)
+            .put("value_encoded",0x1234).put("minimum_encoded",0).put("maximum_encoded",65535)
+        input.getJSONArray("steps").put(JSONObject().put("request_hex","0601").put("status","PASSED")
+            .put("response_hex","4601010212340000FFFF").put("monitor_records",JSONArray().put(monitor)))
+        assertEquals(0x1234,NativeUsbFunctionalEvidence.diagnosticValues(input)!!.monitors.single().value)
+        monitor.put("value_encoded",0x5678)
+        assertTrue(NativeUsbFunctionalEvidence.diagnosticValues(input)!!.monitors.isEmpty())
+    }
     @Test fun inconsistentCampaignAndWrongVinAreNotPasses() {
         val bad=NativeUsbFunctionalEvidence.results(state,report(false)).checks.associateBy { it.key }
         assertEquals(FunctionalTestOutcome.FAILED,bad["native:integrity"]?.outcome)

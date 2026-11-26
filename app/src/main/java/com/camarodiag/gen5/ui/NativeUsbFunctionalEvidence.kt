@@ -22,8 +22,9 @@ internal object NativeUsbFunctionalEvidence {
         FunctionalTestOutcome.NOT_TESTED,"No verified evidence.","Aucune preuve vérifiée.") }
 
     data class Measurement(val mode: Int, val pid: Int, val name: String, val number: Double, val unit: String)
+    data class Monitor(val mid: Int, val tid: Int, val scaling: Int, val value: Int, val minimum: Int, val maximum: Int)
     data class DiagnosticValues(val observedVin: String?, val dtcs: Map<Int, List<String>?>,
-        val measurements: List<Measurement>)
+        val measurements: List<Measurement>, val monitors: List<Monitor>)
 
     /** Only a coherent authenticated-session report can feed the value display.
      * Missing mode evidence remains null, never an empty fault list. */
@@ -34,6 +35,7 @@ internal object NativeUsbFunctionalEvidence {
         val vin = report.optString("observed_vin").takeIf { it.matches(Regex("[A-HJ-NPR-Z0-9]{17}")) }
         val dtcs = linkedMapOf<Int, List<String>?>(3 to null, 7 to null, 10 to null)
         val measured = linkedMapOf<Pair<Int, Int>, Measurement>()
+        val monitors = mutableListOf<Monitor>()
         for (i in 0 until steps.length()) {
             val step = steps.optJSONObject(i) ?: continue
             if (step.optString("status") != "PASSED") continue
@@ -43,6 +45,32 @@ internal object NativeUsbFunctionalEvidence {
                 val codes = step.optJSONArray("dtc_codes") ?: continue
                 val list = (0 until codes.length()).map { codes.optString(it) }
                 if (list.all { it.matches(Regex("[PCBU][0-3][0-9A-F]{3}")) }) dtcs[mode] = list
+            }
+            if (request.matches(Regex("06[0-9A-F]{2}"))) {
+                val mid = request.takeLast(2).toInt(16)
+                if (mid % 32 != 0) {
+                    val response = step.optString("response_hex")
+                    val encoded = step.optJSONArray("monitor_records")
+                    if (encoded != null && response.startsWith("46") &&
+                        response.length == 2 + 18 * encoded.length() &&
+                        encoded.length() in 1..455 && response.matches(Regex("[0-9A-F]+"))) {
+                        val parsed = mutableListOf<Monitor>()
+                        for (j in 0 until encoded.length()) {
+                            val start = 2 + j * 18
+                            val raw = response.substring(start, start + 18)
+                            val row = encoded.optJSONObject(j) ?: break
+                            val item = Monitor(raw.substring(0,2).toInt(16), raw.substring(2,4).toInt(16),
+                                raw.substring(4,6).toInt(16), raw.substring(6,10).toInt(16),
+                                raw.substring(10,14).toInt(16), raw.substring(14,18).toInt(16))
+                            if (item.mid != mid || row.optInt("monitor_id",-1) != item.mid ||
+                                row.optInt("test_id",-1) != item.tid || row.optInt("unit_scaling_id",-1) != item.scaling ||
+                                row.optInt("value_encoded",-1) != item.value || row.optInt("minimum_encoded",-1) != item.minimum ||
+                                row.optInt("maximum_encoded",-1) != item.maximum) break
+                            parsed.add(item)
+                        }
+                        if (parsed.size == encoded.length()) monitors.addAll(parsed)
+                    }
+                }
             }
             val value = step.optJSONObject("measurement") ?: continue
             val mode = value.optInt("mode",-1)
@@ -55,7 +83,7 @@ internal object NativeUsbFunctionalEvidence {
                 !number.isFinite() || name.isBlank() || unit.isBlank()) continue
             measured[mode to pid] = Measurement(mode,pid,name,number,unit)
         }
-        return DiagnosticValues(vin,dtcs,measured.values.sortedWith(compareBy({ it.mode },{ it.pid })))
+        return DiagnosticValues(vin,dtcs,measured.values.sortedWith(compareBy({ it.mode },{ it.pid })),monitors.toList())
     }
 
     fun results(state: FunctionalTestState, report: JSONObject): FunctionalTestState {
