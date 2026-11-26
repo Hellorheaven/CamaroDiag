@@ -914,8 +914,12 @@ internal sealed partial class BridgeDesktopForm
                                         {
                                             "timeout" => "InventoryReasonTimeout",
                                             "identity_or_response_invalid" => "InventoryReasonIdentity",
+                                            "uds_negative_response" => "InventoryReasonNrc",
+                                            "header_nack" => "InventoryReasonHeader",
+                                            "routing_denied" => "InventoryReasonRouting",
+                                            "diagnostic_nack" => "InventoryReasonAck",
                                             _ => "InventoryReasonCommunication"
-                                        }), Color.DarkOrange);
+                                        }) + (row.FailureCode is byte code ? $" (0x{code:X2})" : ""), Color.DarkOrange);
                                     if (row.ProtocolValue is byte protocol)
                                         ConsoleLine("SYSTEM", string.Format(DoIpConsolePresentation.Text(protocol == 1 ?
                                             "InventoryObdSupported" : "InventoryObdUnrecognized"), row.Ecu, protocol),
