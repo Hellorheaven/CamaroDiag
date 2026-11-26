@@ -22,6 +22,7 @@ internal static class BridgeSelfTests
         checks += ObdJ1979EvapTestSelfTests.Run();
         checks += ObdJ1979ClearRecipeSelfTests.Run();
         checks += ObdJ1979LegacyScanSelfTests.Run();
+        checks += ObdJ1979LegacyMutationSelfTests.Run();
         void Assert(bool condition, string name)
         {
             checks++;
