@@ -635,6 +635,16 @@ class Obd2FeatureEngine(
     private data class VehicleInfoInventory(val supported: Set<Int>, val complete: Boolean,
         val reads: List<ObdVehicleInfoRead>)
 
+    /** Strip only the exact command echo; never discard an unrelated diagnostic record.
+     * ELM echo settings are not guaranteed on every supported connector. */
+    private fun mode09Records(response: String, type: Int): List<List<Int>> {
+        val command = "09%02X".format(Locale.ROOT, type)
+        val clean = response.lineSequence()
+            .filterNot { it.trim().removeSuffix(">").filterNot(Char::isWhitespace).equals(command, ignoreCase = true) }
+            .joinToString("\n")
+        return ObdNumberedIdentityFrames.parseAll(clean).orEmpty()
+    }
+
     /** The union is only an inventory, not proof that every ECU supports each type.
      * Preserve complete records separately; no invented units or counter labels. */
     private suspend fun discoverVehicleInfo(): VehicleInfoInventory = withHeaderlessRecords {
@@ -644,16 +654,20 @@ class Obd2FeatureEngine(
         for (base in 0..0xE0 step 0x20) {
             currentCoroutineContext().ensureActive()
             val response = ask("09%02X".format(Locale.ROOT, base), 2500L)
-            val records = ObdNumberedIdentityFrames.parseAll(response).orEmpty()
-                .filter { it.size == 6 && it[0] == 0x49 && it[1] == base }
+            val messages = mode09Records(response, base)
+            val records = messages.filter { it.size == 6 && it[0] == 0x49 && it[1] == base }
             reads += ObdVehicleInfoRead(base, response, records)
             if (records.isEmpty()) break
+            // Keep verified observations, but do not certify completeness when
+            // another responder returned a malformed or unrelated record.
+            val pageComplete = messages.size == records.size
             for (record in records) {
                 for (bit in 0 until 31) {
                     if ((record[2 + bit / 8] and (1 shl (7 - bit % 8))) != 0)
                         supported += base + bit + 1
                 }
             }
+            if (!pageComplete) break
             if (records.none { (it[5] and 1) != 0 }) {
                 complete = true
                 break
@@ -664,7 +678,7 @@ class Obd2FeatureEngine(
         for (type in supported.filterNot { it in setOf(2,4,6,10) }.sorted()) {
             currentCoroutineContext().ensureActive()
             val response = ask("09%02X".format(Locale.ROOT, type), 2500L)
-            val records = ObdNumberedIdentityFrames.parseAll(response).orEmpty()
+            val records = mode09Records(response, type)
                 .filter { it.size > 2 && it[0] == 0x49 && it[1] == type }
             reads += ObdVehicleInfoRead(type, response, records)
         }
