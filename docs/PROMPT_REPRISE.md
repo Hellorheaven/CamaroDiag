@@ -1,3 +1,7 @@
+## J1979 — présentation commune des résultats natifs (26/11/2026)
+
+- Scan OBD et recette Android partagent désormais les composants de présentation MIL/readiness et Mode 06. Dans le scan natif, absence explicite, déclencheur freeze non vérifié et valeurs freeze non obtenues sont distingués. Mots Mode 06 encodés affichés sans verdict inventé. Ressources FR/EN. C6/J1979 ouverts, aucun test intermédiaire, fusion ou Release.
+
 ## J1979 — scan OBD courant Android via CU/1 (26/11/2026)
 
 - Écran Scan OBD : lancement du scan USB natif avec le même sélecteur, consentement local, credential et contrôle propriétaire que la recette. Instantané mono-ECU distinct d'une connexion continue, arrêt, messages partiel/rejet/terminé, choix de capteurs transitoire et export Scan OBD standard incluant capture JSON. Publication uniquement VIN concordant, génération et compte courants ; ne remplace pas les DTC globaux ni ne débloque les opérations Camaro. Invalidation sur nouvelle génération. Régressions de projection écrites au lot précédent, non exécutées. C6/J1979 ouverts ; aucun test intermédiaire, fusion ou Release.

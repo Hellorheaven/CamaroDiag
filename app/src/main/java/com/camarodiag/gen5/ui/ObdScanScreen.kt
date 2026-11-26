@@ -71,6 +71,9 @@ fun ObdScanScreen(
 ) {
     val unavailable = stringResource(R.string.obd_not_available)
     val nativeSnapshot=report?.nativeUsbEvidence!=null
+    val nativeValues=remember(report?.nativeUsbEvidence) {
+        report?.nativeUsbEvidence?.let { runCatching { NativeUsbFunctionalEvidence.diagnosticValues(org.json.JSONObject(it)) }.getOrNull() }
+    }
     val sensorSelectionAvailable=isConnected||nativeSnapshot
 
     val context = LocalContext.current
@@ -276,7 +279,9 @@ fun ObdScanScreen(
 
             item {
                 InfoCard(title = stringResource(R.string.obd_readiness)) {
-                    Text(report.readiness ?: stringResource(R.string.obd_data_unavailable),
+                    val readiness=nativeValues?.readiness
+                    if(readiness!=null) NativeUsbReadinessContent(readiness)
+                    else Text(report.readiness ?: stringResource(R.string.obd_data_unavailable),
                         color = TextPrimary, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
                 }
             }
@@ -355,13 +360,18 @@ fun ObdScanScreen(
                 InfoCard(title = stringResource(R.string.obd_freeze_frame)) {
                     InfoLine(
                         stringResource(R.string.obd_trigger_dtc),
-                        report.freezeFrameDtc?.code ?: unavailable
+                        report.freezeFrameDtc?.code ?: if(nativeSnapshot&&nativeValues?.freeze?.present==false)
+                            stringResource(R.string.functional_native_usb_freeze_absent) else unavailable
                     )
                     report.freezeFrameResponder?.let { InfoLine(stringResource(R.string.obd_value_source, it), it) }
                     if (report.freezeFrameSupportComplete == false)
                         Text(stringResource(R.string.obd_freeze_partial), color = CamaroAmber, fontSize = 11.sp)
                     if (report.freezeFrame.isEmpty()) {
-                        Text(stringResource(R.string.obd_no_freeze_frame), color = TextMuted, fontSize = 12.sp)
+                        Text(stringResource(if(nativeSnapshot) when(nativeValues?.freeze?.present) {
+                            null->R.string.functional_native_usb_freeze_missing
+                            true->R.string.functional_native_usb_freeze_values_missing
+                            false->R.string.functional_native_usb_freeze_absent
+                        } else R.string.obd_no_freeze_frame), color = TextMuted, fontSize = 12.sp)
                     } else {
                         report.freezeFrame.forEach { (pid, bytes) ->
                             InfoLine("PID %02X".format(pid), bytes.joinToString(" ") { "%02X".format(it) })
@@ -391,6 +401,10 @@ fun ObdScanScreen(
 
             item {
                 InfoCard(title = stringResource(R.string.obd_mode06_results)) {
+                    if(nativeValues?.monitors?.isNotEmpty()==true) {
+                        Text(stringResource(R.string.functional_native_usb_monitor_encoded_scope),color=TextMuted,fontSize=11.sp)
+                        nativeValues.monitors.forEach { monitor -> NativeUsbMonitorContent(monitor) }
+                    }
                     Text(report.monitorTestRaw ?: stringResource(R.string.obd_not_available),
                         color = TextPrimary, fontFamily = FontFamily.Monospace, fontSize = 11.sp)
                 }

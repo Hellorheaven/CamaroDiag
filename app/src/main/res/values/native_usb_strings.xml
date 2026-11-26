@@ -63,4 +63,7 @@
     <string name="functional_native_usb_scan_partial">Partial native USB scan. Unobserved data remains unavailable.</string>
     <string name="functional_native_usb_scan_rejected">No verified matching ECU snapshot. See functional test results.</string>
     <string name="functional_native_usb_scan_stop">Stop native USB scan</string>
+    <string name="functional_native_usb_freeze_missing">Freeze-frame trigger was not verified.</string>
+    <string name="functional_native_usb_freeze_values_missing">Freeze frame indicated, but no values were verified.</string>
+    <string name="functional_native_usb_monitor_encoded_scope">Encoded values; no monitor pass/fail inferred.</string>
 </resources>
