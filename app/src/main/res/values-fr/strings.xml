@@ -1274,4 +1274,7 @@
     <string name="functional_doip_confirm">Je suis connecté au véhicule réel sur son réseau de diagnostic isolé.</string>
     <string name="obd_freeze_partial">Inventaire des PID de trame figée incomplet.</string>
     <string name="obd_freeze_unresolved">PID %1$02X : aucune valeur vérifiée ; réponse brute</string>
+    <string name="cal_recovery_export">Exporter la vérification JSON</string>
+    <string name="cal_recovery_export_success">Vérification exportée : %1$s</string>
+    <string name="cal_recovery_export_failed">Impossible d’exporter la vérification de récupération.</string>
 </resources>

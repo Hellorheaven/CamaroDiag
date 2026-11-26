@@ -857,6 +857,9 @@ fun CamaroDiagApp(
                         }
                     },
                     onReadObdbSignal = { signalId, profile -> viewModel.readObdbSignal(signalId, profile) },
+                    onExportPhysicalRecovery = { identity, report ->
+                        withExportFolder { viewModel.exportPhysicalRecoveryInspection(identity, report) }
+                    },
                     onInspectPhysicalRecovery = { identity ->
                         viewModel.activeAccountUid.value?.let { owner ->
                             pendingPhysicalRecovery = (owner to viewModel.exportAccountGeneration()) to identity

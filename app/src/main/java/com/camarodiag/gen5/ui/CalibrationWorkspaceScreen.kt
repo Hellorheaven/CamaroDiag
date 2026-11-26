@@ -159,6 +159,7 @@ data class CalibrationWorkspaceState(
     val physicalRecoveryResult: com.camarodiag.gen5.data.obd.EcuPhysicalBackupInspection.Report? = null,
     val physicalRecoveryIdentity: PhysicalRecoveryIdentity? = null,
     val physicalRecoveryFailed: Boolean = false,
+    val physicalRecoveryExportMessage: String? = null,
     val importedFileName: String? = null,
     val importedFileSize: Long? = null,
     val importedFileSha256: String? = null,
@@ -304,6 +305,7 @@ fun CalibrationWorkspaceScreen(
     onImportFile: () -> Unit,
     onVerifyEcuBackup: () -> Unit,
     onInspectPhysicalRecovery: (PhysicalRecoveryIdentity) -> Unit,
+    onExportPhysicalRecovery: (PhysicalRecoveryIdentity, com.camarodiag.gen5.data.obd.EcuPhysicalBackupInspection.Report) -> Unit,
     onImportTrace: () -> Unit,
     onImportComparisonFile: () -> Unit,
     onPreviewPartialWrite: (Long, Int, Int) -> Unit,
@@ -2482,7 +2484,7 @@ fun CalibrationWorkspaceScreen(
                         color = CamaroAmber, fontSize = 12.sp
                     )
                     HorizontalDivider()
-                    PhysicalRecoveryPanel(state, vehicle.vin, doIpAccountUid, onInspectPhysicalRecovery)
+                    PhysicalRecoveryPanel(state, vehicle.vin, doIpAccountUid, onInspectPhysicalRecovery, onExportPhysicalRecovery)
                 }
             }
         }
@@ -2805,7 +2807,8 @@ fun CalibrationWorkspaceScreen(
 
 @Composable
 private fun PhysicalRecoveryPanel(state: CalibrationWorkspaceState, defaultVin: String,
-                                  accountUid: String?, onInspect: (PhysicalRecoveryIdentity) -> Unit) {
+                                  accountUid: String?, onInspect: (PhysicalRecoveryIdentity) -> Unit,
+                                  onExport: (PhysicalRecoveryIdentity, com.camarodiag.gen5.data.obd.EcuPhysicalBackupInspection.Report) -> Unit) {
     var vin by remember(accountUid, defaultVin) { mutableStateOf(defaultVin.uppercase().take(17)) }
     var family by remember(accountUid) { mutableStateOf("") }
     var controller by remember(accountUid) { mutableStateOf("") }
@@ -2853,6 +2856,9 @@ private fun PhysicalRecoveryPanel(state: CalibrationWorkspaceState, defaultVin: 
             }
             if (report.sectors.size > 20) Text(stringResource(R.string.cal_recovery_more, report.sectors.size - 20))
             Text(stringResource(R.string.cal_recovery_no_restore), color = CamaroAmber, fontSize = 12.sp)
+            OutlinedButton(onClick = { onExport(identity, report) }, enabled = editable && accountUid != null,
+                modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.cal_recovery_export)) }
+            state.physicalRecoveryExportMessage?.let { Text(it, fontSize = 12.sp) }
         }
     }
 }

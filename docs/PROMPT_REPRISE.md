@@ -1,3 +1,7 @@
+## C6 — export de preuve de récupération Android (26/11/2026)
+
+- Export JSON dédié de l'inspection hors ligne, succès ou échec, identité, état journal, adresse incertaine, secteur/adresse/taille/SHA-256 pour tous les blocs, erreur et version. Garde compte/profil de preuve avant publication, aucun octet original ni autorisation de restauration exportés. Aucun nouveau test exécuté.
+
 ## SAE J1979 — Mode 02 exhaustif sur les PID annoncés (26/11/2026)
 
 - Le scan lit tous les PID de trame figée annoncés pour la source du DTC déclencheur (hors pages et PID 02 déjà lu), conserve les réponses brutes non décodées, le répondant et l'état complet/partiel du bitmap. Export JSON et UI FR/EN, recette J1979 ne valide plus un Mode 02 partiel. Aucun scan si DTC déclencheur absent. Les limites du parseur et le profil legacy restent à traiter. Régression écrite, non exécutée.

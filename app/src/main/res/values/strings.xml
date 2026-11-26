@@ -1271,4 +1271,7 @@
     <string name="functional_doip_confirm">I am connected to the actual vehicle on its isolated diagnostic network.</string>
     <string name="obd_freeze_partial">Freeze-frame PID discovery incomplete.</string>
     <string name="obd_freeze_unresolved">PID %1$02X: no verified value; raw response</string>
+    <string name="cal_recovery_export">Export inspection JSON</string>
+    <string name="cal_recovery_export_success">Inspection exported: %1$s</string>
+    <string name="cal_recovery_export_failed">Could not export the recovery inspection.</string>
 </resources>

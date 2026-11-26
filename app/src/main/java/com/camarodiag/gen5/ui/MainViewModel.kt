@@ -3878,7 +3878,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (_calibrationWorkspace.value.physicalRecoveryReading) return
         fun current() = canResumeExport(generation, owner) && hasPremiumLicense()
         _calibrationWorkspace.update { it.copy(physicalRecoveryReading = true, physicalRecoveryResult = null,
-            physicalRecoveryIdentity = identity, physicalRecoveryFailed = false) }
+            physicalRecoveryIdentity = identity, physicalRecoveryFailed = false, physicalRecoveryExportMessage = null) }
         viewModelScope.launch {
             try {
                 val report = withContext(Dispatchers.IO) {
@@ -3893,6 +3893,63 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             } finally {
                 if (isCurrentAccountGeneration(generation))
                     _calibrationWorkspace.update { it.copy(physicalRecoveryReading = false) }
+            }
+        }
+    }
+
+    fun exportPhysicalRecoveryInspection(identity: PhysicalRecoveryIdentity,
+        report: com.camarodiag.gen5.data.obd.EcuPhysicalBackupInspection.Report) {
+        if (!requirePremiumLicense()) return
+        val owner = authenticatedAccountUid ?: return
+        val generation = accountSessionGeneration
+        fun current(): Boolean {
+            val state = _calibrationWorkspace.value
+            return canResumeExport(generation, owner) && hasPremiumLicense() &&
+                !state.physicalRecoveryReading && state.physicalRecoveryIdentity == identity &&
+                state.physicalRecoveryResult === report
+        }
+        if (!current()) return
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                check(current())
+                val now = System.currentTimeMillis()
+                val json = JSONObject()
+                    .put("schema", "camarodiag-ecu-recovery-inspection-v1")
+                    .put("appVersion", com.camarodiag.gen5.BuildConfig.VERSION_NAME)
+                    .put("exportedAtMillis", now)
+                    .put("identity", JSONObject().put("vin", identity.vin)
+                        .put("family", identity.family).put("controller", identity.controller)
+                        .put("firmware", identity.firmware))
+                    .put("verified", report.verified)
+                    .put("expectedSectors", report.expectedSectors)
+                    .put("verifiedBytes", report.verifiedBytes)
+                    .put("problem", report.problem)
+                    .put("uncertainAddress", report.uncertainAddress ?: JSONObject.NULL)
+                    .put("journalDisposition", report.journalDisposition?.name ?: JSONObject.NULL)
+                    .put("sectors", JSONArray(report.sectors.map { sector ->
+                        JSONObject().put("region", sector.region.name).put("address", sector.address)
+                            .put("length", sector.length).put("sha256", sector.sha256)
+                    }))
+                    .put("physicalEcuConnected", false)
+                    .put("restoreAuthorized", false)
+                val path = CamaroDiagExportStorage.write(getApplication<Application>(),
+                    "CamaroDiag_ECU_recovery_inspection_${now}.json", "application/json",
+                    category = CamaroDiagExportStorage.Category.REPORTS, beforePublish = { check(current()) }) {
+                    it.write(json.toString(2).toByteArray(Charsets.UTF_8))
+                }
+                _calibrationWorkspace.update { state ->
+                    if (current() && state.physicalRecoveryResult === report)
+                        state.copy(physicalRecoveryExportMessage = localizedContext.getString(R.string.cal_recovery_export_success, path))
+                    else state
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                _calibrationWorkspace.update { state ->
+                    if (current() && state.physicalRecoveryResult === report)
+                        state.copy(physicalRecoveryExportMessage = localizedContext.getString(R.string.cal_recovery_export_failed))
+                    else state
+                }
             }
         }
     }
