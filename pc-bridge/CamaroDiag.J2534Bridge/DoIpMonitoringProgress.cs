@@ -63,7 +63,7 @@ internal sealed class DoIpSequenceProgress
     {
         ArgumentNullException.ThrowIfNull(response);
         if (index != CommandsCompleted + 1 || index > RequestedCommands ||
-            response.Length is < 1 or > 4091)
+            response.Length < 1 || response.Length > DoIpCodec.MaxPayload - 4)
             throw new InvalidDataException("Invalid DoIP sequence reply progress.");
         var json = System.Text.Json.JsonSerializer.Serialize(new
         {
