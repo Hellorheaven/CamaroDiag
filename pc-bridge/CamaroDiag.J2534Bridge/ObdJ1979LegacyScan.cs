@@ -9,7 +9,8 @@ namespace CamaroDiag.J2534Bridge;
 /// physically addressed request or a complete vehicle inventory.</summary>
 internal static class ObdJ1979LegacyScan
 {
-    internal sealed record Evidence(string Source, string RawHex, string PayloadHex, uint Timestamp);
+    internal sealed record Evidence(string Source, string RawHex, string PayloadHex, uint Timestamp,
+        string? InFrameResponseHex);
     internal sealed record Step(string RequestHex, string? TxHex, IReadOnlyList<Evidence> Responses,
         string Status, string? Detail, long DurationMs);
     internal sealed record Result(string? ObservedVin, string SelectedResponseSource,
@@ -52,7 +53,8 @@ internal static class ObdJ1979LegacyScan
                 result = exchange(request, (int)Math.Min(1800, remaining.TotalMilliseconds));
                 requireActive();
                 evidence = result.Replies.Select(packet => new Evidence(packet.Source.ToString("X2"),
-                    packet.RawHex, Convert.ToHexString(packet.Payload), packet.Timestamp)).ToArray();
+                    packet.RawHex, Convert.ToHexString(packet.Payload), packet.Timestamp,
+                    packet.InFrameResponseHex)).ToArray();
                 var packets = result.Replies.Select(p => p.Payload).ToArray();
                 if (packets.Length == 0)
                 {
