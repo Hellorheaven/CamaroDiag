@@ -8,6 +8,13 @@ namespace CamaroDiag.J2534Bridge;
 /// access; caller supplies the OEM-defined data, authenticated session and
 /// operator's fresh OK -> Oui/Non consent for a mutating transaction.
 /// </summary>
+internal sealed class UdsServiceRefusal(byte service, byte code) :
+    IOException($"UDS negative response 0x{code:X2}.")
+{
+    internal byte Service { get; } = service;
+    internal byte Code { get; } = code;
+}
+
 internal static class UdsStandardServices
 {
     internal static byte[] Session(byte sessionType) => [0x10, sessionType];
@@ -364,7 +371,7 @@ internal static class UdsStandardServices
         if (response[0] == 0x7F)
         {
             if (response.Length == 3 && response[1] == request[0])
-                throw new IOException($"UDS negative response 0x{response[2]:X2}.");
+                throw new UdsServiceRefusal(response[1], response[2]);
             throw new InvalidDataException("UDS negative response does not correspond to request.");
         }
         if (response[0] != unchecked((byte)(request[0] + 0x40)))
