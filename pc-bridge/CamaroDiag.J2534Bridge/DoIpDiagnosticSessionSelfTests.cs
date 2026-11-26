@@ -866,8 +866,11 @@ internal static class DoIpDiagnosticSessionSelfTests
             _ = await RequireRequestAsync(stream);
             await SendAsync(stream, DoIpCodec.DiagnosticMessage,
                 FromEcu([0x62, 0xF1, 0x90, .. System.Text.Encoding.ASCII.GetBytes(selectedVehicleVin)]));
-            var first = await RequireRequestAsync(stream);
-            Check(first.Payload.SequenceEqual(new byte[] { 0x0E,0x80,0x12,0x34,0x22,0x12,0x34 }),
+            // This is the first *custom* UDS command, not the F190 identity
+            // request expected by RequireRequestAsync.
+            var first = await ReadAsync(stream);
+            Check(first.Type == DoIpCodec.DiagnosticMessage &&
+                first.Payload.SequenceEqual(new byte[] { 0x0E,0x80,0x12,0x34,0x22,0x12,0x34 }),
                 "Callback failure fixture received the first command.");
             await SendAsync(stream, DoIpCodec.DiagnosticMessage, FromEcu([0x62,0x12,0x34,0x01]));
         }, async client =>
