@@ -18,6 +18,18 @@ class FunctionalTestSuiteTest {
         assertTrue(FunctionalTestPlanner.j1979Checks().any { it.key == "protocol:04" })
     }
 
+    @Test fun emptyMonitorInventoryIsNotAMonitorResult() {
+        val evidence = FunctionalTestPlanner::monitorEvidence
+        assertEquals(true to false, evidence("DISCOVERED_MIDS=0"))
+        assertEquals(true to false, evidence("DISCOVERED_TIDS=0"))
+        assertEquals(true to true, evidence("MID=01 TID=01 UASID=24 RAW=0001 MIN_RAW=0000 MAX_RAW=FFFF"))
+        assertEquals(true to true, evidence("TID=01 CID=01 LIMIT_TYPE=MAX RAW=0001 LIMIT_RAW=FFFF"))
+        assertEquals(false to false, evidence("MID=01: N/A"))
+        assertEquals(false to false, evidence("DISCOVERED_MIDS=0\nPARTIAL"))
+        assertEquals(false to false, evidence("OK"))
+        assertEquals(false to false, evidence(null))
+    }
+
     @Test fun doIpCampaignRequiresExplicitIdentityAndPhysicalConfirmation() {
         val target = DoIpFunctionalTarget("192.0.2.10", "0E80", "1234", "1G1FA1RXXR0123456", true, true)
         assertTrue(target.valid)
