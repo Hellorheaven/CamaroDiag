@@ -1,3 +1,7 @@
+## J1979 — raccordement USB OTG Android / COM Windows (26/11/2026)
+
+- Adaptateur CDC Android explicite (permission, interfaces, bulk avec tampon, deadline, annulation/génération et fermeture) ; sources Java communes compilées dans communication, entrée Kotlin de campagne en IO avec capture CJ/1 et JSON privés exclusifs, secret non journalisé. Windows : sous-commande --j1979-usb, port COM et profil documentés, consentement, clé locale, captures exclusives synchronisées, lecture bornée et fermeture. Rapports frame-level distincts de l'intégrité sémantique/physique ; pas de claim VIN ni de succès protocole, pas de repli découverte. IHM Android/Windows principale et validation sémantique complète restent à raccorder, carte et firmware non qualifiés. Aucun test/CI, merge ou Release.
+
 ## J1979 — clients natifs Java Android et .NET Windows CU/1 (26/11/2026)
 
 - Codecs HMAC-SHA256 interopérables avec ESP/Python, contrôle profil/nonce, vérification de preuve boîtier avant envoi du client. Capture CJ/1 bornée avec CRC, séquence, tailles, profil et compteurs, conservation des fragments reçus et fermeture unique ; résultat distinct frameIntegrityVerified, pas de preuve de campagne sémantique ni physique. Vecteur HMAC indépendant commun Java/.NET, régressions challenge invalide et troncature ajoutées au gate sans exécution. Restent adaptation USB/CDC et UI/CLI, validation sémantique complète des rapports et propriétaire matériel. Aucune CI ni merge/Release, J1979/C6 ouverts.

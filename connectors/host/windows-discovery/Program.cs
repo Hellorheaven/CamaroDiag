@@ -5,6 +5,9 @@ using CamaroDiagConnectors.Windows;
 if (args is ["--self-test"])
     return SelfTests.Run();
 
+if (args.Length>0 && args[0]=="--j1979-usb")
+    return J1979UsbCli.Run(args[1..]);
+
 if (!OperatingSystem.IsWindows() || args.Length != 2 || args[0] != "--port" ||
     !Regex.IsMatch(args[1], @"\ACOM[1-9][0-9]{0,3}\z", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant))
 {
