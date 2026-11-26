@@ -177,6 +177,33 @@ class Obd2FeatureEngineTest {
     }
 
     @Test
+    fun fullScanPreservesUnknownAdvertisedFreezeFrameAndPartialDiscovery() = runBlocking {
+        val commands = mutableListOf<String>()
+        val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+            commands += command
+            when (command) {
+                "0100" -> "410000000000"
+                "020200" -> "4202000171"
+                "020000" -> "42000008000001"
+                "022000" -> "42200000000001"
+                "024000" -> "42400080000001"
+                "026000" -> "NO DATA"
+                "020500" -> "4205007F"
+                "024100" -> "42410001020304"
+                else -> "NO DATA"
+            }
+        })
+        val report = engine.fullReadOnlyScan()
+        assertEquals(setOf(5, 0x41), report.freezeFrameSupportedPids)
+        assertEquals(false, report.freezeFrameSupportComplete)
+        assertTrue("024100" in commands)
+        assertEquals(listOf(0x7F), report.freezeFrame[5])
+        assertEquals("42410001020304", report.freezeFrameReads.single { it.pid == 0x41 }.rawResponse)
+        assertTrue("020C00" !in commands)
+        Unit
+    }
+
+    @Test
     fun doesNotQueryFreezeFrameValuesWhenNoTriggerDtcIsStored() = runBlocking {
         val commands = mutableListOf<String>()
         val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->

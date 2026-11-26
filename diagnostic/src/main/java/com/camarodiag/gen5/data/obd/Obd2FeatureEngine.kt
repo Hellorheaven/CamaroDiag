@@ -67,6 +67,8 @@ data class ObdMode01Read(
     val observations: List<ObdMode01Observation>
 )
 
+data class ObdFreezeFrameRead(val pid: Int, val rawResponse: String, val verifiedBytes: List<Int>?)
+
 data class ObdScanReport(
     val supportedPids: Set<Int>,
     val liveData: List<ObdValue>,
@@ -89,7 +91,11 @@ data class ObdScanReport(
     val supportedPidsByResponder: Map<String, Set<Int>> = emptyMap(),
     val firstUnresolvedPid: Int? = null,
     val pidAttributionIncomplete: Boolean = false,
-    val mode01Reads: List<ObdMode01Read> = emptyList()
+    val mode01Reads: List<ObdMode01Read> = emptyList(),
+    val freezeFrameSupportedPids: Set<Int> = emptySet(),
+    val freezeFrameReads: List<ObdFreezeFrameRead> = emptyList(),
+    val freezeFrameSupportComplete: Boolean? = null,
+    val freezeFrameResponder: String? = null
 )
 
 /**
@@ -108,6 +114,7 @@ class Obd2FeatureEngine(
     private val log = mutableListOf<String>()
     private var freezeFrameSourcePinned = false
     private var freezeFrameSource: String? = null
+    private var freezeFrameSupportComplete: Boolean? = null
 
     /** An entire freeze-frame record belongs to one responding ECU.
      * Do not switch to another responder when a later PID is unavailable. */
@@ -392,6 +399,7 @@ class Obd2FeatureEngine(
     suspend fun readFreezeFrameDtc(): ObdDtc? {
         freezeFrameSourcePinned = false
         freezeFrameSource = null
+        freezeFrameSupportComplete = null
         val data = freezeFrameValue(ask("020200"), 0x02, nonzeroDtc = true) ?: return null
         val raw = (data[0] shl 8) or data[1]
         if (raw == 0) return null
@@ -407,9 +415,11 @@ class Obd2FeatureEngine(
     suspend fun discoverFreezeFrameSupportedPids(): Set<Int> {
         val supported = linkedSetOf<Int>()
         var basePid = 0x00
+        freezeFrameSupportComplete = false
         repeat(8) {
+            currentCoroutineContext().ensureActive()
             val response = ask("02%02X00".format(Locale.US, basePid))
-            val bitmap = freezeFrameValue(response, basePid) ?: return supported
+            val bitmap = freezeFrameValue(response, basePid)?.takeIf { it.size == 4 } ?: return supported
             for (bit in 0 until 32) {
                 val mask = 1 shl (7 - (bit % 8))
                 if ((bitmap[bit / 8] and mask) != 0 && bit != 31) {
@@ -417,7 +427,10 @@ class Obd2FeatureEngine(
                 }
             }
             val hasNextPage = (bitmap[3] and 0x01) != 0
-            if (!hasNextPage) return supported
+            if (!hasNextPage) {
+                freezeFrameSupportComplete = true
+                return supported
+            }
             basePid += 0x20
         }
         return supported
@@ -427,15 +440,22 @@ class Obd2FeatureEngine(
      * Reads freeze-frame values only for PIDs advertised by the Mode 02 support bitmap.
      * Each Mode 02 response contains the frame number before the actual PID data.
      */
-    suspend fun readFreezeFrame(supportedPids: Set<Int>? = null): Map<Int, List<Int>> {
+    suspend fun readFreezeFrame(supportedPids: Set<Int>? = null): Map<Int, List<Int>> =
+        collectFreezeFrameReads(supportedPids ?: discoverFreezeFrameSupportedPids()).first
+
+    private suspend fun collectFreezeFrameReads(supportedPids: Set<Int>):
+        Pair<Map<Int, List<Int>>, List<ObdFreezeFrameRead>> {
         val result = linkedMapOf<Int, List<Int>>()
-        val pids = listOf(0x03, 0x04, 0x05, 0x06, 0x07, 0x0C, 0x0D, 0x0F, 0x10, 0x11, 0x42)
-        for (pid in pids) {
-            if (supportedPids != null && pid !in supportedPids) continue
-            val data = freezeFrameValue(ask("02%02X00".format(Locale.US, pid)), pid) ?: continue
-            result[pid] = data
+        val reads = mutableListOf<ObdFreezeFrameRead>()
+        // PID 02 has already been read to identify the triggering DTC.
+        for (pid in supportedPids.filter { it in 1..255 && it % 32 != 0 && it != 2 }.sorted()) {
+            currentCoroutineContext().ensureActive()
+            val response = ask("02%02X00".format(Locale.US, pid))
+            val data = freezeFrameValue(response, pid)
+            reads += ObdFreezeFrameRead(pid, response, data)
+            if (data != null) result[pid] = data
         }
-        return result
+        return result to reads
     }
 
     private suspend fun readVinRecord(timeoutMs: Long): String? =
@@ -619,7 +639,8 @@ class Obd2FeatureEngine(
         val dtcSnapshot = readDtcRecords()
         val freezeFrameDtc = readFreezeFrameDtc()
         val freezeFrameSupported = if (freezeFrameDtc != null) discoverFreezeFrameSupportedPids() else emptySet()
-        val freeze = if (freezeFrameDtc != null) readFreezeFrame(freezeFrameSupported) else emptyMap()
+        val (freeze, freezeReads) = if (freezeFrameDtc != null) collectFreezeFrameReads(freezeFrameSupported)
+            else emptyMap<Int, List<Int>>() to emptyList<ObdFreezeFrameRead>()
         val vin = readVin()
         val calIds = readCalibrationIds()
         val cvns = readCalibrationVerificationNumbers()
@@ -649,7 +670,11 @@ class Obd2FeatureEngine(
                 mapOf(physicalCanResponder to supported) else discovery.byResponder,
             firstUnresolvedPid = discovery.firstUnresolvedPid,
             pidAttributionIncomplete = physicalCanResponder == null && discovery.attributionIncomplete,
-            mode01Reads = mode01Reads
+            mode01Reads = mode01Reads,
+            freezeFrameSupportedPids = freezeFrameSupported,
+            freezeFrameReads = freezeReads,
+            freezeFrameSupportComplete = freezeFrameSupportComplete,
+            freezeFrameResponder = if (freezeFrameSourcePinned) freezeFrameSource ?: physicalCanResponder else null
         )
     }
 

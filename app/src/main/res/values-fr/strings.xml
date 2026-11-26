@@ -1272,4 +1272,6 @@
     <string name="functional_doip_vin">VIN attendu du véhicule</string>
     <string name="functional_doip_tls">Utiliser TLS (sans repli automatique)</string>
     <string name="functional_doip_confirm">Je suis connecté au véhicule réel sur son réseau de diagnostic isolé.</string>
+    <string name="obd_freeze_partial">Inventaire des PID de trame figée incomplet.</string>
+    <string name="obd_freeze_unresolved">PID %1$02X : aucune valeur vérifiée ; réponse brute</string>
 </resources>

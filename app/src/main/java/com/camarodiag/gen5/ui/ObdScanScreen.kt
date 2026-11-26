@@ -331,12 +331,19 @@ fun ObdScanScreen(
                         stringResource(R.string.obd_trigger_dtc),
                         report.freezeFrameDtc?.code ?: unavailable
                     )
+                    report.freezeFrameResponder?.let { InfoLine(stringResource(R.string.obd_value_source, it), it) }
+                    if (report.freezeFrameSupportComplete == false)
+                        Text(stringResource(R.string.obd_freeze_partial), color = CamaroAmber, fontSize = 11.sp)
                     if (report.freezeFrame.isEmpty()) {
                         Text(stringResource(R.string.obd_no_freeze_frame), color = TextMuted, fontSize = 12.sp)
                     } else {
                         report.freezeFrame.forEach { (pid, bytes) ->
                             InfoLine("PID %02X".format(pid), bytes.joinToString(" ") { "%02X".format(it) })
                         }
+                    }
+                    report.freezeFrameReads.filter { it.verifiedBytes == null }.forEach { read ->
+                        Text(stringResource(R.string.obd_freeze_unresolved, read.pid), color = CamaroAmber, fontSize = 11.sp)
+                        Text(read.rawResponse.take(1024), fontFamily = FontFamily.Monospace, fontSize = 11.sp)
                     }
                 }
             }

@@ -1269,4 +1269,6 @@
     <string name="functional_doip_vin">Expected vehicle VIN</string>
     <string name="functional_doip_tls">Use TLS (no automatic fallback)</string>
     <string name="functional_doip_confirm">I am connected to the actual vehicle on its isolated diagnostic network.</string>
+    <string name="obd_freeze_partial">Freeze-frame PID discovery incomplete.</string>
+    <string name="obd_freeze_unresolved">PID %1$02X: no verified value; raw response</string>
 </resources>

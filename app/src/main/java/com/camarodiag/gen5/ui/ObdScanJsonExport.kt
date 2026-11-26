@@ -53,6 +53,13 @@ internal object ObdScanJsonExport {
             put("freezeFrame", JSONObject().apply {
                 report.freezeFrame.toSortedMap().forEach { (pid, bytes) -> put(pid.toString(), JSONArray(bytes)) }
             })
+            put("freezeFrameSupportedPids", JSONArray(report.freezeFrameSupportedPids.sorted()))
+            put("freezeFrameSupportComplete", report.freezeFrameSupportComplete ?: JSONObject.NULL)
+            put("freezeFrameResponder", report.freezeFrameResponder ?: JSONObject.NULL)
+            put("freezeFrameReads", JSONArray(report.freezeFrameReads.map { read ->
+                JSONObject().put("pid", read.pid).put("rawResponse", read.rawResponse)
+                    .put("verifiedBytes", read.verifiedBytes?.let { JSONArray(it) } ?: JSONObject.NULL)
+            }))
             put("monitorTestRaw", report.monitorTestRaw ?: JSONObject.NULL)
             put("rawLog", JSONArray(report.rawLog))
         }.toString(2)

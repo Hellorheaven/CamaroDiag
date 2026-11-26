@@ -168,7 +168,8 @@ object FunctionalTestPlanner {
         mark("pids", report.firstUnresolvedPid == null && report.mode01Reads.isNotEmpty())
         mark("live", report.liveData.isNotEmpty())
         mark("readiness", !report.readiness.isNullOrBlank())
-        mark("freeze", report.freezeFrameDtc != null && report.freezeFrame.isNotEmpty())
+        mark("freeze", report.freezeFrameDtc != null && report.freezeFrameSupportComplete == true &&
+            report.freezeFrameReads.isNotEmpty() && report.freezeFrameReads.all { it.verifiedBytes != null })
         mark("monitor", report.monitorTestRaw?.let { it.isNotBlank() && "PARTIAL" !in it && "N/A" !in it } == true)
         val counts = mapOf(3 to report.confirmedDtcs.size, 7 to report.pendingDtcs.size, 10 to report.permanentDtcs.size)
             .mapValues { (mode, count) -> count.takeUnless { mode in report.unavailableDtcModes } }

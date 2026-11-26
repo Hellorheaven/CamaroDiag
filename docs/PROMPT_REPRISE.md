@@ -1,3 +1,7 @@
+## SAE J1979 — Mode 02 exhaustif sur les PID annoncés (26/11/2026)
+
+- Le scan lit tous les PID de trame figée annoncés pour la source du DTC déclencheur (hors pages et PID 02 déjà lu), conserve les réponses brutes non décodées, le répondant et l'état complet/partiel du bitmap. Export JSON et UI FR/EN, recette J1979 ne valide plus un Mode 02 partiel. Aucun scan si DTC déclencheur absent. Les limites du parseur et le profil legacy restent à traiter. Régression écrite, non exécutée.
+
 ## Recette DoIP Android — 26/11/2026
 
 - Parcours autonome ISO 13400 dans Tests fonctionnels : IP/adresses/VIN explicites, confirmation opérateur réseau physique, TLS configurable sans fallback ; découverte UDP, statut et alimentation, routage et VIN ECU, comptage/lecture DTC après identité confirmée. Export JSON propre avec paramètres et traces horodatées, écriture non testée. Aucun besoin ELM. Candidats Mach-E/X1 sous réserve de confirmation. Les tests de formulaire/planner sont écrits, non exécutés. La déclaration de l'opérateur ne constitue pas une preuve indépendante contre un simulateur. Recette Windows/Connectors et autres variantes à compléter. DoIP clôture logicielle historique inchangée, J1979 reste protocole actif, C6 actif.
