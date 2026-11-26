@@ -74,6 +74,12 @@ internal static class J1979UsbSelfTests
         Require(monitor.MonitorRecords is {Count:2} records&&records[0].ValueEncoded==0x1234&&
             records[1].MinimumEncoded==1&&records[1].MaximumEncoded==65534);
         Require(new J1979CampaignSemantics.Step(9,1,1,[6,0],Convert.FromHexString("460080000000")).MonitorRecords is null);
+        var cal=new J1979CampaignSemantics.Step(10,1,1,[9,4],Convert.FromHexString("49040143414C31000000000000000000000000"));
+        Require(cal.Identification?.Values.SequenceEqual(new[]{"CAL1"})==true);
+        var cvn=new J1979CampaignSemantics.Step(11,1,1,[9,6],Convert.FromHexString("49060201020304FFFFFFFF"));
+        Require(cvn.Identification?.Values.SequenceEqual(new[]{"01020304","FFFFFFFF"})==true);
+        Require(new J1979CampaignSemantics.Step(12,1,1,[9,4],
+            Convert.FromHexString("49040143004131000000000000000000000000")).Identification is null);
         var partial=new Sim([.. challenge,.. capture[..^1]]);using var partialRaw=new MemoryStream();
         result=new J1979UsbCapture(partial).RunRequest(hello,10000,key,partialRaw);
         Require(result.DeviceCredentialAuthenticated&&!result.FrameIntegrityVerified&&partial.Closed&&partialRaw.Length==capture.Length-1);

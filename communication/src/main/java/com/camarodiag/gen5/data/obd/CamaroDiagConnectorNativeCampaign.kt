@@ -161,6 +161,9 @@ object CamaroDiagConnectorNativeCampaign {
                                     .put("minimum_encoded", value.minimumEncoded).put("maximum_encoded", value.maximumEncoded))
                             } }
                         } ?: JSONObject.NULL)
+                        put("vehicle_info", step.vehicleInfo()?.let { info ->
+                            JSONObject().put("info_type", info.infoType).put("values", JSONArray(info.values))
+                        } ?: JSONObject.NULL)
                         put("measurement", step.measurement()?.let { value ->
                             JSONObject().put("mode", value.mode).put("pid", value.pid)
                                 .put("name", value.name).put("number", value.number).put("unit", value.unit)

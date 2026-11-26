@@ -161,6 +161,34 @@ def _monitor_records(req, res):
     return records
 
 
+def _vehicle_info(req, res):
+    """Decode known CAN InfoTypes only; invalid ASCII remains raw evidence."""
+    if req[0] != 9 or req[1] not in (2, 4, 6, 10):
+        return None
+    kind = req[1]
+
+    def padded_ascii(data):
+        value = data.rstrip(bytes(1))
+        if not value or any(c < 32 or c > 126 for c in value):
+            raise ValueError("Invalid ASCII field")
+        return value.decode("ascii")
+
+    try:
+        if kind == 2:
+            values = [res[3:].decode("ascii")]
+        elif kind == 4:
+            values = [padded_ascii(res[i:i+16]) for i in range(3, len(res), 16)]
+        elif kind == 6:
+            values = [res[i:i+4].hex().upper() for i in range(3, len(res), 4)]
+        else:
+            if res[2] != 1 or res[7] != ord("-"):
+                return None
+            values = [padded_ascii(res[3:7]) + "-" + padded_ascii(res[8:23])]
+    except ValueError:
+        return None
+    return {"info_type": kind, "values": values}
+
+
 def _exact(stream, size):
     chunks = bytearray()
     while len(chunks) < size:
@@ -344,7 +372,8 @@ def decode(stream):
                     "duration_ms": elapsed, "dtc_codes": dtc_codes,
                     "negative_response_code": res[2] if state == 3 else None,
                     "measurement": _measurement(req, res) if state == 1 else None,
-                    "monitor_records": _monitor_records(req, res) if state == 1 else None})
+                    "monitor_records": _monitor_records(req, res) if state == 1 else None,
+                    "vehicle_info": _vehicle_info(req, res) if state == 1 else None})
                 continue
             if kind != 3 or length != 22:
                 raise ValueError("Unexpected evidence record")

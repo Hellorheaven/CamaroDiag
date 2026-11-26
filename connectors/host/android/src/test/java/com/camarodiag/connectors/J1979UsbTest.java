@@ -86,6 +86,14 @@ public final class J1979UsbTest {
         assert monitor.monitorRecords().get(1).minimumEncoded==1;
         assert monitor.monitorRecords().get(1).maximumEncoded==65534;
         assert new J1979CampaignSemantics.Step(9,1,1,new byte[]{6,0},hex("460080000000")).monitorRecords()==null;
+        J1979CampaignSemantics.Step cal=new J1979CampaignSemantics.Step(10,1,1,new byte[]{9,4},
+            hex("49040143414C31000000000000000000000000"));
+        assert cal.vehicleInfo().values.equals(java.util.Arrays.asList("CAL1"));
+        J1979CampaignSemantics.Step cvn=new J1979CampaignSemantics.Step(11,1,1,new byte[]{9,6},
+            hex("49060201020304FFFFFFFF"));
+        assert cvn.vehicleInfo().values.equals(java.util.Arrays.asList("01020304","FFFFFFFF"));
+        assert new J1979CampaignSemantics.Step(12,1,1,new byte[]{9,4},
+            hex("49040143004131000000000000000000000000")).vehicleInfo()==null;
         Sim partial=new Sim(concat(challenge,Arrays.copyOf(capture,capture.length-1)));
         raw=new ByteArrayOutputStream();
         result=new J1979UsbCapture(partial).runRequest(hello,10000,key,raw);

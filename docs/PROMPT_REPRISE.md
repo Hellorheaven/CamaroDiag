@@ -1,3 +1,7 @@
+## J1979 — identification Mode 09 dans les recettes USB (26/11/2026)
+
+- Android, Windows et Python exportent les InfoTypes CAN 02 (VIN), 04 (CALID), 06 (CVN) et 0A (nom ECU) structurés ; longueur, padding ASCII et séparateur du nom vérifiés avant projection. Les champs non décodables gardent leur réponse brute, sans identité inventée. Un CVN n'est pas une signature de calibration ni une preuve OEM. Régressions ajoutées, non exécutées. C6/J1979 en cours ; pas de CI intermédiaire, fusion ou Release.
+
 ## J1979 — présentation Mode 06 Android/Windows (26/11/2026)
 
 - Les recettes USB affichent les MID/TID, échelles et mots encodés avec ressources FR/EN, uniquement après vérification de la capture ; Android recoupe chaque enregistrement avec les octets de réponse et ne publie pas de ligne contradictoire. Windows conserve aussi les observations après erreur de fermeture/synchronisation du fichier, sans valider la campagne. Régression UI écrite non exécutée. Aucune interprétation d'unité ou verdict moniteur sans table normative. C6 et J1979 ouverts ; aucun test intermédiaire, merge ou Release.

@@ -76,6 +76,14 @@ internal static class J1979CampaignSemantics
             _=>null
         };
     }
+    internal sealed record VehicleInfo(int InfoType,IReadOnlyList<string> Values);
+    private static string? PaddedAscii(byte[] data,int start,int length){
+        int end=start+length;
+        while(end>start&&data[end-1]==0)end--;
+        if(end==start)return null;
+        for(int i=start;i<end;i++)if(data[i] is <32 or >126)return null;
+        return Encoding.ASCII.GetString(data,start,end-start);
+    }
     internal sealed class Step {
         public int Sequence{get;}
         public string RequestHex{get;}
@@ -116,6 +124,25 @@ internal static class J1979CampaignSemantics
                 for(int i=1;i<Response.Length;i+=9)
                     records.Add(new(Response[i],Response[i+1],Response[i+2],Word(i+3),Word(i+5),Word(i+7)));
                 return records.AsReadOnly();
+            }
+        }
+        internal VehicleInfo? Identification {
+            get {
+                if(State!=1||Request[0]!=9)return null;
+                int type=Request[1];var values=new List<string>();
+                if(type==2&&ObservedVin is string vin)values.Add(vin);
+                else if(type==4){
+                    for(int i=3;i<Response.Length;i+=16){
+                        string? value=PaddedAscii(Response,i,16);if(value is null)return null;values.Add(value);
+                    }
+                }else if(type==6){
+                    for(int i=3;i<Response.Length;i+=4)values.Add(Convert.ToHexString(Response.AsSpan(i,4)));
+                }else if(type==10){
+                    if(Response[2]!=1||Response[7]!='-')return null;
+                    string? acronym=PaddedAscii(Response,3,4),description=PaddedAscii(Response,8,15);
+                    if(acronym is null||description is null)return null;values.Add(acronym+"-"+description);
+                }else return null;
+                return new(type,values.AsReadOnly());
             }
         }
         internal string? ObservedVin=>State==1&&Request.AsSpan().SequenceEqual(new byte[]{9,2})?Encoding.ASCII.GetString(Response,3,17):null;

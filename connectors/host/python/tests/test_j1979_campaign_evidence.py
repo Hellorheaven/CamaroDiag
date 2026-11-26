@@ -100,6 +100,23 @@ class CaptureTests(unittest.TestCase):
         self.assertEqual(65534, records[1]["maximum_encoded"])
         self.assertNotIn("passed", records[0])
 
+    def test_mode09_identification_values_and_invalid_ascii(self):
+        tail = (step(6, bytes.fromhex("020200"), bytes.fromhex("4202000000")) +
+                step(7, bytes.fromhex("0600"), bytes.fromhex("460000000000")) +
+                step(8, bytes.fromhex("0800"), bytes.fromhex("480000000000")) +
+                step(9, bytes.fromhex("0900"), bytes.fromhex("490014000000")) +
+                step(10, bytes.fromhex("0904"), bytes.fromhex("49040143414C31000000000000000000000000")) +
+                step(11, bytes.fromhex("0906"), bytes.fromhex("49060201020304FFFFFFFF")))
+        report = decode(io.BytesIO(start() + INITIAL + IDENTITY + DTC + tail +
+            summary(12, flags=231, steps=11, positive=11)))
+        self.assertTrue(report["capture_integrity_verified"])
+        self.assertEqual([VIN.decode()], report["steps"][1]["vehicle_info"]["values"])
+        self.assertEqual(["CAL1"], report["steps"][9]["vehicle_info"]["values"])
+        self.assertEqual(["01020304", "FFFFFFFF"], report["steps"][10]["vehicle_info"]["values"])
+        bad = step(2, bytes.fromhex("0904"), bytes.fromhex("49040143004131000000000000000000000000"))
+        report = decode(io.BytesIO(start() + INITIAL + bad))
+        self.assertIsNone(report["steps"][1]["vehicle_info"])
+
     def test_corruption_and_truncation_keep_prefix(self):
         for tail in (IDENTITY[:-1], IDENTITY[:-1] + bytes([IDENTITY[-1] ^ 1])):
             report = decode(io.BytesIO(start() + INITIAL + tail))

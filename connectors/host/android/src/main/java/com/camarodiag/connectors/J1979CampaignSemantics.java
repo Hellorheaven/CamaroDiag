@@ -104,6 +104,20 @@ public final class J1979CampaignSemantics {
             maximumEncoded=u(data[i+7])*256+u(data[i+8]);
         }
     }
+    public static final class VehicleInfo {
+        public final int infoType;
+        public final List<String> values;
+        VehicleInfo(int infoType,List<String> values){
+            this.infoType=infoType;this.values=Collections.unmodifiableList(new ArrayList<>(values));
+        }
+    }
+    private static String paddedAscii(byte[] data,int start,int length){
+        int end=start+length;
+        while(end>start&&data[end-1]==0)end--;
+        if(end==start)return null;
+        for(int i=start;i<end;i++)if(u(data[i])<32||u(data[i])>126)return null;
+        return new String(data,start,end-start,StandardCharsets.US_ASCII);
+    }
     public static final class Step {
         public final int sequence;
         public final String requestHex,responseHex,status;
@@ -140,6 +154,24 @@ public final class J1979CampaignSemantics {
             List<MonitorRecord> records=new ArrayList<>();
             for(int i=1;i<response.length;i+=9)records.add(new MonitorRecord(response,i));
             return Collections.unmodifiableList(records);
+        }
+        /** Only decoded, structurally valid InfoTypes; CVNs are not signatures. */
+        public VehicleInfo vehicleInfo(){
+            if(state!=1||u(request[0])!=9)return null;
+            int type=u(request[1]);List<String> values=new ArrayList<>();
+            if(type==2)values.add(observedVin());
+            else if(type==4){
+                for(int i=3;i<response.length;i+=16){
+                    String value=paddedAscii(response,i,16);if(value==null)return null;values.add(value);
+                }
+            }else if(type==6){
+                for(int i=3;i<response.length;i+=4)values.add(hex(Arrays.copyOfRange(response,i,i+4)));
+            }else if(type==10){
+                if(u(response[2])!=1||response[7]!='-')return null;
+                String acronym=paddedAscii(response,3,4),description=paddedAscii(response,8,15);
+                if(acronym==null||description==null)return null;values.add(acronym+"-"+description);
+            }else return null;
+            return new VehicleInfo(type,values);
         }
         public String observedVin(){return state==1&&Arrays.equals(request,new byte[]{9,2})?
             new String(response,3,17,StandardCharsets.US_ASCII):null;}
