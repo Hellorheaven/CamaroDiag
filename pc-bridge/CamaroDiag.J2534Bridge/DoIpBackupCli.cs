@@ -89,6 +89,7 @@ internal static class DoIpBackupCli
                     scope.Length, result.Sha256));
                 return 0;
             }
+            DoIpScopedBackup.ValidateCaptureBudget(scope);
             if (File.Exists(options.Archive))
                 throw new IOException(DoIpConsolePresentation.Text("BackupExists"));
             var host = options.Host ?? throw new InvalidOperationException();
