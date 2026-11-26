@@ -46,4 +46,6 @@
   <data name="LegacyConfirmProfile" xml:space="preserve"><value>I verified the protocol, adapter and ECU response source.</value></data>
   <data name="LegacyScope" xml:space="preserve"><value>Functional reads, filtered to the selected response source. Not a whole-vehicle scan. No reset or control test.</value></data>
   <data name="LegacyPrerequisites" xml:space="preserve"><value>Select a J2534 adapter and stop the bridge and console before running the legacy test.</value></data>
+  <data name="LegacyDiscover" xml:space="preserve"><value>Discover sources</value></data>
+  <data name="LegacyDiscoveryScope" xml:space="preserve"><value>Sources observed during PID 00 discovery; no whole-network coverage or OEM module identity is established.</value></data>
 </root>
