@@ -37,7 +37,7 @@ class J1979CanReadExchange {
     if(!link.discardReceive()||!link.active())return;
     uint32_t spent=uint32_t(link.monotonicMs()-start);
     if(spent>=timeout){output.state=State::Timeout;output.elapsedMs=spent;return;}
-    if(!link.send(outgoing,timeout-spent))return;
+    if(!link.send(outgoing,timeout-spent)){output.elapsedMs=uint32_t(link.monotonicMs()-start);return;}
     // Bounded even if a faulty clock never advances or a driver floods data.
     for(unsigned iterations=0;iterations<8192;++iterations){
       const uint32_t now=link.monotonicMs();
@@ -49,6 +49,7 @@ class J1979CanReadExchange {
       const auto status=link.receive(received,remaining<20u?remaining:20u);
       if(status==J1979CanReadLink::Receive::Fault){session.abort();output.state=State::Fault;break;}
       if(status==J1979CanReadLink::Receive::NoFrame)continue;
+      if(!link.active()){session.abort();output.state=State::Fault;break;}
       bool flowRequired=false;
       output.state=session.feed(received,link.monotonicMs(),flow,flowRequired);
       if(flowRequired){
@@ -61,7 +62,7 @@ class J1979CanReadExchange {
     }
     if(output.state==State::Waiting){session.abort();output.state=State::Fault;}
     output.elapsedMs=uint32_t(link.monotonicMs()-start);
-    if(output.state==State::Positive||output.state==State::Negative){
+    if(output.state==State::Positive||output.state==State::Negative||output.state==State::Raw){
       output.responseSize=session.responseSize();
       std::memcpy(output.response,session.response(),output.responseSize);
     }
