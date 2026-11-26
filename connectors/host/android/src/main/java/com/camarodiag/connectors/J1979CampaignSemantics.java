@@ -239,6 +239,23 @@ public final class J1979CampaignSemantics {
         public final int flags,steps;
         Summary(int end,int flags,int steps){this.end=ENDS[end];this.flags=flags;this.steps=steps;}
     }
+    /** Re-decode a positive application record from a locally recorded report.
+     * No campaign or physical provenance is established by this helper. */
+    public static Step decodePositive(String requestHex,String responseHex){
+        byte[] request=parseHex(requestHex,3),response=parseHex(responseHex,4095);
+        if(request==null||response==null)return null;
+        try{return new Step(0,1,0,request,response);}
+        catch(IOException malformed){return null;}
+    }
+    private static byte[] parseHex(String value,int maxBytes){
+        if(value==null||value.length()<2||value.length()>maxBytes*2||value.length()%2!=0)return null;
+        byte[] result=new byte[value.length()/2];String digits="0123456789ABCDEF";
+        for(int i=0;i<result.length;i++){
+            int a=digits.indexOf(value.charAt(i*2)),b=digits.indexOf(value.charAt(i*2+1));
+            if(a<0||b<0)return null;result[i]=(byte)(a*16+b);
+        }
+        return result;
+    }
     private static boolean readOnly(byte[] r){
         if(r.length==0)return false;
         int m=u(r[0]);return r.length==1&&(m==3||m==7||m==10)||

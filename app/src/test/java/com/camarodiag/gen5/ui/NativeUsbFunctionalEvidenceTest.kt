@@ -12,7 +12,10 @@ class NativeUsbFunctionalEvidenceTest {
         .put("device_credential_authenticated",true).put("capture_integrity_verified",valid)
         .put("observed_vin",observed)
         .put("summary",JSONObject().put("transport_observed",true).put("pid_inventory_complete",true))
-        .put("steps",JSONArray().put(JSONObject().put("request_hex","03").put("status","PASSED")))
+         .put("steps",JSONArray().put(JSONObject().put("request_hex","03").put("status","PASSED")
+            .put("response_hex","4300").put("dtc_codes",JSONArray()))
+            .put(JSONObject().put("request_hex","0902").put("status","PASSED").put("response_hex",
+                "490201"+observed.toByteArray(Charsets.US_ASCII).joinToString("") { "%02X".format(it.toInt() and 255) })))
     @Test fun explicitDtcEvidenceDoesNotUpgradeMissingModesOrPhysicalProof() {
         val rows=NativeUsbFunctionalEvidence.results(state,report(true)).checks.associateBy { it.key }
         assertEquals(FunctionalTestOutcome.PASSED,rows["native:dtc3"]?.outcome)
@@ -23,7 +26,7 @@ class NativeUsbFunctionalEvidenceTest {
         val input=report(true)
         val rows=input.getJSONArray("steps")
         rows.getJSONObject(0).put("dtc_codes",JSONArray())
-        rows.put(JSONObject().put("request_hex","010C").put("status","PASSED")
+        rows.put(JSONObject().put("request_hex","010C").put("status","PASSED").put("response_hex","410C1AF8")
             .put("measurement",JSONObject().put("mode",1).put("pid",12).put("name","engine-rpm")
                 .put("number",1726).put("unit","rpm")))
         rows.put(JSONObject().put("request_hex","020500").put("status","TIMEOUT")
@@ -103,6 +106,21 @@ class NativeUsbFunctionalEvidenceTest {
         val rejected=NativeUsbFunctionalEvidence.diagnosticValues(input)!!
         assertTrue(rejected.pages.isEmpty())
         assertNull(rejected.freeze)
+    }
+    @Test fun numericFieldsAndDtcMustAgreeWithRawReply() {
+        val input=report(true)
+        val data=JSONObject().put("mode",1).put("pid",166).put("name","odometer").put("number",123456.7).put("unit","km")
+        input.getJSONArray("steps").put(JSONObject().put("request_hex","01A6").put("response_hex","41A60012D687")
+            .put("status","PASSED").put("measurement",data))
+        assertEquals(123456.7,NativeUsbFunctionalEvidence.diagnosticValues(input)!!.measurements.single().number,0.0)
+        data.put("number",1)
+        input.getJSONArray("steps").getJSONObject(0).put("dtc_codes",JSONArray().put("P0123"))
+        val rejected=NativeUsbFunctionalEvidence.diagnosticValues(input)!!
+        assertTrue(rejected.measurements.isEmpty())
+        assertNull(rejected.dtcs[3])
+        assertEquals(FunctionalTestOutcome.FAILED,NativeUsbFunctionalEvidence.results(state,input).checks.first { it.key=="native:dtc3" }.outcome)
+        input.put("observed_vin","1FA6P8TH0L5100000")
+        assertNull(NativeUsbFunctionalEvidence.diagnosticValues(input)!!.observedVin)
     }
     @Test fun inconsistentCampaignAndWrongVinAreNotPasses() {
         val bad=NativeUsbFunctionalEvidence.results(state,report(false)).checks.associateBy { it.key }

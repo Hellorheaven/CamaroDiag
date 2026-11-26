@@ -154,6 +154,30 @@ class CaptureTests(unittest.TestCase):
         self.assertEqual([1], report["steps"][8]["supported_page"]["supported_ids"])
         self.assertIsNone(report["steps"][1]["supported_page"])
 
+    def test_odometer_high_page_and_legacy_raw_capture(self):
+        first = step(1, bytes.fromhex("0100"), bytes.fromhex("410000000001"))
+        pages = b"".join(step(i, bytes((1, base)), bytes((0x41, base, 0, 0, 0, 1)))
+                         for i, base in enumerate((0x20, 0x40, 0x60, 0x80), 6))
+        pages += step(10, bytes.fromhex("01A0"), bytes.fromhex("41A004000000"))
+        tail = (step(12, bytes.fromhex("020200"), bytes.fromhex("4202000000")) +
+                step(13, bytes.fromhex("0600"), bytes.fromhex("460000000000")) +
+                step(14, bytes.fromhex("0800"), bytes.fromhex("480000000000")) +
+                step(15, bytes.fromhex("0900"), bytes.fromhex("490000000000")))
+        for state in (1, 2):
+            odo = step(11, bytes.fromhex("01A6"), bytes.fromhex("41A60012D687"), state)
+            report = decode(io.BytesIO(start() + first + IDENTITY + DTC + pages + odo + tail +
+                summary(16, flags=231, steps=15, positive=15 if state == 1 else 14, raw=0 if state == 1 else 1)))
+            self.assertTrue(report["capture_integrity_verified"])
+            measurement = report["steps"][10]["measurement"]
+            if state == 1:
+                self.assertEqual(123456.7, measurement["number"])
+                self.assertEqual("km", measurement["unit"])
+            else:
+                self.assertIsNone(measurement)
+        truncated = step(11, bytes.fromhex("01A6"), bytes.fromhex("41A60012D6"))
+        report = decode(io.BytesIO(start() + first + IDENTITY + DTC + pages + truncated))
+        self.assertFalse(report["capture_integrity_verified"])
+
     def test_corruption_and_truncation_keep_prefix(self):
         for tail in (IDENTITY[:-1], IDENTITY[:-1] + bytes([IDENTITY[-1] ^ 1])):
             report = decode(io.BytesIO(start() + INITIAL + tail))

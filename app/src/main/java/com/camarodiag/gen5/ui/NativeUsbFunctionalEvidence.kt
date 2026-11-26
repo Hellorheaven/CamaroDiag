@@ -1,6 +1,7 @@
 package com.camarodiag.gen5.ui
 
 import org.json.JSONObject
+import com.camarodiag.connectors.J1979CampaignSemantics
 
 /** Results reflect recorded replies, not a claim of physical provenance. */
 internal object NativeUsbFunctionalEvidence {
@@ -124,13 +125,26 @@ internal object NativeUsbFunctionalEvidence {
         return type to values
     }
 
+    private fun positive(step:JSONObject):J1979CampaignSemantics.Step? =
+        if(step.optString("status")=="PASSED") J1979CampaignSemantics.decodePositive(
+            step.optString("request_hex"),step.optString("response_hex")) else null
+
+    private fun observedVin(report:JSONObject):String? {
+        val claimed=report.optString("observed_vin")
+        if(!claimed.matches(Regex("[A-HJ-NPR-Z0-9]{17}")))return null
+        val steps=report.optJSONArray("steps") ?: return null
+        val vinRows=(0 until steps.length()).mapNotNull { steps.optJSONObject(it) }
+            .filter { it.optString("request_hex")=="0902" }
+        return claimed.takeIf { vinRows.size==1 && positive(vinRows.single())?.observedVin()==claimed }
+    }
+
     /** Only a coherent authenticated-session report can feed the value display.
      * Missing mode evidence remains null, never an empty fault list. */
     fun diagnosticValues(report: JSONObject): DiagnosticValues? {
         if (report.optBoolean("cancelled") || !report.optBoolean("device_credential_authenticated") ||
             !report.optBoolean("capture_integrity_verified")) return null
         val steps = report.optJSONArray("steps") ?: return null
-        val vin = report.optString("observed_vin").takeIf { it.matches(Regex("[A-HJ-NPR-Z0-9]{17}")) }
+        val vin = observedVin(report)
         val dtcs = linkedMapOf<Int, List<String>?>(3 to null, 7 to null, 10 to null)
         val measured = linkedMapOf<Pair<Int, Int>, Measurement>()
         val monitors = mutableListOf<Monitor>()
@@ -150,7 +164,7 @@ internal object NativeUsbFunctionalEvidence {
                 val mode = request.toInt(16)
                 val codes = step.optJSONArray("dtc_codes") ?: continue
                 val list = (0 until codes.length()).map { codes.optString(it) }
-                if (list.all { it.matches(Regex("[PCBU][0-3][0-9A-F]{3}")) }) dtcs[mode] = list
+                if (list==positive(step)?.dtcCodes()) dtcs[mode] = list
             }
             if (request.matches(Regex("06[0-9A-F]{2}"))) {
                 val mid = request.takeLast(2).toInt(16)
@@ -187,6 +201,9 @@ internal object NativeUsbFunctionalEvidence {
             if (mode !in setOf(1,2) || pid !in 1..255 || pid%32==0 ||
                 request != "%02X%02X%s".format(java.util.Locale.ROOT,mode,pid,if(mode==2) "00" else "") ||
                 !number.isFinite() || name.isBlank() || unit.isBlank()) continue
+            val decoded=positive(step)?.measurement() ?: continue
+            if(decoded.mode!=mode||decoded.pid!=pid||decoded.name!=name||
+                decoded.unit!=unit||decoded.number!=number) continue
             measured[mode to pid] = Measurement(mode,pid,name,number,unit)
         }
         return DiagnosticValues(vin,dtcs,measured.values.sortedWith(compareBy({ it.mode },{ it.pid })),monitors.toList(),identity.toMap(),readiness,pages.values.sortedWith(compareBy({it.mode},{it.base})),freeze)
@@ -196,13 +213,11 @@ internal object NativeUsbFunctionalEvidence {
         val auth = report.optBoolean("device_credential_authenticated")
         val consistent = auth && !report.optBoolean("cancelled") && report.optBoolean("capture_integrity_verified")
         val summary = report.optJSONObject("summary")
-        val vin = report.optString("observed_vin").takeIf { it.matches(Regex("[A-HJ-NPR-Z0-9]{17}")) }
+        val vin = observedVin(report)
         val matches = consistent && vin != null && vin == state.context?.selectedVin
         val steps = report.optJSONArray("steps")
-        fun positive(req: String): Boolean = consistent && steps != null &&
-            (0 until steps.length()).any { i -> steps.optJSONObject(i)?.let {
-                it.optString("request_hex") == req && it.optString("status") == "PASSED"
-            } == true }
+        val values=diagnosticValues(report)
+        fun positive(req: String): Boolean = consistent && values?.dtcs?.get(req.toInt(16))!=null
         fun attempted(req: String): Boolean = consistent && steps != null &&
             (0 until steps.length()).any { i -> steps.optJSONObject(i)?.optString("request_hex") == req }
         val dtcRequests = mapOf("dtc3" to "03", "dtc7" to "07", "dtca" to "0A")

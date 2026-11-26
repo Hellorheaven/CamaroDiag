@@ -8,7 +8,7 @@ using C=cd::J1979CanCampaign;
 class Fake final:public Link {
  public:
   uint32_t now=0;
-  bool enabled=true,failSend=false;
+  bool enabled=true,failSend=false,advertiseOdometer=false;
   std::vector<std::vector<uint8_t>> requests;
   Frame response{};
   bool ready=false;
@@ -23,6 +23,12 @@ class Fake final:public Link {
     requests.push_back(req);
     std::vector<uint8_t> reply={0x7f,req[0],0x11};
     if(req==std::vector<uint8_t>{1,0})reply={0x41,0,0x08,0x10,0,0};
+    if(advertiseOdometer&&req.size()==2&&req[0]==1){
+      const uint8_t pid=req[1];
+      if(pid<=0x80&&pid%32==0)reply={0x41,pid,0,0,0,1};
+      if(pid==0xa0)reply={0x41,pid,4,0,0,0};
+      if(pid==0xa6)reply={0x41,pid,0,0x12,0xd6,0x87};
+    }
     if(req==std::vector<uint8_t>{1,5})reply={0x41,5,90};
     if(req==std::vector<uint8_t>{1,12})reply={0x41,12,0,0};
     if(req==std::vector<uint8_t>{3})reply={0x43,0};
@@ -43,10 +49,15 @@ class Fake final:public Link {
 class Sink final:public C::Sink{
  public:
   unsigned count=0,stopAfter=0;
+  bool odometerObserved=false;
   bool observation(const uint8_t* req,size_t n,const C::Exchange::Result& r)override{
     assert(n>0&&req[0]!=4);
     assert(req[0]!=8||req[1]%32==0);
     assert(r.state!=C::State::Positive||r.responseSize>0);
+    if(n==2&&req[0]==1&&req[1]==0xa6){
+      assert(r.state==C::State::Positive&&r.responseSize==6);
+      odometerObserved=true;
+    }
     ++count;return !stopAfter||count<stopAfter;
   }
 };
@@ -62,6 +73,10 @@ int main(){
          done.controlInventoryComplete&&done.identityInventoryComplete);
   assert(f.requests.front()==std::vector<uint8_t>({1,0}));
   assert(f.requests[1]==std::vector<uint8_t>({9,2}));
+  assert(!sink.odometerObserved);
+  Fake modern;modern.advertiseOdometer=true;Sink modernSink;
+  auto modernDone=C::run(modern,0x7e0,0x7e8,false,60000,modernSink,scratch);
+  assert(modernDone.end==C::End::Complete&&modernDone.pidInventoryComplete&&modernSink.odometerObserved);
   Fake budget;Sink b;
   auto shortRun=C::run(budget,0x7e0,0x7e8,false,30,b,scratch);
   assert(shortRun.end==C::End::Budget||shortRun.end==C::End::InitialUnverified);

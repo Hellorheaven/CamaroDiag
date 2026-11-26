@@ -1,3 +1,7 @@
+## J1979 — valeurs, VIN et DTC relus depuis les octets (26/11/2026)
+
+- Les écrans Android et Scan OBD recalculent le VIN, les listes DTC et les mesures numériques via le décodeur de forme CU/1 commun, rejetant les champs JSON contradictoires ; la réussite DTC nécessite une liste positive vérifiée. Recettes firmware/Python A6 multi-pages et compatibilité ancienne observation RAW écrites, non exécutées. C6/J1979 ouverts ; aucune CI intermédiaire, fusion ou Release.
+
 ## J1979 — kilométrage total standard PID A6 (26/11/2026)
 
 - Alignement du firmware, des hôtes CU/1 Java/.NET/Python, du pont Windows et du scan SocketCAN sur le PID A6 déjà décodé par Android : 4 octets non signés big-endian, 0,1 km, aucune lecture si non annoncé, refus des longueurs invalides. Les anciennes observations RAW ne deviennent pas automatiquement des mesures. Tests de largeur, scaling et overflow écrits, non exécutés. Ne pas confondre kilométrage déclaré par ECU avec kilométrage certifié. C6/J1979 ouverts, aucune CI intermédiaire, fusion ou Release.
