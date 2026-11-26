@@ -1869,6 +1869,7 @@ internal static class StandardProtocolCli
         using var cancellation = new CancellationTokenSource();
         ConsoleCancelEventHandler cancel = (_, e) => { e.Cancel = true; cancellation.Cancel(); };
         Console.CancelKeyPress += cancel;
+        DoIpSequenceProgress? progress = null;
         try
         {
             var timeout = TimeSpan.FromMilliseconds(o.TimeoutMs);
@@ -1889,6 +1890,8 @@ internal static class StandardProtocolCli
                 $"OEM={(o.RoutingOemData is null ? "none" : Convert.ToHexString(o.RoutingOemData))} " +
                 $"commands={string.Join("; ", sequence.Commands.Select(c => Convert.ToHexString(c)))}"))
                 return 2;
+            progress = new DoIpSequenceProgress(sequence.Vin, o.Host, gateway.LogicalAddress,
+                o.Tester, o.Ecu, o.UseTls, sequence.Commands.Length);
             cancellation.Token.ThrowIfCancellationRequested();
             await DoIpVehicleDiscovery.RequireCurrentIdentityAsync(gateway, timeout, cancellation.Token,
                 trace: journal is null ? null : journal.RecordDatagram);
@@ -1901,12 +1904,30 @@ internal static class StandardProtocolCli
                 trace: journal is null ? null : journal.Record);
             count = await DoIpVinReader.ExchangeSequenceVerifiedAsync(transport, gateway,
                 sequence.Commands, timeout, cancellation.Token, (index, reply) =>
+                {
+                    // A verified response is still partial until all commands
+                    // and both resource disposals have succeeded.
+                    Console.Error.WriteLine(progress.RecordVerified(index, reply));
                     Console.WriteLine(string.Format(DoIpConsolePresentation.Text("SequenceReply"),
-                        index, Convert.ToHexString(reply))),
+                        index, Convert.ToHexString(reply)));
+                },
                 TimeSpan.FromMilliseconds(o.DoIpP2Ms), TimeSpan.FromMilliseconds(o.DoIpP2StarMs));
             }
+            if (count != progress.CommandsCompleted)
+                throw new InvalidDataException("DoIP sequence reply count changed.");
+            Console.Error.WriteLine(progress.Summary(complete: true));
             Console.WriteLine(string.Format(DoIpConsolePresentation.Text("SequenceComplete"), count));
             return 0;
+        }
+        catch
+        {
+            if (progress is not null)
+            {
+                try { Console.Error.WriteLine(progress.Summary(complete: false)); }
+                catch (IOException) { /* Preserve the original failure. */ }
+                catch (InvalidDataException) { /* Preserve the original failure. */ }
+            }
+            throw;
         }
         finally { Console.CancelKeyPress -= cancel; }
     }
