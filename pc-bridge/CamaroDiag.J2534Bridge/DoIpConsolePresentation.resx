@@ -210,4 +210,8 @@
   <data name="InventoryObdSupported" xml:space="preserve"><value>ECU 0x{0:X4}: OBDonUDS identified (0x{1:X2})</value></data>
   <data name="InventoryObdUnrecognized" xml:space="preserve"><value>ECU 0x{0:X4}: OBDonUDS not identified (F810 = 0x{1:X2})</value></data>
   <data name="MonitorPartial" xml:space="preserve"><value>Incomplete capture: {0}/{1} verified samples.</value></data>
+  <data name="InventoryProgress" xml:space="preserve"><value>Inventory: {0}/{1} targets examined (partial)</value></data>
+  <data name="InventoryReasonTimeout" xml:space="preserve"><value>Response timed out.</value></data>
+  <data name="InventoryReasonIdentity" xml:space="preserve"><value>ECU identity or diagnostic response is invalid.</value></data>
+  <data name="InventoryReasonCommunication" xml:space="preserve"><value>Communication or identity verification failed.</value></data>
 </root>
