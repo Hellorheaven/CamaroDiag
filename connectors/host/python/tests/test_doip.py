@@ -271,6 +271,47 @@ class DoIpTests(unittest.TestCase):
                              ["unverified", "vin_verified"])
             self.assertEqual(result["verified_count"], 1)
 
+    def test_inventory_progress_is_detached_and_follows_gateway_revalidation(self):
+        events = []
+        def discover_target(*args):
+            events.append("gateway")
+            return GATEWAY
+        def progress(rows, total):
+            self.assertEqual(total, 2)
+            events.append(("progress", len(rows), rows[-1].get("reason")))
+            rows[0]["status"] = "caller mutation"
+        with patch("camarodiagconnectors.doip.discover", side_effect=discover_target), \
+             patch("camarodiagconnectors.doip.Session") as session:
+            active = session.return_value.__enter__.return_value
+            active.verify_vin.side_effect = [VIN, TimeoutError("no response")]
+            session.return_value.__exit__.side_effect = lambda *_: events.append("close")
+            result = inventory_ecus(GATEWAY, VIN, 0x0E80, (0x1234, 0x1235), on_progress=progress)
+        self.assertEqual(events, ["gateway", "close", "gateway", ("progress", 1, None),
+                                  "close", "gateway", ("progress", 2, "timeout")])
+        self.assertEqual(result["targets"][0]["status"], "vin_verified")
+        self.assertEqual(result["targets"][1]["reason"], "timeout")
+
+    def test_inventory_drift_prevents_progress_and_next_target(self):
+        from dataclasses import replace
+        progress = unittest.mock.Mock()
+        with patch("camarodiagconnectors.doip.discover",
+                   side_effect=[GATEWAY, replace(GATEWAY, logical_address=0x1235)]), \
+             patch("camarodiagconnectors.doip.Session") as session:
+            session.return_value.__enter__.return_value.verify_vin.return_value = VIN
+            with self.assertRaises(DoIpError):
+                inventory_ecus(GATEWAY, VIN, 0x0E80, (0x1234, 0x1235), on_progress=progress)
+            progress.assert_not_called()
+            self.assertEqual(session.call_count, 1)
+
+    def test_inventory_progress_failure_never_becomes_an_unverified_ecu(self):
+        with patch("camarodiagconnectors.doip.discover", return_value=GATEWAY), \
+             patch("camarodiagconnectors.doip.Session") as session:
+            session.return_value.__enter__.return_value.verify_vin.return_value = VIN
+            with self.assertRaisesRegex(OSError, "output failed"):
+                inventory_ecus(GATEWAY, VIN, 0x0E80, (0x1234, 0x1235),
+                    on_progress=unittest.mock.Mock(side_effect=OSError("output failed")))
+            self.assertEqual(session.call_count, 1)
+
     def test_inventory_tls_error_stops_all_remaining_targets(self):
         import ssl
         with patch("camarodiagconnectors.doip.discover", return_value=GATEWAY), \
