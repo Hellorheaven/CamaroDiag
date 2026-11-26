@@ -9,7 +9,8 @@ namespace CamaroDiag.J2534Bridge;
 internal sealed class ObdLegacyJ2534Transport : IDisposable
 {
     internal enum Variant { Pwm = 1, Vpw = 2, Iso9141 = 3, KwpSlow = 4, KwpFast = 5 }
-    internal sealed record Packet(byte Source, string RawHex, byte[] Payload, uint Timestamp);
+    internal sealed record Packet(byte Source, string RawHex, byte[] Payload, uint Timestamp,
+        string? InFrameResponseHex = null);
     internal sealed record Exchange(string TxHex, IReadOnlyList<Packet> Replies);
     private readonly J2534StandardChannel channel;
     private readonly Variant variant;
@@ -82,7 +83,8 @@ internal sealed class ObdLegacyJ2534Transport : IDisposable
         }
         if (payload.Length is < 1 or > 7)
             throw new InvalidDataException("Legacy application record length invalid.");
-        return new(source, Convert.ToHexString(data), payload, frame.Timestamp);
+        return new(source, Convert.ToHexString(data), payload, frame.Timestamp,
+            frame.InFrameResponse is null ? null : Convert.ToHexString(frame.InFrameResponse));
     }
 
     internal static ObdLegacyJ2534Transport Open(J2534Adapter adapter, Variant variant,
@@ -95,6 +97,7 @@ internal sealed class ObdLegacyJ2534Transport : IDisposable
         var transport = new ObdLegacyJ2534Transport(channel, variant, source, requireActive);
         try
         {
+            if (variant == Variant.Pwm) channel.ConfigurePwmTesterAddress();
             // Match target and source. KWP format byte contains message length.
             bool kwp = variant is Variant.KwpSlow or Variant.KwpFast;
             channel.ConfigureFilter(kwp ? [0xC0, 0xFF, 0xFF] : [0xFF, 0xFF, 0xFF],
@@ -143,7 +146,7 @@ internal sealed class ObdLegacyJ2534Transport : IDisposable
             // Gather all records from the chosen source (including
             // multi-record VIN/DTC) within one absolute request window.
             var remaining = (int)Math.Max(1, timeoutMs - watch.ElapsedMilliseconds);
-            var frame = channel.Receive(remaining);
+            var frame = channel.Receive(remaining, allowPwmIfr: variant == Variant.Pwm);
             if (frame is null) break;
             var packet = Decode(variant, source, frame);
             if (packet is null) continue;
