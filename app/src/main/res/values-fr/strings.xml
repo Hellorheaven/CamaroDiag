@@ -1304,4 +1304,9 @@
     <string name="functional_clear_warning">Cet effacement peut supprimer les défauts antipollution, les trames figées et les informations de préparation. Exportez les preuves initiales. Respectez la procédure constructeur, véhicule immobilisé et moteur arrêté. Ne masquez pas un défaut non résolu. Aucune répétition automatique.</string>
     <string name="functional_clear_confirm">Demander un seul effacement antipollution sur le véhicule %1$s ?</string>
     <string name="functional_clear_uncertain">Campagne Mode 04 interrompue ou en échec. État de la demande potentiellement incertain ; ne pas relancer automatiquement.</string>
+    <string name="functional_legacy_pwm_candidates">Candidat : ancienne Ford Mustang (1996–2004, moteur et marché à vérifier). La Mach-E 2023 ne convient pas au PWM.</string>
+    <string name="functional_legacy_vpw_candidates">Candidat : Camaro de quatrième génération, par exemple Z28 1998 ; vérifier le protocole réel du calculateur.</string>
+    <string name="functional_legacy_iso9141_candidates">Candidat : Toyota ou Honda essence du début des années 2000, avec OBD ISO 9141-2 confirmé.</string>
+    <string name="functional_legacy_kwp_candidates">Candidat : véhicule européen essence du début des années 2000, avec diagnostic antipollution ISO 14230-4 confirmé. La K-Line seule ne prouve pas J1979.</string>
+    <string name="functional_legacy_route_required">Connectez une interface ELM compatible sur le protocole legacy choisi. Aucun changement automatique. Lecture seule ; les fragments anonymes ne prouvent pas le VIN du calculateur.</string>
 </resources>
