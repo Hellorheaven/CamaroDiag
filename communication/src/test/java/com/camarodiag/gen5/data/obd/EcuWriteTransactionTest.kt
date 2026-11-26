@@ -6,6 +6,8 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.cancel
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -193,6 +195,60 @@ class EcuWriteTransactionTest {
         ).run(request())
         assertEquals(EcuWriteTransaction.Status.COMPLETED, resumed.status)
         assertEquals(1, driver.eraseCalls)
+    }
+
+    @Test fun cancellationReturnedByNonCooperativeJournalCannotErase() = runBlocking {
+        val device = FakeDriver(original, expectedIdentity)
+        val phases = mutableListOf<EcuWriteTransaction.Stage>()
+        val session = async(start = CoroutineStart.UNDISPATCHED) {
+            EcuWriteExecutionEngine(
+                device,
+                EcuWriteTransaction.Journal { record ->
+                    phases += record.stage
+                    if (record.stage == EcuWriteTransaction.Stage.BEFORE_ERASE)
+                        currentCoroutineContext().cancel()
+                    // Deliberately return normally despite cancellation:
+                    // the transaction engine must enforce cancellation itself.
+                },
+                EcuWriteTransaction.PowerMonitor { true }
+            ).run(request())
+        }
+        try {
+            session.await()
+            org.junit.Assert.fail("A cancelled destructive transaction must not return success")
+        } catch (_: CancellationException) {
+            // The in-flight transaction must stop before the erase packet.
+        }
+        assertEquals(0, device.eraseCalls)
+        assertEquals(0, device.writeCalls)
+        assertTrue(EcuWriteTransaction.Stage.BEFORE_ERASE in phases)
+        assertFalse(EcuWriteTransaction.Stage.TRANSACTION_COMPLETED in phases)
+    }
+
+    @Test fun cancellationAfterFinalReadbackCannotPublishCompletedJournal() = runBlocking {
+        val device = FakeDriver(original, expectedIdentity)
+        val phases = mutableListOf<EcuWriteTransaction.Stage>()
+        val session = async(start = CoroutineStart.UNDISPATCHED) {
+            EcuWriteExecutionEngine(
+                device,
+                EcuWriteTransaction.Journal { record ->
+                    phases += record.stage
+                    if (record.stage == EcuWriteTransaction.Stage.FINAL_READBACK_VERIFIED)
+                        currentCoroutineContext().cancel()
+                },
+                EcuWriteTransaction.PowerMonitor { true }
+            ).run(request())
+        }
+        try {
+            session.await()
+            org.junit.Assert.fail("Cancellation must prevent final completion evidence")
+        } catch (_: CancellationException) {
+            // Physically verified sectors remain subject to manual assessment.
+        }
+        assertEquals(1, device.eraseCalls)
+        assertEquals(EcuWriteTransaction.Stage.FINAL_READBACK_VERIFIED, phases.last())
+        assertFalse(EcuWriteTransaction.Stage.TRANSACTION_COMPLETED in phases)
+        assertEquals(0, device.resetCalls)
     }
 
     @Test fun realEntryPointCannotWriteWithoutRegisteredHardwareDriver() = runBlocking {
