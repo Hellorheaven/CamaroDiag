@@ -442,8 +442,14 @@ class BluetoothObdManager(context: Context) {
                     if (count <= 0) ByteArray(0) else buffer.copyOf(count)
                 },
                 interrupt = {
-                    output.write(ElmResponseCompletion.wireBytes("\u001B"))
-                    output.flush()
+                    BoundedBluetoothConnect.write(1500L, write = {
+                        context.ensureActive()
+                        transportSessionEpoch.requireQueuedCurrent(expectedEpoch)
+                        if (socket !== ownedSocket || !ownedSocket.isConnected)
+                            throw ObdTransportDisconnectedException("Bluetooth startup socket was replaced")
+                        output.write(ElmResponseCompletion.wireBytes("\u001B"))
+                        output.flush()
+                    }, close = { ownedSocket.close() })
                 },
                 ensureCurrent = {
                     context.ensureActive()
@@ -1285,8 +1291,8 @@ class BluetoothObdManager(context: Context) {
                 check(sessionTransport == "BLUETOOTH") {
                     "An ELM command cannot be sent through the selected transport."
                 }
-                val out = outputStream; val inp = inputStream
-                if (out == null || inp == null || socket?.isConnected != true) {
+                val out = outputStream; val inp = inputStream; val ownedSocket = socket
+                if (out == null || inp == null || ownedSocket?.isConnected != true) {
                     throw ObdTransportDisconnectedException("Bluetooth OBD adapter is not connected")
                 }
                 // Bound the drain if the adapter was left streaming CAN.
@@ -1301,7 +1307,17 @@ class BluetoothObdManager(context: Context) {
                     drained++
                 }
                 ensureSameSession()
-                out.write(payload); out.flush()
+                BoundedBluetoothConnect.write(timeoutMs.coerceIn(1L, 4000L), write = {
+                    ensureSameSession()
+                    if (socket !== ownedSocket || !ownedSocket.isConnected)
+                        throw ObdTransportDisconnectedException("Bluetooth command socket was replaced")
+                    // Recheck approval after drain and worker dispatch, just
+                    // before sending bytes on this exact socket.
+                    beforeTransmit()
+                    ensureSameSession()
+                    out.write(payload)
+                    out.flush()
+                }, close = { ownedSocket.close() })
                 val buffer = StringBuilder()
                 val callbackBuffer = StringBuilder()
                 val budget = ElmCommandReadBudget(timeoutMs)
