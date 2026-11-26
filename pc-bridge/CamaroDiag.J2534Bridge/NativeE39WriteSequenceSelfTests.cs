@@ -114,6 +114,25 @@ internal static class NativeE39WriteSequenceSelfTests
         }
     }
 
+    private sealed class SuspendedJournal : NativeE39WriteSequence.IDurableJournal
+    {
+        internal readonly TaskCompletionSource<bool> Entered = new(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource<bool> Continue = new(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public async Task AppendAsync(NativeE39WriteSequence.Event evidence,
+            CancellationToken token)
+        {
+            Entered.TrySetResult(true);
+            await Continue.Task.WaitAsync(token);
+        }
+
+        public Task PreserveOriginalBlockAsync(uint address, byte[] liveBytes,
+            string sha256, CancellationToken token) =>
+            throw new InvalidOperationException("Suspended journal must not reach ECU erase.");
+    }
+
     internal static int Run()
     {
         var count = 0;
@@ -333,6 +352,34 @@ internal static class NativeE39WriteSequenceSelfTests
             NativeE39WriteSequence.RunBenchSequenceAsync(tamperEcu, new TestJournal(),
                 damagedPlan, opts, CancellationToken.None).GetAwaiter().GetResult());
         Assert(tamperEcu.Requests.Count == 0, "Mutated sector rejected before any ECU request");
+
+        // Concurrent programming on the *same* live kernel transport must
+        // fail before traffic or durable journal mutation by a second owner.
+        // An interrupted first owner releases the link for a new, separately
+        // preflighted operation; it must not retry or continue automatically.
+        using (var stopFirst = new CancellationTokenSource())
+        {
+            var sharedLink = new TestEcu(origin);
+            var holdingJournal = new SuspendedJournal();
+            var first = NativeE39WriteSequence.RunBenchSequenceAsync(
+                sharedLink, holdingJournal, plan, opts, stopFirst.Token);
+            holdingJournal.Entered.Task.GetAwaiter().GetResult();
+            var competingJournal = new TestJournal();
+            Expect<InvalidOperationException>(() =>
+                NativeE39WriteSequence.RunBenchSequenceAsync(
+                    sharedLink, competingJournal, plan, opts, CancellationToken.None)
+                    .GetAwaiter().GetResult());
+            Assert(competingJournal.Events.Count == 0 && sharedLink.Requests.Count == 0,
+                "Second owner cannot write or journal on a link held by first sequence");
+            stopFirst.Cancel();
+            Expect<OperationCanceledException>(() => first.GetAwaiter().GetResult());
+            var afterCancellation = NativeE39WriteSequence.RunBenchSequenceAsync(
+                sharedLink, new TestJournal(), plan, opts, CancellationToken.None)
+                .GetAwaiter().GetResult();
+            Assert(afterCancellation.SectorsWritten == 2 &&
+                   sharedLink.Memory.SequenceEqual(updated),
+                "Canceled preflight releases link and later fresh transaction succeeds");
+        }
 
         Console.WriteLine($"PASS: {count} native E39 offline write transaction self-tests.");
         return count;

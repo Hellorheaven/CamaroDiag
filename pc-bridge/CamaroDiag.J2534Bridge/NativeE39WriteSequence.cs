@@ -1,3 +1,5 @@
+using System.Runtime.CompilerServices;
+
 namespace CamaroDiag.J2534Bridge;
 
 /// <summary>
@@ -14,6 +16,27 @@ namespace CamaroDiag.J2534Bridge;
 /// </summary>
 internal static class NativeE39WriteSequence
 {
+    // A live kernel link has a single mutable ECU session. Do not permit a
+    // second programming sequence to interleave its preflight/erase/write
+    // traffic with the active owner. Different independent links remain free.
+    private static readonly ConditionalWeakTable<IKernelLink, SemaphoreSlim> LinkGates = new();
+
+    private sealed class LinkLease(SemaphoreSlim gate) : IDisposable
+    {
+        private SemaphoreSlim? ownedGate = gate;
+
+        public void Dispose() => Interlocked.Exchange(ref ownedGate, null)?.Release();
+    }
+
+    private static IDisposable AcquireLink(IKernelLink link)
+    {
+        var gate = LinkGates.GetValue(link, static _ => new SemaphoreSlim(1, 1));
+        if (!gate.Wait(0))
+            throw new InvalidOperationException(
+                "Another E39 programming transaction is already using this ECU link.");
+        return new LinkLease(gate);
+    }
+
     internal enum Phase
     {
         Prepared, OriginalCrcVerified, OriginalBytesVerified, TestWriteAccepted, EraseStarted,
@@ -89,6 +112,7 @@ internal static class NativeE39WriteSequence
         ArgumentNullException.ThrowIfNull(journal);
         ArgumentNullException.ThrowIfNull(plan);
         ArgumentNullException.ThrowIfNull(options);
+        using var exclusiveLink = AcquireLink(link);
         if (!plan.CanAttemptPhysicalWrite ||
             !options.BenchProtocolValidated || !options.RecoveryProcedureTested)
             throw new UnauthorizedAccessException(
