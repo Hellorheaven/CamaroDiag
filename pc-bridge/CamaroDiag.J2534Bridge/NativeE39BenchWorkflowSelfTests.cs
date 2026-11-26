@@ -19,9 +19,22 @@ internal static class NativeE39BenchWorkflowSelfTests
                 throw new InvalidDataException("Physical ECU block backup is invalid.");
             return Task.CompletedTask;
         }
+        internal Action<NativeE39WriteSequence.Event>? OnAppend;
+        public Task RequireOriginalBlocksIntactAsync(CancellationToken token)
+        {
+            token.ThrowIfCancellationRequested();
+            var planned = Events.Where(e => e.Phase == NativeE39WriteSequence.Phase.Prepared).ToArray();
+            if (planned.Length == 0 || PhysicalBlocks.Count != planned.Length ||
+                planned.Any(e => !PhysicalBlocks.TryGetValue(e.Address, out var bytes) ||
+                    !string.Equals(Convert.ToHexString(SHA256.HashData(bytes)), e.Detail,
+                        StringComparison.OrdinalIgnoreCase)))
+                throw new InvalidDataException("Original sector backup changed.");
+            return Task.CompletedTask;
+        }
         public Task AppendAsync(NativeE39WriteSequence.Event evidence, CancellationToken token)
         {
-            token.ThrowIfCancellationRequested(); Events.Add(evidence); return Task.CompletedTask;
+            token.ThrowIfCancellationRequested(); Events.Add(evidence); OnAppend?.Invoke(evidence);
+            return Task.CompletedTask;
         }
     }
 
@@ -239,6 +252,17 @@ internal static class NativeE39BenchWorkflowSelfTests
         Check(normalJournal.Events[^1].Phase == NativeE39WriteSequence.Phase.Completed &&
             normalJournal.Events[^1].Detail.Contains(Hash(target),StringComparison.Ordinal),
             "Completed durable event follows complete target readback");
+        var lostBackup = new Bench(original,id); var lostJournal = new Journal();
+        lostJournal.OnAppend = evidence =>
+        {
+            if (evidence.Phase == NativeE39WriteSequence.Phase.FinalBytesVerified)
+                lostJournal.PhysicalBlocks.Values.First()[0] ^= 1;
+        };
+        Reject<InvalidDataException>(() => Execute(lostBackup,lostJournal,policy,backup));
+        Check(lostBackup.Erases == 1 &&
+            lostJournal.Events[^1].Phase == NativeE39WriteSequence.Phase.RecoveryRequired &&
+            lostJournal.Events.All(e => e.Phase != NativeE39WriteSequence.Phase.Completed),
+            "Backup corruption after programming prevents a completed transaction");
         var corrupted = new Bench(original,id) { CorruptAfterWrite = true }; var journal = new Journal();
         Reject<InvalidDataException>(() => Execute(corrupted,journal,policy,backup));
         Check(corrupted.Erases == 1 && journal.Events[^1].Phase == NativeE39WriteSequence.Phase.RecoveryRequired &&

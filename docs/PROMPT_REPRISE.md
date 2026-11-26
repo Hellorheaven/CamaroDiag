@@ -1,3 +1,7 @@
+## C6 — maintien des preuves jusqu'à la clôture E39 (26/11/2026)
+
+- Audit du workflow E39 : la relecture intégrale des zones voisines/protégées était déjà implémentée dans CompletionGuard. Conservée sans duplication ; raccordement obligatoire de la nouvelle revalidation des sauvegardes au décorateur, relecture avant Completed dans le moteur puis après le contrôle du BIN entier dans le workflow. Corruption tardive interdit Completed et conserve RecoveryRequired. Fake journal et régression de bout en bout mis à jour sans exécution. Aucun test/CI/fusion/Release ; C6/J1979 ouverts.
+
 ## C6 — relecture des sauvegardes durables Android avant chaque effacement (26/11/2026)
 
 - Parité Windows : capture figée avant SHA, digest de l'enveloppe complète calculé pendant la relecture initiale, inventaire exact et relecture bornée de toutes les enveloppes avant chaque erase, puis vérification de puissance/identité. Annulation contrôlée pendant les lectures. Store sans revalidation refusé, harness mémoire vérifie les hashes. Régressions de corruption après marqueur et d'ajout de fichier, non exécutées. Aucun pilote réel ajouté ni activation matérielle ; C6/J1979 ouverts, aucune CI/fusion/Release.

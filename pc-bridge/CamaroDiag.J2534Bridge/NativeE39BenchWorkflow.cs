@@ -172,11 +172,16 @@ internal static class NativeE39BenchWorkflow
             uint address, byte[] liveBytes, string sha256, CancellationToken token) =>
             journal.PreserveOriginalBlockAsync(address, liveBytes, sha256, token);
 
+        public Task RequireOriginalBlocksIntactAsync(CancellationToken token) =>
+            journal.RequireOriginalBlocksIntactAsync(token);
+
         public async Task AppendAsync(NativeE39WriteSequence.Event evidence, CancellationToken token)
         {
             if (evidence.Phase == NativeE39WriteSequence.Phase.Completed)
             {
                 await RequireImageAsync(link, expected, options, token);
+                await journal.RequireOriginalBlocksIntactAsync(token);
+                token.ThrowIfCancellationRequested();
                 evidence = evidence with { Detail = evidence.Detail + ";FullImageSHA256=" + Hash(expected) };
             }
             await journal.AppendAsync(evidence, token);

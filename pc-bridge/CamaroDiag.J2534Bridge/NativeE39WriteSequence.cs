@@ -306,6 +306,8 @@ internal static class NativeE39WriteSequence
                     cancellationToken);
             }
 
+            await journal.RequireOriginalBlocksIntactAsync(cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
             await journal.AppendAsync(
                 new(Phase.Completed, 0, $"Sectors={sectors.Count};Bytes={writtenBytes}"),
                 cancellationToken);
