@@ -1328,6 +1328,37 @@ class DoIpTests(unittest.TestCase):
             client.close()
             peer.close()
 
+    def test_queued_alivecheck_is_answered_before_next_request(self):
+        client = Session.__new__(Session)
+        client.tester, client.ecu = 0x0E80, 0x1234
+        client.timeout = client.p2 = client.p2_star = 2
+        client._operation_lock = threading.Lock()
+        client._busy = False
+        client._socket, peer = socket.socketpair()
+        client.gateway, client.tls, client.trace = GATEWAY, False, None
+        peer.settimeout(2)
+        req = bytes.fromhex("221234")
+        errors = []
+        def server():
+            try:
+                self.assertEqual(receive(peer), (2, 8, TESTER))
+                self.assertEqual(receive(peer), (2, 0x8001, TESTER + ECU + req))
+                peer.sendall(encode(2, 0x8001, ECU + TESTER + bytes.fromhex("62123401")))
+            except BaseException as error:
+                errors.append(error)
+        peer.sendall(encode(2, 7))
+        worker = threading.Thread(target=server)
+        worker.start()
+        try:
+            self.assertEqual(client.exchange(req), bytes.fromhex("62123401"))
+        finally:
+            client.close()
+            worker.join(3)
+            peer.close()
+        self.assertFalse(worker.is_alive())
+        if errors:
+            raise errors[0]
+
     def test_concurrent_idle_and_exchange_are_rejected_without_closing_owner(self):
         client = Session.__new__(Session)
         client._operation_lock = threading.Lock()
