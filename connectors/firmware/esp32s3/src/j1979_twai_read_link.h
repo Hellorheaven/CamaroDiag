@@ -21,7 +21,8 @@ class TwaiJ1979ReadLink final : public J1979CanReadLink {
   bool snapshot(twai_status_info_t& status);
   bool noLoss(const twai_status_info_t& status)const;
   Admission admission_;
-  bool baseline_=false;
+  bool baseline_=false, faulted_=false;
+  bool fail(){faulted_=true;return false;}
   uint32_t missed_=0,overrun_=0,failed_=0;
 };
 }
