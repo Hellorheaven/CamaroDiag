@@ -214,4 +214,8 @@
   <data name="InventoryReasonTimeout" xml:space="preserve"><value>Response timed out.</value></data>
   <data name="InventoryReasonIdentity" xml:space="preserve"><value>ECU identity or diagnostic response is invalid.</value></data>
   <data name="InventoryReasonCommunication" xml:space="preserve"><value>Communication or identity verification failed.</value></data>
+  <data name="InventoryReasonNrc" xml:space="preserve"><value>ECU returned a negative UDS response.</value></data>
+  <data name="InventoryReasonHeader" xml:space="preserve"><value>DoIP header rejected.</value></data>
+  <data name="InventoryReasonRouting" xml:space="preserve"><value>DoIP routing activation denied.</value></data>
+  <data name="InventoryReasonAck" xml:space="preserve"><value>DoIP diagnostic acknowledgement rejected.</value></data>
 </root>
