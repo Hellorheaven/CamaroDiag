@@ -769,6 +769,7 @@ internal sealed partial class BridgeDesktopForm
                 return;
         }
         DoIpBackupScope? backupScope = null;
+        string? backupProfilePath = null;
         string? backupPath = null;
         if (operation == DoIpReadOperation.Backup)
         {
@@ -780,6 +781,8 @@ internal sealed partial class BridgeDesktopForm
             try
             {
                 backupScope = DoIpBackupScope.Load(profile.FileName);
+                DoIpScopedBackup.ValidateCaptureBudget(backupScope);
+                backupProfilePath = profile.FileName;
                 if (backupScope.Gateway != observed.LogicalAddress || backupScope.Tester != tester ||
                     backupScope.Ecu != ecu || (observed.Vin is not null && observed.Vin != backupScope.Vin))
                     throw new InvalidDataException(DoIpConsolePresentation.Text("BackupMismatch"));
@@ -807,7 +810,15 @@ internal sealed partial class BridgeDesktopForm
                 backupScope.Vin, backupScope.Ecu, backupScope.Start, backupScope.Length),
                 DoIpConsolePresentation.Text("Backup"), MessageBoxButtons.YesNo,
                 MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2) != DialogResult.Yes) return;
-            if (!ReferenceEquals(observed, doIpObservedGateway)) return;
+            if (!ReferenceEquals(observed, doIpObservedGateway) || busy ||
+                doIpConsoleDiscoveryCancellation is not null || consoleDevice is not null ||
+                bridgeTask is { IsCompleted: false }) return;
+            try
+            {
+                if (CurrentOptions() != options || consoleTimeout.Value != (decimal)timeout.TotalMilliseconds)
+                    return;
+            }
+            catch (ArgumentException) { return; }
         }
         using var stop = new CancellationTokenSource();
         doIpConsoleDiscoveryCancellation = stop;
@@ -907,22 +918,33 @@ internal sealed partial class BridgeDesktopForm
                     {
                         var scope = backupScope ?? throw new InvalidOperationException();
                         var destination = backupPath ?? throw new InvalidOperationException();
-                        var capture = await DoIpScopedBackup.ReadObservedAsync(observed, address,
+                        var profilePath = backupProfilePath ?? throw new InvalidOperationException();
+                        var backupCapture = await DoIpScopedBackup.ReadObservedAsync(observed, address,
                             scope, useTls, timeout, stop.Token, (pass, count) =>
                             {
-                                DrainTrace();
+                                RequireCompleteTrace();
+                                stop.Token.ThrowIfCancellationRequested();
                                 if (!IsDisposed && !Disposing)
                                     ConsoleLine("SYSTEM", string.Format(
                                         DoIpConsolePresentation.Text("BackupProgress"), pass, count, scope.Length),
                                         Color.DarkSlateGray);
                             }, certificate, trace: Trace, options: options);
+                        await DoIpVehicleDiscovery.RequireCurrentIdentityAsync(observed, timeout,
+                            stop.Token, JournalDoIpUdp);
                         RequireCompleteTrace();
                         stop.Token.ThrowIfCancellationRequested();
-                        await Task.Run(() => DoIpScopedBackup.SaveNew(destination, capture, stop.Token),
-                            stop.Token);
+                        if (IsDisposed || Disposing || !ReferenceEquals(observed, doIpObservedGateway))
+                            throw new InvalidOperationException(DoIpConsolePresentation.Text("BackupMismatch"));
+                        await Task.Run(() =>
+                        {
+                            stop.Token.ThrowIfCancellationRequested();
+                            if (DoIpBackupScope.Load(profilePath) != scope)
+                                throw new InvalidDataException(DoIpConsolePresentation.Text("BackupMismatch"));
+                            DoIpScopedBackup.SaveNew(destination, backupCapture, stop.Token);
+                        }, stop.Token);
                         if (!IsDisposed && !Disposing)
                             ConsoleLine("SYSTEM", string.Format(DoIpConsolePresentation.Text("BackupSaved"),
-                                scope.Length, capture.Sha256, destination), Color.DarkGreen);
+                                scope.Length, backupCapture.Sha256, destination), Color.DarkGreen);
                     }
                     else if (operation == DoIpReadOperation.Exchange)
                     {
