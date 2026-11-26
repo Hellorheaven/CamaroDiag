@@ -1279,4 +1279,7 @@
     <string name="obd_mode09_raw">Mode 09 type %1$02X — raw response</string>
     <string name="cal_recovery_problem_address">Corrupt or invalid backup block at 0x%1$X</string>
     <string name="cal_recovery_uncertain_region">Region at risk: %1$s</string>
+    <string name="obd_mode05_results">Mode 05 — legacy oxygen monitor results</string>
+    <string name="obd_mode05_partial">Incomplete test inventory or response.</string>
+    <string name="obd_mode05_raw_notice">Encoded test results; monitor completion and ECU attribution are not established.</string>
 </resources>
