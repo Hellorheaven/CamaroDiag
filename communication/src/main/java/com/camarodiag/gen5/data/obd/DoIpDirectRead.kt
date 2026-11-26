@@ -1373,14 +1373,22 @@ object DoIpDirectRead {
                 }
             }
         } finally { base.close() }
-        if (operation == Operation.BACKUP) {
-            // No completed acquisition is returned before the TCP/TLS socket
-            // has closed and the same gateway has been rediscovered.
+        if (operation == Operation.BACKUP || operation == Operation.EXCHANGE) {
+            // A memory capture or confirmed raw command sequence is not
+            // complete until its socket has closed and the same gateway has
+            // been rediscovered. An uncertain exchange may have changed ECU
+            // state, so never retry its command automatically.
             kotlinx.coroutines.currentCoroutineContext().ensureActive()
             check(isReadContextCurrent()) { "DoIP operation context changed." }
+            if (operation == Operation.EXCHANGE) {
+                EcuWriteConsentFlow.requireCurrentForTransmit(
+                    requireNotNull(approval), isContextCurrent)
+            }
             val observed = discover(target.address, target.expectedVin, timeoutMs, onControlTrace,
                 port = udpPort, current = isReadContextCurrent)
-            require(gateway.matchesIdentity(observed)) { "DoIP gateway identity changed during memory capture." }
+            require(gateway.matchesIdentity(observed)) {
+                "DoIP gateway identity changed before final publication."
+            }
             kotlinx.coroutines.currentCoroutineContext().ensureActive()
             check(isReadContextCurrent()) { "DoIP operation context changed." }
         }
