@@ -57,28 +57,44 @@ class J1979UsbCampaign {
     } link(arbiter,owner,hardware,profile,lease);
     class GuardedWriter final:public J1979CampaignEvidence::Writer {
      public:
-      GuardedWriter(GuardedLink& l,J1979CampaignEvidence::Writer& w):l_(l),w_(w){}
+      GuardedWriter(GuardedLink& l,J1979CampaignEvidence::Writer& w,
+          HostSessionArbiter& a,Owner& o,const Profile& p,const HostSessionArbiter::Lease& lease)
+        :l_(l),w_(w),a_(a),o_(o),p_(p),lease_(lease){}
+      void afterVerifiedStop(){finalizing_=true;}
+      bool permitted(){
+        if(!finalizing_)return l_.admitted();
+        // Final record is offline evidence, not a diagnostic operation.
+        // A stopped bus is no longer required to be electrically active;
+        // the same authorized host and unreleased lease remain mandatory.
+        if(!o_.currentHost()||!a_.owns(lease_)||a_.recoveryRequired())return false;
+        const auto e=o_.currentEvidence(p_);
+        return e.qualified&&e.localConsent&&e.authenticated&&e.exactProfile&&
+          e.diagnosticAllowlistEnforced;
+      }
       bool write(const uint8_t* data,size_t size)override{
-        return l_.admitted()&&w_.write(data,size)&&l_.admitted();
+        return permitted()&&w_.write(data,size)&&permitted();
       }
      private:
       GuardedLink& l_;J1979CampaignEvidence::Writer& w_;
-    } output(link,writer);
+      HostSessionArbiter& a_;Owner& o_;const Profile& p_;
+      const HostSessionArbiter::Lease& lease_;
+      bool finalizing_=false;
+    } output(link,writer,arbiter,owner,profile,lease);
 
     J1979CampaignEvidence stream(output);
-    if(link.active()&&stream.begin(profile.tx,profile.rx,profile.extended,profile.budgetMs)){
-      report.campaign=J1979CanCampaign::run(link,profile.tx,profile.rx,profile.extended,
+    const bool started=link.active()&&stream.begin(profile.tx,profile.rx,profile.extended,profile.budgetMs);
+    if(started)report.campaign=J1979CanCampaign::run(link,profile.tx,profile.rx,profile.extended,
         profile.budgetMs,stream,scratch);
-      // Never send private evidence once authorization or ownership is lost.
-      if(!link.admitted()||!stream.finish(report.campaign))report.outcome=Outcome::EvidenceLost;
-      else report.outcome=report.campaign.end==J1979CanCampaign::End::Complete?
-        Outcome::Complete:Outcome::Partial;
-    }else report.outcome=Outcome::EvidenceLost;
-    // Every acquired lease exits through the physical owner. A failed stop
-    // prevents admitting another operation until explicit recovery.
+    // Never publish a complete capture while physical shutdown is unverified.
+    // The readable prefix remains available but has no final summary.
     if(!owner.stopAndVerifyQuiescent()){
       arbiter.latchRecovery();report.outcome=Outcome::QuiescenceUnverified;return report;
     }
+    output.afterVerifiedStop();
+    if(!started||!output.permitted()||!stream.finish(report.campaign))
+      report.outcome=Outcome::EvidenceLost;
+    else report.outcome=report.campaign.end==J1979CanCampaign::End::Complete?
+      Outcome::Complete:Outcome::Partial;
     if(!arbiter.release(lease)){
       report.outcome=Outcome::Partial;
     }
