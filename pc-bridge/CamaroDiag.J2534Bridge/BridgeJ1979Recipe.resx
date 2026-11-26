@@ -99,4 +99,10 @@
   <data name="NativeUsb_monitor_boost_pressure" xml:space="preserve"><value>Boost pressure</value></data>
   <data name="NativeUsb_monitor_exhaust_gas_sensor" xml:space="preserve"><value>Exhaust gas sensor</value></data>
   <data name="NativeUsb_monitor_particulate_filter" xml:space="preserve"><value>Particulate filter</value></data>
+  <data name="NativeUsb_inventory" xml:space="preserve"><value>Advertised identifiers (read only)</value></data>
+  <data name="NativeUsb_inventory_page" xml:space="preserve"><value>Mode {0} · page {1}</value></data>
+  <data name="NativeUsb_inventory_empty" xml:space="preserve"><value>No identifiers advertised on this page</value></data>
+  <data name="NativeUsb_inventory_next" xml:space="preserve"><value>Continuation advertised</value></data>
+  <data name="NativeUsb_freeze_trigger" xml:space="preserve"><value>Freeze-frame trigger</value></data>
+  <data name="NativeUsb_freeze_absent" xml:space="preserve"><value>No freeze-frame trigger reported</value></data>
 </root>

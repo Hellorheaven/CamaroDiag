@@ -344,6 +344,11 @@ fun FunctionalTestsScreen(
                             }
                             Text(stringResource(label)+": "+entries.joinToString(", "))
                         }
+                        Text(stringResource(R.string.functional_native_usb_freeze_trigger)+": "+when {
+                            values.freeze==null -> stringResource(R.string.obd_not_available)
+                            !values.freeze.present -> stringResource(R.string.functional_native_usb_freeze_absent)
+                            else -> values.freeze.dtc ?: stringResource(R.string.obd_not_available)
+                        })
                         for ((mode,codes) in values.dtcs) {
                             val caption = when(mode) {
                                 3 -> R.string.functional_native_usb_dtc_confirmed
@@ -369,6 +374,20 @@ fun FunctionalTestsScreen(
                         Text(java.text.NumberFormat.getNumberInstance().apply {
                             maximumFractionDigits=3
                         }.format(value.number)+" "+value.unit,style=MaterialTheme.typography.titleMedium)
+                    }
+                }
+            }
+        }
+        if(values!=null&&values.pages.isNotEmpty()){
+            item { Text(stringResource(R.string.functional_native_usb_inventory),style=MaterialTheme.typography.titleMedium) }
+            items(values.pages,key={"native-page:"+it.mode+":"+it.base}) { page ->
+                Card(modifier=Modifier.fillMaxWidth()) {
+                    Column(modifier=Modifier.padding(12.dp)) {
+                        Text(stringResource(R.string.functional_native_usb_inventory_page,
+                            "%02X".format(java.util.Locale.ROOT,page.mode),"%02X".format(java.util.Locale.ROOT,page.base)))
+                        Text(if(page.ids.isEmpty()) stringResource(R.string.functional_native_usb_inventory_empty)
+                            else page.ids.joinToString(", ") { "%02X".format(java.util.Locale.ROOT,it) })
+                        if(page.next) Text(stringResource(R.string.functional_native_usb_inventory_next))
                     }
                 }
             }

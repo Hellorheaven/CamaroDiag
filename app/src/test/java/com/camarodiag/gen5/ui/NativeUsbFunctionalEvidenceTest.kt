@@ -86,6 +86,24 @@ class NativeUsbFunctionalEvidenceTest {
         ready.put("mil_on",false)
         assertNull(NativeUsbFunctionalEvidence.diagnosticValues(input)!!.readiness)
     }
+    @Test fun inventoryAndFreezeRequireExactResponseAgreement() {
+        val input=report(true)
+        val page=JSONObject().put("mode",1).put("base",0)
+            .put("supported_ids",JSONArray().put(1).put(31)).put("has_next_page",true)
+        val freeze=JSONObject().put("present",true).put("dtc","P0123")
+        input.getJSONArray("steps").put(JSONObject().put("request_hex","0100").put("status","PASSED")
+            .put("response_hex","410080000003").put("supported_page",page))
+            .put(JSONObject().put("request_hex","020200").put("status","PASSED")
+                .put("response_hex","4202000123").put("freeze_trigger",freeze))
+        val values=NativeUsbFunctionalEvidence.diagnosticValues(input)!!
+        assertEquals(listOf(1,31),values.pages.single().ids)
+        assertEquals("P0123",values.freeze!!.dtc)
+        page.put("supported_ids",JSONArray().put(32))
+        freeze.put("dtc","P9999")
+        val rejected=NativeUsbFunctionalEvidence.diagnosticValues(input)!!
+        assertTrue(rejected.pages.isEmpty())
+        assertNull(rejected.freeze)
+    }
     @Test fun inconsistentCampaignAndWrongVinAreNotPasses() {
         val bad=NativeUsbFunctionalEvidence.results(state,report(false)).checks.associateBy { it.key }
         assertEquals(FunctionalTestOutcome.FAILED,bad["native:integrity"]?.outcome)

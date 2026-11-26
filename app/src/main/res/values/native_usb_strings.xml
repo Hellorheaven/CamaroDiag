@@ -50,4 +50,10 @@
     <string name="functional_native_usb_monitor_boost_pressure">Boost pressure</string>
     <string name="functional_native_usb_monitor_exhaust_gas_sensor">Exhaust gas sensor</string>
     <string name="functional_native_usb_monitor_particulate_filter">Particulate filter</string>
+    <string name="functional_native_usb_inventory">Advertised identifiers (read only)</string>
+    <string name="functional_native_usb_inventory_page">Mode %1$s · page %2$s</string>
+    <string name="functional_native_usb_inventory_empty">No identifiers advertised on this page</string>
+    <string name="functional_native_usb_inventory_next">Continuation advertised</string>
+    <string name="functional_native_usb_freeze_trigger">Freeze-frame trigger</string>
+    <string name="functional_native_usb_freeze_absent">No freeze-frame trigger reported</string>
 </resources>

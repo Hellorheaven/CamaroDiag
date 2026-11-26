@@ -50,4 +50,10 @@
     <string name="functional_native_usb_monitor_boost_pressure">Pression de suralimentation</string>
     <string name="functional_native_usb_monitor_exhaust_gas_sensor">Capteur de gaz d’échappement</string>
     <string name="functional_native_usb_monitor_particulate_filter">Filtre à particules</string>
+    <string name="functional_native_usb_inventory">Identifiants annoncés (lecture seule)</string>
+    <string name="functional_native_usb_inventory_page">Mode %1$s · page %2$s</string>
+    <string name="functional_native_usb_inventory_empty">Aucun identifiant annoncé sur cette page</string>
+    <string name="functional_native_usb_inventory_next">Suite annoncée</string>
+    <string name="functional_native_usb_freeze_trigger">Défaut déclencheur des données figées</string>
+    <string name="functional_native_usb_freeze_absent">Aucun défaut déclencheur annoncé</string>
 </resources>

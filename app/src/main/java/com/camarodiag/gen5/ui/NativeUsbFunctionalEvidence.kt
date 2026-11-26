@@ -24,8 +24,45 @@ internal object NativeUsbFunctionalEvidence {
     data class Measurement(val mode: Int, val pid: Int, val name: String, val number: Double, val unit: String)
     data class Monitor(val mid: Int, val tid: Int, val scaling: Int, val value: Int, val minimum: Int, val maximum: Int)
     data class Readiness(val milOn:Boolean,val dtcCount:Int,val compression:Boolean,val monitors:Map<String,Boolean>)
+    data class InventoryPage(val mode:Int,val base:Int,val ids:List<Int>,val next:Boolean)
+    data class FreezeTrigger(val present:Boolean,val dtc:String?)
     data class DiagnosticValues(val observedVin: String?, val dtcs: Map<Int, List<String>?>,
-        val measurements: List<Measurement>, val monitors: List<Monitor>, val identity: Map<Int,List<String>>, val readiness: Readiness?)
+        val measurements: List<Measurement>, val monitors: List<Monitor>, val identity: Map<Int,List<String>>, val readiness: Readiness?, val pages:List<InventoryPage>, val freeze:FreezeTrigger?)
+
+    private fun inventoryValue(step:JSONObject):InventoryPage? {
+        val request=step.optString("request_hex")
+        if(!request.matches(Regex("(?:0[1689][0-9A-F]{2}|02[0-9A-F]{2}00)"))) return null
+        val mode=request.take(2).toInt(16)
+        val base=request.substring(2,4).toInt(16)
+        if(base%32!=0) return null
+        val raw=step.optString("response_hex")
+        val prefix="%02X".format(java.util.Locale.ROOT,mode+64)+request.drop(2)
+        if(!raw.matches(Regex(prefix+"[0-9A-F]{8}"))) return null
+        val bytes=raw.drop(prefix.length).chunked(2).map { it.toInt(16) }
+        val ids=(0..30).filter { bytes[it/8] and (128 shr (it%8))!=0 }.map { base+it+1 }
+        val next=bytes[3] and 1!=0
+        if(base==224&&next) return null
+        val data=step.optJSONObject("supported_page") ?: return null
+        val list=data.optJSONArray("supported_ids") ?: return null
+        if(data.optInt("mode",-1)!=mode || data.optInt("base",-1)!=base ||
+            data.opt("has_next_page")!=next || list.length()!=ids.size ||
+            ids.indices.any { list.optInt(it,-1)!=ids[it] }) return null
+        return InventoryPage(mode,base,ids,next)
+    }
+
+    private fun freezeValue(step:JSONObject):FreezeTrigger? {
+        if(step.optString("request_hex")!="020200") return null
+        val raw=step.optString("response_hex")
+        if(!raw.matches(Regex("420200[0-9A-F]{4}"))) return null
+        val a=raw.substring(6,8).toInt(16)
+        val b=raw.substring(8,10).toInt(16)
+        val present=a!=0||b!=0
+        val dtc=if(present) "${"PCBU"[a shr 6]}${(a shr 4) and 3}"+raw.substring(7,10) else null
+        val data=step.optJSONObject("freeze_trigger") ?: return null
+        if(data.opt("present")!=present || !data.has("dtc") ||
+            (if(dtc==null) !data.isNull("dtc") else data.opt("dtc")!=dtc)) return null
+        return FreezeTrigger(present,dtc)
+    }
 
     private fun readinessValue(step: JSONObject): Readiness? {
         if(step.optString("request_hex")!="0101") return null
@@ -99,10 +136,14 @@ internal object NativeUsbFunctionalEvidence {
         val monitors = mutableListOf<Monitor>()
         val identity=linkedMapOf<Int,List<String>>()
         var readiness:Readiness?=null
+        var freeze:FreezeTrigger?=null
+        val pages=linkedMapOf<Pair<Int,Int>,InventoryPage>()
         for (i in 0 until steps.length()) {
             val step = steps.optJSONObject(i) ?: continue
             if (step.optString("status") != "PASSED") continue
             val request = step.optString("request_hex")
+            inventoryValue(step)?.let { pages[it.mode to it.base]=it }
+            freezeValue(step)?.let { freeze=it }
             readinessValue(step)?.let { readiness=it }
             identityValues(step)?.let { (type,values)->identity[type]=values }
             if (request in setOf("03","07","0A")) {
@@ -148,7 +189,7 @@ internal object NativeUsbFunctionalEvidence {
                 !number.isFinite() || name.isBlank() || unit.isBlank()) continue
             measured[mode to pid] = Measurement(mode,pid,name,number,unit)
         }
-        return DiagnosticValues(vin,dtcs,measured.values.sortedWith(compareBy({ it.mode },{ it.pid })),monitors.toList(),identity.toMap(),readiness)
+        return DiagnosticValues(vin,dtcs,measured.values.sortedWith(compareBy({ it.mode },{ it.pid })),monitors.toList(),identity.toMap(),readiness,pages.values.sortedWith(compareBy({it.mode},{it.base})),freeze)
     }
 
     fun results(state: FunctionalTestState, report: JSONObject): FunctionalTestState {
