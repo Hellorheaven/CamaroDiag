@@ -3,7 +3,9 @@ package com.camarodiag.gen5.data.obd
 import java.io.DataInputStream
 import java.io.DataOutputStream
 import java.io.File
-import java.io.FileOutputStream
+import java.nio.channels.Channels
+import java.nio.channels.FileChannel
+import java.nio.file.StandardOpenOption
 import java.security.MessageDigest
 import java.security.DigestInputStream
 import java.nio.file.Files
@@ -57,6 +59,7 @@ internal class PersistentEcuPhysicalBlockBackup(
     val directory = File(journalFile.absolutePath + ".blocks")
     private data class Envelope(val length: Long, val sha256: ByteArray)
     private val envelopes = linkedMapOf<String, Envelope>()
+    private var backupInvalidated = false
 
     init {
         require(journalFile.isFile && journalFile.parentFile?.isDirectory == true)
@@ -69,6 +72,7 @@ internal class PersistentEcuPhysicalBlockBackup(
         physicalBytes: ByteArray,
         expectedOriginalSha256: String
     ) {
+        check(!backupInvalidated) { "Original ECU backup session was invalidated." }
         val physical = physicalBytes.copyOf()
         require(region.address >= 0 && region.length > 0 &&
             region.address <= Long.MAX_VALUE - region.length &&
@@ -80,12 +84,15 @@ internal class PersistentEcuPhysicalBlockBackup(
         check(Files.isDirectory(directory.toPath(), LinkOption.NOFOLLOW_LINKS))
         val file = File(directory,
             region.region.name + "-" + region.address.toString(16) + "-" + region.length + ".ecu-block")
-        check(file.createNewFile()) { "Refusing to overwrite a physical ECU sector backup." }
+        check(!Files.exists(file.toPath(), LinkOption.NOFOLLOW_LINKS)) {
+            "Refusing to overwrite a physical ECU sector backup."
+        }
         // Stream straight into the create-new sector file instead of building
         // a second full serialized image in RAM. The file is never accepted
         // until the synchronous write and independent byte-for-byte readback.
-        FileOutputStream(file, true).use { stream ->
-            DataOutputStream(stream).use { data ->
+        FileChannel.open(file.toPath(), StandardOpenOption.CREATE_NEW,
+            StandardOpenOption.WRITE, LinkOption.NOFOLLOW_LINKS).use { channel ->
+            DataOutputStream(Channels.newOutputStream(channel)).use { data ->
                 data.writeUTF("CAMARODIAG-PHYSICAL-BLOCK-V1")
                 data.writeUTF(target.controllerFamily)
                 data.writeUTF(target.controllerId)
@@ -98,14 +105,14 @@ internal class PersistentEcuPhysicalBlockBackup(
                 data.writeInt(physical.size)
                 data.write(physical)
                 data.flush()
-                stream.fd.sync()
+                channel.force(true)
             }
         }
         // Treat missing, truncated or modified on-disk backups as an erase stop.
         val envelopeHash = MessageDigest.getInstance("SHA-256")
         val envelopeLength = file.length()
         check(envelopeLength > physical.size && Files.isRegularFile(file.toPath(), LinkOption.NOFOLLOW_LINKS))
-        DataInputStream(DigestInputStream(file.inputStream().buffered(), envelopeHash)).use { data ->
+        DataInputStream(DigestInputStream(Files.newInputStream(file.toPath(), LinkOption.NOFOLLOW_LINKS).buffered(), envelopeHash)).use { data ->
             check(data.readUTF() == "CAMARODIAG-PHYSICAL-BLOCK-V1" &&
                 data.readUTF() == target.controllerFamily &&
                 data.readUTF() == target.controllerId &&
@@ -141,6 +148,17 @@ internal class PersistentEcuPhysicalBlockBackup(
     }
 
     override suspend fun requireOriginalsIntact() {
+        check(!backupInvalidated) { "Original ECU backup session was invalidated." }
+        try {
+            verifyOriginals()
+        } catch (failure: Exception) {
+            // Restoring files after a detected change must not revive the old write session.
+            backupInvalidated = true
+            throw failure
+        }
+    }
+
+    private suspend fun verifyOriginals() {
         fun requireInventory() {
             check(envelopes.isNotEmpty() &&
                 Files.isDirectory(directory.toPath(), LinkOption.NOFOLLOW_LINKS) &&
@@ -154,7 +172,7 @@ internal class PersistentEcuPhysicalBlockBackup(
             check(Files.isRegularFile(file.toPath(), LinkOption.NOFOLLOW_LINKS) &&
                 file.length() == envelope.length) { "Original ECU sector file changed." }
             val digest = MessageDigest.getInstance("SHA-256")
-            DataInputStream(file.inputStream().buffered()).use { input ->
+            DataInputStream(Files.newInputStream(file.toPath(), LinkOption.NOFOLLOW_LINKS).buffered()).use { input ->
                 var remaining = envelope.length
                 while (remaining > 0) {
                     currentCoroutineContext().ensureActive()

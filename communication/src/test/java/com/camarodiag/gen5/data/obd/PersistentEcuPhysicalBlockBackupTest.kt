@@ -52,10 +52,17 @@ class PersistentEcuPhysicalBlockBackupTest {
             file.writeBytes(original.copyOf().also { it[it.lastIndex] = 99 })
             assertTrue(runCatching { store.requireOriginalsIntact() }.isFailure)
             file.writeBytes(original)
-            store.requireOriginalsIntact()
-            val extra = File(store.directory,"unexpected")
-            assertTrue(extra.createNewFile())
             assertTrue(runCatching { store.requireOriginalsIntact() }.isFailure)
+            val secondJournal = File(folder,"second.journal")
+            assertTrue(secondJournal.createNewFile())
+            val second = PersistentEcuPhysicalBlockBackup(secondJournal,target,"1G1FA1RXXR0123456")
+            second.preserve(region,bytes,EcuBenchExpertPlan.sha256Hex(bytes))
+            second.requireOriginalsIntact()
+            val extra = File(second.directory,"unexpected")
+            assertTrue(extra.createNewFile())
+            assertTrue(runCatching { second.requireOriginalsIntact() }.isFailure)
+            assertTrue(extra.delete())
+            assertTrue(runCatching { second.requireOriginalsIntact() }.isFailure)
         } finally { folder.deleteRecursively() }
         Unit
     }
