@@ -336,7 +336,7 @@ object FunctionalTestPlanner {
         mark("08-inventory", report.mode08?.complete == true)
         val counts = mapOf(3 to report.confirmedDtcs.size, 7 to report.pendingDtcs.size, 10 to report.permanentDtcs.size)
             .mapValues { (mode, count) -> count.takeIf {
-                mode in report.verifiedDtcModes && mode !in report.unavailableDtcModes
+                mode !in report.unverifiedDtcModes
             } }
         rows = withDtcModeEvidence(rows, counts)
         return withObservedIdentity(state.copy(checks = rows, obdScan = report, rawObdExchanges = report.rawLog), report.vin)

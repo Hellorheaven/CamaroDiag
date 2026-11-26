@@ -1,3 +1,7 @@
+## J1979 — cohérence IHM et JSON du Scan OBD (26/11/2026)
+
+- Android : l'écran Scan OBD et l'export utilisent désormais les mêmes modes DTC non vérifiés que la recette fonctionnelle ; un rapport vide sans preuves ne peut plus afficher « aucun DTC » en vert. Les codes effectivement présents restent affichés avec les modes indisponibles. Un inventaire PID absent ou sans réponse initiale est affiché indisponible plutôt que zéro. Régressions du modèle ajoutées, non exécutées. J1979/C6 restent ouverts ; aucune CI ni Release.
+
 ## J1979 — preuve explicite des inventaires et DTC Android (26/11/2026)
 
 - Scan OBD : champ explicite pidInventoryComplete, modes DTC réellement vérifiés et export JSON enrichi. Inventaire vide vérifié distinct d'un inventaire absent ; aucun PASS DTC zéro sans mode effectivement répondu. La recette accepte un bitmap vide valide, distingue attribution ECU incomplète et ne valide pas un transport sur simple identifiant sans réponse initiale. Continuation E0 impossible marquée non résolue (E1). Régressions moteur et recette fonctionnelle écrites, non exécutées. J1979/C6 ouverts, aucune CI, fusion ou Release.

@@ -108,7 +108,12 @@ data class ObdScanReport(
     // Distinguish verified empty results from absent evidence.
     val pidInventoryComplete: Boolean? = null,
     val verifiedDtcModes: Set<Int> = emptySet()
-)
+) {
+    /** Missing and explicitly unavailable modes must both remain unknown. */
+    val unverifiedDtcModes: Set<Int> get() = setOf(3, 7, 10).filterTo(linkedSetOf()) {
+        it !in verifiedDtcModes || it in unavailableDtcModes
+    }
+}
 
 /**
  * Read-only SAE J1979 scanner.

@@ -31,6 +31,11 @@ class FunctionalTestSuiteTest {
             rawLog = emptyList(), physicalCanResponder = "7E8")
         fun outcome(snapshot: FunctionalTestState, key: String) =
             snapshot.checks.single { it.key == key }.outcome
+        assertEquals(setOf(3,7,10),report.unverifiedDtcModes)
+        assertEquals(setOf(7,10),report.copy(verifiedDtcModes=setOf(3)).unverifiedDtcModes)
+        assertEquals(setOf(3),report.copy(verifiedDtcModes=setOf(3,7,10),
+            unavailableDtcModes=setOf(3)).unverifiedDtcModes)
+        assertTrue(report.copy(verifiedDtcModes=setOf(3,7,10)).unverifiedDtcModes.isEmpty())
         val missing = FunctionalTestPlanner.j1979Results(state,report)
         assertEquals(FunctionalTestOutcome.NOT_TESTED,outcome(missing,"protocol:transport"))
         assertEquals(FunctionalTestOutcome.NOT_TESTED,outcome(missing,"protocol:pids"))

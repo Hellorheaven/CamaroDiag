@@ -33,7 +33,7 @@ internal object ObdScanJsonExport {
             })
             put("firstUnresolvedPid", report.firstUnresolvedPid ?: JSONObject.NULL)
             put("pidInventoryComplete", report.pidInventoryComplete ?: JSONObject.NULL)
-            put("verifiedDtcModes", JSONArray(report.verifiedDtcModes.sorted()))
+            put("verifiedDtcModes", JSONArray((setOf(3, 7, 10) - report.unverifiedDtcModes).sorted()))
             put("pidAttributionIncomplete", report.pidAttributionIncomplete)
             put("liveData", JSONArray(report.liveData.map { value ->
                 JSONObject().put("pid", value.pid).put("name", value.name)
@@ -53,7 +53,7 @@ internal object ObdScanJsonExport {
             put("confirmedDtcs", dtcs(report.confirmedDtcs))
             put("pendingDtcs", dtcs(report.pendingDtcs))
             put("permanentDtcs", dtcs(report.permanentDtcs))
-            put("unavailableDtcModes", JSONArray(report.unavailableDtcModes.sorted()))
+            put("unavailableDtcModes", JSONArray(report.unverifiedDtcModes.sorted()))
             put("readiness", report.readiness ?: JSONObject.NULL)
             put("freezeFrameDtc", report.freezeFrameDtc?.let { dtc(it) } ?: JSONObject.NULL)
             put("freezeFrame", JSONObject().apply {

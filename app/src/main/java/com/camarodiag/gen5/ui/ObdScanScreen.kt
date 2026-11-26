@@ -230,7 +230,9 @@ fun ObdScanScreen(
                             Text(read.rawResponse.take(1024), fontFamily = FontFamily.Monospace, fontSize = 11.sp)
                         }
                     }
-                    InfoLine(stringResource(R.string.obd_supported_pids), report.supportedPids.size.toString())
+                    InfoLine(stringResource(R.string.obd_supported_pids),
+                        if (report.pidInventoryComplete == null || report.firstUnresolvedPid == 1)
+                            unavailable else report.supportedPids.size.toString())
                     report.supportedPidsByResponder.toSortedMap().forEach { (address, pids) ->
                         InfoLine(stringResource(R.string.obd_pid_count_by_ecu, address), pids.size.toString())
                     }
@@ -312,15 +314,16 @@ fun ObdScanScreen(
                 SectionTitle(stringResource(R.string.obd_dtc_title))
             }
             val allCodes = report.confirmedDtcs + report.pendingDtcs + report.permanentDtcs
-            if (report.unavailableDtcModes.isNotEmpty()) {
+            val unknownDtcModes = report.unverifiedDtcModes
+            if (unknownDtcModes.isNotEmpty()) {
                 item {
                     Text(stringResource(R.string.obd_data_unavailable) + ": OBD " +
-                        report.unavailableDtcModes.sorted().joinToString(" / ") { mode -> "%02X".format(java.util.Locale.ROOT, mode) },
+                        unknownDtcModes.sorted().joinToString(" / ") { mode -> "%02X".format(java.util.Locale.ROOT, mode) },
                         color = CamaroAmber, fontSize = 11.sp)
                 }
             }
             if (allCodes.isEmpty()) {
-                if (report.unavailableDtcModes.isEmpty()) {
+                if (unknownDtcModes.isEmpty()) {
                     item { Text(stringResource(R.string.obd_no_dtcs), color = OkGreen) }
                 }
             } else {
