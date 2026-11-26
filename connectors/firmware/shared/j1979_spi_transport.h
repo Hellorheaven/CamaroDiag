@@ -44,9 +44,10 @@ class SpiTransport final:public Transport {
   bool fail(){if(!closed_){closed_=true;port_.fault();}return false;}
   bool within(uint32_t start,uint32_t budget){return active()&&uint32_t(monotonicMs()-start)<budget;}
   bool transfer(const uint8_t* tx,uint8_t* rx,uint32_t start,uint32_t budget){
-    if(!within(start,budget))return false;
-    const uint32_t remaining=budget-uint32_t(monotonicMs()-start);
-    return remaining&&port_.transfer(tx,rx,remaining)&&within(start,budget);
+    if(!active())return false;
+    const uint32_t elapsed=uint32_t(monotonicMs()-start);
+    if(elapsed>=budget)return false;
+    return port_.transfer(tx,rx,budget-elapsed)&&within(start,budget);
   }
   bool waitFor(bool level,uint32_t start,uint32_t budget){
     // Bound even a faulty/non-advancing monotonic source.

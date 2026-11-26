@@ -36,6 +36,21 @@ class J1979UsbCampaign {
   static Report run(HostSessionArbiter& arbiter,Owner& owner,
       J1979CanReadLink& hardware,J1979CampaignEvidence::Writer& writer,
       const Profile& profile,J1979CanReadExchange::Result& scratch){
+    return runImpl(arbiter,owner,&hardware,nullptr,writer,profile,scratch);
+  }
+  // Interprocessor CI/2 client: its SPI port and STM32 endpoint must both
+  // independently enforce live admission throughout the application exchange.
+  static Report runApplication(HostSessionArbiter& arbiter,Owner& owner,
+      J1979CanCampaign::ApplicationLink& hardware,J1979CampaignEvidence::Writer& writer,
+      const Profile& profile,J1979CanReadExchange::Result& scratch){
+    if(!hardware.matches(profile.tx,profile.rx,profile.extended))return Report{};
+    return runImpl(arbiter,owner,nullptr,&hardware,writer,profile,scratch);
+  }
+ private:
+  static Report runImpl(HostSessionArbiter& arbiter,Owner& owner,
+      J1979CanReadLink* hardware,J1979CanCampaign::ApplicationLink* application,
+      J1979CampaignEvidence::Writer& writer,const Profile& profile,
+      J1979CanReadExchange::Result& scratch){
     Report report;
     if(!J1979CanReadSession::physicalPair(profile.tx,profile.rx,profile.extended)||
        profile.budgetMs<1||profile.budgetMs>600000u||!owner.currentHost())return report;
@@ -43,29 +58,54 @@ class J1979UsbCampaign {
     const auto admission=owner.currentEvidence(profile);
     if(admission.recoveryPending){arbiter.latchRecovery();return report;}
     if(!arbiter.acquire(HostInterface::NativeUsb,admission,lease))return report;
+    class Admission {
+     public:
+      Admission(HostSessionArbiter& a,Owner& o,const Profile& p,
+          const HostSessionArbiter::Lease& l):a_(a),o_(o),p_(p),l_(l){}
+      bool admitted(){return o_.currentHost()&&a_.allowsRead(l_,o_.currentEvidence(p_));}
+     private:
+      HostSessionArbiter& a_;Owner& o_;const Profile& p_;
+      const HostSessionArbiter::Lease& l_;
+    } guard(arbiter,owner,profile,lease);
     class GuardedLink final:public J1979CanReadLink {
      public:
-      GuardedLink(HostSessionArbiter& a,Owner& o,J1979CanReadLink& h,
-          const Profile& p,const HostSessionArbiter::Lease& l):a_(a),o_(o),h_(h),p_(p),l_(l){}
-      bool admitted(){return o_.currentHost()&&a_.allowsRead(l_,o_.currentEvidence(p_));}
-      bool active()override{return admitted()&&h_.active();}
-      uint32_t monotonicMs()override{return h_.monotonicMs();}
-      bool discardReceive()override{return active()&&h_.discardReceive()&&active();}
+      GuardedLink(Admission& a,J1979CanReadLink* h):a_(a),h_(h){}
+      bool active()override{return h_&&a_.admitted()&&h_->active();}
+      uint32_t monotonicMs()override{return h_?h_->monotonicMs():0;}
+      bool discardReceive()override{return active()&&h_->discardReceive()&&active();}
       bool send(const Frame& frame,uint32_t timeout)override{
-        return active()&&h_.send(frame,timeout)&&active();
+        return active()&&h_->send(frame,timeout)&&active();
       }
       Receive receive(Frame& frame,uint32_t timeout)override{
         if(!active())return Receive::Fault;
-        const auto result=h_.receive(frame,timeout);
+        const auto result=h_->receive(frame,timeout);
         return active()?result:Receive::Fault;
       }
      private:
-      HostSessionArbiter& a_;Owner& o_;J1979CanReadLink& h_;
-      const Profile& p_;const HostSessionArbiter::Lease& l_;
-    } link(arbiter,owner,hardware,profile,lease);
+      Admission& a_;J1979CanReadLink* h_;
+    } link(guard,hardware);
+    class GuardedApplication final:public J1979CanCampaign::ApplicationLink {
+     public:
+      GuardedApplication(Admission& a,J1979CanCampaign::ApplicationLink* h):a_(a),h_(h){}
+      bool active()override{return h_&&a_.admitted()&&h_->active();}
+      bool matches(uint32_t tx,uint32_t rx,bool ext)const override{
+        return h_&&h_->matches(tx,rx,ext);
+      }
+      uint32_t monotonicMs()override{return h_?h_->monotonicMs():0;}
+      void exchange(const uint8_t* req,size_t size,uint32_t timeout,
+          J1979CanReadExchange::Result& result)override{
+        if(active()){
+          h_->exchange(req,size,timeout,result);
+          if(active())return;
+        }
+        result.state=J1979CanReadExchange::State::Fault;result.responseSize=0;
+      }
+     private:
+      Admission& a_;J1979CanCampaign::ApplicationLink* h_;
+    } remote(guard,application);
     class GuardedWriter final:public J1979CampaignEvidence::Writer {
      public:
-      GuardedWriter(GuardedLink& l,J1979CampaignEvidence::Writer& w,
+      GuardedWriter(Admission& l,J1979CampaignEvidence::Writer& w,
           HostSessionArbiter& a,Owner& o,const Profile& p,const HostSessionArbiter::Lease& lease)
         :l_(l),w_(w),a_(a),o_(o),p_(p),lease_(lease){}
       void afterVerifiedStop(){finalizing_=true;}
@@ -83,20 +123,25 @@ class J1979UsbCampaign {
         return permitted()&&w_.write(data,size)&&permitted();
       }
      private:
-      GuardedLink& l_;J1979CampaignEvidence::Writer& w_;
+      Admission& l_;J1979CampaignEvidence::Writer& w_;
       HostSessionArbiter& a_;Owner& o_;const Profile& p_;
       const HostSessionArbiter::Lease& lease_;
       bool finalizing_=false;
-    } output(link,writer,arbiter,owner,profile,lease);
+    } output(guard,writer,arbiter,owner,profile,lease);
 
     J1979CampaignEvidence stream(output);
     // Never start an electrical channel before exclusive ownership. Recheck
     // authorization immediately before and after the hardware start.
-    const bool channelStarted=link.admitted()&&owner.startReadChannel(profile,lease);
-    const bool started=channelStarted&&link.active()&&
+    const bool channelStarted=guard.admitted()&&owner.startReadChannel(profile,lease);
+    const bool started=channelStarted&&(application?remote.active():link.active())&&
       stream.begin(profile.tx,profile.rx,profile.extended,profile.budgetMs);
-    if(started)report.campaign=J1979CanCampaign::run(link,profile.tx,profile.rx,profile.extended,
-        profile.budgetMs,stream,scratch);
+    if(started){
+      report.campaign=application?
+        J1979CanCampaign::runApplication(remote,profile.tx,profile.rx,profile.extended,
+          profile.budgetMs,stream,scratch):
+        J1979CanCampaign::run(link,profile.tx,profile.rx,profile.extended,
+          profile.budgetMs,stream,scratch);
+    }
     // Never publish a complete capture while physical shutdown is unverified.
     // The readable prefix remains available but has no final summary.
     if(!owner.stopAndVerifyQuiescent()){

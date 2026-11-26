@@ -1,3 +1,7 @@
+## J1979 / C6 — campagne USB déportée via transport applicatif (26/11/2026)
+
+- Le propriétaire USB peut désormais exécuter la campagne sur client CI/2 sans passer par CAN local, sous le même bail, la même vérification de profil, les mêmes gardes d'admission et l'arrêt vérifié avant résumé CJ/1. Les gardes CAN locales restent au niveau trame ; le transport distant doit contrôler ses propres transactions et le STM32 son admission locale. Tests de succès, profil divergent et révocation déportée écrits. Correction du calcul de délai SPI pour éviter un sous-dépassement si l'horloge avance entre deux lectures. Aucun dispatch USB ni activation matérielle, aucun test exécuté, CI, fusion ou Release.
+
 ## J1979 / C6 — transport SPI CI/2 en deux phases (26/11/2026)
 
 - Transport maître borné (requête CS puis réponse CS, READY bas/haut/bas, CRC et corrélation, aucun rejeu) ; machine esclave armant les buffers avant publication READY, exécution endpoint en tâche, refus transfert partiel/dummy non nul, expiration et callback de défaut. Adaptateur ESP32 Arduino SPI concret sur instance et GPIO déjà configurés par propriétaire qualifié ; pas d'initialisation de broches ni d'OE. SPIClass synchrone sous exclusivité, pas de garantie temps réel si pilote bloqué. Rev A0 ne définit pas de READY validé : aucun choix de broche ni activation. Tests natifs de transport, phases et défauts inscrits au gate, non exécutés. Reste adaptateur esclave HAL, FDCAN, propriétaire matériel et USB. J1979/C6 ouverts, aucune CI, fusion ni Release.
