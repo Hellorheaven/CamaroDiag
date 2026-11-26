@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms</value></resheader>
+  <data name="Run" xml:space="preserve"><value>SAE J1979 CAN</value></data>
+  <data name="Prerequisites" xml:space="preserve"><value>Select an adapter, confirm the physical ECU profile and stop the bridge and console.</value></data>
+  <data name="InvalidChannel" xml:space="preserve"><value>Select a valid physical ISO 15765-4 OBD CAN address pair.</value></data>
+  <data name="Running" xml:space="preserve"><value>J1979 physical read campaign in progress.</value></data>
+  <data name="Completed" xml:space="preserve"><value>Campaign finished. Check individual results.</value></data>
+  <data name="Partial" xml:space="preserve"><value>Time budget reached; campaign incomplete.</value></data>
+  <data name="Unavailable" xml:space="preserve"><value>Unavailable</value></data>
+  <data name="MutationsNotTested" xml:space="preserve"><value>Mode 04, legacy Mode 05 and Mode 08 control execution not tested.</value></data>
+  <data name="Cancelled" xml:space="preserve"><value>Campaign cancelled or authorization expired.</value></data>
+  <data name="Failed" xml:space="preserve"><value>Campaign failed:</value></data>
+  <data name="JsonFilter" xml:space="preserve"><value>JSON report (*.json)|*.json</value></data>
+  <data name="ExportFailed" xml:space="preserve"><value>Could not export the J1979 report.</value></data>
+</root>
