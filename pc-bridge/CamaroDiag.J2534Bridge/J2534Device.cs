@@ -463,6 +463,28 @@ internal sealed partial class J2534Device : IDisposable
             throw new IOException("Standard OBD clear not confirmed by exact positive Mode 04 response.");
     }
 
+    /// <summary>Local, separately authorized Mode 04 recipe, not the
+    /// network bridge's ordinary reset endpoint.</summary>
+    internal ObdJ1979ClearRecipe.Result RunStandardClearRecipe(string expectedVin,
+        bool warningAcknowledged, bool confirmedYes, Action requireCurrent)
+    {
+        EnsureOpen();
+        return ObdJ1979ClearRecipe.Run(expectedVin, IsPrimaryStandardObdChannel,
+            warningAcknowledged, confirmedYes, requireCurrent,
+            (request, timeout) =>
+            {
+                ClearNativeReceiveQueue();
+                requireCurrent();
+                return Exchange(request, timeout);
+            },
+            () =>
+            {
+                ClearNativeReceiveQueue();
+                requireCurrent();
+                return ExchangeCore([0x04], 2500, nativeBenchReply: false);
+            });
+    }
+
     /// <summary>Dedicated local EVAP test only. Never reachable from the
     /// generic read or network bridge exchange methods.</summary>
     internal ObdJ1979EvapTest.Result RunStandardEvapTest(string expectedVin,
