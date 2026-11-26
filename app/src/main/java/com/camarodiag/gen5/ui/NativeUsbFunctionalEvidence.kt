@@ -23,8 +23,36 @@ internal object NativeUsbFunctionalEvidence {
 
     data class Measurement(val mode: Int, val pid: Int, val name: String, val number: Double, val unit: String)
     data class Monitor(val mid: Int, val tid: Int, val scaling: Int, val value: Int, val minimum: Int, val maximum: Int)
+    data class Readiness(val milOn:Boolean,val dtcCount:Int,val compression:Boolean,val monitors:Map<String,Boolean>)
     data class DiagnosticValues(val observedVin: String?, val dtcs: Map<Int, List<String>?>,
-        val measurements: List<Measurement>, val monitors: List<Monitor>, val identity: Map<Int,List<String>>)
+        val measurements: List<Measurement>, val monitors: List<Monitor>, val identity: Map<Int,List<String>>, val readiness: Readiness?)
+
+    private fun readinessValue(step: JSONObject): Readiness? {
+        if(step.optString("request_hex")!="0101") return null
+        val raw=step.optString("response_hex")
+        if(!raw.matches(Regex("4101[0-9A-F]{8}"))) return null
+        val (a,b,c,d)=raw.drop(4).chunked(2).map { it.toInt(16) }
+        val compression=b and 8!=0
+        val monitors=linkedMapOf<String,Boolean>()
+        fun add(names:List<String?>,support:Int,incomplete:Int) {
+            names.forEachIndexed { bit,name ->
+                if(name!=null && support and (1 shl bit)!=0) monitors[name]=incomplete and (1 shl bit)==0
+            }
+        }
+        add(listOf("misfire","fuel-system","components"),b,b shr 4)
+        add(if(compression) listOf("nmhc-catalyst","nox-aftertreatment",null,"boost-pressure",null,
+            "exhaust-gas-sensor","particulate-filter","egr-vvt")
+            else listOf("catalyst","heated-catalyst","evaporative-system","secondary-air",null,
+                "oxygen-sensor","oxygen-sensor-heater","egr-vvt"),c,d)
+        val data=step.optJSONObject("readiness") ?: return null
+        val declared=data.optJSONObject("supported_monitors") ?: return null
+        val mil=a and 128!=0
+        if(data.opt("mil_on")!=mil || data.opt("compression_ignition")!=compression ||
+            data.optInt("confirmed_dtc_count",-1)!=(a and 127) ||
+            data.optInt("byte_b",-1)!=b || data.optInt("byte_c",-1)!=c || data.optInt("byte_d",-1)!=d ||
+            declared.length()!=monitors.size || monitors.any { (key,value)->declared.opt(key)!=value }) return null
+        return Readiness(mil,a and 127,compression,monitors.toMap())
+    }
 
     private fun identityValues(step: JSONObject): Pair<Int,List<String>>? {
         val req=step.optString("request_hex")
@@ -70,10 +98,12 @@ internal object NativeUsbFunctionalEvidence {
         val measured = linkedMapOf<Pair<Int, Int>, Measurement>()
         val monitors = mutableListOf<Monitor>()
         val identity=linkedMapOf<Int,List<String>>()
+        var readiness:Readiness?=null
         for (i in 0 until steps.length()) {
             val step = steps.optJSONObject(i) ?: continue
             if (step.optString("status") != "PASSED") continue
             val request = step.optString("request_hex")
+            readinessValue(step)?.let { readiness=it }
             identityValues(step)?.let { (type,values)->identity[type]=values }
             if (request in setOf("03","07","0A")) {
                 val mode = request.toInt(16)
@@ -118,7 +148,7 @@ internal object NativeUsbFunctionalEvidence {
                 !number.isFinite() || name.isBlank() || unit.isBlank()) continue
             measured[mode to pid] = Measurement(mode,pid,name,number,unit)
         }
-        return DiagnosticValues(vin,dtcs,measured.values.sortedWith(compareBy({ it.mode },{ it.pid })),monitors.toList(),identity.toMap())
+        return DiagnosticValues(vin,dtcs,measured.values.sortedWith(compareBy({ it.mode },{ it.pid })),monitors.toList(),identity.toMap(),readiness)
     }
 
     fun results(state: FunctionalTestState, report: JSONObject): FunctionalTestState {

@@ -67,6 +67,25 @@ class NativeUsbFunctionalEvidenceTest {
         info.put("values",JSONArray().put("00000000").put("FFFFFFFF"))
         assertTrue(NativeUsbFunctionalEvidence.diagnosticValues(input)!!.identity.isEmpty())
     }
+    @Test fun readinessProjectionRejectsContradictoryAndUnsupportedMonitors() {
+        val input=report(true)
+        val monitors=JSONObject().put("misfire",false).put("catalyst",false).put("oxygen-sensor",true)
+        val ready=JSONObject().put("mil_on",true).put("confirmed_dtc_count",2)
+            .put("compression_ignition",false).put("byte_b",17).put("byte_c",33).put("byte_d",5)
+            .put("supported_monitors",monitors)
+        input.getJSONArray("steps").put(JSONObject().put("request_hex","0101").put("status","PASSED")
+            .put("response_hex","410182112105").put("readiness",ready))
+        val value=NativeUsbFunctionalEvidence.diagnosticValues(input)!!.readiness!!
+        assertTrue(value.milOn)
+        assertEquals(2,value.dtcCount)
+        assertEquals(false,value.monitors["catalyst"])
+        assertEquals(true,value.monitors["oxygen-sensor"])
+        monitors.put("evaporative-system",true)
+        assertNull(NativeUsbFunctionalEvidence.diagnosticValues(input)!!.readiness)
+        monitors.remove("evaporative-system")
+        ready.put("mil_on",false)
+        assertNull(NativeUsbFunctionalEvidence.diagnosticValues(input)!!.readiness)
+    }
     @Test fun inconsistentCampaignAndWrongVinAreNotPasses() {
         val bad=NativeUsbFunctionalEvidence.results(state,report(false)).checks.associateBy { it.key }
         assertEquals(FunctionalTestOutcome.FAILED,bad["native:integrity"]?.outcome)

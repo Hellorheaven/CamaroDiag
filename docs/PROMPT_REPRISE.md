@@ -1,3 +1,7 @@
+## J1979 — présentation readiness Android et Windows (26/11/2026)
+
+- MIL, nombre de DTC déclaré, type d'allumage et états de préparation des seuls moniteurs supportés affichés avec ressources FR/EN ; Android recalcule et compare l'intégralité des champs à la réponse 4101. Aucune confusion entre moniteur absent, incomplet et prêt. Régression de projection écrite non exécutée. C6/J1979 ouverts ; pas de CI intermédiaire, fusion ou Release.
+
 ## J1979 — readiness PID 01 natif structuré (26/11/2026)
 
 - Exports Android/Windows/Python : MIL, nombre DTC confirmé annoncé par le PID 01, type d'allumage, octets B/C/D et dictionnaire des moniteurs effectivement supportés avec état ready/incomplete. Réutilisation du mapping existant ObdJ1979MonitorStatus ; bits réservés non interprétés, aucun moniteur absent présumé prêt. Régressions essence/diesel écrites, non exécutées. C6/J1979 ouverts ; aucun test intermédiaire, merge ou Release.

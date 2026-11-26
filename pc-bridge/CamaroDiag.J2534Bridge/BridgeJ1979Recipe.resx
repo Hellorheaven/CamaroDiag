@@ -75,4 +75,28 @@
   <data name="NativeUsbCalibration" xml:space="preserve"><value>Calibration identifiers (CALID)</value></data>
   <data name="NativeUsbCvn" xml:space="preserve"><value>Calibration verification numbers (CVN)</value></data>
   <data name="NativeUsbEcuName" xml:space="preserve"><value>ECU name</value></data>
+  <data name="NativeUsb_readiness" xml:space="preserve"><value>Emission monitor readiness</value></data>
+  <data name="NativeUsb_mil_on" xml:space="preserve"><value>MIL on</value></data>
+  <data name="NativeUsb_mil_off" xml:space="preserve"><value>MIL off</value></data>
+  <data name="NativeUsb_dtc_count" xml:space="preserve"><value>Reported confirmed DTC count: {0}</value></data>
+  <data name="NativeUsb_spark" xml:space="preserve"><value>Spark ignition</value></data>
+  <data name="NativeUsb_compression" xml:space="preserve"><value>Compression ignition</value></data>
+  <data name="NativeUsb_ready" xml:space="preserve"><value>Ready</value></data>
+  <data name="NativeUsb_incomplete" xml:space="preserve"><value>Incomplete</value></data>
+  <data name="NativeUsb_no_monitors" xml:space="preserve"><value>No named supported monitor reported</value></data>
+  <data name="NativeUsb_monitor_misfire" xml:space="preserve"><value>Misfire</value></data>
+  <data name="NativeUsb_monitor_fuel_system" xml:space="preserve"><value>Fuel system</value></data>
+  <data name="NativeUsb_monitor_components" xml:space="preserve"><value>Comprehensive components</value></data>
+  <data name="NativeUsb_monitor_catalyst" xml:space="preserve"><value>Catalyst</value></data>
+  <data name="NativeUsb_monitor_heated_catalyst" xml:space="preserve"><value>Heated catalyst</value></data>
+  <data name="NativeUsb_monitor_evaporative_system" xml:space="preserve"><value>Evaporative system</value></data>
+  <data name="NativeUsb_monitor_secondary_air" xml:space="preserve"><value>Secondary air</value></data>
+  <data name="NativeUsb_monitor_oxygen_sensor" xml:space="preserve"><value>Oxygen sensor</value></data>
+  <data name="NativeUsb_monitor_oxygen_sensor_heater" xml:space="preserve"><value>Oxygen sensor heater</value></data>
+  <data name="NativeUsb_monitor_egr_vvt" xml:space="preserve"><value>EGR / VVT</value></data>
+  <data name="NativeUsb_monitor_nmhc_catalyst" xml:space="preserve"><value>NMHC catalyst</value></data>
+  <data name="NativeUsb_monitor_nox_aftertreatment" xml:space="preserve"><value>NOx aftertreatment</value></data>
+  <data name="NativeUsb_monitor_boost_pressure" xml:space="preserve"><value>Boost pressure</value></data>
+  <data name="NativeUsb_monitor_exhaust_gas_sensor" xml:space="preserve"><value>Exhaust gas sensor</value></data>
+  <data name="NativeUsb_monitor_particulate_filter" xml:space="preserve"><value>Particulate filter</value></data>
 </root>

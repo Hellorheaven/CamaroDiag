@@ -75,4 +75,28 @@
   <data name="NativeUsbCalibration" xml:space="preserve"><value>Identifiants de calibration (CALID)</value></data>
   <data name="NativeUsbCvn" xml:space="preserve"><value>Numéros de vérification (CVN)</value></data>
   <data name="NativeUsbEcuName" xml:space="preserve"><value>Nom du calculateur</value></data>
+  <data name="NativeUsb_readiness" xml:space="preserve"><value>Préparation des moniteurs antipollution</value></data>
+  <data name="NativeUsb_mil_on" xml:space="preserve"><value>Voyant moteur allumé</value></data>
+  <data name="NativeUsb_mil_off" xml:space="preserve"><value>Voyant moteur éteint</value></data>
+  <data name="NativeUsb_dtc_count" xml:space="preserve"><value>Nombre de défauts confirmés annoncé : {0}</value></data>
+  <data name="NativeUsb_spark" xml:space="preserve"><value>Allumage commandé</value></data>
+  <data name="NativeUsb_compression" xml:space="preserve"><value>Allumage par compression</value></data>
+  <data name="NativeUsb_ready" xml:space="preserve"><value>Prêt</value></data>
+  <data name="NativeUsb_incomplete" xml:space="preserve"><value>Incomplet</value></data>
+  <data name="NativeUsb_no_monitors" xml:space="preserve"><value>Aucun moniteur nommé annoncé</value></data>
+  <data name="NativeUsb_monitor_misfire" xml:space="preserve"><value>Ratés d’allumage</value></data>
+  <data name="NativeUsb_monitor_fuel_system" xml:space="preserve"><value>Système de carburant</value></data>
+  <data name="NativeUsb_monitor_components" xml:space="preserve"><value>Composants</value></data>
+  <data name="NativeUsb_monitor_catalyst" xml:space="preserve"><value>Catalyseur</value></data>
+  <data name="NativeUsb_monitor_heated_catalyst" xml:space="preserve"><value>Catalyseur chauffé</value></data>
+  <data name="NativeUsb_monitor_evaporative_system" xml:space="preserve"><value>Système EVAP</value></data>
+  <data name="NativeUsb_monitor_secondary_air" xml:space="preserve"><value>Air secondaire</value></data>
+  <data name="NativeUsb_monitor_oxygen_sensor" xml:space="preserve"><value>Sonde lambda</value></data>
+  <data name="NativeUsb_monitor_oxygen_sensor_heater" xml:space="preserve"><value>Chauffage sonde lambda</value></data>
+  <data name="NativeUsb_monitor_egr_vvt" xml:space="preserve"><value>EGR / VVT</value></data>
+  <data name="NativeUsb_monitor_nmhc_catalyst" xml:space="preserve"><value>Catalyseur NMHC</value></data>
+  <data name="NativeUsb_monitor_nox_aftertreatment" xml:space="preserve"><value>Post-traitement NOx</value></data>
+  <data name="NativeUsb_monitor_boost_pressure" xml:space="preserve"><value>Pression de suralimentation</value></data>
+  <data name="NativeUsb_monitor_exhaust_gas_sensor" xml:space="preserve"><value>Capteur de gaz d’échappement</value></data>
+  <data name="NativeUsb_monitor_particulate_filter" xml:space="preserve"><value>Filtre à particules</value></data>
 </root>

@@ -114,6 +114,17 @@ internal sealed partial class BridgeDesktopForm
                         text.AppendLine($"  {measurement.Name}: {measurement.Number.ToString("0.###",CultureInfo.CurrentCulture)} {measurement.Unit}");
                     if(step.DtcCodes is { } codes)
                         text.AppendLine("  "+(codes.Count==0?J1979RecipeText("NativeUsbZeroDtc"):string.Join(", ",codes)));
+                    if(step.MonitorReadiness is { } ready)
+                    {
+                        text.AppendLine("  "+J1979RecipeText("NativeUsb_readiness"));
+                        text.AppendLine("  "+J1979RecipeText(ready.MilOn?"NativeUsb_mil_on":"NativeUsb_mil_off"));
+                        text.AppendLine("  "+string.Format(CultureInfo.CurrentUICulture,J1979RecipeText("NativeUsb_dtc_count"),ready.ConfirmedDtcCount));
+                        text.AppendLine("  "+J1979RecipeText(ready.CompressionIgnition?"NativeUsb_compression":"NativeUsb_spark"));
+                        if(ready.SupportedMonitors.Count==0)text.AppendLine("  "+J1979RecipeText("NativeUsb_no_monitors"));
+                        foreach(var monitor in ready.SupportedMonitors)
+                            text.AppendLine("  "+J1979RecipeText("NativeUsb_monitor_"+monitor.Key.Replace('-','_'))+": "+
+                                J1979RecipeText(monitor.Value?"NativeUsb_ready":"NativeUsb_incomplete"));
+                    }
                     if(step.Identification is { } info&&info.InfoType!=2)
                     {
                         string label=J1979RecipeText(info.InfoType switch {

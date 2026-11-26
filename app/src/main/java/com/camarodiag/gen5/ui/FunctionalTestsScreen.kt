@@ -373,6 +373,40 @@ fun FunctionalTestsScreen(
                 }
             }
         }
+        values?.readiness?.let { ready ->
+            item {
+                Card(modifier=Modifier.fillMaxWidth()) {
+                    Column(modifier=Modifier.padding(12.dp),verticalArrangement=Arrangement.spacedBy(5.dp)) {
+                        Text(stringResource(R.string.functional_native_usb_readiness),style=MaterialTheme.typography.titleMedium)
+                        Text(stringResource(if(ready.milOn) R.string.functional_native_usb_mil_on else R.string.functional_native_usb_mil_off))
+                        Text(stringResource(R.string.functional_native_usb_dtc_count,ready.dtcCount))
+                        Text(stringResource(if(ready.compression) R.string.functional_native_usb_compression else R.string.functional_native_usb_spark))
+                        if(ready.monitors.isEmpty()) Text(stringResource(R.string.functional_native_usb_no_monitors))
+                        for((name,complete) in ready.monitors) {
+                            val label=when(name) {
+                                "misfire" -> R.string.functional_native_usb_monitor_misfire
+                                "fuel-system" -> R.string.functional_native_usb_monitor_fuel_system
+                                "components" -> R.string.functional_native_usb_monitor_components
+                                "catalyst" -> R.string.functional_native_usb_monitor_catalyst
+                                "heated-catalyst" -> R.string.functional_native_usb_monitor_heated_catalyst
+                                "evaporative-system" -> R.string.functional_native_usb_monitor_evaporative_system
+                                "secondary-air" -> R.string.functional_native_usb_monitor_secondary_air
+                                "oxygen-sensor" -> R.string.functional_native_usb_monitor_oxygen_sensor
+                                "oxygen-sensor-heater" -> R.string.functional_native_usb_monitor_oxygen_sensor_heater
+                                "egr-vvt" -> R.string.functional_native_usb_monitor_egr_vvt
+                                "nmhc-catalyst" -> R.string.functional_native_usb_monitor_nmhc_catalyst
+                                "nox-aftertreatment" -> R.string.functional_native_usb_monitor_nox_aftertreatment
+                                "boost-pressure" -> R.string.functional_native_usb_monitor_boost_pressure
+                                "exhaust-gas-sensor" -> R.string.functional_native_usb_monitor_exhaust_gas_sensor
+                                "particulate-filter" -> R.string.functional_native_usb_monitor_particulate_filter
+                                else -> continue
+                            }
+                            Text(stringResource(label)+": "+stringResource(if(complete) R.string.functional_native_usb_ready else R.string.functional_native_usb_incomplete))
+                        }
+                    }
+                }
+            }
+        }
         if (values != null && values.monitors.isNotEmpty()) {
             item { Text(stringResource(R.string.functional_native_usb_monitors),style=MaterialTheme.typography.titleMedium) }
             items(values.monitors.size,key={ "native-monitor:"+it }) { index ->
