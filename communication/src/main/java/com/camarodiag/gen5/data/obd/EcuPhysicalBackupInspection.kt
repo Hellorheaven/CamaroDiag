@@ -3,6 +3,9 @@ package com.camarodiag.gen5.data.obd
 import java.io.DataInputStream
 import java.io.File
 import java.nio.charset.StandardCharsets
+import java.nio.file.Files
+import java.nio.file.LinkOption
+import java.nio.file.attribute.BasicFileAttributes
 import java.security.MessageDigest
 
 /**
@@ -38,6 +41,15 @@ object EcuPhysicalBackupInspection {
     private const val MAX_BLOCK_BYTES = 64L * 1024 * 1024
     private const val MAX_BLOCK_FILE_BYTES = MAX_BLOCK_BYTES + 65536L
 
+    private data class FileIdentity(val size: Long, val modified: java.nio.file.attribute.FileTime,
+        val created: java.nio.file.attribute.FileTime, val key: Any?)
+
+    private fun identity(file: File): FileIdentity {
+        val attributes = Files.readAttributes(file.toPath(), BasicFileAttributes::class.java, LinkOption.NOFOLLOW_LINKS)
+        check(attributes.isRegularFile && !attributes.isSymbolicLink) { "Expected a regular recovery file." }
+        return FileIdentity(attributes.size(), attributes.lastModifiedTime(), attributes.creationTime(), attributes.fileKey())
+    }
+
     fun inspect(
         journalFile: File,
         target: EcuProgrammingDriverContract.FirmwareTarget,
@@ -64,7 +76,9 @@ object EcuPhysicalBackupInspection {
                     }
                 }
             }
+            val journalIdentity = identity(journalFile)
             val data = readSnapshot()
+            check(identity(journalFile) == journalIdentity) { "ECU journal changed while being inspected." }
             val audit = PersistentEcuWriteJournal.inspectSnapshot(journalFile, target, vin, data)
             check(audit.valid) { "ECU journal is missing, altered or out of sequence." }
             auditedSnapshot = data
@@ -87,17 +101,21 @@ object EcuPhysicalBackupInspection {
                 "No verified original ECU sector baselines."
             }
             val directory = File(journalFile.absolutePath + ".blocks")
-            check(directory.isDirectory) { "Missing original ECU sector backup directory." }
+            check(Files.isDirectory(directory.toPath(), LinkOption.NOFOLLOW_LINKS)) {
+                "Missing or linked original ECU sector backup directory."
+            }
             val files = directory.listFiles()
                 ?: error("Cannot enumerate persisted original ECU sectors.")
             check(files.size == expectedCount && files.all { it.isFile }) {
                 "Physical ECU backup files do not match the journal baselines."
             }
+            val fileIdentities = files.associate { it.name to identity(it) }
             val observed = hashSetOf<Pair<EcuBackupCoverage.Region, Long>>()
             for (file in files) {
                 current = null
                 checkActive()
-                check(file.length() in 1L..MAX_BLOCK_FILE_BYTES) {
+                val originalIdentity = fileIdentities.getValue(file.name)
+                check(identity(file) == originalIdentity && originalIdentity.size in 1L..MAX_BLOCK_FILE_BYTES) {
                     "Saved physical ECU block exceeds the supported size."
                 }
                 DataInputStream(file.inputStream().buffered()).use { input ->
@@ -141,6 +159,7 @@ object EcuPhysicalBackupInspection {
                     check(actualSha.equals(journalHash, true)) {
                         "The physical ECU sector changed after it was saved."
                     }
+                    check(identity(file) == originalIdentity) { "Saved sector changed during inspection." }
                     verified += Sector(region, address, size, actualSha)
                     verifiedBytes = Math.addExact(verifiedBytes, size)
                 }
@@ -149,8 +168,16 @@ object EcuPhysicalBackupInspection {
             check(observed.size == expectedCount) {
                 "Not every original ECU sector has a matching physical backup."
             }
-            check(data.contentEquals(readSnapshot())) {
+            check(data.contentEquals(readSnapshot()) && identity(journalFile) == journalIdentity) {
                 "ECU journal changed during physical backup inspection."
+            }
+            // A previously read sector may have been replaced while another
+            // sector was hashed. Recheck the complete directory inventory.
+            check(Files.isDirectory(directory.toPath(), LinkOption.NOFOLLOW_LINKS))
+            val finalFiles = directory.listFiles() ?: error("Cannot re-enumerate original ECU sectors.")
+            check(finalFiles.map { it.name }.toSet() == fileIdentities.keys &&
+                finalFiles.all { identity(it) == fileIdentities.getValue(it.name) }) {
+                "Original ECU sector inventory changed during inspection."
             }
             Report(true, expectedCount, verified.sortedWith(compareBy({ it.region.name },
                 { it.address })), verifiedBytes, "",

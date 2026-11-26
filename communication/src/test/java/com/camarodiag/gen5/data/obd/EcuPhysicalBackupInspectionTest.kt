@@ -55,6 +55,17 @@ class EcuPhysicalBackupInspectionTest {
             assertFalse(EcuPhysicalBackupInspection.inspect(
                 journalFile, target.copy(firmwareId = "WRONG"), vin).verified)
 
+            // Change a previously inspected file immediately before the
+            // final journal reread. No stale successful report is acceptable.
+            val originalStamp = files[0].lastModified()
+            var activeChecks = 0
+            val modifiedDuringInspection = EcuPhysicalBackupInspection.inspect(journalFile, target, vin) {
+                if (++activeChecks == 6) {
+                    check(files[0].setLastModified(originalStamp + 60_000L))
+                }
+            }
+            assertFalse(modifiedDuringInspection.verified)
+            assertTrue(modifiedDuringInspection.sectors.isEmpty())
             val original = files[0].readBytes()
             val changed = original.copyOf().also { it[it.lastIndex] = (it.last() + 1).toByte() }
             files[0].writeBytes(changed)

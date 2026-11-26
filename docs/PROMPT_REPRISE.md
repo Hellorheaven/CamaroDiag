@@ -1,3 +1,7 @@
+## C6 — stabilité des fichiers de récupération (26/11/2026)
+
+- L'inspection hors ligne refuse les liens symboliques et vérifie taille, dates et identité de fichier avant/après lecture puis sur l'inventaire complet en fin de campagne. Un bloc modifié pendant l'inspection ne donne plus de résultat positif sur une empreinte antérieure. Cette vérification de stabilité n'est pas une protection cryptographique contre une modification concurrente sophistiquée ; les empreintes du journal restent la preuve des octets lus. Régression écrite, non exécutée. Aucun accès ECU.
+
 ## SAE J1979 — réponses PID multitrames (26/11/2026)
 
 - Le parseur Mode 01/02 réutilise l'assemblage ISO-TP par répondant pour les réponses segmentées, y compris entrelacées. Aucun repli sur une trame isolée si une séquence est incomplète ; conservation des réponses ELM numérotées sans adresse inventée et des payloads déjà assemblés jusqu'à 255 octets. Les longueurs connues restent contrôlées. Les PID inconnus restent des octets bruts, pas des mesures. Régressions écrites, non exécutées. J1979 en cours ; pas de nouveau protocole actif.
