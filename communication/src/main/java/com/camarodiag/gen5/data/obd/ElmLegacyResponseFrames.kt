@@ -18,8 +18,16 @@ internal object ElmLegacyResponseFrames {
         return crc xor 255
     }
 
+    /** Mutation recipes use an explicitly fixed route, never ELM auto mode. */
+    fun fixedProtocol(raw: String): Int? {
+        val values = raw.replace('>', '\n').lineSequence()
+            .map { it.trim().uppercase(Locale.ROOT) }
+            .filter { it.isNotEmpty() && it != "ATDPN" }.toList()
+        return values.singleOrNull()?.takeIf { it.matches(Regex("[1-5]")) }?.toInt()
+    }
+
     fun decode(protocol: Int, command: String, raw: String): List<Frame> {
-        require(protocol in 1..5)
+        require(protocol in 1..5 && raw.length <= 32768)
         val rows = raw.replace('>', '\n').lineSequence()
             .map { it.uppercase(Locale.ROOT).filterNot(Char::isWhitespace) }
             .filter { it.isNotEmpty() && it != command && it != "SEARCHING..." }.toList()
