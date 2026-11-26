@@ -51,6 +51,24 @@ internal static class DoIpConsolePresentationSelfTests
         Check(driftRejected && queried == 1 && published == 0,
             "Gateway drift prevents row publication and further ECU interrogation.");
 
+        var refusals = DoIpVinReader.CollectInventoryAsync(new ushort[] { 0x1234, 0x1235, 0x1236, 0x1237 },
+            () => Task.CompletedTask, ecu =>
+            {
+                Exception error = ecu switch
+                {
+                    0x1234 => new DoIpTransportRefusal("header_nack", 2, "header"),
+                    0x1235 => new DoIpTransportRefusal("routing_denied", 6, "routing"),
+                    0x1236 => new DoIpTransportRefusal("diagnostic_nack", 6, "diagnostic"),
+                    _ => new UdsServiceRefusal(0x22, 0x31)
+                };
+                return Task.FromException<DoIpVinReader.InventoryEntry>(error);
+            }, CancellationToken.None, null).GetAwaiter().GetResult();
+        Check(refusals.Select(row => row.Reason).SequenceEqual(new[] {
+            "header_nack", "routing_denied", "diagnostic_nack", "uds_negative_response" }) &&
+            refusals.Select(row => row.FailureCode).SequenceEqual(new byte?[] { 2, 6, 6, 0x31 }) &&
+            refusals[2].RequestedService is null && refusals[3].RequestedService == 0x22,
+            "Inventory preserves refusal layer/code and only UDS carries requested SID.");
+
         var progress = new DoIpMonitoringProgress(2);
         progress.RecordVerified(1);
         Check(!progress.Complete && progress.VerifiedSamples == 1, "Verified partial capture.");
