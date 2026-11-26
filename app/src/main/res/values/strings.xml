@@ -1027,6 +1027,7 @@
     <string name="cal_doip_backup_profile">Load DoIP memory profile</string>
     <string name="cal_doip_backup_scope">VIN %1$s · ECU %2$s · 0x%3$s · %4$d bytes</string>
     <string name="cal_doip_backup">Back up ECU region</string>
+    <string name="cal_doip_backup_limit">This profile can be used to verify an existing archive, but live acquisition exceeds the limit of 8,192 blocks per pass.</string>
     <string name="cal_doip_backup_confirm">Read this region twice? VIN %1$s, ECU %2$s, address 0x%3$s, %4$d bytes. No ECU writes.</string>
     <string name="cal_doip_backup_saved">Verified region backup: %1$d bytes. SHA-256 %2$s. %3$s</string>
     <string name="cal_doip_profile_failed">Invalid memory profile or VIN mismatch.</string>
