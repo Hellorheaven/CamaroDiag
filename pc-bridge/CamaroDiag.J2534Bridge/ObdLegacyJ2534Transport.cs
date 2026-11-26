@@ -14,12 +14,12 @@ internal sealed class ObdLegacyJ2534Transport : IDisposable
     internal sealed record Exchange(string TxHex, IReadOnlyList<Packet> Replies);
     private readonly J2534StandardChannel channel;
     private readonly Variant variant;
-    private readonly byte source;
+    private readonly byte? source;
     private readonly Action requireActive;
     internal string? InitEvidence { get; private set; }
 
     private ObdLegacyJ2534Transport(J2534StandardChannel channel, Variant variant,
-        byte source, Action requireActive)
+        byte? source, Action requireActive)
     {
         this.channel = channel;
         this.variant = variant;
@@ -63,17 +63,19 @@ internal sealed class ObdLegacyJ2534Transport : IDisposable
         return [header, 0x6A, 0xF1, ..request];
     }
 
-    internal static Packet? Decode(Variant variant, byte source, J2534StandardChannel.Frame frame)
+    internal static Packet? Decode(Variant variant, byte? source, J2534StandardChannel.Frame frame)
     {
         if (frame.ProtocolId != Profile(variant).Id ||
             J2534StandardChannel.IsAuxiliaryReceiveStatus(frame.RxStatus)) return null;
         var data = frame.Data;
-        if (data.Length < 4 || data[2] != source) return null;
+        if (data.Length < 4 || data[2] is 0 or 0xF1 or 0xFF ||
+            source.HasValue && data[2] != source.Value) return null;
+        byte actualSource = data[2];
         byte[] payload;
         if (variant is Variant.KwpSlow or Variant.KwpFast)
         {
             if (data[1] != 0xF1 || (data[0] & 0xC0) != 0x80) return null;
-            payload = StandardVehicleProtocols.ParseKwpJ2534(data, 0xF1, source, false, false);
+            payload = StandardVehicleProtocols.ParseKwpJ2534(data, 0xF1, actualSource, false, false);
         }
         else
         {
@@ -83,14 +85,14 @@ internal sealed class ObdLegacyJ2534Transport : IDisposable
         }
         if (payload.Length is < 1 or > 7)
             throw new InvalidDataException("Legacy application record length invalid.");
-        return new(source, Convert.ToHexString(data), payload, frame.Timestamp,
+        return new(actualSource, Convert.ToHexString(data), payload, frame.Timestamp,
             frame.InFrameResponse is null ? null : Convert.ToHexString(frame.InFrameResponse));
     }
 
     internal static ObdLegacyJ2534Transport Open(J2534Adapter adapter, Variant variant,
-        byte source, Action requireActive)
+        byte? source, Action requireActive)
     {
-        if (source is 0 or 0xF1 or 0xFF) throw new ArgumentException("Explicit ECU response source required.");
+        if (source is 0 or 0xF1 or 0xFF) throw new ArgumentException("Invalid ECU response source.");
         requireActive();
         var (id, baud) = Profile(variant);
         var channel = J2534StandardChannel.Connect(adapter, id, baud);
@@ -100,8 +102,11 @@ internal sealed class ObdLegacyJ2534Transport : IDisposable
             if (variant == Variant.Pwm) channel.ConfigurePwmTesterAddress();
             // Match target and source. KWP format byte contains message length.
             bool kwp = variant is Variant.KwpSlow or Variant.KwpFast;
-            channel.ConfigureFilter(kwp ? [0xC0, 0xFF, 0xFF] : [0xFF, 0xFF, 0xFF],
-                kwp ? [0x80, 0xF1, source] : [variant == Variant.Pwm ? (byte)0x41 : (byte)0x48, 0x6B, source]);
+            byte sourceMask = source.HasValue ? (byte)0xFF : (byte)0;
+            byte sourcePattern = source ?? 0;
+            channel.ConfigureFilter(kwp ? [0xC0, 0xFF, sourceMask] : [0xFF, 0xFF, sourceMask],
+                kwp ? [0x80, 0xF1, sourcePattern] :
+                    [variant == Variant.Pwm ? (byte)0x41 : (byte)0x48, 0x6B, sourcePattern]);
             requireActive();
             if (variant is Variant.Iso9141 or Variant.KwpSlow)
             {
@@ -133,6 +138,8 @@ internal sealed class ObdLegacyJ2534Transport : IDisposable
     internal Exchange Read(byte[] request, int timeoutMs)
     {
         if (timeoutMs is < 1 or > 4000) throw new ArgumentOutOfRangeException(nameof(timeoutMs));
+        if (!source.HasValue && !request.AsSpan().SequenceEqual(new byte[] { 1, 0 }))
+            throw new InvalidOperationException("Unpinned discovery can only read initial PID 00.");
         var tx = FrameRead(variant, request);
         requireActive();
         channel.ClearReceiveQueue();
