@@ -1,3 +1,7 @@
+## PR117 — VIN et odomètre sur canal J2534 (26/11/2026)
+
+- C6 : lecture Mode 09 PID 02 avant/après les PID kilométriques sur le même canal physique J2534 sous verrou de session et contrôle d'époque. Décodage VIN strict, aucune attribution si une des deux lectures est indisponible, refus de VIN contradictoires. A6/D3 gardent leur décodage et l'absence de VIN n'est pas remplacée par le profil du garage. Régressions écrites, non exécutées. Aucun checkpoint.
+
 ## PR117 — qualification des températures extrêmes OBD (26/11/2026)
 
 - C6 : les PID température à un octet 05/0F/46/5C signalent explicitement les limites de codage 00/FF dans le scan, en conservant valeur décodée, brut et adresse du répondant. Ne pas assimiler arbitrairement ces valeurs à un capteur absent ni à une température physique confirmée. Régression Mach-E 215/-40/15 °C enrichie, non exécutée. Aucun checkpoint.

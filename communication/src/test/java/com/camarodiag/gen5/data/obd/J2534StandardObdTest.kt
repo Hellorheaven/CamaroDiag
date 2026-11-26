@@ -5,6 +5,22 @@ import org.junit.Test
 
 class J2534StandardObdTest {
     private fun bytes(vararg v: Int) = v.map { it.toByte() }.toByteArray()
+    @Test fun odometerVinRequiresTwoMatchingPhysicalMode09Records() {
+        val vin = "WF0TK3SS7PMA00001"
+        val reply = bytes(0x49, 2, 1) + vin.toByteArray(Charsets.US_ASCII)
+        assertEquals(vin, J2534StandardObd.vinData(reply))
+        assertNull(J2534StandardObd.vinData(reply.copyOf(19)))
+        assertNull(J2534StandardObd.vinData(reply + byteArrayOf(0)))
+        assertNull(J2534StandardObd.vinData(bytes(0x7F, 9, 0x12)))
+        assertNull(J2534StandardObd.vinData(bytes(0x49, 4, 1) + vin.toByteArray()))
+        assertEquals(vin, J2534StandardObd.stableOdometerVin(vin, vin))
+        assertNull(J2534StandardObd.stableOdometerVin(vin, null))
+        assertNull(J2534StandardObd.stableOdometerVin(null, vin))
+        assertThrows(IllegalStateException::class.java) {
+            J2534StandardObd.stableOdometerVin(vin, vin.dropLast(1) + "2")
+        }
+    }
+
     @Test fun identityMustBelongToNegotiatedPhysicalResponder() {
         val vin = "1G1FA1RXXR0123456"
         fun identity(response: String = "7E8", expected: String = "7E8",

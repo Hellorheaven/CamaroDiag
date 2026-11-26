@@ -279,6 +279,13 @@ class J2534BridgeTransport(
         return supported
     }
 
+    suspend fun readStandardObdVin(): String? {
+        check(isStandardObdPhysicalReadEnabled)
+        val reply = exchange(byteArrayOf(9, 2), 3500)
+        check(isStandardObdPhysicalReadEnabled)
+        return J2534StandardObd.vinData(reply)
+    }
+
     suspend fun readStandardObdPid(pid: Int): String {
         check(isStandardObdPhysicalReadEnabled)
         require(pid in 1..255)

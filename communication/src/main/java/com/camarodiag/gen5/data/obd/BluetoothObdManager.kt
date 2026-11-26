@@ -693,13 +693,21 @@ class BluetoothObdManager(context: Context) {
         }
     }
 
-    /** Read both available odometer PIDs from the same physical connection. */
-    suspend fun readJ2534OdometerPids(): Pair<String?, String?> {
+    data class J2534OdometerObservation(val a6: String?, val d3: String?, val verifiedVin: String?)
+
+    /** Compatibility accessor; acquisition also verifies the physical VIN. */
+    suspend fun readJ2534OdometerPids(): Pair<String?, String?> =
+        readJ2534OdometerObservation().let { it.a6 to it.d3 }
+
+    /** The VIN and odometer values use one negotiated channel and manager lock. */
+    suspend fun readJ2534OdometerObservation(): J2534OdometerObservation {
         val epoch = transportSessionEpoch.capture()
         return commandSessionMutex.withLock {
             transportSessionEpoch.requireQueuedCurrent(epoch)
             check(isJ2534StandardObdAvailable())
             val bridge = checkNotNull(j2534BridgeTransport)
+            val before = bridge.readStandardObdVin()
+            transportSessionEpoch.requireQueuedCurrent(epoch)
             val supported = bridge.discoverStandardObdPids()
             transportSessionEpoch.requireQueuedCurrent(epoch)
             suspend fun read(pid: Int): String? {
@@ -708,7 +716,11 @@ class BluetoothObdManager(context: Context) {
                 transportSessionEpoch.requireQueuedCurrent(epoch)
                 return value
             }
-            read(0xA6) to read(0xD3)
+            val a6 = read(0xA6)
+            val d3 = read(0xD3)
+            val after = bridge.readStandardObdVin()
+            transportSessionEpoch.requireQueuedCurrent(epoch)
+            J2534OdometerObservation(a6, d3, J2534StandardObd.stableOdometerVin(before, after))
         }
     }
 

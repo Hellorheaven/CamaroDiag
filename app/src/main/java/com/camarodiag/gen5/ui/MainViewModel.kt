@@ -5035,8 +5035,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     }
                 } else {
                     val (a6Response, d3Response) = if (obdManager.isJ2534StandardObdAvailable()) {
-                        // Existing physical read has no VIN proof in this transaction.
-                        obdManager.readJ2534OdometerPids()
+                        val observation = obdManager.readJ2534OdometerObservation()
+                        auditVin = observation.verifiedVin
+                        observation.a6 to observation.d3
                     } else obdManager.withObdCommandSession { engine ->
                         val before = engine.readVinForVerification()
                         val supportedPids = engine.discoverSupportedPids()

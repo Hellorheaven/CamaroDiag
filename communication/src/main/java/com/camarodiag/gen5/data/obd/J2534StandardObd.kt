@@ -50,6 +50,22 @@ internal object J2534StandardObd {
 
     private fun ByteArray.u(index: Int): Int = this[index].toInt() and 0xFF
 
+    /** Mode 09 PID 02 on a physical ISO-TP channel has a single VIN record. */
+    fun vinData(reply: ByteArray): String? {
+        if (isExplicitlyUnsupported(9, reply)) return null
+        if (reply.size != 20 || reply.u(0) != 0x49 || reply.u(1) != 2 || reply.u(2) != 1)
+            return null
+        return reply.copyOfRange(3, 20).toString(Charsets.US_ASCII)
+            .takeIf { it.matches(Regex("[A-HJ-NPR-Z0-9]{17}")) }
+    }
+
+    fun stableOdometerVin(before: String?, after: String?): String? {
+        check(before == null || after == null || before == after) {
+            "Vehicle VIN changed during odometer read."
+        }
+        return before?.takeIf { it == after }
+    }
+
     fun pidData(pid: Int, reply: ByteArray): ByteArray {
         require(pid in 0..255)
         require(reply.size >= 3 && reply.u(0) == 0x41 && reply.u(1) == pid) {
