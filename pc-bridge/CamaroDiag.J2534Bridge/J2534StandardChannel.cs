@@ -173,9 +173,28 @@ internal sealed class J2534StandardChannel : IDisposable
     }
 
     internal sealed record Frame(uint ProtocolId, uint RxStatus, uint Timestamp,
-        byte[] Data);
+        byte[] Data, byte[]? InFrameResponse = null);
 
-    internal Frame? Receive(int timeoutMs = 1000)
+    // SAE J2534-1 04.04 can expose PWM IFR bytes after ExtraDataIndex.
+    // The opt-in is confined to the legacy campaign. Keep application bytes
+    // separate and do not reinterpret the IFR as a diagnostic record.
+    internal static Frame DecodeReceiveData(uint protocol, uint status, uint timestamp,
+        byte[] data, uint dataSize, uint extraIndex, bool allowPwmIfr = false)
+    {
+        if (dataSize > MaxData || dataSize > data.Length ||
+            extraIndex > dataSize)
+            throw new InvalidDataException("Inconsistent J2534 receive frame size.");
+        var size = (int)dataSize;
+        if (extraIndex == dataSize || extraIndex == 0 && !allowPwmIfr)
+            return new(protocol, status, timestamp, data.AsSpan(0, size).ToArray());
+        if (!allowPwmIfr || protocol != J1850Pwm || extraIndex < 4)
+            throw new InvalidDataException("Unexpected extra data in J2534 receive frame.");
+        var offset = (int)extraIndex;
+        return new(protocol, status, timestamp, data.AsSpan(0, offset).ToArray(),
+            data.AsSpan(offset, size - offset).ToArray());
+    }
+
+    internal Frame? Receive(int timeoutMs = 1000, bool allowPwmIfr = false)
     {
         EnsureConnected();
         if (timeoutMs is < 1 or > 30000)
@@ -200,15 +219,10 @@ internal sealed class J2534StandardChannel : IDisposable
             var frame = received[0];
             if (IsAuxiliaryReceiveStatus(frame.RxStatus))
                 continue;
-            if (frame.ProtocolId != protocolId ||
-                frame.Data is null || frame.DataSize > MaxData ||
-                frame.DataSize > frame.Data.Length ||
-                (frame.ExtraDataIndex != 0 &&
-                 frame.ExtraDataIndex != frame.DataSize))
+            if (frame.ProtocolId != protocolId || frame.Data is null)
                 throw new InvalidDataException("Inconsistent J2534 receive frame.");
-            return new Frame(frame.ProtocolId, frame.RxStatus,
-                frame.Timestamp,
-                frame.Data.AsSpan(0, (int)frame.DataSize).ToArray());
+            return DecodeReceiveData(frame.ProtocolId, frame.RxStatus, frame.Timestamp,
+                frame.Data, frame.DataSize, frame.ExtraDataIndex, allowPwmIfr);
         }
         return null;
     }
@@ -289,6 +303,30 @@ internal sealed class J2534StandardChannel : IDisposable
             throw new ArgumentException(
                 "An actual J2534-2 SW_CAN driver channel and a positive high-speed bitrate are required.");
         SetStandardConfig(SwCanHighSpeedDataRate, bitRate);
+    }
+
+    internal void ConfigurePwmTesterAddress()
+    {
+        EnsureConnected();
+        if (protocolId != J1850Pwm)
+            throw new InvalidOperationException("PWM node configuration requires a PWM channel.");
+        SetStandardConfig(0x04, 0xF1);
+        var bytes = Marshal.AllocHGlobal(1);
+        var input = Marshal.AllocHGlobal(Marshal.SizeOf<SByteArray>());
+        try
+        {
+            Marshal.WriteByte(bytes, 0x6B);
+            Marshal.StructureToPtr(new SByteArray { NumOfBytes = 1, BytePtr = bytes }, input, false);
+            Require(ioctl!(channelId, 0x0B, IntPtr.Zero, IntPtr.Zero),
+                "PassThruIoctl(CLEAR_FUNCT_MSG_LOOKUP_TABLE)");
+            Require(ioctl!(channelId, 0x0C, input, IntPtr.Zero),
+                "PassThruIoctl(ADD_TO_FUNCT_MSG_LOOKUP_TABLE)");
+        }
+        finally
+        {
+            Marshal.FreeHGlobal(input);
+            Marshal.FreeHGlobal(bytes);
+        }
     }
 
     private void SetStandardConfig(uint parameter, uint value)
