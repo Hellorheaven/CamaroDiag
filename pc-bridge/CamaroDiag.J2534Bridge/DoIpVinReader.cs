@@ -236,21 +236,25 @@ internal static class DoIpVinReader
         if (!DoIpVehicleDiscovery.IsVehicleVin(expectedVin) ||
             (did.HasValue && ObdOnUdsServices.ClassifyDid(did.Value) == ObdOnUdsServices.DataGroup.NotLegislated))
             throw new ArgumentException("Invalid OBDonUDS target.");
-        var vin = ObdOnUdsVehicleIdentification.DecodeVin(await link.ExchangeUdsAsync(
-            ObdOnUdsVehicleIdentification.ReadVin(), timeout, token));
+        var vinReply = await link.ExchangeUdsAsync(
+            ObdOnUdsVehicleIdentification.ReadVin(), timeout, token);
+        var vin = ObdOnUdsVehicleIdentification.DecodeVin(vinReply);
         if (vin != expectedVin) throw new InvalidDataException("Legislated VIN differs from selected vehicle.");
-        var identification = ObdOnUdsServices.DecodeProtocolIdentification(await link.ExchangeUdsAsync(
-            ObdOnUdsServices.ReadProtocolIdentification(), timeout, token));
+        var protocolReply = await link.ExchangeUdsAsync(
+            ObdOnUdsServices.ReadProtocolIdentification(), timeout, token);
+        var identification = ObdOnUdsServices.DecodeProtocolIdentification(protocolReply);
         if (!did.HasValue) return new(vin, identification.Value, null);
         if (!identification.IsObdOnUds)
             throw new InvalidDataException("Selected ECU did not identify as OBDonUDS.");
-        var data = did.Value switch
+        byte[] data;
+        if (did.Value == 0xF802) data = Encoding.ASCII.GetBytes(vin);
+        else if (did.Value == 0xF810) data = [identification.Value];
+        else
         {
-            0xF802 => Encoding.ASCII.GetBytes(vin),
-            0xF810 => new byte[] { identification.Value },
-            _ => ObdOnUdsServices.DecodeReadDid(did.Value, await link.ExchangeUdsAsync(
-                ObdOnUdsServices.ReadObdDid(did.Value), timeout, token))
-        };
+            var didReply = await link.ExchangeUdsAsync(
+                ObdOnUdsServices.ReadObdDid(did.Value), timeout, token);
+            data = ObdOnUdsServices.DecodeReadDid(did.Value, didReply);
+        }
         if (data.Length == 0) throw new InvalidDataException("Missing DID data.");
         var after = await ReadVerifiedObdAsync(link, expectedVin, null, timeout, token);
         if (after.ProtocolValue != identification.Value)
@@ -568,8 +572,11 @@ internal static class DoIpVinReader
         await using var link = await ConnectObservedAsync(gateway, address, tester, ecu,
             tls, timeout, token, certificate, trace, options);
         return await ReadVerifiedDtcAsync(link, gateway, timeout, token, async () =>
-            ObdOnUdsServices.DecodeFaultCounters(await link.ExchangeUdsAsync(
-                ObdOnUdsServices.ReadFaultCounters(), timeout, token)));
+        {
+            var response = await link.ExchangeUdsAsync(
+                ObdOnUdsServices.ReadFaultCounters(), timeout, token);
+            return ObdOnUdsServices.DecodeFaultCounters(response);
+        });
     }
 
     internal static async Task<ObdOnUdsServices.DtcStatusReport> ReadObservedHistoricalDtcAsync(
@@ -581,8 +588,11 @@ internal static class DoIpVinReader
         await using var link = await ConnectObservedAsync(gateway, address, tester, ecu,
             tls, timeout, token, certificate, trace, options);
         return await ReadVerifiedDtcAsync(link, gateway, timeout, token, async () =>
-            ObdOnUdsServices.DecodeHistoricalDtc(subfunction,
-                await link.ExchangeUdsAsync(request, timeout, token)));
+        {
+            var response = await link.ExchangeUdsAsync(request, timeout, token);
+            return ObdOnUdsServices.DecodeHistoricalDtc(subfunction,
+                response);
+        });
     }
 
     internal static async Task<ObdOnUdsServices.DtcStatusReport> ReadObservedSupportedDtcsAsync(
@@ -593,8 +603,11 @@ internal static class DoIpVinReader
         await using var link = await ConnectObservedAsync(gateway, address, tester, ecu,
             tls, timeout, token, certificate, trace, options);
         return await ReadVerifiedDtcAsync(link, gateway, timeout, token, async () =>
-            ObdOnUdsServices.DecodeSupportedDtcs(await link.ExchangeUdsAsync(
-                ObdOnUdsServices.ReadSupportedDtcs(), timeout, token)));
+        {
+            var response = await link.ExchangeUdsAsync(
+                ObdOnUdsServices.ReadSupportedDtcs(), timeout, token);
+            return ObdOnUdsServices.DecodeSupportedDtcs(response);
+        });
     }
 
     internal static async Task<ObdOnUdsServices.LegacyDtcReport> ReadObservedLegacyDtcAsync(
@@ -605,7 +618,10 @@ internal static class DoIpVinReader
         var request = ObdOnUdsServices.ReadLegacyDtc(sub, mask, dtc, record);
         await using var link = await ConnectObservedAsync(gateway, address, tester, ecu, tls, timeout, token, certificate, trace, options);
         return await ReadVerifiedDtcAsync(link, gateway, timeout, token, async () =>
-            ObdOnUdsServices.DecodeLegacyDtc(request, await link.ExchangeUdsAsync(request, timeout, token)));
+        {
+            var response = await link.ExchangeUdsAsync(request, timeout, token);
+            return ObdOnUdsServices.DecodeLegacyDtc(request, response);
+        });
     }
 
     internal static async Task<ObdOnUdsServices.StoredRecordReport> ReadObservedStoredRecordAsync(
@@ -616,7 +632,10 @@ internal static class DoIpVinReader
         var request = ObdOnUdsServices.ReadStoredRecord(record);
         await using var link = await ConnectObservedAsync(gateway, address, tester, ecu, tls, timeout, token, certificate, trace, options);
         return await ReadVerifiedDtcAsync(link, gateway, timeout, token, async () =>
-            ObdOnUdsServices.DecodeStoredRecord(record, await link.ExchangeUdsAsync(request, timeout, token)));
+        {
+            var response = await link.ExchangeUdsAsync(request, timeout, token);
+            return ObdOnUdsServices.DecodeStoredRecord(record, response);
+        });
     }
 
     internal static async Task<ObdOnUdsServices.SnapshotRecords> ReadObservedDecodedMemorySnapshotAsync(
@@ -631,8 +650,11 @@ internal static class DoIpVinReader
         var request = ObdOnUdsServices.ReadUserMemory(0x18, memory, 0, dtc, record);
         await using var link = await ConnectObservedAsync(gateway, address, tester, ecu, tls, timeout, token, certificate, trace, options);
         return await ReadVerifiedDtcAsync(link, gateway, timeout, token, async () =>
-            ObdOnUdsServices.DecodeUserMemorySnapshot(memory, dtc, record,
-                await link.ExchangeUdsAsync(request, timeout, token), catalog));
+        {
+            var response = await link.ExchangeUdsAsync(request, timeout, token);
+            return ObdOnUdsServices.DecodeUserMemorySnapshot(memory, dtc, record,
+                response, catalog);
+        });
     }
 
     internal static async Task<ObdOnUdsServices.DecodedExtendedRecords> ReadObservedDecodedMemoryExtendedAsync(
@@ -646,8 +668,11 @@ internal static class DoIpVinReader
         var request = ObdOnUdsServices.ReadUserMemory(0x19, memory, 0, dtc, record);
         await using var link = await ConnectObservedAsync(gateway, address, tester, ecu, tls, timeout, token, certificate, trace, options);
         return await ReadVerifiedDtcAsync(link, gateway, timeout, token, async () =>
-            ObdOnUdsServices.DecodeUserMemoryExtended(memory, dtc, record,
-                await link.ExchangeUdsAsync(request, timeout, token), catalog));
+        {
+            var response = await link.ExchangeUdsAsync(request, timeout, token);
+            return ObdOnUdsServices.DecodeUserMemoryExtended(memory, dtc, record,
+                response, catalog);
+        });
     }
 
     internal static async Task<ObdOnUdsServices.DecodedExtendedRecords> ReadObservedDecodedExtendedAsync(
@@ -661,7 +686,10 @@ internal static class DoIpVinReader
         var request = ObdOnUdsServices.ReadDecodedExtended(dtc, record, catalog);
         await using var link = await ConnectObservedAsync(gateway, address, tester, ecu, tls, timeout, token, certificate, trace, options);
         return await ReadVerifiedDtcAsync(link, gateway, timeout, token, async () =>
-            ObdOnUdsServices.DecodeExtendedRecords(dtc, record, await link.ExchangeUdsAsync(request, timeout, token), catalog),
+        {
+            var response = await link.ExchangeUdsAsync(request, timeout, token);
+            return ObdOnUdsServices.DecodeExtendedRecords(dtc, record, response, catalog);
+        },
             expectedObdVin: expectedObdVin);
     }
 
@@ -678,7 +706,10 @@ internal static class DoIpVinReader
         var request = ObdOnUdsServices.ReadDecodedSnapshot(dtc, record);
         await using var link = await ConnectObservedAsync(gateway, address, tester, ecu, tls, timeout, token, certificate, trace, options);
         return await ReadVerifiedDtcAsync(link, gateway, timeout, token, async () =>
-            ObdOnUdsServices.DecodeSnapshotRecords(dtc, record, await link.ExchangeUdsAsync(request, timeout, token), catalog),
+        {
+            var response = await link.ExchangeUdsAsync(request, timeout, token);
+            return ObdOnUdsServices.DecodeSnapshotRecords(dtc, record, response, catalog);
+        },
             expectedObdVin: expectedObdVin);
     }
 
@@ -693,7 +724,10 @@ internal static class DoIpVinReader
         var request = ObdOnUdsServices.ReadAllStoredRecords();
         await using var link = await ConnectObservedAsync(gateway, address, tester, ecu, tls, timeout, token, certificate, trace, options);
         return await ReadVerifiedDtcAsync(link, gateway, timeout, token, async () =>
-            ObdOnUdsServices.DecodeAllStoredRecords(await link.ExchangeUdsAsync(request, timeout, token), catalog));
+        {
+            var response = await link.ExchangeUdsAsync(request, timeout, token);
+            return ObdOnUdsServices.DecodeAllStoredRecords(response, catalog);
+        });
     }
 
     internal static async Task<ObdOnUdsServices.AllStoredRecords> ReadObservedDecodedStoredRecordsAsync(
@@ -707,7 +741,10 @@ internal static class DoIpVinReader
         var request = record == 255 ? ObdOnUdsServices.ReadAllStoredRecords() : ObdOnUdsServices.ReadStoredRecord(record);
         await using var link = await ConnectObservedAsync(gateway, address, tester, ecu, tls, timeout, token, certificate, trace, options);
         return await ReadVerifiedDtcAsync(link, gateway, timeout, token, async () =>
-            ObdOnUdsServices.DecodeStoredRecords(record, await link.ExchangeUdsAsync(request, timeout, token), catalog));
+        {
+            var response = await link.ExchangeUdsAsync(request, timeout, token);
+            return ObdOnUdsServices.DecodeStoredRecords(record, response, catalog);
+        });
     }
 
     internal static async Task<ObdOnUdsServices.ExtendedRecordReport> ReadObservedExtendedRecordAsync(
@@ -718,7 +755,10 @@ internal static class DoIpVinReader
         var request = ObdOnUdsServices.ReadExtendedRecord(record, size);
         await using var link = await ConnectObservedAsync(gateway, address, tester, ecu, tls, timeout, token, certificate, trace, options);
         return await ReadVerifiedDtcAsync(link, gateway, timeout, token, async () =>
-            ObdOnUdsServices.DecodeExtendedRecord(record, size, await link.ExchangeUdsAsync(request, timeout, token)));
+        {
+            var response = await link.ExchangeUdsAsync(request, timeout, token);
+            return ObdOnUdsServices.DecodeExtendedRecord(record, size, response);
+        });
     }
 
     internal static async Task<ObdOnUdsServices.UserMemoryReport> ReadObservedUserMemoryAsync(
@@ -731,7 +771,10 @@ internal static class DoIpVinReader
         await using var link = await ConnectObservedAsync(gateway, address, tester, ecu,
             tls, timeout, token, certificate, trace, options);
         return await ReadVerifiedDtcAsync(link, gateway, timeout, token, async () =>
-            ObdOnUdsServices.DecodeUserMemory(request, await link.ExchangeUdsAsync(request, timeout, token)));
+        {
+            var response = await link.ExchangeUdsAsync(request, timeout, token);
+            return ObdOnUdsServices.DecodeUserMemory(request, response);
+        });
     }
 
     internal static async Task<ObdOnUdsServices.DtcStatusReport> ReadObservedPermanentDtcsAsync(
@@ -742,8 +785,11 @@ internal static class DoIpVinReader
         await using var link = await ConnectObservedAsync(gateway, address, tester, ecu,
             tls, timeout, token, certificate, trace, options);
         return await ReadVerifiedDtcAsync(link, gateway, timeout, token, async () =>
-            ObdOnUdsServices.DecodePermanentDtcs(await link.ExchangeUdsAsync(
-                ObdOnUdsServices.ReadPermanentDtcs(), timeout, token)));
+        {
+            var response = await link.ExchangeUdsAsync(
+                ObdOnUdsServices.ReadPermanentDtcs(), timeout, token);
+            return ObdOnUdsServices.DecodePermanentDtcs(response);
+        });
     }
 
     internal static async Task<IReadOnlyList<ObdOnUdsServices.SnapshotReference>> ReadObservedSnapshotIndexAsync(
@@ -754,8 +800,11 @@ internal static class DoIpVinReader
         await using var link = await ConnectObservedAsync(gateway, address, tester, ecu,
             tls, timeout, token, certificate, trace, options);
         return await ReadVerifiedDtcAsync(link, gateway, timeout, token, async () =>
-            ObdOnUdsServices.DecodeSnapshotIndex(await link.ExchangeUdsAsync(
-                ObdOnUdsServices.ReadSnapshotIndex(), timeout, token)));
+        {
+            var response = await link.ExchangeUdsAsync(
+                ObdOnUdsServices.ReadSnapshotIndex(), timeout, token);
+            return ObdOnUdsServices.DecodeSnapshotIndex(response);
+        });
     }
 
     internal static async Task<ObdOnUdsServices.DtcStatusReport> ReadObservedGatewayDtcsAsync(
