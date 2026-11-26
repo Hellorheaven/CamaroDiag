@@ -112,7 +112,10 @@ internal object PhysicalRecoveryFolder {
                 var count = 0L
                 val digest = MessageDigest.getInstance("SHA-256")
                 requireNotNull(resolver.openInputStream(uri)).use { input ->
-                    destination.outputStream().use { output ->
+                    Files.newOutputStream(destination.toPath(),
+                        java.nio.file.StandardOpenOption.CREATE_NEW,
+                        java.nio.file.StandardOpenOption.WRITE,
+                        java.nio.file.LinkOption.NOFOLLOW_LINKS).use { output ->
                         val buffer = ByteArray(8192)
                         while (true) {
                             active()
