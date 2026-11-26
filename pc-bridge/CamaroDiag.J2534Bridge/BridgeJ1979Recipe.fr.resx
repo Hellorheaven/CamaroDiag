@@ -18,8 +18,8 @@
   <data name="ExportFailed" xml:space="preserve"><value>Impossible d’exporter le rapport J1979.</value></data>
   <data name="EvapRun" xml:space="preserve"><value>Mode 08 — EVAP</value></data>
   <data name="EvapVinRequired" xml:space="preserve"><value>Saisissez le VIN documenté de 17 caractères du véhicule à tester.</value></data>
-  <data name="EvapWarning" xml:space="preserve"><value>Cette opération demande au calculateur de lancer un test de fuite du système EVAP. Respectez la procédure constructeur : véhicule immobilisé, moteur arrêté, local ventilé et conditions de sécurité réunies. Le calculateur peut refuser le test. Ne le répétez pas automatiquement.</value></data>
-  <data name="EvapConfirm" xml:space="preserve"><value>Lancer une seule demande de test EVAP sur le VIN {0}, CAN physique {1}/{2} ?</value></data>
+  <data name="EvapWarning" xml:space="preserve"><value>Cette opération demande au calculateur de préparer les conditions du test de fuite EVAP ; elle ne réalise pas elle-même le test. Respectez la procédure constructeur : véhicule immobilisé, moteur arrêté, local ventilé et conditions de sécurité réunies. Le calculateur peut refuser le test. Ne le répétez pas automatiquement.</value></data>
+  <data name="EvapConfirm" xml:space="preserve"><value>Demander une seule fois la préparation du test EVAP sur le VIN {0}, CAN physique {1}/{2} ?</value></data>
   <data name="EvapRunning" xml:space="preserve"><value>Vérification des conditions du test EVAP.</value></data>
   <data name="EvapExpired" xml:space="preserve"><value>Autorisation expirée ; état du test potentiellement incertain. Ne le répétez pas automatiquement.</value></data>
   <data name="EvapNotCompletion" xml:space="preserve"><value>Un acquittement ne prouve ni la fin du test ni son résultat.</value></data>
