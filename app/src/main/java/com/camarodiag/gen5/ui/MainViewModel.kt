@@ -5649,6 +5649,49 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun runFunctionalEvapTest(approval: EcuWriteConsentFlow.Approval, confirmedConnection: Long,
+        confirmedVehicle: VehicleProfile) {
+        if (confirmedConnection != connectionAttemptGeneration || confirmedVehicle != _vehicle.value ||
+            !confirmedVehicle.vin.matches(Regex("[A-HJ-NPR-Z0-9]{17}")) ||
+            functionalTestJob?.isCompleted == false || enhancedUdsJob?.isCompleted == false ||
+            _liveCanMonitorState.value.isCapturing || _liveCanMonitorState.value.isSendingRequest ||
+            !obdManager.isElmUdsReadCandidate || obdManager.isDemoMode || obdManager.isSimulationActive ||
+            obdManager.isJ2534BridgeConnected()) return
+        val account = authenticatedAccountUid ?: return
+        val accountGeneration = accountSessionGeneration
+        val execution = ++functionalTestGeneration
+        fun current() = execution == functionalTestGeneration &&
+            isCurrentAccountGeneration(accountGeneration) && authenticatedAccountUid == account &&
+            confirmedConnection == connectionAttemptGeneration && confirmedVehicle == _vehicle.value
+        functionalTestJob = viewModelScope.launch {
+            if (!confirmFunctionalTestOwner(account) || !current()) return@launch
+            _functionalTestState.value = FunctionalTestState(
+                running = true, startedAtMillis = System.currentTimeMillis(),
+                checks = FunctionalTestPlanner.evapChecks(),
+                context = FunctionalTestContext(confirmedVehicle.vin, _adapter.value.deviceName,
+                    obdManager.currentTransportKind, confirmedConnection),
+                protocol = FunctionalProtocol.J1979, evapCampaign = true)
+            try {
+                val result = obdManager.runElmEvapTest(confirmedVehicle.vin, approval, ::current)
+                if (current()) _functionalTestState.value =
+                    FunctionalTestPlanner.evapResults(_functionalTestState.value, result)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                if (current()) _functionalTestState.update {
+                    it.copy(error = localizedContext.getString(R.string.functional_evap_uncertain))
+                }
+            } finally {
+                if (execution == functionalTestGeneration && isCurrentAccountGeneration(accountGeneration)) {
+                    _functionalTestState.update {
+                        it.copy(running = false, finishedAtMillis = System.currentTimeMillis(),
+                            error = if (!current()) localizedContext.getString(R.string.functional_evap_uncertain) else it.error)
+                    }
+                }
+            }
+        }
+    }
+
     fun cancelFunctionalTests() {
         functionalTestGeneration++
         // Retain the cancelled job until transport cleanup actually finishes.
@@ -5657,7 +5700,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _functionalTestState.value = _functionalTestState.value.copy(
                 running = false,
                 finishedAtMillis = System.currentTimeMillis(),
-                error = localizedContext.getString(R.string.functional_tests_cancelled)
+                error = localizedContext.getString(if (_functionalTestState.value.evapCampaign)
+                    R.string.functional_evap_uncertain else R.string.functional_tests_cancelled)
             )
         }
     }
@@ -5672,7 +5716,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             if (!snapshot.canExport) return@launch
             val evidenceContext = snapshot.context ?: return@launch
             val json = JSONObject()
-                .put("schema", "camarodiag-functional-test-v1")
+                .put("schema", if (snapshot.evapCampaign) "camarodiag-functional-j1979-evap-v1"
+                    else "camarodiag-functional-test-v1")
                 .put("protocol", snapshot.protocol?.id ?: JSONObject.NULL)
                 .put("appVersion", com.camarodiag.gen5.BuildConfig.VERSION_NAME)
                 .put("startedAtMillis", snapshot.startedAtMillis)
@@ -5686,7 +5731,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 .put("transport", evidenceContext.transport)
                 .put("connectionGeneration", evidenceContext.connectionGeneration)
                 .put("completedWithoutError", snapshot.error == null)
-                .put("warning", "NOT_TESTED is not a PASS. No write or actuation was tested.")
+                .put("warning", if (snapshot.evapCampaign)
+                    "EVAP acknowledgment is not monitor completion. Do not retry uncertain commands automatically."
+                    else "NOT_TESTED is not a PASS. No write or actuation was tested.")
             val checks = JSONArray()
             snapshot.checks.forEach { check ->
                 checks.put(
@@ -5708,7 +5755,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     .put("expectedVin", target.vin))
             }
             snapshot.obdScan?.let { json.put("obdScan", JSONObject(ObdScanJsonExport.encode(it, System.currentTimeMillis()))) }
-            val exportName = snapshot.protocol?.let { "CamaroDiag_protocol_${it.id}_${snapshot.startedAtMillis}.json" } ?: fileName
+            if (snapshot.evapCampaign) {
+                json.put("monitorCompletionVerified", false)
+                json.put("evap", snapshot.evapResult?.let { result ->
+                    JSONObject().put("outcome", result.outcome).put("commandAttempted", result.attempted)
+                        .put("reason", result.reason ?: JSONObject.NULL)
+                        .put("elmProtocol", result.protocol).put("requestCanId", result.requestCanId)
+                        .put("responseCanId", result.responseCanId)
+                        .put("exchanges", JSONArray(result.exchanges.map { exchange ->
+                            JSONObject().put("requestHex", exchange.requestHex)
+                                .put("responseHex", exchange.responseHex ?: JSONObject.NULL)
+                        }))
+                } ?: JSONObject.NULL)
+            }
+            val exportName = if (snapshot.evapCampaign) "CamaroDiag_SAE-J1979_EVAP_${snapshot.startedAtMillis}.json"
+                else snapshot.protocol?.let { "CamaroDiag_protocol_${it.id}_${snapshot.startedAtMillis}.json" } ?: fileName
             try {
                 val savedPath = CamaroDiagExportStorage.write(getApplication<Application>(), exportName, "application/json",
                     category = CamaroDiagExportStorage.Category.TESTS, beforePublish = { check(isCurrentAccountGeneration(sessionGeneration) &&
