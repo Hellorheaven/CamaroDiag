@@ -3,7 +3,8 @@ using System.Diagnostics;
 namespace CamaroDiag.J2534Bridge;
 
 /// <summary>ISO 15031-5:2006 Table 13, normal J2534 driver-managed
-/// checksum/CRC/IFR representation. Functional read requests only.
+/// checksum/CRC/IFR representation. Public read route and a separate
+/// explicitly consented vehicle-wide mutation recipe.
 /// A selected response source is not a physical TX address.
 /// </summary>
 internal sealed class ObdLegacyJ2534Transport : IDisposable
@@ -56,6 +57,11 @@ internal sealed class ObdLegacyJ2534Transport : IDisposable
     {
         _ = Profile(variant);
         if (!AllowsRead(request)) throw new ArgumentException("Not a legacy J1979 read.");
+        return FrameApplication(variant, request);
+    }
+
+    private static byte[] FrameApplication(Variant variant, byte[] request)
+    {
         if (variant is Variant.KwpSlow or Variant.KwpFast)
             return StandardVehicleProtocols.KwpForJ2534(
                 StandardVehicleProtocols.BuildKwpFunctionalFrame(0x33, 0xF1, request), false);
@@ -140,7 +146,36 @@ internal sealed class ObdLegacyJ2534Transport : IDisposable
         if (timeoutMs is < 1 or > 4000) throw new ArgumentOutOfRangeException(nameof(timeoutMs));
         if (!source.HasValue && !request.AsSpan().SequenceEqual(new byte[] { 1, 0 }))
             throw new InvalidOperationException("Unpinned discovery can only read initial PID 00.");
-        var tx = FrameRead(variant, request);
+        return ExchangeFrame(FrameRead(variant, request), timeoutMs);
+    }
+
+    internal ObdJ1979LegacyMutation.Result RunVehicleMutation(ObdJ1979LegacyMutation.Operation operation,
+        string vin, byte engineSource, IReadOnlyCollection<byte> documentedSources,
+        bool warningAcknowledged, bool confirmedYes, Action<ObdJ1979LegacyMutation.Result> saveBaseline)
+    {
+        if (source.HasValue) throw new InvalidOperationException("A filtered receiver cannot authorize vehicle-wide mutation.");
+        bool attempted = false;
+        return ObdJ1979LegacyMutation.Run(operation, vin, engineSource, documentedSources,
+            warningAcknowledged, confirmedYes, requireActive,
+            (request, timeout) => ExchangeFrame(FrameRead(variant, request), timeout),
+            requested =>
+            {
+                if (attempted || requested != operation)
+                    throw new InvalidOperationException("Only one explicitly approved mutation is allowed.");
+                attempted = true;
+                var payload = requested switch
+                {
+                    ObdJ1979LegacyMutation.Operation.Clear => new byte[] {4},
+                    ObdJ1979LegacyMutation.Operation.EvapPreparation => new byte[] {8,1,0,0,0,0,0},
+                    _ => throw new ArgumentException("Unsupported mutation.")
+                };
+                return ExchangeFrame(FrameApplication(variant, payload), 3000);
+            }, saveBaseline);
+    }
+
+    private Exchange ExchangeFrame(byte[] tx, int timeoutMs)
+    {
+        if (timeoutMs is < 1 or > 4000) throw new ArgumentOutOfRangeException(nameof(timeoutMs));
         requireActive();
         channel.ClearReceiveQueue();
         requireActive();
