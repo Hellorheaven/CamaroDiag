@@ -463,6 +463,28 @@ internal sealed partial class J2534Device : IDisposable
             throw new IOException("Standard OBD clear not confirmed by exact positive Mode 04 response.");
     }
 
+    /// <summary>Dedicated local EVAP test only. Never reachable from the
+    /// generic read or network bridge exchange methods.</summary>
+    internal ObdJ1979EvapTest.Result RunStandardEvapTest(string expectedVin,
+        bool warningAcknowledged, bool confirmedYes, Action requireCurrent)
+    {
+        EnsureOpen();
+        return ObdJ1979EvapTest.Run(expectedVin, IsPrimaryStandardObdChannel,
+            warningAcknowledged, confirmedYes, requireCurrent,
+            (request, timeout) =>
+            {
+                ClearNativeReceiveQueue();
+                requireCurrent();
+                return Exchange(request, timeout);
+            },
+            () =>
+            {
+                ClearNativeReceiveQueue();
+                requireCurrent();
+                return ExchangeCore([0x08, 0x01], 2500, nativeBenchReply: false);
+            });
+    }
+
     public void SendOnly(byte[] payload)
     {
         EnsureOpen();
