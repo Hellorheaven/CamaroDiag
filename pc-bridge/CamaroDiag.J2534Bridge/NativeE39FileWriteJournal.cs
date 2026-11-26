@@ -19,6 +19,8 @@ internal sealed class NativeE39FileWriteJournal :
     private readonly SemaphoreSlim gate = new(1, 1);
     private bool disposed;
     private bool appendFailed;
+    private readonly Dictionary<string, (int Length, byte[] Hash)> savedEnvelopes =
+        new(StringComparer.Ordinal);
 
     internal enum CompletionState
     {
@@ -53,8 +55,10 @@ internal sealed class NativeE39FileWriteJournal :
         uint address, byte[] liveBytes, string expectedSha256, CancellationToken token)
     {
         ArgumentNullException.ThrowIfNull(liveBytes);
-        if (liveBytes.Length == 0 ||
-            !string.Equals(Convert.ToHexString(SHA256.HashData(liveBytes)),
+        // Freeze before any await or digest: the caller may reuse its receive buffer.
+        var frozen = liveBytes.ToArray();
+        if (frozen.Length == 0 || frozen.Length > 1024 * 1024 ||
+            !string.Equals(Convert.ToHexString(SHA256.HashData(frozen)),
                 expectedSha256, StringComparison.OrdinalIgnoreCase))
             throw new InvalidDataException("Physical sector bytes differ from the verified original.");
         await gate.WaitAsync(token);
@@ -71,8 +75,7 @@ internal sealed class NativeE39FileWriteJournal :
                 backupDirectoryCreated = true;
             }
             var name = Path.Combine(backupDirectory,
-                address.ToString("X8") + "-" + liveBytes.Length + ".ecu-block");
-            var frozen = liveBytes.ToArray();
+                address.ToString("X8") + "-" + frozen.Length + ".ecu-block");
             var header = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new {
                 Schema = 1, Region = "E39_MAIN_FLASH",
                 Address = address, Length = frozen.Length,
@@ -89,13 +92,59 @@ internal sealed class NativeE39FileWriteJournal :
             var check = File.ReadAllBytes(name);
             if (check.Length != header.Length + frozen.Length ||
                 !check.AsSpan(0, header.Length).SequenceEqual(header) ||
-                !check.AsSpan(header.Length).SequenceEqual(frozen))
+                !check.AsSpan(header.Length).SequenceEqual(frozen) ||
+                !savedEnvelopes.TryAdd(name, (check.Length, SHA256.HashData(check))))
                 throw new InvalidDataException("Persisted ECU sector backup is incomplete or altered.");
         }
         catch
         {
             appendFailed = true;
             throw;
+        }
+        finally { gate.Release(); }
+    }
+
+    public async Task RequireOriginalBlocksIntactAsync(CancellationToken token)
+    {
+        await gate.WaitAsync(token);
+        try
+        {
+            ObjectDisposedException.ThrowIf(disposed, this);
+            if (appendFailed || !backupDirectoryCreated || savedEnvelopes.Count == 0 ||
+                (File.GetAttributes(backupDirectory) & FileAttributes.ReparsePoint) != 0)
+                throw new InvalidDataException("Original sector backup is unavailable.");
+            void RequireInventory()
+            {
+                if (!Directory.EnumerateFileSystemEntries(backupDirectory)
+                    .ToHashSet(StringComparer.Ordinal).SetEquals(savedEnvelopes.Keys))
+                    throw new InvalidDataException("Original sector backup inventory changed.");
+            }
+            RequireInventory();
+            foreach (var (path, expected) in savedEnvelopes)
+            {
+                token.ThrowIfCancellationRequested();
+                if ((File.GetAttributes(path) & (FileAttributes.ReparsePoint | FileAttributes.Directory)) != 0)
+                    throw new InvalidDataException("Original sector backup is not a regular file.");
+                using var input = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+                if (input.Length != expected.Length)
+                    throw new InvalidDataException("Original sector backup length changed.");
+                using var sha = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+                var buffer = new byte[8192];
+                var remaining = expected.Length;
+                while (remaining > 0)
+                {
+                    token.ThrowIfCancellationRequested();
+                    var count = Math.Min(remaining, buffer.Length);
+                    await input.ReadExactlyAsync(buffer.AsMemory(0, count), token);
+                    sha.AppendData(buffer, 0, count);
+                    remaining -= count;
+                }
+                if (input.ReadByte() != -1 ||
+                    !CryptographicOperations.FixedTimeEquals(expected.Hash, sha.GetHashAndReset()))
+                    throw new InvalidDataException("Original sector backup envelope changed.");
+            }
+            RequireInventory();
+            token.ThrowIfCancellationRequested();
         }
         finally { gate.Release(); }
     }

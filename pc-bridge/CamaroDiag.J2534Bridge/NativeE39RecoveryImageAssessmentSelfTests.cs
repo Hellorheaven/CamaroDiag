@@ -42,6 +42,19 @@ internal static class NativeE39RecoveryImageAssessmentSelfTests
                 journal.PreserveOriginalBlockAsync(address, sector,
                     sectorSha, CancellationToken.None).GetAwaiter().GetResult();
                 Add(NativeE39WriteSequence.Phase.OriginalBytesVerified, sectorSha);
+                journal.RequireOriginalBlocksIntactAsync(CancellationToken.None).GetAwaiter().GetResult();
+                var envelopePath = Directory.GetFiles(journalPath + ".blocks").Single();
+                var unchanged = File.ReadAllBytes(envelopePath);
+                var tampered = unchanged.ToArray(); tampered[^1] ^= 1;
+                File.WriteAllBytes(envelopePath, tampered);
+                try
+                {
+                    journal.RequireOriginalBlocksIntactAsync(CancellationToken.None).GetAwaiter().GetResult();
+                    Check(false, "Changed original envelope must fail before erase");
+                }
+                catch (InvalidDataException) { Check(true, "Changed original envelope rejected"); }
+                finally { File.WriteAllBytes(envelopePath, unchanged); }
+                journal.RequireOriginalBlocksIntactAsync(CancellationToken.None).GetAwaiter().GetResult();
             }
             finally { journal.DisposeAsync().AsTask().GetAwaiter().GetResult(); }
 

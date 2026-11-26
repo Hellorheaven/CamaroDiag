@@ -58,6 +58,11 @@ internal static class NativeE39WriteSequence
         Task PreserveOriginalBlockAsync(
             uint address, byte[] liveBytes, string expectedSha256,
             CancellationToken cancellationToken);
+        // Re-read every preserved sector from the durable store, including
+        // its envelope, immediately before an erase. No implicit trust in
+        // the original write receipt or an in-memory copy.
+        Task RequireOriginalBlocksIntactAsync(CancellationToken cancellationToken) =>
+            throw new InvalidOperationException("Journal does not support durable backup re-verification.");
     }
 
     internal interface IKernelLink
@@ -135,8 +140,9 @@ internal static class NativeE39WriteSequence
                 Original = source.Original.ToArray(),
                 Updated = source.Updated.ToArray()
             };
-            if (sector.Address < previousEnd)
-                throw new ArgumentException("ECU sector ranges overlap.");
+            if (sector.Address < previousEnd ||
+                (ulong)sector.Address + (uint)sector.Length > NativeE39ImageInspector.ImageBytes)
+                throw new ArgumentException("ECU sector ranges overlap or exceed the E39 image.");
             previousEnd = (ulong)sector.Address + (uint)sector.Length;
             if (sector.Length == 0 || sector.Original.Length != sector.Updated.Length)
                 throw new ArgumentException("Invalid frozen ECU sector data.");
@@ -235,6 +241,11 @@ internal static class NativeE39WriteSequence
                 await journal.AppendAsync(
                     new(Phase.EraseStarted, s.Address, s.OriginalSha256),
                     cancellationToken);
+                // Recheck ALL durable originals, not only the current
+                // sector. Previous-sector backups remain essential for
+                // recovery after a later sector fails.
+                await journal.RequireOriginalBlocksIntactAsync(cancellationToken);
+                cancellationToken.ThrowIfCancellationRequested();
                 // Recheck after durable journal I/O as it can take time.
                 await RequireSupplyAsync();
                 destructiveStarted = true;

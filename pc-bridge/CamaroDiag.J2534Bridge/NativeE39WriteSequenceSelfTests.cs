@@ -19,6 +19,17 @@ internal static class NativeE39WriteSequenceSelfTests
                 throw new InvalidDataException("Cannot save fresh physical sector.");
             return Task.CompletedTask;
         }
+        public Task RequireOriginalBlocksIntactAsync(CancellationToken token)
+        {
+            token.ThrowIfCancellationRequested();
+            var expected = Events.Where(e => e.Phase == NativeE39WriteSequence.Phase.Prepared).ToArray();
+            if (expected.Length == 0 || SavedBlocks.Count != expected.Length ||
+                expected.Any(e => !SavedBlocks.TryGetValue(e.Address, out var bytes) ||
+                    !string.Equals(Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(bytes)),
+                        e.Detail, StringComparison.OrdinalIgnoreCase)))
+                throw new InvalidDataException("Saved original sector changed.");
+            return Task.CompletedTask;
+        }
         public Task AppendAsync(NativeE39WriteSequence.Event evidence, CancellationToken token)
         {
             token.ThrowIfCancellationRequested();
@@ -222,6 +233,18 @@ internal static class NativeE39WriteSequenceSelfTests
                journal.Events.FindIndex(e => e.Phase == NativeE39WriteSequence.Phase.EraseAcknowledged),
             "Erase-start event written before physical erase");
 
+        var diskChanged = new TestEcu(origin);
+        var diskJournal = new TestJournal();
+        diskJournal.OnAppend = step =>
+        {
+            if (step.Phase == NativeE39WriteSequence.Phase.EraseStarted)
+                diskJournal.SavedBlocks[plan.Sectors[0].Address][0] ^= 1;
+        };
+        Expect<InvalidDataException>(() =>
+            NativeE39WriteSequence.RunBenchSequenceAsync(diskChanged, diskJournal,
+                plan, opts, CancellationToken.None).GetAwaiter().GetResult());
+        Assert(diskChanged.Erases == 0,
+            "Altered durable original after preflight prevents the first erase");
         var invalid = plan with { VerifiedMemoryMap = false };
         var noTraffic = new TestEcu(origin);
         Expect<UnauthorizedAccessException>(() =>

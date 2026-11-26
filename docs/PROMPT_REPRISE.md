@@ -1,3 +1,7 @@
+## C6 — contrôle des sauvegardes persistées avant chaque effacement E39 (26/11/2026)
+
+- Windows : copie des octets avant tout await, limite de taille, empreinte de l'enveloppe complète conservée ; nouvelle vérification obligatoire de l'intégralité de l'inventaire et des enveloppes originales avant chaque effacement, après le journal durable EraseStarted, puis contrôle alimentation. Refus du dépassement des bornes de l'image. Aucun effet sur ECU réel, tests de corruption après préflight et sur enveloppe écrits sans exécution. Toute implémentation de journal sans relecture échoue fermée. C6/J1979 ouverts, aucune CI/fusion/Release.
+
 ## J1979 — recette Connectors USB dans le pont Windows (26/11/2026)
 
 - Bouton propriétaire dans Tests fonctionnels Windows : sélection COM explicite, VIN et paire CAN du profil confirmé, clé locale, dossier choisi et confirmation ; blocage si pont/console occupés, annulation et expiration contrôlées pendant chaque lecture/écriture. Codecs et moteur partagés avec CLI par Compile Include ; extraction du lien série et sérialiseur JSON commun. Captures exclusives synchronisées, résultats affichés, VIN comparé, provenance physique non déduite. Ressources FR/EN, états des boutons harmonisés. Dépendance org.json JVM pour régressions Android. Aucune validation lancée, J1979/C6 ouverts, aucune fusion/Release.
