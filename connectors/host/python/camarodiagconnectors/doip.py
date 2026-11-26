@@ -27,6 +27,16 @@ class DoIpError(ValueError):
     pass
 
 
+class TransportRefusal(DoIpError):
+    """Exact ISO 13400 refusal layer and numeric code, never an inferred NRC."""
+    def __init__(self, layer: str, code: int):
+        if layer not in ("header_nack", "routing_denied", "diagnostic_nack") or (
+                type(code) is not int or not 0 <= code <= 255):
+            raise ValueError("Invalid DoIP refusal layer or code")
+        self.layer, self.code = layer, code
+        super().__init__(f"DoIP {layer} 0x{code:02X}")
+
+
 class NegativeResponse(DoIpError):
     def __init__(self, service: int, code: int):
         self.service, self.code = service, code
@@ -94,6 +104,15 @@ def decode(raw: bytes) -> tuple[int, int, bytes]:
     return version, kind, raw[8:]
 
 
+def require_no_header_nack(kind: int, payload: bytes) -> None:
+    """Classify only a structurally valid generic DoIP NACK (one code byte)."""
+    if kind != 0:
+        return
+    if len(payload) != 1 or payload[0] not in range(5):
+        raise DoIpError("Malformed generic DoIP header NACK")
+    raise TransportRefusal("header_nack", payload[0])
+
+
 def remaining(deadline: float) -> float:
     left = deadline - time.monotonic()
     if left <= 0:
@@ -125,6 +144,7 @@ class Gateway:
 
 def parse_identity(host: str, raw: bytes, expected_vin: str | None = None) -> Gateway:
     version, kind, body = decode(raw)
+    require_no_header_nack(kind, body)
     if kind != 4 or len(body) not in (32, 33):
         raise DoIpError("Invalid DoIP vehicle identification response")
     raw_vin = body[:17]
@@ -337,6 +357,7 @@ def status(gateway: Gateway, power: bool = False, timeout: float = 3,
         raise DoIpError("Gateway identity changed before control query")
     request = encode(gateway.version, 0x4003 if power else 0x4001)
     version, kind, body = decode(_udp(gateway.host, request, timeout, trace, port))
+    require_no_header_nack(kind, body)
     if version != gateway.version:
         raise DoIpError("Gateway version changed")
     if power:
@@ -707,9 +728,13 @@ def inventory_ecus(gateway: Gateway, expected: str, tester: int, targets: tuple[
         except ssl.SSLError:
             # Never continue or downgrade a failed TLS authentication.
             raise
+        except TransportRefusal as error:
+            rows.append({"ecu": f"{ecu:04X}", "status": "unverified",
+                         "reason": error.layer, "failure_code": error.code})
         except NegativeResponse as error:
             rows.append({"ecu": f"{ecu:04X}", "status": "unverified",
-                         "reason": "uds_negative_response", "nrc": error.code})
+                         "reason": "uds_negative_response", "failure_code": error.code,
+                         "nrc": error.code, "requested_service": error.service})
         except (DoIpError, OSError, EOFError):
             rows.append({"ecu": f"{ecu:04X}", "status": "unverified",
                          "reason": "communication_or_identity_failure"})
@@ -774,7 +799,7 @@ class Session:
                 if body[4] == 0x10:
                     break
                 if body[4] != 0x11:
-                    raise DoIpError("Routing activation denied")
+                    raise TransportRefusal("routing_denied", body[4])
         except BaseException:
             wire.close()
             self._socket = None
@@ -828,8 +853,9 @@ class Session:
         if self._socket is not wire:
             raise DoIpError("Session closed during DoIP reception")
         remaining(deadline)
-        if version != self.gateway.version or kind == 0:
-            raise DoIpError("DoIP version changed or generic negative acknowledgement")
+        if version != self.gateway.version:
+            raise DoIpError("DoIP response changed negotiated protocol version")
+        require_no_header_nack(kind, body)
         return kind, body
 
     def _alive(self, kind: int, body: bytes, deadline: float) -> bool:
@@ -863,7 +889,12 @@ class Session:
                 raise
             if not first:
                 raise EOFError("DoIP socket closed before next exchange")
-            kind, body = self._receive(deadline, first)
+            try:
+                kind, body = self._receive(deadline, first)
+            except TransportRefusal as error:
+                # No request was outstanding: do not attribute a stale NACK
+                # to the next, unsent diagnostic command.
+                raise DoIpError("Unsolicited header NACK before request") from error
             if not self._alive(kind, body, deadline):
                 raise DoIpError("Unexpected diagnostic data before next request")
 
@@ -890,7 +921,10 @@ class Session:
                 if not first:
                     raise EOFError("DoIP socket closed while idle")
                 frame_end = time.monotonic() + self.timeout
-                kind, body = self._receive(frame_end, first)
+                try:
+                    kind, body = self._receive(frame_end, first)
+                except TransportRefusal as error:
+                    raise DoIpError("Unsolicited header NACK while idle") from error
                 if not self._alive(kind, body, frame_end):
                     raise DoIpError("Unexpected diagnostic data while idle")
         except BaseException:
@@ -938,8 +972,14 @@ class Session:
             if kind not in (0x8001, 0x8002, 0x8003) or len(body) < 5 or body[:4] != expected:
                 raise DoIpError("Uncorrelated diagnostic PDU")
             if kind in (0x8002, 0x8003):
-                if body[5:] != request[:len(body)-5] or kind == 0x8003 or body[4] != 0:
-                    raise DoIpError("Diagnostic acknowledgement rejected")
+                if body[5:] != request[:len(body)-5]:
+                    raise DoIpError("Uncorrelated diagnostic acknowledgement echo")
+                if kind == 0x8003:
+                    if body[4] == 0:
+                        raise DoIpError("Invalid diagnostic NACK code")
+                    raise TransportRefusal("diagnostic_nack", body[4])
+                if body[4] != 0:
+                    raise DoIpError("Invalid positive diagnostic acknowledgement")
                 continue
             reply = body[4:]
             if reply[0] == 0x7F:
