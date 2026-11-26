@@ -1,0 +1,93 @@
+name: Publish PR117 APK to CamaroDiag in-app update channel
+
+# The Android updater bundled in earlier stable APKs reads /releases/latest,
+# ignores prereleases, and requires "Android versionCode: <number>" in notes.
+# This one-shot promotion uses the exact already-signed APK; no PR merge.
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/publish-pr117-in-app-apk.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: camaro-pr117-android-inapp-v2046
+  cancel-in-progress: false
+
+jobs:
+  publish-in-app-update:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      SOURCE_TAG: v2.0.46-pr117-26009f1
+      STABLE_TAG: v2.0.46
+      SOURCE_SHA: 26009f1b5025b70dff18f0d7ab5ba1b5e6eed092
+      EXPECTED_SHA256: 2092fb259971319b68fb15d687e1fa5fbb7ab56855ada873ce46425e902f8027
+    steps:
+      - name: Verify prerelease source and avoid overwriting stable versions
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh release view "$STABLE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Stable release $STABLE_TAG already exists: refusing overwrite." >&2
+            exit 1
+          fi
+          gh release view "$SOURCE_TAG" --repo "$GITHUB_REPOSITORY" \
+            --json isPrerelease,tagName,assets \
+            --jq 'if .isPrerelease and .tagName == "v2.0.46-pr117-26009f1" and
+              ([.assets[].name] | index("CamaroDiag-release.apk")) != null
+              then "Verified source prerelease and APK asset" else error("Wrong source release") end'
+      - name: Download exact production-signed Android APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release download "$SOURCE_TAG" --repo "$GITHUB_REPOSITORY" \
+            --pattern 'CamaroDiag-release.apk' --dir .
+          echo "$EXPECTED_SHA256  CamaroDiag-release.apk" | sha256sum --check --status
+          test -s CamaroDiag-release.apk
+          ls -lh CamaroDiag-release.apk
+      - name: Publish stable Android-only release for existing in-app updater
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > android-release-notes.md <<EOF
+          ## CamaroDiag 2.0.46 — Android
+          Android versionCode: 63
+
+          - APK Android Release signée avec le certificat de production existant.
+          - Code compilé depuis la PR #117, commit exact \`$SOURCE_SHA\`; aucune fusion requise.
+          - APK identique bit à bit à la préversion vérifiée : SHA-256 \`$EXPECTED_SHA256\`.
+          - Publication sur le canal officiel \`releases/latest\` pour le téléchargement dans l'application.
+          - **Version de test fonctionnel** : C6 et certaines capacités matérielles restent non qualifiés. Ne pas utiliser pour programmer un ECU avant validation.
+          - Pas d'installateur Windows dans cette publication Android : dernière version Windows complète v2.0.45.
+          EOF
+          gh release create "$STABLE_TAG" CamaroDiag-release.apk \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$SOURCE_SHA" \
+            --title "CamaroDiag v2.0.46 - APK Android (PR117)" \
+            --notes-file android-release-notes.md \
+            --latest
+      - name: Verify latest release matches Android updater contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          for i in 1 2 3 4 5; do
+            gh api "repos/$GITHUB_REPOSITORY/releases/latest" > latest.json
+            if jq -e --arg tag "$STABLE_TAG" \
+              '.tag_name == $tag and .draft == false and .prerelease == false and
+               (.body | test("Android versionCode\\\\s*:\\\\s*63")) and
+               ([.assets[] | select(.name == "CamaroDiag-release.apk") |
+                 .browser_download_url] | length == 1)' latest.json >/dev/null; then
+              echo "In-app release metadata verified for $STABLE_TAG"
+              exit 0
+            fi
+            sleep 3
+          done
+          echo "Release created but /releases/latest does not expose the updater metadata." >&2
+          exit 1
