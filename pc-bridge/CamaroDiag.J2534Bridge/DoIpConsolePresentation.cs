@@ -13,6 +13,31 @@ internal static class DoIpConsolePresentation
         Resources.GetString(key, culture ?? CultureInfo.CurrentUICulture)
         ?? throw new InvalidOperationException("Missing DoIP console resource: " + key);
 
+    internal readonly record struct TargetReadiness(bool Gateway, bool SingleEcu,
+        bool ExplicitVinEcu, bool Inventory);
+
+    internal static TargetReadiness EvaluateTarget(DoIpVehicleDiscovery.Identity? observed,
+        string host, string expectedVin, string testerText, string ecuText, string inventoryText)
+    {
+        if (observed is null || !System.Net.IPAddress.TryParse(host, out var address) ||
+            !observed.Source.Equals(address))
+            return default;
+        var explicitVin = DoIpVehicleDiscovery.IsVehicleVin(expectedVin) && observed.Vin == expectedVin;
+        ushort tester;
+        try { tester = DoIpVinReader.ParseLogicalAddress(testerText); }
+        catch (ArgumentException) { return new(true, false, false, false); }
+        if (tester == observed.LogicalAddress) return new(true, false, false, false);
+        bool single = false, inventory = false;
+        try { single = DoIpVinReader.ParseLogicalAddress(ecuText) != tester; }
+        catch (ArgumentException) { /* no usable single ECU target */ }
+        if (explicitVin)
+        {
+            try { inventory = !DoIpVinReader.ParseInventoryAddresses(inventoryText).Contains(tester); }
+            catch (ArgumentException) { /* no usable inventory targets */ }
+        }
+        return new(true, single, single && explicitVin, inventory);
+    }
+
     internal static string FormatStatus(DoIpCodec.Message response,
         bool powerMode, CultureInfo? culture = null)
     {

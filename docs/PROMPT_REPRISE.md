@@ -1,3 +1,7 @@
+## PR117 — disponibilité des commandes DoIP GUI Windows (26/11/2026)
+
+- C6/DoIP : activation distincte des commandes passerelle, ECU individuel, opérations exigeant un VIN explicitement concordant et inventaire multi-ECU. Les adresses testeur/ECU doivent être valides et différentes ; l'inventaire peut fonctionner sans ECU individuel. La modification du type de routage et des octets OEM invalide le contexte sélectionné, comme les changements d'adresse et TLS. Les boutons ne constituent pas une preuve de support du service par l'ECU ; les réponses réelles restent nécessaires. Régressions de disponibilité écrites, non exécutées. Aucun checkpoint.
+
 ## PR117 — fermeture et publication DoIP Connectors Python (26/11/2026)
 
 - Le transport vérifie que le socket reste courant après chaque callback de trace TX/RX et que le délai reste respecté après décodage final. Une fermeture déclenchée par l'observateur du dernier RX ne valide pas la réponse ni un nouvel échange ; une erreur de close ne conserve pas un socket réutilisable. Régressions TCP loopback et fermeture en erreur ajoutées, non exécutées. Aucun checkpoint.

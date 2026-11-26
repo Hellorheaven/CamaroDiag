@@ -51,6 +51,34 @@ internal static class DoIpConsolePresentationSelfTests
         var observed = new DoIpVehicleDiscovery.Identity(
             "1G1FA1RXXR0123456", 0x1234, [1, 2, 3, 4, 5, 6],
             [7, 8, 9, 10, 11, 12], 0x10, 0x00, IPAddress.Loopback, 3);
+        var target = DoIpConsolePresentation.EvaluateTarget(observed, "127.0.0.1",
+            observed.Vin!, "0E80", "1234", "1234,1235");
+        Check(target.Gateway && target.SingleEcu && target.ExplicitVinEcu && target.Inventory,
+            "Gateway and valid explicit target allow applicable operations.");
+        target = DoIpConsolePresentation.EvaluateTarget(observed, "127.0.0.1",
+            "", "0E80", "1234", "1234");
+        Check(target.Gateway && target.SingleEcu && !target.ExplicitVinEcu && !target.Inventory,
+            "Discovery without explicit VIN cannot authorize VIN-bound routes.");
+        target = DoIpConsolePresentation.EvaluateTarget(observed, "127.0.0.1",
+            observed.Vin!, "0E80", "", "1234,1235");
+        Check(target.Gateway && !target.SingleEcu && target.Inventory,
+            "Inventory does not require a single ECU address.");
+        target = DoIpConsolePresentation.EvaluateTarget(observed, "127.0.0.1",
+            observed.Vin!, "1234", "1235", "1235");
+        Check(target.Gateway && !target.SingleEcu && !target.Inventory,
+            "Tester address cannot equal gateway address.");
+        target = DoIpConsolePresentation.EvaluateTarget(observed, "127.0.0.1",
+            observed.Vin!, "0E80", "0E80", "1234,0E80");
+        Check(target.Gateway && !target.SingleEcu && !target.Inventory,
+            "Tester address cannot be an ECU target.");
+        target = DoIpConsolePresentation.EvaluateTarget(observed, "127.0.0.2",
+            observed.Vin!, "0E80", "1234", "1234");
+        Check(!target.Gateway && !target.SingleEcu && !target.Inventory,
+            "A different IP invalidates the entire selection.");
+        target = DoIpConsolePresentation.EvaluateTarget(observed with { Vin = null }, "127.0.0.1",
+            observed.Vin!, "0E80", "1234", "1234");
+        Check(target.SingleEcu && !target.ExplicitVinEcu && !target.Inventory,
+            "An unobserved gateway VIN is not proof of selected identity.");
         foreach (var language in new[] { "fr-FR", "en-US" })
         {
             var culture = CultureInfo.GetCultureInfo(language);
