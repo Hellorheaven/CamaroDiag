@@ -165,6 +165,10 @@ internal sealed partial class BridgeDesktopForm
                 CheckFileExists = true, Multiselect = false
             };
             if (dialog.ShowDialog(this) != DialogResult.OK) return;
+            // CDJ/1 is not an E39 write journal; do not retain the previous
+            // E39 selection when showing unrelated connector evidence.
+            selectedJournal = null;
+            verifyOriginal.Enabled = false;
             results.Text = "Analyse CDJ/1 hors ligne…";
             chooseConnector.Enabled = choose.Enabled = false;
             try

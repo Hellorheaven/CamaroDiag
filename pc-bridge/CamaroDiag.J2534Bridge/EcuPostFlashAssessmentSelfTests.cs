@@ -73,7 +73,7 @@ internal static class EcuPostFlashAssessmentSelfTests
                 journal.AppendAsync(new(NativeE39WriteSequence.Phase.Prepared,
                     0x20000, sha), CancellationToken.None).GetAwaiter().GetResult();
                 journal.AppendAsync(new(NativeE39WriteSequence.Phase.OriginalCrcVerified,
-                    0x20000, "DUMMY"), CancellationToken.None).GetAwaiter().GetResult();
+                    0x20000, "DEADBEEF"), CancellationToken.None).GetAwaiter().GetResult();
                 journal.PreserveOriginalBlockAsync(0x20000, original,
                     sha, CancellationToken.None).GetAwaiter().GetResult();
                 journal.AppendAsync(new(NativeE39WriteSequence.Phase.OriginalBytesVerified,
@@ -151,8 +151,19 @@ internal static class EcuPostFlashAssessmentSelfTests
             Check(!NativeE39SavedBlockAssessment.Inspect(journalPath).Verified,
                 "Original-block bytes alone cannot substitute for a durable physical-read receipt");
             File.WriteAllText(journalPath, journalText);
+            File.WriteAllText(journalPath, journalText.Replace(
+                "\"Phase\":\"OriginalCrcVerified\"",
+                "\"Phase\":\"TestWriteAccepted\""));
+            Check(!NativeE39SavedBlockAssessment.Inspect(journalPath).Verified,
+                "Original-byte receipt without a prior physical CRC receipt is refused");
+            File.WriteAllText(journalPath, journalText);
+            File.WriteAllText(journalPath, journalText.Replace(
+                "\"Detail\":\"DEADBEEF\"", "\"Detail\":\"BADCRC\""));
+            Check(!NativeE39SavedBlockAssessment.Inspect(journalPath).Verified,
+                "Malformed original CRC evidence cannot authorize physical backup integrity");
+            File.WriteAllText(journalPath, journalText);
             Check(NativeE39SavedBlockAssessment.Inspect(journalPath).Verified,
-                "Untampered original-sector receipt and disk backup remain valid");
+                "Untampered CRC, original-sector receipt and disk backup remain valid");
             var tampered = File.ReadAllBytes(blockFile);
             tampered[^1] ^= 0x02;
             File.WriteAllBytes(blockFile, tampered);

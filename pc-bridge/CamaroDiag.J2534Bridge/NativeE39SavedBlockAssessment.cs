@@ -104,6 +104,8 @@ internal static class NativeE39SavedBlockAssessment
         var state = NativeE39FileWriteJournal.InspectDetailed(journalPath).State;
         var expected = new Dictionary<uint, string>();
         var physicalReceipts = new HashSet<uint>();
+        var crcReceipts = new HashSet<uint>();
+        var destructiveStarted = false;
         var verified = new List<Block>();
         try
         {
@@ -124,10 +126,32 @@ internal static class NativeE39SavedBlockAssessment
                     root.GetProperty("Schema").GetInt32() != 3)
                     throw new InvalidDataException("Invalid ECU journal record.");
                 var phase = root.GetProperty("Phase").GetString();
-                if (phase is not ("Prepared" or "OriginalBytesVerified"))
+                if (phase == "EraseStarted")
+                {
+                    // The complete physical baseline must be durable before
+                    // the first irreversible erase decision.
+                    if (expected.Count == 0 || physicalReceipts.Count != expected.Count)
+                        throw new InvalidDataException(
+                            "ECU erase was recorded before all physical original receipts.");
+                    destructiveStarted = true;
+                }
+                if (phase is not ("Prepared" or "OriginalCrcVerified" or "OriginalBytesVerified"))
                     continue;
+                if (destructiveStarted)
+                    throw new InvalidDataException(
+                        "Physical original receipt appeared after ECU erase began.");
                 var address = root.GetProperty("Address").GetUInt32();
                 var hash = root.GetProperty("Detail").GetString();
+                if (phase == "OriginalCrcVerified")
+                {
+                    // The CRC receipt is 8 uppercase hex digits, unlike
+                    // original-sector SHA-256 receipts (64 hex digits).
+                    if (hash is null || hash.Length != 8 || !hash.All(Uri.IsHexDigit) ||
+                        !expected.ContainsKey(address) || !crcReceipts.Add(address))
+                        throw new InvalidDataException(
+                            "Missing, altered or duplicated original-sector CRC receipt.");
+                    continue;
+                }
                 if (hash is null || hash.Length != 64 || !hash.All(Uri.IsHexDigit))
                     throw new InvalidDataException("Invalid original-sector SHA-256 receipt.");
                 if (phase == "Prepared")
@@ -137,7 +161,8 @@ internal static class NativeE39SavedBlockAssessment
                 }
                 else
                 {
-                    if (!expected.TryGetValue(address, out var plannedHash) ||
+                    if (!crcReceipts.Contains(address) ||
+                        !expected.TryGetValue(address, out var plannedHash) ||
                         !hash.Equals(plannedHash, StringComparison.OrdinalIgnoreCase) ||
                         !physicalReceipts.Add(address))
                         throw new InvalidDataException(
