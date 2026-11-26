@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 from typing import Sequence
 
 from .doip import (Session, discover, discover_unique_vin, discover_ipv4, discover_ipv6, gateway_key, status,
-                   DoIpError, InventoryTraceError, valid_vin, parse_commands, confirm_commands, parse_did_layout, parse_stored_did_lengths, parse_extended_record_lengths, extended_records_request, validate_monitor_layout, parse_ecu_inventory, inventory_ecus)
+                   DoIpError, TransportRefusal, NegativeResponse, InventoryTraceError, valid_vin, parse_commands, confirm_commands, parse_did_layout, parse_stored_did_lengths, parse_extended_record_lengths, extended_records_request, validate_monitor_layout, parse_ecu_inventory, inventory_ecus)
 from .doip_archive import load_scope
 from .doip_capture import capture_region, save_capture
 
@@ -558,6 +558,15 @@ def main():
     try:
         print(json.dumps(run(), indent=2))
     except (OSError, EOFError, ValueError, TraceWriteError, InventoryTraceError) as exc:
+        # Preserve machine-readable correlated refusal details on stderr.
+        # Never publish a successful result or retry on this path.
+        if isinstance(exc, TransportRefusal):
+            print(json.dumps({"diagnostic_error": {"reason": exc.layer,
+                "failure_code": exc.code, "complete": False}}), file=sys.stderr, flush=True)
+        elif isinstance(exc, NegativeResponse):
+            print(json.dumps({"diagnostic_error": {"reason": "uds_negative_response",
+                "failure_code": exc.code, "nrc": exc.code, "requested_service": exc.service,
+                "complete": False}}), file=sys.stderr, flush=True)
         print(f"DoIP: {exc}", file=sys.stderr)
         raise SystemExit(2)
 
