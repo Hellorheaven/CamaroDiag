@@ -1668,6 +1668,49 @@ class DoIpTests(unittest.TestCase):
                 self.assertFalse(client._busy)
                 self.assertFalse(client._operation_lock.locked())
 
+    def test_sequence_wire_keeps_vin_and_both_commands_on_same_owned_socket(self):
+        client = Session.__new__(Session)
+        client.gateway, client.tester, client.ecu = GATEWAY, 0x0E80, 0x1234
+        client.timeout = client.p2 = client.p2_star = 2
+        client.trace, client.tls = None, False
+        client._busy = False
+        client._operation_lock = threading.Lock()
+        client._socket, peer = socket.socketpair()
+        peer.settimeout(3)
+        requests = (bytes.fromhex("22F190"), bytes.fromhex("221234"),
+                    bytes.fromhex("1901FF"))
+        responses = (bytes.fromhex("62F190") + VIN.encode("ascii"),
+                     bytes.fromhex("62123401"), bytes.fromhex("5901FF01000001"))
+        errors = []
+        def peer_loop():
+            try:
+                for request, reply in zip(requests, responses):
+                    self.assertEqual(receive(peer), (2, 0x8001, TESTER + ECU + request))
+                    peer.sendall(encode(2, 0x8001, ECU + TESTER + reply))
+            except BaseException as error:
+                errors.append(error)
+        worker = threading.Thread(target=peer_loop)
+        worker.start()
+        callbacks = []
+        try:
+            def callback(index, response):
+                self.assertTrue(client._operation_lock.locked())
+                callbacks.append((index, response))
+                with self.assertRaises(DoIpError):
+                    client.exchange(bytes.fromhex("221234"))
+            result = client.exchange_sequence(requests[1:], callback, expected_vin=VIN)
+            self.assertEqual(result, list(responses[1:]))
+            self.assertEqual(callbacks, [(1, responses[1]), (2, responses[2])])
+            self.assertIsNotNone(client._socket)
+            self.assertFalse(client._operation_lock.locked())
+        finally:
+            client.close()
+            worker.join(4)
+            peer.close()
+        self.assertFalse(worker.is_alive())
+        if errors:
+            raise errors[0]
+
     def test_sequence_rejects_other_thread_while_first_command_is_pending(self):
         client = Session.__new__(Session)
         client._operation_lock = threading.Lock()
