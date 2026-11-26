@@ -1548,6 +1548,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 (commands == null || approval == null))) return
         val fixedCommands = commands?.map { it.copyOf() }
         launchEnhancedUdsRead(journalDoIp = true) { current ->
+            // Callback replies are provisional until the socket and the
+            // entire command sequence have completed cleanly.
+            var verifiedCommands = 0
             _calibrationWorkspace.update { it.copy(doIpReading = true, doIpResult = "", doIpTrace = emptyList(), doIpBackupBytes = 0,
                 doIpMonitorReport = null, doIpLiveSamples = emptyList()) }
             try {
@@ -1726,12 +1729,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     isReadContextCurrent = current,
                     dtc = detailDtc, record = storedRecord ?: extendedRecord ?: detailRecord, onCommandReply = { index, reply ->
                         check(current())
+                        require(index == verifiedCommands + 1 &&
+                            index <= requireNotNull(fixedCommands).size) { "Unexpected DoIP command reply index." }
                         val line = localizedContext.getString(R.string.cal_doip_sequence_reply, index,
                             reply.joinToString(" ") { "%02X".format(it.toInt() and 255) })
                         _calibrationWorkspace.update { if (current()) it.copy(doIpResult =
                             (it.doIpResult + "\n" + line).trimStart()) else it }
+                        verifiedCommands = index
                     })
                 if (!current()) return@launchEnhancedUdsRead
+                if (operation == DoIpDirectRead.Operation.EXCHANGE) {
+                    require(result.commandReplies.size == requireNotNull(fixedCommands).size &&
+                        verifiedCommands == fixedCommands.size) { "Incomplete DoIP command sequence." }
+                }
                 val module = "DoIP 0x" + ecu.uppercase()
                 val report = result.dtcs
                 // A filtered report is not a complete replacement of the ECU's DTC list.
@@ -1775,10 +1785,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                                     " — " + renderUdsDtcStatus(row.status, wwh.statusAvailability)
                             }
                     }
-                    result.commandReplies.isNotEmpty() -> result.commandReplies.mapIndexed { index, reply ->
-                        localizedContext.getString(R.string.cal_doip_sequence_reply, index + 1,
-                            reply.joinToString(" ") { "%02X".format(it.toInt() and 255) })
-                    }.joinToString("\n")
+                    result.commandReplies.isNotEmpty() ->
+                        localizedContext.getString(R.string.cal_doip_sequence_complete,
+                            verifiedCommands, requireNotNull(fixedCommands).size) + "\n" +
+                            result.commandReplies.mapIndexed { index, reply ->
+                                localizedContext.getString(R.string.cal_doip_sequence_reply, index + 1,
+                                    reply.joinToString(" ") { "%02X".format(it.toInt() and 255) })
+                            }.joinToString("\n")
                     result.decodedExtended != null -> requireNotNull(result.decodedExtended).let { report ->
                         val heading = (result.decodedMemory?.let { localizedContext.getString(R.string.cal_doip_decoded_memory, it) + "\n" } ?: "") +
                             localizedContext.getString(R.string.cal_doip_decoded_extended_result, report.dtc, report.status, report.records.size)
@@ -1910,10 +1923,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     doIpTrace = result.trace.map(::doIpTraceLine), doIpMonitorReport = monitorReport) else it }
                 if (current()) appendCanConsoleSystemEvent(localizedContext.getString(R.string.cal_doip_console_complete))
             } catch (cancelled: CancellationException) {
-                if (current()) _calibrationWorkspace.update { it.copy(doIpReading = false) }
+                if (current()) _calibrationWorkspace.update {
+                    val summary = if (operation == DoIpDirectRead.Operation.EXCHANGE && fixedCommands != null)
+                        localizedContext.getString(R.string.cal_doip_sequence_incomplete,
+                            verifiedCommands, fixedCommands.size) else ""
+                    it.copy(doIpReading = false, doIpResult =
+                        (it.doIpResult + "\n" + summary).trim())
+                }
                 throw cancelled
             } catch (error: Exception) {
-                val message = doIpFailureMessage(error, R.string.cal_doip_failed)
+                val baseMessage = doIpFailureMessage(error, R.string.cal_doip_failed)
+                val message = if (operation == DoIpDirectRead.Operation.EXCHANGE && fixedCommands != null)
+                    localizedContext.getString(R.string.cal_doip_sequence_incomplete,
+                        verifiedCommands, fixedCommands.size) + "\n" + baseMessage else baseMessage
                 if (current()) appendCanConsoleSystemEvent(message, succeeded = false)
                 if (current()) _calibrationWorkspace.update {
                     val error = message
