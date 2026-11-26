@@ -36,15 +36,24 @@ class J1979CampaignEvidence final:public J1979CanCampaign::Sink {
       default:return fail();
     }
     if((state<=3)!=(r.responseSize>0))return fail();
+    if(state<=3){
+      const auto shape=J1979ReadEvidence::classify(J1979ReadEvidence::Variant::ClassicCan,
+        req,n,r.response,r.responseSize);
+      using R=J1979ReadEvidence::Result;
+      if((state==1&&shape!=R::Positive)||(state==2&&shape!=R::Raw)||
+         (state==3&&shape!=R::Negative))return fail();
+    }
     uint8_t body[15]{};
     body[0]=state;body[1]=uint8_t(n);put32(body+2,r.elapsedMs);
     body[6]=uint8_t(r.responseSize);body[7]=uint8_t(r.responseSize>>8);
     std::memcpy(body+8,req,n);
     if(!emit(2,body,8+n,r.response,r.responseSize))return false;
-    ++observations_;return true;
+    ++observations_;++counts_[state-1];return true;
   }
   bool finish(const J1979CanCampaign::Summary& s){
-    if(!started_||finished_||failed_||s.steps!=observations_)return fail();
+    if(!started_||finished_||failed_||s.steps!=observations_||
+       s.positive!=counts_[0]||s.raw!=counts_[1]||s.negative!=counts_[2]||
+       s.timeout!=counts_[3])return fail();
     using E=J1979CanCampaign::End;
     uint8_t body[22]{};
     switch(s.end){
@@ -89,7 +98,7 @@ class J1979CampaignEvidence final:public J1979CanCampaign::Sink {
   }
   Writer& writer_;
   uint16_t sequence_=0;
-  uint32_t observations_=0;
+  uint32_t observations_=0,counts_[5]{};
   bool started_=false,finished_=false,failed_=false;
 };
 }
