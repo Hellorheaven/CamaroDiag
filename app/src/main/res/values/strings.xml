@@ -1200,6 +1200,9 @@
     <string name="cal_doip_inventory_reason_protocol">Invalid or unstable ECU protocol identification</string>
     <string name="cal_doip_inventory_reason_nrc">ECU returned a negative diagnostic response</string>
     <string name="cal_doip_inventory_reason_timeout">Response timed out</string>
+    <string name="cal_doip_inventory_reason_header">DoIP header rejected</string>
+    <string name="cal_doip_inventory_reason_routing">DoIP routing activation denied</string>
+    <string name="cal_doip_inventory_reason_ack">DoIP diagnostic acknowledgement rejected</string>
     <string name="cal_doip_inventory_reason_io">Communication or identity verification failed</string>
     <string name="cal_doip_inventory_verified">ECU 0x%1$04X: VIN verified (%2$s)</string>
     <string name="cal_doip_inventory_unverified">ECU 0x%1$04X: not verified (not proof of absence)</string>
