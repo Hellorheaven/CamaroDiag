@@ -917,6 +917,68 @@ class BluetoothObdManager(context: Context) {
         }
     }
 
+    /** Dedicated EVAP recipe only, using the negotiated CAN profile and
+     * explicitly pinned primary ECM. No functional addressing or fallback. */
+    suspend fun runElmEvapTest(expectedVin: String, approval: EcuWriteConsentFlow.Approval,
+        isCurrent: () -> Boolean): ObdEvapResult {
+        require(approval.warningAcknowledged && approval.confirmedYes)
+        require(expectedVin.matches(Regex("[A-HJ-NPR-Z0-9]{17}")))
+        val epoch = transportSessionEpoch.capture()
+        val original = standardElmProfile
+        val protocol = original.protocol
+        val (tx, rx) = ElmJ1979EvapTest.addresses(protocol)
+        val extended = protocol in setOf(7, 9)
+        val width = if (extended) 8 else 3
+        val txHex = ElmJ1979EvapTest.hex(tx, width)
+        val rxHex = ElmJ1979EvapTest.hex(rx, width)
+        fun requireCurrent() {
+            transportSessionEpoch.requireQueuedCurrent(epoch)
+            EcuWriteConsentFlow.requireCurrentForTransmit(approval, isCurrent)
+        }
+        return commandSessionMutex.withLock {
+            requireCurrent()
+            check(!isDemoMode && !isSimulationActive && isElmUdsReadCandidate &&
+                !isJ2534BridgeConnected() && protocol in availableRawCanProfiles() &&
+                standardElmProfile == original)
+            try {
+                for (command in listOf("ATSP$protocol", "ATH1", "ATS1", "ATD0",
+                    "ATCAF0", "ATSH $txHex", "ATCRA $rxHex",
+                    "ATFCSH $txHex", "ATFCSD 30 00 00", "ATFCSM1", "ATCFC1")) {
+                    requireCurrent()
+                    val response = sendAtCommandInternal(command, 1500L, expectedEpoch = epoch,
+                        preserveLines = true)
+                    check(CanConsoleAdapterRestorationPolicy.accepted(response)) {
+                        "ELM rejected physical diagnostic configuration."
+                    }
+                }
+                ElmJ1979EvapTest.run(protocol, expectedVin, ::requireCurrent) { payload ->
+                    val frame = byteArrayOf(payload.size.toByte()) + payload
+                    val response = sendAtCommandInternal(ElmJ1979EvapTest.hex(frame), 2500L,
+                        expectedEpoch = epoch, preserveLines = true,
+                        beforeTransmit = { requireCurrent() })
+                    ElmUdsPayloadTransport.decode(response, rx, extended)
+                }
+            } finally {
+                withContext(NonCancellable) {
+                    if (transportSessionEpoch.isCurrent(epoch)) {
+                        var restored = true
+                        for (command in ElmUdsPayloadTransport.restoreCommandsFor(original.protocol)) {
+                            val reply = runCatching {
+                                sendAtCommandInternal(command, 1500L, expectedEpoch = epoch)
+                            }.getOrNull()
+                            if (reply == null || !CanConsoleAdapterRestorationPolicy.accepted(reply))
+                                restored = false
+                        }
+                        if (!restored) {
+                            disconnectIfCurrent(epoch)
+                            throw CanAdapterRestorationException(activeTransport)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     /** Invalidates ECU-specific support data after a vehicle identity/profile change. */
     fun invalidateObdPidSupportCache() {
         mode01SupportCache.invalidate()
