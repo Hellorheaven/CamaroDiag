@@ -257,6 +257,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         // Retain the cancelled job until the next connection can join its
         // transport cleanup; clearing it would allow overlapping handshakes.
         connectionAttemptJob?.cancel()
+        bluetoothDiscoveryJob?.cancel()
         _savedSessions.value = emptyList()
         _activeAccountUid.value = accountUid
         discardCanMonitor()
@@ -4487,6 +4488,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         return next
     }
     private var connectionAttemptJob: Job? = null
+    private var bluetoothDiscoveryJob: Job? = null
 
     private fun connectWithResult(
         connect: suspend () -> Result<AdapterCapabilities>,
@@ -4501,10 +4503,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         )
         invalidateFuelHistoryForConnectionChange()
         val previousAttempt = connectionAttemptJob
+        val previousDiscovery = bluetoothDiscoveryJob
+        previousDiscovery?.cancel()
         previousAttempt?.cancel()
         connectionAttemptJob = viewModelScope.launch {
             beginBusyOperation()
             try {
+                // Stop any previously requested BLE scan before opening the socket.
+                previousDiscovery?.join()
                 // A cancelled transport handshake may still be closing its
                 // socket. Wait for that cleanup before opening the replacement.
                 previousAttempt?.join()
@@ -4571,12 +4577,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun refreshPairedDevices() {
-        viewModelScope.launch {
+        if (bluetoothDiscoveryJob?.isActive == true || connectionAttemptJob?.isActive == true) return
+        val account = accountSessionGeneration
+        val connection = connectionAttemptGeneration
+        fun current() = account == accountSessionGeneration && connection == connectionAttemptGeneration
+        // Use LAZY so the handle is installed before a fast completion.
+        val job = viewModelScope.launch(start = CoroutineStart.LAZY) {
             try {
-                _pairedDevices.value = obdManager.getPairedDevices()
-                _usbDevices.value = obdManager.getUsbDevices()
+                val paired = withContext(Dispatchers.IO) { obdManager.getPairedDevices() }
+                val usb = withContext(Dispatchers.IO) { obdManager.getUsbDevices() }
+                if (!current()) return@launch
+                _pairedDevices.value = paired
+                _usbDevices.value = usb
                 val nearbyBle = obdManager.scanNearbyBleDevices()
-                _pairedDevices.value = (_pairedDevices.value + nearbyBle)
+                if (!current()) return@launch
+                _pairedDevices.value = (paired + nearbyBle)
                     .distinctBy { it.second }
                     .sortedByDescending {
                         it.first.contains("OBD", true) ||
@@ -4586,9 +4601,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
-                _connectionMessage.value = localizedContext.getString(R.string.msg_refresh_adapters_failed)
+                if (current()) _connectionMessage.value =
+                    localizedContext.getString(R.string.msg_refresh_adapters_failed)
             }
         }
+        bluetoothDiscoveryJob = job
+        job.start()
     }
 
     fun connectWifi(host: String, port: Int) {
@@ -5689,7 +5707,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
 
             while (currentCoroutineContext().isActive) {
-                if (_isStreamingLive.value) {
+                if (_isStreamingLive.value && connectionAttemptJob?.isActive != true) {
                     batchEvidenceGeneration = liveEvidenceGeneration
                     if (lastEvidenceGeneration != batchEvidenceGeneration) {
                         histories.clear()
