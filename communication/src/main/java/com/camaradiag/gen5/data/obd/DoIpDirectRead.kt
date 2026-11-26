@@ -688,7 +688,7 @@ object DoIpDirectRead {
             if (idle || frame.type != 0x8001) recordControl("RX", header + data)
             remaining(deadline)
             require(frame.version == gateway.version) { "DoIP protocol version changed." }
-            requireNoHeaderNack(frame)
+            if (!idle) requireNoHeaderNack(frame)
             return frame
         }
         private fun alive(frame: Frame, deadline: Long): Boolean {
