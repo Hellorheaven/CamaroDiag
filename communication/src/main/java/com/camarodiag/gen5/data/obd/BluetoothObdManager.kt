@@ -945,7 +945,10 @@ class BluetoothObdManager(context: Context) {
 
     val legacyMutationProtocol: Int?
         get() = standardElmProfile.protocol.takeIf { it in 1..5 &&
-            isElmUdsReadCandidate && !isDemoMode && !isSimulationActive && !isJ2534BridgeConnected() }
+            isObdCommandChannelAvailable && !isDemoMode && !isSimulationActive && !isJ2534BridgeConnected() }
+        // A verified legacy PID00 profile does not require a CAN-capable adapter.
+        // ATH1 and the checksum-verified legacy records are checked in the
+        // exclusive recipe before any potentially modifying command.
 
     suspend fun runElmLegacyMutation(target: LegacyMutationTarget, expectedVin: String,
         approval: EcuWriteConsentFlow.Approval, isCurrent: () -> Boolean,
