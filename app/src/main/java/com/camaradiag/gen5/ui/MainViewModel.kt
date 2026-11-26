@@ -1619,6 +1619,27 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 check(current())
                 if (operation in setOf(DoIpDirectRead.Operation.INVENTORY, DoIpDirectRead.Operation.OBD_INVENTORY)) {
                     val addresses = DoIpDirectRead.parseInventoryAddresses(didHex)
+                    fun renderInventory(rows: List<DoIpDirectRead.InventoryEntry>, total: Int, complete: Boolean): String {
+                        val title = localizedContext.getString(
+                            if (complete) R.string.cal_doip_inventory_result else R.string.cal_doip_inventory_progress,
+                            rows.count { it.vin != null }, total)
+                        return title + rows.joinToString("\n", prefix = "\n") { row ->
+                            if (row.vin == null) {
+                                val reason = when (row.failure) {
+                                    DoIpDirectRead.InventoryFailure.VIN_MISMATCH -> R.string.cal_doip_inventory_reason_vin
+                                    DoIpDirectRead.InventoryFailure.PROTOCOL_IDENTITY -> R.string.cal_doip_inventory_reason_protocol
+                                    DoIpDirectRead.InventoryFailure.NEGATIVE_RESPONSE -> R.string.cal_doip_inventory_reason_nrc
+                                    DoIpDirectRead.InventoryFailure.TIMEOUT -> R.string.cal_doip_inventory_reason_timeout
+                                    DoIpDirectRead.InventoryFailure.COMMUNICATION, null -> R.string.cal_doip_inventory_reason_io
+                                }
+                                localizedContext.getString(R.string.cal_doip_inventory_unverified, row.ecu) +
+                                    " — " + localizedContext.getString(reason)
+                            } else localizedContext.getString(R.string.cal_doip_inventory_verified, row.ecu, row.vin) +
+                                (row.protocolValue?.let { protocol -> "\n" + localizedContext.getString(
+                                    if (protocol == 1) R.string.cal_doip_inventory_obd_supported else R.string.cal_doip_inventory_obd_unknown,
+                                    row.ecu, protocol) } ?: "")
+                        }
+                    }
                     val rows = DoIpDirectRead.inventory(target, addresses, options, clientTls,
                         onTrace = { selected, trace ->
                             journalDoIpTrace(selected, trace, current)
@@ -1628,16 +1649,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                                     ("%04X ".format(selected.ecu) + doIpTraceLine(trace))).takeLast(128)) else state
                             }
                         }, onControlTrace = { trace -> journalDoIpControlTrace(trace, current) }, current = current,
-                        obd = operation == DoIpDirectRead.Operation.OBD_INVENTORY)
+                        obd = operation == DoIpDirectRead.Operation.OBD_INVENTORY,
+                        onProgress = { observed, total ->
+                            check(current())
+                            val partial = renderInventory(observed, total, false)
+                            _calibrationWorkspace.update { state ->
+                                if (current()) state.copy(doIpResult = partial) else state
+                            }
+                        })
                     if (!current()) return@launchEnhancedUdsRead
-                    val rendered = localizedContext.getString(R.string.cal_doip_inventory_result,
-                        rows.count { it.vin != null }, rows.size) + rows.joinToString("\n", prefix = "\n") { row ->
-                        if (row.vin == null) localizedContext.getString(R.string.cal_doip_inventory_unverified, row.ecu)
-                        else localizedContext.getString(R.string.cal_doip_inventory_verified, row.ecu, row.vin) +
-                            (row.protocolValue?.let { protocol -> "\n" + localizedContext.getString(
-                                if (protocol == 1) R.string.cal_doip_inventory_obd_supported else R.string.cal_doip_inventory_obd_unknown,
-                                row.ecu, protocol) } ?: "")
-                    }
+                    val rendered = renderInventory(rows, addresses.size, true)
                     _calibrationWorkspace.update { state -> if (current())
                         state.copy(doIpReading = false, doIpResult = rendered) else state }
                     if (current()) appendCanConsoleSystemEvent(localizedContext.getString(R.string.cal_doip_console_complete))
@@ -1874,7 +1895,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 if (current()) _calibrationWorkspace.update {
                     val error = localizedContext.getString(resource)
                     it.copy(doIpReading = false, doIpResult =
-                        if (operation == DoIpDirectRead.Operation.EXCHANGE && it.doIpResult.isNotBlank())
+                        if (operation in setOf(DoIpDirectRead.Operation.EXCHANGE,
+                            DoIpDirectRead.Operation.INVENTORY, DoIpDirectRead.Operation.OBD_INVENTORY) &&
+                            it.doIpResult.isNotBlank())
                             it.doIpResult + "\n" + error else error)
                 }
             }
