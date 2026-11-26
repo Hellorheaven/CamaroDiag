@@ -222,3 +222,5 @@ camarodiagconnectors-j1979-capture --input campaign.cj --output campaign.json --
 L'export est exclusif, et distingue les labels déclarés des informations observées. Il ne prouve ni provenance matérielle ni validation physique.
 
 `esp32s3/src/j1979_usb_campaign.h` relie la campagne, le flux de preuves et le gestionnaire d'exclusivité NativeUsb à un propriétaire matériel abstrait. Celui-ci doit fournir les preuves locales fraîches de qualification, profil, autorisation et stabilité, ainsi que l'arrêt vérifié du canal. Déconnexion ou révocation interrompent la session ; un arrêt non vérifié verrouille l'admission. Aucun de ces éléments ne crée un profil de carte, une authentification ou un point d'entrée USB réel. **Le firmware de découverte reste inchangé.**
+
+Pour le parcours abstrait NativeUsb, le résumé terminal CJ/1 est émis seulement après arrêt du canal vérifié et maintien de l'autorisation du même hôte. Arrêt non vérifié : verrou de récupération, capture partielle sans résumé. Perte d'autorisation à l'arrêt : pas de résumé. Le profil matériel et le point d'entrée USB réel demeurent à intégrer.
