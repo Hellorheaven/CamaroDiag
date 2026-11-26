@@ -40,6 +40,7 @@ class LinuxIsoTp:
             raise ValueError("Invalid physical ISO 15765-4 CAN channel")
         if not hasattr(socket, "CAN_ISOTP") or not hasattr(socket, "AF_CAN"):
             raise OSError("Linux SocketCAN ISO-TP is unavailable")
+        self._primary = (tx, rx) in ((0x7E0, 0x7E8), (0x18DA10F1, 0x18DAF110))
         self._socket = socket.socket(socket.AF_CAN, socket.SOCK_DGRAM, socket.CAN_ISOTP)
         try:
             flag = 0x80000000 if tx > 0x7FF else 0
@@ -55,8 +56,13 @@ class LinuxIsoTp:
         self._socket.close()
 
     def exchange(self, request: bytes, timeout: float) -> bytes:
-        if not allowed_read(request) or not 0 < timeout <= 2.5:
-            raise ValueError("Unsupported request or timeout")
+        if not allowed_read(request):
+            raise ValueError("Unsupported read request")
+        return self._exchange(request, timeout)
+
+    def _exchange(self, request: bytes, timeout: float, before_send=lambda: None) -> bytes:
+        if not 0 < timeout <= 2.5:
+            raise ValueError("Unsupported timeout")
         deadline = time.monotonic() + timeout
         # Discard previously queued completed ISO-TP messages before TX.
         # A continuously busy queue cannot establish a fresh exchange.
@@ -74,6 +80,7 @@ class LinuxIsoTp:
         if remaining <= 0:
             raise OSError("No time remains for a fresh ISO-TP exchange")
         self._socket.settimeout(remaining)
+        before_send()
         if self._socket.send(request) != len(request):
             raise OSError("Incomplete ISO-TP request")
         pending = 0
@@ -96,6 +103,67 @@ class LinuxIsoTp:
                     raise OSError("Too many pending responses")
                 continue
             return response
+
+
+    def run_evap(self, expected_vin: str, *, warning_acknowledged: bool,
+                 confirmed_yes: bool, require_current=lambda: None) -> dict:
+        # The generic exchange method remains read-only. Only this narrowly
+        # scoped recipe can dispatch the standardized EVAP request.
+        return evap_recipe(self.exchange,
+                           lambda: self._exchange(b"\x08\x01", 2.5, require_current),
+                           expected_vin=expected_vin, primary=self._primary,
+                           warning_acknowledged=warning_acknowledged,
+                           confirmed_yes=confirmed_yes, require_current=require_current)
+
+
+def evap_recipe(read, transmit, *, expected_vin: str, primary: bool,
+                warning_acknowledged: bool, confirmed_yes: bool,
+                require_current=lambda: None) -> dict:
+    """One explicitly approved EVAP request; acknowledgment is not completion."""
+    if not primary or not warning_acknowledged or not confirmed_yes or not re.fullmatch(
+            r"[A-HJ-NPR-Z0-9]{17}", expected_vin):
+        raise ValueError("Physical primary ECU, valid VIN and two confirmations required")
+    exchanges = []
+    observed = None
+    attempted = False
+
+    def result(outcome, reason=None):
+        return {"outcome": outcome, "reason": reason, "command_attempted": attempted,
+                "observed_vin": observed, "monitor_completion_verified": False,
+                "exchanges": exchanges}
+
+    def query(request):
+        require_current()
+        reply = read(request, 1.8)
+        exchanges.append({"request_hex": request.hex().upper(),
+                          "response_hex": reply.hex().upper()})
+        require_current()
+        return reply
+
+    try:
+        vin = query(b"\x09\x02")
+        if len(vin) != 20 or vin[:3] != b"\x49\x02\x01":
+            return result("NOT_TESTED", "INVALID_VIN")
+        observed = vin[3:].decode("ascii")
+        if observed != expected_vin:
+            return result("NOT_TESTED", "VIN_MISMATCH")
+        inventory = query(b"\x08\x00")
+        if len(inventory) != 6 or inventory[:2] != b"\x48\x00" or not inventory[2] & 0x80:
+            return result("NOT_TESTED", "TID_01_NOT_ADVERTISED")
+        if query(b"\x01\x0D") != b"\x41\x0D\x00" or query(b"\x01\x0C") != b"\x41\x0C\x00\x00":
+            return result("NOT_TESTED", "STATIONARY_EVIDENCE_REQUIRED")
+        require_current()
+        attempted = True
+        exchanges.append({"request_hex": "0801", "response_hex": None})
+        response = transmit()
+        exchanges[-1]["response_hex"] = response.hex().upper()
+        if response == b"\x48\x01":
+            return result("ACKNOWLEDGED")
+        if len(response) == 3 and response[:2] == b"\x7F\x08" and response[2] not in (0, 0x78):
+            return result("REFUSED", f"NRC_{response[2]:02X}")
+        return result("UNCERTAIN", "INVALID_OR_INCOMPLETE_RESPONSE")
+    except (OSError, ValueError, RuntimeError, KeyboardInterrupt) as exc:
+        return result("UNCERTAIN" if attempted else "NOT_TESTED", type(exc).__name__)
 
 
 def _validate(request: bytes, response: bytes) -> str | None:
