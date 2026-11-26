@@ -21,6 +21,7 @@ camarodiagconnectors-j1979-clear = "camarodiagconnectors.j1979_clear_cli:main"
 camarodiagconnectors-j1979-legacy = "camarodiagconnectors.j1979_legacy_cli:main"
 camarodiagconnectors-j1979-legacy-mutation = "camarodiagconnectors.j1979_legacy_mutation_cli:main"
 camarodiagconnectors-j1979-capture = "camarodiagconnectors.j1979_campaign_capture_cli:main"
+camarodiagconnectors-j1979-usb = "camarodiagconnectors.j1979_usb_live_cli:main"
 
 [tool.setuptools]
 packages = ["camarodiagconnectors"]

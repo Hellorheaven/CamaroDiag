@@ -1,3 +1,7 @@
+## J1979 — service USB CU/1 et recette hôte active (26/11/2026)
+
+- Service firmware dédié liant lecture bornée hello/proof, session HMAC, bail USB et sortie CJ/1, fermeture systématique sans repli découverte. Hôte Python live : échanges uniques, deadline absolue, lecture bornée par trame, contrôle de profil, capture brute même tronquée, JSON indépendant, fichiers exclusifs et synchronisés, confirmation opérateur. Tests simulés challenge incorrect, troncature, données surnuméraires et profil différent. Le flux CJ/1 n'est pas signé et l'authentification du boîtier ne prouve pas la provenance physique. Pas de binding USB matériel, provisionnement ni activation main ; recette documentée non déployable sur découverte. Aucun test, CI, fusion ni Release. J1979/C6 ouverts.
+
 ## J1979 / C6 — point d'entrée USB authentifié CU/1 (26/11/2026)
 
 - Contrat dédié hors découverte : challenge à deux nonces, preuves HMAC-SHA256 client/boîtier distinctes liées au profil CAN et budget, expiration 30 s, autorisation locale et présence USB revérifiées, challenge consommé une seule fois et révocation en sortie. Adaptateur cryptographique ESP32 mbedTLS + nonce matériel sous précondition entropie qualifiée ; aucun secret en dur. Codec Python de génération demande et vérification de preuve du boîtier. Tests natifs structurels et Python HMAC écrits, non exécutés. Provisionnement des clés, liaison au propriétaire USB réel, preuve entropie et câblage restent ouverts ; main découverte inchangé, aucune revendication de sécurité déployée. Aucun test, CI, fusion ni Release.
