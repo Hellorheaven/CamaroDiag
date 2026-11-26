@@ -85,7 +85,7 @@ internal static class NativeE39RecoveryImageAssessment
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException or
             InvalidDataException or ArgumentException or OverflowException or
-            System.Text.Json.JsonException or KeyNotFoundException)
+            System.Text.Json.JsonException or KeyNotFoundException or InvalidOperationException or FormatException)
         {
             return new Report(false, verified, error.Message, currentAddress);
         }
