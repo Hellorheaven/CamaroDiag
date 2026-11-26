@@ -65,7 +65,14 @@ object EcuBenchExpertPlan {
         val chipMarking: String?,
         val programmerName: String?,
         val accessMethod: AccessMethod,
-        val region: MemoryRegion
+        val region: MemoryRegion,
+        // These must be OBSERVED from the selected live ECU, never inferred
+        // from its marketed family, a part-number supersession or a BIN name.
+        val observedControllerId: String? = null,
+        val observedFirmwareId: String? = null,
+        // CALIBRATION and full PROGRAM_FLASH share PFLASH silicon but are
+        // different write qualifications. This exact region is mandatory.
+        val qualifiedWriteRegion: EcuBackupCoverage.Region? = null
     )
 
     data class Evidence(
@@ -73,6 +80,39 @@ object EcuBenchExpertPlan {
         val recoveryPathVerified: Boolean = false,
         val memoryMapVerified: Boolean = false
     )
+
+    private fun MemoryRegion.matches(region: EcuBackupCoverage.Region): Boolean = when (this) {
+        MemoryRegion.PFLASH -> region == EcuBackupCoverage.Region.CALIBRATION ||
+            region == EcuBackupCoverage.Region.PROGRAM_FLASH
+        MemoryRegion.DFLASH -> region == EcuBackupCoverage.Region.DATA_FLASH
+        MemoryRegion.EXTERNAL_EEPROM -> region == EcuBackupCoverage.Region.EXTERNAL_EEPROM
+    }
+
+    /**
+     * Pure, offline descriptor selection: the actual production admission only
+     * considers descriptors from registered hardware drivers. This helper
+     * permits model-based negative/positive tests without registering a fake
+     * writer or turning an unknown adapter into a supported programmer.
+     */
+    internal fun matchingQualifiedDriverIds(
+        target: Target,
+        descriptors: List<EcuProgrammingDriverContract.Descriptor>
+    ): List<String> {
+        val family = target.controllerFamily?.trim().orEmpty()
+        val controllerId = target.observedControllerId?.trim().orEmpty()
+        val firmwareId = target.observedFirmwareId?.trim().orEmpty()
+        val region = target.qualifiedWriteRegion ?: return emptyList()
+        if (family.isEmpty() || controllerId.isEmpty() || firmwareId.isEmpty() ||
+            !target.accessMethod.permitsRegion(target.region) ||
+            !target.region.matches(region)) return emptyList()
+        val firmware = EcuProgrammingDriverContract.FirmwareTarget(
+            family, controllerId, firmwareId
+        )
+        return descriptors.filter { descriptor ->
+            descriptor.transport in target.accessMethod.candidateTransports &&
+                descriptor.supportsWrite(firmware, descriptor.transport, region, target.accessMethod)
+        }.map { it.id }
+    }
 
     /**
      * A filename, SHA-256 or user-entered chip name cannot confirm that an image
@@ -98,12 +138,12 @@ object EcuBenchExpertPlan {
         if (!evidence.originalReadbackVerified) missing += Blocker.ORIGINAL_READBACK_NOT_VERIFIED
         if (!evidence.recoveryPathVerified) missing += Blocker.RECOVERY_PATH_NOT_VERIFIED
         if (!evidence.memoryMapVerified) missing += Blocker.MEMORY_MAP_NOT_VERIFIED
-        // No family-specific hard stop: permit any actual, registered driver
-        // that supports this ECU family and selected hardware transport.
-        // The current registry is empty, so availability is not fabricated.
-        val driverAvailable = target.accessMethod.candidateTransports.any { transport ->
-            EcuProgrammingDriverContract.hasValidatedWriteDriver(family, transport)
-        }
+        // A shared family protocol does not authorize a specific firmware,
+        // region or physical access method. Use only live registered driver
+        // descriptors and the EXACT observed ECU identity and memory scope.
+        val driverAvailable = matchingQualifiedDriverIds(
+            target, EcuProgrammingDriverContract.registeredHardwareDrivers.map { it.descriptor }
+        ).isNotEmpty()
         if (!driverAvailable) missing += Blocker.HARDWARE_PROGRAMMING_DRIVER_UNAVAILABLE
         return missing
     }
