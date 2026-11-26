@@ -35,6 +35,15 @@ internal object ObdScanJsonExport {
                     .put("raw", JSONArray(value.raw)).put("responder", value.responder ?: JSONObject.NULL)
                     .put("temperatureAtEncodingLimit", value.temperatureAtEncodingLimit)
             }))
+            put("mode01Reads", JSONArray(report.mode01Reads.map { read ->
+                JSONObject().put("pid", read.pid).put("rawResponse", read.rawResponse)
+                    .put("observations", JSONArray(read.observations.map { observation ->
+                        JSONObject().put("responder", observation.responder ?: JSONObject.NULL)
+                            .put("raw", JSONArray(observation.bytes))
+                            .put("eligibleForDecode", observation.eligibleForDecode)
+                            .put("decodedValueCount", observation.decodedValueCount)
+                    }))
+            }))
             put("confirmedDtcs", dtcs(report.confirmedDtcs))
             put("pendingDtcs", dtcs(report.pendingDtcs))
             put("permanentDtcs", dtcs(report.permanentDtcs))

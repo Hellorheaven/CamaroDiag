@@ -53,6 +53,20 @@ data class ObdEcuIdentification(
     val respondingEcuAddresses: List<String>
 )
 
+/** Raw observations are evidence, not necessarily a valid or decoded measurement. */
+data class ObdMode01Observation(
+    val responder: String?,
+    val bytes: List<Int>,
+    val eligibleForDecode: Boolean,
+    val decodedValueCount: Int
+)
+
+data class ObdMode01Read(
+    val pid: Int,
+    val rawResponse: String,
+    val observations: List<ObdMode01Observation>
+)
+
 data class ObdScanReport(
     val supportedPids: Set<Int>,
     val liveData: List<ObdValue>,
@@ -74,7 +88,8 @@ data class ObdScanReport(
     val unavailableDtcModes: Set<Int> = emptySet(),
     val supportedPidsByResponder: Map<String, Set<Int>> = emptyMap(),
     val firstUnresolvedPid: Int? = null,
-    val pidAttributionIncomplete: Boolean = false
+    val pidAttributionIncomplete: Boolean = false,
+    val mode01Reads: List<ObdMode01Read> = emptyList()
 )
 
 /**
@@ -294,36 +309,44 @@ class Obd2FeatureEngine(
     }
 
     suspend fun readLiveData(supportedPids: Set<Int>,
-        byResponder: Map<String, Set<Int>> = emptyMap()): List<ObdValue> {
-        val requested = listOf(
-            0x01, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B,
-            0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x11, 0x12, 0x13, 0x1C, 0x1F,
-            0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29, 0x2A,
-            0x2B, 0x2C, 0x2D, 0x2E, 0x2F, 0x30, 0x31, 0x32, 0x33, 0x34,
-            0x35, 0x36, 0x37, 0x38, 0x39, 0x3A, 0x3B, 0x3C, 0x3D, 0x3E,
-            0x3F, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4A,
-            0x4B, 0x4C, 0x4D, 0x4E, 0x52, 0x5A, 0x5B, 0x5C, 0x5D, 0x5E, 0x5F,
-            0x59, 0x61, 0x62, 0x63, 0xA6
-        )
+        byResponder: Map<String, Set<Int>> = emptyMap()): List<ObdValue> =
+        collectMode01Reads(supportedPids, byResponder).first
+
+    /** Read every advertised data PID once, including those without a local
+     * definition. Bitmap page markers are discovery commands, not sensor data.
+     * Keep conflicting and anonymous replies as raw evidence, never measurements. */
+    private suspend fun collectMode01Reads(
+        supportedPids: Set<Int>,
+        byResponder: Map<String, Set<Int>>,
+        physicalCanResponder: String? = null
+    ): Pair<List<ObdValue>, List<ObdMode01Read>> {
         val values = mutableListOf<ObdValue>()
-        for (pid in requested) {
-            if (pid !in supportedPids) continue
+        val reads = mutableListOf<ObdMode01Read>()
+        for (pid in supportedPids.filter { it in 1..255 && it % 32 != 0 }.sorted()) {
+            currentCoroutineContext().ensureActive()
             val response = ask("01%02X".format(Locale.US, pid), 1200L)
             val observations = CamaroUdsProtocol.parsePidObservations(response, "%02X".format(Locale.ROOT, pid))
             val groups = observations.groupBy { it.responder }
-            val attributed = if (groups.keys.any { it != null }) groups.filterKeys { it != null } else groups
-            for ((responder, rows) in attributed) {
-                if (responder != null && byResponder.isNotEmpty() && pid !in byResponder[responder].orEmpty()) continue
-                // Once support has been attributed to physical addresses, an
-                // anonymous reply cannot be credited to any of those ECUs.
-                if (responder == null && byResponder.isNotEmpty()) continue
-                // Conflicting values from the same or unidentified responder
-                // cannot be promoted into a single trusted measurement.
-                val data = rows.map { it.bytes }.distinct().singleOrNull() ?: continue
-                values += decode(pid, data).map { it.copy(responder = responder) }
+            val hasAddress = groups.keys.any { it != null }
+            val evidence = mutableListOf<ObdMode01Observation>()
+            for ((responder, rows) in groups) {
+                val dataRows = rows.map { it.bytes }.distinct()
+                val address = responder ?: physicalCanResponder
+                val eligible = dataRows.size == 1 &&
+                    !(hasAddress && responder == null) &&
+                    !(responder == null && byResponder.isNotEmpty()) &&
+                    !(responder != null && byResponder.isNotEmpty() && pid !in byResponder[responder].orEmpty()) &&
+                    !(physicalCanResponder != null && responder != null && responder != physicalCanResponder)
+                for (data in dataRows) {
+                    val decoded = if (eligible) decode(pid, data).map { it.copy(responder = address) }
+                        else emptyList()
+                    values += decoded
+                    evidence += ObdMode01Observation(address, data, eligible, decoded.size)
+                }
             }
+            reads += ObdMode01Read(pid, response, evidence)
         }
-        return values
+        return values to reads
     }
 
     suspend fun readDtcs(): Triple<List<ObdDtc>, List<ObdDtc>, List<ObdDtc>> = Triple(
@@ -592,9 +615,7 @@ class Obd2FeatureEngine(
     ): ObdScanReport {
         val discovery = discoverPidAvailability()
         val supported = discovery.supported
-        val live = readLiveData(supported, discovery.byResponder).map {
-            if (physicalCanResponder != null && it.responder == null) it.copy(responder = physicalCanResponder) else it
-        }
+        val (live, mode01Reads) = collectMode01Reads(supported, discovery.byResponder, physicalCanResponder)
         val dtcSnapshot = readDtcRecords()
         val freezeFrameDtc = readFreezeFrameDtc()
         val freezeFrameSupported = if (freezeFrameDtc != null) discoverFreezeFrameSupportedPids() else emptySet()
@@ -627,7 +648,8 @@ class Obd2FeatureEngine(
             supportedPidsByResponder = if (physicalCanResponder != null)
                 mapOf(physicalCanResponder to supported) else discovery.byResponder,
             firstUnresolvedPid = discovery.firstUnresolvedPid,
-            pidAttributionIncomplete = physicalCanResponder == null && discovery.attributionIncomplete
+            pidAttributionIncomplete = physicalCanResponder == null && discovery.attributionIncomplete,
+            mode01Reads = mode01Reads
         )
     }
 

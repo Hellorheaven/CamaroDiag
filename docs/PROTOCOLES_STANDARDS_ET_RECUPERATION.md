@@ -517,3 +517,7 @@ Un seul protocole est actif pour ce travail : **ISO-TP CAN classique**, sans bas
 **Statut :** code et tests enregistrés dans la branche PR #95 ; checkpoint Debug unique demandé en fin de tranche. En l'absence du rapport GitHub Actions au SHA exact, écrire **NON VALIDÉ** et garder la valeur d'avancement logiciel indicative précédente. La qualification J2534 matériel, bus-off, timing réel, performances, compatibilité sur plusieurs ECU, opérations OEM d'écriture et restauration/anti-brick restent **OUVERTES**. Une validation logicielle isolée ne clôture pas le protocole au sens de la qualification véhicule.
 
 Références documentaires indépendantes : [Linux ISO-TP](https://docs.kernel.org/networking/iso15765-2.html), [python-can-isotp](https://can-isotp.readthedocs.io/en/latest/isotp/implementation.html). Aucune norme commerciale redistribuée.
+
+## Reprise SAE J1979 après clôture logicielle DoIP (26/11/2026)
+
+Le protocole actif est SAE J1979 classique. Scan Android Mode 01 : lecture de tous les PID annoncés hors pages de support, conservation des octets bruts même sans définition et export JSON `mode01Reads` avec attribution, éligibilité et nombre de valeurs décodées. Les réponses contradictoires ou anonymes non attribuables ne deviennent pas des mesures. Aucun service mutateur lancé par le scan. Ce lot n'est pas la clôture J1979 ; compléter les services et raccordements applicables avant validation groupée.

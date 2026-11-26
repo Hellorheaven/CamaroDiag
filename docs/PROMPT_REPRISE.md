@@ -1,3 +1,7 @@
+## Protocole actif après DoIP — SAE J1979 OBD-II (26/11/2026)
+
+- Choix du prochain protocole : SAE J1979 classique, priorité au scan multimarque demandé par le propriétaire. C6 reste actif en parallèle ; aucun second protocole ouvert. Le scan Android lit maintenant chaque PID annoncé Mode 01 (hors bitmaps de continuation), conserve les observations brutes par répondant et la réponse complète, distingue absence de réponse, conflit/attribution et absence de décodage ; export JSON et rubrique FR/EN dédiés. Pas de PID arbitraire, ni interprétation inventée. Tests écrits, non exécutés. Restent services 02/05/06/08/09, preuves par transport et intégration Windows/Connectors ; ne pas déclarer J1979 terminé.
+
 ## C6 — inspection interrompue et adresse incertaine (26/11/2026)
 
 - Propagation de l'adresse du secteur en cours d'effacement lorsque les originaux sont intègres mais la transaction interrompue. Le calcul de SHA-256 vérifie l'annulation et le contexte à chaque bloc de lecture, propage l'annulation plutôt que d'afficher une fausse erreur d'intégrité. Tests de régression ajoutés, non exécutés. Aucun accès ECU.

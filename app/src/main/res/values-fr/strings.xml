@@ -1255,4 +1255,9 @@
     <string name="cal_recovery_sector">%1$s · 0x%2$X · %3$d octets</string>
     <string name="cal_recovery_more">%1$d secteurs supplémentaires vérifiés</string>
     <string name="cal_recovery_no_restore">L’intégrité des fichiers ne garantit pas la restauration du calculateur. Aucune écriture ni réinitialisation effectuée.</string>
+    <string name="obd_raw_pid_title">Réponses PID brutes ou non résolues</string>
+    <string name="obd_raw_pid_notice">Les PID annoncés sont interrogés même sans définition vérifiée. Les octets bruts ne constituent pas une mesure décodée.</string>
+    <string name="obd_raw_pid_no_value">Aucune réponse positive exploitable</string>
+    <string name="obd_raw_pid_undecoded">Aucune valeur décodée vérifiée</string>
+    <string name="obd_raw_pid_unattributed">Réponse contradictoire ou non attribuable</string>
 </resources>

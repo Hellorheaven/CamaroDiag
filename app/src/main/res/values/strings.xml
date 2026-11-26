@@ -1252,4 +1252,9 @@
     <string name="cal_recovery_sector">%1$s · 0x%2$X · %3$d bytes</string>
     <string name="cal_recovery_more">%1$d additional sectors verified</string>
     <string name="cal_recovery_no_restore">File integrity does not establish that the ECU is safe to restore. No write or reset performed.</string>
+    <string name="obd_raw_pid_title">Raw or unresolved PID responses</string>
+    <string name="obd_raw_pid_notice">Advertised PIDs are read even without a verified definition. Raw bytes are not a decoded measurement.</string>
+    <string name="obd_raw_pid_no_value">No usable positive response</string>
+    <string name="obd_raw_pid_undecoded">No verified decoded value</string>
+    <string name="obd_raw_pid_unattributed">Conflicting or unattributed response</string>
 </resources>

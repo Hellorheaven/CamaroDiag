@@ -274,6 +274,30 @@ fun ObdScanScreen(
                 }
             }
 
+            val unresolvedReads = report.mode01Reads.filter { read ->
+                read.observations.isEmpty() || read.observations.any { it.decodedValueCount == 0 }
+            }
+            if (unresolvedReads.isNotEmpty()) {
+                item {
+                    SectionTitle(stringResource(R.string.obd_raw_pid_title))
+                    Text(stringResource(R.string.obd_raw_pid_notice), color = TextMuted, fontSize = 12.sp)
+                }
+                items(unresolvedReads, key = { "mode01-raw-${it.pid}" }) { read ->
+                    InfoCard(title = stringResource(R.string.obd_pid_generic, read.pid)) {
+                        if (read.observations.isEmpty()) {
+                            Text(stringResource(R.string.obd_raw_pid_no_value), color = CamaroAmber)
+                            Text(read.rawResponse.take(1024), fontFamily = FontFamily.Monospace, fontSize = 11.sp)
+                        } else read.observations.filter { it.decodedValueCount == 0 }.forEach { observation ->
+                            observation.responder?.let { Text(stringResource(R.string.obd_value_source, it), color = TextMuted) }
+                            Text(stringResource(if (observation.eligibleForDecode) R.string.obd_raw_pid_undecoded
+                                else R.string.obd_raw_pid_unattributed), color = CamaroAmber)
+                            Text(observation.bytes.joinToString(" ") { "%02X".format(it) },
+                                fontFamily = FontFamily.Monospace, fontSize = 12.sp)
+                        }
+                    }
+                }
+            }
+
             item {
                 SectionTitle(stringResource(R.string.obd_dtc_title))
             }

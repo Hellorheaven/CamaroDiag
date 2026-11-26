@@ -925,5 +925,50 @@ class Obd2FeatureEngineTest {
     }
 
 
+    @Test
+    fun fullScanReadsAdvertisedUnknownPidsAndPreservesEvidence() = runBlocking {
+        val commands = mutableListOf<String>()
+        val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+            commands += command
+            when (command) {
+                "0100" -> "7E8 06 41 00 00 00 00 01"
+                "0120" -> "7E8 06 41 20 00 00 00 01"
+                // 0x41, 0x42 and 0x51 advertised; only 0x42 decoded.
+                "0140" -> "7E8 06 41 40 C0 00 80 00"
+                "0141" -> "7E8 06 41 41 01 02 03 04"
+                "0142" -> "7E8 04 41 42 36 B0"
+                "0151" -> "NO DATA"
+                else -> "NO DATA"
+            }
+        })
+        val report = engine.fullReadOnlyScan()
+        assertEquals(setOf(0x41, 0x42, 0x51), report.mode01Reads.map { it.pid }.toSet())
+        val unknown = report.mode01Reads.single { it.pid == 0x41 }.observations.single()
+        assertEquals("7E8", unknown.responder)
+        assertEquals(listOf(1, 2, 3, 4), unknown.bytes)
+        assertTrue(unknown.eligibleForDecode)
+        assertEquals(0, unknown.decodedValueCount)
+        assertTrue(report.liveData.none { it.pid == 0x41 })
+        assertEquals(1, report.mode01Reads.single { it.pid == 0x42 }.observations.single().decodedValueCount)
+        assertTrue(report.mode01Reads.single { it.pid == 0x51 }.observations.isEmpty())
+        assertFalse("0143" in commands)
+        Unit
+    }
 
+    @Test
+    fun conflictingRawResponsesRemainSeparateAndNeverBecomeValues() = runBlocking {
+        val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+            when (command) {
+                "0100" -> "7E8 06 41 00 08 00 00 00"
+                "0105" -> "7E8 03 41 05 37\r7E8 03 41 05 FF"
+                else -> "NO DATA"
+            }
+        })
+        val report = engine.fullReadOnlyScan()
+        val evidence = report.mode01Reads.single { it.pid == 5 }.observations
+        assertEquals(setOf(listOf(0x37), listOf(0xFF)), evidence.map { it.bytes }.toSet())
+        assertTrue(evidence.none { it.eligibleForDecode })
+        assertTrue(report.liveData.none { it.pid == 5 })
+        Unit
+    }
 }
