@@ -1,3 +1,7 @@
+## J1979 / C6 — cycle matériel HAL STM32 et contrôle du bail SPI (26/11/2026)
+
+- Propriétaire HAL FDCAN/SPI : filtre RX exact unique 11/29 bits, rejet des autres trames/RTR, FIFO bloquante, démarrage FDCAN sous interlock TX fermé, contrôle de génération et d'états physiques avant admission, inhibition TX avant annulation et arrêt HAL, preuve de quiescence indépendante et verrou recovery. Les callbacks doivent provenir du véritable superviseur local ; GPIO/bitrate/horloge et qualification non inventés. ESP32 : vérification après persistance de l'intention et contrôle du bail exact à chaque transaction SPI ; régression de bail révoqué écrite. Aucun test exécuté ni CI, fusion ou Release. J1979/C6 ouverts.
+
 ## C6 / J1979 — verrou électrique durable NVS avant ouverture (26/11/2026)
 
 - Journal séparé du flash ECU : état Clean/Active avec génération et CRC ; marqueur Active durabilisé et relu AVANT démarrage électrique, retour Clean uniquement après arrêt physique vérifié dans la même session. NVS absent/corrompu, état Active au reboot, écriture incertaine et débordement verrouillent. Le propriétaire USB utilise ce garde obligatoirement ; aucun effacement ni remise à zéro via l'API. Provisionnement initial Clean et résolution recovery restent à réaliser sous procédure locale qualifiée ; le firmware de découverte ne les expose pas. Tests natifs de redémarrage, corruption, panne disque et démarrage/arrêt écrits, non exécutés. J1979/C6 ouverts ; aucun test, CI, fusion ni Release.

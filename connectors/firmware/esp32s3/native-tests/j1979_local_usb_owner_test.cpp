@@ -67,6 +67,9 @@ int main(){
   Fixture stopDisk;assert(stopDisk.lease(l)&&stopDisk.owner.startReadChannel(stopDisk.profile,l));
   stopDisk.store.writable=false;
   assert(!stopDisk.owner.stopAndVerifyQuiescent()&&stopDisk.board.stops==1&&stopDisk.arbiter.recoveryRequired());
+  Fixture staleLease;assert(staleLease.lease(l)&&staleLease.owner.startReadChannel(staleLease.profile,l));
+  assert(staleLease.arbiter.release(l)&&!staleLease.owner.spiAdmitted());
+  assert(staleLease.owner.stopAndVerifyQuiescent()&&staleLease.board.stops==1);
   Fixture busy;HostSessionArbiter::Lease otherLease;
   auto evidence=busy.owner.currentEvidence(busy.profile);evidence.authenticated=true;
   assert(busy.arbiter.acquire(HostInterface::PcBridge,evidence,otherLease));

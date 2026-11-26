@@ -80,7 +80,11 @@ class J1979LocalUsbOwner final:public J1979UsbAuthSession::Security,
     if(!durable_.begin()){
       failedStop_=true;board_.latchRecovery();arbiter_.latchRecovery();return false;
     }
-    attempted_=true;
+    attempted_=true;lease_=lease;
+    // Storage I/O may outlast the connection or consent. Revalidate after
+    // the durable intent and before any hardware operation.
+    if(!localApproval(p)||!arbiter_.allowsRead(lease,currentEvidence(p)))return false;
+    physicalAttempted_=true;
     return board_.start(p,lease.generation)&&localApproval(p)&&
       arbiter_.allowsRead(lease,currentEvidence(p));
   }
@@ -90,13 +94,14 @@ class J1979LocalUsbOwner final:public J1979UsbAuthSession::Security,
     // Never stop a different owner's channel if this session never tried
     // to start. A partially failed start still requires a verified stop.
     if(!attempted_)return true;
-    if(!board_.stopAndVerify()||!durable_.finishVerified()){
+    if((physicalAttempted_&&!board_.stopAndVerify())||!durable_.finishVerified()){
       durable_.uncertain();failedStop_=true;board_.latchRecovery();arbiter_.latchRecovery();return false;
     }
     stopped_=true;return true;
   }
   bool spiAdmitted(){
-    return attempted_&&!stopped_&&!failedStop_&&currentHost()&&localApproval(profile_);
+    return physicalAttempted_&&!stopped_&&!failedStop_&&currentHost()&&localApproval(profile_)&&
+      arbiter_.allowsRead(lease_,currentEvidence(profile_));
   }
   void transportFault(){
     if(attempted_&&!stopped_)stopAndVerifyQuiescent();
@@ -113,6 +118,8 @@ class J1979LocalUsbOwner final:public J1979UsbAuthSession::Security,
   }
   Board& board_;HostSessionArbiter& arbiter_;J1979ReadGuard& durable_;
   const Profile profile_;const Snapshot initial_;
-  bool granted_=false,revoked_=false,attempted_=false,stopped_=false,failedStop_=false;
+  HostSessionArbiter::Lease lease_;
+  bool granted_=false,revoked_=false,attempted_=false,physicalAttempted_=false,
+    stopped_=false,failedStop_=false;
 };
 }
