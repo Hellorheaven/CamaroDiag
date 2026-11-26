@@ -33,6 +33,29 @@ class ObdMode08DiscoveryTest {
         assertFalse(malformed.complete)
     }
 
+    @Test fun finalContinuationCannotWrapToAnotherPage() = runBlocking {
+        val result = ObdMode08Discovery.discover(false) { command, _ ->
+            "48" + command.substring(2) + "80000001"
+        }
+        assertFalse(result.complete)
+        assertEquals(8, result.pages.size)
+        assertTrue(result.pages.last().positiveRecords.isEmpty())
+    }
+
+    @Test fun deadlineDoesNotTransmitAnotherInventoryPage() = runBlocking {
+        var now = 0L
+        val commands = mutableListOf<String>()
+        val result = ObdMode08Discovery.discover(false, budgetMs = 100L, clockMs = { now }) { cmd, timeout ->
+            commands += cmd
+            assertEquals(100L, timeout)
+            now += timeout
+            "480080000001"
+        }
+        assertEquals(listOf("0800"), commands)
+        assertFalse(result.complete)
+        assertEquals(setOf(1), result.supportedTests)
+    }
+
     @Test fun mixedOrMissingResponsesDoNotProveCompleteInventory() = runBlocking {
         val result = ObdMode08Discovery.discover(false) { command, _ ->
             when (command) {
