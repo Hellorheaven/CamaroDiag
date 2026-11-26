@@ -34,7 +34,8 @@ internal static class DoIpVinReader
         IReadOnlyList<ushort> targets, bool tls, TimeSpan timeout, CancellationToken token,
         string? certificate = null, DoIpDiagnosticTransport.SessionOptions? options = null,
         DoIpVehicleDiscovery.DatagramTrace? udpTrace = null,
-        Action<ushort, DoIpDiagnosticTransport.PduTrace>? pduTrace = null, bool obd = false)
+        Action<ushort, DoIpDiagnosticTransport.PduTrace>? pduTrace = null, bool obd = false,
+        Action<IReadOnlyList<InventoryEntry>, int>? progress = null)
     {
         var frozen = targets.ToArray();
         if (!DoIpVehicleDiscovery.IsVehicleVin(expectedVin) || gateway.Vin != expectedVin ||
@@ -66,18 +67,31 @@ internal static class DoIpVinReader
             {
                 rows.Add(new(ecu, null, "timeout"));
             }
-            catch (Exception error) when (error is IOException or InvalidDataException or
-                System.Net.Sockets.SocketException or TimeoutException)
+            catch (TimeoutException)
+            {
+                token.ThrowIfCancellationRequested();
+                rows.Add(new(ecu, null, "timeout"));
+            }
+            catch (InvalidDataException)
+            {
+                token.ThrowIfCancellationRequested();
+                rows.Add(new(ecu, null, "identity_or_response_invalid"));
+            }
+            catch (Exception error) when (error is IOException or System.Net.Sockets.SocketException)
             {
                 // A failed read cannot establish that an ECU does not exist.
                 token.ThrowIfCancellationRequested();
                 rows.Add(new(ecu, null, "communication_or_identity_failure"));
             }
+            // Revalidate the gateway outside the ECU failure handlers. Never
+            // publish a row, even a failed one, if the gateway has drifted.
+            await DoIpVehicleDiscovery.RequireCurrentIdentityAsync(gateway, timeout, token, udpTrace);
+            token.ThrowIfCancellationRequested();
+            progress?.Invoke(Array.AsReadOnly(rows.ToArray()), frozen.Length);
+            token.ThrowIfCancellationRequested();
             // AuthenticationException and caller/trace errors are deliberately fatal.
         }
-        await DoIpVehicleDiscovery.RequireCurrentIdentityAsync(gateway, timeout, token, udpTrace);
-        token.ThrowIfCancellationRequested();
-        return rows;
+        return Array.AsReadOnly(rows.ToArray());
     }
 
     internal static string ParseVin(byte[] reply)
