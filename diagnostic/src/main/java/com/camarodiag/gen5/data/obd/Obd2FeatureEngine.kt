@@ -742,6 +742,16 @@ class Obd2FeatureEngine(
     ): List<ObdDtc>? {
         val lines = response.lineSequence().map { it.trim().removeSuffix(">").trim().uppercase(Locale.ROOT) }
             .filter { it.isNotEmpty() }.toList()
+        // Physical multi-frame CAN replies retain their responder while
+        // reassembling ISO-TP. Never decode a first/consecutive frame alone.
+        if (ObdNumberedDtcRecords.hasMultiFrame(response, positiveService)) {
+            val records = ObdNumberedDtcRecords.parsePhysical(response, positiveService) ?: return null
+            val positive = records.filter { it.firstOrNull() == positiveService }
+            if (positive.isEmpty() || positive.any { !ObdNumberedDtcRecords.validPositive(it, positiveService) })
+                return null
+            return positive.flatMap { decodeSingleDtcPayload(it.drop(1), status).orEmpty() }
+                .distinctBy(ObdDtc::code)
+        }
         // Numbered ELM blocks must be complete, separately framed and
         // internally consistent. They contain CAN DTC counts, not legacy pairs.
         if (':' in response) {
