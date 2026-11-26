@@ -46,6 +46,22 @@ class EcuPhysicalBackupInspectionTest {
             assertEquals(2, normal.expectedSectors)
             assertEquals(2, normal.sectors.size)
             assertEquals(16L, normal.verifiedBytes)
+
+            // Cancellation at the last possible checkpoint must not publish
+            // an already computed but no longer authorized success.
+            var totalChecks = 0
+            assertTrue(EcuPhysicalBackupInspection.inspect(journalFile, target, vin) { totalChecks++ }.verified)
+            var finalChecks = 0
+            try {
+                EcuPhysicalBackupInspection.inspect(journalFile, target, vin) {
+                    if (++finalChecks == totalChecks)
+                        throw java.util.concurrent.CancellationException("cancel before publication")
+                }
+                throw AssertionError("Final inspection cancellation must propagate")
+            } catch (_: java.util.concurrent.CancellationException) {
+                assertEquals(totalChecks, finalChecks)
+            }
+
             assertEquals(
                 PersistentEcuWriteJournal.RecoveryDisposition.NO_ERASE_RECORDED,
                 normal.journalDisposition)
