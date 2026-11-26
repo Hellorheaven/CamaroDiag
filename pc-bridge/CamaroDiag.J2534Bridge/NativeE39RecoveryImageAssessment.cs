@@ -78,7 +78,9 @@ internal static class NativeE39RecoveryImageAssessment
                 NativeE39SavedBlockAssessment.InspectTargetMetadata(journalPath) != target)
                 throw new InvalidDataException("Original BIN or ECU metadata changed during inspection.");
             var final = NativeE39SavedBlockAssessment.Inspect(journalPath);
-            if (!final.Verified || final.JournalState != physical.JournalState ||
+            if (!final.Verified || physical.SnapshotSha256 is null ||
+                final.SnapshotSha256 != physical.SnapshotSha256 ||
+                final.JournalState != physical.JournalState ||
                 !final.Blocks.SequenceEqual(physical.Blocks))
                 throw new InvalidDataException("Physical backup evidence changed during original comparison.");
             return new Report(true, verified, "");
