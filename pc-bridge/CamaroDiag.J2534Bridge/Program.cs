@@ -233,11 +233,12 @@ internal static class Program
 
     private static int InspectWriteJournal(string[] args)
     {
-        if (args.Length != 2 ||
+        if (args.Length is < 2 or > 3 ||
             !args[0].Equals("--inspect-write-journal", StringComparison.OrdinalIgnoreCase) ||
-            string.IsNullOrWhiteSpace(args[1]))
+            string.IsNullOrWhiteSpace(args[1]) ||
+            (args.Length == 3 && string.IsNullOrWhiteSpace(args[2])))
         {
-            Console.Error.WriteLine("Usage: --inspect-write-journal <journal.jsonl>");
+            Console.Error.WriteLine("Usage: --inspect-write-journal <journal.jsonl> [original-3MiB.bin]");
             return 6;
         }
 
@@ -273,15 +274,28 @@ internal static class Program
                     Console.WriteLine($"  0x{block.Address:X8}  {block.Length} bytes  SHA-256 {block.OriginalSha256}");
             }
             else Console.Error.WriteLine("Physical backup error: " + backups.Problem);
+            var referenceVerified = true;
+            if (args.Length == 3)
+            {
+                var reference = NativeE39RecoveryImageAssessment.Inspect(args[1], args[2]);
+                referenceVerified = reference.Verified;
+                Console.WriteLine("Original full BIN vs live physical sector captures: " +
+                    (referenceVerified ? $"MATCH ({reference.VerifiedSectors} sectors)" :
+                        "UNVERIFIED (" + reference.Problem + ")"));
+                if (reference.FailedSectorAddress is uint mismatchedAddress)
+                    Console.Error.WriteLine($"Unverified original sector: 0x{mismatchedAddress:X8}");
+            }
             Console.WriteLine("Offline evidence only; no ECU contact, reset, programming or automatic restoration.");
             if (!report.RequiresAssessment && backups.Verified && target.Verified &&
-                geometryConsistent) return 0;
+                geometryConsistent && referenceVerified) return 0;
             if (!target.Verified)
                 Console.Error.WriteLine("Original ECU identity metadata unavailable; verify VIN/OSID independently.");
             if (!backups.Verified)
                 Console.Error.WriteLine("Physical originals incomplete or changed; do NOT attempt restoration.");
             if (backups.Verified && !geometryConsistent)
                 Console.Error.WriteLine("Saved sectors do not match known silicon erase geometry; no restoration qualified.");
+            if (!referenceVerified)
+                Console.Error.WriteLine("Selected BIN differs from the recovery evidence; do NOT use it for ECU restoration.");
             Console.Error.WriteLine(report.RequiresAssessment
                 ? "The ECU write journal does not prove a completed transaction; preserve its recovery evidence."
                 : "The ECU write journal is complete, but offline recovery evidence is incomplete or inconsistent.");

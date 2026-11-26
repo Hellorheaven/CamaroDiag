@@ -21,7 +21,7 @@ internal static class NativeE39SavedBlockAssessment
     }
 
     internal sealed record TargetMetadata(bool Verified, string? Family,
-        string? Vin, uint? OsId, string Problem);
+        string? Vin, uint? OsId, string Problem, string? OriginalImageSha256 = null);
 
     /// <summary>
     /// Verify the separately persisted target manifest before using its
@@ -80,10 +80,10 @@ internal static class NativeE39SavedBlockAssessment
                 throw new InvalidDataException("Unusable ECU VIN, family, OSID or profile metadata.");
             _ = Digest("ProfileSha256");
             _ = Digest("DriverSha256");
-            _ = Digest("OriginalSha256");
+            var originalImageSha256 = Digest("OriginalSha256");
             _ = Digest("TargetSha256");
             _ = Digest("KernelSha256");
-            return new TargetMetadata(true, family, vin, osid, "");
+            return new TargetMetadata(true, family, vin, osid, "", originalImageSha256);
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException or
             InvalidDataException or JsonException or KeyNotFoundException or

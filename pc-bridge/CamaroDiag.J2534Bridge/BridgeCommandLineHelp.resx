@@ -14,7 +14,7 @@ Usage:
   CamaroDiag.J2534Bridge.exe --probe-drivers
   CamaroDiag.J2534Bridge.exe --discover-connector COM5
   CamaroDiag.J2534Bridge.exe --inspect-connector-checkpoint checkpoint.bin
-  CamaroDiag.J2534Bridge.exe --inspect-write-journal attempt.jsonl
+  CamaroDiag.J2534Bridge.exe --inspect-write-journal attempt.jsonl original-3MiB.bin
   CamaroDiag.J2534Bridge.exe --inspect-e39-image original-3MiB.bin
   CamaroDiag.J2534Bridge.exe --port 35001
   CamaroDiag.J2534Bridge.exe --port 35001 --memory-read-profile profile.json
@@ -33,8 +33,8 @@ Examples:
   --self-test                 Software simulation only. No ECU or adapter.
   --probe-drivers             Inspect installed Windows J2534 drivers; no ECU.
   --discover-connector COM5   USB serial CD/1 discovery only, isolated prototype.
-  --inspect-write-journal attempt.jsonl
-                              Inspect journal, physical backups and sector geometry offline; never erase or restore.
+  --inspect-write-journal attempt.jsonl [original-3MiB.bin]
+                              Inspect journal, saved physical blocks and optionally compare an original full BIN; no ECU write.
   --port 35001                Start the TLS-paired LAN bridge using a selected J2534 driver.
                               It may check for app updates; never forward the LAN port to the Internet.
   --allow-obd-clear           Explicitly enable OBD DTC clear on this local bridge run.
