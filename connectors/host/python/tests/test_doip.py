@@ -300,6 +300,21 @@ class DoIpTests(unittest.TestCase):
         with self.assertRaises(TransportRefusal):
             parse_identity(GATEWAY.host, encode(2, 0, b"\x02"), VIN)
 
+    def test_gateway_status_wrong_version_cannot_be_classified_as_correlated_header_nack(self):
+        with patch("camarodiagconnectors.doip.discover", return_value=GATEWAY), \
+             patch("camarodiagconnectors.doip._udp",
+                   return_value=encode(3, 0, bytes((2,)))):
+            with self.assertRaises(DoIpError) as error:
+                status(GATEWAY)
+        self.assertNotIsInstance(error.exception, TransportRefusal)
+        with patch("camarodiagconnectors.doip.discover", return_value=GATEWAY), \
+             patch("camarodiagconnectors.doip._udp",
+                   return_value=encode(2, 0, bytes((2,)))):
+            with self.assertRaises(TransportRefusal) as refusal:
+                status(GATEWAY)
+        self.assertEqual((refusal.exception.layer, refusal.exception.code),
+                         ("header_nack", 2))
+
     def test_inventory_progress_is_detached_and_follows_gateway_revalidation(self):
         events = []
         def discover_target(*args):
