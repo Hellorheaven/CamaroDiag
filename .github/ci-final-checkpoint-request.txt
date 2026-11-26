@@ -48,3 +48,12 @@ corrected:
 - Simulator LFX Mode01 replies inherit the same synthetic physical responder 7E8 advertised in support bitmap; no anonymous live data in physically attributed scan
 - Simulator test now explicitly requires stable physical responder for synthetic RPM evidence
 commits: e10c7de09024b7a2d061011adb664a6b7ec9c859, 77535af20df3a6f0a3e630a549b67c5f53f88990, 553f0130791adfe4aee7e94ac76f3c834e3668e9
+
+attempt: 6 -- grouped final DoIP gate
+previous_gate_sha: 32a3c84816a7bc4117dc46a73f9e482db1dcbbd9
+previous_gate: https://github.com/Hellorheaven/CamaroDiag/actions/runs/45802379339
+corrected:
+- Windows DoIP protocol CLI: compare output binary path to normalized Path.GetFullPath() (commit fd642d3)
+- Android simulator: consistent physical 7E8 provenance for Mode02 DTC, support bitmap and freeze-frame values
+- Regress Mode02 source continuity on the synthetic LFX simulator without relaxing strict real ECU attribution
+commits: fd642d3a2ab52643ad5d9f421a0c33939a630f89, e7720e438a082ba70e4b8fd804122db8228a6145, f07bb766dd01d2a53f39aa9079557ce8e548be54
