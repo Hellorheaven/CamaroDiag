@@ -848,7 +848,7 @@ class Session:
         remaining(deadline)
         return bytes(data)
 
-    def _receive(self, deadline: float, first: bytes = b"") -> tuple[int, bytes]:
+    def _receive(self, deadline: float, first: bytes = b"", *, idle: bool = False) -> tuple[int, bytes]:
         wire = self._wire()
         raw_header = first + self._read_exact(8 - len(first), deadline)
         version, kind, length = header(raw_header)
@@ -859,7 +859,8 @@ class Session:
         remaining(deadline)
         if version != self.gateway.version:
             raise DoIpError("DoIP version changed")
-        require_no_header_nack(kind, body)
+        if not idle:
+            require_no_header_nack(kind, body)
         return kind, body
 
     def _alive(self, kind: int, body: bytes, deadline: float) -> bool:
@@ -893,7 +894,7 @@ class Session:
                 raise
             if not first:
                 raise EOFError("DoIP socket closed before next exchange")
-            kind, body = self._receive(deadline, first)
+            kind, body = self._receive(deadline, first, idle=True)
             if not self._alive(kind, body, deadline):
                 raise DoIpError("Unexpected diagnostic data before next request")
 
@@ -920,7 +921,7 @@ class Session:
                 if not first:
                     raise EOFError("DoIP socket closed while idle")
                 frame_end = time.monotonic() + self.timeout
-                kind, body = self._receive(frame_end, first)
+                kind, body = self._receive(frame_end, first, idle=True)
                 if not self._alive(kind, body, frame_end):
                     raise DoIpError("Unexpected diagnostic data while idle")
         except BaseException:
