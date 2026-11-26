@@ -747,6 +747,9 @@ def inventory_ecus(gateway: Gateway, expected: str, tester: int, targets: tuple[
         require_gateway(sink)
         if on_progress is not None:
             on_progress([dict(row) for row in rows], len(targets))
+    # Final overall evidence is recorded after every individual socket and
+    # its post-close identity check, before a complete inventory is returned.
+    require_gateway(trace)
     return {"vin": expected, "complete": True, "targets": rows,
             "identification": "F802/F810" if obd else "F190",
             "verified_count": sum(row["status"] == "vin_verified" for row in rows),

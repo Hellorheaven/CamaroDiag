@@ -855,8 +855,8 @@ internal static class StandardVehicleProtocolsSelfTests
         {
             var read = StandardProtocolCli.ParseVerifiedDoIpRead([..legacyArgs, option, "0x08"]);
             Check(!read.Obd && read.Target.Request.SequenceEqual(new byte[] { 0x19, sub, 8 }), "Legacy scope uses explicit UDS.");
-            byte[] reply = sub is 0x11 or 0x12 ? [0x59, sub, 8, 1, 0, 2] : [0x59, sub, 8, 1, 2, 3, 8];
-            var result = ObdOnUdsServices.DecodeLegacyDtc(read.Target.Request, reply);
+            byte[] legacyReply = sub is 0x11 or 0x12 ? [0x59, sub, 8, 1, 0, 2] : [0x59, sub, 8, 1, 2, 3, 8];
+            var result = ObdOnUdsServices.DecodeLegacyDtc(read.Target.Request, legacyReply);
             Check(result.Subfunction == sub && (sub is 0x11 or 0x12 ? result.Count?.Count == 2 :
                 result.List?.Codes.Single().Code == 0x010203), "Legacy count or list preserved.");
             Reject<InvalidDataException>(() => ObdOnUdsServices.DecodeLegacyDtc(read.Target.Request,

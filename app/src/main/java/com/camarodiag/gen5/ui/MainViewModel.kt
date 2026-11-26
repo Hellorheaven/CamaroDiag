@@ -1794,7 +1794,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         val heading = (result.decodedMemory?.let { localizedContext.getString(R.string.cal_doip_decoded_memory, it) + "\n" } ?: "") +
                             localizedContext.getString(R.string.cal_doip_decoded_extended_result, report.dtc, report.status, report.records.size)
                         (listOf(heading) + report.records.map { row ->
-                            localizedContext.getString(R.string.cal_doip_extended_record_result, row.number,
+                            localizedContext.getString(R.string.cal_doip_decoded_extended_record_row, row.number,
                                 row.data.joinToString(" ") { "%02X".format(it.toInt() and 255) })
                         }).joinToString("\n")
                     }

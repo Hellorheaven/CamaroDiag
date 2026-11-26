@@ -553,7 +553,11 @@ internal static class DoIpVinReader
         await using var link = await ConnectObservedAsync(gateway, address, tester, ecu,
             tls, timeout, token, certificate, trace, options);
         return await ReadVerifiedDtcAsync(link, gateway, timeout, token, async () =>
-            ObdOnUdsServices.DecodeSeverity(frozen, await link.ExchangeUdsAsync(frozen, timeout, token)));
+        {
+            // Do not preserve an implicit ReadOnlySpan argument across await.
+            var response = await link.ExchangeUdsAsync(frozen, timeout, token);
+            return ObdOnUdsServices.DecodeSeverity(frozen, response);
+        });
     }
 
     internal static async Task<IReadOnlyList<ObdOnUdsServices.FaultCounter>> ReadObservedFaultCountersAsync(

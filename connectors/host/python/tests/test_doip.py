@@ -76,7 +76,7 @@ class DoIpTests(unittest.TestCase):
                     output = io.StringIO()
                     args = ["--host", GATEWAY.host, "--vin", VIN, "--tester", "0E80",
                             "--ecu", "1234", "--tcp", action, "--samples", "2"]
-                    args += ["--did", "F40D"] if action == "monitor" else ["--layout", "F40D:1"]
+                    args += ["--did", "F40D"] if action == "monitor" else ["--layout", "F40D:1,F40E:1"]
                     def monitor(*args, on_sample, **kwargs):
                         rows = [{"index": 1, "data": "01"}, {"index": 2, "data": "02"}]
                         on_sample(rows[0])
@@ -194,7 +194,7 @@ class DoIpTests(unittest.TestCase):
             self.assertEqual([row["status"] for row in result["targets"]], ["vin_verified", "unverified"])
             self.assertEqual(result["targets"][1]["nrc"], 0x31)
             self.assertEqual(result["verified_count"], 1)
-            self.assertEqual(discover_mock.call_count, 3)
+            self.assertEqual(discover_mock.call_count, 5)
             self.assertEqual([call.args[2] for call in session.call_args_list], [0x1234, 0x1235])
             self.assertTrue(all(call.kwargs["tls"] for call in session.call_args_list))
 
@@ -214,7 +214,7 @@ class DoIpTests(unittest.TestCase):
             self.assertFalse(result["targets"][1]["obd_on_uds"])
             self.assertEqual(result["targets"][2]["status"], "unverified")
             self.assertNotIn("obd_on_uds", result["targets"][2])
-            self.assertEqual(discover_mock.call_count, 4)
+            self.assertEqual(discover_mock.call_count, 7)
             active.verify_vin.assert_not_called()
 
     def test_inventory_trace_attributes_real_events_and_final_discovery(self):
@@ -235,7 +235,8 @@ class DoIpTests(unittest.TestCase):
         self.assertEqual(result["verified_count"], 2)
         self.assertEqual([(row[0], row[2], row[4]) for row in events],
                          [(0x1234, "UDP", "0001"), (0x1234, "TLS", "0005"),
-                          (0x1235, "UDP", "0001"), (0x1235, "TLS", "0005")])
+                          (0x1234, "UDP", "0001"), (0x1235, "UDP", "0001"),
+                          (0x1235, "TLS", "0005"), (0x1235, "UDP", "0001")])
         self.assertEqual(final, [("RX", "UDP", GATEWAY.host, "0001")])
 
     def test_inventory_trace_failure_aborts_without_next_ecu(self):

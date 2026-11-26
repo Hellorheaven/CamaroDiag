@@ -1158,7 +1158,7 @@
     <string name="cal_doip_obd_decoded_extended">Données étendues OBDonUDS décodées</string>
     <string name="cal_doip_extended_catalog">Longueurs documentées des enregistrements (ex. 01:2,90:1)</string>
     <string name="cal_doip_decoded_extended_result">DTC %1$06X — statut %2$02X — enregistrements : %3$d</string>
-    <string name="cal_doip_extended_record_result">Enregistrement 0x%1$02X : %2$s</string>
+    <string name="cal_doip_decoded_extended_record_row">Enregistrement 0x%1$02X : %2$s</string>
     <string name="cal_doip_memory_decoded_snapshot">Snapshots décodés de la mémoire</string>
     <string name="cal_doip_memory_decoded_extended">Données étendues décodées de la mémoire</string>
     <string name="cal_doip_decoded_memory">Mémoire 0x%1$02X</string>
