@@ -23,6 +23,13 @@ internal static class J1979NativeReport
                 measurement=s.PidMeasurement is { } value?new {
                     mode=value.Mode,pid=value.Pid,name=value.Name,number=value.Number,unit=value.Unit
                 }:null}),
+            service_observations=new[]{1,2,3,6,7,8,9,10}.Select(mode=>{
+                string hex=mode.ToString("X2",CultureInfo.InvariantCulture);
+                var rows=result.Steps.Where(s=>s.RequestHex.StartsWith(hex,StringComparison.Ordinal)).ToArray();
+                return new {mode=hex,attempted=rows.Length,passed=rows.Count(s=>s.Status=="PASSED"),
+                    raw=rows.Count(s=>s.Status=="RAW"),negative=rows.Count(s=>s.Status=="NEGATIVE"),
+                    timeout=rows.Count(s=>s.Status=="TIMEOUT"),failed=rows.Count(s=>s.Status=="FAILED")};
+            }),
             summary=result.Summary is { } summary?new{
                 end=summary.End,steps=summary.Steps,
                 transport_observed=(summary.Flags&1)!=0,pid_inventory_complete=(summary.Flags&2)!=0,

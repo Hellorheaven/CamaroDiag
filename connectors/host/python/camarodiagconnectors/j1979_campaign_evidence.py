@@ -248,6 +248,18 @@ def _verify_campaign(steps, end, flags):
         raise ValueError("Campaign summary inconsistent with recorded steps")
 
 
+def service_observations(steps):
+    """Counts of observed requests, not protocol coverage or monitor outcomes."""
+    result = []
+    for mode in (1, 2, 3, 6, 7, 8, 9, 10):
+        key = f"{mode:02X}"
+        rows = [row for row in steps if row["request_hex"].startswith(key)]
+        result.append({"mode": key, "attempted": len(rows),
+                       **{status.lower(): sum(row["status"] == status for row in rows)
+                          for status in _STATES.values()}})
+    return result
+
+
 def decode(stream):
     """Consume one capture, preserving verified prefix on corruption/truncation."""
     report = {"schema": "camarodiag-functional-j1979-embedded-evidence-v1",
@@ -332,3 +344,5 @@ def decode(stream):
     except (EOFError, ValueError, OSError) as error:
         report["error"] = str(error)
         return report
+    finally:
+        report["service_observations"] = service_observations(report["steps"])

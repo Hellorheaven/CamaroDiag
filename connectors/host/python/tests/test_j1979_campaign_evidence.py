@@ -59,6 +59,12 @@ class CaptureTests(unittest.TestCase):
         self.assertIsNone(report["steps"][3]["dtc_codes"])
         self.assertEqual(0x11, report["steps"][3]["negative_response_code"])
         self.assertEqual([], report["steps"][4]["dtc_codes"])
+        modes = {row["mode"]: row for row in report["service_observations"]}
+        self.assertEqual(1, modes["03"]["passed"])
+        self.assertEqual(1, modes["07"]["negative"])
+        self.assertEqual(0, modes["07"]["passed"])
+        self.assertEqual(1, modes["0A"]["passed"])
+        self.assertEqual(len(report["steps"]), sum(row["attempted"] for row in modes.values()))
 
     def test_numeric_pid_measurement_only_for_verified_known_definitions(self):
         initial = step(1, b"\x01\x00", bytes.fromhex("410008100000"))
@@ -81,6 +87,8 @@ class CaptureTests(unittest.TestCase):
             report = decode(io.BytesIO(start() + INITIAL + tail))
             self.assertFalse(report["capture_integrity_verified"])
             self.assertEqual(1, len(report["steps"]))
+            self.assertEqual(1, report["service_observations"][0]["attempted"])
+            self.assertEqual(0, report["service_observations"][2]["attempted"])
             self.assertIsNotNone(report["error"])
         report = decode(io.BytesIO(CAPTURE + b"extra"))
         self.assertFalse(report["capture_integrity_verified"])

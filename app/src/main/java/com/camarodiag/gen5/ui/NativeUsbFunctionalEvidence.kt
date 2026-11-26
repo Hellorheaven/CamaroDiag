@@ -28,7 +28,7 @@ internal object NativeUsbFunctionalEvidence {
     /** Only a coherent authenticated-session report can feed the value display.
      * Missing mode evidence remains null, never an empty fault list. */
     fun diagnosticValues(report: JSONObject): DiagnosticValues? {
-        if (!report.optBoolean("device_credential_authenticated") ||
+        if (report.optBoolean("cancelled") || !report.optBoolean("device_credential_authenticated") ||
             !report.optBoolean("capture_integrity_verified")) return null
         val steps = report.optJSONArray("steps") ?: return null
         val vin = report.optString("observed_vin").takeIf { it.matches(Regex("[A-HJ-NPR-Z0-9]{17}")) }
@@ -60,7 +60,7 @@ internal object NativeUsbFunctionalEvidence {
 
     fun results(state: FunctionalTestState, report: JSONObject): FunctionalTestState {
         val auth = report.optBoolean("device_credential_authenticated")
-        val consistent = auth && report.optBoolean("capture_integrity_verified")
+        val consistent = auth && !report.optBoolean("cancelled") && report.optBoolean("capture_integrity_verified")
         val summary = report.optJSONObject("summary")
         val vin = report.optString("observed_vin").takeIf { it.matches(Regex("[A-HJ-NPR-Z0-9]{17}")) }
         val matches = consistent && vin != null && vin == state.context?.selectedVin
@@ -69,6 +69,9 @@ internal object NativeUsbFunctionalEvidence {
             (0 until steps.length()).any { i -> steps.optJSONObject(i)?.let {
                 it.optString("request_hex") == req && it.optString("status") == "PASSED"
             } == true }
+        fun attempted(req: String): Boolean = consistent && steps != null &&
+            (0 until steps.length()).any { i -> steps.optJSONObject(i)?.optString("request_hex") == req }
+        val dtcRequests = mapOf("dtc3" to "03", "dtc7" to "07", "dtca" to "0A")
         fun flag(name: String) = consistent && summary?.optBoolean(name) == true
         val checks = initial().map { row ->
             val key = row.key.substringAfter(':')
@@ -88,7 +91,8 @@ internal object NativeUsbFunctionalEvidence {
                 else -> false
             }
             val failed = key == "auth" && !auth || key == "integrity" && !consistent ||
-                key == "vin" && consistent && vin != null && !matches
+                key == "vin" && consistent && vin != null && !matches ||
+                (dtcRequests[key]?.let { attempted(it) && !positive(it) } == true)
             row.copy(outcome = when {
                 passed -> FunctionalTestOutcome.PASSED
                 failed -> FunctionalTestOutcome.FAILED
@@ -96,7 +100,7 @@ internal object NativeUsbFunctionalEvidence {
             }, detailEn = when { passed -> "Recorded evidence verified."; failed -> "Evidence rejected."; else -> row.detailEn },
                 detailFr = when { passed -> "Preuve enregistrée vérifiée."; failed -> "Preuve rejetée."; else -> row.detailFr })
         }
-        return state.copy(checks=checks,context=state.context?.copy(observedVin=vin),
+        return state.copy(checks=checks,context=state.context?.copy(observedVin=vin.takeIf { consistent }),
             nativeUsbEvidence=report.toString())
     }
 }

@@ -1,3 +1,7 @@
+## J1979 — couverture observée et annulation de recette native (26/11/2026)
+
+- Les exports USB Android/Windows et décodeur Python distinguent par mode les observations tentées, positives, brutes, négatives, expirées ou échouées. Ces compteurs ne prouvent ni la couverture complète du service ni la réussite d'un moniteur. Android ne publie plus de valeurs validées après annulation/révocation et classe une réponse DTC négative ou expirée comme échec de la lecture, non comme absence de test. Le VIN non vérifié reste dans la trace brute, pas dans le contexte de recette. Régressions écrites, non exécutées. C6/J1979 ouverts ; aucun déclenchement de CI, merge ou Release.
+
 ## J1979 — valeurs et défauts observés dans les interfaces de recette (26/11/2026)
 
 - Android : projection des mesures positives et DTC par mode (null distinct de zéro), VIN observé et affichage des unités en dessous des checks, filtrage des valeurs indisponibles ou captures incohérentes. Windows : détails numériques/DTC/NRC ajoutés aux lignes de recette, modes non vérifiés explicitement indisponibles. Ressources FR/EN et régression de projection écrites sans exécution. Les valeurs sont des observations enregistrées, pas un flux temps réel ni une provenance physique prouvée. C6/J1979 ouverts, aucune CI/fusion/Release.

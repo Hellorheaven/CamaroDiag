@@ -6,7 +6,7 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class NativeUsbFunctionalEvidenceTest {
-    private val vin = "2G1FF3D36C9104199"
+    private val vin = "1G1FA1RXXR0123456"
     private val state = FunctionalTestState(context=FunctionalTestContext(vin,"USB","CU1",1))
     private fun report(valid: Boolean, observed: String = vin) = JSONObject()
         .put("device_credential_authenticated",true).put("capture_integrity_verified",valid)
@@ -35,6 +35,18 @@ class NativeUsbFunctionalEvidenceTest {
         assertEquals(1,values.measurements.size)
         assertEquals(1726.0,values.measurements.single().number,0.0)
         assertNull(NativeUsbFunctionalEvidence.diagnosticValues(input.put("capture_integrity_verified",false)))
+    }
+    @Test fun attemptedNegativeIsNotUntestedAndCancellationCannotPublishValues() {
+        val input=report(true)
+        input.getJSONArray("steps").put(JSONObject().put("request_hex","07").put("status","NEGATIVE"))
+        val checks=NativeUsbFunctionalEvidence.results(state,input).checks.associateBy { it.key }
+        assertEquals(FunctionalTestOutcome.FAILED,checks["native:dtc7"]?.outcome)
+        assertEquals(FunctionalTestOutcome.NOT_TESTED,checks["native:dtca"]?.outcome)
+        input.put("cancelled",true)
+        assertNull(NativeUsbFunctionalEvidence.diagnosticValues(input))
+        val cancelled=NativeUsbFunctionalEvidence.results(state,input)
+        assertNull(cancelled.context?.observedVin)
+        assertEquals(FunctionalTestOutcome.NOT_TESTED,cancelled.checks.first { it.key=="native:dtc3" }.outcome)
     }
     @Test fun inconsistentCampaignAndWrongVinAreNotPasses() {
         val bad=NativeUsbFunctionalEvidence.results(state,report(false)).checks.associateBy { it.key }

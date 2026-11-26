@@ -100,6 +100,8 @@ object CamaroDiagConnectorNativeCampaign {
         } finally {
             key.fill(0)
         }
+        val cancelled = !jobContext.isActive || !stillApproved(target.connectionGeneration)
+        if (cancelled) semantic = false
         val json = JSONObject().apply {
             put("schema", "camarodiag-functional-j1979-native-usb-v1")
             put("protocol", "SAE-J1979")
@@ -118,6 +120,19 @@ object CamaroDiagConnectorNativeCampaign {
             put("device_credential_authenticated", authenticated)
             put("frame_integrity_verified", frames)
             put("capture_integrity_verified", semantic)
+            put("cancelled", cancelled)
+            put("service_observations", JSONArray().apply {
+                for (mode in listOf(1, 2, 3, 6, 7, 8, 9, 10)) {
+                    val rows = steps.filter { it.requestHex.take(2).toInt(16) == mode }
+                    put(JSONObject().apply {
+                        put("mode", "%02X".format(java.util.Locale.ROOT, mode))
+                        put("attempted", rows.size)
+                        for (status in listOf("PASSED", "RAW", "NEGATIVE", "TIMEOUT", "FAILED")) {
+                            put(status.lowercase(java.util.Locale.ROOT), rows.count { it.status == status })
+                        }
+                    })
+                }
+            })
             put("evidence_authenticated", false)
             put("physical_vehicle_verified", false)
             put("observed_vin", vin ?: JSONObject.NULL)
