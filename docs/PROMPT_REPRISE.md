@@ -1,3 +1,7 @@
+## C6 — journal Windows : contrôle du préfixe durable (26/11/2026)
+
+- Descripteur ouvert en lecture/écriture exclusive vis-à-vis des autres écrivains ; longueur et SHA-256 du dernier préfixe accepté comparés avant append, relecture après flush sur descripteur et chemin, refus des points de réanalyse. Une divergence rend l'écrivain inutilisable ; aucune garantie d'atomicité du répertoire contre un adversaire local. Régression remplacement/restauration ou verrouillage Windows écrite, non exécutée. C6/J1979 ouverts ; aucun flash, CI intermédiaire, fusion ou Release.
+
 ## J1979 — présentation readiness Android et Windows (26/11/2026)
 
 - MIL, nombre de DTC déclaré, type d'allumage et états de préparation des seuls moniteurs supportés affichés avec ressources FR/EN ; Android recalcule et compare l'intégralité des champs à la réponse 4101. Aucune confusion entre moniteur absent, incomplet et prêt. Régression de projection écrite non exécutée. C6/J1979 ouverts ; pas de CI intermédiaire, fusion ou Release.

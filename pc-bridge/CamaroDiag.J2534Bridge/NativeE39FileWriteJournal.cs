@@ -14,6 +14,9 @@ internal sealed class NativeE39FileWriteJournal :
 {
     private const int MaximumJournalBytes = 8 * 1024 * 1024;
     private readonly FileStream stream;
+    private readonly string journalPath;
+    private long acceptedLength;
+    private byte[] acceptedDigest=SHA256.HashData(Array.Empty<byte>());
     private readonly string backupDirectory;
     private bool backupDirectoryCreated;
     private readonly SemaphoreSlim gate = new(1, 1);
@@ -40,11 +43,12 @@ internal sealed class NativeE39FileWriteJournal :
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
         var full = Path.GetFullPath(path);
+        journalPath=full;
         backupDirectory = full + ".blocks";
         // An existing path can represent a flash interrupted days ago.
         // Never truncate it, even on an explicit second attempt.
         stream = new FileStream(full, FileMode.CreateNew,
-            FileAccess.Write, FileShare.Read, 4096, FileOptions.WriteThrough);
+            FileAccess.ReadWrite, FileShare.Read, 4096, FileOptions.WriteThrough);
     }
 
     /// <summary>
@@ -177,15 +181,25 @@ internal sealed class NativeE39FileWriteJournal :
                 Detail = evidence.Detail
             });
             var encoded = Encoding.UTF8.GetBytes(entry + "\n");
-            if (encoded.Length > MaximumJournalBytes - stream.Length)
+            if (encoded.Length > MaximumJournalBytes - acceptedLength)
                 throw new IOException("ECU journal size limit reached; refusing further programming.");
             cancellationToken.ThrowIfCancellationRequested();
             try
             {
+                var prefix=ReadAcceptedPrefix();
+                cancellationToken.ThrowIfCancellationRequested();
+                stream.Position=acceptedLength;
                 await stream.WriteAsync(encoded, cancellationToken);
                 // Flush(true) propagates file buffers to the storage subsystem.
                 // Filesystem/drive caches are still a hardware-dependent boundary.
                 stream.Flush(flushToDisk: true);
+                using var hash=IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+                hash.AppendData(prefix);hash.AppendData(encoded);
+                var nextDigest=hash.GetHashAndReset();
+                var nextLength=acceptedLength+encoded.Length;
+                RequireDigest(stream,nextLength,nextDigest);
+                RequirePathDigest(nextLength,nextDigest);
+                acceptedLength=nextLength;acceptedDigest=nextDigest;
             }
             catch
             {
@@ -201,12 +215,44 @@ internal sealed class NativeE39FileWriteJournal :
         }
     }
 
+    // Read from the held descriptor before append; reject a replaced path
+    // as well. A failed check poisons the writer rather than retrying an erase.
+    private byte[] ReadAcceptedPrefix()
+    {
+        var prefix=RequireDigest(stream,acceptedLength,acceptedDigest);
+        RequirePathDigest(acceptedLength,acceptedDigest);
+        return prefix;
+    }
+
+    private void RequirePathDigest(long length,byte[] digest)
+    {
+        if((File.GetAttributes(journalPath)&(FileAttributes.Directory|FileAttributes.ReparsePoint))!=0)
+            throw new IOException("ECU journal path is redirected or not a regular file.");
+        using var check=new FileStream(journalPath,FileMode.Open,FileAccess.Read,FileShare.ReadWrite);
+        RequireDigest(check,length,digest);
+    }
+
+    private static byte[] RequireDigest(FileStream input,long length,byte[] digest)
+    {
+        if(length<0||length>MaximumJournalBytes||input.Length!=length)
+            throw new IOException("ECU journal length changed.");
+        input.Position=0;
+        var bytes=new byte[(int)length];
+        input.ReadExactly(bytes);
+        if(input.ReadByte()!=-1||input.Length!=length||
+            !CryptographicOperations.FixedTimeEquals(SHA256.HashData(bytes),digest))
+            throw new IOException("ECU journal differs from the last durable accepted state.");
+        return bytes;
+    }
+
     internal static CompletionState Inspect(string path) => InspectDetailed(path).State;
 
     internal static Inspection InspectDetailed(string path)
     {
         if (!File.Exists(path))
             throw new FileNotFoundException("No ECU programming journal exists.", path);
+        if((File.GetAttributes(path)&(FileAttributes.Directory|FileAttributes.ReparsePoint))!=0)
+            return new(CompletionState.Interrupted,false);
         // Read a bounded snapshot, not an unbounded or changing text file.
         // A concurrently appended record may be absent from this snapshot;
         // the result is strictly evidence from the captured journal prefix.

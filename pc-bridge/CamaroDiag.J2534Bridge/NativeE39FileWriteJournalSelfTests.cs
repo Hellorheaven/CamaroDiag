@@ -67,6 +67,43 @@ internal static class NativeE39FileWriteJournalSelfTests
                 "Only the accepted event is persisted; disposing twice cannot append completion");
 
             File.Delete(path);
+            // Windows normally prevents external writers while the descriptor
+            // is open. On a platform permitting rename, verify path replacement.
+            var active=new NativeE39FileWriteJournal(path);
+            string moved=path+".moved";
+            try
+            {
+                active.AppendAsync(new(NativeE39WriteSequence.Phase.Prepared,0x20000,"baseline"),
+                    CancellationToken.None).GetAwaiter().GetResult();
+                bool renamed=false;
+                try { File.Move(path,moved);renamed=true; }
+                catch(IOException) { }
+                catch(UnauthorizedAccessException) { }
+                if(renamed)
+                {
+                    File.WriteAllText(path,"replacement");
+                    AssertThrows<IOException>(()=>active.AppendAsync(new(NativeE39WriteSequence.Phase.OriginalCrcVerified,
+                        0x20000,"must not append"),CancellationToken.None).GetAwaiter().GetResult());
+                    tests++;
+                    Assert(File.ReadAllText(path)=="replacement","Replacement journal is untouched");
+                    File.Delete(path);File.Move(moved,path);
+                    AssertThrows<IOException>(()=>active.AppendAsync(new(NativeE39WriteSequence.Phase.OriginalCrcVerified,
+                        0x20000,"must remain blocked"),CancellationToken.None).GetAwaiter().GetResult());
+                    tests++;
+                }
+                else
+                {
+                    Assert(File.Exists(path)&&!File.Exists(moved),"Active journal cannot be renamed");
+                    active.AppendAsync(new(NativeE39WriteSequence.Phase.OriginalCrcVerified,0x20000,"next"),
+                        CancellationToken.None).GetAwaiter().GetResult();
+                }
+            }
+            finally
+            {
+                active.DisposeAsync().AsTask().GetAwaiter().GetResult();
+                if(File.Exists(moved))File.Delete(moved);
+            }
+            File.Delete(path);
             WriteScenario(path, true, false);
             Assert(NativeE39FileWriteJournal.Inspect(path) ==
                 NativeE39FileWriteJournal.CompletionState.Completed,
