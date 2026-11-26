@@ -57,7 +57,7 @@ internal object ElmStartupSynchronization {
     suspend fun synchronize(
         available: () -> Int,
         read: (Int) -> ByteArray,
-        interrupt: () -> Unit,
+        interrupt: suspend () -> Unit,
         ensureCurrent: () -> Unit,
         clockMs: () -> Long = { System.nanoTime() / 1_000_000L },
         pause: suspend (Long) -> Unit = { kotlinx.coroutines.delay(it) }
