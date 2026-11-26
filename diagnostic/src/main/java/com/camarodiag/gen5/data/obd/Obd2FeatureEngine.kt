@@ -743,6 +743,8 @@ class Obd2FeatureEngine(
             else emptyMap<Int, List<Int>>() to emptyList<ObdFreezeFrameRead>()
         val protocolNumber = negotiatedProtocol
         val legacy = protocolNumber != null && protocolNumber in 1..5
+        val canEvidence = physicalCanResponder != null || respondingEcus.isNotEmpty() ||
+            protocolNumber != null && protocolNumber in 6..9
         val vehicleInfo = discoverVehicleInfo(legacy)
         // A legacy anonymous segmented response must never be decoded by
         // the CAN identity parser or used as a verified physical VIN.
@@ -757,8 +759,8 @@ class Obd2FeatureEngine(
         // Distinct legacy TID/CID records and CAN MID/TID/UASID records.
         val mode06 = if (legacy) withHeaderlessRecords {
             ObdLegacyOxygenTests.scanMode06({ command, timeout -> ask(command, timeout) })
-        } else if (physicalCanResponder != null || protocolNumber != null && protocolNumber in 6..9) readMonitorTests() else null
-        val mode08 = if (legacy || physicalCanResponder != null || protocolNumber != null && protocolNumber in 6..9) withHeaderlessRecords {
+        } else if (canEvidence) readMonitorTests() else null
+        val mode08 = if (legacy || canEvidence) withHeaderlessRecords {
             ObdMode08Discovery.discover(legacy, physicalCanResponder) { command, timeout -> ask(command, timeout) }
         } else null
         return ObdScanReport(
