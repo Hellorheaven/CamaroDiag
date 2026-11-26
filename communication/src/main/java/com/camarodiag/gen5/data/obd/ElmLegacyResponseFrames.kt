@@ -2,6 +2,16 @@ package com.camarodiag.gen5.data.obd
 
 import java.util.Locale
 
+data class LegacySourceObservation(val source: String, val status: String,
+    val supportedPidBitmap: String?, val rawFrames: List<String>)
+data class LegacySourceDiscovery(val protocol: Int, val observedProtocol: Int?,
+    val rawResponse: String, val rawProtocolResponse: String,
+    val sources: List<LegacySourceObservation>, val error: String? = null) {
+    val verifiedSources: List<String> get() =
+        if (error == null && protocol == observedProtocol)
+            sources.filter { it.status == "PASSED" }.map { it.source } else emptyList()
+}
+
 /** ATH1 legacy response records. Never fall back to anonymous application
  * bytes when a recipe requires ECU source attribution. */
 internal object ElmLegacyResponseFrames {
@@ -48,6 +58,32 @@ internal object ElmLegacyResponseFrames {
             }
             require(checksum(protocol, bytes.dropLast(1)) == bytes.last()) { "Legacy checksum mismatch." }
             Frame(source, line, bytes.subList(3, bytes.lastIndex).toList())
+        }
+    }
+
+    /** PID 00 discovery preserves all observed sources but never names an OEM ECU. */
+    fun discover(protocol: Int, raw: String, rawProtocol: String): LegacySourceDiscovery {
+        val observed = fixedProtocol(rawProtocol)
+        if (observed != protocol) return LegacySourceDiscovery(protocol,observed,raw,rawProtocol,
+            emptyList(),"PROTOCOL_UNVERIFIED")
+        return try {
+            val frames = decode(protocol,"0100",raw)
+            val sources = frames.groupBy { it.source }.toSortedMap().map { (source,group) ->
+                val payloads = group.map { it.payload }.distinct()
+                val single = payloads.singleOrNull()
+                val valid = single?.size == 6 && single.take(2) == listOf(0x41,0)
+                val negative = group.all { it.payload.size == 3 && it.payload.take(2) == listOf(0x7F,1) &&
+                    it.payload[2] != 0 }
+                LegacySourceObservation(hex(source),when {
+                    valid -> "PASSED"
+                    negative -> "NOT_TESTED"
+                    else -> "FAILED"
+                },if (valid) single!!.drop(2).joinToString("",transform=::hex) else null,
+                    group.map { it.rawHex })
+            }
+            LegacySourceDiscovery(protocol,observed,raw,rawProtocol,sources)
+        } catch (_: IllegalArgumentException) {
+            LegacySourceDiscovery(protocol,observed,raw,rawProtocol,emptyList(),"MALFORMED_LEGACY_FRAME")
         }
     }
 
