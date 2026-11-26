@@ -152,6 +152,7 @@ object FunctionalTestPlanner {
         Triple("freeze", "Mode 02 freeze frame", "Trame figée mode 02"),
         Triple("monitor", "Mode 06 monitor results", "Résultats moniteurs mode 06"),
         Triple("05", "Mode 05 oxygen sensor tests", "Tests sondes mode 05"),
+        Triple("08-inventory", "Mode 08 supported control tests", "Tests de commande annoncés mode 08"),
         Triple("08", "Mode 08 system control (separate test)", "Commande système mode 08 (essai distinct)"),
         Triple("04", "Mode 04 clear DTCs (separate test)", "Effacement DTC mode 04 (essai distinct)")
     ).map { (id, en, fr) ->
@@ -174,6 +175,7 @@ object FunctionalTestPlanner {
             report.freezeFrameReads.isNotEmpty() && report.freezeFrameReads.all { it.verifiedBytes != null })
         mark("monitor", report.monitorTestRaw?.let { it.isNotBlank() && "PARTIAL" !in it && "N/A" !in it } == true)
         mark("05", report.mode05?.let { it.complete && it.hasTestResults } == true)
+        mark("08-inventory", report.mode08?.complete == true)
         val counts = mapOf(3 to report.confirmedDtcs.size, 7 to report.pendingDtcs.size, 10 to report.permanentDtcs.size)
             .mapValues { (mode, count) -> count.takeUnless { mode in report.unavailableDtcModes } }
         rows = withDtcModeEvidence(rows, counts)
