@@ -388,6 +388,9 @@ class DoIpGatewayControlTraceTest {
                 assertTrue(result.isFailure)
                 assertEquals(listOf("TX", "RX"), events.map { it.direction })
                 assertEquals(hex(negative), events.last().payloadHex)
+                val refusal = result.exceptionOrNull() as DoIpDirectRead.Refusal
+                assertEquals(DoIpDirectRead.RefusalLayer.HEADER, refusal.layer)
+                assertEquals(1, refusal.code)
             } finally {
                 executor.shutdownNow()
             }
@@ -794,6 +797,59 @@ class DoIpGatewayControlTraceTest {
         }
     }
 
+    @Test fun doIpTransportRefusalsPreserveLayerAndRetireConnection(): Unit = runBlocking {
+        val loopback = InetAddress.getByName("127.0.0.1")
+        fun bytes(value: String) = value.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
+        for (scenario in listOf("routing", "diagnostic", "wrong-echo", "wrong-address", "bad-positive")) {
+            DatagramSocket(0, loopback).use { udp ->
+                java.net.ServerSocket(0, 1, loopback).use { tcp ->
+                    udp.soTimeout = 3000
+                    tcp.soTimeout = 3000
+                    val worker = Executors.newSingleThreadExecutor()
+                    try {
+                        val server = worker.submit {
+                            respond(udp, pdu(255, 1), identity())
+                            tcp.accept().use { socket ->
+                                socket.soTimeout = 3000
+                                val input = java.io.DataInputStream(socket.getInputStream())
+                                val output = socket.getOutputStream()
+                                assertArrayEquals(pdu(2, 5, bytes("0E800000000000")),
+                                    ByteArray(15).also { input.readFully(it) })
+                                output.write(pdu(2, 6, bytes(if (scenario == "routing")
+                                    "0E8010000600000000" else "0E8010001000000000")))
+                                output.flush()
+                                if (scenario != "routing") {
+                                    assertArrayEquals(pdu(2, 0x8001, bytes("0E80123422F190")),
+                                        ByteArray(15).also { input.readFully(it) })
+                                    val body = when (scenario) {
+                                        "wrong-echo" -> "12340E800619"
+                                        "wrong-address" -> "12350E800622"
+                                        else -> "12340E800622"
+                                    }
+                                    output.write(pdu(2, if (scenario == "bad-positive") 0x8002 else 0x8003, bytes(body)))
+                                    output.flush()
+                                }
+                                assertEquals("Rejected exchange must close without retry", -1, input.read())
+                            }
+                        }
+                        val target = DoIpDirectRead.Target.parse("127.0.0.1", "0E80", "1234", vin, false)
+                        val result = runCatching { DoIpDirectRead.readAt(target, DoIpDirectRead.Operation.VIN,
+                            timeoutMs = 1500, udpPort = udp.localPort, tcpPort = tcp.localPort) }
+                        server.get(5, TimeUnit.SECONDS)
+                        assertTrue(result.isFailure)
+                        val error = result.exceptionOrNull()
+                        if (scenario == "routing" || scenario == "diagnostic") {
+                            val refusal = error as DoIpDirectRead.Refusal
+                            assertEquals(if (scenario == "routing") DoIpDirectRead.RefusalLayer.ROUTING
+                                else DoIpDirectRead.RefusalLayer.DIAGNOSTIC_ACK, refusal.layer)
+                            assertEquals(6, refusal.code)
+                        } else assertFalse(error is DoIpDirectRead.Refusal)
+                    } finally { worker.shutdownNow() }
+                }
+            }
+        }
+    }
+
     @Test fun inventoryProgressRequiresClosedSocketAndStableGateway(): Unit = runBlocking {
         val loopback = InetAddress.getByName("127.0.0.1")
         fun bytes(value: String) = value.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
@@ -851,6 +907,7 @@ class DoIpGatewayControlTraceTest {
                             assertEquals(listOf(1, 2), progress.map { it.size })
                             assertEquals(vin, rows.first().vin)
                             assertEquals(DoIpDirectRead.InventoryFailure.NEGATIVE_RESPONSE, rows.last().failure)
+                            assertEquals(0x31, rows.last().failureCode)
                             assertEquals(rows, progress.last())
                         }
                     } finally { worker.shutdownNow() }
