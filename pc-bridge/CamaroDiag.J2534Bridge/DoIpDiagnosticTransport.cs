@@ -91,6 +91,9 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
             FullMode = BoundedChannelFullMode.Wait
         });
     private readonly SemaphoreSlim writeGate = new(1, 1);
+    // The route belongs to one complete application operation, not merely
+    // each request/reply inside a confirmed multi-command sequence.
+    private readonly SemaphoreSlim operationGate = new(1, 1);
     private readonly CancellationTokenSource lifetime = new();
     private Task? receiveTask;
     private Exception? receiveFailure;
@@ -277,6 +280,78 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
     internal async Task<byte[]> ExchangeUdsAsync(byte[] request,
         TimeSpan timeout, CancellationToken cancellationToken,
         TimeSpan? p2Timeout = null, TimeSpan? p2StarTimeout = null)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!await operationGate.WaitAsync(0, cancellationToken))
+            throw new InvalidOperationException("A DoIP diagnostic operation already owns this session.");
+        try
+        {
+            return await ExchangeUdsCoreAsync(request, timeout, cancellationToken, p2Timeout, p2StarTimeout);
+        }
+        finally { operationGate.Release(); }
+    }
+
+    /// <summary>
+    /// Keep the same logical ECU, socket and receive owner for the complete
+    /// approved command sequence. No competing diagnostic operation may
+    /// consume a response or inject a command between its steps.
+    /// </summary>
+    internal async Task<int> ExchangeSequenceAsync(IReadOnlyList<byte[]> commands,
+        string expectedVin, TimeSpan timeout, CancellationToken cancellationToken,
+        Action<int, byte[]> onReply,
+        TimeSpan? p2Timeout = null, TimeSpan? p2StarTimeout = null)
+    {
+        ArgumentNullException.ThrowIfNull(commands);
+        ArgumentNullException.ThrowIfNull(onReply);
+        if (!DoIpVehicleDiscovery.IsVehicleVin(expectedVin) ||
+            commands.Count is < 1 or > 16 ||
+            commands.Any(c => c is null || c.Length is < 1 or > 4091) ||
+            commands.Sum(c => (long)c.Length) > 4091)
+            throw new ArgumentException("Expected 1..16 valid UDS commands and an observed VIN.");
+        // Freeze every approved command before the first await/TX.
+        var frozen = commands.Select(c => c.ToArray()).ToArray();
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!await operationGate.WaitAsync(0, cancellationToken))
+            throw new InvalidOperationException("A DoIP diagnostic operation already owns this session.");
+        try
+        {
+            // The VIN check and all subsequent commands are part of the same
+            // exclusive session operation. A concurrent request cannot
+            // intervene after identity verification but before first TX.
+            var vinReply = await ExchangeUdsCoreAsync(
+                UdsStandardServices.ReadDid(0xF190), timeout, cancellationToken,
+                p2Timeout, p2StarTimeout);
+            if (!string.Equals(DoIpVinReader.ParseVin(vinReply), expectedVin,
+                    StringComparison.Ordinal))
+                throw new InvalidDataException("DoIP ECU VIN changed before the sequence.");
+            for (var index = 0; index < frozen.Length; index++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var response = await ExchangeUdsCoreAsync(frozen[index], timeout,
+                    cancellationToken, p2Timeout, p2StarTimeout);
+                cancellationToken.ThrowIfCancellationRequested();
+                onReply(index + 1, response.ToArray());
+            }
+            cancellationToken.ThrowIfCancellationRequested();
+            return frozen.Length;
+        }
+        catch
+        {
+            // Callback failures are uncertain too: retire the exact socket
+            // and never permit a following command or automatic retry.
+            lock (exchangeBoundary) exchangeState = 2;
+            try { lifetime.Cancel(); }
+            catch (ObjectDisposedException) { /* Already retired elsewhere. */ }
+            stream.Dispose();
+            socket.Dispose();
+            throw;
+        }
+        finally { operationGate.Release(); }
+    }
+
+    private async Task<byte[]> ExchangeUdsCoreAsync(byte[] request,
+        TimeSpan timeout, CancellationToken cancellationToken,
+        TimeSpan? p2Timeout, TimeSpan? p2StarTimeout)
     {
         if (request is null || request.Length == 0 ||
             request.Length > DoIpCodec.MaxPayload - 4)
