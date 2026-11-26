@@ -90,11 +90,20 @@ class J1979UsbCampaign {
     if(!owner.stopAndVerifyQuiescent()){
       arbiter.latchRecovery();report.outcome=Outcome::QuiescenceUnverified;return report;
     }
+    // Physical quiescence is not the same as recovery clearance. If the
+    // board owner reports an unresolved recovery state, keep the shared
+    // arbiter latched so a different host cannot acquire a fresh lease.
+    if(owner.currentEvidence(profile).recoveryPending){
+      arbiter.latchRecovery();report.outcome=Outcome::EvidenceLost;return report;
+    }
     output.afterVerifiedStop();
     if(!started||!output.permitted()||!stream.finish(report.campaign))
       report.outcome=Outcome::EvidenceLost;
     else report.outcome=report.campaign.end==J1979CanCampaign::End::Complete?
       Outcome::Complete:Outcome::Partial;
+    if(owner.currentEvidence(profile).recoveryPending){
+      arbiter.latchRecovery();report.outcome=Outcome::EvidenceLost;return report;
+    }
     if(!arbiter.release(lease)){
       report.outcome=Outcome::Partial;
     }

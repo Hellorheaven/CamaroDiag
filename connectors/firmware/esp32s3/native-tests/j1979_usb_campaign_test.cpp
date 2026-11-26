@@ -80,9 +80,13 @@ int main(){
   Owner revoked;revoked.detachOnStop=true;Bus revBus(revoked);Writer revWriter;
   assert(U::run(arbiter,revoked,revBus,revWriter,profile,scratch).outcome==U::Outcome::EvidenceLost);
   assert(revoked.stops==1&&!hasSummary(revWriter)&&!arbiter.recoveryRequired());
+  cd::HostSessionArbiter recoveryArbiter;
   Owner recovery;recovery.recoveryOnStop=true;Bus recBus(recovery);Writer recWriter;
-  assert(U::run(arbiter,recovery,recBus,recWriter,profile,scratch).outcome==U::Outcome::EvidenceLost);
-  assert(recovery.stops==1&&!hasSummary(recWriter));
+  assert(U::run(recoveryArbiter,recovery,recBus,recWriter,profile,scratch).outcome==U::Outcome::EvidenceLost);
+  assert(recovery.stops==1&&!hasSummary(recWriter)&&recoveryArbiter.recoveryRequired());
+  Owner alternative;Bus altBus(alternative);Writer altWriter;
+  assert(U::run(recoveryArbiter,alternative,altBus,altWriter,profile,scratch).outcome==U::Outcome::Denied);
+  assert(altBus.sends==0&&altWriter.bytes.empty());
   Owner detached;Bus lost(detached);Writer prefix;lost.detachAfterSend=true;
   auto partial=U::run(arbiter,detached,lost,prefix,profile,scratch);
   assert(partial.outcome==U::Outcome::EvidenceLost&&lost.sends==1&&detached.stops==1);

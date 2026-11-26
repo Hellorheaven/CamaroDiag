@@ -1,3 +1,7 @@
+## C6 — verrou de récupération partagé après arrêt USB (26/11/2026)
+
+- Connectors : si le propriétaire matériel indique une récupération non résolue après arrêt ou export, l'arbitre partagé reste verrouillé au lieu de simplement libérer le bail. Un autre hôte ne peut pas contourner ce verrou par un nouveau bail. Régression native pour un hôte alternatif ajoutée, non exécutée. Un flux CJ/1 éventuellement déjà écrit avant une révocation ne constitue pas une authentification matérielle. Aucune activation physique, CI, fusion ou Release.
+
 ## J1979 / C6 — intégrité des campagnes CJ/1 et continuité TWAI (26/11/2026)
 
 - Hôte Python : relecture du plan exact de campagne embarquée depuis les observations et bitmaps, vérification indépendante de l'ordre, des étapes obligatoires, de la raison d'arrêt et des drapeaux d'inventaire. Un résumé COMPLETE avec étapes omises ou inventaires inventés est rejeté même si CRC et compteurs correspondent. Préfixe conservé, aucune preuve d'origine matérielle déduite. Fixtures de campagne complète et régressions falsification/troncature/arrêt écrites.
