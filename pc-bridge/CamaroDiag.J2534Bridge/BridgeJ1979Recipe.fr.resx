@@ -48,4 +48,15 @@
   <data name="LegacyPrerequisites" xml:space="preserve"><value>Sélectionnez une interface J2534, arrêtez le pont et fermez la console avant la recette legacy.</value></data>
   <data name="LegacyDiscover" xml:space="preserve"><value>Découvrir les sources</value></data>
   <data name="LegacyDiscoveryScope" xml:space="preserve"><value>Sources observées sur le PID 00 ; ni couverture exhaustive du réseau ni identité constructeur établie.</value></data>
+  <data name="LegacyMutationRun" xml:space="preserve"><value>Legacy — effacement / EVAP</value></data>
+  <data name="LegacyMutationProfile" xml:space="preserve"><value>Je confirme le protocole du véhicule, le calculateur moteur et toutes les sources antipollution documentées.</value></data>
+  <data name="LegacyMutationScope" xml:space="preserve"><value>Requête fonctionnelle véhicule : tous les calculateurs concernés, même silencieux, peuvent être affectés. Un filtre de réponse ne limite pas cette portée.</value></data>
+  <data name="LegacyMutationNext" xml:space="preserve"><value>Continuer</value></data>
+  <data name="LegacyMutationOperation" xml:space="preserve"><value>Opération indépendante</value></data>
+  <data name="LegacyMutationEngine" xml:space="preserve"><value>Source moteur (hex)</value></data>
+  <data name="LegacyMutationSources" xml:space="preserve"><value>Sources documentées (séparées par virgules)</value></data>
+  <data name="LegacyMutationNewFile" xml:space="preserve"><value>Choisissez un nouveau chemin de rapport et de référence initiale.</value></data>
+  <data name="LegacyMutationConfirm" xml:space="preserve"><value>Confirmer une seule requête fonctionnelle véhicule sur le VIN {0}, {1}, sources documentées {2} ? D’autres calculateurs peuvent être affectés.</value></data>
+  <data name="LegacyMutationUncertain" xml:space="preserve"><value>Campagne interrompue, indisponible ou incertaine. Consultez les preuves enregistrées ; ne relancez pas automatiquement.</value></data>
+  <data name="LegacyMutationSaved" xml:space="preserve"><value>Rapport final enregistré ici :</value></data>
 </root>
