@@ -102,7 +102,9 @@ data class ObdScanReport(
     val vehicleInfoSupportComplete: Boolean? = null,
     val vehicleInfoReads: List<ObdVehicleInfoRead> = emptyList(),
     val mode05: ObdMode05Report? = null,
-    val mode08: ObdMode08Inventory? = null
+    val mode08: ObdMode08Inventory? = null,
+    val negotiatedElmProtocol: Int? = null,
+    val anonymousLegacyVinCandidate: String? = null
 )
 
 /**
@@ -616,7 +618,23 @@ class Obd2FeatureEngine(
         // here would silently switch 29-bit/250 kbit/s/legacy OBD to CAN 11-bit.
         val adapter = inspectAdapter()
         val respondingEcus = discoverFunctionalObdResponders()
-        return collectReadOnlyScan(adapter, respondingEcus, readDtcRecords = {
+        val negotiated = ObdLegacyOxygenTests.protocolNumber(ask("ATDPN"))
+        if (negotiated != null && negotiated in 1..5) {
+            // Legacy headers are not CAN ISO-TP framing. Let ELM validate
+            // link-layer checksums and expose anonymous application records.
+            return withHeaderlessRecords {
+                val legacyEngine = Obd2FeatureEngine(channel)
+                val report = legacyEngine.collectReadOnlyScan(adapter, emptyList(),
+                    negotiatedProtocol = negotiated, readDtcRecords = {
+                        PhysicalObdDtcSnapshot(
+                            ObdLegacyRecords.dtcs("03", legacyEngine.ask("03", 2500L), "confirmed"),
+                            ObdLegacyRecords.dtcs("07", legacyEngine.ask("07", 2500L), "pending"),
+                            ObdLegacyRecords.dtcs("0A", legacyEngine.ask("0A", 2500L), "permanent"))
+                    })
+                report.copy(rawLog = log.toList() + report.rawLog)
+            }
+        }
+        return collectReadOnlyScan(adapter, respondingEcus, negotiatedProtocol = negotiated, readDtcRecords = {
             val modes = readDtcModeEvidence()
             PhysicalObdDtcSnapshot(modes[3], modes[7], modes[10])
         })
@@ -643,7 +661,7 @@ class Obd2FeatureEngine(
     }
 
     private data class VehicleInfoInventory(val supported: Set<Int>, val complete: Boolean,
-        val reads: List<ObdVehicleInfoRead>)
+        val reads: List<ObdVehicleInfoRead>, val anonymousVin: String? = null)
 
     /** Strip only the exact command echo; never discard an unrelated diagnostic record.
      * ELM echo settings are not guaranteed on every supported connector. */
@@ -657,7 +675,7 @@ class Obd2FeatureEngine(
 
     /** The union is only an inventory, not proof that every ECU supports each type.
      * Preserve complete records separately; no invented units or counter labels. */
-    private suspend fun discoverVehicleInfo(): VehicleInfoInventory = withHeaderlessRecords {
+    private suspend fun discoverVehicleInfo(legacy: Boolean = false): VehicleInfoInventory = withHeaderlessRecords {
         val supported = linkedSetOf<Int>()
         val reads = mutableListOf<ObdVehicleInfoRead>()
         var complete = false
@@ -665,7 +683,10 @@ class Obd2FeatureEngine(
             currentCoroutineContext().ensureActive()
             val response = ask("09%02X".format(Locale.ROOT, base), 2500L)
             val messages = mode09Records(response, base)
-            val records = messages.filter { it.size == 6 && it[0] == 0x49 && it[1] == base }
+            val offset = if (legacy) 3 else 2
+            val records = if (legacy) ObdLegacyRecords.infoPage(base, response).orEmpty()
+                else messages.filter { it.size == 6 && it[0] == 0x49 && it[1] == base &&
+                    (base != 0xE0 || it.last() and 1 == 0) }
             reads += ObdVehicleInfoRead(base, response, records)
             if (records.isEmpty()) break
             // Keep verified observations, but do not certify completeness when
@@ -673,32 +694,36 @@ class Obd2FeatureEngine(
             val pageComplete = messages.size == records.size
             for (record in records) {
                 for (bit in 0 until 31) {
-                    if ((record[2 + bit / 8] and (1 shl (7 - bit % 8))) != 0)
+                    if ((record[offset + bit / 8] and (1 shl (7 - bit % 8))) != 0)
                         supported += base + bit + 1
                 }
             }
             if (!pageComplete) break
-            if (records.none { (it[5] and 1) != 0 }) {
+            if (records.none { (it.last() and 1) != 0 }) {
                 complete = true
                 break
             }
         }
         // These four identity records are acquired by the existing verified
         // VIN/CAL ID/CVN/ECU-name readers, including their fallback formatting.
-        for (type in supported.filterNot { it in setOf(2,4,6,10) }.sorted()) {
+        for (type in supported.filterNot { !legacy && it in setOf(2,4,6,10) }.sorted()) {
             currentCoroutineContext().ensureActive()
             val response = ask("09%02X".format(Locale.ROOT, type), 2500L)
-            val records = mode09Records(response, type)
-                .filter { it.size > 2 && it[0] == 0x49 && it[1] == type }
+            val records = if (legacy) ObdLegacyRecords.infoRecords(type, response).orEmpty()
+                else mode09Records(response, type).filter { it.size > 2 && it[0] == 0x49 && it[1] == type }
             reads += ObdVehicleInfoRead(type, response, records)
         }
-        VehicleInfoInventory(supported, complete, reads)
+        val candidate = if (legacy) ObdLegacyRecords.anonymousVin(
+            reads.firstOrNull { it.infoType == 1 }?.positiveRecords.orEmpty(),
+            reads.firstOrNull { it.infoType == 2 }?.positiveRecords.orEmpty()) else null
+        VehicleInfoInventory(supported, complete, reads, candidate)
     }
 
     private suspend fun collectReadOnlyScan(
         adapter: Map<String, String>,
         respondingEcus: List<String>,
         physicalCanResponder: String? = null,
+        negotiatedProtocol: Int? = null,
         readDtcRecords: suspend () -> PhysicalObdDtcSnapshot
     ): ObdScanReport {
         val discovery = discoverPidAvailability()
@@ -709,24 +734,23 @@ class Obd2FeatureEngine(
         val freezeFrameSupported = if (freezeFrameDtc != null) discoverFreezeFrameSupportedPids() else emptySet()
         val (freeze, freezeReads) = if (freezeFrameDtc != null) collectFreezeFrameReads(freezeFrameSupported)
             else emptyMap<Int, List<Int>>() to emptyList<ObdFreezeFrameRead>()
-        val vehicleInfo = discoverVehicleInfo()
-        val vin = readVin()
-        val calIds = readCalibrationIds()
-        val cvns = readCalibrationVerificationNumbers()
-        val ecuNames = readEcuName()
-        val readiness = readReadiness()
-        // Query the negotiated ELM protocol after a vehicle exchange. Do not
-        // issue legacy oxygen monitor requests on a CAN or unidentified link.
-        val protocolNumber = if (physicalCanResponder == null)
-            ObdLegacyOxygenTests.protocolNumber(ask("ATDPN")) else null
+        val protocolNumber = negotiatedProtocol
         val legacy = protocolNumber != null && protocolNumber in 1..5
+        val vehicleInfo = discoverVehicleInfo(legacy)
+        // A legacy anonymous segmented response must never be decoded by
+        // the CAN identity parser or used as a verified physical VIN.
+        val vin = if (legacy) null else readVin()
+        val calIds = if (legacy) emptyList() else readCalibrationIds()
+        val cvns = if (legacy) emptyList() else readCalibrationVerificationNumbers()
+        val ecuNames = if (legacy) emptyList() else readEcuName()
+        val readiness = readReadiness()
         val mode05 = if (protocolNumber != null && legacy) withHeaderlessRecords {
             ObdLegacyOxygenTests.scan(protocolNumber, { command, timeout -> ask(command, timeout) })
         } else null
         // Distinct legacy TID/CID records and CAN MID/TID/UASID records.
         val mode06 = if (legacy) withHeaderlessRecords {
             ObdLegacyOxygenTests.scanMode06({ command, timeout -> ask(command, timeout) })
-        } else readMonitorTests()
+        } else if (physicalCanResponder != null || protocolNumber != null && protocolNumber in 6..9) readMonitorTests() else null
         val mode08 = if (legacy || physicalCanResponder != null || protocolNumber != null && protocolNumber in 6..9) withHeaderlessRecords {
             ObdMode08Discovery.discover(legacy, physicalCanResponder) { command, timeout -> ask(command, timeout) }
         } else null
@@ -762,7 +786,9 @@ class Obd2FeatureEngine(
             vehicleInfoSupportComplete = vehicleInfo.complete,
             vehicleInfoReads = vehicleInfo.reads,
             mode05 = mode05,
-            mode08 = mode08
+            mode08 = mode08,
+            negotiatedElmProtocol = protocolNumber,
+            anonymousLegacyVinCandidate = vehicleInfo.anonymousVin
         )
     }
 
