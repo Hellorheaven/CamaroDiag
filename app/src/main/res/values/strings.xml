@@ -1290,8 +1290,8 @@
     <string name="functional_evap_run">Mode 08 — EVAP</string>
     <string name="functional_evap_scope">Separate physical CAN ECM test; available only on a compatible ELM/STN adapter.</string>
     <string name="functional_evap_profile">I verified the primary ECM and the selected vehicle VIN: %1$s</string>
-    <string name="functional_evap_warning">Follow the manufacturer’s EVAP procedure. Vehicle stationary, engine stopped, ventilated area and safe conditions. The ECU may refuse the test. No automatic retry.</string>
-    <string name="functional_evap_confirm">Request the EVAP test once on vehicle %1$s?</string>
+    <string name="functional_evap_warning">This request prepares EVAP leak-test conditions; it does not perform the test. Follow the manufacturer’s EVAP procedure. Vehicle stationary, engine stopped, ventilated area and safe conditions. The ECU may refuse the test. No automatic retry.</string>
+    <string name="functional_evap_confirm">Request EVAP test conditions once on vehicle %1$s?</string>
     <string name="functional_evap_ok">OK</string>
     <string name="functional_evap_yes">Yes</string>
     <string name="functional_evap_cancel">Cancel</string>
