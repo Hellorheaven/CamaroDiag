@@ -10,7 +10,7 @@ internal static class ObdJ1979FunctionalScan
     internal sealed record Step(string RequestHex, string? ResponseHex,
         string Status, string? Detail, long DurationMs);
     internal sealed record Result(string? ObservedVin, IReadOnlyList<Step> Steps,
-        bool Completed, string[] NotExecuted);
+        bool Completed, string[] NotExecuted, string? StopReason);
 
     internal static Result Run(Func<byte[], int, byte[]> exchange,
         Action requireActive, TimeSpan budget)
@@ -22,6 +22,7 @@ internal static class ObdJ1979FunctionalScan
         var steps = new List<Step>();
         string? vin = null;
         bool expired = false;
+        string? stopReason = null;
 
         byte[]? Read(byte[] request, Func<byte[], string>? decode = null)
         {
@@ -32,8 +33,9 @@ internal static class ObdJ1979FunctionalScan
             if (remaining.TotalMilliseconds < 100)
             {
                 expired = true;
+                stopReason = "BUDGET_EXHAUSTED";
                 steps.Add(new(Convert.ToHexString(request), null, "NOT_TESTED",
-                    "BUDGET_EXHAUSTED", 0));
+                    stopReason, 0));
                 return null;
             }
             var timer = Stopwatch.StartNew();
@@ -76,6 +78,17 @@ internal static class ObdJ1979FunctionalScan
                 steps.Add(new(Convert.ToHexString(request),
                     response is null ? null : Convert.ToHexString(response),
                     "FAILED", "INVALID_RESPONSE", timer.ElapsedMilliseconds));
+                return null;
+            }
+            catch (IOException error)
+            {
+                requireActive();
+                expired = true; // Stop after a terminal transport fault; no retry.
+                stopReason = "TRANSPORT_ERROR";
+                steps.Add(new(Convert.ToHexString(request),
+                    response is null ? null : Convert.ToHexString(response),
+                    "FAILED", stopReason + ":" + error.GetType().Name,
+                    timer.ElapsedMilliseconds));
                 return null;
             }
         }
@@ -177,6 +190,6 @@ internal static class ObdJ1979FunctionalScan
         }
         requireActive();
         return new(vin, steps.ToArray(), !expired,
-            ["MODE_04_CLEAR", "MODE_05_LEGACY", "MODE_08_CONTROL"]);
+            ["MODE_04_CLEAR", "MODE_05_LEGACY", "MODE_08_CONTROL"], stopReason);
     }
 }
