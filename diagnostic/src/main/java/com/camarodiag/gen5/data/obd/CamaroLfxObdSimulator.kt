@@ -22,7 +22,20 @@ object CamaroLfxObdSimulator {
     private val simulatedEcuName = "CAMARODIAG LFX SIM".padEnd(20, ' ')
 
     fun createEngine(): Obd2FeatureEngine = Obd2FeatureEngine(
-        ObdCommandChannel { command, _ -> response(command) }
+        ObdCommandChannel { command, _ ->
+            val raw = response(command)
+            val selected = command.trim().replace(" ", "").uppercase(Locale.ROOT)
+            // This simulator advertises a synthetic physical 7E8 responder
+            // during supported-PID discovery. Attribute its synthetic Mode 01
+            // measurements to that SAME responder instead of supplying
+            // anonymous data that strict ECU attribution must reject.
+            if (selected.matches(Regex("01[0-9A-F]{2}")) &&
+                raw.matches(Regex("(?:[0-9A-F]{2}){3,8}")) &&
+                raw.startsWith("41")) {
+                "7E8 %02X ".format(Locale.ROOT, raw.length / 2) +
+                    raw.chunked(2).joinToString(" ")
+            } else raw
+        }
     )
 
     fun response(command: String): String {
