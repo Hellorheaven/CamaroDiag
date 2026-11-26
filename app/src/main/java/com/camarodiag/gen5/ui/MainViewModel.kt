@@ -4905,6 +4905,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             )
             return
         }
+        // The identity may arrive asynchronously just before the first sample.
+        // Once samples exist, never relabel them with a later VIN.
+        if (recordingObservedVin == null && recordedLiveSamples.isEmpty())
+            recordingObservedVin = _observedStandardVin.value
         if (_observedStandardVin.value != recordingObservedVin) {
             stopLiveRecording()
             _liveRecordingState.update { it.copy(message = localizedContext.getString(R.string.live_recording_identity_changed)) }

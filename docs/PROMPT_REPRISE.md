@@ -1,3 +1,10 @@
+## Retour propriétaire Android / ELM327 sur Mach-E — 26/11/2026
+
+- Deux exports fonctionnels identiques : 27 PID annoncés, répondants 7E8/7EA/7EC/7EE/7EF, VIN Ford lu, modes DTC 03/07/0A positifs sans code. CSV 51 valeurs / 12 paramètres, VIN vide et profil Camaro erroné. Ne pas déduire l'identité OEM des adresses ni l'état de santé batterie de PID 5B.
+- Commits d4eb9bc et 0e120e6 : export JSON intégral du rapport OBD (rawLog et provenance inclus) dans Reports via stockage existant, VIN physique figé pour CSV live, affichage répondants OBD indépendamment de la topologie GM, capacités adaptateur lisibles, DoIP avancé replié par défaut, restauration CAN distinguant refus de configuration et perte réelle de session ; ESC seulement si le mode moniteur peut encore être actif.
+- Suite : affichage des répondants issus d'un test fonctionnel terminé de la même connexion et du même profil, avec régression écrite ; possibilité d'adopter le VIN avant le premier échantillon CSV uniquement.
+- **Non compilé, non testé** conformément aux consignes de clôture de chantier/protocole ; comportement ELM327 réel non confirmé. Restent à vérifier : traces TX/RX de chaque mode CAN, restauration de profil sur clones, ergonomie complète cartographie et qualification réelle. Ne pas déclarer ces anomalies closes sans preuves. Pas de Release, merge, nouvelle branche ou clôture C6/C8.
+
 ## PR117 — C6 : sauvegardes physiques et BIN original — dernier état (26/11/2026)
 
 - **HEAD de reprise avant cette note : `f158e980100d990602c9979f09ac564e657a70e5`; PR #117 ouverte (brouillon), `chore/unified-ci` non fusionnée.** Six commits de code : `a5d55ad`, `1916d4c`, `7c1eced`, `1ff30dd`, `3ff17f7`, `f158e98`.

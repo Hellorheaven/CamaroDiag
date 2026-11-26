@@ -674,7 +674,11 @@ fun CamaroDiagApp(
                     // Physical CDJ/USB checkpoint capture is not implemented (C5): never enable it as a working export.
                     onConnectWifi = { host, port -> viewModel.connectWifi(host, port) }
                 )
-                DiagTab.MODULES -> ModulesScreen(modules, obdScanReport, isObdScanning, { viewModel.runFullObdScan() })
+                DiagTab.MODULES -> ModulesScreen(
+                    modules, obdScanReport, isObdScanning, { viewModel.runFullObdScan() },
+                    FunctionalTestPlanner.currentResponders(functionalTests, connectionGeneration, vehicle.vin),
+                    obdScanMessage
+                )
                 DiagTab.LICENSE -> {
                     if (LicenseRolloutConfig.ENABLED) {
                         LicenseScreen(licenseLevel, onRefreshLicense)
@@ -1434,8 +1438,11 @@ fun ModulesScreen(
     modules: List<EcuModule>,
     report: com.camarodiag.gen5.data.obd.ObdScanReport? = null,
     scanning: Boolean = false,
-    onScan: (() -> Unit)? = null
+    onScan: (() -> Unit)? = null,
+    testedResponders: List<String> = emptyList(),
+    scanMessage: String? = null
 ) {
+    val respondingAddresses = (report?.respondingEcuAddresses ?: testedResponders).distinct().sorted()
     LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item {
             SectionTitle(stringResource(R.string.modules_vehicle_title))
@@ -1444,18 +1451,24 @@ fun ModulesScreen(
                     Text(stringResource(R.string.obd_run_full_scan))
                 }
             }
-            if (modules.isEmpty() && report?.respondingEcuAddresses.isNullOrEmpty()) {
+            scanMessage?.let { Text(it, color = TextMuted, fontSize = 12.sp) }
+            if (modules.isEmpty() && respondingAddresses.isEmpty()) {
                 Text(stringResource(R.string.modules_no_observed_responders), color = TextMuted)
             }
         }
-        if (report != null) {
-            item { SectionTitle(stringResource(R.string.modules_obd_responders)) }
-            items(report.respondingEcuAddresses.distinct().sorted()) { address ->
+        if (respondingAddresses.isNotEmpty()) {
+            item {
+                SectionTitle(stringResource(R.string.modules_obd_responders))
+                if (report?.adapterInfo?.get("IDENTIFICATION").orEmpty().contains("SIMULATED", ignoreCase = true)) {
+                    Text(stringResource(R.string.obd_offline_simulation_notice), color = CamaroAmber)
+                }
+            }
+            items(respondingAddresses) { address ->
                 Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
                     Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text(address, color = CamaroBlue, fontWeight = FontWeight.Bold)
                         Text(stringResource(R.string.modules_oem_identity_unknown), color = TextMuted)
-                        report.supportedPidsByResponder[address]?.let { pids ->
+                        report?.supportedPidsByResponder?.get(address)?.let { pids ->
                             Text(stringResource(R.string.obd_pid_count_by_ecu, address) + ": " + pids.size)
                         }
                     }

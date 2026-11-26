@@ -135,6 +135,19 @@ object FunctionalTestPlanner {
                 "Réponse physique au mode 01 PID 00 ; identité constructeur du calculateur non établie.")
         }
 
+    /** Reuse physical test evidence only for the current vehicle/connection, never a previous adapter. */
+    fun currentResponders(state: FunctionalTestState, connectionGeneration: Long, selectedVin: String): List<String> {
+        val context = state.context ?: return emptyList()
+        if (state.running || state.finishedAtMillis == null || state.error != null ||
+            context.connectionGeneration != connectionGeneration || context.selectedVin != selectedVin) return emptyList()
+        return state.checks.asSequence()
+            .filter { it.group == "obd_responder" && it.key.startsWith("obd_responder:") &&
+                it.outcome == FunctionalTestOutcome.PASSED }
+            .map { it.key.substringAfter(':') }
+            .filter { it.isNotBlank() }
+            .distinct().sorted().toList()
+    }
+
     fun withDtcModeEvidence(rows: List<FunctionalTestCheck>, counts: Map<Int, Int?>): List<FunctionalTestCheck> =
         rows.filterNot { it.key.startsWith("service:dtc-mode:") } + counts.entries.sortedBy { it.key }.map { (mode, count) ->
             val hex = "%02X".format(java.util.Locale.ROOT, mode)

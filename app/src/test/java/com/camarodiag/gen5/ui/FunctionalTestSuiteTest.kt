@@ -56,6 +56,22 @@ class FunctionalTestSuiteTest {
         assertEquals(FunctionalTestOutcome.PASSED, checked.first { it.key == "service:dtc-mode:0A" }.outcome)
     }
 
+    @Test fun physicalRespondersAreShownOnlyForCurrentCompletedTest() {
+        val selected = ""
+        val state = FunctionalTestState(
+            context = FunctionalTestContext(selected, "OBDII", "BLUETOOTH", 9),
+            finishedAtMillis = 2,
+            checks = FunctionalTestPlanner.withStandardResponders(emptyList(),
+                listOf("7E8", "7EA", "7EC", "7EE", "7EF", "7E8"))
+        )
+        assertEquals(listOf("7E8", "7EA", "7EC", "7EE", "7EF"),
+            FunctionalTestPlanner.currentResponders(state, 9, selected))
+        assertTrue(FunctionalTestPlanner.currentResponders(state, 10, selected).isEmpty())
+        assertTrue(FunctionalTestPlanner.currentResponders(state, 9, "different").isEmpty())
+        assertTrue(FunctionalTestPlanner.currentResponders(state.copy(running = true), 9, selected).isEmpty())
+        assertTrue(FunctionalTestPlanner.currentResponders(state.copy(error = "Interrupted"), 9, selected).isEmpty())
+    }
+
     @Test fun foreignVinIsNotCamaroCandidate() {
         val matcher = com.camarodiag.gen5.domain.model.VehicleVinMatcher
         assertTrue(matcher.isCamaroCandidate("2G1FF3D30C9000001"))
