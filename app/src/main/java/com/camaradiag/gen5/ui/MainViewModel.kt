@@ -5677,16 +5677,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 // flooding slower ELM327 adapters with every optional sensor on each refresh.
                 if (pidValue % 4 != activeTelemetryBatch) return null
                 if (batchEvidenceGeneration != liveEvidenceGeneration) return null
-                val response = obdManager.readMode01PidIfSupported(pidValue) ?: return null
+                val observations = obdManager.readMode01PidObservationsIfSupported(pidValue)
                 if (batchEvidenceGeneration != liveEvidenceGeneration) return null
-                if (response.equals("NO_SOCKET", ignoreCase = true) ||
-                    response.contains("UNABLE TO CONNECT", ignoreCase = true)) {
-                    throw ObdTransportDisconnectedException("Live OBD transport is disconnected")
-                }
                 // Generic live data may come from an explicitly selected
                 // secondary ECU even on a Camaro; fuel analysis has its own
-                // primary powertrain restriction.
-                val observation = liveSources.select(pidValue, CamaroUdsProtocol.parsePidObservations(response, pid))
+                // primary powertrain restriction. Only advertised responders
+                // may contribute when the transport knows their PID bitmaps.
+                val observation = liveSources.select(pidValue, observations)
                 lastReadResponder = observation?.responder
                 return observation?.bytes?.toIntArray()
             }
