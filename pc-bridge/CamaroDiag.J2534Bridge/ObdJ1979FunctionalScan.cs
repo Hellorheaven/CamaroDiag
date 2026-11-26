@@ -80,6 +80,15 @@ internal static class ObdJ1979FunctionalScan
             }
         }
 
+        // Prioritize VIN and DTC evidence before the potentially large
+        // supported-PID inventory consumes the campaign budget.
+        Read([9, 2], data => vin = ObdJ1979Vin.DecodeIsoTp(data));
+        foreach (byte mode in new byte[] { 3, 7, 10 })
+        {
+            if (expired) break;
+            Read([mode]);
+        }
+
         // Discover standard PID support before reading any PID values.
         var pids = new SortedSet<byte>();
         for (int page = 0; page <= 0xE0 && !expired; page += 32)
@@ -99,12 +108,6 @@ internal static class ObdJ1979FunctionalScan
         {
             if (expired) break;
             Read([1, pid]);
-        }
-
-        foreach (byte mode in new byte[] { 3, 7, 10 })
-        {
-            if (expired) break;
-            Read([mode]);
         }
 
         // Frame 00 only: without a verified triggering DTC there is no
@@ -166,10 +169,7 @@ internal static class ObdJ1979FunctionalScan
         }
         Inventory(8); // Discovery only; never emit a control command.
         var info = Inventory(9);
-        // VIN is independently attempted even if optional bitmap discovery
-        // is absent. Do not infer the identity from a user-selected profile.
-        if (!expired)
-            Read([9, 2], data => vin = ObdJ1979Vin.DecodeIsoTp(data));
+        // VIN was independently attempted before the inventory.
         foreach (var type in info.Where(x => x != 2))
         {
             if (expired) break;
