@@ -82,3 +82,20 @@ Windows/Linux : utiliser la recette ELM série `camarodiagconnectors-j1979-legac
 La Ducati 848 2008 peut être candidate à l'étude K-Line constructeur mais ne prouve pas SAE J1979 ; Peugeot 207 CC 2010 et les voitures récentes du parc ne sont pas des candidats legacy présumés. Utiliser un banc si aucun véhicule compatible n'est disponible. Références : ISO 15031-5:2006 §6.3/6.5/6.6/6.8/6.9, https://studylib.net/doc/25827573/iso-15031-5-2006 ; historique indicatif des véhicules https://www.obdtester.com/obd2_protocols et https://www.blafusel.de/obd/obd2_scanned.php?order=usb . Vérifier année, marché, moteur, adaptateur et vraie réponse, sans déduire le protocole de la seule prise DLC.
 
 Separate legacy read recipes on Android and serial ELM host, with variant-specific JSON and raw anonymous records. Mutating legacy recipes and native J2534 legacy integration remain open. Firmware passive application classifier is not a vehicle transport.
+
+### SAE J1979 legacy — J2534 natif Windows
+
+Le pont Windows dispose maintenant d'une recette locale distincte pour les cinq variantes legacy. Dans l'onglet des tests privés, arrêter le pont et fermer la console, sélectionner l'interface J2534 puis le bouton J1979 legacy. Choisir le protocole documenté. Si la source de réponse ECU est inconnue, utiliser Découvrir les sources (PID 00 uniquement), puis sélectionner explicitement la source observée appropriée lors d'une nouvelle recette. Une source numérique n'identifie pas à elle seule un calculateur constructeur.
+
+En CLI, exemples illustratifs (remplacer index, variante et source par les valeurs vérifiées) :
+```powershell
+CamaroDiag.J2534Bridge.exe --j1979-legacy --adapter-index 0 --variant 2 --source discover --confirm-legacy-profile --output vpw-sources.json
+CamaroDiag.J2534Bridge.exe --j1979-legacy --adapter-index 0 --variant 2 --source 10 --confirm-legacy-profile --output vpw-ecu10.json
+```
+Variantes 1 PWM, 2 VPW, 3 ISO 9141-2, 4 KWP slow init, 5 KWP fast init. Budget 180 s, option `--budget-seconds` 1–600. Le pilote doit accepter la configuration, le filtre, l'initialisation applicable et CLEAR_RX_BUFFER. Les entêtes sont ceux des requêtes fonctionnelles antipollution, pas un adressage physique de transmission. La sélection de source est un filtre de réponse. PWM : adresse testeur F1 et table fonctionnelle de réponse configurées ; IFR J2534 04.04 séparés des données applicatives. Les autres trames suivent le contrat habituel où le pilote gère CRC/checksum.
+
+La recette conserve les octets TX/RX, source, horodatage pilote, NRC, statut et VIN reconstitué sur cette seule source si les cinq fragments et le compteur concordent. Elle lit 01/02/03/05/06/07/08 inventaire/09/0A si disponibles ; CALID/CVN legacy et DTC décodés quand leur format est vérifié. Une donnée brute de PID à largeur inconnue n'est pas une mesure décodée. Une recette terminée ne signifie pas que tous les services ont répondu. Les exports sont distincts (découverte / source sélectionnée), sans écrasement. Ne pas présenter un silence comme zéro DTC.
+
+Aucun Mode 04 ni actionnement 08 dans cette campagne. La transmission normative legacy fonctionnelle peut affecter plusieurs ECU : les futures recettes mutatrices doivent traiter la portée véhicule entière avec consentements distincts ; ne pas réutiliser la sélection de réponse comme preuve d'adressage physique. Le transport J2534 générique existant reste distinct. Réf. ISO 15031-5:2006 tableau 13 et §6 (https://studylib.net/doc/25827573/iso-15031-5-2006), SAE J2534-1 04.04 §8.5 (https://netcult.ch/elmue/HUD%20ECU%20Hacker/J2534%20PassThrough.pdf). EVAP : l'annexe F définit TID 01 comme préparation des conditions du contrôle de fuite, pas la réalisation du contrôle ; messages de confirmation CAN corrigés en conséquence.
+
+Native Windows J2534 legacy: independent read-only campaign and bounded source discovery on a documented protocol, with source-specific JSON, driver-managed framing and separate PWM IFR evidence. No automatic ECU selection, write, or claim of whole-vehicle coverage. The ELM serial host remains available on Windows/Linux. Hardware/driver validation is separate.
