@@ -27,7 +27,8 @@ internal static class DoIpVinReader
         return targets;
     }
 
-    internal sealed record InventoryEntry(ushort Ecu, string? Vin, string? Reason, byte? ProtocolValue = null);
+    internal sealed record InventoryEntry(ushort Ecu, string? Vin, string? Reason,
+        byte? ProtocolValue = null, byte? FailureCode = null, byte? RequestedService = null);
 
     internal static async Task<IReadOnlyList<InventoryEntry>> InventoryObservedAsync(
         DoIpVehicleDiscovery.Identity gateway, string expectedVin, ushort tester,
@@ -82,6 +83,15 @@ internal static class DoIpVinReader
             catch (TimeoutException)
             {
                 row = new(ecu, null, "timeout");
+            }
+            catch (UdsServiceRefusal error)
+            {
+                row = new(ecu, null, "uds_negative_response",
+                    FailureCode: error.Code, RequestedService: error.Service);
+            }
+            catch (DoIpTransportRefusal error)
+            {
+                row = new(ecu, null, error.Layer, FailureCode: error.Code);
             }
             catch (InvalidDataException)
             {
