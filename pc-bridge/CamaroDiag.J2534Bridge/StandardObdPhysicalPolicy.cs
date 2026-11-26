@@ -39,5 +39,6 @@ internal static class StandardObdPhysicalPolicy
         payload.Length == 2 && payload[0] == 0x01 ||
         payload.Length == 3 && payload[0] == 0x02 && payload[2] == 0x00 ||
         payload.Length == 2 && payload[0] is 0x06 or 0x09 ||
+        payload.Length == 2 && payload[0] == 0x08 && payload[1] % 32 == 0 ||
         payload.Length == 1 && payload[0] is 0x03 or 0x07 or 0x0A;
 }
