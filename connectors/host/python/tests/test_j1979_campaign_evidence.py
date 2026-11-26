@@ -117,6 +117,26 @@ class CaptureTests(unittest.TestCase):
         report = decode(io.BytesIO(start() + INITIAL + bad))
         self.assertIsNone(report["steps"][1]["vehicle_info"])
 
+    def test_readiness_ignition_specific_and_unsupported_monitors(self):
+        for response, expected in (
+            ("410182112105", {"misfire": False, "catalyst": False, "oxygen-sensor": True}),
+            ("410100084040", {"particulate-filter": False}),
+        ):
+            initial = step(1, bytes.fromhex("0100"), bytes.fromhex("410080000000"))
+            tail = (step(6, bytes.fromhex("0101"), bytes.fromhex(response)) +
+                    step(7, bytes.fromhex("020200"), bytes.fromhex("4202000000")) +
+                    step(8, bytes.fromhex("0600"), bytes.fromhex("460000000000")) +
+                    step(9, bytes.fromhex("0800"), bytes.fromhex("480000000000")) +
+                    step(10, bytes.fromhex("0900"), bytes.fromhex("490000000000")))
+            report = decode(io.BytesIO(start() + initial + IDENTITY + DTC + tail +
+                summary(11, flags=231, steps=10, positive=10)))
+            self.assertTrue(report["capture_integrity_verified"])
+            ready = report["steps"][5]["readiness"]
+            self.assertEqual(expected, ready["supported_monitors"])
+            self.assertEqual(response == "410182112105", ready["mil_on"])
+            self.assertEqual(response == "410100084040", ready["compression_ignition"])
+            self.assertIsNone(report["steps"][0]["readiness"])
+
     def test_corruption_and_truncation_keep_prefix(self):
         for tail in (IDENTITY[:-1], IDENTITY[:-1] + bytes([IDENTITY[-1] ^ 1])):
             report = decode(io.BytesIO(start() + INITIAL + tail))

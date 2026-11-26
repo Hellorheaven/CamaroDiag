@@ -118,6 +118,26 @@ public final class J1979CampaignSemantics {
         for(int i=start;i<end;i++)if(u(data[i])<32||u(data[i])>126)return null;
         return new String(data,start,end-start,StandardCharsets.US_ASCII);
     }
+    public static final class Readiness {
+        public final boolean milOn,compressionIgnition;
+        public final int confirmedDtcCount,byteB,byteC,byteD;
+        public final java.util.Map<String,Boolean> supportedMonitors;
+        Readiness(byte[] response){
+            int a=u(response[2]);byteB=u(response[3]);byteC=u(response[4]);byteD=u(response[5]);
+            milOn=(a&128)!=0;confirmedDtcCount=a&127;compressionIgnition=(byteB&8)!=0;
+            java.util.Map<String,Boolean> monitors=new java.util.LinkedHashMap<>();
+            addMonitors(monitors,new String[]{"misfire","fuel-system","components"},byteB,byteB>>>4);
+            addMonitors(monitors,compressionIgnition?
+                new String[]{"nmhc-catalyst","nox-aftertreatment",null,"boost-pressure",null,"exhaust-gas-sensor","particulate-filter","egr-vvt"}:
+                new String[]{"catalyst","heated-catalyst","evaporative-system","secondary-air",null,"oxygen-sensor","oxygen-sensor-heater","egr-vvt"},
+                byteC,byteD);
+            supportedMonitors=Collections.unmodifiableMap(monitors);
+        }
+        private static void addMonitors(java.util.Map<String,Boolean> out,String[] names,int support,int incomplete){
+            for(int bit=0;bit<names.length;bit++)if(names[bit]!=null&&(support&(1<<bit))!=0)
+                out.put(names[bit],(incomplete&(1<<bit))==0);
+        }
+    }
     public static final class Step {
         public final int sequence;
         public final String requestHex,responseHex,status;
@@ -156,6 +176,9 @@ public final class J1979CampaignSemantics {
             return Collections.unmodifiableList(records);
         }
         /** Only decoded, structurally valid InfoTypes; CVNs are not signatures. */
+        public Readiness readiness(){
+            return state==1&&Arrays.equals(request,new byte[]{1,1})?new Readiness(response):null;
+        }
         public VehicleInfo vehicleInfo(){
             if(state!=1||u(request[0])!=9)return null;
             int type=u(request[1]);List<String> values=new ArrayList<>();

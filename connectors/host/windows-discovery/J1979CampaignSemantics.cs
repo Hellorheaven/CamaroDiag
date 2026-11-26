@@ -84,6 +84,22 @@ internal static class J1979CampaignSemantics
         for(int i=start;i<end;i++)if(data[i] is <32 or >126)return null;
         return Encoding.ASCII.GetString(data,start,end-start);
     }
+    internal sealed record Readiness(bool MilOn,int ConfirmedDtcCount,bool CompressionIgnition,int ByteB,int ByteC,int ByteD,
+        IReadOnlyDictionary<string,bool> SupportedMonitors);
+    private static Readiness DecodeReadiness(byte[] response){
+        int a=response[2],b=response[3],c=response[4],d=response[5];
+        bool compression=(b&8)!=0;
+        var monitors=new Dictionary<string,bool>(StringComparer.Ordinal);
+        void Add(string?[] names,int support,int incomplete){
+            for(int bit=0;bit<names.Length;bit++)
+                if(names[bit] is string name&&(support&(1<<bit))!=0)monitors.Add(name,(incomplete&(1<<bit))==0);
+        }
+        Add(["misfire","fuel-system","components"],b,b>>4);
+        Add(compression?
+            ["nmhc-catalyst","nox-aftertreatment",null,"boost-pressure",null,"exhaust-gas-sensor","particulate-filter","egr-vvt"]:
+            ["catalyst","heated-catalyst","evaporative-system","secondary-air",null,"oxygen-sensor","oxygen-sensor-heater","egr-vvt"],c,d);
+        return new((a&128)!=0,a&127,compression,b,c,d,new System.Collections.ObjectModel.ReadOnlyDictionary<string,bool>(monitors));
+    }
     internal sealed class Step {
         public int Sequence{get;}
         public string RequestHex{get;}
@@ -126,6 +142,7 @@ internal static class J1979CampaignSemantics
                 return records.AsReadOnly();
             }
         }
+        internal Readiness? MonitorReadiness=>State==1&&Request.AsSpan().SequenceEqual(new byte[]{1,1})?DecodeReadiness(Response):null;
         internal VehicleInfo? Identification {
             get {
                 if(State!=1||Request[0]!=9)return null;

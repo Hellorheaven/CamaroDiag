@@ -80,6 +80,13 @@ internal static class J1979UsbSelfTests
         Require(cvn.Identification?.Values.SequenceEqual(new[]{"01020304","FFFFFFFF"})==true);
         Require(new J1979CampaignSemantics.Step(12,1,1,[9,4],
             Convert.FromHexString("49040143004131000000000000000000000000")).Identification is null);
+        var ready=new J1979CampaignSemantics.Step(13,1,1,[1,1],Convert.FromHexString("410182112105")).MonitorReadiness!;
+        Require(ready.MilOn&&ready.ConfirmedDtcCount==2&&!ready.CompressionIgnition);
+        Require(!ready.SupportedMonitors["misfire"]&&!ready.SupportedMonitors["catalyst"]&&
+            ready.SupportedMonitors["oxygen-sensor"]&&!ready.SupportedMonitors.ContainsKey("evaporative-system"));
+        var diesel=new J1979CampaignSemantics.Step(14,1,1,[1,1],Convert.FromHexString("410100084040")).MonitorReadiness!;
+        Require(diesel.CompressionIgnition&&!diesel.SupportedMonitors["particulate-filter"]&&
+            !diesel.SupportedMonitors.ContainsKey("oxygen-sensor-heater"));
         var partial=new Sim([.. challenge,.. capture[..^1]]);using var partialRaw=new MemoryStream();
         result=new J1979UsbCapture(partial).RunRequest(hello,10000,key,partialRaw);
         Require(result.DeviceCredentialAuthenticated&&!result.FrameIntegrityVerified&&partial.Closed&&partialRaw.Length==capture.Length-1);

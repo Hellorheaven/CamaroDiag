@@ -94,6 +94,17 @@ public final class J1979UsbTest {
         assert cvn.vehicleInfo().values.equals(java.util.Arrays.asList("01020304","FFFFFFFF"));
         assert new J1979CampaignSemantics.Step(12,1,1,new byte[]{9,4},
             hex("49040143004131000000000000000000000000")).vehicleInfo()==null;
+        J1979CampaignSemantics.Readiness ready=new J1979CampaignSemantics.Step(13,1,1,new byte[]{1,1},
+            hex("410182112105")).readiness();
+        assert ready.milOn&&ready.confirmedDtcCount==2&&!ready.compressionIgnition;
+        assert Boolean.FALSE.equals(ready.supportedMonitors.get("misfire"));
+        assert Boolean.FALSE.equals(ready.supportedMonitors.get("catalyst"));
+        assert Boolean.TRUE.equals(ready.supportedMonitors.get("oxygen-sensor"));
+        assert !ready.supportedMonitors.containsKey("evaporative-system");
+        J1979CampaignSemantics.Readiness diesel=new J1979CampaignSemantics.Step(14,1,1,new byte[]{1,1},
+            hex("410100084040")).readiness();
+        assert diesel.compressionIgnition&&Boolean.FALSE.equals(diesel.supportedMonitors.get("particulate-filter"));
+        assert !diesel.supportedMonitors.containsKey("oxygen-sensor-heater");
         Sim partial=new Sim(concat(challenge,Arrays.copyOf(capture,capture.length-1)));
         raw=new ByteArrayOutputStream();
         result=new J1979UsbCapture(partial).runRequest(hello,10000,key,raw);

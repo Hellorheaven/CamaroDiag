@@ -1,3 +1,7 @@
+## J1979 — readiness PID 01 natif structuré (26/11/2026)
+
+- Exports Android/Windows/Python : MIL, nombre DTC confirmé annoncé par le PID 01, type d'allumage, octets B/C/D et dictionnaire des moniteurs effectivement supportés avec état ready/incomplete. Réutilisation du mapping existant ObdJ1979MonitorStatus ; bits réservés non interprétés, aucun moniteur absent présumé prêt. Régressions essence/diesel écrites, non exécutées. C6/J1979 ouverts ; aucun test intermédiaire, merge ou Release.
+
 ## C6 — journal Android : création et append vérifiés sur descripteur (26/11/2026)
 
 - CREATE_NEW atomique, aucun suivi de lien symbolique en création/lecture/append ; comparaison de l'instantané attendu sur le descripteur qui écrit, force(true), relecture exacte sur ce descripteur et réouverture du chemin avant de confirmer. Une divergence invalide la session, même si le fichier est ensuite restauré. Régression de redirection symbolique et restauration écrite (non exécutée). Pas de garantie contre toutes les races ni de validation matérielle. C6/J1979 ouverts ; aucun flash, test intermédiaire, merge ou Release.

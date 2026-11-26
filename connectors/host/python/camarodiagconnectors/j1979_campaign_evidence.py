@@ -189,6 +189,29 @@ def _vehicle_info(req, res):
     return {"info_type": kind, "values": values}
 
 
+def _readiness(req, res):
+    # Same Mode 01 PID 01 semantics as the existing bridge monitor decoder.
+    if req != bytes((1, 1)):
+        return None
+    a, b, c, d = res[2:6]
+    compression = bool(b & 8)
+    monitors = {}
+
+    def add(names, support, incomplete):
+        for bit, name in enumerate(names):
+            if name is not None and support & (1 << bit):
+                monitors[name] = not bool(incomplete & (1 << bit))
+
+    add(("misfire", "fuel-system", "components"), b, b >> 4)
+    add(("nmhc-catalyst", "nox-aftertreatment", None, "boost-pressure", None,
+         "exhaust-gas-sensor", "particulate-filter", "egr-vvt") if compression else
+        ("catalyst", "heated-catalyst", "evaporative-system", "secondary-air", None,
+         "oxygen-sensor", "oxygen-sensor-heater", "egr-vvt"), c, d)
+    return {"mil_on": bool(a & 128), "confirmed_dtc_count": a & 127,
+            "compression_ignition": compression, "byte_b": b, "byte_c": c, "byte_d": d,
+            "supported_monitors": monitors}
+
+
 def _exact(stream, size):
     chunks = bytearray()
     while len(chunks) < size:
@@ -373,7 +396,8 @@ def decode(stream):
                     "negative_response_code": res[2] if state == 3 else None,
                     "measurement": _measurement(req, res) if state == 1 else None,
                     "monitor_records": _monitor_records(req, res) if state == 1 else None,
-                    "vehicle_info": _vehicle_info(req, res) if state == 1 else None})
+                    "vehicle_info": _vehicle_info(req, res) if state == 1 else None,
+                    "readiness": _readiness(req, res) if state == 1 else None})
                 continue
             if kind != 3 or length != 22:
                 raise ValueError("Unexpected evidence record")
