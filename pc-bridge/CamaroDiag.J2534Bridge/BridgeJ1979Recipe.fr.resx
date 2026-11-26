@@ -27,4 +27,16 @@
   <data name="EvapOutcome_REFUSED" xml:space="preserve"><value>Demande de test refusée par le calculateur.</value></data>
   <data name="EvapOutcome_UNCERTAIN" xml:space="preserve"><value>État de la demande incertain — ne pas la répéter automatiquement.</value></data>
   <data name="EvapOutcome_NOT_TESTED" xml:space="preserve"><value>Conditions non vérifiées ; aucune demande de test envoyée.</value></data>
+  <data name="ClearRun" xml:space="preserve"><value>Mode 04 — effacement DTC antipollution</value></data>
+  <data name="ClearVinRequired" xml:space="preserve"><value>Saisissez le VIN documenté de 17 caractères du véhicule à tester.</value></data>
+  <data name="ClearWarning" xml:space="preserve"><value>Cet effacement peut supprimer des défauts antipollution, les trames figées et les informations de préparation des moniteurs. Exportez les preuves initiales. Respectez la procédure constructeur, véhicule immobilisé et moteur arrêté. Ne masquez pas un défaut non résolu. Aucune répétition automatique.</value></data>
+  <data name="ClearConfirm" xml:space="preserve"><value>Demander un seul effacement antipollution sur le VIN {0}, CAN physique {1}/{2} ?</value></data>
+  <data name="ClearRunning" xml:space="preserve"><value>Enregistrement des preuves initiales et contrôle des conditions.</value></data>
+  <data name="ClearExpired" xml:space="preserve"><value>Autorisation expirée. État de la demande potentiellement incertain ; ne pas relancer automatiquement.</value></data>
+  <data name="ClearNotCompletion" xml:space="preserve"><value>Les DTC permanents sont relus et jamais présumés effacés. Un acquittement ne prouve pas l’absence de tous les défauts.</value></data>
+  <data name="ClearOutcome_ACKNOWLEDGED_READBACK" xml:space="preserve"><value>Effacement acquitté ; défauts confirmés et en attente relus.</value></data>
+  <data name="ClearOutcome_ACKNOWLEDGED_PARTIAL" xml:space="preserve"><value>Effacement acquitté ; relecture incomplète.</value></data>
+  <data name="ClearOutcome_REFUSED" xml:space="preserve"><value>Demande refusée par le calculateur.</value></data>
+  <data name="ClearOutcome_UNCERTAIN" xml:space="preserve"><value>État de la demande incertain — ne pas relancer automatiquement.</value></data>
+  <data name="ClearOutcome_NOT_TESTED" xml:space="preserve"><value>Conditions non vérifiées ; aucune demande tentée.</value></data>
 </root>
