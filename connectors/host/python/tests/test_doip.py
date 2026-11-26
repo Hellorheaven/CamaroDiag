@@ -1228,6 +1228,8 @@ class DoIpTests(unittest.TestCase):
                 client.tester, client.ecu = 0xE80, 0x1234
                 client.timeout, client.p2, client.p2_star = 2.0, 0.55, 1.0
                 client._busy = False
+                client._operation_lock = threading.Lock()
+                client._drain_ready = lambda *_: None
                 clock = [0.0]
                 closed = []
                 received_deadlines = []
@@ -1299,6 +1301,7 @@ class DoIpTests(unittest.TestCase):
     def test_idle_interval_expiring_before_read_does_not_close_session(self):
         client = Session.__new__(Session)
         client._busy = False
+        client._operation_lock = threading.Lock()
         wire = unittest.mock.Mock()
         client._wire = lambda: wire
         client.close = unittest.mock.Mock()
@@ -1306,6 +1309,37 @@ class DoIpTests(unittest.TestCase):
             client.wait(.25)
         wire.recv.assert_not_called()
         client.close.assert_not_called()
+
+    def test_queued_diagnostic_reply_retires_socket_before_next_transmission(self):
+        client = Session.__new__(Session)
+        client.tester, client.ecu = 0x0E80, 0x1234
+        client.timeout = client.p2 = client.p2_star = 1
+        client._operation_lock = threading.Lock()
+        client._busy = False
+        client._socket, peer = socket.socketpair()
+        client.gateway, client.tls, client.trace = GATEWAY, False, None
+        try:
+            peer.sendall(encode(2, 0x8001, ECU + TESTER + bytes.fromhex("62123401")))
+            with self.assertRaisesRegex(DoIpError, "before next request"):
+                client.exchange(bytes.fromhex("221234"))
+            self.assertIsNone(client._socket)
+            self.assertEqual(peer.recv(1), b"")
+        finally:
+            client.close()
+            peer.close()
+
+    def test_concurrent_idle_and_exchange_are_rejected_without_closing_owner(self):
+        client = Session.__new__(Session)
+        client._operation_lock = threading.Lock()
+        client.close = unittest.mock.Mock()
+        with client._operation_lock:
+            with self.assertRaises(DoIpError):
+                client.exchange(bytes.fromhex("221234"))
+            with self.assertRaises(DoIpError):
+                client.wait(.25)
+            client.close.assert_not_called()
+        self.assertTrue(client._operation_lock.acquire(blocking=False))
+        client._operation_lock.release()
 
     def test_routing_options_on_wire(self):
         for routing_type, oem in ((0, None), (0xE0, bytes.fromhex("01020304"))):
