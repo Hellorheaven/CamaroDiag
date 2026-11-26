@@ -3871,6 +3871,32 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun inspectPhysicalRecoveryFolder(uri: Uri, identity: PhysicalRecoveryIdentity) {
+        if (!requirePremiumLicense() || !identity.valid) return
+        val owner = authenticatedAccountUid ?: return
+        val generation = accountSessionGeneration
+        if (_calibrationWorkspace.value.physicalRecoveryReading) return
+        fun current() = canResumeExport(generation, owner) && hasPremiumLicense()
+        _calibrationWorkspace.update { it.copy(physicalRecoveryReading = true, physicalRecoveryResult = null,
+            physicalRecoveryIdentity = identity, physicalRecoveryFailed = false) }
+        viewModelScope.launch {
+            try {
+                val report = withContext(Dispatchers.IO) {
+                    val app = getApplication<Application>()
+                    PhysicalRecoveryFolder.inspect(app.contentResolver, uri, app.cacheDir, identity, ::current)
+                }
+                if (current()) _calibrationWorkspace.update { it.copy(physicalRecoveryResult = report) }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                if (current()) _calibrationWorkspace.update { it.copy(physicalRecoveryFailed = true) }
+            } finally {
+                if (isCurrentAccountGeneration(generation))
+                    _calibrationWorkspace.update { it.copy(physicalRecoveryReading = false) }
+            }
+        }
+    }
+
     fun verifyEcuBackup(uri: Uri) {
         if (!requirePremiumLicense()) return
         if (_calibrationWorkspace.value.archiveVerification == ArchiveVerification.Reading) return

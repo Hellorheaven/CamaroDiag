@@ -1,3 +1,7 @@
+## C6 — inspection de récupération dans Android (26/11/2026)
+
+- Écran cartographie > mémoire : saisie indépendante VIN/famille/contrôleur/firmware, sélection SAF du dossier contenant un journal Android et son dossier .blocks, inspection hors connexion avec copies temporaires privées bornées (256 Mio), effacées après traitement. Résultat lié au compte et à l'identité saisie, sans opération ECU. FR/EN ; état de transaction distinct de l'intégrité, adresses et SHA-256 des 20 premiers secteurs. Limite : pas de récupération active, ni format Windows interchangeable, ni validation matérielle. Tests écrits/non exécutés avant clôture C6.
+
 ## Reprise C6 — cohérence du journal de récupération (26/11/2026)
 
 - Après les correctifs Android Mach-E, poursuite C6 : l'inspecteur hors ligne des secteurs physiques vérifie la chaîne SHA-256 sur **les mêmes octets** utilisés pour extraire les baselines ; refuse un journal modifié entre le début et la fin de l'inspection. Régression ajoutée sur snapshots avant/après et troncature. Aucune autorisation d'écriture/restauration déduite, aucune protection existante supprimée. Tests non exécutés avant clôture C6.

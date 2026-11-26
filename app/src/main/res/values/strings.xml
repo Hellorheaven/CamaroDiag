@@ -1230,4 +1230,26 @@
     <string name="cal_section_vehicle">Vehicle and selected profile</string>
     <string name="cal_section_signals">Diagnostic signal catalogues</string>
     <string name="cal_selected_profile_label">Selected profile: %1$s</string>
+    <string name="cal_recovery_title">Inspect physical ECU backups</string>
+    <string name="cal_recovery_folder_hint">Select a folder containing one ECU journal and its matching .blocks folder. Enter the original ECU identity independently. No vehicle connection required.</string>
+    <string name="cal_recovery_vin">Original VIN</string>
+    <string name="cal_recovery_family">Controller family</string>
+    <string name="cal_recovery_controller">Controller identifier</string>
+    <string name="cal_recovery_firmware">Firmware / OS identifier</string>
+    <string name="cal_recovery_choose_folder">Select recovery folder</string>
+    <string name="cal_recovery_folder_failed">Cannot inspect this folder. Check its contents and size (256 MiB maximum).</string>
+    <string name="cal_recovery_verified">Saved sectors match the journal</string>
+    <string name="cal_recovery_failed">Backup integrity or identity not verified</string>
+    <string name="cal_recovery_counts">%1$d of %2$d sectors verified — %3$d bytes</string>
+    <string name="cal_recovery_no_erase">No erase recorded</string>
+    <string name="cal_recovery_incomplete">Erase or write may be incomplete</string>
+    <string name="cal_recovery_partial">Additional sectors were not written</string>
+    <string name="cal_recovery_sectors_verified">Recorded sectors verified; completion not recorded</string>
+    <string name="cal_recovery_final_incomplete">Final readback incomplete</string>
+    <string name="cal_recovery_completed">Transaction completion recorded</string>
+    <string name="cal_recovery_unknown">Transaction state not verified</string>
+    <string name="cal_recovery_address">Uncertain address: 0x%1$X</string>
+    <string name="cal_recovery_sector">%1$s · 0x%2$X · %3$d bytes</string>
+    <string name="cal_recovery_more">%1$d additional sectors verified</string>
+    <string name="cal_recovery_no_restore">File integrity does not establish that the ECU is safe to restore. No write or reset performed.</string>
 </resources>

@@ -155,6 +155,10 @@ data class CalibrationWorkspaceState(
     val traceMessage: String = "",
     val canTraceReport: CanTraceAnalysisReport? = null,
     val archiveVerification: ArchiveVerification? = null,
+    val physicalRecoveryReading: Boolean = false,
+    val physicalRecoveryResult: com.camarodiag.gen5.data.obd.EcuPhysicalBackupInspection.Report? = null,
+    val physicalRecoveryIdentity: PhysicalRecoveryIdentity? = null,
+    val physicalRecoveryFailed: Boolean = false,
     val importedFileName: String? = null,
     val importedFileSize: Long? = null,
     val importedFileSha256: String? = null,
@@ -299,6 +303,7 @@ fun CalibrationWorkspaceScreen(
     vehicle: VehicleProfile,
     onImportFile: () -> Unit,
     onVerifyEcuBackup: () -> Unit,
+    onInspectPhysicalRecovery: (PhysicalRecoveryIdentity) -> Unit,
     onImportTrace: () -> Unit,
     onImportComparisonFile: () -> Unit,
     onPreviewPartialWrite: (Long, Int, Int) -> Unit,
@@ -2476,6 +2481,8 @@ fun CalibrationWorkspaceScreen(
                         stringResource(R.string.cal_no_calibration_write),
                         color = CamaroAmber, fontSize = 12.sp
                     )
+                    HorizontalDivider()
+                    PhysicalRecoveryPanel(state, vehicle.vin, doIpAccountUid, onInspectPhysicalRecovery)
                 }
             }
         }
@@ -2792,6 +2799,60 @@ fun CalibrationWorkspaceScreen(
                     }
                 }
             )
+        }
+    }
+}
+
+@Composable
+private fun PhysicalRecoveryPanel(state: CalibrationWorkspaceState, defaultVin: String,
+                                  accountUid: String?, onInspect: (PhysicalRecoveryIdentity) -> Unit) {
+    var vin by remember(accountUid, defaultVin) { mutableStateOf(defaultVin.uppercase().take(17)) }
+    var family by remember(accountUid) { mutableStateOf("") }
+    var controller by remember(accountUid) { mutableStateOf("") }
+    var firmware by remember(accountUid) { mutableStateOf("") }
+    val identity = PhysicalRecoveryIdentity(vin, family.trim(), controller.trim(), firmware.trim())
+    val editable = !state.physicalRecoveryReading
+    Text(stringResource(R.string.cal_recovery_title), fontWeight = FontWeight.Bold, color = TextPrimary)
+    Text(stringResource(R.string.cal_recovery_folder_hint), color = TextMuted, fontSize = 12.sp)
+    OutlinedTextField(vin, { vin = it.uppercase().filter { ch -> ch in "ABCDEFGHJKLMNPRSTUVWXYZ0123456789" }.take(17) },
+        label = { Text(stringResource(R.string.cal_recovery_vin)) }, enabled = editable,
+        singleLine = true, modifier = Modifier.fillMaxWidth())
+    OutlinedTextField(family, { family = it.take(128) }, label = { Text(stringResource(R.string.cal_recovery_family)) },
+        enabled = editable, singleLine = true, modifier = Modifier.fillMaxWidth())
+    OutlinedTextField(controller, { controller = it.take(128) }, label = { Text(stringResource(R.string.cal_recovery_controller)) },
+        enabled = editable, singleLine = true, modifier = Modifier.fillMaxWidth())
+    OutlinedTextField(firmware, { firmware = it.take(128) }, label = { Text(stringResource(R.string.cal_recovery_firmware)) },
+        enabled = editable, singleLine = true, modifier = Modifier.fillMaxWidth())
+    Button(onClick = { onInspect(identity) }, enabled = editable && identity.valid && accountUid != null,
+        modifier = Modifier.fillMaxWidth()) {
+        Text(stringResource(R.string.cal_recovery_choose_folder))
+    }
+    if (state.physicalRecoveryReading) CircularProgressIndicator()
+    if (state.physicalRecoveryIdentity == identity) {
+        if (state.physicalRecoveryFailed) Text(stringResource(R.string.cal_recovery_folder_failed), color = WarnRed)
+        state.physicalRecoveryResult?.let { report ->
+            Text(stringResource(if (report.verified) R.string.cal_recovery_verified else R.string.cal_recovery_failed),
+                color = if (report.verified) OkGreen else WarnRed)
+            Text(stringResource(R.string.cal_recovery_counts, report.sectors.size, report.expectedSectors, report.verifiedBytes))
+            val disposition = when (report.journalDisposition) {
+                com.camarodiag.gen5.data.obd.PersistentEcuWriteJournal.RecoveryDisposition.NO_ERASE_RECORDED -> R.string.cal_recovery_no_erase
+                com.camarodiag.gen5.data.obd.PersistentEcuWriteJournal.RecoveryDisposition.ERASE_OR_WRITE_MAY_BE_INCOMPLETE -> R.string.cal_recovery_incomplete
+                com.camarodiag.gen5.data.obd.PersistentEcuWriteJournal.RecoveryDisposition.ADDITIONAL_BASELINES_NOT_WRITTEN -> R.string.cal_recovery_partial
+                com.camarodiag.gen5.data.obd.PersistentEcuWriteJournal.RecoveryDisposition.ALL_RECORDED_SECTORS_VERIFIED -> R.string.cal_recovery_sectors_verified
+                com.camarodiag.gen5.data.obd.PersistentEcuWriteJournal.RecoveryDisposition.FINAL_READBACK_INCOMPLETE -> R.string.cal_recovery_final_incomplete
+                com.camarodiag.gen5.data.obd.PersistentEcuWriteJournal.RecoveryDisposition.TRANSACTION_COMPLETION_RECORDED -> R.string.cal_recovery_completed
+                else -> R.string.cal_recovery_unknown
+            }
+            Text(stringResource(disposition), color = CamaroAmber)
+            report.uncertainAddress?.let { Text(stringResource(R.string.cal_recovery_address, it), color = WarnRed) }
+            // Keep very large reports readable without composing thousands of rows.
+            report.sectors.take(20).forEach { sector ->
+                Text(stringResource(R.string.cal_recovery_sector, sector.region.name, sector.address, sector.length),
+                    fontSize = 12.sp)
+                Text(sector.sha256, fontFamily = FontFamily.Monospace, fontSize = 10.sp)
+            }
+            if (report.sectors.size > 20) Text(stringResource(R.string.cal_recovery_more, report.sectors.size - 20))
+            Text(stringResource(R.string.cal_recovery_no_restore), color = CamaroAmber, fontSize = 12.sp)
         }
     }
 }

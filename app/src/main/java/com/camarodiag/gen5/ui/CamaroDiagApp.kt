@@ -370,6 +370,17 @@ fun CamaroDiagApp(
             viewModel.verifyDirectDoIpBackup(uri, pending.second)
     }
 
+    var pendingPhysicalRecovery by remember {
+        mutableStateOf<Pair<Pair<String, Long>, PhysicalRecoveryIdentity>?>(null)
+    }
+    val physicalRecoveryPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        val pending = pendingPhysicalRecovery
+        pendingPhysicalRecovery = null
+        if (uri != null && pending != null && viewModel.canResumeExport(pending.first.second, pending.first.first)) {
+            viewModel.inspectPhysicalRecoveryFolder(uri, pending.second)
+        }
+    }
+
     val ecuBackupPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri?.let(viewModel::verifyEcuBackup)
     }
@@ -845,6 +856,12 @@ fun CamaroDiagApp(
                         }
                     },
                     onReadObdbSignal = { signalId, profile -> viewModel.readObdbSignal(signalId, profile) },
+                    onInspectPhysicalRecovery = { identity ->
+                        viewModel.activeAccountUid.value?.let { owner ->
+                            pendingPhysicalRecovery = (owner to viewModel.exportAccountGeneration()) to identity
+                            physicalRecoveryPicker.launch(null)
+                        }
+                    },
                     onVerifyEcuBackup = { ecuBackupPicker.launch(arrayOf("application/zip", "application/octet-stream")) },
                     onImportFile = { calibrationFilePicker.launch(arrayOf("*/*")) },
                     onImportTrace = { canTracePicker.launch(arrayOf("text/*", "text/csv", "application/vnd.ms-excel", "*/*")) },

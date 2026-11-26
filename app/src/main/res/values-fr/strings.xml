@@ -1233,4 +1233,26 @@
     <string name="cal_section_vehicle">Véhicule et profil sélectionné</string>
     <string name="cal_section_signals">Catalogues de données diagnostiques</string>
     <string name="cal_selected_profile_label">Profil sélectionné : %1$s</string>
+    <string name="cal_recovery_title">Vérifier les sauvegardes physiques ECU</string>
+    <string name="cal_recovery_folder_hint">Choisissez un dossier contenant un journal ECU et son dossier .blocks associé. Renseignez indépendamment l’identité ECU d’origine. Aucune connexion véhicule nécessaire.</string>
+    <string name="cal_recovery_vin">VIN d’origine</string>
+    <string name="cal_recovery_family">Famille du calculateur</string>
+    <string name="cal_recovery_controller">Identifiant du calculateur</string>
+    <string name="cal_recovery_firmware">Identifiant firmware / OS</string>
+    <string name="cal_recovery_choose_folder">Choisir le dossier de récupération</string>
+    <string name="cal_recovery_folder_failed">Impossible de vérifier ce dossier. Contrôlez son contenu et sa taille (256 Mio maximum).</string>
+    <string name="cal_recovery_verified">Secteurs sauvegardés conformes au journal</string>
+    <string name="cal_recovery_failed">Intégrité ou identité de la sauvegarde non vérifiée</string>
+    <string name="cal_recovery_counts">%1$d secteurs vérifiés sur %2$d — %3$d octets</string>
+    <string name="cal_recovery_no_erase">Aucun effacement enregistré</string>
+    <string name="cal_recovery_incomplete">Effacement ou écriture potentiellement incomplet</string>
+    <string name="cal_recovery_partial">Secteurs supplémentaires non écrits</string>
+    <string name="cal_recovery_sectors_verified">Secteurs enregistrés vérifiés ; fin de transaction non enregistrée</string>
+    <string name="cal_recovery_final_incomplete">Relecture finale incomplète</string>
+    <string name="cal_recovery_completed">Fin de transaction enregistrée</string>
+    <string name="cal_recovery_unknown">État de la transaction non vérifié</string>
+    <string name="cal_recovery_address">Adresse incertaine : 0x%1$X</string>
+    <string name="cal_recovery_sector">%1$s · 0x%2$X · %3$d octets</string>
+    <string name="cal_recovery_more">%1$d secteurs supplémentaires vérifiés</string>
+    <string name="cal_recovery_no_restore">L’intégrité des fichiers ne garantit pas la restauration du calculateur. Aucune écriture ni réinitialisation effectuée.</string>
 </resources>
