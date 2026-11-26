@@ -11,7 +11,7 @@ namespace cd {
 // transmission. This class does not enable GPIO or access hardware.
 class J1979CanReadSession {
  public:
-  enum class State { Idle, Waiting, Positive, Negative, Timeout, Fault };
+  enum class State { Idle, Waiting, Positive, Negative, Timeout, Fault, Raw };
   struct Frame {
     uint32_t id=0;
     bool extended=false;
@@ -70,6 +70,7 @@ class J1979CanReadSession {
     }
     if(evidence==J1979ReadEvidence::Result::Positive)state_=State::Positive;
     else if(evidence==J1979ReadEvidence::Result::Negative)state_=State::Negative;
+    else if(evidence==J1979ReadEvidence::Result::Raw)state_=State::Raw;
     else return fail();
     return state_;
   }
@@ -81,7 +82,7 @@ class J1979CanReadSession {
   }
   void abort(){if(state_==State::Waiting)state_=State::Fault;}
   const uint8_t* response()const{
-    return state_==State::Positive||state_==State::Negative?observer_.message():nullptr;
+    return state_==State::Positive||state_==State::Negative||state_==State::Raw?observer_.message():nullptr;
   }
   size_t responseSize()const{return response()?observer_.size():0;}
   State state()const{return state_;}
