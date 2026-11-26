@@ -210,3 +210,15 @@ Le noyau partagé `j1979_can_read_session.h`, `j1979_can_read_exchange.h` et `j1
 L'adaptateur `firmware/esp32s3/src/j1979_twai_read_link.*` est prévu pour un canal TWAI déjà configuré et détenu exclusivement par un profil matériel qualifié. Il exige une confirmation effective TX_SUCCESS, contrôle les pertes, arrête le parcours et verrouille l'instance sur erreur. Il ne configure aucune broche, alimentation ou transceiver et ne lance pas le pilote. Après une erreur de transmission, le propriétaire matériel doit contrôler et arrêter le canal avant toute nouvelle session ; la classe ne garantit pas l'annulation d'une trame déjà soumise au pilote.
 
 **Le firmware USB de découverte reste inchangé et n'annonce aucun accès CAN.** Aucune liaison physique ou qualification matérielle n'est démontrée ; ne pas connecter le prototype au véhicule. Les tests natifs de campagne sont enregistrés pour la clôture logicielle, pas exécutés dans cette session.
+
+### Capture de preuves J1979 embarquées CJ/1
+
+Le format de preuves CJ/1 est **distinct du protocole de découverte CD/1**. Le collecteur `j1979_campaign_evidence.h` transmet enregistrements de début, observations (requête/réponse, statut, durée), puis résumé et indicateurs d'inventaire. CRC-32 et séquence vérifient corruption et ordre, pas l'authenticité. Le format n'accepte aucune commande véhicule. Le lecteur Python vérifie aussi les longueurs et formes applicatives, la distinction RAW/PASSED, les comptes du résumé et la présence de la première réponse PID00. Il préserve le préfixe lisible en cas de capture partielle, sans déclarer l'intégrité complète.
+
+Conversion d'une capture existante, Windows/Linux :
+```shell
+camarodiagconnectors-j1979-capture --input campaign.cj --output campaign.json --vehicle "Camaro 2012" --ecu "ECM" --connector "bench"
+```
+L'export est exclusif, et distingue les labels déclarés des informations observées. Il ne prouve ni provenance matérielle ni validation physique.
+
+`esp32s3/src/j1979_usb_campaign.h` relie la campagne, le flux de preuves et le gestionnaire d'exclusivité NativeUsb à un propriétaire matériel abstrait. Celui-ci doit fournir les preuves locales fraîches de qualification, profil, autorisation et stabilité, ainsi que l'arrêt vérifié du canal. Déconnexion ou révocation interrompent la session ; un arrêt non vérifié verrouille l'admission. Aucun de ces éléments ne crée un profil de carte, une authentification ou un point d'entrée USB réel. **Le firmware de découverte reste inchangé.**
