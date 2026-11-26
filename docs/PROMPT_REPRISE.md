@@ -1,3 +1,7 @@
+## J1979 — inventaire explicite et déclencheur freeze frame (26/11/2026)
+
+- Hôtes Android/Windows/Python : projection des pages positives de support Modes 01/02/06/08/09 en liste d'identifiants annoncés, indicateur de continuation distinct (pas une mesure ni une autorisation d'actionnement) ; Mode 02 PID 02 trame 0 : DTC déclencheur décodé, absence explicite distincte d'une réponse indisponible. JSON harmonisé, régressions écrites non exécutées. Aucun changement de plan firmware ni requête mutante. C6/J1979 ouverts, aucun test intermédiaire, fusion ou Release.
+
 ## C6 — journal Windows : contrôle du préfixe durable (26/11/2026)
 
 - Descripteur ouvert en lecture/écriture exclusive vis-à-vis des autres écrivains ; longueur et SHA-256 du dernier préfixe accepté comparés avant append, relecture après flush sur descripteur et chemin, refus des points de réanalyse. Une divergence rend l'écrivain inutilisable ; aucune garantie d'atomicité du répertoire contre un adversaire local. Régression remplacement/restauration ou verrouillage Windows écrite, non exécutée. C6/J1979 ouverts ; aucun flash, CI intermédiaire, fusion ou Release.

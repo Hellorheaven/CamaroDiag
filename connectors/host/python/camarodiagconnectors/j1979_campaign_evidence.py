@@ -212,6 +212,27 @@ def _readiness(req, res):
             "supported_monitors": monitors}
 
 
+def _supported_page(req, res):
+    if len(req) < 2 or req[1] % 32:
+        return None
+    mode, base = req[:2]
+    offset = 3 if mode == 2 else 2
+    bitmap = res[offset:offset+4]
+    return {"mode": mode, "base": base,
+            "supported_ids": [base + i + 1 for i in range(31)
+                              if bitmap[i // 8] & (128 >> (i % 8))],
+            "has_next_page": bool(bitmap[3] & 1)}
+
+
+def _freeze_trigger(req, res):
+    if req != bytes((2, 2, 0)):
+        return None
+    a, b = res[3:5]
+    present = bool(a or b)
+    return {"present": present,
+            "dtc": f"{'PCBU'[a >> 6]}{(a >> 4) & 3:X}{a & 15:X}{b:02X}" if present else None}
+
+
 def _exact(stream, size):
     chunks = bytearray()
     while len(chunks) < size:
@@ -397,7 +418,9 @@ def decode(stream):
                     "measurement": _measurement(req, res) if state == 1 else None,
                     "monitor_records": _monitor_records(req, res) if state == 1 else None,
                     "vehicle_info": _vehicle_info(req, res) if state == 1 else None,
-                    "readiness": _readiness(req, res) if state == 1 else None})
+                    "readiness": _readiness(req, res) if state == 1 else None,
+                    "supported_page": _supported_page(req, res) if state == 1 else None,
+                    "freeze_trigger": _freeze_trigger(req, res) if state == 1 else None})
                 continue
             if kind != 3 or length != 22:
                 raise ValueError("Unexpected evidence record")

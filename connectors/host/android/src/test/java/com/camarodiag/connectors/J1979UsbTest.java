@@ -105,6 +105,14 @@ public final class J1979UsbTest {
             hex("410100084040")).readiness();
         assert diesel.compressionIgnition&&Boolean.FALSE.equals(diesel.supportedMonitors.get("particulate-filter"));
         assert !diesel.supportedMonitors.containsKey("oxygen-sensor-heater");
+        J1979CampaignSemantics.SupportedPage page=new J1979CampaignSemantics.Step(15,1,1,new byte[]{1,0},
+            hex("410080000003")).supportedPage();
+        assert page.hasNextPage&&page.supportedIds.equals(java.util.Arrays.asList(1,31));
+        J1979CampaignSemantics.FreezeTrigger freeze=new J1979CampaignSemantics.Step(16,1,1,new byte[]{2,2,0},
+            hex("4202000123")).freezeTrigger();
+        assert freeze.present&&freeze.dtc.equals("P0123");
+        assert !new J1979CampaignSemantics.Step(17,1,1,new byte[]{2,2,0},
+            hex("4202000000")).freezeTrigger().present;
         Sim partial=new Sim(concat(challenge,Arrays.copyOf(capture,capture.length-1)));
         raw=new ByteArrayOutputStream();
         result=new J1979UsbCapture(partial).runRequest(hello,10000,key,raw);

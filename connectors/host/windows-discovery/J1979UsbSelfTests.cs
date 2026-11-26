@@ -87,6 +87,11 @@ internal static class J1979UsbSelfTests
         var diesel=new J1979CampaignSemantics.Step(14,1,1,[1,1],Convert.FromHexString("410100084040")).MonitorReadiness!;
         Require(diesel.CompressionIgnition&&!diesel.SupportedMonitors["particulate-filter"]&&
             !diesel.SupportedMonitors.ContainsKey("oxygen-sensor-heater"));
+        var page=new J1979CampaignSemantics.Step(15,1,1,[1,0],Convert.FromHexString("410080000003")).InventoryPage!;
+        Require(page.HasNextPage&&page.SupportedIds.SequenceEqual(new[]{1,31}));
+        var freeze=new J1979CampaignSemantics.Step(16,1,1,[2,2,0],Convert.FromHexString("4202000123")).FreezeFrameTrigger!;
+        Require(freeze.Present&&freeze.Dtc=="P0123");
+        Require(new J1979CampaignSemantics.Step(17,1,1,[2,2,0],Convert.FromHexString("4202000000")).FreezeFrameTrigger is {Present:false,Dtc:null});
         var partial=new Sim([.. challenge,.. capture[..^1]]);using var partialRaw=new MemoryStream();
         result=new J1979UsbCapture(partial).RunRequest(hello,10000,key,partialRaw);
         Require(result.DeviceCredentialAuthenticated&&!result.FrameIntegrityVerified&&partial.Closed&&partialRaw.Length==capture.Length-1);

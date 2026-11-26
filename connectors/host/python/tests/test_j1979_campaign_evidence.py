@@ -137,6 +137,23 @@ class CaptureTests(unittest.TestCase):
             self.assertEqual(response == "410100084040", ready["compression_ignition"])
             self.assertIsNone(report["steps"][0]["readiness"])
 
+    def test_supported_page_and_freeze_trigger(self):
+        report = decode(io.BytesIO(CAPTURE))
+        self.assertEqual({"mode": 1, "base": 0, "supported_ids": [], "has_next_page": False},
+                         report["steps"][0]["supported_page"])
+        self.assertEqual({"present": False, "dtc": None}, report["steps"][5]["freeze_trigger"])
+        tail = (step(6, bytes.fromhex("020200"), bytes.fromhex("4202000123")) +
+                step(7, bytes.fromhex("020000"), bytes.fromhex("42000000000000")) +
+                step(8, bytes.fromhex("0600"), bytes.fromhex("460000000000")) +
+                step(9, bytes.fromhex("0800"), bytes.fromhex("480080000000")) +
+                step(10, bytes.fromhex("0900"), bytes.fromhex("490000000000")))
+        report = decode(io.BytesIO(start() + INITIAL + IDENTITY + DTC + tail +
+            summary(11, flags=255, steps=10, positive=10)))
+        self.assertTrue(report["capture_integrity_verified"])
+        self.assertEqual({"present": True, "dtc": "P0123"}, report["steps"][5]["freeze_trigger"])
+        self.assertEqual([1], report["steps"][8]["supported_page"]["supported_ids"])
+        self.assertIsNone(report["steps"][1]["supported_page"])
+
     def test_corruption_and_truncation_keep_prefix(self):
         for tail in (IDENTITY[:-1], IDENTITY[:-1] + bytes([IDENTITY[-1] ^ 1])):
             report = decode(io.BytesIO(start() + INITIAL + tail))

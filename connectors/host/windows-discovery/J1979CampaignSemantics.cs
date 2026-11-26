@@ -100,6 +100,8 @@ internal static class J1979CampaignSemantics
             ["catalyst","heated-catalyst","evaporative-system","secondary-air",null,"oxygen-sensor","oxygen-sensor-heater","egr-vvt"],c,d);
         return new((a&128)!=0,a&127,compression,b,c,d,new System.Collections.ObjectModel.ReadOnlyDictionary<string,bool>(monitors));
     }
+    internal sealed record SupportedPage(int Mode,int Base,IReadOnlyList<int> SupportedIds,bool HasNextPage);
+    internal sealed record FreezeTrigger(bool Present,string? Dtc);
     internal sealed class Step {
         public int Sequence{get;}
         public string RequestHex{get;}
@@ -140,6 +142,22 @@ internal static class J1979CampaignSemantics
                 for(int i=1;i<Response.Length;i+=9)
                     records.Add(new(Response[i],Response[i+1],Response[i+2],Word(i+3),Word(i+5),Word(i+7)));
                 return records.AsReadOnly();
+            }
+        }
+        internal SupportedPage? InventoryPage {
+            get {
+                if(State!=1||Request.Length<2||Request[1]%32!=0)return null;
+                int mode=Request[0],page=Request[1],offset=mode==2?3:2;
+                var ids=new List<int>();
+                for(int i=0;i<31;i++)if((Response[offset+i/8]&(128>>(i%8)))!=0)ids.Add(page+i+1);
+                return new(mode,page,ids.AsReadOnly(),(Response[offset+3]&1)!=0);
+            }
+        }
+        internal FreezeTrigger? FreezeFrameTrigger {
+            get {
+                if(State!=1||!Request.AsSpan().SequenceEqual(new byte[]{2,2,0}))return null;
+                int a=Response[3],b=Response[4];
+                return a==0&&b==0?new(false,null):new(true,$"{ "PCBU"[a>>6]}{(a>>4)&3:X}{a&15:X}{b:X2}");
             }
         }
         internal Readiness? MonitorReadiness=>State==1&&Request.AsSpan().SequenceEqual(new byte[]{1,1})?DecodeReadiness(Response):null;

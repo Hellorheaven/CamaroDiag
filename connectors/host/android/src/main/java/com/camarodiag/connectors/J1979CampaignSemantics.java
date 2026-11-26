@@ -138,6 +138,25 @@ public final class J1979CampaignSemantics {
                 out.put(names[bit],(incomplete&(1<<bit))==0);
         }
     }
+    public static final class SupportedPage {
+        public final int mode,base;
+        public final boolean hasNextPage;
+        public final List<Integer> supportedIds;
+        SupportedPage(int mode,int base,byte[] response,int offset){
+            this.mode=mode;this.base=base;List<Integer> ids=new ArrayList<>();
+            for(int i=0;i<31;i++)if((u(response[offset+i/8])&(128>>>(i%8)))!=0)ids.add(base+i+1);
+            supportedIds=Collections.unmodifiableList(ids);hasNextPage=(u(response[offset+3])&1)!=0;
+        }
+    }
+    public static final class FreezeTrigger {
+        public final boolean present;
+        public final String dtc;
+        FreezeTrigger(int a,int b){
+            present=a!=0||b!=0;String digits="0123456789ABCDEF";
+            dtc=present?new String(new char[]{"PCBU".charAt(a>>>6),digits.charAt((a>>>4)&3),
+                digits.charAt(a&15),digits.charAt(b>>>4),digits.charAt(b&15)}):null;
+        }
+    }
     public static final class Step {
         public final int sequence;
         public final String requestHex,responseHex,status;
@@ -176,6 +195,15 @@ public final class J1979CampaignSemantics {
             return Collections.unmodifiableList(records);
         }
         /** Only decoded, structurally valid InfoTypes; CVNs are not signatures. */
+        public SupportedPage supportedPage(){
+            if(state!=1||request.length<2||u(request[1])%32!=0)return null;
+            int mode=u(request[0]);
+            return new SupportedPage(mode,u(request[1]),response,mode==2?3:2);
+        }
+        public FreezeTrigger freezeTrigger(){
+            return state==1&&Arrays.equals(request,new byte[]{2,2,0})?
+                new FreezeTrigger(u(response[3]),u(response[4])):null;
+        }
         public Readiness readiness(){
             return state==1&&Arrays.equals(request,new byte[]{1,1})?new Readiness(response):null;
         }
