@@ -1078,6 +1078,40 @@ internal static class DoIpDiagnosticSessionSelfTests
                 DoIpScopedBackup.SaveNew(path, capture, CancellationToken.None);
                 var verified = DoIpScopedBackup.VerifyZip(path, backupScope, CancellationToken.None);
                 Check(verified.Sha256 == capture.Sha256, "DoIP backup verifies against original profile.");
+                var validZip = File.ReadAllBytes(path);
+                var central = System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(
+                    validZip.AsSpan(validZip.Length - 6, 4));
+                Check(central > 0 && central < validZip.Length - 22, "DoIP test ZIP directory offset.");
+                var brokenPath = Path.Combine(folder, "broken.zip");
+                foreach (var broken in new byte[][] { validZip[..central], validZip[..^1], [..validZip, 0x41] })
+                {
+                    File.WriteAllBytes(brokenPath, broken);
+                    await Expect<InvalidDataException>(() => Task.Run(() =>
+                        DoIpScopedBackup.VerifyZip(brokenPath, backupScope, CancellationToken.None)),
+                        "Incomplete DoIP directory or trailing bytes rejected.");
+                }
+                foreach (var offset in new[] { 16, 34 })
+                {
+                    var broken = validZip.ToArray();
+                    broken[central + offset] ^= 1;
+                    File.WriteAllBytes(brokenPath, broken);
+                    await Expect<InvalidDataException>(() => Task.Run(() =>
+                        DoIpScopedBackup.VerifyZip(brokenPath, backupScope, CancellationToken.None)),
+                        "DoIP directory checksum or disk metadata rejected.");
+                }
+                var escapedPath = Path.Combine(folder, "escaped.zip");
+                File.Copy(path, escapedPath);
+                using (var zip = System.IO.Compression.ZipFile.Open(escapedPath, System.IO.Compression.ZipArchiveMode.Update))
+                {
+                    string manifestText;
+                    using (var reader = new StreamReader(zip.GetEntry("manifest.json")!.Open()))
+                        manifestText = reader.ReadToEnd();
+                    zip.GetEntry("manifest.json")!.Delete();
+                    using var writer = new StreamWriter(zip.CreateEntry("manifest.json").Open());
+                    writer.Write(manifestText.Replace("CALIBRATION", @"\u0043ALIBRATION"));
+                }
+                Check(DoIpScopedBackup.VerifyZip(escapedPath, backupScope, CancellationToken.None).Sha256 == capture.Sha256,
+                    "Equivalent JSON string escapes do not change the selected DoIP scope.");
                 await Expect<InvalidDataException>(() => Task.Run(() =>
                     DoIpScopedBackup.VerifyZip(path, backupScope with { Start = 0x200 }, CancellationToken.None)),
                     "DoIP archive rejected for different memory region.");
