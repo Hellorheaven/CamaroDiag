@@ -165,6 +165,43 @@ class DoIpGatewayControlTraceTest {
         assertTrue(runCatching { read(archive(first, first, extra = true)) }.isFailure)
     }
 
+    @Test fun archiveReaderAndStagedVerifierRejectIncompleteOrContradictoryZipDirectory() {
+        val scope = DoIpMemoryBackup.Scope(vin, 0x1000, 0x0E80, 0x1234, 0x1235,
+            "A1B2", 0x100, 4, 2, "CALIBRATION")
+        val data = byteArrayOf(1, 2, 3, 4)
+        val capture = DoIpMemoryBackup.createCapture(scope, data, data.copyOf())
+        val output = java.io.ByteArrayOutputStream()
+        DoIpMemoryBackup.write(output, capture)
+        val valid = output.toByteArray()
+        val end = valid.size - 22
+        val directory = java.nio.ByteBuffer.wrap(valid, end + 16, 4)
+            .order(java.nio.ByteOrder.LITTLE_ENDIAN).int
+        assertTrue(directory > 0 && directory < end)
+        DoIpMemoryBackup.readArchiveContents(valid.inputStream(), scope.length)
+        DoIpMemoryBackup.verifyStaged(valid.inputStream(), capture)
+        fun rejected(bytes: ByteArray) {
+            assertTrue(runCatching {
+                DoIpMemoryBackup.readArchiveContents(bytes.inputStream(), scope.length)
+            }.isFailure)
+            assertTrue(runCatching {
+                DoIpMemoryBackup.verifyStaged(bytes.inputStream(), capture)
+            }.isFailure)
+        }
+        rejected(valid.copyOf(directory)) // complete local files, no central directory
+        rejected(valid.copyOf(valid.size - 1))
+        rejected(valid + byteArrayOf(0x41))
+        // Modify only central metadata; local compressed bytes and CRC are unchanged.
+        for (offset in listOf(10, 16, 20, 24, 34)) {
+            rejected(valid.copyOf().also {
+                val index = directory + offset
+                it[index] = (it[index].toInt() xor 1).toByte()
+            })
+        }
+        rejected(valid.copyOf().also {
+            for (index in directory + 42 until directory + 46) it[index] = 0xFF.toByte()
+        })
+    }
+
     @Test fun queuedUnsolicitedResponseCannotSatisfyNextDidRequest(): Unit = runBlocking {
         val loopback = InetAddress.getByName("127.0.0.1")
         fun bytes(value: String) = value.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
