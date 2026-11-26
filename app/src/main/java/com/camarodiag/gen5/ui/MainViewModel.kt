@@ -551,8 +551,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _dtcScanNotice = MutableStateFlow<String?>(null)
     val dtcScanNotice: StateFlow<String?> = _dtcScanNotice.asStateFlow()
     private var liveEvidenceGeneration = 0L
+    private val _observedStandardVin = MutableStateFlow<String?>(null)
+    val observedStandardVin: StateFlow<String?> = _observedStandardVin.asStateFlow()
 
     private fun resetLiveAndDtcEvidence() {
+        _observedStandardVin.value = null
         liveEvidenceGeneration++
         _livePids.value = emptyList()
         _detectedLiveSensors.value = emptyList()
@@ -4989,6 +4992,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             beginBusyOperation()
             _mileageReport.value = null
             val readings = mutableListOf<MileageSourceReading>()
+            var auditVin: String? = null
             try {
                 if (!obdManager.isStandardObdReadAvailable()) {
                     if (obdManager.isJ2534BridgeConnected()) {
@@ -5008,11 +5012,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     }
                 } else {
                     val (a6Response, d3Response) = if (obdManager.isJ2534StandardObdAvailable()) {
+                        // Existing physical read has no VIN proof in this transaction.
                         obdManager.readJ2534OdometerPids()
                     } else obdManager.withObdCommandSession { engine ->
+                        val before = engine.readVinForVerification()
                         val supportedPids = engine.discoverSupportedPids()
-                        engine.readMode01PidIfSupported(0xA6, supportedPids) to
-                            engine.readMode01PidIfSupported(0xD3, supportedPids)
+                        val a6 = engine.readMode01PidIfSupported(0xA6, supportedPids)
+                        val d3 = engine.readMode01PidIfSupported(0xD3, supportedPids)
+                        val after = engine.readVin()
+                        check(before == null || after == null || before == after) {
+                            "Vehicle VIN changed during odometer read."
+                        }
+                        auditVin = before?.takeIf { it == after }
+                        a6 to d3
                     }
                     val a6Km = a6Response?.let { CamaroUdsProtocol.parseOdometerPidA6(it) }
                     readings += MileageSourceReading(
@@ -5045,14 +5057,24 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     )
                 }
                 if (!current()) return@launch
-                _mileageReport.value = MileageAuditEngine.evaluate(selectedVin, readings)
+                _mileageReport.value = MileageAuditEngine.evaluate(auditVin.orEmpty(), readings)
+                auditVin?.let { vin ->
+                    _observedStandardVin.value = vin
+                    if (!VehicleVinMatcher.isCamaroCandidate(vin)) {
+                        _modules.value = emptyList()
+                        _calibrationWorkspace.update { it.copy(ecuVinResponse = vin,
+                            ecuIdentityFromSimulation = false,
+                            vinComparison = VehicleVinMatcher.compare(selectedVin, vin),
+                            vinModelYear = VehicleVinMatcher.modelYearFromVin(vin)) }
+                    }
+                }
                 _connectionMessage.value = null
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
                 if (current()) {
                     reportConnectionLoss(error)
-                    _mileageReport.value = MileageAuditEngine.evaluate(selectedVin, readings)
+                    _mileageReport.value = MileageAuditEngine.evaluate(auditVin.orEmpty(), readings)
                     _connectionMessage.value = localizedContext.getString(R.string.msg_mileage_audit_failed)
                 }
             } finally {
@@ -5408,6 +5430,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 if (!current()) return@launch
                 _obdScanReport.value = report
+                if (!obdManager.isSimulationActive && report.vin != null)
+                    _observedStandardVin.value = report.vin
                 if (!obdManager.isSimulationActive && report.vin != null && !VehicleVinMatcher.isCamaroCandidate(report.vin)) {
                     _modules.value = emptyList()
                     _calibrationWorkspace.value = _calibrationWorkspace.value.copy(ecuVinResponse = report.vin.orEmpty(),

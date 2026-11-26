@@ -127,6 +127,8 @@
     <string name="mileage_consistency">Mileage consistency check</string>
     <string name="mileage_reread">Re-read</string>
     <string name="common_save">Save</string>
+    <string name="obd_connected_other_vehicle">Connected vehicle: VIN %1$s</string>
+    <string name="mileage_reported_odometer_confidence">ECU-reported value / not independently verified</string>
     <string name="mileage_engineering_summary">Engineering Summary (VIN: %1$s)</string>
     <string name="guide_title">OBD-II Hardware &amp; GM GMLAN Buying Guide</string>
     <string name="guide_recommended_mxplus">1. Recommended: OBDLink MX+ (STN2255 Chip)</string>

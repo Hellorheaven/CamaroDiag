@@ -127,6 +127,8 @@
     <string name="mileage_consistency">Contrôle de cohérence kilométrique</string>
     <string name="mileage_reread">Relire</string>
     <string name="common_save">Sauver</string>
+    <string name="obd_connected_other_vehicle">Véhicule connecté : VIN %1$s</string>
+    <string name="mileage_reported_odometer_confidence">Valeur déclarée par le calculateur / non vérifiée indépendamment</string>
     <string name="mileage_engineering_summary">Synthèse Technique (VIN : %1$s)</string>
     <string name="guide_title">Guide d\'Achat &amp; Compatibilité OBD-II GM</string>
     <string name="guide_recommended_mxplus">1. Recommandé : OBDLink MX+ (Puce STN2255)</string>

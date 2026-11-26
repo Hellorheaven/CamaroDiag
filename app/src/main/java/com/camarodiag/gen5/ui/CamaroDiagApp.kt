@@ -203,6 +203,7 @@ fun CamaroDiagApp(
     val liveRecording by viewModel.liveRecordingState.collectAsState()
     val liveTelemetryMessage by viewModel.liveTelemetryMessage.collectAsState()
     val mileageReport by viewModel.mileageReport.collectAsState()
+    val observedStandardVin by viewModel.observedStandardVin.collectAsState()
     val savedSessions by viewModel.savedSessions.collectAsState()
     val calibrationWorkspace by viewModel.calibrationWorkspace.collectAsState()
     val liveCanMonitorState by viewModel.liveCanMonitorState.collectAsState()
@@ -434,7 +435,9 @@ fun CamaroDiagApp(
                             letterSpacing = 1.6.sp
                         )
                         Text(
-                            text = "${localizedGenerationName(vehicle.generation)} • ${vehicle.modelYear} • ${vehicle.engine.rpo} • ${vehicle.market.code}",
+                            text = observedStandardVin?.takeUnless(VehicleVinMatcher::isCamaroCandidate)?.let {
+                                stringResource(R.string.obd_connected_other_vehicle, it)
+                            } ?: "${localizedGenerationName(vehicle.generation)} • ${vehicle.modelYear} • ${vehicle.engine.rpo} • ${vehicle.market.code}",
                             fontSize = 12.sp,
                             color = TextMuted
                         )
@@ -2868,7 +2871,8 @@ fun MileageScreen(
                 Card(colors = CardDefaults.cardColors(containerColor = if (rep.hasDiscrepancy) Color(0xFF3B1518) else SurfaceElevated)) {
                     Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Text(
-                            text = stringResource(R.string.mileage_engineering_summary, rep.vin),
+                            text = stringResource(R.string.mileage_engineering_summary,
+                                rep.vin.ifBlank { stringResource(R.string.obd_not_available) }),
                             fontWeight = FontWeight.Bold,
                             color = if (rep.hasDiscrepancy) WarnRed else OkGreen
                         )
@@ -2876,7 +2880,10 @@ fun MileageScreen(
                     }
                 }
             }
-            items(rep.readings) { item ->
+            // Keep all evidence in the saved report. Hide unqueried or
+            // unavailable sources when a usable reading exists, not the caveat.
+            val usable = rep.readings.any { it.kmValue?.let { km -> km.isFinite() && km >= 0 } == true }
+            items(rep.readings.filter { !usable || it.kmValue != null }) { item ->
                 val confColor = when (item.confidence) {
                     ConfidenceLevel.HIGH -> OkGreen
                     ConfidenceLevel.MODERATE -> CamaroAmber
@@ -2894,7 +2901,10 @@ fun MileageScreen(
                             )
                         }
                         Text(localizedMileageDetails(item), fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = TextMuted)
-                        Text(localizedMileageConfidence(item.confidence), color = confColor, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                        Text(if (item.moduleId == "ECM_A6" && item.kmValue != null)
+                            stringResource(R.string.mileage_reported_odometer_confidence)
+                        else localizedMileageConfidence(item.confidence),
+                            color = confColor, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                         Text(localizedMileageCaveat(item), fontSize = 12.sp, color = TextMuted)
                     }
                 }
