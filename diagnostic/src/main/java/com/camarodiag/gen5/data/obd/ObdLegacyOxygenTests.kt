@@ -19,8 +19,8 @@ data class ObdMode05Report(
     val reads: List<ObdMode05Read>
 ) {
     val hasTestResults: Boolean get() = reads.any { read ->
-        read.command.startsWith("05") &&
-            read.command.substring(2, 4).toInt(16) % 32 != 0 &&
+        read.command.length == 6 && read.command.startsWith("05") &&
+            read.command.substring(2, 4).toIntOrNull(16)?.let { it % 32 != 0 } == true &&
             read.positiveRecords.isNotEmpty()
     }
 }
@@ -43,6 +43,7 @@ internal object ObdLegacyOxygenTests {
             it.trim().removeSuffix(">").filterNot(Char::isWhitespace)
                 .equals(command, ignoreCase = true)
         }.joinToString("\n")
+        if (ObdNumberedIdentityFrames.hasPhysicalHeaders(clean)) return null
         return ObdNumberedIdentityFrames.parseAll(clean)
     }
 
