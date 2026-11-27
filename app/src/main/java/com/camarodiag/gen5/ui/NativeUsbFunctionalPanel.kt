@@ -52,8 +52,15 @@ internal fun NativeUsbFunctionalPanel(
     var frames by remember(generation,vehicle) { mutableStateOf("00") }
     var pids by remember(generation,vehicle) { mutableStateOf("") }
     var budget by remember(generation,vehicle) { mutableStateOf("180") }
+    data class CredentialContext(val generation: Long,val vehicle: VehicleProfile,val device: String?)
+    val credentialContext by rememberUpdatedState(CredentialContext(generation,vehicle,selected?.deviceName))
+    var pendingCredential by remember { mutableStateOf<CredentialContext?>(null) }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        credential = uri; confirmed = false
+        if(pendingCredential==credentialContext&&uri?.scheme=="content") {
+            credential=uri
+            confirmed=false
+        }
+        pendingCredential=null
     }
     fun refresh() {
         devices = manager?.deviceList?.values?.sortedBy { it.deviceName }.orEmpty()
@@ -169,11 +176,14 @@ internal fun NativeUsbFunctionalPanel(
                     enabled=enabled,modifier=Modifier.fillMaxWidth())
             }
         }
-        OutlinedButton(onClick = { picker.launch(arrayOf("*/*")) }, enabled = enabled) {
+        OutlinedButton(onClick = {
+            pendingCredential=credentialContext
+            picker.launch(arrayOf("*/*"))
+        }, enabled = enabled && device!=null && pendingCredential==null) {
             Text(stringResource(if (credential == null) R.string.functional_native_usb_key else R.string.functional_native_usb_key_selected))
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Checkbox(confirmed, { confirmed = it }, enabled = enabled)
+            Checkbox(confirmed, { confirmed = it }, enabled = enabled && pendingCredential==null)
             Text(if(freeze) stringResource(R.string.j1979_freeze_confirm,vehicle.vin)
                 else if(live) stringResource(R.string.j1979_native_live_confirm,vehicle.vin)
                 else stringResource(R.string.functional_native_usb_confirm))
@@ -181,13 +191,13 @@ internal fun NativeUsbFunctionalPanel(
         Button(onClick = {
             val uri = credential
             if (device != null && target != null && scopeValid && uri != null && confirmed &&
-                manager?.hasPermission(device) == true) {
+                manager?.hasPermission(device) == true && pendingCredential==null) {
                 confirmed = false; credential = null
                 if(freeze) freezeTarget?.let { onRunFreeze?.invoke(device,it,uri,generation,vehicle) }
                 else if(live) liveTarget?.let { onRunLive?.invoke(device,it,uri,generation,vehicle) }
                 else onRun(device, target, uri, generation, vehicle)
             }
-        }, enabled = enabled && granted && confirmed && credential != null && scopeValid,
+        }, enabled = enabled && granted && confirmed && credential != null && scopeValid && pendingCredential==null,
             modifier = Modifier.fillMaxWidth()) { Text(stringResource(if(freeze) R.string.j1979_freeze_run else if(live) R.string.j1979_native_live_run else if(asScan) R.string.functional_native_usb_scan_run else R.string.functional_native_usb_run)) }
     }
 }
