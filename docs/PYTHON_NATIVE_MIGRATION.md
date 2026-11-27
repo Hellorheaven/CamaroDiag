@@ -8,13 +8,13 @@ Directive utilisateur : **supprimer tout Python du projet livré**, sans réécr
 |---|---|
 | Android | Kotlin, code métier et UI Compose existants |
 | Windows | C#/.NET, pont J2534 et interface existants |
-| Linux ARM/x64 | C **ou C++**, selon le composant et les bibliothèques natives, exécutable et paquet .deb sans interpréteur |
-| Firmware ESP32-S3 | **C++ existant** (ESP-IDF/Arduino/PlatformIO), composants en C seulement lorsqu'utiles et réellement partagés |
+| Linux ARM/x64 | **C++20** pour le développement natif, avec migration progressive des anciens fichiers C, paquet .deb sans interpréteur |
+| Firmware ESP32-S3 | **C++ existant** (ESP-IDF/Arduino/PlatformIO) ; aucun nouveau moteur de protocole en C |
 | STM32G4 | C/C++ de son firmware et de ses pilotes, selon les modules existants |
 
 ## SAE J1979 : migration en cours dans la PR #117
 
-Les implémentations Python comprennent des commandes et bibliothèques pour : découverte et inventaire CAN, DTC/VIN et Mode 01/02, trames figées et rapports CF/1, capture CL/1 CU/3 et Mode 01 live, anciennes liaisons J1850/K-Line, catalogues et échelles, surveillance, effacement Mode 04, EVAP Mode 08, opérations mutatrices distinctes, maintenance/journaux et preuves. Le pont Linux C couvre **une partie seulement** des lectures CAN, du rejeu CF/1 et CL/1 et des captures CU/2 et CU/3. La reprise Android Kotlin et Windows C# est également partielle. Ne pas annoncer la parité globale avant comparaison fonctionnalité par fonctionnalité et validation finale.
+Les implémentations Python comprennent des commandes et bibliothèques pour : découverte et inventaire CAN, DTC/VIN et Mode 01/02, trames figées et rapports CF/1, capture CL/1 CU/3 et Mode 01 live, anciennes liaisons J1850/K-Line, catalogues et échelles, surveillance, effacement Mode 04, EVAP Mode 08, opérations mutatrices distinctes, maintenance/journaux et preuves. Le pont Linux en migration **C++20** couvre **une partie seulement** des lectures CAN, du rejeu CF/1 et CL/1 et des captures CU/2 et CU/3. La reprise Android Kotlin et Windows C# est également partielle. Ne pas annoncer la parité globale avant comparaison fonctionnalité par fonctionnalité et validation finale.
 
 Les modules Python hors SAE J1979 (DoIP, mémoire, découverte générique, récupération, transport sécurisé et journal de programmation) ne seront pas arbitrairement mélangés dans le chantier J1979 : prévoir leur migration native dans les chantiers associés **après** clôture du protocole actif, sans effacer leurs contrats encore nécessaires.
 

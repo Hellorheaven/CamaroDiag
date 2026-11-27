@@ -1,11 +1,11 @@
-# CamaroDiag — Pont Linux natif en C
+# CamaroDiag — Pont Linux natif (migration C++20)
 
 Première migration **sans Python** de l'inspection CF/1 SAE J1979 Mode 02
-depuis l'outillage hôte expérimental vers un exécutable Linux C11.
+depuis l'outillage hôte expérimental vers un exécutable Linux C++20 (les transports CF/1 et CL/1 historiques sont encore en C durant leur migration).
 
 ## Construction (ARM64, ARMv7, x86_64)
 
-Prérequis : compilateur C11, make, en-têtes et bibliothèque OpenSSL libcrypto.
+Prérequis : compilateur C++20 (g++), compilateur C uniquement pour les anciens transports restant à migrer, make, en-têtes et bibliothèque OpenSSL libcrypto.
 
 ~~~sh
 sudo apt install build-essential libssl-dev
@@ -241,3 +241,9 @@ configuration du calculateur (PID 4F/50), `context_required=true` et
 `number=null` préservent l'absence de preuve. Les trames figées sont
 attribuées uniquement à leur frame Mode 02; un deuxième octet de trim n'est
 pas attribué à une banque supérieure sans preuve d'implantation.
+
+## Transition vers C++20
+
+Les nouveaux décodeurs, les campagnes CAN, la surveillance Mode 01 et le transport ISO-TP Linux sont maintenant en C++20. Les buffers sont bornés et les allocations temporaires protégées par RAII. La frontière ABI historique conserve encore des destructeurs explicites.
+
+Les anciens parseurs CF/1/CL/1, le transport USB et le point d'entrée C restent à migrer ; la suppression finale des modules Python dépend aussi de leur remplacement fonctionnel. Aucun build/test intermédiaire ni APK v2.0.47 n'a été lancé à cette étape.
