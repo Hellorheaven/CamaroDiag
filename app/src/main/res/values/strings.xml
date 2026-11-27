@@ -1317,7 +1317,7 @@
     <string name="j1979_catalogue_title">Documented PID catalogue (offline)</string>
     <string name="j1979_catalogue_file">JSON catalogue</string>
     <string name="j1979_catalogue_reference">Documented reference</string>
-    <string name="j1979_catalogue_report">Raw Mode 01 recording</string>
+    <string name="j1979_catalogue_report">Raw Mode 01 recording, CL/1 or Mode 02 CF/1 capture</string>
     <string name="j1979_catalogue_selected">Selected</string>
     <string name="j1979_catalogue_not_selected">Select file</string>
     <string name="j1979_catalogue_pin">Independent reference SHA-256</string>
