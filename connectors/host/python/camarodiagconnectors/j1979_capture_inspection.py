@@ -143,6 +143,8 @@ def verify(capture, report, *, expected_vin=None):
     compare(report, "service_observations", replay["service_observations"])
     # Older v1 reports did not provide this derived view; if present it must
     # exactly match the captured response, not a producer-supplied claim.
+    if "multi_signal_records" in report:
+        compare(report, "multi_signal_records", replay["multi_signal_records"])
     if "extended_vehicle_info" in report:
         compare(report, "extended_vehicle_info", replay["extended_vehicle_info"])
     wanted_summary = replay["summary"]
@@ -224,6 +226,7 @@ def verify(capture, report, *, expected_vin=None):
         "verified_prefix_steps": len(replay["steps"]),
         "service_observations": replay["service_observations"],
         "extended_vehicle_info": replay["extended_vehicle_info"],
+        "multi_signal_records": replay["multi_signal_records"],
         "capture_error": replay["error"],
         "host_error": report.get("error"),
         "device_credential_independently_verified": False,
