@@ -63,7 +63,7 @@ class J1979MaintenanceStorage final:public J1979MaintenanceJournal::Storage {
     inspected_=true;
     if(!load(state_)||!inventory())return fail();
     if(state_.guard==Guard::Sealed){
-      if(state_.records!=count_||!count_||!validateSlot(count_-1,4))return fail();
+      if(state_.records!=count_||!count_||!validateSealed())return fail();
       sealed_=true;return false;
     }
     if(state_.guard!=Guard::Provisioned||count_||state_.generation==UINT64_MAX)return fail();
@@ -80,7 +80,8 @@ class J1979MaintenanceStorage final:public J1979MaintenanceJournal::Storage {
     // Export can be permitted while locked, but never reinterpret unknown
     // slot sizes as zero. Inspect original bytes without opening a writer.
     if(!inspected_){(void)inspect();}
-    if(!inventory())return fail();
+    if(!locked_&&!sealed_){if(!checkInventory())return fail();}
+    else if(!inventory())return fail();
     for(unsigned i=0;i<count_;++i)bytes+=sizes_[i];
     return bytes<=Journal::MaximumJournal;
   }
@@ -161,7 +162,8 @@ class J1979MaintenanceStorage final:public J1979MaintenanceJournal::Storage {
       State old;
       // Do not invent a generation for a missing/corrupt guard. The
       // missing/corrupt state itself prevents all future admission.
-      if(load(old)&&old.generation){
+      if(load(old)){
+        if(!old.generation)old.generation=1;
         old.guard=Guard::Recovery;(void)persist(old);
       }
     }
@@ -203,10 +205,21 @@ class J1979MaintenanceStorage final:public J1979MaintenanceJournal::Storage {
     }
     return true;
   }
-  bool validateSlot(unsigned slot,uint8_t wanted){
-    if(slot>=count_||sizes_[slot]>sizeof(scratch_.pending))return false;
-    if(!medium_.readSlot(slot,0,scratch_.pending,sizes_[slot]))return false;
-    return scratch_.pending[3]==wanted&&recordHeader(scratch_.pending,sizes_[slot],slot,wanted-1);
+  bool validateSealed(){
+    unsigned previous=0;
+    uint8_t scope[J1979MaintenanceScope::WireSize]{};
+    for(unsigned i=0;i<count_;++i){
+      if(!medium_.readSlot(i,0,scratch_.pending,sizes_[i])||
+         !recordHeader(scratch_.pending,sizes_[i],i,previous))return false;
+      const uint8_t* current=scratch_.pending+Journal::Header;
+      if(!i)std::memcpy(scope,current,sizeof(scope));
+      else if(std::memcmp(scope,current,sizeof(scope)))return false;
+      previous=scratch_.pending[3];
+      if(previous==4&&(i+1!=count_||
+         (scratch_.pending[Journal::Header+J1979MaintenanceScope::WireSize+5]&32u)))return false;
+    }
+    J1979MaintenanceScope decoded;
+    return previous==4&&J1979MaintenanceScope::decode(scope,sizeof(scope),decoded);
   }
   Medium& medium_;Scratch& scratch_;State state_{};
   size_t sizes_[Slots]{},pendingSize_=0;
