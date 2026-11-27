@@ -1,3 +1,7 @@
+## SAE J1979 — découverte et campagnes CAN multi-ECU Windows (27/11/2026)
+
+- Découverte classique J2534 11/29 bits à profil explicite 33–36, PID00 seul, filtre RAW et purge, classification des sources et conflits, campagnes physiques distinctes sur les seules sources confirmées, budget partagé et VIN facultatif. Nouvelle CLI --j1979-network et écran privé FR/EN, JSON exclusif, export lié à l'autorisation originale. Régressions écrites, non exécutées. Aucun merge, Release, CI intermédiaire ni qualification réelle. C6 et J1979 restent ouverts. Le compteur précédent affichant plus de 10 000 additions incluait quatre fichiers Android préexistants comptés intégralement comme ajoutés ; ne pas le présenter comme développement net.
+
 ## SAE J1979 — découverte CAN Linux et campagne multi-calculateurs (27/11/2026)
 
 - SocketCAN RAW classique, découverte PID 00 fonctionnelle 11/29 bits à famille explicite, filtration et décodage bornés, classification par répondant avec réponses conflictuelles exclues. Nouveau CLI : découverte seule ou liste de sources explicitement confirmées, campagnes ISO-TP physiques séparées à budget partagé, VIN facultatif strict par ECU, JSON exclusif et synchronisé. Pas de scan implicite des sources non sélectionnées ni fallback. Régressions écrites non exécutées, aucune preuve matérielle. C6/J1979 ouverts.

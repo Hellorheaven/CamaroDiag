@@ -132,3 +132,7 @@ Les CLI Windows et Python acceptent `--vin` suivi d'un VIN attendu (17 caractèr
 ### Linux — J1979 CAN discovery and selected responder set
 
 La recette `camarodiagconnectors-j1979-network` ajoute une découverte PID 00 sur une seule famille 11/29 bits documentée, puis des campagnes ISO-TP physiques distinctes pour les seules sources sélectionnées. Le rapport conserve toutes les réponses éligibles, contradictoires, négatives, les adresses, budgets et preuves individuelles. Aucun essai physique n'est revendiqué ; voir les commandes dans connectors/README.md. / One bounded functional PID00 discovery, then explicitly selected separate physical scans. No fallback, mutation or coverage claim.
+
+### Windows — CAN network / réseau multicalculateurs
+
+Tests privés : sélectionner l'interface J2534, arrêter le pont et la console, ouvrir Réseau CAN J1979. Découverte seule sur profil 33–36 documenté, puis nouvelle campagne avec les identifiants de réponse documentés (séparés par virgules). CLI `--j1979-network` : voir `--help`. Un VIN facultatif impose une correspondance par ECU. Aucun Mode 04/08, aucun balayage physique implicite. / One functional PID00 discovery, explicit selected physical channels, individual evidence and no whole-vehicle claim.

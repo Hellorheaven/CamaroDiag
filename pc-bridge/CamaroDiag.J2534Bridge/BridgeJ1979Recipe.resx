@@ -119,4 +119,10 @@
   <data name="ScanVinUnverified" xml:space="preserve"><value>VIN unavailable — scan stopped.</value></data>
   <data name="ScanVinNotRequested" xml:space="preserve"><value>VIN comparison not requested.</value></data>
   <data name="LegacyOptionalVin" xml:space="preserve"><value>Expected VIN (optional)</value></data>
+  <data name="NetworkRun" xml:space="preserve"><value>J1979 CAN network</value></data>
+  <data name="NetworkDiscoverOnly" xml:space="preserve"><value>Discovery only</value></data>
+  <data name="NetworkConfirm" xml:space="preserve"><value>I confirm the documented network and selected physical channels.</value></data>
+  <data name="NetworkProfile" xml:space="preserve"><value>Classic CAN profile (33–36)</value></data>
+  <data name="NetworkSources" xml:space="preserve"><value>Response CAN IDs, comma separated</value></data>
+  <data name="NetworkScope" xml:space="preserve"><value>Only PID 00 is broadcast. Separate physical scans; no vehicle-wide coverage or mutations.</value></data>
 </root>

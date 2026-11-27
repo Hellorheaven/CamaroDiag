@@ -14,6 +14,9 @@ internal sealed partial class BridgeDesktopForm
     private readonly Button functionalRunAll = Button("Tout lancer");
     private readonly Button functionalRunJ1979 = Button(J1979RecipeText("Run"));
     private WindowsJ1979Report? completedJ1979;
+    private readonly Button functionalRunNetwork=Button(J1979RecipeText("NetworkRun"));
+    private ObdJ1979CanNetworkCli.Report? completedNetwork;
+    private DateTimeOffset networkReportAuthorization;
     private readonly Button functionalCancel = Button("Arrêter");
     private readonly Button functionalExport = Button("Exporter JSON");
     private readonly CheckBox functionalEcmProfileConfirmed = new()
@@ -70,6 +73,7 @@ internal sealed partial class BridgeDesktopForm
         extraRecipes.Controls.Add(functionalRunClear);
         extraRecipes.Controls.Add(functionalRunLegacy);
         extraRecipes.Controls.Add(functionalRunNativeUsb);
+        extraRecipes.Controls.Add(functionalRunNetwork);
         WideRow(fields, functionalRunLegacyMutation, 42);
         WideRow(fields, extraRecipes, 42);
         WideRow(fields, new Label
@@ -84,6 +88,7 @@ internal sealed partial class BridgeDesktopForm
         functionalGoogleSignIn.Click += async (_, _) => await FunctionalGoogleSignInAsync();
         functionalRunAll.Click += async (_, _) => await RunAllWindowsFunctionalTestsAsync();
         functionalRunJ1979.Click += async (_, _) => await RunWindowsJ1979Async();
+        functionalRunNetwork.Click += async (_, _) => await RunWindowsNetworkAsync();
         functionalRunNativeUsb.Click += async (_, _) => await RunWindowsNativeUsbAsync();
         functionalRunLegacy.Click += async (_, _) => await RunWindowsLegacyAsync();
         functionalRunLegacyMutation.Click += async (_, _) => await RunWindowsLegacyMutationAsync();
@@ -91,7 +96,7 @@ internal sealed partial class BridgeDesktopForm
         functionalRunClear.Click += async (_, _) => await RunWindowsClearAsync();
         functionalCancel.Click += (_, _) => functionalCancellation?.Cancel();
         functionalExport.Click += (_, _) => ExportWindowsFunctionalResults();
-        functionalRunNativeUsb.Enabled = functionalRunAll.Enabled = functionalRunJ1979.Enabled = functionalRunEvap.Enabled = functionalRunClear.Enabled = functionalRunLegacy.Enabled = functionalRunLegacyMutation.Enabled = functionalCancel.Enabled = functionalExport.Enabled = false;
+        functionalRunNetwork.Enabled = functionalRunNativeUsb.Enabled = functionalRunAll.Enabled = functionalRunJ1979.Enabled = functionalRunEvap.Enabled = functionalRunClear.Enabled = functionalRunLegacy.Enabled = functionalRunLegacyMutation.Enabled = functionalCancel.Enabled = functionalExport.Enabled = false;
         layout.Controls.Add(fields, 0, 0);
         layout.Controls.Add(functionalResults, 0, 1);
         tab.Controls.Add(layout);
@@ -103,8 +108,8 @@ internal sealed partial class BridgeDesktopForm
         if (functionalCancellation is not null) return;
         functionalGoogleSignIn.Enabled = false;
         functionalAuthentication.Text = "Connexion Google dans le navigateur système...";
-        functionalRunNativeUsb.Enabled = functionalRunAll.Enabled = functionalRunJ1979.Enabled = functionalRunEvap.Enabled = functionalRunClear.Enabled = functionalRunLegacy.Enabled = functionalRunLegacyMutation.Enabled = functionalExport.Enabled = false;
-        completedJ1979 = null;
+        functionalRunNetwork.Enabled = functionalRunNativeUsb.Enabled = functionalRunAll.Enabled = functionalRunJ1979.Enabled = functionalRunEvap.Enabled = functionalRunClear.Enabled = functionalRunLegacy.Enabled = functionalRunLegacyMutation.Enabled = functionalExport.Enabled = false;
+        completedJ1979 = null; completedNetwork = null;
         completedEvap = null;
         completedClear = null;
         completedLegacy = null;
@@ -115,7 +120,7 @@ internal sealed partial class BridgeDesktopForm
             functionalAuthorizedUntil = await DesktopOwnerGoogleAuth.SignInAsync();
             functionalAuthentication.Text =
                 "Compte Google autorisé par Firebase (session privée de 10 min maximum).";
-            functionalRunNativeUsb.Enabled = functionalRunAll.Enabled = functionalRunJ1979.Enabled = functionalRunEvap.Enabled = functionalRunClear.Enabled = functionalRunLegacy.Enabled = functionalRunLegacyMutation.Enabled = true;
+            functionalRunNetwork.Enabled = functionalRunNativeUsb.Enabled = functionalRunAll.Enabled = functionalRunJ1979.Enabled = functionalRunEvap.Enabled = functionalRunClear.Enabled = functionalRunLegacy.Enabled = functionalRunLegacyMutation.Enabled = true;
         }
         catch (Exception)
         {
@@ -134,7 +139,7 @@ internal sealed partial class BridgeDesktopForm
         if (functionalCancellation is not null) return;
         if (DateTimeOffset.UtcNow >= functionalAuthorizedUntil)
         {
-            functionalRunNativeUsb.Enabled = functionalRunAll.Enabled = functionalRunJ1979.Enabled = functionalRunEvap.Enabled = functionalRunClear.Enabled = functionalRunLegacy.Enabled = functionalRunLegacyMutation.Enabled = false;
+            functionalRunNetwork.Enabled = functionalRunNativeUsb.Enabled = functionalRunAll.Enabled = functionalRunJ1979.Enabled = functionalRunEvap.Enabled = functionalRunClear.Enabled = functionalRunLegacy.Enabled = functionalRunLegacyMutation.Enabled = false;
             functionalAuthentication.Text = "Session expirée : reconnectez votre compte Google.";
             return;
         }
@@ -170,12 +175,12 @@ internal sealed partial class BridgeDesktopForm
         }
 
         busy = true;
-        completedJ1979 = null;
+        completedJ1979 = null; completedNetwork = null;
         completedEvap = null;
         completedClear = null;
         completedLegacy = null;
         completedFunctionalChecks = [];
-        functionalRunNativeUsb.Enabled = functionalRunAll.Enabled = functionalRunJ1979.Enabled = functionalRunEvap.Enabled = functionalRunClear.Enabled = functionalRunLegacy.Enabled = functionalRunLegacyMutation.Enabled = functionalGoogleSignIn.Enabled = functionalExport.Enabled = false;
+        functionalRunNetwork.Enabled = functionalRunNativeUsb.Enabled = functionalRunAll.Enabled = functionalRunJ1979.Enabled = functionalRunEvap.Enabled = functionalRunClear.Enabled = functionalRunLegacy.Enabled = functionalRunLegacyMutation.Enabled = functionalGoogleSignIn.Enabled = functionalExport.Enabled = false;
         functionalCancel.Enabled = true;
         functionalCancellation = new CancellationTokenSource();
         var cancellation = functionalCancellation;
@@ -210,7 +215,7 @@ internal sealed partial class BridgeDesktopForm
             busy = false;
             functionalCancel.Enabled = false;
             functionalGoogleSignIn.Enabled = true;
-            functionalRunNativeUsb.Enabled = functionalRunAll.Enabled = functionalRunJ1979.Enabled = functionalRunEvap.Enabled = functionalRunClear.Enabled = functionalRunLegacy.Enabled = functionalRunLegacyMutation.Enabled = DateTimeOffset.UtcNow < functionalAuthorizedUntil;
+            functionalRunNetwork.Enabled = functionalRunNativeUsb.Enabled = functionalRunAll.Enabled = functionalRunJ1979.Enabled = functionalRunEvap.Enabled = functionalRunClear.Enabled = functionalRunLegacy.Enabled = functionalRunLegacyMutation.Enabled = DateTimeOffset.UtcNow < functionalAuthorizedUntil;
         }
     }
 
@@ -330,6 +335,11 @@ internal sealed partial class BridgeDesktopForm
     private void ExportWindowsFunctionalResults()
     {
         if (DateTimeOffset.UtcNow >= functionalAuthorizedUntil) return;
+        if (completedNetwork is not null)
+        {
+            ExportWindowsNetwork(completedNetwork);
+            return;
+        }
         if (completedLegacy is not null)
         {
             ExportWindowsLegacy(completedLegacy);

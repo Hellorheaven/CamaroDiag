@@ -111,12 +111,12 @@ internal sealed partial class BridgeDesktopForm
         using var cancellation = new CancellationTokenSource();
         functionalCancellation = cancellation;
         busy = true;
-        completedJ1979 = null;
+        completedJ1979 = null; completedNetwork = null;
         completedEvap = null;
         completedClear = null;
         completedLegacy = null;
         completedFunctionalChecks = [];
-        functionalRunNativeUsb.Enabled = functionalRunAll.Enabled = functionalRunJ1979.Enabled = functionalRunEvap.Enabled =
+        functionalRunNetwork.Enabled = functionalRunNativeUsb.Enabled = functionalRunAll.Enabled = functionalRunJ1979.Enabled = functionalRunEvap.Enabled =
             functionalRunClear.Enabled = functionalRunLegacy.Enabled = functionalRunLegacyMutation.Enabled =
             functionalGoogleSignIn.Enabled = functionalExport.Enabled = false;
         functionalCancel.Enabled = true;
@@ -195,7 +195,7 @@ internal sealed partial class BridgeDesktopForm
             busy = false;
             functionalCancel.Enabled = false;
             functionalGoogleSignIn.Enabled = true;
-            functionalRunNativeUsb.Enabled = functionalRunAll.Enabled = functionalRunJ1979.Enabled = functionalRunEvap.Enabled =
+            functionalRunNetwork.Enabled = functionalRunNativeUsb.Enabled = functionalRunAll.Enabled = functionalRunJ1979.Enabled = functionalRunEvap.Enabled =
                 functionalRunClear.Enabled = functionalRunLegacy.Enabled = functionalRunLegacyMutation.Enabled =
                 DateTimeOffset.UtcNow < functionalAuthorizedUntil;
         }

@@ -13,6 +13,8 @@ Usage:
   CamaroDiag.J2534Bridge.exe --self-test
   CamaroDiag.J2534Bridge.exe --probe-drivers
   CamaroDiag.J2534Bridge.exe --j1979-legacy --adapter-index 0 --variant 2 --source 10 --confirm-legacy-profile --output legacy-vpw.json
+  CamaroDiag.J2534Bridge.exe --j1979-network --adapter-index 0 --protocol 33 --discover-only --confirm-functional-pid00 --output can-sources.json
+  CamaroDiag.J2534Bridge.exe --j1979-network --adapter-index 0 --protocol 33 --source 7E8 --source 7E9 --confirm-functional-pid00 --confirm-physical-channels --output can-network.json
     Read legacy emissions records for one documented response source. Variant 1=PWM, 2=VPW, 3=ISO9141, 4=KWP slow, 5=KWP fast. New JSON file required; no reset/control.
   CamaroDiag.J2534Bridge.exe --discover-connector COM5
   CamaroDiag.J2534Bridge.exe --inspect-connector-checkpoint checkpoint.bin
