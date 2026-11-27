@@ -1,3 +1,9 @@
+## Reprise — SAE J1979 Mode 01 multicanal (27 novembre 2026)
+
+- 49 PID multicanaux / 144 champs potentiels : O2, couple, débit, températures, EGR, admission, injection, turbo, échappement, DPF et durées. Décodeurs stricts Kotlin/C#/Python, longueur exacte, masques de présence, signés/non signés, absence distincte de zéro ; pas d'attribution de banc O2 non justifiée. Sous-ensemble historique, pas le J1979DA complet.
+- Intégrations diagnostic Android, Windows J2534, Linux/Python, réseau/legacy, projections USB natives et relecture indépendante des rapports. Enregistrement continu sur les trois plateformes, statistiques isolées par canal, export CSV multicanal compatible avec l'ancien en-tête scalaire ; legacy limité à cinq octets de données par PID multicanal. CJ/1 RAW conservé.
+- Régressions écrites Android, Windows et Python, non exécutées selon AGENTS.md. C6 et SAE J1979 ouverts. Reste catalogue complet, Mode 08 et intégration firmware ; aucune CI de clôture, fusion ou APK signé. Release après validation de clôture uniquement.
+
 ## Reprise — SAE J1979 Mode 09 étendu (27 novembre 2026)
 
 - Décodage 08/0B IUPR essence/diesel, 0D/0F et 0A legacy, compteurs non signés, dénominateurs nuls, longueurs exactes et fragments corrélés. Compteur legacy 07 partagé par 08 et 0B ; correction firmware du classement des types 0B/0C/0D/0E/0F, sans revendiquer l'activation physique legacy.
