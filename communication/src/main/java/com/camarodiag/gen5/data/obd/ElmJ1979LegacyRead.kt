@@ -42,6 +42,9 @@ data class LegacyReadReport(
     val otherSources: List<String>, val durationMs: Long,
     val multiSignalRecords: List<ObdJ1979MultiSignal.Record> = emptyList()
 ) {
+    val statusRecords get()=steps.mapNotNull {
+        ObdJ1979Status.tryRecord(it.requestHex,it.acceptedRecords.singleOrNull(),it.status)
+    }
     val contextualMeasurements get() = ObdJ1979ScalingContext.project(steps.map {
         ObdJ1979ScalingContext.Observation(it.requestHex,it.acceptedRecords.singleOrNull(),it.status)
     })
@@ -278,7 +281,9 @@ internal object ElmJ1979LegacyRead {
         suspend fun readPid(mode: Int,pid: Int): List<Int>? {
             val request = pidRequest(mode,pid)
             val row = read(request,true) {
-                if(mode==1&&ObdJ1979ScalingContext.isConfiguration(pid))
+                if(mode==1&&ObdJ1979Status.width(pid)!=null&&
+                    ObdJ1979Status.tryRecord(request,hex(it),"RAW")==null)false
+                else if(mode==1&&ObdJ1979ScalingContext.isConfiguration(pid))
                     it.take(2)==listOf(0x41,pid)&&ObdJ1979ScalingContext.validConfiguration(pid,it.drop(2))
                 else if(mode==1&&ObdJ1979MultiSignal.width(pid)!=null)
                     ObdJ1979MultiSignal.decodeResponse(request,hex(it))!=null
