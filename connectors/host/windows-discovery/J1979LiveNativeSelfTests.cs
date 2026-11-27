@@ -61,6 +61,38 @@ internal static class J1979LiveNativeSelfTests
         }
         public void Dispose(){Closed=true;}
     }
+    private static void Prefix(J1979LiveNative.Profile profile,byte[] full)
+    {
+        var bodies=Bodies(profile);
+        byte[] original=bodies.Take(bodies.Count-1).SelectMany((b,i)=>Frame(i==0?1:2,i,b)).ToArray();
+        byte[] terminal=Frame(3,bodies.Count-1,bodies[^1]);
+        foreach(var (tail,reason) in new (byte[],string)[]{
+            (Array.Empty<byte>(),"MISSING_TERMINAL"),(terminal[..5],"TRUNCATED_HEADER"),
+            (terminal[..^1],"TRUNCATED_RECORD")})
+        {
+            var prefix=J1979LiveNative.InspectPrefix([..original,..tail],Vin);
+            Check(Equals(prefix["prefix_integrity_verified"],true)&&Equals(prefix["capture_integrity_verified"],false)&&
+                Equals(prefix["execution_completed"],false)&&Equals(prefix["terminal_present"],false),"prefix is not completed");
+            Check(Equals(prefix["complete_records"],8)&&Equals(prefix["complete_observations"],7)&&
+                Equals(prefix["discarded_tail_bytes"],tail.Length)&&Equals(prefix["last_complete_offset"],original.Length)&&
+                Equals(prefix["interruption"],reason),"prefix offsets and interruption");
+            Check(Equals(prefix["raw_samples_in_prefix"],4)&&Equals(prefix["final_identity_observed_in_prefix"],true),
+                "prefix observations retained without terminal claim");
+        }
+        void Reject(byte[] source,string vin=Vin)
+        {
+            bool rejected=false;
+            try{J1979LiveNative.InspectPrefix(source,vin);}
+            catch(InvalidDataException){rejected=true;}
+            Check(rejected,"invalid prefix rejected");
+        }
+        byte[] corrupt=original.ToArray();corrupt[^1]^=1;
+        Reject(corrupt);Reject(full);Reject([..full,0]);Reject([..original,(byte)'X']);
+        Reject([..original,(byte)'C',(byte)'L',2]);Reject(original,"1FA6P8TH0L5100000");
+        (bodies[3],bodies[4])=(bodies[4],bodies[3]);
+        Reject(bodies.Take(bodies.Count-1).SelectMany((b,i)=>Frame(i==0?1:2,i,b)).ToArray());
+    }
+
     internal static void Run()
     {
         var profile=new J1979LiveNative.Profile(0x7e0,0x7e8,false,Vin,[5,12],2,100,1000);
@@ -75,6 +107,7 @@ internal static class J1979LiveNativeSelfTests
         Check(J1979LiveNative.Proof(hello,challenge,key).SequenceEqual(
             new byte[]{(byte)'C',(byte)'U',3,3}.Concat(HMACSHA256.HashData(key,transcript))),"CU/3 proof");
         byte[] capture=Capture(Bodies(profile));
+        Prefix(profile,capture);
         var replay=J1979LiveNative.Decode(new MemoryStream(capture),profile);
         Check(replay.CaptureIntegrityVerified&&replay.Summary?.Completed==true&&replay.Summary.Raw==4,"complete recording");
         Check(replay.Result?.Samples.Length==4&&replay.Result.Observations.Length==7,"all samples and admission retained");
