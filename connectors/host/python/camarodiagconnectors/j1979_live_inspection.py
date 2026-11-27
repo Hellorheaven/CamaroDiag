@@ -65,7 +65,7 @@ def _dict(value, name):
 
 
 def _same_number(a, b):
-    return type(a) in (int, float) and math.isfinite(a) and math.isclose(a, b, rel_tol=1e-9, abs_tol=1e-9)
+    return type(a) in (int, float) and -1e100 <= a <= 1e100 and math.isfinite(a) and math.isclose(a, b, rel_tol=1e-9, abs_tol=1e-9)
 
 
 def _pairs(pairs):
@@ -527,6 +527,8 @@ def compare_files(paths, *, expected_vin=None):
                  {k:v for k,v in first["channel"].items() if k!="link_checksum_verified"}
                  for x in results),"Different VIN or ECU channel")
     _require(len({x["source_sha256"] for x in results})==len(results),"Duplicate recording")
+    _require(all(x["raw_only"] == first["raw_only"] for x in results),
+             "Raw and numeric recordings cannot be compared as equivalent measurements")
     shared=sorted(set.intersection(*(set(x["selected_pids"]) for x in results)))
     comparisons=[]
     for pid in shared:
@@ -557,7 +559,7 @@ def compare_files(paths, *, expected_vin=None):
             "mean_range":max(means)-min(means) if present==len(results) else None,
         })
     return {"schema":"camaradiag-j1979-live-comparison-v1","verified":True,
-            "declared_vin":first["declared_vin"],"channel":first["channel"],"shared_pids":shared,
+            "declared_vin":first["declared_vin"],"channel":first["channel"],"raw_only":first["raw_only"],"shared_pids":shared,
             "recordings":[{"sha256":x["source_sha256"],"completed":x["completed"],
                            "completed_cycles":x["completed_cycles"]} for x in results],
             "comparison":comparisons,"channel_comparison":channel_comparisons,"time_aligned":False,"diagnostic_verdict":None,
