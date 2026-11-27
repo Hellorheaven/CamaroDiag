@@ -156,6 +156,8 @@ def verify(capture, report, *, expected_vin=None):
         compare(report, "status_records", replay["status_records"])
     if "contextual_measurements" in report:
         compare(report, "contextual_measurements", replay["contextual_measurements"])
+    if "operating_context" in report:
+        compare(report, "operating_context", replay["operating_context"])
     if "scaled_monitor_records" in report:
         compare(report, "scaled_monitor_records", replay["scaled_monitor_records"])
     if "extended_vehicle_info" in report:
@@ -244,6 +246,7 @@ def verify(capture, report, *, expected_vin=None):
         "status_records": replay["status_records"],
         "contextual_measurements": replay["contextual_measurements"],
         "scaled_monitor_records": replay["scaled_monitor_records"],
+        "operating_context": replay["operating_context"],
         "capture_error": replay["error"],
         "host_error": report.get("error"),
         "device_credential_independently_verified": False,
