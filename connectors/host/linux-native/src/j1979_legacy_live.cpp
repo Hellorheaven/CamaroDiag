@@ -195,7 +195,7 @@ LiveResult replay_live(Protocol p,unsigned source,const LivePlan& plan,std::span
     require(offset==trace.size(),"Extra live trace after terminal recipe");
     return result;
 }
-LiveResult acquire_live(Elm& elm,unsigned source,const LivePlan& plan,Clock clock,Current current,Wait wait){
+LiveResult acquire_live(Elm& elm,unsigned source,const LivePlan& plan,Clock clock,Current current,Wait wait,const std::function<void(const LiveExchange&)>& sink){
     if(!elm.ready()||!elm.headered()||!clock||!current||!wait||!plan.valid()||!valid_source(source))
         throw std::invalid_argument("Configured selected legacy live context required");
     const auto started=clock();
@@ -206,7 +206,7 @@ LiveResult acquire_live(Elm& elm,unsigned source,const LivePlan& plan,Clock cloc
         if(now<previous||now<started||now-started>3600000)throw TransportError("Live monotonic clock invalid");
         previous=now;return static_cast<unsigned>(now-started);
     };
-    return Recipe(elm.protocol(),source,plan,[&](LivePhase phase,unsigned cycle,std::string_view command,unsigned earliest){
+    auto observe=[&](LivePhase phase,unsigned cycle,std::string_view command,unsigned earliest){
         LiveExchange x{};x.phase=phase;x.cycle=cycle;x.exchange.command=command;
         auto& row=x.exchange;
         x.started_ms=x.ended_ms=time();
@@ -237,6 +237,9 @@ LiveResult acquire_live(Elm& elm,unsigned source,const LivePlan& plan,Clock cloc
             if(row.outcome==FreezeOutcome::received&&(x.ended_ms>=plan.budget_ms||x.ended_ms-x.started_ms>timeout))row.outcome=FreezeOutcome::late;
         }
         row.duration_ms=x.ended_ms-x.started_ms;return x;
+    };
+    return Recipe(elm.protocol(),source,plan,[&](LivePhase phase,unsigned cycle,std::string_view command,unsigned earliest){
+        auto row=observe(phase,cycle,command,earliest);if(sink)sink(row);return row;
     }).run();
 }
 }

@@ -40,7 +40,7 @@ struct FreezeResult{
 };
 using FreezeRead=std::function<FreezeExchange(std::string_view)>;
 FreezeResult freeze_recipe(Protocol,unsigned source,const FreezePlan&,const FreezeRead&);
-FreezeResult acquire_freeze(Elm&,unsigned source,const FreezePlan&,Clock,Current);
+FreezeResult acquire_freeze(Elm&,unsigned source,const FreezePlan&,Clock,Current,const std::function<void(const FreezeExchange&)>& sink={});
 FreezeResult replay_freeze(Protocol,unsigned source,const FreezePlan&,std::span<const FreezeExchange>);
 std::string freeze_report(const FreezeResult&);
 }

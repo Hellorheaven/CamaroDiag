@@ -2,7 +2,7 @@
 #include <algorithm>
 #include <limits>
 namespace cd::legacy {
-FreezeResult acquire_freeze(Elm& elm,unsigned source,const FreezePlan& plan,Clock clock,Current current){
+FreezeResult acquire_freeze(Elm& elm,unsigned source,const FreezePlan& plan,Clock clock,Current current,const std::function<void(const FreezeExchange&)>& sink){
     if(!elm.ready()||!elm.headered()||!plan.valid()||!valid_source(source)||!clock||!current)
         throw std::invalid_argument("Explicit configured legacy freeze scope required");
     const auto started=clock();
@@ -13,7 +13,7 @@ FreezeResult acquire_freeze(Elm& elm,unsigned source,const FreezePlan& plan,Cloc
         if(now<previous||now<started)throw TransportError("Monotonic clock regressed");
         previous=now;return now-started;
     };
-    return freeze_recipe(elm.protocol(),source,plan,[&](std::string_view command){
+    auto observe=[&](std::string_view command){
         FreezeExchange x{};x.command=command;
         if(!current()){x.outcome=FreezeOutcome::cancelled;return x;}
         std::uint64_t begin=0;
@@ -46,6 +46,9 @@ FreezeResult acquire_freeze(Elm& elm,unsigned source,const FreezePlan& plan,Cloc
             catch(const TransportError&){x.outcome=FreezeOutcome::cancelled;}
         }
         return x;
+    };
+    return freeze_recipe(elm.protocol(),source,plan,[&](std::string_view command){
+        auto row=observe(command);if(sink)sink(row);return row;
     });
 }
 }

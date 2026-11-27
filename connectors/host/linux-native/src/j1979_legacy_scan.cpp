@@ -210,7 +210,7 @@ public:
     }
 };
 }
-Scan scan_selected(Elm& elm,unsigned source,std::string_view vin,unsigned budget,Clock clock,Current current){
+Scan scan_selected(Elm& elm,unsigned source,std::string_view vin,unsigned budget,Clock clock,Current current,const std::function<void(const ScanExchange&)>& sink){
     if(!elm.headered()||!elm.ready()||!valid_source(source)||!valid_vin(vin)||
         !clock||!current||!budget||budget>600000)
         throw std::invalid_argument("Explicit selected source, documented VIN and bounded headered session required");
@@ -220,7 +220,7 @@ Scan scan_selected(Elm& elm,unsigned source,std::string_view vin,unsigned budget
         if(now<previous||now-start>3600000)throw std::logic_error("Invalid monotonic clock");
         previous=now;return static_cast<unsigned>(now-start);
     };
-    return Campaign(elm.protocol(),source,vin,budget,[&](std::string_view command){
+    auto observe=[&](std::string_view command){
         ScanExchange row{};row.command=command;row.started_ms=row.ended_ms=elapsed();
         if(!current()||max_raw-retained<32768){row.outcome=ScanOutcome::cancelled;return row;}
         if(row.started_ms>=budget){row.outcome=ScanOutcome::budget;return row;}
@@ -236,6 +236,9 @@ Scan scan_selected(Elm& elm,unsigned source,std::string_view vin,unsigned budget
         catch(const TransportError&){row.outcome=ScanOutcome::transport;row.ended_ms=elapsed();}
         if(row.outcome!=ScanOutcome::received)row.raw.clear();
         retained+=row.raw.size();return row;
+    };
+    return Campaign(elm.protocol(),source,vin,budget,[&](std::string_view command){
+        auto row=observe(command);if(sink)sink(row);return row;
     }).run();
 }
 Scan replay_scan(Protocol protocol,unsigned source,std::string_view vin,unsigned budget,std::span<const ScanExchange> trace){

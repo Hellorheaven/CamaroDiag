@@ -34,7 +34,7 @@ struct Scan {
     std::set<unsigned> other_sources;
     bool completed{},identity_rechecked{},budget_expired{};
 };
-Scan scan_selected(Elm&,unsigned source,std::string_view expected_vin,unsigned budget_ms,Clock,Current);
+Scan scan_selected(Elm&,unsigned source,std::string_view expected_vin,unsigned budget_ms,Clock,Current,const std::function<void(const ScanExchange&)>& sink={});
 Scan replay_scan(Protocol,unsigned source,std::string_view expected_vin,unsigned budget_ms,std::span<const ScanExchange>);
 std::string scan_report(const Scan&);
 }

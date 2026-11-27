@@ -38,7 +38,7 @@ struct LiveResult{
     bool inventory_complete{},identity_rechecked{},completed{};
 };
 using Wait=std::function<void(unsigned)>;
-LiveResult acquire_live(Elm&,unsigned,const LivePlan&,Clock,Current,Wait);
+LiveResult acquire_live(Elm&,unsigned,const LivePlan&,Clock,Current,Wait,const std::function<void(const LiveExchange&)>& sink={});
 LiveResult replay_live(Protocol,unsigned,const LivePlan&,std::span<const LiveExchange>);
 std::string live_report(const LiveResult&);
 }
