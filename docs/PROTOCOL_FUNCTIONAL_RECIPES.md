@@ -288,3 +288,23 @@ camarodiagconnectors-offline verify-legacy-freeze --report legacy.json --vin 1G1
 ```
 
 Le VIN d'exemple est fictif. Pour une acquisition réelle, sélectionner le véhicule et le calculateur documentés, le connecteur qualifié, et les numéros de trames explicitement autorisés. Les adresses CAN et la source legacy ne sont pas interchangeables. Le Mode 02 ne constitue pas une autorisation d'effacement ou de programmation. Une absence de DTC déclencheur empêche la lecture des mesures ; les valeurs OEM hors trame 00 restent brutes. L'intégrité CRC, la preuve de credential et le rejeu indépendant n'attestent pas l'origine physique de la capture. Les tests simulés sont préparés mais non exécutés ; la recette reste ouverte.
+
+
+## SAE J1979 Mode 01 — projection documentée hors ligne / offline documented projection
+
+La capture Mode 01 **raw-only** constitue l'entrée ; elle reste inchangée. Le catalogue JSON déclaratif, la référence locale autorisée et son SHA-256 épinglé indépendamment sont nécessaires. Sélectionner le VIN attendu indépendamment de la capture. Aucun catalogue J1979DA moderne complet n'est fourni ni simulé.
+
+- Android : Tests fonctionnels J1979, section catalogue ; sélectionner la capture JSON, le catalogue et le document de référence, saisir l'empreinte et confirmer. L'export passe par le dossier autorisé, avec contrôle du contexte propriétaire, véhicule et session.
+- Windows : Tests fonctionnels, projection de catalogue ; ou commande hors ligne du bridge ci-dessous. Aucun pilote ni transport ouvert.
+- Python : `project-live` effectue le rejeu indépendant de la capture originale puis la projection ; `verify-local-projection` vérifie un export Android ou Windows contre le rejeu indépendant et les mêmes fichiers de référence.
+
+```text
+CamaroDiag.J2534Bridge.exe --j1979-project-catalogue --catalogue catalogue.json --reference reference.txt --reference-sha256 <SHA256> --report raw.json --vin <VIN> --output projection.json
+camarodiagconnectors-j1979-catalogue verify-local-projection --catalogue catalogue.json --reference reference.txt --reference-sha256 <SHA256> --report raw.json --vin <VIN> --projection projection.json
+```
+
+Remplacer les paramètres entre chevrons par les valeurs réelles ; conserver les quatre fichiers originaux et le rapport produit. Les définitions doivent être documentées et respecter le schéma de `j1979_catalogue.py` ; les exemples unitaires sont synthétiques et non normatifs. Un PID inconnu, une valeur indisponible ou une longueur non conforme ne devient jamais une mesure numérique.
+
+Android et Windows contrôlent la structure des preuves applicatives, la séquence VIN/inventaire/échantillons, les réponses brutes et les empreintes. Leurs exports locaux ne revendiquent pas un rejeu indépendant du transport : celui-ci relève du vérificateur Python sur le rapport original. Ni une empreinte correcte ni une projection exacte ne certifient l'authenticité de la référence, la conformité SAE ou une validation physique.
+
+**EN:** Use an original raw-only Mode 01 report, an authorized documented JSON catalogue, its local reference and an independently pinned SHA-256. Enter the expected VIN independently. Native Android and Windows outputs are local application-evidence projections; use the Python command above for independent verification against the original report. Unknown or unavailable values remain unknown, and neither integrity nor replay proves vehicle provenance or normative compliance. No transport, write, DTC clear or programming operation is performed by the offline projector. Tests have been added but not run; full J1979 acceptance and the release gate remain open.
