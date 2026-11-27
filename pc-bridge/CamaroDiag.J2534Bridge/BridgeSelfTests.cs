@@ -22,6 +22,7 @@ internal static class BridgeSelfTests
         checks += ObdJ1979FreezeSelfTests.Run();
         checks += ObdJ1979CanNetworkSelfTests.Run();
         checks += ObdJ1979LiveRecorderSelfTests.Run();
+        checks += ObdJ1979CatalogueSelfTests.Run();
         checks += ObdJ1979LegacyLiveSelfTests.Run();
         checks += ObdJ1979EvapTestSelfTests.Run();
         checks += ObdJ1979ClearRecipeSelfTests.Run();
