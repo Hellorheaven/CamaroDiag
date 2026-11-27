@@ -88,6 +88,8 @@ internal object J1979FreezeCampaign {
         val transmissionAttempted: Boolean, val raw: String? = null
     )
 
+    internal class AdapterReplyError(val raw: String,cause: Throwable) : IllegalStateException("Invalid adapter reply",cause)
+
     private val outcomes = setOf("RECEIVED","TIMEOUT","TRANSPORT_ERROR","BUDGET",
         "CANCELLED","CONTEXT_CHANGED","LATE_RESPONSE")
     private val scalarPids = setOf(
@@ -305,6 +307,9 @@ internal object J1979FreezeCampaign {
                         else -> observed("RECEIVED",response)
                     }
                 }
+            } catch (error: AdapterReplyError) {
+                raw = error.raw.take(MAX_RAW)
+                observed("TRANSPORT_ERROR")
             } catch (_: CancellationException) { observed("CANCELLED") }
             catch (_: java.util.concurrent.TimeoutException) {
                 observed(if (attempted) "TIMEOUT" else "CONTEXT_CHANGED")
