@@ -76,6 +76,17 @@ internal static class ObdJ1979Mode06SelfTests
         Check(ObdJ1979Interpretation.Interpret([6,0x21],
             [0x46,0x21,0x80,0x24,0,100,0,0,0,200]).Description.Contains("unit=count"),
             "Windows console includes the decoded unit.");
+        Check(Enumerable.Range(0,256).Count(i=>ObdJ1979Mode06.DecodeScale((byte)i,0,0,1)!=null)==79,
+            "Historical Annex E definitions, excluding reserved codes.");
+        Check(ObdJ1979Mode06.DecodeScale(0x99,0,0,1)==null,
+            "Later revision identifiers are not implicitly recognized.");
+        Check(ObdJ1979Mode06.DecodeScale(0x16,400,0,1000) is
+            { Unit: "degC", Value: 0, Minimum: -40, Maximum: 60 },
+            "Unsigned temperature offset.");
+        Check(Math.Abs(ObdJ1979Mode06.DecodeScale(0x39,32768,0,65535)!.Value)<1e-9,
+            "Percentage offset.");
+        Check(ObdJ1979Mode06.DecodeScale(0x2E,2,0,1)==null,
+            "Reserved boolean encoding stays raw.");
         return checks;
     }
 }
