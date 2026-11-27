@@ -32,5 +32,7 @@ camarodiagconnectors-j1979-usb = "camarodiagconnectors.j1979_usb_live_cli:main"
 
 camarodiagconnectors-j1979-catalogue = "camarodiagconnectors.j1979_catalogue_cli:main"
 
+camarodiagconnectors-j1979-maintenance-journal = "camarodiagconnectors.j1979_maintenance_journal_cli:main"
+
 [tool.setuptools]
 packages = ["camarodiagconnectors"]
