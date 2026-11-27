@@ -93,7 +93,25 @@ internal sealed partial class BridgeDesktopForm
                 device.Open(options.RequestCanId, options.ResponseCanId, options.Can29Bit, options.ProtocolNumber);
                 RequireActive();
                 return device.RunStandardClearRecipe(expectedVin, warning == DialogResult.OK,
-                    yes == DialogResult.Yes, RequireActive);
+                    yes == DialogResult.Yes, RequireActive, baseline =>
+                    {
+                        RequireActive();
+                        var directory=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                            "CamaroDiag","j1979-clear-evidence");
+                        Directory.CreateDirectory(directory);
+                        var path=Path.Combine(directory,"clear-"+Guid.NewGuid().ToString("N")+".baseline.json");
+                        var report=new WindowsClearReport("camarodiag-j1979-can-clear-baseline-v1",
+                            "SAE-J1979",typeof(BridgeDesktopForm).Assembly.GetName().Version?.ToString()??"",
+                            expectedVin,selected.Adapter.DisplayName,options.ProtocolNumber,
+                            options.RequestCanId.ToString("X"),options.ResponseCanId.ToString("X"),
+                            started,DateTimeOffset.UtcNow,baseline);
+                        var payload=JsonSerializer.SerializeToUtf8Bytes(report,new JsonSerializerOptions {
+                            WriteIndented=true,PropertyNamingPolicy=JsonNamingPolicy.CamelCase
+                        });
+                        using var file=new FileStream(path,FileMode.CreateNew,FileAccess.Write,FileShare.None);
+                        file.Write(payload);file.Flush(true);
+                        RequireActive();
+                    });
             });
             // Preserve evidence if the user cancels after possible TX.
             // Expired owner sessions may not expose the diagnostic payload.
