@@ -153,6 +153,39 @@ class NativePrefixTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             inspect_prefix(base, expected_vin="1FA6P8TH0L5100000")
 
+    def test_cross_host_prefix_verifier_rejects_modified_report(self):
+        import json
+        import tempfile
+        from pathlib import Path
+        from camarodiagconnectors.j1979_live_native import inspect_prefix_file
+        from camarodiagconnectors.j1979_live_native_cli import verify_prefix_files, run
+        with tempfile.TemporaryDirectory() as temp:
+            folder = Path(temp)
+            raw_path, report_path, verify_path = (folder / x for x in ("original.cl", "partial.json", "verified.json"))
+            original = stream(fixture()[:-1])
+            raw_path.write_bytes(original)
+            report = run(["inspect-prefix", "--capture", str(raw_path), "--vin", VIN,
+                          "--output", str(report_path)])
+            self.assertEqual(report, inspect_prefix_file(raw_path, expected_vin=VIN))
+            self.assertTrue(verify_prefix_files(raw_path, report_path, expected_vin=VIN)["consistent"])
+            verified = run(["verify-prefix", "--capture", str(raw_path), "--report", str(report_path),
+                            "--vin", VIN, "--output", str(verify_path)])
+            self.assertTrue(verified["prefix_integrity_verified"])
+            self.assertFalse(verified["execution_completed"])
+            self.assertFalse(verified["capture_integrity_verified"])
+            for field, value in (("execution_completed", True), ("last_complete_offset", 1),
+                                 ("discarded_tail_bytes", 9), ("raw_samples_in_prefix", 999),
+                                 ("capture_sha256", "f"*64), ("observations", [])):
+                altered = dict(report)
+                altered[field] = value
+                report_path.write_text(json.dumps(altered), encoding="utf-8")
+                with self.assertRaises(ValueError):
+                    verify_prefix_files(raw_path, report_path, expected_vin=VIN)
+            report_path.write_text(json.dumps(report), encoding="utf-8")
+            raw_path.write_bytes(original + b"CL")
+            with self.assertRaises(ValueError):
+                verify_prefix_files(raw_path, report_path, expected_vin=VIN)
+
     def test_capacity_terminal_must_be_earned(self):
         from camarodiagconnectors.j1979_live_native import MAX_RAW_BYTES
         profile = dataclasses.replace(PROFILE, pids=tuple(range(1,32)), cycles=200,
