@@ -88,6 +88,46 @@ class InspectionTests(unittest.TestCase):
                         clock=clock.now,sleep=clock.sleep)
         r["schema"]="camarodiag-j1979-legacy-live-v1"
         self.assertTrue(inspect(r)["completed"])
+        for raw_only in (False, True):
+            clock.t=0
+            baseline=record_legacy(exchange,lambda timeout:2,2,0x10,
+                                   Plan((5,),VIN,1,0.1,10,raw_only),
+                                   clock=clock.now,sleep=clock.sleep)
+            baseline["schema"]="camarodiag-j1979-legacy-live-v1"
+            result=inspect(baseline,expected_vin=VIN)
+            self.assertTrue(result["completed"])
+            self.assertEqual(result["raw_only"],raw_only)
+            if raw_only:
+                self.assertEqual(result["samples"][0]["response_hex"],"410564")
+                self.assertIsNone(result["samples"][0]["number"])
+            # Both frames have valid checksums, but the original adapter
+            # transcript and parsed projection must agree byte for byte.
+            for new_raw in (None, "NO DATA", frame(bytes.fromhex("410563")),
+                            frame(bytes.fromhex("410564"),0x11)):
+                damaged=copy.deepcopy(baseline)
+                row=next(x for x in damaged["transport_exchanges"]
+                         if x["request_hex"]=="0105")
+                row["raw_response"]=new_raw
+                with self.assertRaises(ValueError):
+                    inspect(damaged)
+            # Additional ATDPN text, if present, cannot contradict the
+            # protocol number already returned by the adapter callback.
+            for probe_text,accepted in (("ATDPN\r2>",True),("3>",False),("A2>",False)):
+                candidate=copy.deepcopy(baseline)
+                probe=next(x for x in candidate["transport_exchanges"]
+                           if x["request_hex"]=="ATDPN")
+                probe["raw_response"]=probe_text
+                if accepted:
+                    self.assertTrue(inspect(candidate)["completed"])
+                else:
+                    with self.assertRaises(ValueError):
+                        inspect(candidate)
+            for req in ("0100","0900","0901","0902"):
+                damaged=copy.deepcopy(baseline)
+                row=next(x for x in damaged["transport_exchanges"] if x["request_hex"]==req)
+                row["status"]="FAILED"
+                with self.assertRaises(ValueError):
+                    inspect(damaged)
         r["transport_exchanges"][-1]["frames"][0]["raw_hex"]="486B1049020100000000"
         with self.assertRaises(ValueError):
             inspect(r)
