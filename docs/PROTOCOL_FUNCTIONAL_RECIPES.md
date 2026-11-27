@@ -128,3 +128,7 @@ Sur firmware et carte qualifiés uniquement, avec clé hôte provisionnée local
 
 ### Comparaison VIN USB / USB VIN comparison
 Les CLI Windows et Python acceptent `--vin` suivi d'un VIN attendu (17 caractères). Les rapports distinguent `declared_vin`, `observed_vin` et `vin_match` (`MATCH`, `MISMATCH`, `UNVERIFIED`, `NOT_REQUESTED`). Une comparaison demandée non confirmée produit un code de sortie non nul ; les traces sont conservées. La comparaison hors ligne n'authentifie pas le boîtier ou la voiture. / Optional expected VIN comparison is separate from campaign integrity and physical provenance.
+
+### Linux — J1979 CAN discovery and selected responder set
+
+La recette `camarodiagconnectors-j1979-network` ajoute une découverte PID 00 sur une seule famille 11/29 bits documentée, puis des campagnes ISO-TP physiques distinctes pour les seules sources sélectionnées. Le rapport conserve toutes les réponses éligibles, contradictoires, négatives, les adresses, budgets et preuves individuelles. Aucun essai physique n'est revendiqué ; voir les commandes dans connectors/README.md. / One bounded functional PID00 discovery, then explicitly selected separate physical scans. No fallback, mutation or coverage claim.

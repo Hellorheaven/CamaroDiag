@@ -1,3 +1,7 @@
+## SAE J1979 — découverte CAN Linux et campagne multi-calculateurs (27/11/2026)
+
+- SocketCAN RAW classique, découverte PID 00 fonctionnelle 11/29 bits à famille explicite, filtration et décodage bornés, classification par répondant avec réponses conflictuelles exclues. Nouveau CLI : découverte seule ou liste de sources explicitement confirmées, campagnes ISO-TP physiques séparées à budget partagé, VIN facultatif strict par ECU, JSON exclusif et synchronisé. Pas de scan implicite des sources non sélectionnées ni fallback. Régressions écrites non exécutées, aucune preuve matérielle. C6/J1979 ouverts.
+
 ## SAE J1979 — intégration Android de la lecture legacy par source (27/11/2026)
 
 - Recette dédiée Android, source explicite et VIN attendu du véhicule sélectionné, session ELM exclusive ATH1 et restauration du profil, vérification PID00/ATDPN, inventaires et mesures typées, DTC, readiness, VIN/CALID/CVN, freeze et moniteurs legacy. Export JSON dans les tests privés, conservation des autres trames en preuve sans mélange des mesures. Pas de mutation ni revendication d'adressage physique, pas de qualification réelle. Régressions écrites sur les cinq variantes, non exécutées. C6/J1979 ouverts.

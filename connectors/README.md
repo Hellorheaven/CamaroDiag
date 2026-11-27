@@ -233,3 +233,21 @@ L'export est exclusif, et distingue les labels déclarés des informations obser
 `esp32s3/src/j1979_usb_campaign.h` relie la campagne, le flux de preuves et le gestionnaire d'exclusivité NativeUsb à un propriétaire matériel abstrait. Celui-ci doit fournir les preuves locales fraîches de qualification, profil, autorisation et stabilité, ainsi que l'arrêt vérifié du canal. Déconnexion ou révocation interrompent la session ; un arrêt non vérifié verrouille l'admission. Aucun de ces éléments ne crée un profil de carte, une authentification ou un point d'entrée USB réel. **Le firmware de découverte reste inchangé.**
 
 Pour le parcours abstrait NativeUsb, le résumé terminal CJ/1 est émis seulement après arrêt du canal vérifié et maintien de l'autorisation du même hôte. Arrêt non vérifié : verrou de récupération, capture partielle sans résumé. Perte d'autorisation à l'arrêt : pas de résumé. Le profil matériel et le point d'entrée USB réel demeurent à intégrer.
+
+### SAE J1979 — découverte CAN et recettes multi-calculateurs / CAN network discovery
+
+Sur une interface Linux SocketCAN déjà configurée pour le réseau documenté (CAN classique), découverte seule :
+
+```sh
+camarodiagconnectors-j1979-network --interface can0 --addressing 11bit --discover-only --confirm-functional-pid00 --output sources.json
+```
+
+Puis sélectionner les sources documentées à contrôler lors d'une nouvelle recette (exemples uniquement) :
+
+```sh
+camarodiagconnectors-j1979-network --interface can0 --addressing 11bit --source 7E8 --source 7E9 --confirm-functional-pid00 --confirm-physical-channels --output network.json
+```
+
+`--addressing 29bit` accepte les sources de réponse normalisées 18DAF1xx (xx inférieur à F0). `--vin` facultatif exige le même VIN sur chaque source sélectionnée et interrompt la campagne si absent ou discordant. Aucune source non demandée ne reçoit de scan physique ; la seule requête fonctionnelle est PID 00, les réponses contradictoires sont exclues. Budget global, JSON privé exclusif, aucun Mode 04/08 mutateur, aucune preuve de couverture véhicule.
+
+On an already configured classic SocketCAN interface, use discovery-only or select documented response IDs explicitly. Optional VIN comparison is fail-closed per selected responder; silent or conflicting responders are not silently substituted. No automatic interface setup, CAN FD or write operation.
