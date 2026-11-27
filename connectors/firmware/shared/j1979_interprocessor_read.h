@@ -5,15 +5,22 @@
 #include "j1979_live_sequence.h"
 
 namespace cd { namespace readlink {
-// CI/2 application mailbox. Separate from CI/1 discovery; no implicit upgrade.
+// CI/2 application mailbox for scan/freeze; CI/3 for long raw live sessions.
+// CI/3 uses the previously reserved byte 7 for a 24-bit sequence. Neither
+// version is negotiated from incoming bytes: local session scope selects it.
+// Separate from CI/1 discovery; no implicit upgrade or fallback.
 // A board owner must establish an exclusive, qualified physical link before
 // constructing Endpoint, and independently stop it on any mailbox failure.
 // CRC/sequence detect corruption and stale replies, not authentication.
 static constexpr size_t Size=32, BodySize=20;
+static constexpr uint8_t ClassicVersion=2, LiveVersion=3;
+inline uint32_t sequenceLimit(uint8_t version){return version==LiveVersion?0xffffffu:0xffffu;}
+inline bool supportedVersion(uint8_t version){return version==ClassicVersion||version==LiveVersion;}
 enum class Op:uint8_t { Read=1, Fetch=2, Result=0x81, Chunk=0x82 };
 struct Packet {
   Op op=Op::Read;
-  uint16_t seq=0;
+  uint32_t seq=0;
+  uint8_t version=ClassicVersion;
   uint8_t length=0;
   uint8_t body[BodySize]{};
 };
@@ -27,18 +34,20 @@ inline bool known(Op op){
   return op==Op::Read||op==Op::Fetch||op==Op::Result||op==Op::Chunk;
 }
 inline bool encode(const Packet& p,uint8_t* out,size_t n){
-  if(!out||n!=Size||!known(p.op)||p.length>BodySize)return false;
-  std::memset(out,0,n);out[0]='C';out[1]='I';out[2]=2;out[3]=uint8_t(p.op);
-  put16(out+4,p.seq);out[6]=p.length;std::memcpy(out+8,p.body,p.length);
+  if(!out||n!=Size||!known(p.op)||p.length>BodySize||
+     !supportedVersion(p.version)||p.seq>sequenceLimit(p.version))return false;
+  std::memset(out,0,n);out[0]='C';out[1]='I';out[2]=p.version;out[3]=uint8_t(p.op);
+  put16(out+4,uint16_t(p.seq));out[6]=p.length;out[7]=uint8_t(p.seq>>16);
+  std::memcpy(out+8,p.body,p.length);
   put32(out+28,link::crc(out,28));return true;
 }
 inline bool decode(const uint8_t* in,size_t n,Packet& out){
   out=Packet{};
-  if(!in||n!=Size||in[0]!='C'||in[1]!='I'||in[2]!=2||in[7]||
+  if(!in||n!=Size||in[0]!='C'||in[1]!='I'||!supportedVersion(in[2])||(in[2]==ClassicVersion&&in[7])||
      in[6]>BodySize||get32(in+28)!=link::crc(in,28))return false;
   for(size_t i=8+in[6];i<28;++i)if(in[i])return false;
   const auto op=static_cast<Op>(in[3]);if(!known(op))return false;
-  out.op=op;out.seq=get16(in+4);out.length=in[6];
+  out.op=op;out.version=in[2];out.seq=uint32_t(get16(in+4))|(uint32_t(in[7])<<16);out.length=in[6];
   std::memcpy(out.body,in+8,out.length);return true;
 }
 using Exchange=J1979CanReadExchange;
@@ -86,8 +95,8 @@ class Endpoint {
     if(closed_||!admitted_||!admitted_()||!bus_.active()||
        !J1979CanReadSession::physicalPair(tx_,rx_,ext_)||(scoped_&&!scope_.valid())||
        (liveScoped_&&!liveScope_.valid())||(scoped_&&liveScoped_)||!out||m!=Size||
-       !decode(in,n,p)||p.seq!=next_)return fail();
-    r.seq=p.seq;
+       !decode(in,n,p)||p.version!=version()||p.seq!=next_)return fail();
+    r.seq=p.seq;r.version=version();
     if(p.op==Op::Read){
       if(offset_!=scratchSize_||p.length<12||p.length>18)return fail();
       const uint16_t timeout=get16(p.body);
@@ -119,11 +128,12 @@ class Endpoint {
       std::memcpy(r.body+2,scratch_.response+offset_,count);offset_+=count;
     }else return fail();
     if(!admitted_()||!encode(r,out,m))return fail();
-    if(next_==0xffffu||scratch_.state==State::Fault)closed_=true;
+    if(next_==sequenceLimit(version())||scratch_.state==State::Fault)closed_=true;
     else ++next_;
     return true;
   }
  private:
+  uint8_t version()const{return liveScoped_?LiveVersion:ClassicVersion;}
   bool fail(){closed_=true;return false;}
   J1979CanReadLink& bus_;Exchange::Result& scratch_;
   uint32_t tx_,rx_;bool ext_;Admission admitted_;
@@ -132,7 +142,7 @@ class Endpoint {
   bool liveScoped_;const J1979LiveScope liveScope_;J1979LiveSequence liveSequence_;
   bool liveBegun_=false;
   size_t scratchSize_=0,offset_=0;
-  uint16_t next_=0;bool closed_=false;
+  uint32_t next_=0;bool closed_=false;
 };
 // Actual SPI master must enforce a bounded request/response transaction,
 // including chip select, response readiness and local session admission.
@@ -213,16 +223,17 @@ class Client final:public J1979CanCampaign::ApplicationLink {
     return true;
   }
  private:
+  uint8_t version()const{return liveScoped_?LiveVersion:ClassicVersion;}
   bool fail(){closed_=true;return false;}
   bool request(Packet& p,Op expected,Packet& r,uint32_t started,uint32_t budget){
     if(!active())return fail();
     const uint32_t elapsed=uint32_t(monotonicMs()-started);
     if(elapsed>=budget)return fail();
-    p.seq=next_;uint8_t tx[Size]{},rx[Size]{};
+    p.seq=next_;p.version=version();uint8_t tx[Size]{},rx[Size]{};
     if(!encode(p,tx,Size)||!transport_.exchange(tx,rx,budget-elapsed)||
        !transport_.active()||uint32_t(monotonicMs()-started)>=budget||
-       !decode(rx,Size,r)||r.op!=expected||r.seq!=next_)return fail();
-    if(next_==0xffffu)closed_=true;else ++next_;
+       !decode(rx,Size,r)||r.version!=version()||r.op!=expected||r.seq!=next_)return fail();
+    if(next_==sequenceLimit(version()))closed_=true;else ++next_;
     return true;
   }
   Transport& transport_;uint32_t tx_,rx_;bool ext_;
@@ -230,6 +241,6 @@ class Client final:public J1979CanCampaign::ApplicationLink {
   J1979FreezeSequence sequence_;
   bool liveScoped_;const J1979LiveScope liveScope_;J1979LiveSequence liveSequence_;
   bool liveBegun_=false;
-  uint16_t next_=0;bool closed_=false;
+  uint32_t next_=0;bool closed_=false;
 };
 } }
