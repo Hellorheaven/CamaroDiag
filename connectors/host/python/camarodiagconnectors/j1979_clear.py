@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import re
+import copy
 
 _MODES = (3, 7, 10)
 
@@ -26,8 +27,8 @@ def _codes(mode: int, response: bytes):
 
 def clear_recipe(read, transmit, *, expected_vin: str, primary: bool,
                  warning_acknowledged: bool, confirmed_yes: bool,
-                 require_current=lambda: None) -> dict:
-    if not primary or not warning_acknowledged or not confirmed_yes or not re.fullmatch(
+                 save_baseline, require_current=lambda: None) -> dict:
+    if not callable(save_baseline) or not primary or not warning_acknowledged or not confirmed_yes or not re.fullmatch(
             r"[A-HJ-NPR-Z0-9]{17}", expected_vin):
         raise ValueError("Physical primary ECM, VIN and two confirmations required")
     observations = []
@@ -39,7 +40,8 @@ def clear_recipe(read, transmit, *, expected_vin: str, primary: bool,
     def finish(outcome, reason=None):
         return {"outcome": outcome, "reason": reason, "command_attempted": attempted,
                 "acknowledged": acknowledged, "observed_vin": vin,
-                "before_dtcs": before, "after_dtcs": after, "observations": observations}
+                "before_dtcs": copy.deepcopy(before), "after_dtcs": copy.deepcopy(after),
+                "observations": copy.deepcopy(observations)}
 
     def query(stage, request, decode=lambda _: None):
         require_current()
@@ -94,6 +96,13 @@ def clear_recipe(read, transmit, *, expected_vin: str, primary: bool,
         if (query("PRECONDITION", b"\x01\x0D") != b"\x41\x0D\x00" or
                 query("PRECONDITION", b"\x01\x0C") != b"\x41\x0C\x00\x00"):
             return finish("NOT_TESTED", "STATIONARY_EVIDENCE_REQUIRED")
+        save_baseline(finish("BASELINE_SAVED"))
+        require_current()
+        if query("RECHECK", b"\x09\x02") != identity:
+            return finish("NOT_TESTED", "IDENTITY_CHANGED_AFTER_BASELINE")
+        if (query("RECHECK", b"\x01\x0D") != b"\x41\x0D\x00" or
+                query("RECHECK", b"\x01\x0C") != b"\x41\x0C\x00\x00"):
+            return finish("NOT_TESTED", "STATIONARY_EVIDENCE_CHANGED")
         require_current()
         attempted = True
         row = {"stage": "RESET", "request_hex": "04", "response_hex": None,
