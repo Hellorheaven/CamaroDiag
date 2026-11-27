@@ -165,6 +165,62 @@ public final class J1979MaintenanceUsbTest {
             catch(IOException expected){/* expected */}
         }
     }
+    private static byte[] archiveEnvelope(byte[] raw,int records,int flags)throws IOException{
+        byte[] head=ByteBuffer.allocate(12).order(ByteOrder.LITTLE_ENDIAN)
+            .put(new byte[]{'C','U',5,4,(byte)flags,(byte)records,0,0}).putInt(raw.length).array();
+        CRC32 crc=new CRC32();crc.update(raw);
+        byte[] tail=ByteBuffer.allocate(12).order(ByteOrder.LITTLE_ENDIAN)
+            .put(new byte[]{'C','U',5,5}).putInt(raw.length).putInt((int)crc.getValue()).array();
+        return concat(head,raw,tail);
+    }
+    private static void archive(J1979MaintenanceUsb.Profile profile,byte[][] records,boolean recovery)throws Exception{
+        byte[] hello=concat(new byte[]{'C','U',5,1},profile.encode(),NONCE);
+        byte[] transcript=concat(new byte[]{'R'},Arrays.copyOfRange(hello,4,hello.length),DEVICE);
+        byte[] challenge=concat(new byte[]{'C','U',5,2},DEVICE,mac(transcript));
+        transcript[0]='r';
+        byte[] proof=concat(new byte[]{'C','U',5,3},mac(transcript));
+        for(int count=1;count<=records.length;count++){
+            byte[] raw=concat(Arrays.copyOf(records,count));
+            boolean terminal=count==4;
+            boolean required=!terminal||recovery;
+            int flags=(terminal?1:0)|(required?4:0);
+            for(int scenario=0;scenario<12;scenario++){
+                byte[] ch=challenge.clone(),response=archiveEnvelope(raw,count,flags);
+                switch(scenario){
+                    case 1:ch[36]^=1;break;
+                    case 2:response=Arrays.copyOf(response,response.length-12);break;
+                    case 3:response[response.length-1]^=1;break;
+                    case 4:response=Arrays.copyOf(response,response.length+1);break;
+                    case 5:response[5]=(byte)(count==4?3:4);break;
+                    case 6:response[2]=4;break;
+                    case 7:response[4]=(byte)(flags^1);break;
+                    case 8:response[12+10]^=1;break;
+                    case 9:response=Arrays.copyOf(response,12+raw.length/2);break;
+                    default:break;
+                }
+                Sim sim=new Sim(ch,response,hello,proof);sim.failProof=scenario==10;
+                ByteArrayOutputStream output=new ByteArrayOutputStream();
+                J1979MaintenanceUsb capture=new J1979MaintenanceUsb(sim,()->0);
+                final boolean revoke=scenario==11;
+                Map<String,Object> report=capture.runArchive(profile,KEY,output,
+                    ()->!revoke||sim.writes<2,NONCE);
+                assert sim.closed;
+                assert Boolean.FALSE.equals(report.get("maintenance_command_sent"));
+                assert Boolean.FALSE.equals(report.get("physical_vehicle_verified"));
+                assert Boolean.FALSE.equals(report.get("permits_automatic_retry"));
+                assert Boolean.valueOf(scenario==0).equals(report.get("archive_transfer_verified"));
+                assert Boolean.valueOf(scenario==0).equals(report.get("archive_close_receipt_verified"));
+                assert Boolean.valueOf(scenario!=0||required).equals(report.get("recovery_required"));
+                if(scenario==0){
+                    assert Arrays.equals(output.toByteArray(),raw);
+                    assert J1979MaintenanceJournal.inspect(raw,VIN).equals(report.get("inspection"));
+                }else assert report.get("inspection")==null;
+                assert sim.writes==(scenario==1?1:2);
+                try{capture.runArchive(profile,KEY,output,()->true,NONCE);throw new AssertionError("CU/5 reuse");}
+                catch(IOException expected){/* expected */}
+            }
+        }
+    }
     public static void main(String[] args)throws Exception{
         for(int operation=1;operation<=2;operation++){
             J1979MaintenanceUsb.Profile profile=new J1979MaintenanceUsb.Profile(operation,0x7e0,0x7e8,false,VIN,60000);
@@ -192,6 +248,7 @@ public final class J1979MaintenanceUsbTest {
                 byte[] corrupt=prefix.clone();corrupt[corrupt.length-1]^=1;
                 reject(corrupt,true,VIN);reject(concat(prefix,new byte[]{'X'}),true,VIN);
                 runCapture(profile,full,failure==2);
+                archive(profile,records,failure==2);
             }
         }
     }
