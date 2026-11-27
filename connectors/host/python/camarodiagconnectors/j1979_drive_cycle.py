@@ -46,7 +46,12 @@ def trim_width(pid, width):
 
 
 def decode_trim(request, data, layout):
-    if len(request) not in (2,3) or request[0] not in (1,2):
+    if not isinstance(request,bytes) or not isinstance(data,bytes):
+        return None
+    if (len(request) not in (2,3) or request[0] not in (1,2) or
+        len(request)!=(3 if request[0]==2 else 2) or
+        (request[0]==2 and request[2]!=0) or
+        (layout is not None and (type(layout) is not int or not 0<=layout<=255))):
         return None
     pid=request[1]
     if not trim_width(pid,len(data)):
@@ -67,7 +72,7 @@ def decode_trim(request, data, layout):
                         "unit":"%","attribution":"DEFINED" if verified else "UNVERIFIED_UPPER_BANK"})
     return {"request_hex":request.hex().upper(),"frame":request[2] if len(request)==3 else None,
             "layout_1d":layout,"signals":signals,
-            "upper_bank_present":upper_verified if len(data)==2 else None}
+            "upper_bank_verified":upper_verified if len(data)==2 else None}
 
 
 def cycle_data(data, baseline):
