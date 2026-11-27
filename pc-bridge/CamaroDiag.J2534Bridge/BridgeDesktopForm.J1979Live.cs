@@ -102,7 +102,7 @@ internal sealed partial class BridgeDesktopForm
             if(functionalCancellation!=cancel||functionalAuthorizedUntil!=expiry||DateTimeOffset.UtcNow>=expiry)return;
             var line=$"{row.ElapsedMs} ms · {row.Pid:X2} · "+
                 (row.MultiSignals is { } channels?ObdJ1979MultiSignal.Format(channels):
-                    row.Measurement is {} v?$"{v.Number.ToString(CultureInfo.CurrentCulture)} {v.Unit}":options.Plan.RawOnly?row.ResponseHex??row.Status:row.Status);
+                    row.Measurement is {} v?$"{v.Number.ToString(CultureInfo.CurrentCulture)} {v.Unit}":options.Plan.RawOnly?(row.ResponseHex is {} raw?raw[..Math.Min(raw.Length,128)]:row.Status):row.Status);
             var lines=functionalResults.Lines.TakeLast(39).Append(line).ToArray();
             functionalResults.Lines=lines;
         });
@@ -121,6 +121,9 @@ internal sealed partial class BridgeDesktopForm
                 output.AppendLine(string.Format(CultureInfo.CurrentUICulture,J1979RecipeText("LiveCycleCount"),result.CompletedCycles,result.RequestedCycles));
                 output.AppendLine("VIN: "+(result.ObservedVin??J1979RecipeText("Unavailable")));
                 if(result.StopReason is not null)output.AppendLine(result.StopReason);
+                if(result.RawOnly)
+                    foreach(var item in result.Summary)
+                        output.AppendLine(string.Format(CultureInfo.CurrentUICulture,J1979RecipeText("LiveRawCount"),$"{item.Pid:X2}",item.StatusCounts.GetValueOrDefault("RAW"),item.Attempted));
                 foreach(var item in result.MultiSignalSummary)
                     output.AppendLine($"{item.Pid:X2} {item.Name} · n={item.Count}/{item.Attempted} · "+
                         string.Format(CultureInfo.CurrentUICulture,J1979RecipeText("LiveSummary"),
