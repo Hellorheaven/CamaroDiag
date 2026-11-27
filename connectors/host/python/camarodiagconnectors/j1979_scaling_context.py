@@ -160,7 +160,7 @@ def _bytes(value):
     return None
 
 
-def project(steps, *, legacy_source=None, legacy=False):
+def _collect(steps, *, legacy_source=None, legacy=False):
     """Produce scoped measurements from a single selected ECU's campaign.
     Only exactly one correlated legacy record is admissible, and never
     associate headerless observations with configuration from another ECU.
@@ -188,7 +188,15 @@ def project(steps, *, legacy_source=None, legacy=False):
                 configs.setdefault(pid,[]).append(res)
         if res is not None and pid in DEPENDENT_PIDS:
             samples.append((req,res))
-    ctx = Context.from_inventory(pages,configs)
+    return Context.from_inventory(pages,configs), samples
+
+
+def context_from_steps(steps):
+    return _collect(steps)[0]
+
+
+def project(steps, *, legacy_source=None, legacy=False):
+    ctx, samples = _collect(steps,legacy_source=legacy_source,legacy=legacy)
     result = []
     for req,res in samples:
         record = ctx.decode(req,res)
