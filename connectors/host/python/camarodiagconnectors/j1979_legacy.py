@@ -9,6 +9,8 @@ from __future__ import annotations
 import re
 import time
 
+from .j1979_campaign_evidence import decode_observation
+
 PROTOCOLS = {1: "SAE J1850 PWM", 2: "SAE J1850 VPW", 3: "ISO 9141-2",
              4: "ISO 14230-4 slow init", 5: "ISO 14230-4 fast init"}
 
@@ -233,15 +235,23 @@ def scan(exchange, protocol_check, expected_protocol: int, *, budget=180.0,
         # Legacy fixed three DTC pairs; zero pair is padding, no CAN count.
         read(f"{mode:02X}", lambda r: len(r) == 7 and r[0] == mode + 0x40)
 
+    measurements = []
+    def read_pid(mode, pid):
+        request = bytes((mode, pid)) + (b"\x00" if mode == 2 else b"")
+        def positive(row):
+            evidence = decode_observation(request, row)
+            return evidence is not None and evidence["shape"] in ("PASSED", "RAW")
+        rows = read(request.hex().upper(), positive)
+        for index, row in enumerate(rows):
+            evidence = decode_observation(request, row)
+            if evidence.get("measurement") is not None:
+                measurements.append({**evidence["measurement"], "response_index": index,
+                                     "responder_attribution": "ANONYMOUS"})
+        return rows
+
     sensors = set()
     for pid in pids:
-        if pid == 1:
-            valid = lambda r: len(r) == 6 and r[:2] == b"\x41\x01"
-        elif pid in (0x13, 0x1D):
-            valid = lambda r: len(r) == 3 and r[:2] == bytes((0x41, pid))
-        else:
-            valid = lambda r: len(r) >= 3 and r[:2] == bytes((0x41, pid))
-        rows = read(f"01{pid:02X}", valid)
+        rows = read_pid(1, pid)
         if pid in (0x13, 0x1D):
             for row in rows:
                 sensors.update(1 << bit for bit in range(8) if row[2] & (1 << bit))
@@ -250,8 +260,7 @@ def scan(exchange, protocol_check, expected_protocol: int, *, budget=180.0,
     if any(row[3:] != b"\x00\x00" for row in trigger):
         for pid in inventory(2, lambda r: r[2] == 0, 3, suffix="00"):
             if pid != 2:
-                read(f"02{pid:02X}00", lambda r: len(r) >= 4 and
-                     r[:3] == bytes((0x42, pid, 0)))
+                read_pid(2, pid)
 
     for sensor in sorted(sensors):
         for tid in inventory(5, lambda r: r[2] == sensor, 3, suffix=f"{sensor:02X}"):
@@ -286,6 +295,7 @@ def scan(exchange, protocol_check, expected_protocol: int, *, budget=180.0,
     return {"expected_protocol": expected_protocol, "observed_protocol": observed_protocol,
             "protocol_name": PROTOCOLS[expected_protocol], "responder_attribution": "ANONYMOUS",
             "observed_vin": None, "anonymous_vin_candidate": vin_candidate,
-            "steps": steps, "advertised_control_tests": controls, "completed": stop is None,
+            "steps": steps, "measurements": measurements,
+            "advertised_control_tests": controls, "completed": stop is None,
             "stop_reason": stop, "cancelled": stop == "CANCELLED", "duration_ms": round((clock() - start) * 1000),
             "not_executed": ["MODE_04_CLEAR", "MODE_08_CONTROL"]}

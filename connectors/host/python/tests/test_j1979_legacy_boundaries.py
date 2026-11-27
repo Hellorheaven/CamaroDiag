@@ -31,3 +31,14 @@ class LegacyBoundariesTests(unittest.TestCase):
         self.assertEqual(["0100", "03"], sent)
         self.assertEqual("PASSED", report["steps"][0]["status"])
         self.assertEqual("CANCELLED", report["steps"][1]["detail"])
+
+    def test_legacy_measurements_keep_anonymous_records_and_reject_bad_width(self):
+        replies = {"0100": "410008180000", "0105": "41055A\n410550",
+                   "010C": "410C12", "010D": "410D00"}
+        report = scan(lambda req, _: replies.get(req, "NO DATA"), lambda: 2, 2)
+        rows = {row["request_hex"]: row for row in report["steps"]}
+        self.assertNotEqual("PASSED", rows["010C"]["status"])
+        values = report["measurements"]
+        self.assertEqual([50.0, 40.0], [x["number"] for x in values if x["pid"] == 5])
+        self.assertTrue(all(x["responder_attribution"] == "ANONYMOUS" for x in values))
+        self.assertIsNone(report["observed_vin"])
