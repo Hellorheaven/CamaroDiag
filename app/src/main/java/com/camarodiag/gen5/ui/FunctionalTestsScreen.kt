@@ -63,6 +63,8 @@ fun FunctionalTestsScreen(
     onRunNetwork: (com.camarodiag.gen5.data.obd.J1979NetworkPlan,Long,VehicleProfile)->Unit,
     onRunNativeFreeze: (android.hardware.usb.UsbDevice, com.camarodiag.gen5.data.obd.CamaroDiagConnectorFreezeCampaign.Target,
         android.net.Uri,Long,VehicleProfile)->Unit,
+    onRunNativeMaintenance: (android.hardware.usb.UsbDevice, com.camarodiag.gen5.data.obd.CamaroDiagConnectorMaintenanceCampaign.Target,
+        android.net.Uri, Long, VehicleProfile)->Unit,
     onRunNativeLive: (android.hardware.usb.UsbDevice, com.camarodiag.gen5.data.obd.CamaroDiagConnectorLiveCampaign.Target,
         android.net.Uri,Long,VehicleProfile)->Unit,
     nativeUsbEnabled: Boolean,
@@ -241,7 +243,7 @@ fun FunctionalTestsScreen(
                     J1979NativePrefixPanel(!state.running,vehicle,connectionGeneration,onInspectNativePrefix)
                     J1979NativePrefixPanel(!state.running,vehicle,connectionGeneration,onInspectNativeMaintenance,maintenance=true)
                     J1979FreezePanel(liveProtocol?.takeIf { it in 1..9 },state,vehicle,connectionGeneration,onRunFreeze)
-                    NativeUsbFunctionalPanel(nativeUsbEnabled && !state.running, connectionGeneration, vehicle, onRunNativeUsb,onRunFreeze=onRunNativeFreeze,onRunLive=onRunNativeLive)
+                    NativeUsbFunctionalPanel(nativeUsbEnabled && !state.running, connectionGeneration, vehicle, onRunNativeUsb,onRunFreeze=onRunNativeFreeze,onRunLive=onRunNativeLive,onRunMaintenance=onRunNativeMaintenance)
                     Text(stringResource(R.string.functional_evap_scope), style = MaterialTheme.typography.bodySmall)
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Checkbox(evapConfirmedProfile, { evapConfirmedProfile = it },
@@ -348,6 +350,11 @@ fun FunctionalTestsScreen(
                         style = MaterialTheme.typography.bodySmall)
                     Text(evidence.adapterName + " • " + evidence.transport,
                         style = MaterialTheme.typography.bodySmall)
+                }
+                state.nativeMaintenanceEvidence?.let { native ->
+                    if(native.recoveryRequired) Text(stringResource(R.string.j1979_native_maintenance_recovery))
+                    else if(native.verified) Text(stringResource(R.string.j1979_native_maintenance_journal_checked))
+                    else Text(stringResource(R.string.j1979_native_maintenance_unverified))
                 }
                 state.nativeLiveEvidence?.let { native ->
                     val summary=native.replay?.summary
