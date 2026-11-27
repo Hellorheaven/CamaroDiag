@@ -40,7 +40,10 @@ class J1979MaintenanceArchive {
     // access to the previous journal only, even if recovery is latched.
     virtual bool acquire(const Scope& scope)=0;
     virtual bool admitted(const Scope& scope)=0;
-    virtual void release()=0;
+    // Release the read-only storage lease, independently of the USB/SPI
+    // connection generation. Return false if release cannot be verified.
+    // A failed release must leave physical TX inhibited.
+    virtual bool release()=0;
   };
   class LocalSource final:public Source {
    public:
@@ -72,9 +75,17 @@ class J1979MaintenanceArchive {
       }
       offset_+=n;return true;
     }
-    bool finish()override{return current()&&offset_==snapshot_.size&&storage_.verifyArchive(snapshot_)&&current();}
+    bool finish()override{
+      if(!current()||offset_!=snapshot_.size||!storage_.verifyArchive(snapshot_)||!current()){
+        close();return false;
+      }
+      // The terminal receipt is emitted only after successful release,
+      // not just after the last record has been read.
+      closed_=true;open_=false;
+      return owner_.release();
+    }
     void close()override{
-      if(!closed_){closed_=true;open_=false;if(attempted_)owner_.release();}
+      if(!closed_){closed_=true;open_=false;if(attempted_)(void)owner_.release();}
     }
    private:
     Storage& storage_;Owner& owner_;const Scope scope_;
