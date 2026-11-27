@@ -12,7 +12,8 @@ import re
 from .j1979_can_network import CanFrame, decode_frame, response_pair, validate_targets
 from .j1979 import allowed_read
 from .j1979_vehicle_info import can_info
-from .j1979_multi_signal import from_steps as multi_records
+from .j1979_multi_signal import from_steps as multi_records, historical_projection
+from .j1979_status import from_steps as status_records
 from .j1979_campaign_evidence import decode_observation, summarize_observations
 from .j1979_live_inspection import load, _get, _require, _hex, _array, _dict, _id
 
@@ -355,10 +356,22 @@ def replay_ecu(row,android,vin):
                  "Extended Mode 09 data differs from physical response")
     multi=multi_records(steps)
     claimed=_get(body,"multi_signal_records")
+    catalog="NOT_REPORTED"
     if claimed is not None:
-        _require(_equal(_normalize(claimed),multi),"Multi-signal records differ from physical responses")
+        normalized=_normalize(claimed)
+        if _equal(normalized,multi):
+            catalog="CURRENT"
+        else:
+            _require(_equal(normalized,historical_projection(multi)),
+                     "Multi-signal records differ from physical responses")
+            catalog="HISTORICAL_49"
+    states=status_records(steps)
+    claimed_states=_get(body,"status_records")
+    if claimed_states is not None:
+        _require(_equal(_normalize(claimed_states),states),"Categorical states differ from physical responses")
     return {"completed":completed,"observed_vin":first,"final_vin":last,
-            "steps":steps,"extended_vehicle_info":extended,"multi_signal_records":multi,**summary}
+            "steps":steps,"extended_vehicle_info":extended,"multi_signal_records":multi,
+            "multi_signal_report_catalog":catalog,"status_records":states,**summary}
 
 
 def inspect_network(root,expected_vin=None):
