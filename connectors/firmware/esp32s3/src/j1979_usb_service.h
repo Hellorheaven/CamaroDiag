@@ -19,9 +19,20 @@ class J1979UsbService {
   static J1979UsbCampaign::Report serve(Channel& channel,Auth::Security& security,
       HostSessionArbiter& arbiter,J1979UsbCampaign::Owner& owner,
       J1979CanCampaign::ApplicationLink& link,J1979CanReadExchange::Result& scratch){
-    Auth auth(security);
+    return serveTyped<Auth>(channel,security,arbiter,owner,link,scratch);
+  }
+  static J1979UsbCampaign::Report serveFreeze(Channel& channel,Auth::Security& security,
+      HostSessionArbiter& arbiter,J1979UsbCampaign::Owner& owner,
+      J1979CanCampaign::ApplicationLink& link,J1979CanReadExchange::Result& scratch){
+    return serveTyped<J1979FreezeUsbAuthSession>(channel,security,arbiter,owner,link,scratch);
+  }
+ private:
+  template<class Session> static J1979UsbCampaign::Report serveTyped(Channel& channel,Auth::Security& security,
+      HostSessionArbiter& arbiter,J1979UsbCampaign::Owner& owner,
+      J1979CanCampaign::ApplicationLink& link,J1979CanReadExchange::Result& scratch){
+    Session auth(security);
     J1979UsbCampaign::Report report;
-    uint8_t hello[Auth::HelloSize]{},challenge[Auth::ChallengeSize]{},proof[Auth::ProofSize]{};
+    uint8_t hello[Session::HelloSize]{},challenge[Session::ChallengeSize]{},proof[Session::ProofSize]{};
     // No fallback to discovery after malformed or unauthorized CU/1.
     if(!channel.present()||!channel.readExact(hello,sizeof(hello),5000)||
        !auth.hello(hello,sizeof(hello),challenge,sizeof(challenge))||
