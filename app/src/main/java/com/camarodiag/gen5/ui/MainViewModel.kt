@@ -5979,6 +5979,62 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun runFunctionalFreeze(requested: com.camarodiag.gen5.data.obd.J1979FreezePlan,
+        confirmedConnection: Long, confirmedVehicle: VehicleProfile) {
+        if (!requested.valid) return
+        val plan = requested.pinned()
+        if (plan.target.vin != confirmedVehicle.vin || confirmedConnection != connectionAttemptGeneration ||
+            confirmedVehicle != _vehicle.value || functionalTestJob?.isCompleted == false ||
+            enhancedUdsJob?.isCompleted == false || nativeFunctionalCleanup?.isCompleted == false ||
+            _liveCanMonitorState.value.isCapturing || _liveCanMonitorState.value.isSendingRequest ||
+            obdManager.j1979LiveProtocol != plan.target.protocol) return
+        val account = authenticatedAccountUid ?: return
+        val generation = accountSessionGeneration
+        val execution = ++functionalTestGeneration
+        fun current() = execution == functionalTestGeneration && isCurrentAccountGeneration(generation) &&
+            authenticatedAccountUid == account && confirmedConnection == connectionAttemptGeneration &&
+            confirmedVehicle == _vehicle.value && currentLicenseLevel == LicenseLevel.OWNER
+        functionalTestJob = viewModelScope.launch {
+            if (!confirmFunctionalTestOwner(account) || !current()) return@launch
+            _functionalTestState.value = FunctionalTestState(running = true,
+                startedAtMillis = System.currentTimeMillis(),protocol = FunctionalProtocol.J1979,
+                freezePlan = plan,checks = FunctionalTestPlanner.j1979Checks(),
+                context = FunctionalTestContext(confirmedVehicle.vin,_adapter.value.deviceName,
+                    obdManager.currentTransportKind,confirmedConnection))
+            var report: com.camarodiag.gen5.data.obd.J1979FreezeReport? = null
+            var failure: String? = null
+            try {
+                report = obdManager.runJ1979Freeze(plan,::current) { report = it }
+            } catch (cancelled: CancellationException) {
+                failure = "CANCELLED"
+                throw cancelled
+            } catch (_: Exception) {
+                failure = "TRANSPORT_ERROR"
+            } finally {
+                if (current()) {
+                    val retained = report?.let { if (failure == null) it else it.copy(transportProblem=failure) }
+                    val rows = retained?.result?.frames?.map { frame ->
+                        val label = "%02X".format(java.util.Locale.ROOT,frame.frame)
+                        val outcome = when (frame.status) {
+                            "COMPLETE", "ABSENT" -> if (retained.executionCompleted)
+                                FunctionalTestOutcome.PASSED else FunctionalTestOutcome.NOT_TESTED
+                            "CHANGED" -> FunctionalTestOutcome.FAILED
+                            else -> FunctionalTestOutcome.NOT_TESTED
+                        }
+                        FunctionalTestCheck("freeze:$label","j1979_freeze",label,label,outcome,
+                            frame.detail ?: frame.status,frame.detail ?: frame.status)
+                    }
+                    _functionalTestState.update { state -> state.copy(running = false,
+                        finishedAtMillis = System.currentTimeMillis(),freezeReport = retained,
+                        checks = rows?.takeIf { it.isNotEmpty() } ?: state.checks,
+                        context = state.context?.copy(observedVin=retained?.result?.initialVin),
+                        error = if (retained?.executionCompleted == true && retained.result.allFramesStable) null
+                            else localizedContext.getString(R.string.j1979_freeze_incomplete)) }
+                }
+            }
+        }
+    }
+
     fun runFunctionalLive(requested: com.camarodiag.gen5.data.obd.J1979LivePlan,
         confirmedConnection: Long, confirmedVehicle: VehicleProfile) {
         val plan=requested.copy(pids=requested.pids.toList())
@@ -6272,6 +6328,28 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val snapshot = _functionalTestState.value
             if (!snapshot.canExport) return@launch
             val evidenceContext = snapshot.context ?: return@launch
+            snapshot.freezeReport?.let { report ->
+                fun current() = isCurrentAccountGeneration(sessionGeneration) &&
+                    authenticatedAccountUid == accountUid && currentLicenseLevel == LicenseLevel.OWNER &&
+                    _functionalTestState.value === snapshot
+                try {
+                    val bytes = J1979FreezeEvidenceJson.encode(report,evidenceContext.adapterName,
+                        com.camarodiag.gen5.BuildConfig.VERSION_NAME).toString(2).toByteArray(Charsets.UTF_8)
+                    val savedPath = CamaroDiagExportStorage.write(getApplication<Application>(),
+                        "CamaroDiag_SAE-J1979_FREEZE_${snapshot.startedAtMillis}.json","application/json",
+                        category = CamaroDiagExportStorage.Category.TESTS,beforePublish={check(current())},
+                        verifyStaged={input -> PhysicalRecoveryEvidenceJson.requireExactJson(input,bytes)}) {
+                        it.write(bytes)
+                    }
+                    if (current()) _connectionMessage.value =
+                        localizedContext.getString(R.string.export_folder_success) + "\n" + savedPath
+                } catch (cancelled: CancellationException) { throw cancelled }
+                catch (_: Exception) {
+                    if (current()) _connectionMessage.value = localizedContext.getString(R.string.export_folder_failed)
+                }
+                return@launch
+            }
+            if (snapshot.freezePlan != null) return@launch
             val json = JSONObject()
                 .put("schema", when {
                     snapshot.livePlan?.target?.legacy == true -> "camarodiag-j1979-legacy-live-v1"
