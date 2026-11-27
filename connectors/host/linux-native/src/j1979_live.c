@@ -14,14 +14,14 @@ static uint64_t tick(const j1979_live_plan *p) {
     return p->channel.clock ? p->channel.clock(p->channel.context) : uptime_ms();
 }
 static bool current(const j1979_live_plan *p) {
-    return !p->channel.current || p->channel.current(p->channel.context);
+    return p->channel.current(p->channel.context);
 }
 static void halt(j1979_live_result *r,const char *reason) {
     if (!r->stop_reason[0])
         snprintf(r->stop_reason,sizeof(r->stop_reason),"%s",reason);
 }
 bool j1979_live_plan_valid(const j1979_live_plan *p) {
-    if (!p || !p->channel.exchange ||
+    if (!p || !p->channel.exchange || !p->channel.current ||
         !j1979_can_physical_pair(p->channel.tx,p->channel.rx) ||
         !j1979_can_valid_vin(p->channel.expected_vin) ||
         p->pid_count==0 || p->pid_count>J1979_LIVE_MAX_PIDS ||

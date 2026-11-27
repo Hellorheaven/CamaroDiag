@@ -114,7 +114,7 @@ static j1979_can_step *read_one(const j1979_can_plan *p, j1979_can_result *r,
         stop(r, "UNSAFE_SERVICE_REJECTED");
         return NULL;
     }
-    if (p->current && !p->current(p->context)) {
+    if (!p->current(p->context)) {
         stop(r, "CONTEXT_CHANGED"); return NULL;
     }
     uint64_t now = now_ms(p);
@@ -224,9 +224,12 @@ static void measure_inventory(const j1979_can_plan *p, j1979_can_result *r,
 int j1979_can_scan(const j1979_can_plan *p, j1979_can_result *r) {
     if (!r) return -1;
     memset(r, 0, sizeof(*r));
-    if (!p || !p->exchange || !j1979_can_physical_pair(p->tx, p->rx) ||
+    /* The pure campaign cannot be reused with an anonymous ECU or a
+     * channel that cannot be requalified before every request. */
+    if (!p || !p->exchange || !p->current ||
+        !j1979_can_physical_pair(p->tx, p->rx) ||
         p->budget_ms == 0 || p->budget_ms > 600000 ||
-        (p->expected_vin && !j1979_can_valid_vin(p->expected_vin)))
+        !j1979_can_valid_vin(p->expected_vin))
         return -1;
     r->steps = calloc(J1979_CAN_MAX_STEPS, sizeof(*r->steps));
     if (!r->steps) return -1;

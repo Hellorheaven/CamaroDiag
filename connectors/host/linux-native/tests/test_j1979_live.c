@@ -87,6 +87,11 @@ int main(void) {
     fake f={.clock=1000};
     j1979_live_plan p=plan(&f);
     assert(j1979_live_plan_valid(&p));
+    j1979_live_plan missing=p;
+    missing.channel.current=NULL;
+    assert(!j1979_live_plan_valid(&missing));
+    missing=p;missing.channel.expected_vin=NULL;
+    assert(!j1979_live_plan_valid(&missing));
     assert(p.channel.expected_vin && p.pid_count==2);
     j1979_live_result r={0};
     assert(j1979_live_record(&p,&r)==0);

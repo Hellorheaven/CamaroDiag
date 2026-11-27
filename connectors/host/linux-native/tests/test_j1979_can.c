@@ -88,6 +88,14 @@ int main(void) {
 
     stub s={.current=true};
     j1979_can_plan p=plan(&s);
+    j1979_can_result refused={0};
+    j1979_can_plan missing=p;
+    missing.current=NULL;
+    assert(j1979_can_scan(&missing,&refused)!=0);
+    assert(refused.steps==NULL);
+    missing=p;missing.expected_vin=NULL;
+    assert(j1979_can_scan(&missing,&refused)!=0);
+    assert(refused.steps==NULL);
     j1979_can_result r={0};
     assert(j1979_can_scan(&p,&r)==0);
     assert(r.completed && r.vin_valid && !strcmp(r.observed_vin,vin));
