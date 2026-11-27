@@ -12,6 +12,7 @@ import time
 from collections.abc import Callable
 from .j1979_campaign_evidence import decode_observation, summarize_observations
 from .j1979_monitor_scaling import scale_record
+from .j1979_scaling_context import project as contextual_measurements, config_data, CONFIG_PIDS
 from .j1979_vehicle_info import can_info
 from .j1979_multi_signal import width as multi_width, decode_response as multi_decode, from_steps as multi_records
 
@@ -270,6 +271,9 @@ def scan(exchange: Exchange, *, budget: float = 180.0,
             if request[0] == 1 and len(request) == 2 and status_width(request[1]) is not None and application["shape"] in ("RAW", "PASSED"):
                 if status_decode(request, response) is None:
                     raise ValueError("Invalid categorical PID record")
+            if request[0] == 1 and request[1] in CONFIG_PIDS and application["shape"] in ("RAW","PASSED"):
+                if config_data(request[1],response[2:]) is None:
+                    raise ValueError("Invalid ECU measurement configuration")
             if application["shape"] == "RAW":
                 # CJ/1 v1 records preserve their historical shape. Extended
                 # Mode 09 has a separately validated typed view.
@@ -375,6 +379,7 @@ def scan(exchange: Exchange, *, budget: float = 180.0,
             "duration_ms": round((clock() - started) * 1000),
             "multi_signal_records": multi_records(steps),
             "status_records": status_records(steps),
+            "contextual_measurements": contextual_measurements(steps),
             "extended_vehicle_info": [s["decoded"] for s in steps
                                       if s["status"] == "RAW" and s["decoded"] is not None
                                       and s["request_hex"] in ("0908", "090B", "090D", "090F")],
