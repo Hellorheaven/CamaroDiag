@@ -141,18 +141,18 @@ internal static class J1979MaintenanceUsbCli
             {
                 if(report is null)report=Failure(options,e,enteredUsb);
                 else FailReport(report,e,enteredUsb);
-                if(archive)report["archive_transfer_verified"]=false;
+                if(archive){report["archive_transfer_verified"]=false;report["archive_close_receipt_verified"]=false;}
             }
             if(!current()){
                 FailReport(report!,new OperationCanceledException("Owner revoked"),enteredUsb);
-                if(archive)report!["archive_transfer_verified"]=false;
+                if(archive){report!["archive_transfer_verified"]=false;report["archive_close_receipt_verified"]=false;}
             }
             if(archive){
                 report!["schema"]="camarodiag-j1979-native-maintenance-archive-v1";
                 report["source"]="READ_ONLY_USB_CU5";
                 report["maintenance_command_sent"]=false;
                 if(!Equals(report.GetValueOrDefault("archive_transfer_verified"),true)){
-                    report["archive_transfer_verified"]=false;report["recovery_required"]=true;report["inspection"]=null;
+                    report["archive_transfer_verified"]=false;report["archive_close_receipt_verified"]=false;report["recovery_required"]=true;report["inspection"]=null;
                 }
                 report.Remove("command_outcome_unknown");report.Remove("proof_transmission_attempted");
                 report.Remove("client_proof_sent");report.Remove("journal_transfer_verified");
