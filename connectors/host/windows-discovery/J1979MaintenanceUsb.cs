@@ -180,6 +180,11 @@ internal sealed class J1979MaintenanceUsb(J1979UsbCapture.ILink link,Func<long>?
             declared=new(){["bytes"]=(int)length,["records"]=(int)head[5],["terminal_present"]=terminal,
                 ["damaged_tail"]=damaged,["recovery_required"]=recovery};
             _=Read((int)length,start,budget,current,raw,copy);
+            byte[] trailer=Read(12,start,budget,current,null,null);
+            Require(trailer.AsSpan(0,4).SequenceEqual(new byte[]{(byte)'C',(byte)'U',5,5})&&
+                BinaryPrimitives.ReadUInt32LittleEndian(trailer.AsSpan(4))==length&&
+                BinaryPrimitives.ReadUInt32LittleEndian(trailer.AsSpan(8))==BinaryDiscovery.Crc32(copy.ToArray()),
+                "CU/5 closing receipt missing or inconsistent");
             link.CheckNoBufferedInput();_=Remaining(start,budget,current);
             var result=J1979MaintenanceJournal.Inspect(copy.ToArray(),profile.Vin);
             Require(JsonSerializer.Serialize(result["scope"])==JsonSerializer.Serialize(profile.View())&&
@@ -201,7 +206,8 @@ internal sealed class J1979MaintenanceUsb(J1979UsbCapture.ILink link,Func<long>?
         return new(){
             ["schema"]="camarodiag-j1979-native-maintenance-archive-v1",["protocol"]="SAE-J1979",
             ["source"]="READ_ONLY_USB_CU5",["scope"]=profile.View(),["device_credential_authenticated"]=authenticated,
-            ["archive_transfer_verified"]=inspection is not null,["journal_bytes_received"]=copy.Length,
+            ["archive_transfer_verified"]=inspection is not null,["archive_close_receipt_verified"]=inspection is not null,
+            ["journal_bytes_received"]=copy.Length,
             ["declared_archive"]=declared,["inspection"]=inspection,
             ["recovery_required"]=inspection is null||Equals(declared!["recovery_required"],true),
             ["maintenance_command_sent"]=false,["physical_vehicle_verified"]=false,
