@@ -52,9 +52,31 @@ class NativeUsbObdScanProjectionTest {
         input.getJSONObject("summary").put("steps",rows.length())
         val result=NativeUsbObdScanProjection.project(input,vin,0x7E0,0x7E8,false)!!
         assertEquals(setOf(5),result.supportedPids)
-        assertFalse(result.pidInventoryComplete)
+        assertEquals(false,result.pidInventoryComplete)
         assertEquals(listOf(5),result.liveData.map { it.pid })
         assertFalse(result.mode01Reads.single { it.pid==12 }.observations.single().eligibleForDecode)
+    }
+    @Test fun monitorAndIdentificationCannotBypassInventoryViaNativeDisplay() {
+        val input=fixture()
+        val rows=input.getJSONArray("steps")
+        rows.put(JSONObject().put("request_hex","0601").put("status","PASSED")
+            .put("response_hex","4601010212340000FFFF")
+            .put("monitor_records",JSONArray().put(JSONObject().put("monitor_id",1)
+                .put("test_id",1).put("unit_scaling_id",2).put("value_encoded",0x1234)
+                .put("minimum_encoded",0).put("maximum_encoded",65535))))
+        rows.put(JSONObject().put("request_hex","0906").put("status","PASSED")
+            .put("response_hex","49060101020304").put("vehicle_info",
+                JSONObject().put("info_type",6).put("values",JSONArray().put("01020304"))))
+        input.getJSONObject("summary").put("steps",rows.length())
+        val raw=NativeUsbFunctionalEvidence.diagnosticValues(input)!!
+        assertEquals(1,raw.monitors.size)
+        assertEquals(listOf("01020304"),raw.identity[6])
+        val scoped=NativeUsbFunctionalEvidence.scanValues(input)!!
+        assertTrue(scoped.monitors.isEmpty())
+        assertTrue(scoped.identity.isEmpty())
+        val scan=NativeUsbObdScanProjection.project(input,vin,0x7E0,0x7E8,false)!!
+        assertTrue(scan.calibrationVerificationNumbers.isEmpty())
+        assertTrue(scan.rawLog.any { it.contains("49060101020304") })
     }
     @Test fun duplicatedRequestsCannotPublishScan() {
         val input=fixture()

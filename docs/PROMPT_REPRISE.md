@@ -1,3 +1,7 @@
+## J1979 — même périmètre de valeurs pour Scan OBD et affichage natif (27/11/2026)
+
+- Les valeurs affichées dans le scan courant, y compris readiness, résultats Mode 06 et identité, sont limitées à la chaîne d'inventaire vérifiée. La recette indépendante conserve les observations brutes ; aucun résultat hors inventaire ne devient une mesure ordinaire. Régressions écrites non exécutées.
+
 ## J1979 — inventaires natifs et projection Android (27/11/2026)
 
 - Inventaires reconstruits depuis une chaîne continue de bitmaps vérifiés, pas depuis le seul résumé. Pages orphelines ignorées, doublons refusés, PID non annoncés exclus du scan courant, contrôle de forme et trigger freeze requis. Les réponses brutes restent exportées. Régressions écrites non exécutées ; C6/J1979 restent ouverts, aucune CI intermédiaire.

@@ -72,7 +72,7 @@ fun ObdScanScreen(
     val unavailable = stringResource(R.string.obd_not_available)
     val nativeSnapshot=report?.nativeUsbEvidence!=null
     val nativeValues=remember(report?.nativeUsbEvidence) {
-        report?.nativeUsbEvidence?.let { runCatching { NativeUsbFunctionalEvidence.diagnosticValues(org.json.JSONObject(it)) }.getOrNull() }
+        report?.nativeUsbEvidence?.let { runCatching { NativeUsbFunctionalEvidence.scanValues(org.json.JSONObject(it)) }.getOrNull() }
     }
     val sensorSelectionAvailable=isConnected||nativeSnapshot
 

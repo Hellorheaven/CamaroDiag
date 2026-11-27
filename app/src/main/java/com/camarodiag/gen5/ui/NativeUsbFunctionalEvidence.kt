@@ -222,6 +222,22 @@ internal object NativeUsbFunctionalEvidence {
         return DiagnosticValues(vin,dtcs,measured.values.sortedWith(compareBy({ it.mode },{ it.pid })),monitors.toList(),identity.toMap(),readiness,pages.values.sortedWith(compareBy({it.mode},{it.base})),freeze)
     }
 
+    /** Verified readings within the advertised inventory, for ordinary diagnostic
+     * views. Independent recipe views may still show raw out-of-chain observations. */
+    fun scanValues(report:JSONObject):DiagnosticValues? {
+        val values=diagnosticValues(report) ?: return null
+        val chains=listOf(1,2,6,8,9).associateWith { inventory(values.pages,it) }
+        if(chains.getValue(1).pages.isEmpty())return null
+        fun supported(mode:Int,id:Int)=id in chains.getValue(mode).ids
+        return values.copy(
+            measurements=values.measurements.filter { supported(it.mode,it.pid) &&
+                (it.mode!=2||values.freeze?.present==true) },
+            monitors=values.monitors.filter { supported(6,it.mid) },
+            identity=values.identity.filterKeys { supported(9,it) },
+            readiness=values.readiness.takeIf { supported(1,1) },
+            pages=chains.values.flatMap { it.pages }.filter { it.mode!=2||values.freeze?.present==true })
+    }
+
     fun results(state: FunctionalTestState, report: JSONObject): FunctionalTestState {
         val auth = report.optBoolean("device_credential_authenticated")
         val consistent = auth && !report.optBoolean("cancelled") && report.optBoolean("capture_integrity_verified")

@@ -17,7 +17,7 @@ internal object NativeUsbObdScanProjection {
             report.optString("request_can_id")!=tx.toString(16).uppercase(Locale.ROOT) ||
             report.optString("response_can_id")!=rx.toString(16).uppercase(Locale.ROOT) ||
             report.opt("extended")!=extended) return null
-        val values=NativeUsbFunctionalEvidence.diagnosticValues(report) ?: return null
+        val values=NativeUsbFunctionalEvidence.scanValues(report) ?: return null
         if(values.observedVin!=expectedVin) return null
         val summary=report.optJSONObject("summary") ?: return null
         if(!summary.optBoolean("transport_observed")) return null
