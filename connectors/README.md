@@ -251,3 +251,13 @@ camarodiagconnectors-j1979-network --interface can0 --addressing 11bit --source 
 `--addressing 29bit` accepte les sources de réponse normalisées 18DAF1xx (xx inférieur à F0). `--vin` facultatif exige le même VIN sur chaque source sélectionnée et interrompt la campagne si absent ou discordant. Aucune source non demandée ne reçoit de scan physique ; la seule requête fonctionnelle est PID 00, les réponses contradictoires sont exclues. Budget global, JSON privé exclusif, aucun Mode 04/08 mutateur, aucune preuve de couverture véhicule.
 
 On an already configured classic SocketCAN interface, use discovery-only or select documented response IDs explicitly. Optional VIN comparison is fail-closed per selected responder; silent or conflicting responders are not silently substituted. No automatic interface setup, CAN FD or write operation.
+
+### SAE J1979 — enregistrement de mesures physiques / live recording
+
+```sh
+camarodiagconnectors-j1979-live --interface can0 --tx 7E0 --rx 7E8 --vin VIN_DOCUMENTE --pid 05 --pid 0C --cycles 30 --interval 1 --budget 180 --confirm-physical-channel --output live.json --csv live.csv
+```
+
+Remplacer VIN et adresses par ceux documentés. La recette vérifie le VIN avant, pendant les campagnes longues et à la fin. Seuls les PID numériques sélectionnés et confirmés par une chaîne de bitmaps sont interrogés. Chaque valeur possède son horodatage et sa réponse ; zéro n'est jamais utilisé à la place d'un timeout. Les cycles ne sont pas des acquisitions simultanées. Export JSON/CSV exclusif, limite de temps et d'observations. Le rapport est incomplet si l'identité finale est perdue ; aucune preuve physique ou mutation revendiquée.
+
+The live recorder uses one documented physical CAN channel, verified VIN and advertised numeric Mode 01 PIDs. Per-request timestamps and raw evidence, no reused stale values, bounded cycles/deadline, no mutations. Output paths must be new.

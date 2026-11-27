@@ -1,0 +1,288 @@
+"""Bounded, physical-source SAE J1979 live measurement recording.
+
+Only standardized Mode 01 numeric PIDs announced by the selected ECU are
+sampled. Every observation preserves its own timestamp and response bytes.
+A timeout never copies a preceding value; no monitor or OEM verdict is inferred.
+"""
+from __future__ import annotations
+
+from dataclasses import dataclass
+import math
+import re
+import time
+
+from .j1979_campaign_evidence import decode_observation
+
+MAX_PIDS = 32
+MAX_CYCLES = 1000
+MAX_OBSERVATIONS = 10000
+MAX_BUDGET = 600.0
+
+# Reuse the canonical application decoder. Widths are not guessed from an
+# observed response and a bitmap identifier is never a numeric live value.
+def numeric_pid(pid):
+    if not isinstance(pid, int) or isinstance(pid, bool) or not 1 <= pid <= 255 or pid % 32 == 0:
+        return False
+    for width in (1, 2, 4):
+        evidence = decode_observation(bytes((1,pid)), bytes((0x41,pid))+bytes(width))
+        if evidence and evidence.get("measurement") is not None:
+            return True
+    return False
+
+
+@dataclass(frozen=True)
+class Plan:
+    pids: tuple[int,...]
+    expected_vin: str
+    cycles: int = 30
+    interval: float = 1.0
+    budget: float = 180.0
+
+    def validate(self):
+        if (not self.pids or len(self.pids)>MAX_PIDS or len(set(self.pids))!=len(self.pids)
+                or not all(numeric_pid(pid) for pid in self.pids)):
+            raise ValueError("Select unique supported numeric PID definitions")
+        if not isinstance(self.expected_vin,str) or not re.fullmatch(r"[A-HJ-NPR-Z0-9]{17}",self.expected_vin):
+            raise ValueError("Documented physical ECU VIN required")
+        if (not isinstance(self.cycles,int) or isinstance(self.cycles,bool) or not 1<=self.cycles<=MAX_CYCLES
+                or self.cycles*len(self.pids)>MAX_OBSERVATIONS):
+            raise ValueError("Invalid cycle or observation limit")
+        if (not math.isfinite(self.interval) or not 0.1<=self.interval<=60 or
+                not math.isfinite(self.budget) or not 0<self.budget<=MAX_BUDGET):
+            raise ValueError("Invalid recording interval or budget")
+        return self
+
+
+class _Accumulator:
+    """Online count and finite numeric summary of accepted observations only."""
+    def __init__(self,pid):
+        self.pid=pid
+        self.name=None
+        self.unit=None
+        self.counts={}
+        self.minimum=None
+        self.maximum=None
+        self.mean=None
+        self.last=None
+        self.last_elapsed_ms=None
+
+    def append(self,row):
+        status=row["status"]
+        self.counts[status]=self.counts.get(status,0)+1
+        value=row["measurement"]
+        if status!="PASSED" or value is None:
+            return
+        number=value["number"]
+        if not math.isfinite(number):
+            raise ValueError("Nonfinite measurement")
+        count=self.counts["PASSED"]
+        self.name=value["name"]
+        self.unit=value["unit"]
+        self.minimum=number if self.minimum is None else min(self.minimum,number)
+        self.maximum=number if self.maximum is None else max(self.maximum,number)
+        self.mean=number if self.mean is None else self.mean+(number-self.mean)/count
+        self.last=number
+        self.last_elapsed_ms=row["elapsed_ms"]
+
+    def report(self):
+        return {"pid":self.pid,"name":self.name,"unit":self.unit,
+                "attempted":sum(self.counts.values()),"status_counts":dict(self.counts),
+                "minimum":self.minimum,"maximum":self.maximum,"mean":self.mean,
+                "last_verified_value":self.last,"last_verified_elapsed_ms":self.last_elapsed_ms}
+
+
+def record(exchange, plan: Plan, *, clock=time.monotonic, sleep=time.sleep,
+           require_current=lambda:None, on_observation=lambda _:None):
+    """Capture a private prefix even on cancellation or transport failure.
+
+    A cycle is a sequence of individual requests, not simultaneous samples.
+    Scheduling is start-to-start; if an ECU is slow the next cycle is delayed,
+    never burst-replayed to catch up. The whole session has one deadline.
+    """
+    plan.validate()
+    started=clock()
+    admission=[]
+    rows=[]
+    stats={pid:_Accumulator(pid) for pid in plan.pids}
+    pages=[]
+    advertised=set()
+    observed=None
+    last_identity=None
+    stop=None
+    completed_cycles=0
+    inventory_complete=False
+
+    def elapsed():
+        return max(0,round((clock()-started)*1000))
+
+    def remaining():
+        return plan.budget-(clock()-started)
+
+    def active():
+        nonlocal stop
+        if stop is not None:
+            return False
+        require_current()
+        if remaining()<=0:
+            stop="BUDGET_EXHAUSTED"
+            return False
+        return True
+
+    def query(request,phase,cycle=None,pid=None):
+        nonlocal stop
+        if not active():
+            return None
+        began=clock()
+        row={"phase":phase,"cycle":cycle,"pid":pid,"request_hex":request.hex().upper(),
+             "response_hex":None,"started_elapsed_ms":max(0,round((began-started)*1000)),
+             "elapsed_ms":None,"duration_ms":None,"status":"NOT_TESTED","detail":None,
+             "measurement":None,"application_evidence":None}
+        try:
+            raw=exchange(request,min(2.5,remaining()))
+            if not isinstance(raw,bytes) or len(raw)>4095:
+                raise ValueError("Invalid response type or length")
+            row["response_hex"]=raw.hex().upper()
+            require_current()
+            if remaining()<=0:
+                stop="BUDGET_EXHAUSTED"
+                row["detail"]="LATE_RESPONSE"
+            else:
+                evidence=decode_observation(request,raw)
+                if evidence is None:
+                    row.update(status="FAILED",detail="INVALID_APPLICATION_RESPONSE")
+                    # A malformed or unrelated response calls the correlation
+                    # into question; stop instead of using another ECU/value.
+                    stop="INVALID_APPLICATION_RESPONSE"
+                else:
+                    row["application_evidence"]=evidence
+                    row["status"]=evidence["shape"]
+                    if evidence["shape"]=="NEGATIVE":
+                        row["detail"]=f'NRC_{evidence["negative_response_code"]:02X}'
+                    if phase=="SAMPLE" and evidence["shape"]=="PASSED":
+                        value=evidence.get("measurement")
+                        if value is None or value["pid"]!=pid or value["mode"]!=1:
+                            stop="INVALID_MEASUREMENT"
+                            row.update(status="FAILED",detail=stop,application_evidence=None)
+                        else:
+                            row["measurement"]=value
+        except KeyboardInterrupt:
+            stop="CANCELLED"
+            row["detail"]=stop
+        except TimeoutError:
+            row["status"]="TIMEOUT"
+            row["detail"]="TIMEOUT"
+            if remaining()<=0:
+                stop="BUDGET_EXHAUSTED"
+        except (OSError,ValueError,RuntimeError) as error:
+            stop="TRANSPORT_OR_CONTEXT_ERROR"
+            row.update(status="FAILED",detail=type(error).__name__)
+        row["elapsed_ms"]=elapsed()
+        row["duration_ms"]=max(0,round((clock()-began)*1000))
+        (rows if phase=="SAMPLE" else admission).append(row)
+        if phase=="SAMPLE":
+            stats[pid].append(row)
+            on_observation(dict(row))
+        return row
+
+    def identity(phase):
+        nonlocal observed,last_identity,stop
+        row=query(b"\x09\x02",phase)
+        if row is None or stop is not None:
+            return False
+        found=(row.get("application_evidence") or {}).get("observed_vin")
+        if phase=="INITIAL_VIN":
+            observed=found
+        if found!=plan.expected_vin:
+            stop="VIN_UNVERIFIED" if found is None else "VIN_MISMATCH"
+            return False
+        last_identity=clock()
+        return True
+
+    def inventory():
+        nonlocal inventory_complete,stop
+        for base in range(0,256,32):
+            row=query(bytes((1,base)),"INVENTORY")
+            if row is None or stop is not None:
+                return
+            page=(row.get("application_evidence") or {}).get("supported_page")
+            if row["status"]!="PASSED" or page is None or page["base"]!=base:
+                break
+            pages.append(page)
+            advertised.update(page["supported_ids"])
+            if not page["has_next_page"]:
+                inventory_complete=True
+                break
+            # No need to probe additional optional pages once all selected
+            # PIDs are proven, but report that remaining inventory is partial.
+            if all(pid in advertised for pid in plan.pids):
+                break
+        if any(pid not in advertised for pid in plan.pids):
+            stop="SELECTED_PID_NOT_VERIFIED"
+
+    def pause_until(target):
+        nonlocal stop
+        while active():
+            left=target-clock()
+            if left<=0:
+                return True
+            sleep(min(left,remaining(),0.2))
+        return False
+
+    try:
+        if identity("INITIAL_VIN"):
+            inventory()
+        if stop is None:
+            next_start=clock()
+            for cycle in range(1,plan.cycles+1):
+                if not pause_until(next_start):
+                    break
+                if last_identity is not None and clock()-last_identity>=30:
+                    if not identity("PERIODIC_VIN"):
+                        break
+                actual_start=clock()
+                done=True
+                for pid in plan.pids:
+                    if not active():
+                        done=False
+                        break
+                    row=query(bytes((1,pid)),"SAMPLE",cycle,pid)
+                    if row is None or stop is not None:
+                        done=False
+                        break
+                if not done:
+                    break
+                completed_cycles+=1
+                next_start=max(actual_start+plan.interval,clock())
+        if stop is None and completed_cycles==plan.cycles:
+            identity("FINAL_VIN")
+        if stop is None and not any(row["status"]=="PASSED" for row in rows):
+            stop="NO_VERIFIED_MEASUREMENT"
+    except KeyboardInterrupt:
+        stop="CANCELLED"
+    except (OSError,ValueError,RuntimeError) as error:
+        stop="CONTEXT_OR_SINK_ERROR"
+    return {"scope":"PHYSICAL_SELECTED_ECU_LIVE","declared_vin":plan.expected_vin,
+            "observed_vin":observed,"vin_match":"UNVERIFIED" if observed is None else
+                "MATCH" if observed==plan.expected_vin else "MISMATCH",
+            "selected_pids":list(plan.pids),"advertised_pids":sorted(advertised),
+            "inventory_pages":pages,"inventory_complete":inventory_complete,
+            "unverified_selected_pids":[pid for pid in plan.pids if pid not in advertised],
+            "requested_cycles":plan.cycles,"completed_cycles":completed_cycles,
+            "interval_ms":round(plan.interval*1000),"budget_ms":round(plan.budget*1000),
+            "duration_ms":elapsed(),"admission":admission,"observations":rows,
+            "summary":[stats[pid].report() for pid in plan.pids],
+            "completed":stop is None and completed_cycles==plan.cycles,
+            "stop_reason":stop,"cancelled":stop=="CANCELLED",
+            "physical_vehicle_verified":False,"whole_vehicle_coverage_verified":False,
+            "not_executed":["MODE_04_CLEAR","MODE_08_CONTROL"]}
+
+
+def csv_rows(report):
+    """Stable long-form CSV; empty fields represent missing values, never zero."""
+    yield ("cycle","pid_hex","started_elapsed_ms","elapsed_ms","duration_ms","status",
+           "value","unit","request_hex","response_hex","detail")
+    for row in report["observations"]:
+        value=row.get("measurement") or {}
+        yield (row["cycle"],f'{row["pid"]:02X}',row["started_elapsed_ms"],row["elapsed_ms"],
+               row["duration_ms"],row["status"],value.get("number"),value.get("unit"),
+               row["request_hex"],row["response_hex"],row["detail"])

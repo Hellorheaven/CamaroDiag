@@ -1,3 +1,7 @@
+## SAE J1979 — enregistrement de mesures physiques Linux (27/11/2026)
+
+- Nouveau moteur de cycles Mode 01 numériques, VIN initial/périodique/final, inventaire continu des PID choisis, contrôle strict des formes, temporisation sans rattrapage en rafale, horodatage individuel, conservation du préfixe, statistiques des seules valeurs vérifiées. CLI SocketCAN avec JSON et CSV privés exclusifs, régressions écrites non exécutées. Aucune mutation ni qualification réelle ; C6/J1979 ouverts.
+
 ## C6 — rapport Android de récupération et revalidation à l’export (27/11/2026)
 
 - Inspection : empreintes individuelles des enveloppes, journal et audit complet. Affichage FR/EN des compteurs d’audit. Export JSON lié à l’URI et au rapport vérifié affiché, nouvelle inspection avant écriture et avant publication du fichier SAF, relecture exacte du JSON. Une modification du dossier invalide le résultat affiché, les preuves incomplètes restent visibles mais ne sont pas exportées comme vérifiées. Régressions écrites non exécutées. C6/J1979 ouverts, aucune CI intermédiaire.
