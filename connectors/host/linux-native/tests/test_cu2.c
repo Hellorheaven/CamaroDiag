@@ -59,6 +59,14 @@ int main(void) {
     for (size_t i = 0; i < sizeof(proof); ++i) assert(proof[i] == 0xa5);
     nonce[0] ^= 1;
     assert(!cf1_cu2_proof(hello, altered, key, proof, error, sizeof(error)));
+    /* Valid HMAC is insufficient when the CU/2 approved scope has changed. */
+    uint8_t forged_hello[140], forged_challenge[68];
+    memcpy(forged_hello, hello, sizeof(forged_hello));
+    memcpy(forged_challenge, challenge, sizeof(forged_challenge));
+    forged_hello[17] = 'Q'; /* Forbidden VIN character in the approved plan. */
+    sign_transcript(forged_hello, forged_challenge, key, 'F', forged_challenge + 36);
+    assert(!cf1_cu2_proof(forged_hello, forged_challenge, key, proof,
+                          error, sizeof(error)));
     memset(nonce, 0, sizeof(nonce));
     assert(!cf1_cu2_hello(&plan, nonce, hello, error, sizeof(error)));
     plan.pids[0] = 0; assert(!cf1_cu2_hello(&plan, key, hello, error, sizeof(error)));

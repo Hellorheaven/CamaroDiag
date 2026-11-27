@@ -41,13 +41,39 @@ bool cf1_cu2_hello(const cf1_plan *p, const uint8_t nonce[32],
     memcpy(wire + 108, nonce, 32);
     return true;
 }
+static uint32_t le32(const uint8_t *p) {
+    return (uint32_t)p[0] | ((uint32_t)p[1] << 8) |
+           ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24);
+}
+/* Never accept an HMAC-valid but noncanonical approved profile. The raw
+ * 104 bytes must re-encode exactly from the same strict native plan that
+ * governs the read-only campaign and physical CAN IDs.
+ */
+static bool valid_profile_wire(const uint8_t wire[CF1_PLAN_SIZE]) {
+    if (wire[8] > 1 || wire[30] > CF1_MAX_FRAMES ||
+        wire[39] > CF1_MAX_PIDS) return false;
+    cf1_plan plan = {0};
+    plan.tx = le32(wire);
+    plan.rx = le32(wire + 4);
+    plan.extended = wire[8] == 1;
+    plan.budget_ms = le32(wire + 9);
+    memcpy(plan.vin, wire + 13, 17);
+    plan.frame_count = wire[30];
+    plan.pid_count = wire[39];
+    memcpy(plan.frames, wire + 31, plan.frame_count);
+    memcpy(plan.pids, wire + 40, plan.pid_count);
+    uint8_t canonical[CF1_PLAN_SIZE];
+    return cf1_encode_profile(&plan, canonical, NULL, 0) &&
+           CRYPTO_memcmp(wire, canonical, CF1_PLAN_SIZE) == 0;
+}
 bool cf1_cu2_proof(const uint8_t hello[CF1_CU2_HELLO_SIZE],
                     const uint8_t challenge[CF1_CU2_CHALLENGE_SIZE],
                     const uint8_t key[32],
                     uint8_t proof[CF1_CU2_PROOF_SIZE], char *err, size_t cap) {
     if (!hello || !challenge || !key || !proof ||
         memcmp(hello, "CU\x02\x01", 4) ||
-        memcmp(challenge, "CU\x02\x02", 4))
+        memcmp(challenge, "CU\x02\x02", 4) ||
+        !valid_profile_wire(hello + 4))
         return deny(err, cap, "Invalid CU/2 challenge framing");
     unsigned client_nonzero = 0, device_nonzero = 0;
     for (size_t i = 0; i < 32; ++i) {

@@ -22,6 +22,10 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
+      - name: Build and run native Linux C SAE J1979 bridge tests (final gate only)
+        run: |
+          set -euo pipefail
+          make -C connectors/host/linux-native clean all test
       - name: Build and run native USB parser tests
         run: |
           g++ -std=c++11 -Wall -Wextra -Werror -pedantic connectors/firmware/esp32s3/native-tests/discovery_parser_test.cpp -o /tmp/discovery_parser_test
