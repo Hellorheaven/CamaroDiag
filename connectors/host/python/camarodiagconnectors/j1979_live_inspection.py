@@ -203,11 +203,18 @@ def _match_legacy(group, request, response, status, protocol, driver):
         probe = group[1][3]
         observed = _get(probe,"observed_protocol")
         raw = _get(probe,"raw_response")
-        _require(isinstance(raw,str), "Missing legacy fixed protocol evidence")
-        lines = [x.strip().upper() for x in raw.replace(">","\n").splitlines()
-                 if x.strip() and x.strip().upper()!="ATDPN"]
-        _require(lines==[str(protocol)] and (observed is None or
-                 type(observed) is int and observed==protocol), "Legacy protocol mismatch")
+        # Python's existing protocol-check callback returns a negotiated
+        # integer rather than an ATDPN transcript. Do not invent text for
+        # it; when the original text exists, both representations must agree.
+        if raw is None:
+            _require(type(observed) is int and observed==protocol,
+                     "Missing legacy fixed protocol evidence")
+        else:
+            _require(isinstance(raw,str), "Invalid legacy fixed protocol evidence")
+            lines = [x.strip().upper() for x in raw.replace(">","\n").splitlines()
+                     if x.strip() and x.strip().upper()!="ATDPN"]
+            _require(lines==[str(protocol)] and (observed is None or
+                     type(observed) is int and observed==protocol), "Legacy protocol mismatch")
         _require(group[1][2]=="PASSED","Legacy protocol probe did not pass")
     _require(all(item[2] in ("PASSED","CORRELATED") for item in group[-3:]),
              "Legacy VIN fragments or inventory not accepted")
