@@ -124,6 +124,7 @@ internal sealed class NativeE39FileWriteJournal :
                     .ToHashSet(StringComparer.Ordinal).SetEquals(savedEnvelopes.Keys))
                     throw new InvalidDataException("Original sector backup inventory changed.");
             }
+            RequireJournalPrefixForBackupCheck();
             RequireInventory();
             foreach (var (path, expected) in savedEnvelopes)
             {
@@ -149,6 +150,7 @@ internal sealed class NativeE39FileWriteJournal :
                     throw new InvalidDataException("Original sector backup envelope changed.");
             }
             RequireInventory();
+            RequireJournalPrefixForBackupCheck();
             token.ThrowIfCancellationRequested();
         }
         catch
@@ -158,6 +160,14 @@ internal sealed class NativeE39FileWriteJournal :
             throw;
         }
         finally { gate.Release(); }
+    }
+
+    // A failed journal check is different from a failed backup check:
+    // even a RecoveryRequired append would target an untrusted prefix.
+    private void RequireJournalPrefixForBackupCheck()
+    {
+        try { ReadAcceptedPrefix(); }
+        catch { appendFailed = true; throw; }
     }
 
     public async Task AppendAsync(

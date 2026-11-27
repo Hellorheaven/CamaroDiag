@@ -84,6 +84,23 @@ class PersistentEcuWriteJournalTest {
         assertTrue(completePrefix.contentEquals(file.readBytes()))
     }
 
+    @Test fun rollbackAfterEraseReceiptPoisonsActiveBoundaryCheck() = runBlocking {
+        val (file,journal) = newJournal()
+        journal.append(record)
+        val baseline = file.readBytes()
+        journal.append(record.copy(stage = EcuWriteTransaction.Stage.BEFORE_ERASE))
+        val accepted = file.readBytes()
+        journal.requireAcceptedState()
+        file.writeBytes(baseline)
+        assertTrue(runCatching { journal.requireAcceptedState() }.isFailure)
+        file.writeBytes(accepted)
+        assertTrue(runCatching { journal.requireAcceptedState() }.isFailure)
+        assertTrue(runCatching {
+            journal.append(record.copy(stage = EcuWriteTransaction.Stage.VERIFIED_AFTER_WRITE))
+        }.isFailure)
+        assertTrue(accepted.contentEquals(file.readBytes()))
+    }
+
     @Test fun redirectedJournalCannotBeAcceptedOrReopenedForAppend() = runBlocking {
         val (file,journal)=newJournal()
         journal.append(record)

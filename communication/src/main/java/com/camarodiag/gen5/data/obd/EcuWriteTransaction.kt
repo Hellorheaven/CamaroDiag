@@ -448,6 +448,9 @@ internal class EcuWriteExecutionEngine(
                 // A journal/power/identity provider may complete despite a
                 // cancelled coroutine. Cancellation must win before erase.
                 currentCoroutineContext().ensureActive()
+                // Production always uses the persistent journal; the in-memory
+                // engine harness cannot authorize a real hardware driver.
+                if (journal is PersistentEcuWriteJournal) boundary { journal.requireAcceptedState() }
                 eraseSector(region)
                 currentCoroutineContext().ensureActive()
                 val unitBytes = request.layout.programBlockBytes
@@ -552,6 +555,7 @@ internal class EcuWriteExecutionEngine(
                 EcuWriteTransaction.Stage.TRANSACTION_COMPLETED,
                 request.region, last.absoluteAddress, last.originalSha256, last.updatedSha256
             ))
+            if (journal is PersistentEcuWriteJournal) boundary { journal.requireAcceptedState() }
             currentCoroutineContext().ensureActive()
             return EcuWriteTransaction.Outcome(
                 EcuWriteTransaction.Status.COMPLETED, verifiedSectors = verified

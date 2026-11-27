@@ -153,6 +153,24 @@ class PersistentEcuWriteJournal private constructor(
         }
     }
 
+    /** Recheck the active durable prefix at a hardware boundary, even when
+     * no new journal event is being appended. A rollback cannot revive it. */
+    internal fun requireAcceptedState() = synchronized(guard) {
+        check(writable && !appendFailed) { "Active ECU journal is unavailable." }
+        try {
+            val raw = checkNotNull(readBoundedSnapshot())
+            val audit = inspectLocked(raw = raw)
+            val tail = if (audit.records == 0) sha256(header)
+                else raw.toString(StandardCharsets.UTF_8).dropLast(1).substringAfterLast('\t')
+            check(audit.valid && raw.size.toLong() == expectedLength && tail == expectedTailHash) {
+                "The active ECU journal differs from the last durable accepted state."
+            }
+        } catch (error: Exception) {
+            appendFailed = true
+            throw error
+        }
+    }
+
     /** Detects truncated records and alterations, including changes to earlier entries. */
     fun inspect(): Audit = synchronized(guard) { inspectLocked() }
 

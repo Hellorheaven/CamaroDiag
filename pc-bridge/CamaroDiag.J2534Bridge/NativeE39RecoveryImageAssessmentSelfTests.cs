@@ -54,7 +54,10 @@ internal static class NativeE39RecoveryImageAssessmentSelfTests
                 }
                 catch (InvalidDataException) { Check(true, "Changed original envelope rejected"); }
                 finally { File.WriteAllBytes(envelopePath, unchanged); }
-                journal.RequireOriginalBlocksIntactAsync(CancellationToken.None).GetAwaiter().GetResult();
+                bool stillInvalidated = false;
+                try { journal.RequireOriginalBlocksIntactAsync(CancellationToken.None).GetAwaiter().GetResult(); }
+                catch (InvalidDataException) { stillInvalidated = true; }
+                Check(stillInvalidated, "Restoring bytes cannot revive an invalidated active transaction");
             }
             finally { journal.DisposeAsync().AsTask().GetAwaiter().GetResult(); }
 
