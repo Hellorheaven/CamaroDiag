@@ -270,6 +270,128 @@ DEFINITIONS = {
         Field("egt-bank-2-sensor-7", "degC", 5, 2, 1, 10, -40, 2, False, None),
         Field("egt-bank-2-sensor-8", "degC", 7, 2, 1, 10, -40, 3, False, None),
     )),
+    0x6B: Definition(5, 0xFF, (
+        Field("egr-temperature-a", "degC", 1, 1, 1, 1, -40, 0, False, None),
+        Field("egr-temperature-c", "degC", 2, 1, 1, 1, -40, 1, False, None),
+        Field("egr-temperature-b", "degC", 3, 1, 1, 1, -40, 2, False, None),
+        Field("egr-temperature-d", "degC", 4, 1, 1, 1, -40, 3, False, None),
+    )),
+    0x6F: Definition(3, 0x0F, (
+        Field("compressor-inlet-pressure-a", "kPa", 1, 1, 1, 1, 0, 0, False, None),
+        Field("compressor-inlet-pressure-b", "kPa", 2, 1, 1, 1, 0, 1, False, None),
+    )),
+    0x81: Definition(41, 0x1F, (
+        Field("aecd-1-timer-1", "s", 1, 4, 1, 1, 0, 0, False, None),
+        Field("aecd-1-timer-2", "s", 5, 4, 1, 1, 0, 0, False, None),
+        Field("aecd-2-timer-1", "s", 9, 4, 1, 1, 0, 1, False, None),
+        Field("aecd-2-timer-2", "s", 13, 4, 1, 1, 0, 1, False, None),
+        Field("aecd-3-timer-1", "s", 17, 4, 1, 1, 0, 2, False, None),
+        Field("aecd-3-timer-2", "s", 21, 4, 1, 1, 0, 2, False, None),
+        Field("aecd-4-timer-1", "s", 25, 4, 1, 1, 0, 3, False, None),
+        Field("aecd-4-timer-2", "s", 29, 4, 1, 1, 0, 3, False, None),
+        Field("aecd-5-timer-1", "s", 33, 4, 1, 1, 0, 4, False, None),
+        Field("aecd-5-timer-2", "s", 37, 4, 1, 1, 0, 4, False, None),
+    )),
+    0x82: Definition(41, 0x1F, (
+        Field("aecd-6-timer-1", "s", 1, 4, 1, 1, 0, 0, False, None),
+        Field("aecd-6-timer-2", "s", 5, 4, 1, 1, 0, 0, False, None),
+        Field("aecd-7-timer-1", "s", 9, 4, 1, 1, 0, 1, False, None),
+        Field("aecd-7-timer-2", "s", 13, 4, 1, 1, 0, 1, False, None),
+        Field("aecd-8-timer-1", "s", 17, 4, 1, 1, 0, 2, False, None),
+        Field("aecd-8-timer-2", "s", 21, 4, 1, 1, 0, 2, False, None),
+        Field("aecd-9-timer-1", "s", 25, 4, 1, 1, 0, 3, False, None),
+        Field("aecd-9-timer-2", "s", 29, 4, 1, 1, 0, 3, False, None),
+        Field("aecd-10-timer-1", "s", 33, 4, 1, 1, 0, 4, False, None),
+        Field("aecd-10-timer-2", "s", 37, 4, 1, 1, 0, 4, False, None),
+    )),
+    0x83: Definition(9, 0x0F, (
+        Field("nox-bank-1-sensor-1", "ppm", 1, 2, 1, 1, 0, 0, False, None),
+        Field("nox-bank-1-sensor-2", "ppm", 3, 2, 1, 1, 0, 1, False, None),
+        Field("nox-bank-2-sensor-1", "ppm", 5, 2, 1, 1, 0, 2, False, None),
+        Field("nox-bank-2-sensor-2", "ppm", 7, 2, 1, 1, 0, 3, False, None),
+    )),
+    0x84: Definition(1, 0x00, (
+        Field("intake-manifold-surface-temperature", "degC", 0, 1, 1, 1, -40, -1, False, None),
+    )),
+    0x85: Definition(10, 0x0F, (
+        Field("reagent-consumption", "L/h", 1, 2, 1, 200, 0, 0, False, None),
+        Field("reagent-demand", "L/h", 3, 2, 1, 200, 0, 1, False, None),
+        Field("reagent-level", "%", 5, 1, 100, 255, 0, 2, False, None),
+        Field("nox-warning-runtime", "s", 6, 4, 1, 1, 0, 3, False, None),
+    )),
+    0x87: Definition(5, 0x03, (
+        Field("manifold-pressure-a", "kPa", 1, 2, 1, 32, 0, 0, False, None),
+        Field("manifold-pressure-b", "kPa", 3, 2, 1, 32, 0, 1, False, None),
+    )),
+    0x89: Definition(41, 0x1F, (
+        Field("aecd-11-timer-1", "s", 1, 4, 1, 1, 0, 0, False, None),
+        Field("aecd-11-timer-2", "s", 5, 4, 1, 1, 0, 0, False, None),
+        Field("aecd-12-timer-1", "s", 9, 4, 1, 1, 0, 1, False, None),
+        Field("aecd-12-timer-2", "s", 13, 4, 1, 1, 0, 1, False, None),
+        Field("aecd-13-timer-1", "s", 17, 4, 1, 1, 0, 2, False, None),
+        Field("aecd-13-timer-2", "s", 21, 4, 1, 1, 0, 2, False, None),
+        Field("aecd-14-timer-1", "s", 25, 4, 1, 1, 0, 3, False, None),
+        Field("aecd-14-timer-2", "s", 29, 4, 1, 1, 0, 3, False, None),
+        Field("aecd-15-timer-1", "s", 33, 4, 1, 1, 0, 4, False, None),
+        Field("aecd-15-timer-2", "s", 37, 4, 1, 1, 0, 4, False, None),
+    )),
+    0x8A: Definition(41, 0x1F, (
+        Field("aecd-16-timer-1", "s", 1, 4, 1, 1, 0, 0, False, None),
+        Field("aecd-16-timer-2", "s", 5, 4, 1, 1, 0, 0, False, None),
+        Field("aecd-17-timer-1", "s", 9, 4, 1, 1, 0, 1, False, None),
+        Field("aecd-17-timer-2", "s", 13, 4, 1, 1, 0, 1, False, None),
+        Field("aecd-18-timer-1", "s", 17, 4, 1, 1, 0, 2, False, None),
+        Field("aecd-18-timer-2", "s", 21, 4, 1, 1, 0, 2, False, None),
+        Field("aecd-19-timer-1", "s", 25, 4, 1, 1, 0, 3, False, None),
+        Field("aecd-19-timer-2", "s", 29, 4, 1, 1, 0, 3, False, None),
+        Field("aecd-20-timer-1", "s", 33, 4, 1, 1, 0, 4, False, None),
+        Field("aecd-20-timer-2", "s", 37, 4, 1, 1, 0, 4, False, None),
+    )),
+    0x8B: Definition(7, 0x7F, (
+        Field("dpf-regeneration-trigger", "%", 2, 1, 100, 255, 0, 4, False, None),
+        Field("dpf-regeneration-interval", "min", 3, 2, 1, 1, 0, 5, False, None),
+        Field("dpf-regeneration-distance", "km", 5, 2, 1, 1, 0, 6, False, None),
+    )),
+    0x8C: Definition(17, 0xFF, (
+        Field("oxygen-concentration-bank-1-sensor-1", "%", 1, 2, 1526, 1000000, 0, 0, False, None),
+        Field("oxygen-concentration-bank-1-sensor-2", "%", 3, 2, 1526, 1000000, 0, 1, False, None),
+        Field("oxygen-concentration-bank-2-sensor-1", "%", 5, 2, 1526, 1000000, 0, 2, False, None),
+        Field("oxygen-concentration-bank-2-sensor-2", "%", 7, 2, 1526, 1000000, 0, 3, False, None),
+        Field("oxygen-lambda-bank-1-sensor-1", "ratio", 9, 2, 122, 1000000, 0, 4, False, None),
+        Field("oxygen-lambda-bank-1-sensor-2", "ratio", 11, 2, 122, 1000000, 0, 5, False, None),
+        Field("oxygen-lambda-bank-2-sensor-1", "ratio", 13, 2, 122, 1000000, 0, 6, False, None),
+        Field("oxygen-lambda-bank-2-sensor-2", "ratio", 15, 2, 122, 1000000, 0, 7, False, None),
+    )),
+    0x8D: Definition(1, 0x00, (
+        Field("absolute-throttle-g", "%", 0, 1, 100, 255, 0, -1, False, None),
+    )),
+    0x8E: Definition(1, 0x00, (
+        Field("engine-friction-torque", "%", 0, 1, 1, 1, -125, -1, False, None),
+    )),
+    0x8F: Definition(7, 0x0F, (
+        Field("pm-sensor-bank-1-output", "%", 2, 2, 1, 100, 0, 1, False, None),
+        Field("pm-sensor-bank-2-output", "%", 5, 2, 1, 100, 0, 3, False, None),
+    )),
+    0x93: Definition(3, 0x01, (
+        Field("cumulative-continuous-mi", "h", 1, 2, 1, 1, 0, 0, False, None),
+    )),
+    0x94: Definition(12, 0x3F, (
+        Field("reagent-quality-counter", "h", 2, 2, 1, 1, 0, 1, False, None),
+        Field("reagent-consumption-counter", "h", 4, 2, 1, 1, 0, 2, False, None),
+        Field("reagent-dosing-counter", "h", 6, 2, 1, 1, 0, 3, False, None),
+        Field("egr-valve-counter", "h", 8, 2, 1, 1, 0, 4, False, None),
+        Field("nox-monitoring-counter", "h", 10, 2, 1, 1, 0, 5, False, None),
+    )),
+    0x9C: Definition(17, 0xFF, (
+        Field("oxygen-concentration-bank-1-sensor-3", "%", 1, 2, 1526, 1000000, 0, 0, False, None),
+        Field("oxygen-concentration-bank-1-sensor-4", "%", 3, 2, 1526, 1000000, 0, 1, False, None),
+        Field("oxygen-concentration-bank-2-sensor-3", "%", 5, 2, 1526, 1000000, 0, 2, False, None),
+        Field("oxygen-concentration-bank-2-sensor-4", "%", 7, 2, 1526, 1000000, 0, 3, False, None),
+        Field("oxygen-lambda-bank-1-sensor-3", "ratio", 9, 2, 122, 1000000, 0, 4, False, None),
+        Field("oxygen-lambda-bank-1-sensor-4", "ratio", 11, 2, 122, 1000000, 0, 5, False, None),
+        Field("oxygen-lambda-bank-2-sensor-3", "ratio", 13, 2, 122, 1000000, 0, 6, False, None),
+        Field("oxygen-lambda-bank-2-sensor-4", "ratio", 15, 2, 122, 1000000, 0, 7, False, None),
+    )),
 }
 
 
@@ -285,9 +407,20 @@ def decode_data(pid: int, data: bytes) -> list[dict] | None:
         return None
     if definition.support_mask and data[0] & ~definition.support_mask:
         return None
+    # Standard and extended range flags refer to the same physical slot.
+    # If both are asserted the encoding is ambiguous: do not choose a scale.
+    alternate = 4 if pid == 0x6B else 2 if pid == 0x6F else 0
+    if alternate and (data[0] & (data[0] >> alternate) & ((1 << alternate)-1)):
+        return None
     measurements = []
     for field in definition.fields:
-        if field.bit >= 0 and not data[0] & (1 << field.bit):
+        multiplier = field.multiplier
+        if alternate:
+            if data[0] & (1 << (field.bit + alternate)):
+                multiplier = 4 if pid == 0x6B else 8
+            elif not data[0] & (1 << field.bit):
+                continue
+        elif field.bit >= 0 and not data[0] & (1 << field.bit):
             continue
         raw = int.from_bytes(data[field.offset:field.offset+field.width], "big")
         if raw == field.unavailable:
@@ -296,7 +429,7 @@ def decode_data(pid: int, data: bytes) -> list[dict] | None:
         if field.signed and raw >= 1 << (field.width*8-1):
             encoded -= 1 << (field.width*8)
         measurements.append({"pid": pid, "name": field.name, "unit": field.unit,
-                             "number": encoded * field.multiplier / field.divisor + field.bias,
+                             "number": encoded * multiplier / field.divisor + field.bias,
                              "raw_encoded": raw})
     return measurements
 
