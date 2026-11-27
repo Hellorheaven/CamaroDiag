@@ -359,6 +359,10 @@ class J1979CatalogueProjectionTest {
             val planPartial=com.camarodiag.gen5.data.obd.J1979FreezePrefix.inspect(planOnly,freezeVin)
             assertEquals(0,planPartial["complete_observations"])
             assertEquals(true,planPartial["replay_terminated_by_missing_observation"])
+            assertEquals(null,planPartial["last_observed_request_hex"])
+            assertEquals("0902",planPartial["next_unobserved_request_hex"])
+            assertEquals(false,planPartial["unobserved_request_transmitted"])
+            assertEquals(listOf(0,1),planPartial["unvisited_frame_numbers_in_prefix"])
             assertTrue(runCatching {
                 com.camarodiag.gen5.data.obd.J1979FreezePrefix.inspect(capture,freezeVin)
             }.isFailure)

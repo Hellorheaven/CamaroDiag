@@ -123,6 +123,11 @@ object J1979FreezePrefix {
             "discarded_tail_bytes" to prefix.discardedTailBytes,
             "interruption" to prefix.interruption,
             "replay_terminated_by_missing_observation" to synthesized,
+            "last_observed_request_hex" to result.steps.take(observed.size).lastOrNull()?.requestHex,
+            "next_unobserved_request_hex" to
+                if(synthesized) result.steps[observed.size].requestHex else null,
+            "unobserved_request_transmitted" to false,
+            "unvisited_frame_numbers_in_prefix" to result.unvisitedFrames,
             "observed_initial_vin_in_prefix" to result.initialVin,
             "observed_final_vin_in_prefix" to result.finalVin,
             "independently_replayed_steps" to result.steps.take(observed.size).map(::step),

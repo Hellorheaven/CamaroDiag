@@ -267,6 +267,12 @@ internal static class J1979FreezeNative
             ["complete_observations"]=observations.Count,["last_complete_offset"]=position,
             ["discarded_tail_bytes"]=raw.Length-position,["interruption"]=interruption,
             ["replay_terminated_by_missing_observation"]=synthesized,
+            ["last_observed_request_hex"]=observations.Count>0?
+                replay.Steps[observations.Count-1].RequestHex:null,
+            ["next_unobserved_request_hex"]=synthesized?
+                replay.Steps[observations.Count].RequestHex:null,
+            ["unobserved_request_transmitted"]=false,
+            ["unvisited_frame_numbers_in_prefix"]=replay.UnvisitedFrames,
             ["observed_initial_vin_in_prefix"]=replay.InitialVin,
             ["observed_final_vin_in_prefix"]=replay.FinalVin,
             ["independently_replayed_steps"]=replay.Steps.Take(observations.Count).ToArray(),

@@ -113,7 +113,10 @@ internal static class J1979FreezeNativeSelfTests
             "CF/1 frame-level inventory is provisional even after all observations");
         var planOnly=J1979FreezeNative.InspectPrefix(capture[..(12+J1979FreezeNative.PlanSize)],Vin);
         Require((int)planOnly["complete_observations"]! == 0&&
-            (bool)planOnly["replay_terminated_by_missing_observation"]!,
+            (bool)planOnly["replay_terminated_by_missing_observation"]! &&
+            (string)planOnly["next_unobserved_request_hex"]! == "0902"&&
+            planOnly["last_observed_request_hex"] is null&&
+            !(bool)planOnly["unobserved_request_transmitted"]!,
             "plan-only prefix cannot invent VIN observation");
         var shortHeader=J1979FreezeNative.InspectPrefix(interrupted.Concat(new byte[]{(byte)'C',(byte)'F',1,3,7}).ToArray(),Vin);
         Require((string)shortHeader["interruption"]! == "TRUNCATED_HEADER"&&

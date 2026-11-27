@@ -41,6 +41,9 @@ class FreezeNativePrefixTests(unittest.TestCase):
         self.assertEqual(result["interruption"], "MISSING_TERMINAL")
         self.assertEqual(result["discarded_tail_bytes"], 0)
         self.assertFalse(result["replay_terminated_by_missing_observation"])
+        self.assertIsNone(result["next_unobserved_request_hex"])
+        self.assertEqual(result["last_observed_request_hex"], "0902")
+        self.assertFalse(result["unobserved_request_transmitted"])
         self.assertEqual(result["last_complete_offset"], len(raw))
         self.assertEqual(result["observed_final_vin_in_prefix"], VIN)
         self.assertTrue(decode(io.BytesIO(raw))["error"])
@@ -68,6 +71,10 @@ class FreezeNativePrefixTests(unittest.TestCase):
         self.assertEqual(report["complete_records"], 1)
         self.assertEqual(report["visited_frame_numbers_in_prefix"], [])
         self.assertTrue(report["replay_terminated_by_missing_observation"])
+        self.assertIsNone(report["last_observed_request_hex"])
+        self.assertEqual(report["next_unobserved_request_hex"], "0902")
+        self.assertFalse(report["unobserved_request_transmitted"])
+        self.assertEqual(report["unvisited_frame_numbers_in_prefix"], [0, 1])
         self.assertIsNone(report["observed_initial_vin_in_prefix"])
 
     def test_truncated_header_does_not_replay_tail(self):

@@ -148,6 +148,11 @@ def inspect_prefix(raw: bytes, *, expected_vin: str) -> dict:
         "discarded_tail_bytes": len(raw) - position,
         "interruption": interruption,
         "replay_terminated_by_missing_observation": synthesized,
+        "last_observed_request_hex": steps[-1]["request_hex"] if steps else None,
+        "next_unobserved_request_hex": (partial_result["steps"][len(observations)]["request_hex"]
+                                         if synthesized else None),
+        "unobserved_request_transmitted": False,
+        "unvisited_frame_numbers_in_prefix": partial_result["unvisited_frames"],
         "observed_initial_vin_in_prefix": partial_result["initial_vin"],
         "observed_final_vin_in_prefix": partial_result["final_vin"],
         "independently_replayed_steps": steps,
