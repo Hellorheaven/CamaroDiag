@@ -11,7 +11,7 @@ import socket
 import time
 from collections.abc import Callable
 from .j1979_campaign_evidence import decode_observation, summarize_observations
-from .j1979_monitor_scaling import scale_record
+from .j1979_monitor_scaling import scale_record, from_steps as scaled_monitor_records
 from .j1979_scaling_context import project as contextual_measurements, config_data, CONFIG_PIDS
 from .j1979_vehicle_info import can_info
 from .j1979_multi_signal import width as multi_width, decode_response as multi_decode, from_steps as multi_records
@@ -380,6 +380,7 @@ def scan(exchange: Exchange, *, budget: float = 180.0,
             "multi_signal_records": multi_records(steps),
             "status_records": status_records(steps),
             "contextual_measurements": contextual_measurements(steps),
+            "scaled_monitor_records": scaled_monitor_records(steps),
             "extended_vehicle_info": [s["decoded"] for s in steps
                                       if s["status"] == "RAW" and s["decoded"] is not None
                                       and s["request_hex"] in ("0908", "090B", "090D", "090F")],
