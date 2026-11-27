@@ -44,7 +44,8 @@ internal static class Program
         // Reject mixed native live options before any other driver path.
         if (args.Contains(CamaroDiagConnectors.Windows.J1979LiveNativeCli.CaptureCommand,StringComparer.OrdinalIgnoreCase) ||
             args.Contains(CamaroDiagConnectors.Windows.J1979LiveNativeCli.InspectCommand,StringComparer.OrdinalIgnoreCase) ||
-            args.Contains(CamaroDiagConnectors.Windows.J1979LiveNativeCli.CsvCommand,StringComparer.OrdinalIgnoreCase))
+            args.Contains(CamaroDiagConnectors.Windows.J1979LiveNativeCli.CsvCommand,StringComparer.OrdinalIgnoreCase) ||
+            args.Contains(CamaroDiagConnectors.Windows.J1979LiveNativeCli.PrefixCommand,StringComparer.OrdinalIgnoreCase))
             return CamaroDiagConnectors.Windows.J1979LiveNativeCli.Run(args);
 
         // Parse the complete backup invocation first; a mixed command never
