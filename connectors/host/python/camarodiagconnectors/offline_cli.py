@@ -13,6 +13,7 @@ from .doip_archive import verify_archive
 from .memory import Geometry, Patch, Region, Technology, plan_patches
 from .recovery_bundle import AndroidIdentity,inspect_bundle,write_report
 from .recovery_report_inspection import verify_recovery_report
+from .recovery_history import inspect_history as inspect_recovery_history
 from .j1979_live_inspection import inspect_file, compare_files
 from .j1979_network_inspection import inspect_network_file
 from .j1979_capture_inspection import verify_files as verify_j1979_capture
@@ -72,6 +73,17 @@ def _parser() -> argparse.ArgumentParser:
     recovery.add_argument("--original-bin",type=Path)
     recovery.add_argument("--expected-snapshot")
     recovery.add_argument("--output",type=Path,required=True)
+
+    recovery_history = commands.add_parser("verify-recovery-history",
+        help="Check explicitly ordered original-sector snapshots for rollback or divergence")
+    recovery_history.add_argument("--journal", type=Path, action="append", required=True)
+    recovery_history.add_argument("--platform", choices=("android", "windows"), required=True)
+    recovery_history.add_argument("--family")
+    recovery_history.add_argument("--controller")
+    recovery_history.add_argument("--firmware")
+    recovery_history.add_argument("--vin")
+    recovery_history.add_argument("--osid", type=_number)
+    recovery_history.add_argument("--output", type=Path, required=True)
 
     recovery_report = commands.add_parser("verify-recovery-report",
         help="Reproduce an Android or Windows recovery assessment from the original files")
@@ -156,6 +168,19 @@ def run(argv: Sequence[str] | None = None) -> dict[str, object]:
                               expected_vin=args.vin,expected_osid=args.osid,
                               original_bin=args.original_bin,expected_snapshot=args.expected_snapshot)
         return write_report(args.output,report)
+
+    if args.action == "verify-recovery-history":
+        identity = None
+        if args.platform == "android":
+            if not all((args.family, args.controller, args.firmware, args.vin)) or args.osid is not None:
+                raise ValueError("Android requires --family --controller --firmware --vin")
+            identity = AndroidIdentity(args.family, args.controller, args.firmware, args.vin).validate()
+        elif any((args.family, args.controller, args.firmware)):
+            raise ValueError("Windows target identity is read from metadata")
+        if args.output.resolve() in {p.resolve() for p in args.journal}:
+            raise ValueError("History output must differ from journal inputs")
+        return write_report(args.output, inspect_recovery_history(args.journal, args.platform,
+            android_identity=identity, expected_vin=args.vin, expected_osid=args.osid))
 
     if args.action == "verify-recovery-report":
         return write_report(args.output, verify_recovery_report(
