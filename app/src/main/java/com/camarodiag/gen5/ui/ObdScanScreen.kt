@@ -244,6 +244,7 @@ fun ObdScanScreen(
                         report.vehicleInfoReads.filter { it.infoType % 32 != 0 }.forEach { read ->
                             Text(stringResource(R.string.obd_mode09_raw, read.infoType), fontSize = 11.sp)
                             Text(read.rawResponse.take(1024), fontFamily = FontFamily.Monospace, fontSize = 11.sp)
+                            read.extendedRecords.forEach { J1979ExtendedVehicleInfoContent(it) }
                         }
                     }
                     InfoLine(stringResource(R.string.obd_supported_pids),
