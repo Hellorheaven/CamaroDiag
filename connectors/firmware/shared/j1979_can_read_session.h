@@ -20,11 +20,12 @@ class J1979CanReadSession {
   };
 
   J1979CanReadSession(uint32_t requestId,uint32_t responseId,bool extended,
-      const J1979FreezeScope* freeze=nullptr)
+      const J1979FreezeScope* freeze=nullptr,const J1979LiveScope* live=nullptr)
     :tx_(requestId),rx_(responseId),extended_(extended),
      observer_(responseId,extended),valid_(physicalPair(requestId,responseId,extended)),
-     scoped_(freeze!=nullptr),scope_(freeze?*freeze:J1979FreezeScope{}){
-    if(scoped_&&!scope_.valid())valid_=false;
+     scoped_(freeze!=nullptr),scope_(freeze?*freeze:J1979FreezeScope{}),
+     liveScoped_(live!=nullptr),liveScope_(live?*live:J1979LiveScope{}){
+    if((scoped_&&!scope_.valid())||(liveScoped_&&!liveScope_.valid())||(scoped_&&liveScoped_))valid_=false;
   }
 
   static bool physicalPair(uint32_t tx,uint32_t rx,bool ext){
@@ -37,7 +38,7 @@ class J1979CanReadSession {
   // Each session represents one request. No automatic resend.
   bool begin(const uint8_t* request,size_t size,uint32_t now,uint32_t timeout,Frame& outgoing){
     if(state_!=State::Idle||!valid_||timeout<1||timeout>4000u||
-       !(scoped_?scope_.allows(request,size):
+       !(scoped_?scope_.allows(request,size):liveScoped_?liveScope_.allows(request,size):
          J1979ReadEvidence::readRequest(J1979ReadEvidence::Variant::ClassicCan,request,size))||
        size>7)return false;
     std::memcpy(request_,request,size);
@@ -67,7 +68,8 @@ class J1979CanReadSession {
     }
     if(result!=IsoTpObserver::Result::Complete)return state_;
     const auto evidence=scoped_?J1979ReadEvidence::classifyFreeze(scope_,
-      request_,requestSize_,observer_.message(),observer_.size()):
+      request_,requestSize_,observer_.message(),observer_.size()):liveScoped_?
+      J1979ReadEvidence::classifyLive(liveScope_,request_,requestSize_,observer_.message(),observer_.size()):
       J1979ReadEvidence::classify(J1979ReadEvidence::Variant::ClassicCan,
         request_,requestSize_,observer_.message(),observer_.size());
     if(evidence==J1979ReadEvidence::Result::Pending){
@@ -101,6 +103,8 @@ class J1979CanReadSession {
   bool valid_;
   bool scoped_;
   const J1979FreezeScope scope_;
+  bool liveScoped_;
+  const J1979LiveScope liveScope_;
   State state_=State::Idle;
   uint32_t started_=0,timeout_=0;
   uint8_t request_[7]{};
