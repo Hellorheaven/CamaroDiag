@@ -79,7 +79,6 @@ object ObdCanMonitorRecords {
         0x8E to Scale("A", 0.001, true, 0.0),
         0x90 to Scale("ms", 1.0, true, 0.0),
         0x96 to Scale("degC", 0.1, true, 0.0),
-        0x99 to Scale("kPa", 0.1, true, 0.0),
         0x9C to Scale("deg", 0.01, true, 0.0),
         0x9D to Scale("deg", 0.5, true, 0.0),
         0xA8 to Scale("g/s", 1.0, true, 0.0),
