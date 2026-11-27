@@ -15,7 +15,7 @@ import re
 import statistics
 
 from .j1979_campaign_evidence import decode_observation
-from .j1979_live import Plan, numeric_pid, legacy_numeric_pid
+from .j1979_live import Plan, numeric_pid, legacy_numeric_pid, raw_sample
 from .j1979_multi_signal import width as multi_width, decode_response as multi_decode
 from .j1979_scaling_context import dependency, context_from_steps, config_data
 from .j1979_drive_cycle import TRIMS, trim_layout, live_signals as trim_signals
@@ -215,7 +215,9 @@ def inspect(root, *, expected_vin=None):
     cycles=_integer(_get(result,"requested_cycles"),1,1000,"requested cycles")
     interval=_integer(_get(result,"interval_ms"),100,60000,"interval")
     budget=_integer(_get(result,"budget_ms"),1,600000,"budget")
-    Plan(tuple(pids),vin,cycles,interval/1000,budget/1000).validate()
+    raw_only=_get(result,"raw_only",False)
+    _require(type(raw_only) is bool,"Invalid raw-only selection")
+    Plan(tuple(pids),vin,cycles,interval/1000,budget/1000,raw_only).validate()
     if expected_vin is not None:
         _require(vin==expected_vin,"Declared VIN differs from expected VIN")
     for obj in (root,result):
@@ -224,7 +226,7 @@ def inspect(root, *, expected_vin=None):
     groups={}
     protocol=None
     if legacy:
-        _require(all(legacy_numeric_pid(pid) for pid in pids),"PID exceeds legacy application width")
+        _require(raw_only or all(legacy_numeric_pid(pid) for pid in pids),"PID exceeds legacy application width")
         _require(_get(root,"physically_addressed",False) is False,"Legacy cannot claim physical addressing")
         source=_id(_get(root,"selected_response_source"))
         _require(valid_source(source),"Invalid selected legacy source")
@@ -240,14 +242,14 @@ def inspect(root, *, expected_vin=None):
         channel={"kind":"can","tx":tx,"rx":rx}
     rows=_array(result.get("observations"),MAX_ROWS,"observations")
     admissions=_array(result.get("admission"),256,"admission")
-    required_configs=sorted({dependency(pid) for pid in pids if dependency(pid) is not None})
+    required_configs=[] if raw_only else sorted({dependency(pid) for pid in pids if dependency(pid) is not None})
     claimed_scaling=_get(result,"scaling_configuration")
     scoped_scaling=claimed_scaling is not None
     _require(not scoped_scaling or bool(required_configs),"Unexpected scaling configuration")
     claimed_layout=_get(result,"trim_layout")
     contextual_trims=claimed_layout is not None
-    _require(not contextual_trims or any(pid in TRIMS for pid in pids),"Unexpected trim layout")
-    _require(contextual_trims or not any(0x55<=pid<=0x58 for pid in pids),"Missing secondary trim layout")
+    _require(not contextual_trims or not raw_only and any(pid in TRIMS for pid in pids),"Unexpected trim layout")
+    _require(raw_only or contextual_trims or not any(0x55<=pid<=0x58 for pid in pids),"Missing secondary trim layout")
     layout_rows=[]
     layout_attempted=False
     scale_rows=[]
@@ -288,6 +290,7 @@ def inspect(root, *, expected_vin=None):
     last_start=None
     last_identity=None
     terminal=False
+    raw_bytes=0
     for index,(start,end,group,_,row) in enumerate(combined):
         _require(start>=last_end,"Overlapping sequential exchanges")
         last_end=end
@@ -297,7 +300,9 @@ def inspect(root, *, expected_vin=None):
         req=_hex(_get(row,"request_hex"),2)
         raw=_get(row,"response_hex")
         res=None if raw is None else _hex(raw)
-        ev=decode_observation(req,res) if res is not None else None
+        raw_bytes+=len(res) if res is not None else 0
+        if raw_only:_require(raw_bytes<=16*1024*1024,"Raw live payload evidence exceeds bound")
+        ev=(raw_sample(req,res,legacy=legacy) if raw_only and group=="sample" else decode_observation(req,res)) if res is not None else None
         if status in ("PASSED","RAW","NEGATIVE"):
             _require(ev is not None and ev["shape"]==status,"Response and status do not correlate")
             _require(end<=budget+1,"Successful response beyond budget")
@@ -330,7 +335,14 @@ def inspect(root, *, expected_vin=None):
             counts[pid][status]+=1
             measured=ev.get("measurement") if status=="PASSED" else None
             signals=None
-            if (multi_width(pid) is not None or contextual_trims and pid in TRIMS) and status in ("RAW","PASSED"):
+            if raw_only:
+                _require(value is None and declared_multi in (None,[]),
+                         "Raw-only sample cannot carry interpreted values")
+                _require(status!="PASSED", "Raw-only response cannot claim decoded measurement")
+                if status=="RAW":
+                    _require(row.get("detail")=="RAW_UNINTERPRETED","Missing raw interpretation boundary")
+                measured=None
+            elif (multi_width(pid) is not None or contextual_trims and pid in TRIMS) and status in ("RAW","PASSED"):
                 signals=trim_signals(req,res,trim_layout(scale_rows+layout_rows)) if contextual_trims and pid in TRIMS else multi_decode(req,res)
                 _require(signals is not None and value is None,"Invalid multi-signal response")
                 if context is not None and dependency(pid) is not None:
@@ -363,7 +375,8 @@ def inspect(root, *, expected_vin=None):
                          "Failed or missing response cannot carry a measurement")
             clean.append({"cycle":cycle,"pid":pid,"elapsed_ms":end,"status":status,
                           "number":measured["number"] if measured else None,
-                          "unit":measured["unit"] if measured else None,"multi_signals":signals})
+                          "unit":measured["unit"] if measured else None,"multi_signals":signals,
+                          **({"response_hex":res.hex().upper() if res is not None else None} if raw_only else {})})
             sample_index+=1
         elif phase in ("INITIAL_VIN","PERIODIC_VIN","FINAL_VIN"):
             _require(req==b"\x09\x02" and value is None,"Unexpected identity request")
@@ -470,7 +483,7 @@ def inspect(root, *, expected_vin=None):
             "maximum":max(numbers),"mean":statistics.fmean(numbers),
             "last_verified_value":seq[-1][0],"last_verified_elapsed_ms":seq[-1][1]})
     declared_signals=_get(result,"multi_signal_summary")
-    if declared_signals is not None or contextual_trims or any(multi_width(pid) is not None for pid in pids):
+    if declared_signals is not None or contextual_trims or not raw_only and any(multi_width(pid) is not None for pid in pids):
         declared_signals=_array(declared_signals,320,"multi-signal summary")
         _require(len(declared_signals)==len(signal_summaries),"Missing or excess channel summaries")
         for raw,wanted in zip(declared_signals,signal_summaries):
@@ -481,7 +494,8 @@ def inspect(root, *, expected_vin=None):
                          else type(actual) is type(val) and actual==val,"Multi-signal summary differs: "+key)
     if completed:
         _require(final and identity==vin and not terminal and recorded_cycles==cycles and
-                 (any(samples.values()) or bool(multi_samples)) and _get(result,"stop_reason") is None,
+                 (all(counts[pid].get("RAW",0)>0 for pid in pids) if raw_only else
+                  any(samples.values()) or bool(multi_samples)) and _get(result,"stop_reason") is None,
                  "Completion not established by observations")
     else:
         _require(isinstance(_get(result,"stop_reason"),str) and _get(result,"stop_reason"),
@@ -489,7 +503,7 @@ def inspect(root, *, expected_vin=None):
     return {"schema":"camarodiag-j1979-live-inspection-v1","verified":True,
             "completed":completed,"declared_vin":vin,"initial_vin":initial,"final_identity_verified":final and identity==vin,
             "channel":channel,"requested_cycles":cycles,"completed_cycles":recorded_cycles,
-            "selected_pids":pids,"advertised_pids":sorted(advertised),"inventory_complete":inventory_complete,
+            "raw_only":raw_only,"selected_pids":pids,"advertised_pids":sorted(advertised),"inventory_complete":inventory_complete,
             "summary":summaries,"multi_signal_summary":signal_summaries,"samples":clean,
             "trim_layout":derived_layout,"scaling_configuration":derived_scaling,"scaling_context_verified":not required_configs or (scoped_scaling and all(context_from_steps(scale_rows).get(c).state!="UNVERIFIED" for c in required_configs)),"physical_vehicle_verified":False,
             "authenticated":False,"whole_vehicle_coverage_verified":False,
