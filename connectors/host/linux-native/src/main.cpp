@@ -11,6 +11,7 @@
 #include "j1979_discovery.hpp"
 #include "j1979_legacy_scan.hpp"
 #include "j1979_legacy_scan_wire.hpp"
+#include "j1979_legacy_mutation.hpp"
 #include "j1979_legacy_freeze_wire.hpp"
 #include "j1979_legacy_live_wire.hpp"
 #include <time.h>
@@ -1718,6 +1719,121 @@ static int legacy_scan_replay(const char* protocol,const char* source,const char
     }catch(const std::exception& e){return error(e.what());}
 }
 
+struct LegacyMaintenanceOptions{
+    cd::legacy::MutationPlan plan;
+    const char* port{},*baseline{},*intent{},*output{};
+    uint32_t baud{38400};
+    bool protocol{},operation{},engine{},baud_set{},budget_set{},confirmed{},warning{};
+};
+static bool parse_legacy_maintenance(int argc,char** argv,LegacyMaintenanceOptions& o){
+    for(int i=2;i<argc;++i){
+        const std::string_view flag=argv[i];
+        if(flag=="--confirm-functional-scope"||flag=="--acknowledge-maintenance-warning"){
+            auto& seen=flag=="--confirm-functional-scope"?o.confirmed:o.warning;
+            if(seen)return false;
+            seen=true;continue;
+        }
+        if(i+1>=argc||argv[i+1][0]=='-'||!*argv[i+1])return false;
+        const char* value=argv[++i];
+        if(flag=="--protocol"){
+            uint32_t n=0;if(o.protocol||!decimal_uint32(value,&n)||n<1||n>5)return false;
+            o.protocol=true;o.plan.protocol=static_cast<cd::legacy::Protocol>(n);
+        }else if(flag=="--operation"){
+            if(o.operation)return false;
+            o.operation=true;
+            if(!strcmp(value,"clear"))o.plan.operation=cd::legacy::MutationOperation::clear;
+            else if(!strcmp(value,"evap"))o.plan.operation=cd::legacy::MutationOperation::evap;
+            else return false;
+        }else if(flag=="--engine-source"||flag=="--source"){
+            uint32_t n=0;
+            if(strlen(value)!=2||!hex_uint32(value,&n)||!cd::legacy::valid_source(n))return false;
+            if(flag=="--engine-source"){
+                if(o.engine)return false;
+                o.engine=true;o.plan.engine=n;
+            }else if(o.plan.sources.size()>=32||!o.plan.sources.insert(n).second)return false;
+        }else if(flag=="--vin"){
+            if(!o.plan.vin.empty())return false;
+            o.plan.vin=value;
+        }else if(flag=="--budget-ms"||flag=="--baud"){
+            auto& seen=flag=="--baud"?o.baud_set:o.budget_set;
+            uint32_t n=0;if(seen||!decimal_uint32(value,&n))return false;
+            seen=true;if(flag=="--baud")o.baud=n;else o.plan.budget_ms=n;
+        }else{
+            const char** slot=nullptr;
+            if(flag=="--port")slot=&o.port;
+            else if(flag=="--baseline")slot=&o.baseline;
+            else if(flag=="--intent")slot=&o.intent;
+            else if(flag=="--output")slot=&o.output;
+            if(!slot||*slot)return false;
+            *slot=value;
+        }
+    }
+    return o.protocol&&o.operation&&o.engine&&o.confirmed&&o.warning&&o.port&&o.baseline&&o.intent&&o.output&&
+        strcmp(o.baseline,o.intent)&&strcmp(o.baseline,o.output)&&strcmp(o.intent,o.output)&&o.plan.valid();
+}
+static bool sync_parent(const char* path){
+    const std::string name(path);
+    const auto slash=name.find_last_of('/');
+    const auto dir=slash==std::string::npos?std::string("."):slash==0?std::string("/"):name.substr(0,slash);
+    const int fd=open(dir.c_str(),O_RDONLY|O_DIRECTORY|O_CLOEXEC);
+    if(fd<0)return false;
+    const bool synced=fsync(fd)==0;const bool closed=close(fd)==0;return synced&&closed;
+}
+static int legacy_maintenance_cli(int argc,char** argv){
+    LegacyMaintenanceOptions o;
+    if(!parse_legacy_maintenance(argc,argv,o))return error("Explicit functional scope, documented ECU set, VIN, separate journals and warnings required");
+    if(!isatty(STDIN_FILENO))return error("Interactive local consent required");
+    fputs("WARNING: functional legacy requests may affect ECUs outside the observed set. "
+        "Clearing DTCs can erase diagnostic and readiness data; EVAP is an active test. "
+        "Verify manufacturer safety conditions and authorized stationary vehicle. "
+        "No automatic retry. Type AUTHORIZE VEHICLE WIDE: ",stderr);
+    char answer[64]{};
+    if(!fgets(answer,sizeof(answer),stdin)||strcmp(answer,"AUTHORIZE VEHICLE WIDE\n"))return error("Consent refused");
+    struct File{
+        const char* path;
+        int fd{-1};
+        explicit File(const char* p):path(p),fd(open(p,O_WRONLY|O_CREAT|O_EXCL|O_NOFOLLOW|O_CLOEXEC,0600)){}
+        ~File(){if(fd>=0)close(fd);}
+        bool persist(std::string_view text){
+            return fd>=0&&write_owned_file(fd,text.data(),text.size())&&sync_parent(path);
+        }
+    };
+    // All three unique destinations must be reserved before adapter access.
+    File baseline(o.baseline),intent(o.intent),output(o.output);
+    if(baseline.fd<0||intent.fd<0||output.fd<0)return error("Maintenance journal paths unavailable");
+    legacy_cancelled=0;
+    struct Signals{
+        struct sigaction oldint{},oldterm{};
+        bool intr{},term{};
+        Signals(){
+            struct sigaction act{};act.sa_handler=legacy_signal;sigemptyset(&act.sa_mask);
+            intr=sigaction(SIGINT,&act,&oldint)==0;
+            term=intr&&sigaction(SIGTERM,&act,&oldterm)==0;
+        }
+        ~Signals(){if(term)sigaction(SIGTERM,&oldterm,nullptr);if(intr)sigaction(SIGINT,&oldint,nullptr);}
+    } signals;
+    cd::legacy::MutationResult r{};r.plan=o.plan;
+    try{
+        if(!signals.term)throw cd::legacy::TransportError("SIGNAL_HANDLERS_UNAVAILABLE");
+        const auto current=[](){return legacy_cancelled==0;};
+        auto link=cd::legacy::serial_link(o.port,o.baud,current);
+        cd::legacy::Elm elm(*link,o.plan.protocol,true,current);elm.configure();
+        cd::legacy::MutationSession session(elm);
+        r=session.run(o.plan,true,true,cd::legacy::monotonic_ms,current,
+            [&](std::string_view stage,const cd::legacy::MutationResult& observed){
+                auto snapshot=observed;snapshot.outcome=stage;
+                auto& file=stage=="BASELINE"?baseline:intent;
+                if(!file.persist(cd::legacy::mutation_report(snapshot)))
+                    throw cd::legacy::TransportError("DURABLE_JOURNAL_WRITE_FAILED");
+            });
+    }catch(const std::exception& e){r.reason=e.what();}
+    try{
+        const auto report=cd::legacy::mutation_report(r);
+        if(!output.persist(report))return error("Final maintenance report failed; retain intent and never retry automatically");
+        return (r.outcome=="ACKNOWLEDGED_READBACK"&&r.reason.empty())||r.outcome=="ACKNOWLEDGED"?0:2;
+    }catch(const std::exception& e){return error(e.what());}
+}
+
 static void usage(FILE *stream) {
     fprintf(stream,
         "CamaroDiag Linux native C++20 — SAE J1979\n"
@@ -1753,6 +1869,7 @@ static void usage(FILE *stream) {
         "  camarodiag-native --verify-j1979-legacy-live PROTOCOL SOURCE VIN CAPTURE.llr REPORT.json PROOF.json\n"
         "  camarodiag-native --inspect-j1979-legacy-scan PROTOCOL SOURCE VIN CAPTURE.lsr REPORT.json\n"
         "  camarodiag-native --verify-j1979-legacy-scan PROTOCOL SOURCE VIN CAPTURE.lsr REPORT.json PROOF.json\n"
+        "  camarodiag-native --j1979-legacy-maintenance --operation clear --port /dev/ttyUSB0 --protocol 2 --engine-source 10 --source 10 --vin VIN --baseline baseline.json --intent intent.json --output result.json --confirm-functional-scope --acknowledge-maintenance-warning\n"
         "  camarodiag-native --inspect-j1979-legacy-discovery PROTOCOL RAW_RESPONSE RAW_ATDPN REPORT.json\n"
         "  camarodiag-native --help\n"
         "Examples:\n"
@@ -1773,6 +1890,7 @@ int main(int argc, char **argv) {
     if (argc==8 && !strcmp(argv[1],"--verify-j1979-legacy-freeze"))return legacy_freeze_replay(argv[2],argv[3],argv[4],argv[5],argv[6],argv[7]);
     if (argc==7 && !strcmp(argv[1],"--inspect-j1979-legacy-scan"))return legacy_scan_replay(argv[2],argv[3],argv[4],argv[5],argv[6],nullptr);
     if (argc==8 && !strcmp(argv[1],"--verify-j1979-legacy-scan"))return legacy_scan_replay(argv[2],argv[3],argv[4],argv[5],argv[6],argv[7]);
+    if (argc>=3 && !strcmp(argv[1],"--j1979-legacy-maintenance"))return legacy_maintenance_cli(argc,argv);
     if (argc>=3 && !strcmp(argv[1],"--j1979-legacy"))return legacy_discovery_cli(argc,argv,true);
     if (argc>=3 && !strcmp(argv[1],"--j1979-legacy-discover"))return legacy_discovery_cli(argc,argv);
     if (argc==6 && !strcmp(argv[1],"--inspect-j1979-legacy-discovery"))return replay_legacy_discovery(argv[2],argv[3],argv[4],argv[5]);
