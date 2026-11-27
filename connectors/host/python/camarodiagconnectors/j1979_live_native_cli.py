@@ -19,7 +19,7 @@ import struct
 import zlib
 
 from .j1979_live_native import (
-    NativeLiveProfile, hello, proof, decode, inspect_file, require, valid_vin,
+    NativeLiveProfile, hello, proof, decode, inspect_file, inspect_prefix_file, require, valid_vin,
     HEADER, MAX_BODY, MAX_CAPTURE, MAX_STEPS,
 )
 from .recovery_bundle import _regular, _json
@@ -289,6 +289,11 @@ def parser():
     offline.add_argument("--capture", type=Path, required=True)
     offline.add_argument("--output", type=Path, required=True)
     offline.add_argument("--vin", required=True)
+    prefix = commands.add_parser("inspect-prefix", allow_abbrev=False,
+                                 help="Inspect complete records from an interrupted capture; no completion claim")
+    prefix.add_argument("--capture", type=Path, required=True)
+    prefix.add_argument("--output", type=Path, required=True)
+    prefix.add_argument("--vin", required=True)
     csv_export = commands.add_parser("export-csv", allow_abbrev=False)
     csv_export.add_argument("--capture", type=Path, required=True)
     csv_export.add_argument("--output", type=Path, required=True)
@@ -324,6 +329,10 @@ def run(argv=None):
     if args.command == "capture":
         paths.append(args.key_file)
     require(len({p.resolve() for p in paths}) == len(paths), "Input and output paths must differ")
+    if args.command == "inspect-prefix":
+        report = inspect_prefix_file(args.capture, expected_vin=args.vin)
+        write_new(args.output, report)
+        return report
     if args.command == "export-csv":
         return export_csv(args.capture, args.output, expected_vin=args.vin)
     if args.command == "verify":
@@ -402,6 +411,12 @@ def main():
     except (OSError, ValueError, EOFError) as exc:
         print(str(exc), file=sys.stderr)
         raise SystemExit(2) from exc
+    if report["schema"] == "camarodiag-j1979-native-live-prefix-v1":
+        print(json.dumps({"prefix_integrity_verified": True,
+                          "complete_records": report["complete_records"],
+                          "discarded_tail_bytes": report["discarded_tail_bytes"],
+                          "execution_completed": False}, ensure_ascii=True))
+        raise SystemExit(7)
     if report["schema"] in ("camarodiag-j1979-native-live-verification-v1",
                              "camarodiag-j1979-native-live-csv-export-v1"):
         integrity = report["verified"]
