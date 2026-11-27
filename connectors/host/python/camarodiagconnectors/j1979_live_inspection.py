@@ -15,7 +15,8 @@ import re
 import statistics
 
 from .j1979_campaign_evidence import decode_observation
-from .j1979_live import Plan, numeric_pid
+from .j1979_live import Plan, numeric_pid, legacy_numeric_pid
+from .j1979_multi_signal import width as multi_width, decode_response as multi_decode
 from .j1979 import physical_pair
 from .j1979_legacy_discovery import valid_source
 from .j1979_legacy_frames import checksum
@@ -160,7 +161,7 @@ def _match_legacy(group, request, response, status, protocol, driver):
     commands = [item[0] for item in group]
     if request != b"\x09\x02":
         _require(commands == [request.hex().upper()], "Unexpected legacy sample exchange sequence")
-        if status in ("PASSED","NEGATIVE"):
+        if status in ("PASSED","RAW","NEGATIVE"):
             _require(group[0][1] == [response] and group[0][2] in ("CORRELATED","PASSED","NEGATIVE"),
                      "Normalized sample does not match selected source")
         return
@@ -221,6 +222,7 @@ def inspect(root, *, expected_vin=None):
     groups={}
     protocol=None
     if legacy:
+        _require(all(legacy_numeric_pid(pid) for pid in pids),"PID exceeds legacy application width")
         _require(_get(root,"physically_addressed",False) is False,"Legacy cannot claim physical addressing")
         source=_id(_get(root,"selected_response_source"))
         _require(valid_source(source),"Invalid selected legacy source")
@@ -265,6 +267,7 @@ def inspect(root, *, expected_vin=None):
     identity_count=0
     counts={pid:defaultdict(int) for pid in pids}
     samples={pid:[] for pid in pids}
+    multi_samples=defaultdict(list)
     clean=[]
     sample_index=0
     last_end=0
@@ -276,15 +279,18 @@ def inspect(root, *, expected_vin=None):
         last_end=end
         phase=row.get("phase")
         status=row.get("status")
-        _require(status in ("PASSED","NEGATIVE","TIMEOUT","FAILED","NOT_TESTED"),"Unknown live status")
+        _require(status in ("PASSED","RAW","NEGATIVE","TIMEOUT","FAILED","NOT_TESTED"),"Unknown live status")
         req=_hex(_get(row,"request_hex"),2)
         raw=_get(row,"response_hex")
         res=None if raw is None else _hex(raw)
         ev=decode_observation(req,res) if res is not None else None
-        if status in ("PASSED","NEGATIVE"):
+        if status in ("PASSED","RAW","NEGATIVE"):
             _require(ev is not None and ev["shape"]==status,"Response and status do not correlate")
             _require(end<=budget+1,"Successful response beyond budget")
         value=row.get("measurement")
+        declared_multi=_get(row,"multi_signals")
+        if group!="sample":
+            _require(status!="RAW" and declared_multi in (None,[]),"Admission cannot carry multi-channel samples")
         if legacy:
             _match_legacy(groups.get(index),req,res,status,protocol,driver)
         _require(not terminal,"Observation after terminal condition")
@@ -303,16 +309,33 @@ def inspect(root, *, expected_vin=None):
                 last_start=start
             counts[pid][status]+=1
             measured=ev.get("measurement") if status=="PASSED" else None
-            if status=="PASSED":
+            signals=None
+            if multi_width(pid) is not None and status in ("RAW","PASSED"):
+                signals=multi_decode(req,res)
+                _require(signals is not None and value is None,"Invalid multi-signal response")
+                claimed=_array(declared_multi,8,"multi-signal values")
+                _require(len(claimed)==len(signals),"Missing or extra signal values")
+                for raw,signal in zip(claimed,signals):
+                    raw=_dict(raw,"multi-signal value")
+                    _require(raw.get("pid")==pid and raw.get("name")==signal["name"] and
+                             raw.get("unit")==signal["unit"] and
+                             type(_get(raw,"raw_encoded")) is int and
+                             _get(raw,"raw_encoded")==signal["raw_encoded"] and
+                             _same_number(raw.get("number"),signal["number"]),"Multi-signal value differs from raw bytes")
+                    multi_samples[(pid,signal["name"])].append((signal["number"],end,signal["unit"]))
+                measured=None
+            elif status=="PASSED":
+                _require(declared_multi in (None,[]),"Single measurement carries unexpected signal vector")
                 _require(measured is not None and isinstance(value,dict),"Missing numeric measurement")
                 _require(value.get("name")==measured["name"] and value.get("unit")==measured["unit"]
                          and _same_number(value.get("number"),measured["number"]),"Measurement differs from raw response")
                 samples[pid].append((measured["number"],end,measured["name"],measured["unit"]))
             else:
-                _require(value is None,"Failed or missing response cannot carry numeric measurement")
+                _require(status!="RAW" and declared_multi in (None,[]) and value is None,
+                         "Failed or missing response cannot carry a measurement")
             clean.append({"cycle":cycle,"pid":pid,"elapsed_ms":end,"status":status,
                           "number":measured["number"] if measured else None,
-                          "unit":measured["unit"] if measured else None})
+                          "unit":measured["unit"] if measured else None,"multi_signals":signals})
             sample_index+=1
         elif phase in ("INITIAL_VIN","PERIODIC_VIN","FINAL_VIN"):
             _require(req==b"\x09\x02" and value is None,"Unexpected identity request")
@@ -377,9 +400,27 @@ def inspect(root, *, expected_vin=None):
             _require(_same_number(actual,val) if name in ("minimum","maximum","mean","last_verified_value")
                      and val is not None else actual==val,"PID summary differs: "+name)
         summaries.append(summary)
+    signal_summaries=[]
+    for (pid,name),seq in sorted(multi_samples.items()):
+        numbers=[x[0] for x in seq]
+        attempts=sum(counts[pid].values())
+        signal_summaries.append({"pid":pid,"name":name,"unit":seq[-1][2],"count":len(seq),
+            "attempted":attempts,"missing":attempts-len(seq),"minimum":min(numbers),
+            "maximum":max(numbers),"mean":statistics.fmean(numbers),
+            "last_verified_value":seq[-1][0],"last_verified_elapsed_ms":seq[-1][1]})
+    declared_signals=_get(result,"multi_signal_summary")
+    if declared_signals is not None or any(multi_width(pid) is not None for pid in pids):
+        declared_signals=_array(declared_signals,256,"multi-signal summary")
+        _require(len(declared_signals)==len(signal_summaries),"Missing or excess channel summaries")
+        for raw,wanted in zip(declared_signals,signal_summaries):
+            raw=_dict(raw,"channel summary")
+            for key,val in wanted.items():
+                actual=_get(raw,key)
+                _require(_same_number(actual,val) if key in ("minimum","maximum","mean","last_verified_value")
+                         else type(actual) is type(val) and actual==val,"Multi-signal summary differs: "+key)
     if completed:
         _require(final and identity==vin and not terminal and recorded_cycles==cycles and
-                 any(samples.values()) and _get(result,"stop_reason") is None,
+                 (any(samples.values()) or bool(multi_samples)) and _get(result,"stop_reason") is None,
                  "Completion not established by observations")
     else:
         _require(isinstance(_get(result,"stop_reason"),str) and _get(result,"stop_reason"),
@@ -388,7 +429,7 @@ def inspect(root, *, expected_vin=None):
             "completed":completed,"declared_vin":vin,"initial_vin":initial,"final_identity_verified":final and identity==vin,
             "channel":channel,"requested_cycles":cycles,"completed_cycles":recorded_cycles,
             "selected_pids":pids,"advertised_pids":sorted(advertised),"inventory_complete":inventory_complete,
-            "summary":summaries,"samples":clean,"physical_vehicle_verified":False,
+            "summary":summaries,"multi_signal_summary":signal_summaries,"samples":clean,"physical_vehicle_verified":False,
             "authenticated":False,"whole_vehicle_coverage_verified":False,
             "stop_reason":_get(result,"stop_reason")}
 
