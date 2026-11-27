@@ -80,4 +80,5 @@ int cf1_inspect_complete(const uint8_t *raw, size_t length,
 void cf1_evidence_free(cf1_evidence *evidence);
 uint32_t cf1_crc32(const uint8_t *data, size_t size);
 bool cf1_valid_vin(const char *vin);
+bool cf1_valid_plan(const cf1_plan *plan);
 #endif

@@ -48,6 +48,19 @@ static bool physical_pair(uint32_t tx, uint32_t rx, bool extended) {
     return tx <= 0x1fffffffu && (tx & 0x1fff00ffu) == 0x18da00f1u &&
         ((tx >> 8) & 255u) < 0xf0u && rx == (0x18daf100u | ((tx >> 8) & 255u));
 }
+bool cf1_valid_plan(const cf1_plan *p) {
+    if (!p || !physical_pair(p->tx, p->rx, p->extended) ||
+        p->budget_ms < 1000 || p->budget_ms > 600000 ||
+        !cf1_valid_vin(p->vin) ||
+        p->frame_count == 0 || p->frame_count > CF1_MAX_FRAMES ||
+        p->pid_count > CF1_MAX_PIDS ||
+        !distinct(p->frames, p->frame_count) ||
+        !distinct(p->pids, p->pid_count)) return false;
+    for (size_t i = 0; i < p->pid_count; ++i)
+        if (p->pids[i] == 0 || p->pids[i] == 2 || p->pids[i] % 32 == 0)
+            return false;
+    return true;
+}
 static int decode_plan(const uint8_t *body, cf1_plan *p,
                        const char *expected, char *err, size_t cap) {
     memset(p, 0, sizeof(*p));
