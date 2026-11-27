@@ -116,7 +116,7 @@ internal sealed class J1979MaintenanceUsb(J1979UsbCapture.ILink link,Func<long>?
                 attempted=true;link.Write(proof,timeout);sent=true;
             }
             finally{CryptographicOperations.ZeroMemory(proof);}
-            start=now();int budget=profile.BudgetMs+20000;
+            start=now();int budget=profile.BudgetMs+40000;
             var (length,recovery)=Header(Read(ResultSize,start,budget,current,null,null));
             envelopeRecovery=recovery;
             _=Read(length,start,budget,current,raw,copy);
