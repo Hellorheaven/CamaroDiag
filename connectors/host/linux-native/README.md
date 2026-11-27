@@ -300,3 +300,9 @@ camarodiag-native --verify-j1979-legacy-live 2 10 VIN capture.llr report.json pr
 ```
 
 Les tests sont raccordés au Makefile et réservés au gate de clôture. Aucune validation matérielle, compilation ou livraison APK ne résulte de ce portage.
+
+## Rejeu de scan, maintenance, découverte réseau et catalogues locaux
+
+Ce lot ajoute des chemins C++20 pour le scan legacy LSR/1, la maintenance legacy, la découverte CAN classique avec sélection physique explicite des calculateurs, et les catalogues de mesures fournis localement. Les projections sont calculées en fractions exactes et sont conditionnées à la vérification de la capture, du VIN, de la portée du transport et de l'empreinte SHA-256 de la référence. La CLI expose les options dans `--help`. Les rapports et preuves natifs ne sont pas automatiquement interchangeables avec les anciens schémas Python.
+
+La maintenance legacy demande une confirmation interactive et des journaux distincts ; une commande d'incertitude ne doit jamais être relancée automatiquement. Les captures de lecture legacy restent enregistrées en fin d'acquisition. Les tests de ce lot sont intégrés mais non exécutés ; aucune qualification matérielle, parité totale ni couverture normative n'est revendiquée.

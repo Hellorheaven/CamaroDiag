@@ -1,3 +1,12 @@
+## Reprise PR117 — rejeu legacy, maintenance, découverte CAN et catalogues (27/11/2026)
+
+- Base `c0f582ad45c45de3a2f5cd26d729e85a26a89215`, dernier SHA code `d4b042da2f48991c48a2846b55d5899483420b1d`. Comparaison GitHub avant documentation : **20 commits, 33 fichiers, +2702/-36 lignes**. Objectif de 10 000 lignes non atteint ; aucun build/test exécuté.
+- Linux C++20 : rejeu déterministe du scan legacy, format LSR/1 borné, CLI et preuve canonique ; maintenance legacy Mode 04/08 avec sources et moteur explicites, consentement, vérifications du VIN et de l'immobilité, journal initial/intention distincts, écriture exclusive et relecture, aucune relance automatique.
+- Découverte CAN classique 11/29 bits : classification PID00, réponses contradictoires exclues, sélection physique explicite par calculateur, liens ISO-TP isolés, budget commun, rapports, tests synthétiques. Aucun certificat de couverture véhicule.
+- Catalogues locaux : JSON strict et borné, SHA-256 de la référence, définitions live/freeze et portée transport, fractions exactes avec OpenSSL, extraction de bits, valeurs indisponibles et énumérations ; projection CL/1, CF/1 et LLR/1 rejouées, inventaire et vérification des exports. Aucun contenu normatif J1979DA_202607 inventé.
+- Reste avant clôture : parité complète avec Python (dont maintenance CAN directe, chemins ELM CAN, compatibilité des rapports historiques et persistance incrémentale des captures legacy), rapprochement indépendant de maintenance et raccordements produit. Les tests ajoutés sont non exécutés. Qualification matérielle séparée. Les fichiers historiques ne sont pas supprimés sans parité démontrée.
+- APK 2.0.47 (versionCode 64) non générée, signée ni publiée ; PR #117 ouverte. Respecter le gate unique de clôture J1979 avant publication, puis autres protocoles et C6/C8 selon l'ordre convenu. Aucun merge non autorisé.
+
 ## Reprise PR117 — maintenance CU/4–CU/5, Mode 02 et Mode 01 legacy (27/11/2026)
 
 - Base `e881d4b155e55312be6913f371917e28202280a0`, dernier SHA de code `f52c360ab516c96f19363e58ccac9b9b70ee8090` ; comparaison GitHub avant documentation : **21 commits, 33 fichiers, +2762/-38 lignes**. Objectif 10 000 lignes non atteint. Aucun build, test ou APK exécuté.

@@ -42,3 +42,7 @@ SHA code : `2f466499f6e0b3a2e9b506b4dd5675cc7291f77b`. Authentification et trans
 - Reste : CU/1 et parité des données dérivées du rapport Python CJ/1, autres fonctions Python et migration des 19 fichiers C MPC5566 selon contraintes de cible. Le corpus Python reste présent (128 fichiers) comme référence jusqu'à parité démontrée. Ne pas le supprimer par simple renommage.
 - Protocole SAE J1979 toujours ouvert ; aucun passage à C6 ni aux autres protocoles. Référence normative J1979DA_202607 toujours non disponible, qualification physique encore à établir. Aucun checkpoint intermédiaire. APK v2.0.47 (versionCode 64) non produite : poursuivre jusqu'à clôture réelle, gate final unique, puis production et vérification de l'APK signée selon la procédure de v2.0.46. PR non fusionnée.
 
+
+## Reprise du lot natif — 27/11/2026
+
+SHA code : `d4b042da2f48991c48a2846b55d5899483420b1d`. Le scan legacy LSR/1, la maintenance fonctionnelle legacy, la découverte CAN et les campagnes physiques multi-ECU, ainsi que les catalogues locaux et leurs projections CL/1, CF/1 et LLR/1 disposent maintenant de chemins C++20 et de tests de régression écrits. Les schémas et la compatibilité historique restent à rapprocher. Le journal de maintenance et son intention sont persistés et relus avant commande ; la persistance des captures de lecture n'est pas encore incrémentale. Pas de validation exécutée, pas de suppression du corpus Python ni du noyau C MPC5566, pas de release APK.
