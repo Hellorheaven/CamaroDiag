@@ -92,6 +92,9 @@ data class FunctionalTestState(
     val legacyResult: com.camarodiag.gen5.data.obd.LegacyMutationResult? = null,
     val legacyDiscovery: com.camarodiag.gen5.data.obd.LegacySourceDiscovery? = null,
     val legacyRead: com.camarodiag.gen5.data.obd.LegacyReadReport? = null,
+    val livePlan: com.camarodiag.gen5.data.obd.J1979LivePlan? = null,
+    val liveReport: com.camarodiag.gen5.data.obd.J1979LiveReport? = null,
+    val liveRecent: List<com.camarodiag.gen5.data.obd.J1979LiveObservation> = emptyList(),
     val nativeUsbEvidence: String? = null
 ) {
     val canExport: Boolean get() = !running && finishedAtMillis != null && context != null && checks.isNotEmpty()

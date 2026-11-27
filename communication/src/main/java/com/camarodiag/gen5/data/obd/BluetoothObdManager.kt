@@ -1120,6 +1120,65 @@ class BluetoothObdManager(context: Context) {
         }
     }
 
+    val j1979LiveProtocol: Int? get() = standardElmProfile.protocol.takeIf { isElmEvapCandidate }
+
+    /** Hold the same exclusive lock as the console and other ELM sessions.
+     * Only the recorder's exact Mode 01/09 allowlist may cross this boundary. */
+    suspend fun runJ1979Live(plan: J1979LivePlan,isCurrent: ()->Boolean,
+        onSample: (J1979LiveObservation)->Unit,retain: (J1979LiveReport)->Unit): J1979LiveReport {
+        require(plan.valid)
+        val epoch=transportSessionEpoch.capture()
+        val original=standardElmProfile
+        val target=plan.target
+        val tx=target.idHex(requireNotNull(target.requestId))
+        val rx=target.idHex(target.responseId)
+        fun guard(){
+            transportSessionEpoch.requireQueuedCurrent(epoch)
+            check(isCurrent()) { "Live recording context changed." }
+        }
+        return commandSessionMutex.withLock {
+            guard()
+            check(j1979LiveProtocol==target.protocol&&standardElmProfile==original)
+            try {
+                for(command in listOf("ATSP${target.protocol}","ATE0","ATL0","ATH1","ATS1","ATD0",
+                    "ATCAF0","ATSH $tx","ATCRA $rx","ATFCSH $tx","ATFCSD 30 00 00","ATFCSM1","ATCFC1")){
+                    guard()
+                    check(CanConsoleAdapterRestorationPolicy.accepted(sendAtCommandInternal(command,1500L,
+                        expectedEpoch=epoch,preserveLines=true,beforeTransmit=::guard)))
+                }
+                J1979LiveRecorder.run(plan,exchange={ payload,timeout ->
+                    check(J1979LiveRecorder.allowed(payload))
+                    val frame=byteArrayOf(payload.size.toByte())+payload
+                    val raw=sendAtCommandInternal(ElmJ1979EvapTest.hex(frame),timeout,
+                        expectedEpoch=epoch,preserveLines=true,beforeTransmit=::guard)
+                    val lines=raw.replace('>','\n').lineSequence().map { it.trim().uppercase(java.util.Locale.ROOT) }
+                        .filter { it.isNotEmpty() }.toList()
+                    val data=if(lines==listOf("NO DATA"))null else
+                        ElmUdsPayloadTransport.decode(raw,target.responseId,target.extended)
+                    J1979LiveRecorder.Reply(data,raw)
+                },verifyProtocol={ timeout ->
+                    sendAtCommandInternal("ATDPN",timeout,expectedEpoch=epoch,preserveLines=true,beforeTransmit=::guard)
+                },requireCurrent=::guard,onSample=onSample).also(retain)
+            }finally {
+                withContext(NonCancellable){
+                    if(transportSessionEpoch.isCurrent(epoch)){
+                        var restored=true
+                        for(command in ElmUdsPayloadTransport.restoreCommandsFor(original.protocol)){
+                            val response=runCatching {
+                                sendAtCommandInternal(command,1500L,expectedEpoch=epoch)
+                            }.getOrNull()
+                            if(response==null||!CanConsoleAdapterRestorationPolicy.accepted(response))restored=false
+                        }
+                        if(!restored){
+                            disconnectIfCurrent(epoch)
+                            throw CanAdapterRestorationException(activeTransport)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     private suspend fun <T> withPrimaryObdMutationSession(expectedVin: String,
         approval: EcuWriteConsentFlow.Approval, isCurrent: () -> Boolean, mutation: String,
         recipe: suspend (Int, () -> Unit, suspend (ByteArray) -> ByteArray) -> T): T {

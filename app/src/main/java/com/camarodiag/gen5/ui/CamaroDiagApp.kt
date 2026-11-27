@@ -719,6 +719,9 @@ fun CamaroDiagApp(
                         onRunLegacyRead = { target, epoch, profile ->
                             viewModel.runFunctionalLegacyRead(target,epoch,profile)
                         },
+                        liveProtocol = viewModel.functionalLiveProtocol(),
+                        onRunLive = { plan,epoch,profile -> viewModel.runFunctionalLive(plan,epoch,profile) },
+                        onExportLiveCsv = { withExportFolder { viewModel.exportFunctionalLiveCsv() } },
                         nativeUsbEnabled = adapter.tier == AdapterTier.DISCONNECTED && !calibrationWorkspace.isJ2534BridgeConnected,
                         onRunNativeUsb = viewModel::runNativeUsbFunctionalTest,
                         onRunAll = { viewModel.runFunctionalTests() },

@@ -5805,6 +5805,64 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun functionalLegacyMutationProtocol(): Int? = obdManager.legacyMutationProtocol
 
+    fun functionalLiveProtocol(): Int? = obdManager.j1979LiveProtocol
+
+    fun runFunctionalLive(requested: com.camarodiag.gen5.data.obd.J1979LivePlan,
+        confirmedConnection: Long, confirmedVehicle: VehicleProfile) {
+        val plan=requested.copy(pids=requested.pids.toList())
+        if(!plan.valid||plan.target.vin!=confirmedVehicle.vin||
+            confirmedConnection!=connectionAttemptGeneration||confirmedVehicle!=_vehicle.value||
+            functionalTestJob?.isCompleted==false||enhancedUdsJob?.isCompleted==false||
+            nativeFunctionalCleanup?.isCompleted==false||_liveCanMonitorState.value.isCapturing||
+            _liveCanMonitorState.value.isSendingRequest||obdManager.j1979LiveProtocol!=plan.target.protocol)return
+        val account=authenticatedAccountUid?:return
+        val accountGeneration=accountSessionGeneration
+        val execution=++functionalTestGeneration
+        fun current()=execution==functionalTestGeneration&&isCurrentAccountGeneration(accountGeneration)&&
+            authenticatedAccountUid==account&&confirmedConnection==connectionAttemptGeneration&&
+            confirmedVehicle==_vehicle.value&&currentLicenseLevel==LicenseLevel.OWNER
+        functionalTestJob=viewModelScope.launch {
+            if(!confirmFunctionalTestOwner(account)||!current())return@launch
+            _functionalTestState.value=FunctionalTestState(running=true,startedAtMillis=System.currentTimeMillis(),
+                protocol=FunctionalProtocol.J1979,livePlan=plan,checks=FunctionalTestPlanner.j1979Checks(),
+                context=FunctionalTestContext(confirmedVehicle.vin,_adapter.value.deviceName,
+                    obdManager.currentTransportKind,confirmedConnection))
+            var report: com.camarodiag.gen5.data.obd.J1979LiveReport?=null
+            var failure: String?=null
+            var lastUpdate=-1000L
+            try {
+                report=obdManager.runJ1979Live(plan,::current,onSample={ row ->
+                    if(current()&&row.elapsedMs-lastUpdate>=150){
+                        lastUpdate=row.elapsedMs
+                        _functionalTestState.update { it.copy(liveRecent=(it.liveRecent+row).takeLast(40)) }
+                    }
+                },retain={report=it})
+            }catch(cancelled:CancellationException){
+                failure="CANCELLED"
+                throw cancelled
+            }catch(error:Exception){failure=error.javaClass.simpleName}
+            finally {
+                if(current()){
+                    val retained=report?.let { if(failure!=null)it.copy(completed=false,stopReason=failure) else it }
+                    val checks=retained?.summaries?.map { item ->
+                        val passed=item.statusCounts["PASSED"]?:0
+                        val failed=item.statusCounts["FAILED"]?:0
+                        val name="%02X".format(java.util.Locale.ROOT,item.pid)
+                        FunctionalTestCheck("live:$name","j1979_live",name,name,
+                            if(failed>0)FunctionalTestOutcome.FAILED else if(passed>0)FunctionalTestOutcome.PASSED
+                            else FunctionalTestOutcome.NOT_TESTED,
+                            "$passed/${item.attempted}","${passed}/${item.attempted}")
+                    }
+                    _functionalTestState.update { state -> state.copy(running=false,finishedAtMillis=System.currentTimeMillis(),
+                        liveReport=retained,liveRecent=retained?.observations?.takeLast(40)?:state.liveRecent,
+                        checks=checks?.takeIf { it.isNotEmpty() }?:state.checks,
+                        context=state.context?.copy(observedVin=retained?.observedVin),
+                        error=if(retained?.completed==true)null else localizedContext.getString(R.string.j1979_live_incomplete)) }
+                }
+            }
+        }
+    }
+
     fun runFunctionalLegacyRead(target: com.camarodiag.gen5.data.obd.LegacyReadTarget,
         confirmedConnection: Long, confirmedVehicle: VehicleProfile) {
         if(!target.valid || confirmedConnection!=connectionAttemptGeneration ||
@@ -5984,6 +6042,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun cancelFunctionalTests() {
+        // Live read cancellation retains its prefix after exclusive transport
+        // restoration. Account/connection changes still invalidate generation.
+        if(_functionalTestState.value.running&&_functionalTestState.value.livePlan!=null){
+            functionalTestJob?.cancel()
+            return
+        }
         functionalTestGeneration++
         // Retain the cancelled job until transport cleanup actually finishes.
         functionalTestJob?.cancel()
@@ -6012,6 +6076,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val evidenceContext = snapshot.context ?: return@launch
             val json = JSONObject()
                 .put("schema", when {
+                    snapshot.livePlan != null -> "camarodiag-j1979-live-v1"
                     snapshot.nativeUsbEvidence != null -> "camarodiag-functional-j1979-native-usb-v1"
                     snapshot.legacyRead != null -> "camarodiag-functional-j1979-legacy-source-v1"
                     snapshot.legacyTarget != null -> "camarodiag-functional-j1979-legacy-mutation-v1"
@@ -6051,6 +6116,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
             json.put("checks", checks)
             json.put("rawObdExchanges", JSONArray(snapshot.rawObdExchanges))
+            snapshot.liveReport?.let { json.put("live",J1979LiveEvidenceJson.encode(it)) }
             snapshot.nativeUsbEvidence?.let { json.put("nativeUsb", JSONObject(it)) }
             snapshot.legacyRead?.let { json.put("legacyRead", LegacyReadEvidenceJson.encode(it)) }
             json.put("error", snapshot.error ?: JSONObject.NULL)
@@ -6115,7 +6181,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     .put("legacyDocumentedSources",JSONArray(target.sources.map { "%02X".format(java.util.Locale.ROOT,it) }))
                     .put("legacyProtocol",target.protocol).put("wholeVehicleCoverageVerified",false)
             }
-            val exportName = if (snapshot.nativeUsbEvidence != null)
+            val exportName = if (snapshot.livePlan != null)
+                "CamaroDiag_SAE-J1979_LIVE_${snapshot.startedAtMillis}.json"
+                else if (snapshot.nativeUsbEvidence != null)
                 "CamaroDiag_SAE-J1979_NATIVE_USB_" + snapshot.startedAtMillis + ".json"
                 else if (snapshot.legacyRead != null)
                 "CamaroDiag_SAE-J1979_LEGACY_${snapshot.legacyRead.target.protocol}_${snapshot.legacyRead.target.sourceHex}_${snapshot.startedAtMillis}.json"
@@ -6139,6 +6207,28 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     _connectionMessage.value = localizedContext.getString(R.string.export_folder_failed)
                 }
             }
+        }
+    }
+
+    fun exportFunctionalLiveCsv() {
+        val account=authenticatedAccountUid?:return
+        val generation=accountSessionGeneration
+        val snapshot=_functionalTestState.value
+        val report=snapshot.liveReport?:return
+        if(snapshot.running||!snapshot.canExport)return
+        fun current()=isCurrentAccountGeneration(generation)&&authenticatedAccountUid==account&&
+            currentLicenseLevel==LicenseLevel.OWNER&&_functionalTestState.value===snapshot
+        viewModelScope.launch {
+            if(!confirmFunctionalTestOwner(account)||!current())return@launch
+            try {
+                val path=CamaroDiagExportStorage.write(getApplication<Application>(),
+                    "CamaroDiag_SAE-J1979_LIVE_${snapshot.startedAtMillis}.csv","text/csv",
+                    category=CamaroDiagExportStorage.Category.TESTS,beforePublish={check(current())}){
+                    it.write(J1979LiveEvidenceJson.csv(report).toByteArray(Charsets.UTF_8))
+                }
+                if(current())_connectionMessage.value=localizedContext.getString(R.string.export_folder_success)+"\n"+path
+            }catch(cancelled:CancellationException){throw cancelled}
+            catch(_:Exception){if(current())_connectionMessage.value=localizedContext.getString(R.string.export_folder_failed)}
         }
     }
 

@@ -53,6 +53,9 @@ fun FunctionalTestsScreen(
     legacyAvailableProtocol: Int?,
     onRunLegacy: (LegacyMutationTarget, EcuWriteConsentFlow.Approval, Long, VehicleProfile) -> Unit,
     onRunLegacyRead: (com.camarodiag.gen5.data.obd.LegacyReadTarget, Long, VehicleProfile) -> Unit,
+    liveProtocol: Int?,
+    onRunLive: (com.camarodiag.gen5.data.obd.J1979LivePlan,Long,VehicleProfile)->Unit,
+    onExportLiveCsv: ()->Unit,
     nativeUsbEnabled: Boolean,
     onRunNativeUsb: (android.hardware.usb.UsbDevice, com.camarodiag.gen5.data.obd.CamaroDiagConnectorNativeCampaign.Target,
         android.net.Uri, Long, VehicleProfile) -> Unit
@@ -223,6 +226,7 @@ fun FunctionalTestsScreen(
                     Text(stringResource(R.string.functional_protocol_run))
                 }
                 if (selected == FunctionalProtocol.J1979) {
+                    J1979LivePanel(liveProtocol,state,vehicle,connectionGeneration,onRunLive,onExportLiveCsv)
                     NativeUsbFunctionalPanel(nativeUsbEnabled && !state.running, connectionGeneration, vehicle, onRunNativeUsb)
                     Text(stringResource(R.string.functional_evap_scope), style = MaterialTheme.typography.bodySmall)
                     Row(verticalAlignment = Alignment.CenterVertically) {

@@ -1,3 +1,7 @@
+## SAE J1979 — enregistrement continu Android ELM/STN (27/11/2026)
+
+- Moteur Mode 01 numérique sur adresse physique explicite, VIN et ATDPN initial/périodique/final, inventaire de support, cycles à budget global et mesures horodatées indépendantes, statistiques, préfixe d'annulation conservé après restauration du profil. Intégration dans tests privés Android, paramètres FR/EN, affichage progressif, JSON et CSV dans stockage autorisé. Aucune mutation ni qualification physique. Tests écrits non exécutés ; C6 et J1979 ouverts. Chemins Kotlin canoniques contrôlés avant publication.
+
 ## SAE J1979 — enregistrement de mesures Windows (27/11/2026)
 
 - Moteur de cycles Mode 01 numériques J2534, sélection explicite de PID confirmés par bitmaps, contrôle VIN initial/périodique/final, horodatage et statistiques, délais et annulation avec préfixe. CLI --j1979-live, écran privé FR/EN avec affichage progressif borné, JSON/CSV exclusifs et contrôle de l’autorisation originale. Régressions écrites non exécutées ; C6/J1979 ouverts, aucune qualification matérielle.
