@@ -254,21 +254,149 @@ object ObdJ1979MultiSignal {
             Field("egt-bank-2-sensor-7", "degC", 5, 2, 1, 10, -40, 2, false, ),
             Field("egt-bank-2-sensor-8", "degC", 7, 2, 1, 10, -40, 3, false, ),
         )),
+        0x6B to Definition(5,0xFF,listOf(
+            Field("egr-temperature-a", "degC", 1, 1, 1, 1, -40, 0, false, null),
+            Field("egr-temperature-c", "degC", 2, 1, 1, 1, -40, 1, false, null),
+            Field("egr-temperature-b", "degC", 3, 1, 1, 1, -40, 2, false, null),
+            Field("egr-temperature-d", "degC", 4, 1, 1, 1, -40, 3, false, null),
+        )),
+        0x6F to Definition(3,0x0F,listOf(
+            Field("compressor-inlet-pressure-a", "kPa", 1, 1, 1, 1, 0, 0, false, null),
+            Field("compressor-inlet-pressure-b", "kPa", 2, 1, 1, 1, 0, 1, false, null),
+        )),
+        0x81 to Definition(41,0x1F,listOf(
+            Field("aecd-1-timer-1", "s", 1, 4, 1, 1, 0, 0, false, null),
+            Field("aecd-1-timer-2", "s", 5, 4, 1, 1, 0, 0, false, null),
+            Field("aecd-2-timer-1", "s", 9, 4, 1, 1, 0, 1, false, null),
+            Field("aecd-2-timer-2", "s", 13, 4, 1, 1, 0, 1, false, null),
+            Field("aecd-3-timer-1", "s", 17, 4, 1, 1, 0, 2, false, null),
+            Field("aecd-3-timer-2", "s", 21, 4, 1, 1, 0, 2, false, null),
+            Field("aecd-4-timer-1", "s", 25, 4, 1, 1, 0, 3, false, null),
+            Field("aecd-4-timer-2", "s", 29, 4, 1, 1, 0, 3, false, null),
+            Field("aecd-5-timer-1", "s", 33, 4, 1, 1, 0, 4, false, null),
+            Field("aecd-5-timer-2", "s", 37, 4, 1, 1, 0, 4, false, null),
+        )),
+        0x82 to Definition(41,0x1F,listOf(
+            Field("aecd-6-timer-1", "s", 1, 4, 1, 1, 0, 0, false, null),
+            Field("aecd-6-timer-2", "s", 5, 4, 1, 1, 0, 0, false, null),
+            Field("aecd-7-timer-1", "s", 9, 4, 1, 1, 0, 1, false, null),
+            Field("aecd-7-timer-2", "s", 13, 4, 1, 1, 0, 1, false, null),
+            Field("aecd-8-timer-1", "s", 17, 4, 1, 1, 0, 2, false, null),
+            Field("aecd-8-timer-2", "s", 21, 4, 1, 1, 0, 2, false, null),
+            Field("aecd-9-timer-1", "s", 25, 4, 1, 1, 0, 3, false, null),
+            Field("aecd-9-timer-2", "s", 29, 4, 1, 1, 0, 3, false, null),
+            Field("aecd-10-timer-1", "s", 33, 4, 1, 1, 0, 4, false, null),
+            Field("aecd-10-timer-2", "s", 37, 4, 1, 1, 0, 4, false, null),
+        )),
+        0x83 to Definition(9,0x0F,listOf(
+            Field("nox-bank-1-sensor-1", "ppm", 1, 2, 1, 1, 0, 0, false, null),
+            Field("nox-bank-1-sensor-2", "ppm", 3, 2, 1, 1, 0, 1, false, null),
+            Field("nox-bank-2-sensor-1", "ppm", 5, 2, 1, 1, 0, 2, false, null),
+            Field("nox-bank-2-sensor-2", "ppm", 7, 2, 1, 1, 0, 3, false, null),
+        )),
+        0x84 to Definition(1,0x00,listOf(
+            Field("intake-manifold-surface-temperature", "degC", 0, 1, 1, 1, -40, -1, false, null),
+        )),
+        0x85 to Definition(10,0x0F,listOf(
+            Field("reagent-consumption", "L/h", 1, 2, 1, 200, 0, 0, false, null),
+            Field("reagent-demand", "L/h", 3, 2, 1, 200, 0, 1, false, null),
+            Field("reagent-level", "%", 5, 1, 100, 255, 0, 2, false, null),
+            Field("nox-warning-runtime", "s", 6, 4, 1, 1, 0, 3, false, null),
+        )),
+        0x87 to Definition(5,0x03,listOf(
+            Field("manifold-pressure-a", "kPa", 1, 2, 1, 32, 0, 0, false, null),
+            Field("manifold-pressure-b", "kPa", 3, 2, 1, 32, 0, 1, false, null),
+        )),
+        0x89 to Definition(41,0x1F,listOf(
+            Field("aecd-11-timer-1", "s", 1, 4, 1, 1, 0, 0, false, null),
+            Field("aecd-11-timer-2", "s", 5, 4, 1, 1, 0, 0, false, null),
+            Field("aecd-12-timer-1", "s", 9, 4, 1, 1, 0, 1, false, null),
+            Field("aecd-12-timer-2", "s", 13, 4, 1, 1, 0, 1, false, null),
+            Field("aecd-13-timer-1", "s", 17, 4, 1, 1, 0, 2, false, null),
+            Field("aecd-13-timer-2", "s", 21, 4, 1, 1, 0, 2, false, null),
+            Field("aecd-14-timer-1", "s", 25, 4, 1, 1, 0, 3, false, null),
+            Field("aecd-14-timer-2", "s", 29, 4, 1, 1, 0, 3, false, null),
+            Field("aecd-15-timer-1", "s", 33, 4, 1, 1, 0, 4, false, null),
+            Field("aecd-15-timer-2", "s", 37, 4, 1, 1, 0, 4, false, null),
+        )),
+        0x8A to Definition(41,0x1F,listOf(
+            Field("aecd-16-timer-1", "s", 1, 4, 1, 1, 0, 0, false, null),
+            Field("aecd-16-timer-2", "s", 5, 4, 1, 1, 0, 0, false, null),
+            Field("aecd-17-timer-1", "s", 9, 4, 1, 1, 0, 1, false, null),
+            Field("aecd-17-timer-2", "s", 13, 4, 1, 1, 0, 1, false, null),
+            Field("aecd-18-timer-1", "s", 17, 4, 1, 1, 0, 2, false, null),
+            Field("aecd-18-timer-2", "s", 21, 4, 1, 1, 0, 2, false, null),
+            Field("aecd-19-timer-1", "s", 25, 4, 1, 1, 0, 3, false, null),
+            Field("aecd-19-timer-2", "s", 29, 4, 1, 1, 0, 3, false, null),
+            Field("aecd-20-timer-1", "s", 33, 4, 1, 1, 0, 4, false, null),
+            Field("aecd-20-timer-2", "s", 37, 4, 1, 1, 0, 4, false, null),
+        )),
+        0x8B to Definition(7,0x7F,listOf(
+            Field("dpf-regeneration-trigger", "%", 2, 1, 100, 255, 0, 4, false, null),
+            Field("dpf-regeneration-interval", "min", 3, 2, 1, 1, 0, 5, false, null),
+            Field("dpf-regeneration-distance", "km", 5, 2, 1, 1, 0, 6, false, null),
+        )),
+        0x8C to Definition(17,0xFF,listOf(
+            Field("oxygen-concentration-bank-1-sensor-1", "%", 1, 2, 1526, 1000000, 0, 0, false, null),
+            Field("oxygen-concentration-bank-1-sensor-2", "%", 3, 2, 1526, 1000000, 0, 1, false, null),
+            Field("oxygen-concentration-bank-2-sensor-1", "%", 5, 2, 1526, 1000000, 0, 2, false, null),
+            Field("oxygen-concentration-bank-2-sensor-2", "%", 7, 2, 1526, 1000000, 0, 3, false, null),
+            Field("oxygen-lambda-bank-1-sensor-1", "ratio", 9, 2, 122, 1000000, 0, 4, false, null),
+            Field("oxygen-lambda-bank-1-sensor-2", "ratio", 11, 2, 122, 1000000, 0, 5, false, null),
+            Field("oxygen-lambda-bank-2-sensor-1", "ratio", 13, 2, 122, 1000000, 0, 6, false, null),
+            Field("oxygen-lambda-bank-2-sensor-2", "ratio", 15, 2, 122, 1000000, 0, 7, false, null),
+        )),
+        0x8D to Definition(1,0x00,listOf(
+            Field("absolute-throttle-g", "%", 0, 1, 100, 255, 0, -1, false, null),
+        )),
+        0x8E to Definition(1,0x00,listOf(
+            Field("engine-friction-torque", "%", 0, 1, 1, 1, -125, -1, false, null),
+        )),
+        0x8F to Definition(7,0x0F,listOf(
+            Field("pm-sensor-bank-1-output", "%", 2, 2, 1, 100, 0, 1, false, null),
+            Field("pm-sensor-bank-2-output", "%", 5, 2, 1, 100, 0, 3, false, null),
+        )),
+        0x93 to Definition(3,0x01,listOf(
+            Field("cumulative-continuous-mi", "h", 1, 2, 1, 1, 0, 0, false, null),
+        )),
+        0x94 to Definition(12,0x3F,listOf(
+            Field("reagent-quality-counter", "h", 2, 2, 1, 1, 0, 1, false, null),
+            Field("reagent-consumption-counter", "h", 4, 2, 1, 1, 0, 2, false, null),
+            Field("reagent-dosing-counter", "h", 6, 2, 1, 1, 0, 3, false, null),
+            Field("egr-valve-counter", "h", 8, 2, 1, 1, 0, 4, false, null),
+            Field("nox-monitoring-counter", "h", 10, 2, 1, 1, 0, 5, false, null),
+        )),
+        0x9C to Definition(17,0xFF,listOf(
+            Field("oxygen-concentration-bank-1-sensor-3", "%", 1, 2, 1526, 1000000, 0, 0, false, null),
+            Field("oxygen-concentration-bank-1-sensor-4", "%", 3, 2, 1526, 1000000, 0, 1, false, null),
+            Field("oxygen-concentration-bank-2-sensor-3", "%", 5, 2, 1526, 1000000, 0, 2, false, null),
+            Field("oxygen-concentration-bank-2-sensor-4", "%", 7, 2, 1526, 1000000, 0, 3, false, null),
+            Field("oxygen-lambda-bank-1-sensor-3", "ratio", 9, 2, 122, 1000000, 0, 4, false, null),
+            Field("oxygen-lambda-bank-1-sensor-4", "ratio", 11, 2, 122, 1000000, 0, 5, false, null),
+            Field("oxygen-lambda-bank-2-sensor-3", "ratio", 13, 2, 122, 1000000, 0, 6, false, null),
+            Field("oxygen-lambda-bank-2-sensor-4", "ratio", 15, 2, 122, 1000000, 0, 7, false, null),
+        )),
     )
     fun width(pid:Int):Int?=definitions[pid]?.width
     fun decodeData(pid:Int,data:List<Int>):List<Signal>? {
         val definition=definitions[pid]?:return null
         if(data.size!=definition.width||data.any { it !in 0..255 })return null
         if(definition.supportMask!=0&&data[0] and definition.supportMask.inv()!=0)return null
+        val alternate=when(pid){0x6B->4;0x6F->2;else->0}
+        if(alternate!=0 && (data[0] and (data[0] shr alternate) and ((1 shl alternate)-1))!=0)return null
         return buildList {
             for(field in definition.fields){
-                if(field.bit>=0&&data[0] and (1 shl field.bit)==0)continue
+                var multiplier=field.multiplier
+                if(alternate!=0){
+                    if(data[0] and (1 shl (field.bit+alternate))!=0)multiplier=if(pid==0x6B)4 else 8
+                    else if(data[0] and (1 shl field.bit)==0)continue
+                }else if(field.bit>=0&&data[0] and (1 shl field.bit)==0)continue
                 var raw=0L
                 for(i in field.offset until field.offset+field.width)raw=(raw shl 8) or data[i].toLong()
                 if(raw==field.unavailable)continue
                 val encoded=if(field.signed&&raw>=(1L shl (field.width*8-1)))
                     raw-(1L shl (field.width*8)) else raw
-                add(Signal(pid,field.name,field.unit,encoded.toDouble()*field.multiplier/field.divisor+field.bias,raw))
+                add(Signal(pid,field.name,field.unit,encoded.toDouble()*multiplier/field.divisor+field.bias,raw))
             }
         }
     }
