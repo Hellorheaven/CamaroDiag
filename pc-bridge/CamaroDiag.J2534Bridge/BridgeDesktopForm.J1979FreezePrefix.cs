@@ -15,7 +15,7 @@ internal sealed partial class BridgeDesktopForm
 
     // Internal machine status remains unchanged in JSON. Keep the
     // functional-test display understandable in the selected UI language.
-    private string FreezePrefixInterruptionLabel(object? code)=>code as string switch
+    private string FreezePrefixInterruptionLabel(object? code)=>(code as string) switch
     {
         "MISSING_TERMINAL"=>J1979RecipeText("FreezePrefixMissingTerminal"),
         "TRUNCATED_HEADER"=>J1979RecipeText("FreezePrefixTruncatedHeader"),

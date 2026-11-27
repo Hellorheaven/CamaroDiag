@@ -1,3 +1,15 @@
+## Reprise SAE J1979 — 27/11/2026 — enquête CF/1 interrompue et vérification trois hôtes
+
+PR #117, branche `chore/unified-ci`, base `9ad7f914e81bbf089f04d7a775d129ef3a4be85c`. Avant cette note, au SHA `2c6ab94e887270747b7c9b09870085458e63ddf2` : **15 commits, 20 fichiers, +576/-14 lignes** selon comparaison GitHub. Cible de 10 000 lignes utiles non atteinte ; aucun code de remplissage.
+
+- Python, Windows, Android : inspection hors ligne des captures CF/1 interrompues, suivi de progression provisoire par trame Mode 02 (PID annoncés/lus, DTC et recontrôle, mesures et statuts non finalisés). Prochaine requête *théorique non observée* indiquée sans émission, sans retry. Le terminal manquant, les octets finaux tronqués et l'absence de preuve physique restent explicites.
+- Vérification indépendante d'un export précédemment enregistré : conservation des originaux, rejeu strict, contrôle du VIN et des deux SHA-256, refus de rapports falsifiés, normalisation JSON et relecture avant publication. CLI Python et Windows, GUI Windows et Android avec import de deux fichiers et contrôle du propriétaire/session. Schéma `camarodiag-j1979-native-freeze-prefix-verification-v1` commun, offset du dernier enregistrement complet et longueur de fin non vérifiée.
+- Correction effective des arguments Windows `--verify-j1979-freeze-native-prefix source.cf report.json proof.json VIN`, affichage FR/EN de l'interruption, révalidation d'autorisation Windows juste avant l'écriture. Régressions de captures synthétiques, annulations et exports écrites, **non exécutées**.
+- C6 et les autres protocoles demeurent en pause ; aucun test, build, checkpoint/gate, fusion, APK ou Release lancé. Pas de validation matérielle implicite.
+- **Avant clôture SAE J1979** : source normative autorisée J1979DA_202607 non disponible, qualification matérielle réelle CU/5–CI/5 à documenter, revue d'intégration et gate de validation de fin de protocole. APK Release signé et vérifié selon v2.0.46 uniquement après clôture logicielle réussie et autorisation ; ne pas livrer une APK non vérifiée.
+
+---
+
 ## Reprise SAE J1979 — 27/11/2026 — Mode 02, audit CF/1 et cohérence des routes
 
 PR #117, branche `chore/unified-ci`, base avant le lot `45201077447c37622a1810e3cd2b2a72a8fb5345`. Au SHA `a394e65eea3f179c22503996ef199c5a1bdb01d5` : **10 commits, 15 fichiers, +623/-40 lignes** (comparaison GitHub). Volume souhaité de 10 000 lignes utiles non atteint, aucun remplissage artificiel.
