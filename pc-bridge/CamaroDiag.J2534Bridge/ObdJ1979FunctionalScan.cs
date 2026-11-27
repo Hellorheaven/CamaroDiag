@@ -25,6 +25,9 @@ internal static class ObdJ1979FunctionalScan
         }).ToArray();
         // Keep the native CJ/1 evidence schema unchanged; this is a derived
         // engineering view of correlated physical CAN Mode 06 scan records.
+        public IReadOnlyList<ObdJ1979MultiSignal.Record> MultiSignalRecords => Steps
+            .Select(s=>ObdJ1979MultiSignal.TryRecord(s.RequestHex,s.ResponseHex,s.Status))
+            .OfType<ObdJ1979MultiSignal.Record>().ToArray();
         public IReadOnlyList<ObdJ1979ExtendedVehicleInfo.Record> ExtendedVehicleInfo => Steps
             .Where(s=>s.Status=="RAW" && s.Detail=="EXTENDED_INFOTYPE_DECODED" &&
                 s.ResponseHex is not null)
@@ -123,6 +126,11 @@ internal static class ObdJ1979FunctionalScan
                     throw new InvalidDataException("Missing diagnostic record data.");
                 if(application.Shape=="RAW"){
                     string? detail = null;
+                    if(request[0]==1 && ObdJ1979MultiSignal.Width(request[1]) is not null){
+                        var signals=ObdJ1979MultiSignal.DecodeResponse(request,response)
+                            ?? throw new InvalidDataException("Invalid multi-signal record.");
+                        detail=ObdJ1979MultiSignal.Format(signals);
+                    }
                     if(request[0]==9 && ObdJ1979ExtendedVehicleInfo.IsExtended(request[1])){
                         _=ObdJ1979ExtendedVehicleInfo.Can(request[1],response);
                         detail="EXTENDED_INFOTYPE_DECODED";
