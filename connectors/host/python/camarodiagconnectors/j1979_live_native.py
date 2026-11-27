@@ -266,6 +266,8 @@ class Replay:
         require(event.start >= self.duration and self.stage != 7 and self.steps < MAX_STEPS,
                 "Overlapping or post-terminal CL/1 observation")
         phase = self.expected_phase(event.start)
+        if event.phase == 3 and phase == 4 and self.index == 0 and not self.early_identity:
+            phase = 3
         require(event.phase == phase and phase in PHASES, "Unexpected CL/1 phase")
         req = self.next_request(phase)
         require(req == event.request and event.timeout <= self.profile.budget_ms - event.start,
