@@ -225,6 +225,9 @@ def inspect(root, *, expected_vin=None):
             _require(_get(obj,key,False) is False,"Unsupported physical verification claim")
     groups={}
     protocol=None
+    elm_can = not legacy and ("rawProtocolResponse" in root or "raw_protocol_response" in root)
+    elm_verified = False
+    transcript_chars = 0
     if legacy:
         _require(raw_only or all(legacy_numeric_pid(pid) for pid in pids),"PID exceeds legacy application width")
         _require(_get(root,"physically_addressed",False) is False,"Legacy cannot claim physical addressing")
@@ -240,6 +243,14 @@ def inspect(root, *, expected_vin=None):
         rx=_id(_get(root,"rx_can_id"))
         _require(physical_pair(tx,rx),"Invalid physical CAN channel pair")
         channel={"kind":"can","tx":tx,"rx":rx}
+        if elm_can:
+            from .j1979_freeze_elm import fixed_protocol
+            profile=_integer(_get(root,"expected_protocol"),6,9,"ELM CAN protocol")
+            observed=_get(root,"observed_protocol")
+            _require((tx>0x7ff)==(profile in (7,9)),"ELM CAN ID width differs from profile")
+            _require(fixed_protocol(_get(root,"raw_protocol_response"))==observed,
+                     "ELM protocol transcript differs from reported protocol")
+            elm_verified=observed==profile
     rows=_array(result.get("observations"),MAX_ROWS,"observations")
     admissions=_array(result.get("admission"),256,"admission")
     required_configs=[] if raw_only else sorted({dependency(pid) for pid in pids if dependency(pid) is not None})
@@ -312,6 +323,20 @@ def inspect(root, *, expected_vin=None):
             _require((status!="RAW" or phase=="SCALING" and scoped_scaling) and declared_multi in (None,[]),"Admission cannot carry multi-channel samples")
         if legacy:
             _match_legacy(groups.get(index),req,res,status,protocol,driver)
+        elif elm_can and raw_only:
+            from .j1979_freeze_elm import decode, is_no_data, MAX_RAW, MAX_COMBINED_RAW
+            adapter_raw=_get(row,"raw_adapter_response")
+            if adapter_raw is not None:
+                _require(isinstance(adapter_raw,str) and len(adapter_raw)<=MAX_RAW,"Invalid ELM live transcript")
+                transcript_chars+=len(adapter_raw)
+                _require(transcript_chars<=MAX_COMBINED_RAW,"ELM live transcript exceeds bound")
+            if status in ("PASSED","RAW","NEGATIVE"):
+                _require(adapter_raw is not None and decode(adapter_raw,rx,tx>0x7ff)==res,
+                         "ELM live payload differs from selected responder transcript")
+                if phase not in ("INITIAL_VIN","FINAL_VIN","PERIODIC_VIN"):
+                    _require(elm_verified,"Raw samples lack fixed ELM protocol evidence")
+            elif status=="TIMEOUT" and adapter_raw is not None:
+                _require(is_no_data(adapter_raw),"ELM timeout contradicts adapter transcript")
         _require(not terminal,"Observation after terminal condition")
         if group=="sample":
             _require(phase=="SAMPLE" and identity==vin and set(pids)<=advertised and not final,
@@ -493,6 +518,7 @@ def inspect(root, *, expected_vin=None):
                 _require(_same_number(actual,val) if key in ("minimum","maximum","mean","last_verified_value")
                          else type(actual) is type(val) and actual==val,"Multi-signal summary differs: "+key)
     if completed:
+        _require(not (elm_can and raw_only) or elm_verified,"Completed raw ELM report lacks protocol verification")
         _require(final and identity==vin and not terminal and recorded_cycles==cycles and
                  (all(counts[pid].get("RAW",0)>0 for pid in pids) if raw_only else
                   any(samples.values()) or bool(multi_samples)) and _get(result,"stop_reason") is None,
@@ -502,7 +528,7 @@ def inspect(root, *, expected_vin=None):
                  "Incomplete report requires stop reason")
     return {"schema":"camarodiag-j1979-live-inspection-v1","verified":True,
             "completed":completed,"declared_vin":vin,"initial_vin":initial,"final_identity_verified":final and identity==vin,
-            "channel":channel,"requested_cycles":cycles,"completed_cycles":recorded_cycles,
+            "channel":channel,"adapter_transcript_replayed":elm_can and raw_only,"requested_cycles":cycles,"completed_cycles":recorded_cycles,
             "raw_only":raw_only,"selected_pids":pids,"advertised_pids":sorted(advertised),"inventory_complete":inventory_complete,
             "summary":summaries,"multi_signal_summary":signal_summaries,"samples":clean,
             "trim_layout":derived_layout,"scaling_configuration":derived_scaling,"scaling_context_verified":not required_configs or (scoped_scaling and all(context_from_steps(scale_rows).get(c).state!="UNVERIFIED" for c in required_configs)),"physical_vehicle_verified":False,
