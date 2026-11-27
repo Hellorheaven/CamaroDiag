@@ -1,4 +1,5 @@
 #include "../j1979_freeze_evidence.h"
+#include "../j1979_freeze_sequence.h"
 #include <cassert>
 #include <vector>
 
@@ -102,6 +103,26 @@ int main(){
   assert(link.requests.size()==12&&writer.data[0]=='C'&&writer.data[1]=='F'&&writer.data[2]==1);
   assert(link.requests.front()==std::vector<uint8_t>({9,2}));
   assert(link.requests.back()==std::vector<uint8_t>({9,2}));
+
+  J1979FreezeSequence sequence(s);
+  Campaign::Exchange::Result observation{};
+  Link replay(s);
+  const uint8_t skip[]={2,12,0};
+  assert(!sequence.allows(skip,3));
+  for(const auto& request:link.requests){
+    assert(sequence.allows(request.data(),request.size()));
+    replay.exchange(request.data(),request.size(),1000,observation);
+    assert(sequence.observe(request.data(),request.size(),observation));
+  }
+  assert(sequence.finished()&&!sequence.allows(skip,3));
+  J1979FreezeSequence deniedVin(s);
+  Link badIdentity(s);badIdentity.wrongVin=true;
+  const uint8_t vinRequest[]={9,2};
+  badIdentity.exchange(vinRequest,2,1000,observation);
+  assert(deniedVin.observe(vinRequest,2,observation)&&deniedVin.finished());
+  assert(!deniedVin.allows(skip,3));
+  J1979FreezeSequence skipped(s);
+  assert(!skipped.observe(skip,3,observation)&&skipped.finished());
 
   Link mismatch(s);mismatch.wrongVin=true;Writer rejected;
   const auto wrongVin=run(mismatch,s,rejected);
