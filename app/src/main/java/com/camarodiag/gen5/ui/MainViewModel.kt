@@ -5591,13 +5591,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             if(!confirmFunctionalTestOwner(owner)||!current())return@launch
             val context=getApplication<Application>()
             val usb=context.getSystemService(android.hardware.usb.UsbManager::class.java)?:return@launch
-            val labelEn=if(approved.operation==1)"Native Mode 04" else "Native Mode 08 EVAP"
-            val labelFr=if(approved.operation==1)"Mode 04 natif" else "Mode 08 EVAP natif"
+            val labelEn=if(approved.archive)"Native maintenance archive (read-only)" else if(approved.operation==1)"Native Mode 04" else "Native Mode 08 EVAP"
+            val labelFr=if(approved.archive)"Archive de maintenance native (lecture seule)" else if(approved.operation==1)"Mode 04 natif" else "Mode 08 EVAP natif"
             fun row(outcome:FunctionalTestOutcome,detail:String)=FunctionalTestCheck(
                 "j1979-native-maintenance","j1979",labelEn,labelFr,outcome,detail,detail)
             _functionalTestState.value=FunctionalTestState(running=true,startedAtMillis=System.currentTimeMillis(),
                 protocol=FunctionalProtocol.J1979,checks=listOf(row(FunctionalTestOutcome.NOT_TESTED,"")),
-                context=FunctionalTestContext(confirmedVehicle.vin,device.deviceName,"NATIVE_USB_CU4",connection),
+                context=FunctionalTestContext(confirmedVehicle.vin,device.deviceName,if(approved.archive)"READ_ONLY_USB_CU5" else "NATIVE_USB_CU4",connection),
                 nativeMaintenanceTarget=approved)
             beginBusyOperation()
             try{
@@ -5622,7 +5622,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     // PASSED means the exact functional acknowledgment/readback
                     // was recorded, not an actual leak test or repair.
                     val outcome=when{
-                        !evidence.verified||evidence.recoveryRequired->FunctionalTestOutcome.NOT_TESTED
+                        !evidence.verified||approved.archive||evidence.recoveryRequired->FunctionalTestOutcome.NOT_TESTED
                         terminal?.get("outcome")=="REFUSED"->FunctionalTestOutcome.FAILED
                         terminal?.get("outcome") in setOf("ACKNOWLEDGED_READBACK","ACKNOWLEDGED_EVAP")->FunctionalTestOutcome.PASSED
                         else->FunctionalTestOutcome.NOT_TESTED
@@ -5634,8 +5634,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     })
                     _functionalTestState.update { state -> state.copy(nativeMaintenanceEvidence=evidence,
                         checks=listOf(row(outcome,detail)),
-                        context=state.context?.copy(observedVin=confirmedVehicle.vin.takeIf{terminal?.get("initial_vin")==true}),
-                        error=detail.takeIf{outcome!=FunctionalTestOutcome.PASSED}) }
+                        context=state.context?.copy(observedVin=confirmedVehicle.vin.takeIf{!approved.archive&&terminal?.get("initial_vin")==true}),
+                        error=detail.takeIf{!evidence.verified||evidence.recoveryRequired||(!approved.archive&&outcome!=FunctionalTestOutcome.PASSED)}) }
                 }
             }catch(cancelled:CancellationException){throw cancelled}
             catch(_:Exception){
