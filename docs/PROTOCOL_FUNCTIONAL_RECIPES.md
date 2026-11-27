@@ -266,3 +266,25 @@ Android permet de sélectionner et d'ordonner plusieurs dossiers de preuves de r
 Le vérificateur Python `verify-recovery-history-report` prend désormais en charge le rapport d'historique natif Windows en plus du format portable utilisé par Python et Android. Les journaux originaux doivent être fournis dans l'ordre déclaré ; les empreintes, secteurs, états, transitions et résultats sont recalculés indépendamment. Les exports unitaires Windows sont aussi interdits dans les répertoires de preuves d'origine.
 
 Android supports explicit ordered selection of recovery evidence folders, byte-prefix and invariant original-sector comparison, source reinspection and portable JSON export. Python independently replays native Windows history reports and the portable Android/Python shape from the actual source journals. These checks are offline, not hardware attestation or permission to recover an ECU. Regression cases are written, not executed. C6 remains open.
+
+
+### SAE J1979 Mode 02 — parcours multi-trames natif et legacy (développement)
+
+| Parcours | Acquisition | Vérification |
+|---|---|---|
+| Windows J2534 CAN | `--j1979-freeze`, écran tests fonctionnels | `verify-freeze` |
+| Windows USB natif | `--j1979-freeze-native`, écran tests fonctionnels | `--inspect-j1979-freeze-native`, `verify-native-freeze` |
+| Android CAN ELM/STN | Écran Mode 02 | `verify-freeze` |
+| Android USB natif CU/2 | Écran connecteur USB, capture CF/1 et JSON | `verify-native-freeze` |
+| Linux SocketCAN | `camarodiagconnectors-j1979-freeze` | `verify-freeze` |
+| Linux USB natif | `camarodiagconnectors-j1979-freeze-native capture` | `inspect`, `verify-native-freeze` |
+| Linux/Android legacy ELM, Windows J2534 legacy | Profil legacy, source documentée, VIN, trames explicites | `verify-legacy-freeze` |
+
+Exemples de rejeu sans connecter le véhicule (nouveaux fichiers de sortie uniquement) :
+
+```sh
+camarodiagconnectors-offline verify-native-freeze --capture freeze.cf --report freeze.json --vin 1G1FA1E30D1234567 --output inspection.json
+camarodiagconnectors-offline verify-legacy-freeze --report legacy.json --vin 1G1FA1E30D1234567 --output inspection-legacy.json
+```
+
+Le VIN d'exemple est fictif. Pour une acquisition réelle, sélectionner le véhicule et le calculateur documentés, le connecteur qualifié, et les numéros de trames explicitement autorisés. Les adresses CAN et la source legacy ne sont pas interchangeables. Le Mode 02 ne constitue pas une autorisation d'effacement ou de programmation. Une absence de DTC déclencheur empêche la lecture des mesures ; les valeurs OEM hors trame 00 restent brutes. L'intégrité CRC, la preuve de credential et le rejeu indépendant n'attestent pas l'origine physique de la capture. Les tests simulés sont préparés mais non exécutés ; la recette reste ouverte.
