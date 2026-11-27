@@ -79,6 +79,38 @@ class J1979ReadEvidence {
     }
   }
 
+  // Status-only PIDs retain their original raw/positive host classification.
+  static size_t statusWidth(uint8_t pid){
+    switch(pid){
+      case 3:case 0x92:return 2;
+      case 0x12:case 0x13:case 0x1c:case 0x1d:case 0x1e:
+      case 0x51:case 0x7d:case 0x7e:return 1;
+      case 0x90:return 3;
+      case 0x91:return 5;
+      case 0x70:return 10;
+      case 0x71:return 6;
+      case 0x8b:case 0x8f:return 7;
+      case 0x94:return 12;
+      default:return 0;
+    }
+  }
+
+  static bool validStatus(uint8_t pid,const uint8_t* data,size_t size){
+    const auto width=statusWidth(pid);
+    if(!data||!width||width!=size)return false;
+    switch(pid){
+      case 0x1e:return !(data[0]&0xfeu);
+      case 0x7d:case 0x7e:case 0x91:return !(data[0]&0xf0u);
+      case 0x70:return !(data[0]&0xc0u)&&!(data[9]&0xf0u);
+      case 0x71:return !(data[0]&0xc0u)&&!(data[5]&0xf0u);
+      case 0x8b:return !(data[0]&0x80u)&&!(data[1]&0xf0u);
+      case 0x8f:return !(data[0]&0xf0u)&&!(data[1]&0xfcu)&&!(data[4]&0xfcu);
+      case 0x90:return !(data[0]&0x80u);
+      case 0x94:return !(data[0]&0xc0u)&&!(data[1]&0x80u);
+      default:return true;
+    }
+  }
+
   static bool validMulti(MultiLayout layout,const uint8_t* data,size_t size){
     if(!data||!layout.width||size!=layout.width)return false;
     if(layout.mask&&(data[0]&uint8_t(~layout.mask)))return false;
@@ -144,6 +176,7 @@ class J1979ReadEvidence {
       if(mode==2&&req[1]==2)return len==5?Result::Positive:Result::Invalid;
       if(legacy&&len>7)return Result::Invalid;
       if(mode==1){
+        if(statusWidth(req[1])&&!validStatus(req[1],reply+offset,len-offset))return Result::Invalid;
         const auto layout=multiLayout(req[1]);
         if(layout.width)return validMulti(layout,reply+offset,len-offset)?Result::Raw:Result::Invalid;
       }
