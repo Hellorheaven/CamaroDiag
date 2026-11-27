@@ -402,7 +402,11 @@ fun FunctionalTestsScreen(
                     }
                 }
             }
-            items(values.measurements,key={ "native-value:"+it.mode+":"+it.pid }) { value ->
+            val contextualRequests=values.contextualMeasurements.records.map { it.requestHex }.toSet()
+            items(values.measurements.filter { measurement ->
+                ("%02X%02X".format(java.util.Locale.ROOT,measurement.mode,measurement.pid)+
+                    if(measurement.mode==2)"00" else "") !in contextualRequests
+            },key={ "native-value:"+it.mode+":"+it.pid }) { value ->
                 Card(modifier=Modifier.fillMaxWidth()) {
                     Column(modifier=Modifier.padding(12.dp)) {
                         Text(stringResource(R.string.functional_native_usb_pid,
@@ -412,6 +416,26 @@ fun FunctionalTestsScreen(
                         Text(java.text.NumberFormat.getNumberInstance().apply {
                             maximumFractionDigits=3
                         }.format(value.number)+" "+value.unit,style=MaterialTheme.typography.titleMedium)
+                    }
+                }
+            }
+        }
+        if(values!=null){
+            items(values.contextualMeasurements.records,key={"native-context:"+it.requestHex}) { record ->
+                Card(modifier=Modifier.fillMaxWidth()) {
+                    Column(modifier=Modifier.padding(12.dp)) {
+                        Text(record.requestHex)
+                        record.signals.forEach { signal ->
+                            Text(signal.name+": "+(signal.number?.toString() ?: stringResource(R.string.obd_not_available))+" "+signal.unit)
+                        }
+                    }
+                }
+            }
+            items(values.statusRecords,key={"native-state:"+it.requestHex}) { record ->
+                Card(modifier=Modifier.fillMaxWidth()) {
+                    Column(modifier=Modifier.padding(12.dp)) {
+                        Text(record.requestHex)
+                        record.states.forEach { state -> Text(state.name+": "+state.code) }
                     }
                 }
             }
