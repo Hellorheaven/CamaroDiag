@@ -51,6 +51,13 @@ public final class UsbJ1979 {
         return open(manager,device,controlId,dataId,credential,raw,stillSelected,
             (link,key)->new J1979MaintenanceUsb(link).run(profile,key,raw,stillSelected));
     }
+    public static java.util.Map<String,Object> captureMaintenanceArchive(UsbManager manager,UsbDevice device,
+            int controlId,int dataId,J1979MaintenanceUsb.Profile profile,byte[] credential,
+            OutputStream raw,BooleanSupplier stillSelected)throws IOException{
+        if(profile==null)throw new IllegalArgumentException("Explicit CU/5 archive scope required");
+        return open(manager,device,controlId,dataId,credential,raw,stillSelected,
+            (link,key)->new J1979MaintenanceUsb(link).runArchive(profile,key,raw,stillSelected));
+    }
     private static <T> T open(UsbManager manager,UsbDevice device,
             int controlId,int dataId,byte[] credential,OutputStream raw,
             BooleanSupplier stillSelected,Session<T> session)throws IOException{
