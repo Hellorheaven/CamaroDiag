@@ -466,7 +466,7 @@ internal sealed partial class J2534Device : IDisposable
     /// <summary>Local, separately authorized Mode 04 recipe, not the
     /// network bridge's ordinary reset endpoint.</summary>
     internal ObdJ1979ClearRecipe.Result RunStandardClearRecipe(string expectedVin,
-        bool warningAcknowledged, bool confirmedYes, Action requireCurrent)
+        bool warningAcknowledged, bool confirmedYes, Action requireCurrent, Action<ObdJ1979ClearRecipe.Result> saveBaseline)
     {
         EnsureOpen();
         return ObdJ1979ClearRecipe.Run(expectedVin, IsPrimaryStandardObdChannel,
@@ -482,7 +482,7 @@ internal sealed partial class J2534Device : IDisposable
                 ClearNativeReceiveQueue();
                 requireCurrent();
                 return ExchangeCore([0x04], 2500, nativeBenchReply: false);
-            });
+            },saveBaseline);
     }
 
     /// <summary>Dedicated local EVAP test only. Never reachable from the
