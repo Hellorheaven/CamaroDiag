@@ -42,6 +42,8 @@ internal static class Program
             return ObdJ1979CatalogueCli.Run(args);
 
         // Reject mixed native live options before any other driver path.
+        if (args.Contains(CamaroDiagConnectors.Windows.J1979MaintenanceUsbCli.Command,StringComparer.OrdinalIgnoreCase))
+            return CamaroDiagConnectors.Windows.J1979MaintenanceUsbCli.Run(args);
         if (args.Contains(CamaroDiagConnectors.Windows.J1979MaintenanceJournal.Command,StringComparer.OrdinalIgnoreCase))
             return CamaroDiagConnectors.Windows.J1979MaintenanceJournal.Run(args);
         if (args.Contains(CamaroDiagConnectors.Windows.J1979LiveNativeCli.CaptureCommand,StringComparer.OrdinalIgnoreCase) ||
