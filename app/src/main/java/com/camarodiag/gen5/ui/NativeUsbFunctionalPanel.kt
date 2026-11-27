@@ -49,7 +49,9 @@ internal fun NativeUsbFunctionalPanel(
     var freeze by remember(generation,vehicle) { mutableStateOf(false) }
     var live by remember(generation,vehicle) { mutableStateOf(false) }
     var maintenance by remember(generation,vehicle) { mutableStateOf(0) }
-    var warningAccepted by remember(generation,vehicle,maintenance,selected,tx,rx,extended,credential) { mutableStateOf(false) }
+    var archive by remember(generation,vehicle) { mutableStateOf(false) }
+    var archiveBudget by remember(generation,vehicle) { mutableStateOf("60000") }
+    var warningAccepted by remember(generation,vehicle,maintenance,archive,archiveBudget,selected,tx,rx,extended,credential) { mutableStateOf(false) }
     var livePids by remember(generation,vehicle) { mutableStateOf("05,0C,0D") }
     var cycles by remember(generation,vehicle) { mutableStateOf("30") }
     var interval by remember(generation,vehicle) { mutableStateOf("1000") }
@@ -88,7 +90,7 @@ internal fun NativeUsbFunctionalPanel(
     val response = address(rx)
     val target = if (device != null && control != null && data != null && request != null && response != null)
         CamaroDiagConnectorNativeCampaign.Target(control.id, data.id, request, response,
-            extended, if(maintenance!=0) 60000 else if(freeze || live) (budget.toIntOrNull() ?: 0)*1000 else 60000, vehicle.vin, "ECM", device.deviceName, maxOf(1L,generation)) else null
+            extended, if(maintenance!=0) (if(archive) archiveBudget.toIntOrNull() ?: 0 else 60000) else if(freeze || live) (budget.toIntOrNull() ?: 0)*1000 else 60000, vehicle.vin, "ECM", device.deviceName, maxOf(1L,generation)) else null
     val freezeTarget = if (freeze && target != null) {
         val selectedFrames=parseFreezeIds(frames,8,false)
         val selectedPids=parseFreezeIds(pids,64,true)
@@ -103,7 +105,7 @@ internal fun NativeUsbFunctionalPanel(
             CamaroDiagConnectorLiveCampaign.Target(target,ids.filterNotNull(),count,delay) else null
     } else null
     val maintenanceTarget=if(maintenance!=0&&target!=null)
-        CamaroDiagConnectorMaintenanceCampaign.Target(target,maintenance) else null
+        CamaroDiagConnectorMaintenanceCampaign.Target(target,maintenance,archive) else null
     val scopeValid = when {
         maintenance!=0 -> maintenanceTarget?.valid==true && warningAccepted
         freeze -> freezeTarget?.valid == true
@@ -202,11 +204,18 @@ internal fun NativeUsbFunctionalPanel(
                 Text(stringResource(R.string.j1979_native_maintenance_evap))
             }
             if(maintenance!=0) {
-                Text(stringResource(if(maintenance==1) R.string.j1979_native_maintenance_clear_warning
+                Row(verticalAlignment=Alignment.CenterVertically) {
+                    Checkbox(archive,{archive=it;confirmed=false;warningAccepted=false},enabled=enabled)
+                    Text(stringResource(R.string.j1979_native_maintenance_archive))
+                }
+                if(archive) OutlinedTextField(archiveBudget,{archiveBudget=it.take(6);confirmed=false;warningAccepted=false},
+                    singleLine=true,label={Text(stringResource(R.string.j1979_native_maintenance_archive_budget))},
+                    enabled=enabled,modifier=Modifier.fillMaxWidth())
+                Text(stringResource(if(archive) R.string.j1979_native_maintenance_archive_warning else if(maintenance==1) R.string.j1979_native_maintenance_clear_warning
                     else R.string.j1979_native_maintenance_evap_warning))
                 Row(verticalAlignment=Alignment.CenterVertically) {
                     Checkbox(warningAccepted,{warningAccepted=it;confirmed=false},enabled=enabled)
-                    Text(stringResource(R.string.j1979_native_maintenance_warning_accept))
+                    Text(stringResource(if(archive) R.string.j1979_native_maintenance_archive_accept else R.string.j1979_native_maintenance_warning_accept))
                 }
             }
         }
@@ -218,7 +227,7 @@ internal fun NativeUsbFunctionalPanel(
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Checkbox(confirmed, { confirmed = it }, enabled = enabled && pendingCredential==null)
-            Text(if(maintenance!=0) stringResource(R.string.j1979_native_maintenance_confirm,vehicle.vin)
+            Text(if(maintenance!=0) stringResource(if(archive) R.string.j1979_native_maintenance_archive_confirm else R.string.j1979_native_maintenance_confirm,vehicle.vin)
                 else if(freeze) stringResource(R.string.j1979_freeze_confirm,vehicle.vin)
                 else if(live) stringResource(R.string.j1979_native_live_confirm,vehicle.vin)
                 else stringResource(R.string.functional_native_usb_confirm))
@@ -236,6 +245,6 @@ internal fun NativeUsbFunctionalPanel(
                 else onRun(device, target, uri, generation, vehicle)
             }
         }, enabled = enabled && granted && confirmed && credential != null && scopeValid && pendingCredential==null,
-            modifier = Modifier.fillMaxWidth()) { Text(stringResource(if(maintenance!=0) R.string.j1979_native_maintenance_execute else if(freeze) R.string.j1979_freeze_run else if(live) R.string.j1979_native_live_run else if(asScan) R.string.functional_native_usb_scan_run else R.string.functional_native_usb_run)) }
+            modifier = Modifier.fillMaxWidth()) { Text(stringResource(if(maintenance!=0) (if(archive) R.string.j1979_native_maintenance_archive_run else R.string.j1979_native_maintenance_execute) else if(freeze) R.string.j1979_freeze_run else if(live) R.string.j1979_native_live_run else if(asScan) R.string.functional_native_usb_scan_run else R.string.functional_native_usb_run)) }
     }
 }
