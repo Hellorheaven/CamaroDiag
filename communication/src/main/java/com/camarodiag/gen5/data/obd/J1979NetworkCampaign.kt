@@ -40,7 +40,8 @@ data class J1979NetworkDiscovery(
 data class J1979NetworkStep(
     val requestHex: String,val responseHex: String?,val rawResponse: String?,
     val status: String,val detail: String?,val durationMs: Long,
-    val application: J1979CampaignSemantics.Step?
+    val application: J1979CampaignSemantics.Step?,
+    val extendedVehicleInfo: ObdJ1979ExtendedVehicleInfo.Result? = null
 )
 data class J1979NetworkInventory(
     val mode: Int,val status: String,val advertised: List<Int>,val pages: Int
@@ -195,6 +196,7 @@ internal object J1979NetworkCampaign {
                 var reply:J1979LiveRecorder.Reply?=null
                 var response:String?=null
                 var evidence:J1979CampaignSemantics.Step?=null
+                var extended:ObdJ1979ExtendedVehicleInfo.Result?=null
                 var status="NOT_TESTED"
                 var detail:String?=null
                 try {
@@ -211,11 +213,22 @@ internal object J1979NetworkCampaign {
                         else {
                             status=evidence.status
                             detail=evidence.negativeResponseCode()?.let { "NRC_"+ElmJ1979EvapTest.hex(it,2) }
+                            if(status=="RAW" && request.size==2 && u(request[0])==9 &&
+                                u(request[1]) in ObdJ1979ExtendedVehicleInfo.extendedTypes) {
+                                extended=reply.payload?.let { bytes ->
+                                    ObdJ1979ExtendedVehicleInfo.can(u(request[1]),bytes.map(::u))
+                                }
+                                if(extended==null){
+                                    status="FAILED"
+                                    detail="INVALID_EXTENDED_INFOTYPE"
+                                    evidence=null
+                                }else detail="EXTENDED_INFOTYPE_DECODED"
+                            }
                         }
                     }
-                }catch(_:CancellationException){status="NOT_TESTED";stop="CANCELLED";detail=stop;evidence=null}
-                catch(e:Exception){status="FAILED";stop="TRANSPORT_OR_CONTEXT_ERROR";detail=e.javaClass.simpleName;evidence=null}
-                steps+=J1979NetworkStep(command,response,reply?.raw,status,detail,(clock()-begun).coerceAtLeast(0),evidence)
+                }catch(_:CancellationException){status="NOT_TESTED";stop="CANCELLED";detail=stop;evidence=null;extended=null}
+                catch(e:Exception){status="FAILED";stop="TRANSPORT_OR_CONTEXT_ERROR";detail=e.javaClass.simpleName;evidence=null;extended=null}
+                steps+=J1979NetworkStep(command,response,reply?.raw,status,detail,(clock()-begun).coerceAtLeast(0),evidence,extended)
                 return evidence?.takeIf { status=="PASSED" }
             }
             suspend fun inventory(mode:Int,cached:J1979CampaignSemantics.Step?=null,members:Boolean=true){
