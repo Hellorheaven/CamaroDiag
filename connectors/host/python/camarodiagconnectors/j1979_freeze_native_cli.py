@@ -214,7 +214,7 @@ def main():
         raise SystemExit(2) from exc
     print(json.dumps({key: report.get(key) for key in
                       ("capture_integrity_verified", "observations_received", "error")}))
-    if not report["capture_integrity_verified"] or not (report.get("summary") or {}).get("completed"):
+    if not report["capture_integrity_verified"] or not (report.get("summary") or {}).get("all_frames_stable"):
         raise SystemExit(2)
 
 
