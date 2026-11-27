@@ -292,6 +292,47 @@ class J1979CatalogueProjectionTest {
             "0202014202010301d9409567434601020c002000010102000500000014000902490201314731464131453330443132333435" +
             "363723d3f9ee434601030d001400000207000c0000003c0000000202000000000000937d821a"
             val capture = wire.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
+            // Same CF/1 bytes as the Windows fixture. The prefix path
+            // explicitly refuses an intact terminal, even for a good capture.
+            val withoutTerminal=capture.copyOfRange(0,capture.size-32)
+            val partial=com.camarodiag.gen5.data.obd.J1979FreezePrefix.inspect(withoutTerminal,freezeVin)
+            assertEquals("camarodiag-j1979-native-freeze-prefix-v1",partial["schema"])
+            assertEquals(true,partial["prefix_integrity_verified"])
+            assertEquals(false,partial["capture_integrity_verified"])
+            assertEquals(false,partial["execution_completed"])
+            assertEquals(false,partial["terminal_present"])
+            assertEquals(false,partial["physical_vehicle_verified"])
+            assertEquals(false,partial["permits_programming"])
+            assertEquals("MISSING_TERMINAL",partial["interruption"])
+            assertEquals(0,partial["discarded_tail_bytes"])
+            assertEquals(withoutTerminal.size,partial["last_complete_offset"])
+            assertEquals(freezeVin,partial["observed_final_vin_in_prefix"])
+            val rowsPartial=J1979CatalogueJson.array(partial["independently_replayed_steps"],1,100)
+            assertEquals(12,rowsPartial.size)
+            assertEquals(12,partial["complete_observations"])
+            assertEquals(13,partial["complete_records"])
+            val exported=J1979CatalogueJson.encode(partial)
+            assertEquals(false,J1979CatalogueJson.obj(
+                J1979CatalogueJson.parse(exported,1024*1024))["execution_completed"])
+            val truncated=com.camarodiag.gen5.data.obd.J1979FreezePrefix.inspect(capture.copyOf(capture.size-1),freezeVin)
+            assertEquals("TRUNCATED_RECORD",truncated["interruption"])
+            assertEquals(false,truncated["terminal_present"])
+            assertEquals(31,truncated["discarded_tail_bytes"])
+            val planOnly=capture.copyOfRange(0,116)
+            val planPartial=com.camarodiag.gen5.data.obd.J1979FreezePrefix.inspect(planOnly,freezeVin)
+            assertEquals(0,planPartial["complete_observations"])
+            assertEquals(true,planPartial["replay_terminated_by_missing_observation"])
+            assertTrue(runCatching {
+                com.camarodiag.gen5.data.obd.J1979FreezePrefix.inspect(capture,freezeVin)
+            }.isFailure)
+            assertTrue(runCatching {
+                com.camarodiag.gen5.data.obd.J1979FreezePrefix.inspect(withoutTerminal,vin)
+            }.isFailure)
+            val corruptedPrefix=withoutTerminal.copyOf()
+            corruptedPrefix[corruptedPrefix.size-8]=(corruptedPrefix[corruptedPrefix.size-8].toInt() xor 1).toByte()
+            assertTrue(runCatching {
+                com.camarodiag.gen5.data.obd.J1979FreezePrefix.inspect(corruptedPrefix,freezeVin)
+            }.isFailure)
             val definition = """{"schema":"camarodiag-j1979-freeze-catalogue-v1","edition":"synthetic","reference_name":"synthetic","reference_sha256":"PIN","frames":[{"frame":0,"definitions":[{"pid":12,"payload_bytes":2,"protocols":["CAN"],"reference":"synthetic","signals":[{"name":"sample","unit":"fixture","bits":{"offset":0,"width":16,"order":"MSB0"},"signed":false,"scale":[1,2],"offset":[0,1],"reference":"test only"}]},{"pid":13,"payload_bytes":1,"protocols":["CAN"],"reference":"synthetic","signals":[{"name":"sample","unit":"fixture","bits":{"offset":0,"width":8,"order":"MSB0"},"signed":false,"scale":[1,2],"offset":[0,1],"reference":"test only"}]}]},{"frame":1,"definitions":[{"pid":12,"payload_bytes":2,"protocols":["CAN"],"reference":"synthetic","signals":[{"name":"sample","unit":"fixture","bits":{"offset":0,"width":16,"order":"MSB0"},"signed":false,"scale":[1,2],"offset":[100,1],"reference":"test only"}]}]}]}""".replace("PIN",pin)
             val result = J1979FreezeCatalogue.build(definition.toByteArray(),pin,capture,freezeVin)
             assertEquals(J1979FreezeCatalogue.PROJECTION,result.document["schema"])
