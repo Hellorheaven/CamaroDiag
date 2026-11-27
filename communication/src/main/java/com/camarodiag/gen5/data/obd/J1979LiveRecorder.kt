@@ -107,7 +107,7 @@ internal object J1979LiveRecorder {
         fun append(row: J1979LiveObservation) {
             counts[row.status]=(counts[row.status]?:0)+1
             if(row.status!="PASSED")return
-            val value=requireNotNull(row.value)
+            val value=row.value?:return
             require(value.number.isFinite())
             name=value.name;unit=value.unit
             min=min?.let { minOf(it,value.number) }?:value.number
