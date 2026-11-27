@@ -111,6 +111,27 @@ internal sealed partial class BridgeDesktopForm
             output.AppendLine(options.Output);
             if(result["counts"] is SortedDictionary<string,int> counts)
                 foreach(var entry in counts)output.AppendLine(entry.Key+" : "+entry.Value.ToString(CultureInfo.CurrentCulture));
+            // Mode 02 frame coverage belongs to the original CF/1 replay;
+            // unknown document definitions are not an absence of ECU support.
+            if(result.TryGetValue("catalogue_coverage",out var coverageValue)&&
+                coverageValue is Dictionary<string,object?> coverage&&
+                coverage.TryGetValue("frames",out var frameValue)&&
+                frameValue is List<Dictionary<string,object?>> audited)
+            {
+                output.AppendLine(J1979RecipeText("CatalogueFrameCoverage"));
+                foreach(var frame in audited)
+                {
+                    int number=(int)frame["frame"]!;
+                    int unknown=((int[])frame["advertised_without_documentation"]!).Length;
+                    int unrequested=((int[])frame["advertised_not_requested"]!).Length;
+                    string inventory=(bool)frame["inventory_complete"]!?
+                        J1979RecipeText("CatalogueInventoryComplete"):
+                        J1979RecipeText("CatalogueInventoryIncomplete");
+                    output.AppendLine(string.Format(CultureInfo.CurrentCulture,
+                        J1979RecipeText("CatalogueFrameCoverageRow"),number.ToString("X2",CultureInfo.InvariantCulture),
+                        unknown,unrequested,inventory));
+                }
+            }
             output.AppendLine(J1979RecipeText("CatalogueScope"));
             MessageBox.Show(this,output.ToString(),J1979RecipeText("CatalogueProject"),MessageBoxButtons.OK,MessageBoxIcon.Information);
         }

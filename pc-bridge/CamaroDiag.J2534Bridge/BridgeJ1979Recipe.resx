@@ -175,6 +175,10 @@
   <data name="CatalogueAnyFile" xml:space="preserve"><value>All files (*.*)|*.*</value></data>
   <data name="CatalogueScope" xml:space="preserve"><value>Offline byte projection. Transport replay, normative compliance and physical provenance are not verified.</value></data>
   <data name="CatalogueConfirm" xml:space="preserve"><value>I confirm the VIN and reference digest.</value></data>
+    <data name="CatalogueFrameCoverage" xml:space="preserve"><value>Mode 02 frame coverage (saved in JSON)</value></data>
+    <data name="CatalogueFrameCoverageRow" xml:space="preserve"><value>Frame {0}: {1} undocumented advertised PIDs, {2} advertised but not requested — {3}</value></data>
+    <data name="CatalogueInventoryComplete" xml:space="preserve"><value>inventory complete</value></data>
+    <data name="CatalogueInventoryIncomplete" xml:space="preserve"><value>inventory incomplete</value></data>
   <data name="CatalogueSaved" xml:space="preserve"><value>Projection saved.</value></data>
   <data name="CatalogueRejected" xml:space="preserve"><value>Projection rejected. Check the catalogue, reference and recording.</value></data>
   <data name="LiveNativeRun" xml:space="preserve"><value>Native USB live recording</value></data>
