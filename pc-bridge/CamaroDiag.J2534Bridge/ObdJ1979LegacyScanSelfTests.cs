@@ -103,7 +103,13 @@ internal static class ObdJ1979LegacyScanSelfTests
             sent.Clear(); packetSource = 0x11;
             var badSource = Run();
             Check(!badSource.TransportObserved && !badSource.Completed && sent.SequenceEqual(new[] {"0100"}), "no other source fallback");
-            packetSource = source; sent.Clear(); failAt = "03";
+            packetSource = source; sent.Clear();
+            replies["03"]=[[0x7F,3,0x78]];
+            var pending=Run();
+            Check(pending.Steps.Single(x=>x.RequestHex=="03").Status=="FAILED",
+                "unfinished pending response is not terminal NRC");
+            replies["03"]=[[0x43,1,0x23,0,0,0,0]];
+            sent.Clear(); failAt = "03";
             var lost = Run();
             Check(lost.StopReason == "TRANSPORT_ERROR" && lost.ObservedVin == vin && sent.Last() == "03", "partial evidence on driver fault");
             failAt = null; sent.Clear(); cancel = true;

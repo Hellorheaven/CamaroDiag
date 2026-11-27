@@ -55,15 +55,22 @@ internal static class ObdJ1979LegacyScan
                 evidence = result.Replies.Select(packet => new Evidence(packet.Source.ToString("X2"),
                     packet.RawHex, Convert.ToHexString(packet.Payload), packet.Timestamp,
                     packet.InFrameResponseHex)).ToArray();
+                if(timer.Elapsed >= budget){
+                    stop="BUDGET_EXHAUSTED";
+                    steps.Add(new(hex,result.TxHex,evidence,"NOT_TESTED","LATE_RESPONSE",watch.ElapsedMilliseconds));
+                    return [];
+                }
                 var packets = result.Replies.Select(p => p.Payload).ToArray();
                 if (packets.Length == 0)
                 {
                     steps.Add(new(hex, result.TxHex, evidence, "NOT_TESTED", "NO_RESPONSE", watch.ElapsedMilliseconds));
                     return [];
                 }
-                if (result.Replies.Any(p => p.Source != source))
+                if (result.Replies.Any(p => p.Source != source)){
+                    stop="RESPONSE_SOURCE_CHANGED";
                     throw new InvalidDataException("Response source changed.");
-                if (packets.All(p => p.Length == 3 && p[0] == 0x7F && p[1] == request[0] && p[2] != 0))
+                }
+                if (packets.All(p => p.Length == 3 && p[0] == 0x7F && p[1] == request[0] && p[2] is not (0 or 0x78)))
                 {
                     steps.Add(new(hex, result.TxHex, evidence, "NOT_TESTED",
                         string.Join(",", packets.Select(p => $"NRC_{p[2]:X2}")), watch.ElapsedMilliseconds));
