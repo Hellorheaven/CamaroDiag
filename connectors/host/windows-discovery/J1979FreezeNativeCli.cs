@@ -270,7 +270,8 @@ internal static class J1979FreezeNativeCli
             }
             if(args[0]==VerifyPrefixCommand&&args.Length==5)
             {
-                var value=VerifyPrefix(args[1],args[2],args[4],args[3]);
+                // CLI contract: source, saved report, new verification output, independent VIN.
+                var value=VerifyPrefix(args[1],args[2],args[3],args[4]);
                 Console.WriteLine(JsonSerializer.Serialize(value,PrefixJsonOptions));
                 return 0;
             }

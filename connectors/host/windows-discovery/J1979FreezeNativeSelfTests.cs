@@ -150,6 +150,13 @@ internal static class J1979FreezeNativeSelfTests
             Require(File.Exists(output)&&Equals(saved["prefix_integrity_verified"],true),
                 "Windows prefix CLI persists separate report");
             var verified=J1979FreezeNativeCli.VerifyPrefix(source,output,proof,Vin);
+            string cliProof=Path.Combine(root,"cli-verification.json");
+            int exitCode=J1979FreezeNativeCli.Run(new[]{
+                J1979FreezeNativeCli.VerifyPrefixCommand,source,output,cliProof,Vin
+            });
+            Require(exitCode==0&&File.Exists(cliProof),
+                "Windows CF/1 verify CLI follows documented capture/report/output/VIN order");
+
             bool expired=false;
             string cancelled=Path.Combine(root,"revoked.json");
             try{J1979FreezeNativeCli.VerifyPrefix(source,output,cancelled,Vin,()=>false);}
