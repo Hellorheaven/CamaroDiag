@@ -107,6 +107,18 @@ internal static class ObdJ1979LegacyScanSelfTests
             Check(complete.MonitorRecords.Single(x=>x.Mode==5).EncodedDataHex=="2A"&&
                 complete.MonitorRecords.Single(x=>x.Mode==6) is {ValueEncoded:1,LimitEncoded:2},
                 "Monitor encoded values retained without verdict");
+            var legacyMonitors=ObdJ1979LegacyMonitorValues.Project(complete.Steps,complete.SelectedResponseSource);
+            Check(legacyMonitors.Count==2,"Both legacy monitor services projected");
+            Check(legacyMonitors.Single(x=>x.Record.Mode==5).Record.Scaled is
+                { Unit:"V",Minimum:null,Maximum:null } oxygen &&
+                Math.Abs(oxygen.Value-0.21d)<1e-9,"Mode 05 constant conversion");
+            var rawMonitor=ObdJ1979LegacyMonitorValues.Decode([6,1],[0x46,1,0x81,0,1,0,2]);
+            Check(rawMonitor is {ComponentId:1,LimitType:"MINIMUM",EncodedRelation:"BELOW",Scaled:null},
+                "Mode 06 legacy component and limit direction, no guessed unit");
+            Check(ObdJ1979LegacyMonitorValues.Decode([5,0x70,1],[0x45,0x70,1,1,2,3]) is {Scaled:null},
+                "Manufacturer oxygen test retained raw");
+            Check(ObdJ1979LegacyMonitorValues.Decode([5,1,1],[0x45,1,2,42]) is null,
+                "Wrong oxygen sensor rejected");
             // Diesel IPT is an odd-numbered data type, not a count. The
             // shared count is InfoType 07, and only the selected source counts.
             replies["0900"]=[[0x49,0,1,0xC2,0x20,0,0]];
