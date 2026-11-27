@@ -21,7 +21,7 @@ from .j1979_scaling_context import dependency, context_from_steps, config_data
 from .j1979_drive_cycle import TRIMS, trim_layout, live_signals as trim_signals
 from .j1979 import physical_pair
 from .j1979_legacy_discovery import valid_source
-from .j1979_legacy_frames import checksum
+from .j1979_legacy_frames import checksum, response_frames
 
 MAX_REPORT_BYTES = 64 * 1024 * 1024
 MAX_ROWS = 10000
@@ -133,6 +133,7 @@ def _frame_payload(frame, protocol, source, driver):
 def _legacy_groups(root, protocol, source, driver):
     groups = defaultdict(list)
     previous = -1
+    transcript_chars = 0
     traces = _array(_get(root, "transport_exchanges"), MAX_ROWS+256, "legacy transport exchanges")
     for trace in traces:
         trace = _dict(trace, "legacy exchange")
@@ -144,10 +145,30 @@ def _legacy_groups(root, protocol, source, driver):
                  re.fullmatch(r"01[0-9A-F]{2}|090[012]",request), "Unexpected legacy command")
         frames = _array(trace.get("frames"), 128, "legacy frames")
         selected = []
+        verified_frames = []
         for frame in frames:
             address,payload = _frame_payload(frame,protocol,source,driver)
+            verified_frames.append((address, _hex(_get(frame, "raw_hex"), 11), payload))
             if address == source:
                 selected.append(payload)
+        # An ELM export contains both its original transcript and a parsed
+        # projection. CRC-valid projected frames alone do not prove they are
+        # the frames in that transcript. Never apply this check to J2534,
+        # whose driver may remove the link checksum.
+        if not driver:
+            raw = _get(trace, "raw_response")
+            if raw is not None:
+                _require(isinstance(raw, str) and len(raw) <= 32768,
+                         "Invalid legacy adapter transcript")
+                transcript_chars += len(raw)
+                _require(transcript_chars <= 16*1024*1024,
+                         "Legacy adapter transcript exceeds bound")
+            if request != "ATDPN" and (frames or trace.get("status") in
+                                       ("CORRELATED", "PASSED", "NEGATIVE")):
+                _require(raw is not None, "Missing original legacy adapter transcript")
+                parsed = response_frames(protocol, request, raw)
+                _require([(x.source, x.raw, x.payload) for x in parsed] == verified_frames,
+                         "Legacy adapter transcript differs from recorded frames")
         declared = _get(trace,"selected_records_hex")
         if declared is not None:
             _require([_hex(x,7) for x in _array(declared,128,"selected records")] == selected,
@@ -175,20 +196,21 @@ def _match_legacy(group, request, response, status, protocol, driver):
         return
     _require(commands == expected, "Incomplete legacy VIN evidence")
     initial = group[0][1]
-    _require(len(initial)==1 and decode_observation(b"\x01\x00",initial[0]) is not None and
-             initial[0][:2]==b"\x41\x00", "Missing verified legacy initial PID00")
+    _require(len(initial)==1 and len(initial[0])==6 and
+             initial[0][:2]==b"\x41\x00" and group[0][2] in ("PASSED","CORRELATED"),
+             "Missing verified legacy initial PID00")
     if not driver:
         probe = group[1][3]
         observed = _get(probe,"observed_protocol")
-        if observed is None:
-            raw = _get(probe,"raw_response")
-            _require(isinstance(raw,str), "Missing legacy fixed protocol evidence")
-            lines = [x.strip().upper() for x in raw.replace(">","\n").splitlines()
-                     if x.strip() and x.strip().upper()!="ATDPN"]
-            _require(lines==[str(protocol)], "Legacy protocol mismatch")
-        else:
-            _require(observed==protocol,"Legacy protocol mismatch")
+        raw = _get(probe,"raw_response")
+        _require(isinstance(raw,str), "Missing legacy fixed protocol evidence")
+        lines = [x.strip().upper() for x in raw.replace(">","\n").splitlines()
+                 if x.strip() and x.strip().upper()!="ATDPN"]
+        _require(lines==[str(protocol)] and (observed is None or
+                 type(observed) is int and observed==protocol), "Legacy protocol mismatch")
         _require(group[1][2]=="PASSED","Legacy protocol probe did not pass")
+    _require(all(item[2] in ("PASSED","CORRELATED") for item in group[-3:]),
+             "Legacy VIN fragments or inventory not accepted")
     page,count,fragments = [item[1] for item in group[-3:]]
     _require(len(page)==1 and len(page[0])==7 and page[0][:3]==b"\x49\x00\x01"
              and page[0][3]&0xC0==0xC0 and count==[b"\x49\x01\x05"], "Missing legacy VIN inventory or count")
