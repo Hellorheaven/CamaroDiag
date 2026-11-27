@@ -49,6 +49,20 @@ class ObdJ1979OperatingContextTest {
         assertFalse(unknown.supportVerified)
         assertTrue(unknown.monitors.all { it.supported==null&&it.complete==null })
     }
+    @Test fun malformedBaselineAndAmbiguousContext(){
+        for(baseline in listOf(listOf(0,128,1,0),listOf(0,0,17,0),listOf(0,1,1,16),
+            listOf(0,8,4,0),listOf(0,8,0,4))){
+            val cycle=c.decodeCycle(listOf(0,baseline[1] and 8,1,0),baseline)!!
+            assertFalse(cycle.supportVerified)
+            assertTrue(cycle.monitors.all { it.supported==null })
+        }
+        val projection=c.project(listOf(c.Observation("0101","410100010100","PASSED"),
+            c.Observation("0101","410100","RAW"),c.Observation("0141","414100010100","PASSED"),
+            c.Observation("011D","411D30","PASSED"),c.Observation("011D","411D3030","RAW"),
+            c.Observation("0106","41068090","PASSED")))
+        assertFalse(projection.driveCycle!!.supportVerified)
+        assertNull(projection.fuelTrims.single().signals[1].number)
+    }
     @Test fun layoutAdmissionRequiresAdvertisedAndUniqueResponse(){
         val page=c.Observation("0100","410004000008","PASSED")
         val layout=c.Observation("011D","411D30","PASSED")
