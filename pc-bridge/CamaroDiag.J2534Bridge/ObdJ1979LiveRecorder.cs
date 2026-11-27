@@ -139,6 +139,9 @@ internal static class ObdJ1979LiveRecorder
                         detail=$"NRC_{nrc:X2}";
                     }else if(phase=="SAMPLE"&&status is ("RAW" or "PASSED") &&
                         pid is byte selected&&ObdJ1979MultiSignal.Width(selected) is not null){
+                        if(ObdJ1979Status.Width(selected) is not null &&
+                            ObdJ1979Status.DecodeResponse(request,raw) is null)
+                            throw new InvalidDataException("Invalid categorical fields in multi-signal response.");
                         multi=ObdJ1979MultiSignal.DecodeResponse(request,raw)
                             ?? throw new InvalidDataException("Invalid multi-signal response.");
                     }else if(phase=="SAMPLE"&&status=="PASSED"){
