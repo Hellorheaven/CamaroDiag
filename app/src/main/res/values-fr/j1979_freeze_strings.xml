@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="j1979_freeze_title">Trames figées (mode 02)</string>
+    <string name="j1979_freeze_frames">Numéros de trames (hex, séparés par virgules)</string>
+    <string name="j1979_freeze_pids">PID (hex ; vide = tous les PID annoncés)</string>
+    <string name="j1979_freeze_confirm">J’ai vérifié le canal physique du calculateur et les trames sélectionnées pour le VIN %1$s.</string>
+    <string name="j1979_freeze_run">Lire les trames figées</string>
+    <string name="j1979_freeze_complete">Trames figées sélectionnées acquises</string>
+    <string name="j1979_freeze_incomplete">Campagne de trames figées incomplète</string>
+    <string name="j1979_freeze_identity">VIN revérifié : %1$s</string>
+    <string name="j1979_freeze_verified">vérifié</string>
+    <string name="j1979_freeze_unavailable">Indisponible</string>
+    <string name="j1979_freeze_status_complete">Complète</string>
+    <string name="j1979_freeze_status_absent">Aucun déclencheur enregistré</string>
+    <string name="j1979_freeze_status_partial">Partielle</string>
+    <string name="j1979_freeze_status_changed">Déclencheur modifié</string>
+    <string name="j1979_freeze_summary">Trame %1$s — %2$s — DTC %3$s — %4$d/%5$d PID</string>
+    <string name="j1979_freeze_not_advertised">Non annoncés : %1$s</string>
+    <string name="j1979_freeze_not_read">Non lus : %1$s</string>
+    <string name="j1979_freeze_unvisited">Trames non parcourues : %1$s</string>
+    <string name="j1979_freeze_more">%1$d entrées supplémentaires dans l’export JSON</string>
+    <string name="j1979_freeze_scope">Données enregistrées uniquement. Trames OEM supplémentaires brutes ; aucune validation physique.</string>
+</resources>
