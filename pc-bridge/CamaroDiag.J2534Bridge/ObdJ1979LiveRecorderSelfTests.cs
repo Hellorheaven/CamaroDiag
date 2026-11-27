@@ -70,6 +70,23 @@ internal static class ObdJ1979LiveRecorderSelfTests
         rejected=false;
         try{ObdJ1979LiveCli.Parse(args.Where(x=>x!="--confirm-physical-channel").ToArray());}catch(ArgumentException){rejected=true;}
         Check(rejected,"physical confirmation required");
+        now=0;reads=0;
+        var channels=ObdJ1979LiveRecorder.Run((req,_)=>Convert.ToHexString(req) switch {
+            "0100"=>[0x41,0,0,0,0,1],
+            "0120"=>[0x41,0x20,0,0,0,1],
+            "0140"=>[0x41,0x40,0,0,0,1],
+            "0160"=>[0x41,0x60,2,0,0,0],
+            "0167"=>++reads==1?[0x41,0x67,3,90,100]:[0x41,0x67,1,94,0],
+            _=>Normal(req)
+        },plan with{Pids=[0x67],Cycles=2},()=>{},clock:()=>now,delay:ms=>now+=ms);
+        Check(channels.Completed&&channels.MultiSignalSummary.Count==2,"multi-channel completion");
+        Check(channels.MultiSignalSummary[0].Count==2&&channels.MultiSignalSummary[0].Mean==52,
+            "independent first channel mean");
+        Check(channels.MultiSignalSummary[1].Count==1&&channels.MultiSignalSummary[1].Missing==1&&
+            channels.MultiSignalSummary[1].Mean==60,"missing second channel excluded");
+        Check(channels.Observations.All(x=>x.Measurement is null),"no scalar projection of multi-channel PID");
+        Check(ObdJ1979LiveRecorder.Csv(channels).First().EndsWith("signal_name,raw_encoded"),
+            "multi-channel CSV header");
         return count;
     }
 }
