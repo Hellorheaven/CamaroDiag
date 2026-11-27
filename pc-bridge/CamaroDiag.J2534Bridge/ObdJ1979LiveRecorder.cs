@@ -9,7 +9,7 @@ namespace CamaroDiag.J2534Bridge;
 internal static class ObdJ1979LiveRecorder
 {
     internal static bool NumericPid(byte pid)=>ObdJ1979PidValues.DataLength(pid) is not null ||
-        ObdJ1979MultiSignal.Width(pid) is not null;
+        ObdJ1979MultiSignal.Width(pid) is not null || ObdJ1979OperatingContext.IsTrim(pid);
     internal static bool LegacyNumericPid(byte pid)=>NumericPid(pid) &&
         (ObdJ1979MultiSignal.Width(pid)??0)<=5;
     internal sealed record Plan(byte[] Pids,string ExpectedVin,int Cycles=30,int IntervalMs=1000,int BudgetMs=180000)
@@ -40,6 +40,7 @@ internal static class ObdJ1979LiveRecorder
     {
         public IReadOnlyList<ChannelSummary> MultiSignalSummary {get;init;}=[];
         public IReadOnlyList<ObdJ1979ScalingContext.Configuration>? ScalingConfiguration {get;init;}
+        public ObdJ1979OperatingContext.Layout? TrimLayout {get;init;}
         public string VinMatch=>ObservedVin is null?"UNVERIFIED":ObservedVin==DeclaredVin?"MATCH":"MISMATCH";
         public IReadOnlyList<byte> UnverifiedSelectedPids=>SelectedPids.Except(AdvertisedPids).ToArray();
         public bool Cancelled=>StopReason=="CANCELLED";
@@ -110,6 +111,10 @@ internal static class ObdJ1979LiveRecorder
         bool inventoryComplete=false;
         var requiredConfigs=plan.Pids.Select(p=>ObdJ1979ScalingContext.Dependency(p)).OfType<int>().Distinct().Order().ToArray();
         ObdJ1979ScalingContext.Context? scaling=null;
+        bool needsTrim=plan.Pids.Any(pid=>ObdJ1979OperatingContext.IsTrim(pid));
+        ObdJ1979OperatingContext.Layout? layout=null;
+        ObdJ1979OperatingContext.Layout BuildLayout()=>ObdJ1979OperatingContext.ResolveLayout(admission.Select(
+            s=>new ObdJ1979OperatingContext.Observation(s.RequestHex,s.ResponseHex,s.Status)));
         ObdJ1979ScalingContext.Context BuildScaling()=>ObdJ1979ScalingContext.Context.Build(admission.Select(
             s=>new ObdJ1979ScalingContext.Observation(s.RequestHex,s.ResponseHex,s.Status)));
         bool Active(){
@@ -145,6 +150,11 @@ internal static class ObdJ1979LiveRecorder
                     }else if(phase=="SCALING"&&status is ("RAW" or "PASSED") &&
                         !ObdJ1979ScalingContext.ValidConfiguration(request[1],raw.AsSpan(2))){
                         throw new InvalidDataException("Invalid ECU measurement configuration.");
+                    }else if(phase=="SAMPLE"&&status is ("RAW" or "PASSED") &&
+                        pid is byte trimPid&&ObdJ1979OperatingContext.IsTrim(trimPid)){
+                        multi=ObdJ1979OperatingContext.LiveSignals(request,raw,layout??BuildLayout())
+                            ?? throw new InvalidDataException("Invalid fuel trim response.");
+                        if(multi.Count<raw.Length-2)detail="UPPER_BANK_UNVERIFIED";
                     }else if(phase=="SAMPLE"&&status is ("RAW" or "PASSED") &&
                         pid is byte selected&&ObdJ1979MultiSignal.Width(selected) is not null){
                         if(ObdJ1979Status.Width(selected) is not null &&
@@ -238,6 +248,10 @@ internal static class ObdJ1979LiveRecorder
                 if(stop is null&&scaling.Configurations.Any(c=>requiredConfigs.Contains(c.Pid)&&c.State=="UNVERIFIED"))
                     stop="SCALING_UNVERIFIED";
             }
+            if(stop is null&&needsTrim){
+                if(advertised.Contains(0x1D))Query([1,0x1D],"TRIM_LAYOUT");
+                layout=BuildLayout();
+            }
             if(stop is null){
                 long next=Elapsed();
                 for(int cycle=1;cycle<=plan.Cycles;cycle++){
@@ -263,6 +277,7 @@ internal static class ObdJ1979LiveRecorder
         return new(plan.ExpectedVin,vin,plan.Pids,advertised.ToArray(),pages.ToArray(),inventoryComplete,
             plan.Cycles,completedCycles,plan.IntervalMs,plan.BudgetMs,admission.ToArray(),observations.ToArray(),
             plan.Pids.Select(pid=>stats[pid].Report()).ToArray(),stop is null&&completedCycles==plan.Cycles,stop,Elapsed()){
+                TrimLayout=needsTrim?layout??BuildLayout():null,
                 ScalingConfiguration=requiredConfigs.Length==0?null:(scaling??BuildScaling()).Configurations,
                 MultiSignalSummary=channels.OrderBy(x=>x.Key.Pid).ThenBy(x=>x.Key.Name,StringComparer.Ordinal)
                     .Select(x=>x.Value.Report(stats[(byte)x.Key.Pid].Report().Attempted)).ToArray()
@@ -273,7 +288,7 @@ internal static class ObdJ1979LiveRecorder
     {
         static string Escape(string? field)=>field is null?"":"\""+field.Replace("\"","\"\"")+"\"";
         static string Number(double? value)=>value?.ToString("R",CultureInfo.InvariantCulture)??"";
-        bool multi=report.SelectedPids.Any(pid=>ObdJ1979MultiSignal.Width(pid) is not null);
+        bool multi=report.SelectedPids.Any(pid=>ObdJ1979MultiSignal.Width(pid) is not null||ObdJ1979OperatingContext.IsTrim(pid));
         const string header="cycle,pid_hex,started_elapsed_ms,elapsed_ms,duration_ms,status,value,unit,request_hex,response_hex,detail";
         yield return multi?header+",signal_name,raw_encoded":header;
         foreach(var row in report.Observations){
