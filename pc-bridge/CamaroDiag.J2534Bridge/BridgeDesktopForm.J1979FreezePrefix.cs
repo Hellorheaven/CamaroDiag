@@ -43,6 +43,20 @@ internal sealed partial class BridgeDesktopForm
             message.AppendLine(string.Format(CultureInfo.CurrentCulture,
                 J1979RecipeText("FreezePrefixSummary"),report["complete_observations"],
                 report["discarded_tail_bytes"],report["interruption"]));
+            if(report.TryGetValue("observed_frame_progress",out var frameValue)&&
+               frameValue is Dictionary<string,object?>[] progress&&progress.Length>0)
+            {
+                message.AppendLine(J1979RecipeText("FreezePrefixFrames"));
+                foreach(var frame in progress)
+                {
+                    var announced=(int[])frame["advertised_measurement_pids"]!;
+                    var read=(int[])frame["read_measurement_pids"]!;
+                    message.AppendLine(string.Format(CultureInfo.CurrentCulture,
+                        J1979RecipeText("FreezePrefixFrameRow"),
+                        ((int)frame["frame"]!).ToString("X2",CultureInfo.InvariantCulture),
+                        announced.Length,read.Length));
+                }
+            }
             functionalResults.Text=message.ToString();
         }
         catch(Exception e) when(e is IOException or InvalidDataException or ArgumentException or

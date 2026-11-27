@@ -225,6 +225,8 @@
   <data name="NativeArchiveConfirm" xml:space="preserve"><value>Confirmer la récupération du journal existant</value></data>
   <data name="NativeArchiveReadOnly" xml:space="preserve"><value>Archive en lecture seule (aucun nouveau test véhicule)</value></data>
   <data name="FreezePrefixInspect" xml:space="preserve"><value>Inspecter une capture CF/1 interrompue</value></data>
+  <data name="FreezePrefixFrames" xml:space="preserve"><value>Avancement par trame (provisoire)</value></data>
+  <data name="FreezePrefixFrameRow" xml:space="preserve"><value>Trame {0} : {1} PID de mesure annoncés, {2} lus</value></data>
   <data name="FreezePrefixSaved" xml:space="preserve"><value>Inspection CF/1 partielle enregistrée (capture non terminée).</value></data>
   <data name="FreezePrefixConfirm" xml:space="preserve"><value>Confirmez le VIN indépendant attendu {0}. Seuls les enregistrements complets seront inspectés. Continuer ?</value></data>
   <data name="FreezePrefixSummary" xml:space="preserve"><value>Observations complètes : {0} ; octets finaux non vérifiés : {1} ; état : {2}</value></data>
