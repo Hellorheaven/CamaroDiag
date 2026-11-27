@@ -2,6 +2,7 @@
 #include "host_session_arbiter.h"
 #include "../../shared/j1979_campaign_evidence.h"
 #include "../../shared/j1979_freeze_evidence.h"
+#include "../../shared/j1979_live_evidence.h"
 
 namespace cd {
 // Integration boundary for a qualified native USB owner, not discovery.
@@ -14,6 +15,8 @@ class J1979UsbCampaign {
     bool extended=false;
     bool freeze=false;
     J1979FreezeScope freezeScope{};
+    bool live=false;
+    J1979LiveScope liveScope{};
   };
   class Owner {
    public:
@@ -35,12 +38,13 @@ class J1979UsbCampaign {
     Outcome outcome=Outcome::Denied;
     J1979CanCampaign::Summary campaign;
     J1979FreezeCampaign::Summary freezeCampaign;
+    J1979LiveCampaign::Summary liveCampaign;
   };
 
   static Report run(HostSessionArbiter& arbiter,Owner& owner,
       J1979CanReadLink& hardware,J1979CampaignEvidence::Writer& writer,
       const Profile& profile,J1979CanReadExchange::Result& scratch){
-    if(profile.freeze)return Report{};
+    if(profile.freeze||profile.live)return Report{};
     return runImpl(arbiter,owner,&hardware,nullptr,writer,profile,scratch);
   }
   // Interprocessor CI/2 client: its SPI port and STM32 endpoint must both
@@ -48,23 +52,33 @@ class J1979UsbCampaign {
   static Report runApplication(HostSessionArbiter& arbiter,Owner& owner,
       J1979CanCampaign::ApplicationLink& hardware,J1979CampaignEvidence::Writer& writer,
       const Profile& profile,J1979CanReadExchange::Result& scratch){
-    if(profile.freeze||!hardware.matches(profile.tx,profile.rx,profile.extended))return Report{};
+    if(profile.freeze||profile.live||!hardware.matches(profile.tx,profile.rx,profile.extended))return Report{};
     return runImpl(arbiter,owner,nullptr,&hardware,writer,profile,scratch);
   }
   static Report runFreezeApplication(HostSessionArbiter& arbiter,Owner& owner,
       J1979CanCampaign::ApplicationLink& hardware,J1979CampaignEvidence::Writer& writer,
       const Profile& profile,J1979CanReadExchange::Result& scratch){
-    if(!profile.freeze||!profile.freezeScope.valid()||
+    if(!profile.freeze||profile.live||!profile.freezeScope.valid()||
        !hardware.matches(profile.tx,profile.rx,profile.extended)||
        !hardware.matchesFreeze(profile.freezeScope))return Report{};
     return runImpl(arbiter,owner,nullptr,&hardware,writer,profile,scratch);
+  }
+  static Report runLiveApplication(HostSessionArbiter& arbiter,Owner& owner,
+      J1979CanCampaign::ApplicationLink& hardware,J1979CampaignEvidence::Writer& writer,
+      const Profile& profile,J1979CanReadExchange::Result& scratch,J1979LiveCampaign::Waiter& waiter){
+    if(profile.freeze||!profile.live||!profile.liveScope.valid()||
+       profile.budgetMs!=profile.liveScope.budgetMs||
+       !hardware.matches(profile.tx,profile.rx,profile.extended)||
+       !hardware.matchesLive(profile.liveScope))return Report{};
+    return runImpl(arbiter,owner,nullptr,&hardware,writer,profile,scratch,&waiter);
   }
  private:
   static Report runImpl(HostSessionArbiter& arbiter,Owner& owner,
       J1979CanReadLink* hardware,J1979CanCampaign::ApplicationLink* application,
       J1979CampaignEvidence::Writer& writer,const Profile& profile,
-      J1979CanReadExchange::Result& scratch){
+      J1979CanReadExchange::Result& scratch,J1979LiveCampaign::Waiter* waiter=nullptr){
     Report report;
+    if(profile.live&&(!waiter||!application||profile.freeze))return report;
     if(!J1979CanReadSession::physicalPair(profile.tx,profile.rx,profile.extended)||
        profile.budgetMs<1||profile.budgetMs>600000u||!owner.currentHost())return report;
     HostSessionArbiter::Lease lease;
@@ -107,6 +121,9 @@ class J1979UsbCampaign {
       bool matchesFreeze(const J1979FreezeScope& scope)const override{
         return h_&&h_->matchesFreeze(scope);
       }
+      bool matchesLive(const J1979LiveScope& scope)const override{
+        return h_&&h_->matchesLive(scope);
+      }
       uint32_t monotonicMs()override{return h_?h_->monotonicMs():0;}
       void exchange(const uint8_t* req,size_t size,uint32_t timeout,
           J1979CanReadExchange::Result& result)override{
@@ -147,14 +164,28 @@ class J1979UsbCampaign {
 
     J1979CampaignEvidence stream(output);
     J1979FreezeEvidence freezeStream(output);
+    J1979LiveEvidence liveStream(output,profile.liveScope);
+    class GuardedWaiter final:public J1979LiveCampaign::Waiter {
+     public:
+      GuardedWaiter(Admission& guard,J1979LiveCampaign::Waiter* waiter):guard_(guard),waiter_(waiter){}
+      bool waitMs(uint32_t duration)override{
+        return waiter_&&guard_.admitted()&&waiter_->waitMs(duration)&&guard_.admitted();
+      }
+     private:
+      Admission& guard_;J1979LiveCampaign::Waiter* waiter_;
+    } pacing(guard,waiter);
     // Never start an electrical channel before exclusive ownership. Recheck
     // authorization immediately before and after the hardware start.
     const bool channelStarted=guard.admitted()&&owner.startReadChannel(profile,lease);
     const bool started=channelStarted&&(application?remote.active():link.active())&&
-      (profile.freeze?freezeStream.begin(profile.tx,profile.rx,profile.extended,
+      (profile.live?liveStream.begin(profile.tx,profile.rx,profile.extended):
+       profile.freeze?freezeStream.begin(profile.tx,profile.rx,profile.extended,
         profile.budgetMs,profile.freezeScope):
         stream.begin(profile.tx,profile.rx,profile.extended,profile.budgetMs));
-    if(started&&profile.freeze){
+    if(started&&profile.live){
+      report.liveCampaign=J1979LiveCampaign::runApplication(remote,profile.tx,
+        profile.rx,profile.extended,profile.liveScope,pacing,liveStream,scratch);
+    }else if(started&&profile.freeze){
       report.freezeCampaign=J1979FreezeCampaign::runApplication(remote,profile.tx,
         profile.rx,profile.extended,profile.budgetMs,profile.freezeScope,freezeStream,scratch);
     }else if(started){
@@ -177,9 +208,11 @@ class J1979UsbCampaign {
     }
     output.afterVerifiedStop();
     if(!channelStarted)report.outcome=Outcome::StartFailed;
-    else if(!started||!output.permitted()||!(profile.freeze?freezeStream.finish(report.freezeCampaign):stream.finish(report.campaign)))
+    else if(!started||!output.permitted()||!(profile.live?liveStream.finish(report.liveCampaign):
+      profile.freeze?freezeStream.finish(report.freezeCampaign):stream.finish(report.campaign)))
       report.outcome=Outcome::EvidenceLost;
-    else report.outcome=(profile.freeze?report.freezeCampaign.completed:
+    else report.outcome=(profile.live?report.liveCampaign.completed:
+      profile.freeze?report.freezeCampaign.completed:
       report.campaign.end==J1979CanCampaign::End::Complete)?
       Outcome::Complete:Outcome::Partial;
     if(owner.currentEvidence(profile).recoveryPending){
