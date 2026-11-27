@@ -31,9 +31,9 @@ def android():
     report.update(transport="ANDROID_ELM_ISOTP", profile=6,
                   raw_protocol_response="6\r>", observed_protocol=6,
                   adapter_exchanges=[
-                      {"request_hex": row["request_hex"],
-                       "raw_adapter_response": elm_frames(bytes.fromhex(row["response_hex"]))}
-                      for row in report["result"]["steps"]])
+                      {"step": index, "request_hex": row["request_hex"],
+                       "raw_response": elm_frames(bytes.fromhex(row["response_hex"]))}
+                      for index, row in enumerate(report["result"]["steps"])])
     return report
 
 
@@ -63,8 +63,8 @@ class CrossHostFreezeTests(unittest.TestCase):
 
     def test_android_wrong_address_rejected(self):
         original = android()
-        original["adapter_exchanges"][0]["raw_adapter_response"] = (
-            original["adapter_exchanges"][0]["raw_adapter_response"].replace("7E8", "7E9"))
+        original["adapter_exchanges"][0]["raw_response"] = (
+            original["adapter_exchanges"][0]["raw_response"].replace("7E8", "7E9"))
         with self.assertRaises(ValueError):
             inspect(original)
 
@@ -81,7 +81,7 @@ class CrossHostFreezeTests(unittest.TestCase):
                     "7E8 01 42\r7E8 01 42\r>",
                     "7E8 10 14 49 02 01 31 47 31\r7E8 22 46 41 31 45 33 30 44\r>"):
             altered = copy.deepcopy(original)
-            altered["adapter_exchanges"][0]["raw_adapter_response"] = raw
+            altered["adapter_exchanges"][0]["raw_response"] = raw
             with self.subTest(raw=raw), self.assertRaises(ValueError):
                 inspect(altered)
 
@@ -92,7 +92,7 @@ class CrossHostFreezeTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             inspect(altered)
         altered = copy.deepcopy(original)
-        altered["adapter_exchanges"][1]["raw_adapter_response"] = elm_frames(bytes.fromhex("42000000000000"))
+        altered["adapter_exchanges"][1]["raw_response"] = elm_frames(bytes.fromhex("42000000000000"))
         with self.assertRaises(ValueError):
             inspect(altered)
 
