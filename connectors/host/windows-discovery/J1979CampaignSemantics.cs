@@ -216,6 +216,10 @@ internal static class J1979CampaignSemantics
         if(m==2&&(r.Length<3||r[2]!=req[2]))return 0;
         if(pid%32==0)return r.Length==off+4&&!(pid==224&&(r[^1]&1)!=0)?1:0;
         if(m is 1 or 2){
+            if(pid is >=6 and <=9 or >=0x55 and <=0x58){
+                if(r.Length==off+1)return pid<0x55?1:2;
+                return r.Length==off+2?2:0;
+            }
             int width=m==2&&pid==2?2:(pid==1||pid==0xA6)?4:One.Contains(pid)?1:Two.Contains(pid)?2:0;
             return width>0?(r.Length==off+width?1:0):(r.Length>off?2:0);
         }
