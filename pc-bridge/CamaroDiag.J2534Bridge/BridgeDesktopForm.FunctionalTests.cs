@@ -79,6 +79,10 @@ internal sealed partial class BridgeDesktopForm
         extraRecipes.Controls.Add(functionalRunNetwork);
         extraRecipes.Controls.Add(functionalRunLive);
         WideRow(fields, functionalRunFreeze, 42);
+        var nativeFreezeActions=new FlowLayoutPanel { Dock=DockStyle.Fill };
+        nativeFreezeActions.Controls.Add(functionalRunNativeFreeze);
+        nativeFreezeActions.Controls.Add(functionalInspectNativeFreeze);
+        WideRow(fields,nativeFreezeActions,42);
         WideRow(fields, functionalRunLegacyMutation, 42);
         WideRow(fields, extraRecipes, 42);
         WideRow(fields, new Label
@@ -103,6 +107,10 @@ internal sealed partial class BridgeDesktopForm
         };
         functionalRunFreeze.Enabled = functionalRunLive.Enabled;
         functionalRunNativeUsb.Click += async (_, _) => await RunWindowsNativeUsbAsync();
+        functionalRunNativeFreeze.Click += async (_, _) => await RunWindowsNativeFreezeAsync();
+        functionalInspectNativeFreeze.Click += async (_, _) => await InspectWindowsNativeFreezeAsync();
+        functionalRunNativeUsb.EnabledChanged += (_, _) => functionalRunNativeFreeze.Enabled = functionalInspectNativeFreeze.Enabled = functionalRunNativeUsb.Enabled;
+        functionalRunNativeFreeze.Enabled = functionalInspectNativeFreeze.Enabled = functionalRunNativeUsb.Enabled;
         functionalRunLegacy.Click += async (_, _) => await RunWindowsLegacyAsync();
         functionalRunLegacyMutation.Click += async (_, _) => await RunWindowsLegacyMutationAsync();
         functionalRunEvap.Click += async (_, _) => await RunWindowsEvapAsync();
