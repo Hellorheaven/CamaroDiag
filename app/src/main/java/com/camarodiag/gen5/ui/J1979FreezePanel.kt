@@ -37,7 +37,7 @@ internal fun J1979FreezePanel(protocol: Int?,state: FunctionalTestState,vehicle:
     var budget by remember(epoch,vehicle) { mutableStateOf("180") }
     var confirmed by remember(protocol,epoch,vehicle) { mutableStateOf(false) }
     var expanded by remember { mutableStateOf(false) }
-    val enabled = !state.running && protocol in 6..9
+    val enabled = !state.running && protocol != null && protocol in 6..9
     val selectedFrames = parseFreezeIds(frames,8,false)
     val selectedPids = parseFreezeIds(pids,64,true)
     val target = source.trim().takeIf { it.matches(Regex("[0-9A-Fa-f]{3,8}")) }
