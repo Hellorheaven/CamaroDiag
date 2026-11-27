@@ -240,8 +240,63 @@ internal static class J1979MaintenanceJournal
             ["operator_consent_verified"]=false,["monitor_completion_verified"]=false,["evidence_authenticated"]=false,
             ["permits_automatic_retry"]=false,["permits_programming"]=false};
     }
+    // Only whole, independently replayed records are exposed. Never accept
+    // a complete corrupt record as a torn tail and never trim a terminal.
+    internal static Dictionary<string,object?> InspectPrefix(byte[] data,string expectedVin)
+    {
+        Require(data.Length is >0 and <=MaxJournal&&J1979LiveNative.ValidVin(expectedVin),"Invalid interrupted CM/1 input");
+        int pos=0,number=0,prior=0;
+        string? declaredKind=null;
+        Scope? firstScope=null;
+        byte[] magic=[(byte)'C',(byte)'M',1];
+        while(pos<data.Length)
+        {
+            Require(number<4&&prior!=4,"Trailing bytes after CM/1 terminal");
+            var h=data.AsSpan(pos,Math.Min(Header,data.Length-pos));
+            int fixedSize=Math.Min(3,h.Length);
+            Require(h[..fixedSize].SequenceEqual(magic.AsSpan(0,fixedSize)),"Invalid CM/1 prefix magic/version");
+            if(h.Length>=4)
+            {
+                int k=h[3];
+                Require(k is >=1 and <=4&&(number==0?k==1:k==prior+1||k==4),"Unexpected prefix record");
+                declaredKind=Kinds[k];
+            }
+            if(h.Length>=5)Require(h[4]==number,"Invalid prefix sequence");
+            if(h.Length>=6)Require(h[5]<=MaxRows&&(number!=0||h[5]==0),"Invalid prefix observation count");
+            for(int i=6;i<Math.Min(8,h.Length);i++)Require(h[i]==0,"Invalid prefix reserved field");
+            if(h.Length<Header)break;
+            int kind=h[3],count=h[5];long length=U32(h,8);
+            Require(length>=ScopeSize&&length<=MaxRecord-Header-4&&
+                (kind==1?length==ScopeSize&&count==0:length>=ScopeSize+SummarySize+count*RowSize),
+                "Invalid prefix body size");
+            int end=pos+Header+(int)length+4;
+            if(data.Length-pos>=Header+ScopeSize)
+            {
+                var scope=Scope.Decode(data.AsSpan(pos+Header,ScopeSize));
+                Require(scope.Vin==expectedVin&&(firstScope is null||firstScope==scope),"CM/1 prefix scope changed");
+                firstScope??=scope;
+            }
+            if(end>data.Length)break;
+            Require(BinaryDiscovery.Crc32(data.AsSpan(pos,end-pos-4))==U32(data,end-4),"Complete prefix record has bad CRC");
+            pos=end;number++;prior=kind;declaredKind=null;
+        }
+        Require(number>0&&prior!=4,"Interrupted CM/1 requires verified open and no terminal");
+        var verified=Inspect(data[..pos],expectedVin);
+        Require(Equals(verified["terminal_present"],false)&&Equals(verified["recovery_required"],true),"Invalid prefix state");
+        return new(){
+            ["schema"]="camarodiag-j1979-native-maintenance-prefix-v1",["protocol"]="SAE-J1979",["scope"]=verified["scope"],
+            ["prefix_integrity_verified"]=true,["record_consistency_verified"]=false,["terminal_present"]=false,
+            ["verified_prefix_bytes"]=pos,["unverified_trailing_bytes"]=data.Length-pos,["journal_bytes_received"]=data.Length,
+            ["next_record_kind_declared"]=declaredKind,["verified_records"]=verified["records"],
+            ["baseline_record_present"]=verified["baseline_record_present"],["intent_record_present"]=verified["intent_record_present"],
+            ["observations"]=verified["observations"],["recovery_required"]=true,["command_outcome_unknown"]=true,
+            ["physical_vehicle_verified"]=false,["physical_stop_independently_verified"]=false,
+            ["durable_before_tx_independently_verified"]=false,["operator_consent_verified"]=false,
+            ["monitor_completion_verified"]=false,["evidence_authenticated"]=false,["permits_automatic_retry"]=false,["permits_programming"]=false};
+    }
+    internal const string PrefixCommand="--inspect-j1979-maintenance-prefix";
     internal const string Command="--inspect-j1979-maintenance-journal";
-    internal static Dictionary<string,object?> InspectFile(string source,string vin,string destination,Func<bool>? current=null)
+    internal static Dictionary<string,object?> InspectFile(string source,string vin,string destination,Func<bool>? current=null,bool prefix=false)
     {
         Require(!Path.GetFullPath(source).Equals(Path.GetFullPath(destination),StringComparison.OrdinalIgnoreCase),"Distinct input and output required");
         if(current is not null&&!current())throw new OperationCanceledException();
@@ -251,7 +306,7 @@ internal static class J1979MaintenanceJournal
         byte[] bytes=new byte[(int)input.Length];input.ReadExactly(bytes);
         Require(input.ReadByte()==-1,"CM/1 grew during read");
         string digest=Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
-        var report=Inspect(bytes,vin);report["journal_sha256"]=digest;
+        var report=prefix?InspectPrefix(bytes,vin):Inspect(bytes,vin);report["journal_sha256"]=digest;
         input.Position=0;
         Require(digest==Convert.ToHexString(SHA256.HashData(input)).ToLowerInvariant(),"CM/1 changed during inspection");
         byte[] json=JsonSerializer.SerializeToUtf8Bytes(report,new JsonSerializerOptions{WriteIndented=true});
@@ -262,8 +317,8 @@ internal static class J1979MaintenanceJournal
     internal static int Run(string[] args)
     {
         try{
-            Require(args.Length==4&&args[0]==Command,"Expected CM/1 source, independent VIN and new JSON path");
-            var report=InspectFile(args[1],args[2],args[3]);
+            Require(args.Length==4&&(args[0]==Command||args[0]==PrefixCommand),"Expected CM/1 source, independent VIN and new JSON path");
+            var report=InspectFile(args[1],args[2],args[3],prefix:args[0]==PrefixCommand);
             Console.WriteLine(JsonSerializer.Serialize(report));
             return Equals(report["recovery_required"],true)?7:0;
         }catch(Exception e) when(e is IOException or ArgumentException or UnauthorizedAccessException or InvalidDataException or OperationCanceledException)
