@@ -17,6 +17,7 @@ from .j1979_multi_signal import decode_response as multi_decode, width as multi_
 from .j1979_status import decode_response as status_decode, width as status_width
 from .j1979_scaling_context import project as contextual_project, config_data, CONFIG_PIDS
 from .j1979_vehicle_info import legacy_info
+from .j1979_legacy_monitor import project as monitor_projection
 from .j1979_live_inspection import load, _get, _require, _hex, _array, _dict
 from .j1979_network_inspection import _normalize, _equal
 from .j1979_multi_signal import historical_projection
@@ -487,6 +488,11 @@ def inspect(root,*,expected_vin=None):
     if claimed("freeze_triggers") is not None:
         _require(freeze is not None and project_claims("freeze_triggers",[freeze],("present","dtc")),"Freeze trigger differs from selected ECU")
         checked.append("freeze_triggers")
+    legacy_monitors=monitor_projection(normalized)
+    if claimed("legacy_monitor_results") is not None:
+        _require(_equal(_normalize(claimed("legacy_monitor_results")),legacy_monitors),
+                 "Legacy monitor results differ from original responses")
+        checked.append("legacy_monitor_results")
     context=contextual_project(normalized)
     if claimed("contextual_measurements") is not None:
         _require(_equal(_normalize(claimed("contextual_measurements")),context),
@@ -509,7 +515,7 @@ def inspect(root,*,expected_vin=None):
             "dtc_modes":[{"mode":m,"codes":dtcs.get(m)} for m in (3,7,10)],
             "measurements":measurements,"multi_signal_records":multis,"status_records":states,
             "contextual_measurements":context,"readiness":readiness,
-            "freeze_trigger":freeze,"monitor_records":monitors}
+            "freeze_trigger":freeze,"monitor_records":monitors,"legacy_monitor_results":legacy_monitors}
 
 
 def inspect_file(path,*,expected_vin=None):
