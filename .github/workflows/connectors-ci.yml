@@ -129,9 +129,9 @@ jobs:
           mkdir -p /tmp/android-protocol
           command -v kotlinc
           kotlinc -Werror -jvm-target 17 -include-runtime -d /tmp/android-cu-auth.jar $(find connectors/host/android/src/main/java/com/camarodiag/connectors -name '*.kt' ! -name 'UsbJ1979.kt' ! -name 'UsbDiscovery.kt' | sort)
-          javac -Xlint:all -Werror -cp /tmp/android-cu-auth.jar -d /tmp/android-protocol connectors/host/android/src/test/java/com/camarodiag/connectors/BinaryDiscoveryTest.java
+          kotlinc -Werror -jvm-target 17 -cp /tmp/android-cu-auth.jar -d /tmp/android-protocol connectors/host/android/src/test/java/com/camarodiag/connectors/UsbFixtures.kt connectors/host/android/src/test/java/com/camarodiag/connectors/BinaryDiscoveryTest.kt
           java -ea -cp /tmp/android-protocol:/tmp/android-cu-auth.jar com.camarodiag.connectors.BinaryDiscoveryTest
-          javac -Xlint:all -Werror -cp /tmp/android-cu-auth.jar -d /tmp/android-protocol connectors/host/android/src/test/java/com/camarodiag/connectors/J1979UsbTest.java
+          kotlinc -Werror -jvm-target 17 -cp /tmp/android-cu-auth.jar -d /tmp/android-protocol connectors/host/android/src/test/java/com/camarodiag/connectors/UsbFixtures.kt connectors/host/android/src/test/java/com/camarodiag/connectors/J1979UsbTest.kt
           java -ea -cp /tmp/android-protocol:/tmp/android-cu-auth.jar com.camarodiag.connectors.J1979UsbTest
           javac -Xlint:all -Werror -cp /tmp/android-protocol:/tmp/android-cu-auth.jar -d /tmp/android-protocol connectors/host/android/src/test/java/com/camarodiag/connectors/J1979FreezeUsbTest.java
           java -ea -cp /tmp/android-protocol:/tmp/android-cu-auth.jar com.camarodiag.connectors.J1979FreezeUsbTest
