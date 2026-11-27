@@ -19,7 +19,7 @@ class ElmJ1979ClearRecipeTest {
     @Test fun actualBeforeAfterAndPermanentEvidence() = runBlocking {
         val sent = mutableListOf<String>()
         val records = replies()
-        val result = ElmJ1979ClearRecipe.run(6, vin, {}) {
+        val result = ElmJ1979ClearRecipe.run(6, vin, {}, {}) {
             val command = ElmJ1979EvapTest.hex(it)
             sent += command
             if (command == "04") {
@@ -40,7 +40,7 @@ class ElmJ1979ClearRecipeTest {
         for ((key, value) in listOf("0902" to (bytes("490201") + "1G1FA1RXXR0123457".toByteArray()),
             "03" to bytes("43010000"), "010D" to bytes("410D01"), "010C" to bytes("410C0001"))) {
             val records = replies().apply { put(key, value) }
-            val result = ElmJ1979ClearRecipe.run(6, vin, {}) {
+            val result = ElmJ1979ClearRecipe.run(6, vin, {}, {}) {
                 val command = ElmJ1979EvapTest.hex(it)
                 assertNotEquals("04", command)
                 records.getValue(command)
@@ -53,7 +53,7 @@ class ElmJ1979ClearRecipeTest {
     @Test fun missingPostResetEvidenceIsNotZero() = runBlocking {
         val records = replies()
         var sent = 0
-        val result = ElmJ1979ClearRecipe.run(8, vin, {}) {
+        val result = ElmJ1979ClearRecipe.run(8, vin, {}, {}) {
             val command = ElmJ1979EvapTest.hex(it)
             if (command == "04") {
                 sent++
@@ -68,12 +68,35 @@ class ElmJ1979ClearRecipeTest {
         assertEquals(listOf("P0123"), result.afterDtcs["0A"])
     }
 
+    @Test fun baselinePersistenceAndFreshIdentityAreRequired() = runBlocking {
+        for (scenario in listOf("disk","vin","motion")) {
+            val records=replies()
+            val sent=mutableListOf<String>()
+            val result=ElmJ1979ClearRecipe.run(6,vin,{}, { baseline ->
+                assertFalse(baseline.attempted)
+                assertEquals("BASELINE_SAVED",baseline.outcome)
+                when(scenario) {
+                    "disk" -> throw java.io.IOException("disk unavailable")
+                    "vin" -> records["0902"]=bytes("490201")+"1G1FA1RXXR0123457".toByteArray()
+                    "motion" -> records["010D"]=bytes("410D01")
+                }
+            }) { request ->
+                val cmd=ElmJ1979EvapTest.hex(request)
+                sent+=cmd
+                records.getValue(cmd)
+            }
+            assertFalse(result.attempted)
+            assertEquals("NOT_TESTED",result.outcome)
+            assertFalse("04" in sent)
+        }
+    }
+
     @Test fun persistentDtcAndLostAckNeverCauseAnotherReset() = runBlocking {
         for ((reply, outcome) in listOf(bytes("44") to "ACKNOWLEDGED_READBACK",
             bytes("7F0422") to "REFUSED", null to "UNCERTAIN")) {
             val records = replies()
             var sent = 0
-            val result = ElmJ1979ClearRecipe.run(6, vin, {}) {
+            val result = ElmJ1979ClearRecipe.run(6, vin, {}, {}) {
                 val command = ElmJ1979EvapTest.hex(it)
                 if (command == "04") {
                     sent++
