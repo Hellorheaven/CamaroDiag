@@ -72,7 +72,7 @@ class J1979MaintenanceArchive {
       }
       offset_+=n;return true;
     }
-    bool finish()override{return current()&&offset_==snapshot_.size;}
+    bool finish()override{return current()&&offset_==snapshot_.size&&storage_.verifyArchive(snapshot_)&&current();}
     void close()override{
       if(!closed_){closed_=true;open_=false;if(attempted_)owner_.release();}
     }
