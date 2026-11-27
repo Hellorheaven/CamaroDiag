@@ -1,3 +1,9 @@
+## Lots J1979 et C6 — reprise du 27/11/2026
+
+- Dix commits fonctionnels successifs sur PR #117 : échéances et annulation ELM legacy, contrôle du répondant et NRC terminal J2534 legacy, conservation du rapport CAN SocketCAN après échec de fermeture, mesures numériques legacy anonymes de largeur vérifiée, identité des enveloppes de sauvegarde Android, identité du journal actif Android, contrôle VIN optionnel intégré au scan CAN Windows (ressources FR/EN), lecture bornée des enveloppes Windows, DTC legacy structurés par réponse et résultats Mode 05/06 et déclencheurs de trame figée legacy structurés sans attribution inventée.
+- Les tests de régression ont été ajoutés ou étendus, sans exécution intermédiaire conformément à la règle du propriétaire. Les identités de fichiers restent dépendantes du support du système et ne garantissent pas l'atomicité des chemins. Les données de moniteurs sont encodées, pas des verdicts ou valeurs physiques certifiés. C6 et J1979 restent ouverts ; aucun merge, Release ou gate de clôture.
+- Demande du propriétaire pour cette reprise : au moins dix commits fonctionnels, sans découpage artificiel. Poursuivre les lots substantiels et privilégier les fonctions intégrées et la clôture effective.
+
 ## J1979 — intégration des recettes CAN : VIN Linux et annulation Windows (27/11/2026)
 
 - SocketCAN : paramètre VIN facultatif vérifié avant ouverture, comparaison sur première lecture ; arrêt avant les autres requêtes en cas de VIN discordant/non vérifié, export JSON du résultat et code non nul. Windows J2534 : conservation du préfixe accepté lors d'une annulation opérateur, uniquement si l'autorisation initiale reste valable ; aucune publication après expiration/remplacement. Inventaire indisponible distinct de partiel, ressources FR/EN. Régressions écrites sans exécution ; C6/J1979 ouverts, aucune CI intermédiaire, fusion ou Release.

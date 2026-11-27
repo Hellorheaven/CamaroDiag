@@ -270,13 +270,30 @@ def scan(exchange, protocol_check, expected_protocol: int, *, budget=180.0,
             if pid != 2:
                 read_pid(2, pid)
 
+    # Keep records separate: a headerless response cannot identify an ECU.
+    # Unknown scaling, limit direction and monitor verdict are not inferred.
+    monitor_records = []
     for sensor in sorted(sensors):
         for tid in inventory(5, lambda r: r[2] == sensor, 3, suffix=f"{sensor:02X}"):
-            read(f"05{tid:02X}{sensor:02X}", lambda r:
+            rows = read(f"05{tid:02X}{sensor:02X}", lambda r:
                  len(r) == (4 if tid in range(1, 5) else 6) and
                  r[:3] == bytes((0x45, tid, sensor)))
+            for index, row in enumerate(rows):
+                monitor_records.append({"mode": 5, "test_id": tid, "sensor_mask": sensor,
+                    "encoded_data_hex": row[3:].hex().upper(), "response_index": index,
+                    "responder_attribution": "ANONYMOUS"})
     for tid in inventory(6, lambda r: r[2] == 0xFF, 3):
-        read(f"06{tid:02X}", lambda r: len(r) == 7 and r[:2] == bytes((0x46, tid)))
+        rows = read(f"06{tid:02X}", lambda r: len(r) == 7 and r[:2] == bytes((0x46, tid)))
+        for index, row in enumerate(rows):
+            monitor_records.append({"mode": 6, "test_id": tid,
+                "component_and_limit_encoded": row[2],
+                "value_encoded": int.from_bytes(row[3:5], "big"),
+                "limit_encoded": int.from_bytes(row[5:7], "big"),
+                "response_index": index, "responder_attribution": "ANONYMOUS"})
+    freeze_triggers = [{"response_index": i, "present": bool(row[3] or row[4]),
+                        "dtc": dtc(row[3], row[4]) if row[3] or row[4] else None,
+                        "responder_attribution": "ANONYMOUS"}
+                       for i, row in enumerate(trigger)] if trigger else None
 
     controls = inventory(8, lambda r: r[2] == 0, 3, suffix="0000000000")
     info = inventory(9, lambda r: r[2] == 1, 3)
@@ -304,6 +321,7 @@ def scan(exchange, protocol_check, expected_protocol: int, *, budget=180.0,
             "protocol_name": PROTOCOLS[expected_protocol], "responder_attribution": "ANONYMOUS",
             "observed_vin": None, "anonymous_vin_candidate": vin_candidate,
             "steps": steps, "measurements": measurements, "dtc_modes": dtc_modes,
+            "monitor_records": monitor_records, "freeze_triggers": freeze_triggers,
             "advertised_control_tests": controls, "completed": stop is None,
             "stop_reason": stop, "cancelled": stop == "CANCELLED", "duration_ms": round((clock() - start) * 1000),
             "not_executed": ["MODE_04_CLEAR", "MODE_08_CONTROL"]}

@@ -52,3 +52,21 @@ class LegacyBoundariesTests(unittest.TestCase):
         self.assertEqual([[]], modes[7]["anonymous_records"])
         self.assertIsNone(modes[10]["anonymous_records"])
         self.assertEqual("ANONYMOUS", modes[3]["responder_attribution"])
+
+    def test_legacy_monitor_records_and_freeze_trigger_remain_anonymous(self):
+        replies = {"0100": "410000002000", "0113": "411301",
+                   "020200": "4202000000\n4202000123",
+                   "020000": "42000000000000",
+                   "050001": "45000180000000", "050101": "4501012A",
+                   "0600": "4600FF80000000", "0601": "46018100010002"}
+        report = scan(lambda req, _: replies.get(req, "NO DATA"), lambda: 2, 2)
+        self.assertEqual([None, "P0123"], [row["dtc"] for row in report["freeze_triggers"]])
+        self.assertEqual([False, True], [row["present"] for row in report["freeze_triggers"]])
+        oxygen, monitor = report["monitor_records"]
+        self.assertEqual((5, 1, 1, "2A"), (oxygen["mode"], oxygen["test_id"],
+                         oxygen["sensor_mask"], oxygen["encoded_data_hex"]))
+        self.assertEqual((6, 1, 129, 1, 2), (monitor["mode"], monitor["test_id"],
+                         monitor["component_and_limit_encoded"], monitor["value_encoded"], monitor["limit_encoded"]))
+        self.assertTrue(all(row["responder_attribution"] == "ANONYMOUS"
+                            for row in report["monitor_records"]))
+        self.assertNotIn("passed", monitor)
