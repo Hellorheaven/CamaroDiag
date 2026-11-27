@@ -79,6 +79,8 @@ internal static class ObdJ1979LiveCli
             throw new ArgumentException("Explicit physical channel, VIN, confirmations and distinct new files required.");
         var plan=new ObdJ1979LiveRecorder.Plan(pids.ToArray(),values.GetValueOrDefault("--vin")??"",
             Number("--cycles",30),Number("--interval-ms",1000),budget*1000).Validate();
+        if(legacy&&plan.Pids.Any(pid=>!ObdJ1979LiveRecorder.LegacyNumericPid(pid)))
+            throw new ArgumentException("Selected PID exceeds legacy application width.");
         return new(index,profile,tx,rx,plan,output,csv,quiet,variant,source);
     }
     internal static Report Execute(J2534Adapter adapter,Options options,Action requireActive,
@@ -91,6 +93,8 @@ internal static class ObdJ1979LiveCli
         try{
             requireActive();
             if(options.LegacyVariant is {} variant&&options.LegacySource is byte source){
+                if(options.Plan.Pids.Any(pid=>!ObdJ1979LiveRecorder.LegacyNumericPid(pid)))
+                    throw new ArgumentException("Selected PID exceeds legacy application width.");
                 using var session=ObdLegacyJ2534Transport.Open(adapter,variant,source,requireActive);
                 initialization=session.InitEvidence;
                 legacyLink=new ObdJ1979LegacyLiveLink(source,session.Read,requireActive);
@@ -138,7 +142,8 @@ internal static class ObdJ1979LiveCli
             try{
                 var report=Execute(adapters[options.AdapterIndex],options,cancel.Token.ThrowIfCancellationRequested,
                     row=>{if(!options.Quiet)Console.WriteLine($"{row.ElapsedMs} ms {row.Pid:X2} "+
-                        (row.Measurement is {} v?ObdJ1979PidValues.Format(v):row.Status));});
+                        (row.MultiSignals is { } signals?ObdJ1979MultiSignal.Format(signals):
+                             row.Measurement is {} v?ObdJ1979PidValues.Format(v):row.Status));});
                 Write(output,[Encode(report)]);
                 if(csv is not null)Write(csv,report.Result is {} result?ObdJ1979LiveRecorder.Csv(result):
                     new[]{"cycle,pid_hex,started_elapsed_ms,elapsed_ms,duration_ms,status,value,unit,request_hex,response_hex,detail"});
