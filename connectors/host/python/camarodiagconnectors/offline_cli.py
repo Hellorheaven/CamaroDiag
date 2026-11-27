@@ -23,6 +23,7 @@ from .j1979_legacy_discovery_inspection import inspect_file as inspect_legacy_di
 from .j1979_capture_inspection import verify_files as verify_j1979_capture
 from .j1979_freeze_inspection import inspect_file as inspect_freeze
 from .j1979_legacy_freeze_inspection import inspect_file as inspect_legacy_freeze
+from .j1979_freeze_native_inspection import verify_files as verify_native_freeze
 from .connector_checkpoint import inspect_file as inspect_checkpoint, inspect_history, verify_report as verify_checkpoint_report
 
 
@@ -168,6 +169,12 @@ def _parser() -> argparse.ArgumentParser:
     legacy_freeze.add_argument("--vin")
     legacy_freeze.add_argument("--output", type=Path, required=True)
 
+    native_freeze = commands.add_parser("verify-native-freeze", help="Recheck CF/1 binary against native host JSON")
+    native_freeze.add_argument("--capture", type=Path, required=True)
+    native_freeze.add_argument("--report", type=Path, required=True)
+    native_freeze.add_argument("--vin")
+    native_freeze.add_argument("--output", type=Path, required=True)
+
     capture = commands.add_parser("verify-j1979-capture", help="Recheck CJ/1 binary against exported host JSON")
     capture.add_argument("--capture", type=Path, required=True)
     capture.add_argument("--report", type=Path, required=True)
@@ -303,6 +310,12 @@ def run(argv: Sequence[str] | None = None) -> dict[str, object]:
             raise ValueError("Inspection output must differ from original evidence")
         return write_report(args.output, inspect_legacy_freeze(args.report, expected_vin=args.vin))
 
+    if args.action == "verify-native-freeze":
+        if args.output.resolve() in (args.capture.resolve(), args.report.resolve()):
+            raise ValueError("Inspection output must differ from native evidence")
+        return write_report(args.output, verify_native_freeze(
+            args.capture, args.report, expected_vin=args.vin))
+
     if args.action == "verify-j1979-capture":
         if args.output.resolve() in (args.capture.resolve(), args.report.resolve()):
             raise ValueError("Inspection output must differ from the original evidence")
@@ -346,7 +359,7 @@ def main() -> None:
         raise SystemExit(7)
     if result.get("schema") in ("camarodiag-j1979-freeze-inspection-v1", "camarodiag-j1979-legacy-freeze-inspection-v1") and not result["all_frames_stable"]:
         raise SystemExit(2)
-    if result.get("schema") == "camarodiag-j1979-capture-inspection-v1" and not result["verified"]:
+    if result.get("schema") in ("camarodiag-j1979-capture-inspection-v1", "camarodiag-j1979-native-freeze-inspection-v1") and not result["verified"]:
         raise SystemExit(2)
     if result.get("schema") in (
         "camaradiag-offline-recovery-bundle-v1",
