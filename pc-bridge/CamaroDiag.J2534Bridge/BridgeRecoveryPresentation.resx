@@ -55,4 +55,35 @@
   <data name="StateRecoveryRequired" xml:space="preserve"><value>Recovery assessment required</value></data>
   <data name="StateInterrupted" xml:space="preserve"><value>Interrupted or incomplete journal</value></data>
   <data name="RecoveryEvidenceOnly" xml:space="preserve"><value>Evidence describes the recorded transaction, not the current physical ECU state.</value></data>
+  <data name="OpenHistory" xml:space="preserve"><value>Compare recovery snapshots</value></data>
+  <data name="HistoryTitle" xml:space="preserve"><value>Recovery history — oldest to newest</value></data>
+  <data name="HistoryAdd" xml:space="preserve"><value>Add journal</value></data>
+  <data name="HistoryRemove" xml:space="preserve"><value>Remove</value></data>
+  <data name="HistoryUp" xml:space="preserve"><value>Move up</value></data>
+  <data name="HistoryDown" xml:space="preserve"><value>Move down</value></data>
+  <data name="HistoryInspect" xml:space="preserve"><value>Inspect history</value></data>
+  <data name="HistoryCancel" xml:space="preserve"><value>Cancel</value></data>
+  <data name="HistoryVerified" xml:space="preserve"><value>Verified journal continuity: {0} snapshots</value></data>
+  <data name="HistoryRejected" xml:space="preserve"><value>History not verified</value></data>
+  <data name="HistorySnapshot" xml:space="preserve"><value>{0}. {1} · {2} records · {3}</value></data>
+  <data name="HistoryTransition" xml:space="preserve"><value>{0} → {1}: +{2} records, +{3} bytes</value></data>
+  <data name="HistoryLatestState" xml:space="preserve"><value>Last recorded state: {0}</value></data>
+  <data name="HistoryFailedOrdinal" xml:space="preserve"><value>Snapshot rejected: {0}</value></data>
+  <data name="HistoryProblem_SnapshotCount" xml:space="preserve"><value>Select 2 to 8 distinct journals.</value></data>
+  <data name="HistoryProblem_DuplicatePath" xml:space="preserve"><value>The same journal was selected twice.</value></data>
+  <data name="HistoryProblem_NotRegularJournal" xml:space="preserve"><value>A journal is linked or is not a regular file.</value></data>
+  <data name="HistoryProblem_JournalSize" xml:space="preserve"><value>Journal exceeds the supported size or is empty.</value></data>
+  <data name="HistoryProblem_CombinedJournalSize" xml:space="preserve"><value>Combined journal size exceeds the inspection limit.</value></data>
+  <data name="HistoryProblem_IncompleteJournal" xml:space="preserve"><value>Incomplete journal record.</value></data>
+  <data name="HistoryProblem_UnverifiedSnapshot" xml:space="preserve"><value>Original sectors or target metadata could not be verified.</value></data>
+  <data name="HistoryProblem_InvalidSequence" xml:space="preserve"><value>Journal sequence is invalid.</value></data>
+  <data name="HistoryProblem_JournalChanged" xml:space="preserve"><value>Journal changed during inspection.</value></data>
+  <data name="HistoryProblem_OriginalEvidenceChanged" xml:space="preserve"><value>Target metadata or original sectors differ.</value></data>
+  <data name="HistoryProblem_NotStrictExtension" xml:space="preserve"><value>Duplicate, reversed or divergent journal history.</value></data>
+  <data name="HistoryProblem_TerminalExtension" xml:space="preserve"><value>A terminal journal cannot have a successor.</value></data>
+  <data name="HistoryProblem_NoCompleteNewRecord" xml:space="preserve"><value>No complete new journal record.</value></data>
+  <data name="HistoryProblem_EvidenceChanged" xml:space="preserve"><value>Evidence changed during inspection.</value></data>
+  <data name="HistoryProblem_Cancelled" xml:space="preserve"><value>Inspection cancelled.</value></data>
+  <data name="HistoryProblem_EvidenceUnavailable" xml:space="preserve"><value>Evidence unavailable or unreadable.</value></data>
+  <data name="HistoryProblem_ProtectedDestination" xml:space="preserve"><value>Select a destination outside original recovery evidence.</value></data>
 </root>
