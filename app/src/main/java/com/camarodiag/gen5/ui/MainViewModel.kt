@@ -6531,6 +6531,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     }
                     check(current())
                     val json=JSONObject(evidence.report()).apply {
+                        put("version",com.camarodiag.gen5.BuildConfig.VERSION_NAME)
                         put("raw_capture_name",capturePath?.substringAfterLast('/') ?: JSONObject.NULL)
                     }
                     val bytes=json.toString(2).toByteArray(Charsets.UTF_8)
