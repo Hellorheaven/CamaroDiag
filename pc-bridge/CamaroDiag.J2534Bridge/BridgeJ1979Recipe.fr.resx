@@ -125,4 +125,15 @@
   <data name="NetworkProfile" xml:space="preserve"><value>Profil CAN classique (33–36)</value></data>
   <data name="NetworkSources" xml:space="preserve"><value>CAN IDs de réponse, séparés par virgules</value></data>
   <data name="NetworkScope" xml:space="preserve"><value>Seul PID 00 est diffusé. Scans physiques distincts ; ni couverture globale ni mutation.</value></data>
+  <data name="LiveRun" xml:space="preserve"><value>Enregistrement J1979</value></data>
+  <data name="LiveChannel" xml:space="preserve"><value>Canal CAN physique</value></data>
+  <data name="LivePids" xml:space="preserve"><value>PID numériques, séparés par virgules</value></data>
+  <data name="LiveVin" xml:space="preserve"><value>VIN attendu</value></data>
+  <data name="LiveCycles" xml:space="preserve"><value>Nombre de cycles</value></data>
+  <data name="LiveInterval" xml:space="preserve"><value>Intervalle des cycles (ms)</value></data>
+  <data name="LiveBudget" xml:space="preserve"><value>Budget total (s)</value></data>
+  <data name="LiveConfirm" xml:space="preserve"><value>Je confirme le calculateur physique documenté et le VIN.</value></data>
+  <data name="LiveCycleCount" xml:space="preserve"><value>Cycles : {0}/{1}</value></data>
+  <data name="LiveSummary" xml:space="preserve"><value>min {0} · max {1} · moyenne {2} {3}</value></data>
+  <data name="LiveScope" xml:space="preserve"><value>Lectures horodatées distinctes ; ni mesure simultanée ni mutation.</value></data>
 </root>

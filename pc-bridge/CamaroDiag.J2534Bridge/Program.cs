@@ -55,6 +55,8 @@ internal static class Program
 
         // Explicit bidirectional ISO/SAE exchanges. No default startup
         // programming and no network-listener fallback on malformed CLI.
+        if (args.Contains(ObdJ1979LiveCli.Command, StringComparer.OrdinalIgnoreCase))
+            return ObdJ1979LiveCli.Run(args);
         if (args.Contains(ObdJ1979CanNetworkCli.Command, StringComparer.OrdinalIgnoreCase))
             return await ObdJ1979CanNetworkCli.RunAsync(args);
         if (args.Contains(ObdJ1979LegacyMutationCli.Command, StringComparer.OrdinalIgnoreCase))

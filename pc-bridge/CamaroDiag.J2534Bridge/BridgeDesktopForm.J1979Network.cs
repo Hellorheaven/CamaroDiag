@@ -73,9 +73,9 @@ internal sealed partial class BridgeDesktopForm
         var expiry=functionalAuthorizedUntil;
         using var cancellation=new CancellationTokenSource();
         functionalCancellation=cancellation;busy=true;
-        completedNetwork=null;completedJ1979=null;completedEvap=null;completedClear=null;completedLegacy=null;
+        completedNetwork = null; completedLive = null;completedJ1979=null;completedEvap=null;completedClear=null;completedLegacy=null;
         completedFunctionalChecks=[];
-        functionalRunNetwork.Enabled=functionalRunNativeUsb.Enabled=functionalRunAll.Enabled=functionalRunJ1979.Enabled=
+        functionalRunLive.Enabled = functionalRunNetwork.Enabled =functionalRunNativeUsb.Enabled=functionalRunAll.Enabled=functionalRunJ1979.Enabled=
             functionalRunEvap.Enabled=functionalRunClear.Enabled=functionalRunLegacy.Enabled=functionalRunLegacyMutation.Enabled=
             functionalGoogleSignIn.Enabled=functionalExport.Enabled=false;
         functionalCancel.Enabled=true;functionalResults.Text=J1979RecipeText("Running");
@@ -111,7 +111,7 @@ internal sealed partial class BridgeDesktopForm
         catch(Exception e){functionalResults.Text=J1979RecipeText("Failed")+" "+e.GetType().Name;}
         finally{
             functionalCancellation=null;busy=false;functionalCancel.Enabled=false;functionalGoogleSignIn.Enabled=true;
-            functionalRunNetwork.Enabled=functionalRunNativeUsb.Enabled=functionalRunAll.Enabled=functionalRunJ1979.Enabled=
+            functionalRunLive.Enabled = functionalRunNetwork.Enabled =functionalRunNativeUsb.Enabled=functionalRunAll.Enabled=functionalRunJ1979.Enabled=
                 functionalRunEvap.Enabled=functionalRunClear.Enabled=functionalRunLegacy.Enabled=functionalRunLegacyMutation.Enabled=
                     DateTimeOffset.UtcNow<functionalAuthorizedUntil;
         }

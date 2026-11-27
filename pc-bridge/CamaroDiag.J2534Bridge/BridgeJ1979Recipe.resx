@@ -125,4 +125,15 @@
   <data name="NetworkProfile" xml:space="preserve"><value>Classic CAN profile (33–36)</value></data>
   <data name="NetworkSources" xml:space="preserve"><value>Response CAN IDs, comma separated</value></data>
   <data name="NetworkScope" xml:space="preserve"><value>Only PID 00 is broadcast. Separate physical scans; no vehicle-wide coverage or mutations.</value></data>
+  <data name="LiveRun" xml:space="preserve"><value>J1979 live recording</value></data>
+  <data name="LiveChannel" xml:space="preserve"><value>Physical CAN channel</value></data>
+  <data name="LivePids" xml:space="preserve"><value>Numeric PID IDs, comma separated</value></data>
+  <data name="LiveVin" xml:space="preserve"><value>Expected VIN</value></data>
+  <data name="LiveCycles" xml:space="preserve"><value>Number of cycles</value></data>
+  <data name="LiveInterval" xml:space="preserve"><value>Cycle interval (ms)</value></data>
+  <data name="LiveBudget" xml:space="preserve"><value>Total budget (s)</value></data>
+  <data name="LiveConfirm" xml:space="preserve"><value>I confirm the documented physical ECU and VIN.</value></data>
+  <data name="LiveCycleCount" xml:space="preserve"><value>Cycles: {0}/{1}</value></data>
+  <data name="LiveSummary" xml:space="preserve"><value>min {0} · max {1} · mean {2} {3}</value></data>
+  <data name="LiveScope" xml:space="preserve"><value>Separate timestamped read requests; no simultaneous measurements or mutations.</value></data>
 </root>

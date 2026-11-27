@@ -26,7 +26,7 @@ internal sealed partial class BridgeDesktopForm
         if (functionalCancellation is not null) return;
         if (DateTimeOffset.UtcNow >= functionalAuthorizedUntil)
         {
-            functionalRunNetwork.Enabled = functionalRunNativeUsb.Enabled = functionalRunAll.Enabled = functionalRunJ1979.Enabled = functionalRunEvap.Enabled = functionalRunClear.Enabled = functionalRunLegacy.Enabled = functionalRunLegacyMutation.Enabled = false;
+            functionalRunLive.Enabled = functionalRunNetwork.Enabled = functionalRunNativeUsb.Enabled = functionalRunAll.Enabled = functionalRunJ1979.Enabled = functionalRunEvap.Enabled = functionalRunClear.Enabled = functionalRunLegacy.Enabled = functionalRunLegacyMutation.Enabled = false;
             return;
         }
         if (busy || bridgeTask is { IsCompleted: false } || consoleDevice is not null ||
@@ -65,12 +65,12 @@ internal sealed partial class BridgeDesktopForm
         using var cancellation = new CancellationTokenSource();
         functionalCancellation = cancellation;
         busy = true;
-        completedJ1979 = null; completedNetwork = null;
+        completedJ1979 = null; completedNetwork = null; completedLive = null;
         completedEvap = null;
         completedClear = null;
         completedLegacy = null;
         completedFunctionalChecks = [];
-        functionalRunNetwork.Enabled = functionalRunNativeUsb.Enabled = functionalRunAll.Enabled = functionalRunJ1979.Enabled = functionalRunEvap.Enabled = functionalRunClear.Enabled = functionalRunLegacy.Enabled = functionalRunLegacyMutation.Enabled =
+        functionalRunLive.Enabled = functionalRunNetwork.Enabled = functionalRunNativeUsb.Enabled = functionalRunAll.Enabled = functionalRunJ1979.Enabled = functionalRunEvap.Enabled = functionalRunClear.Enabled = functionalRunLegacy.Enabled = functionalRunLegacyMutation.Enabled =
             functionalGoogleSignIn.Enabled = functionalExport.Enabled = functionalEvapVin.Enabled = false;
         functionalCancel.Enabled = true;
         functionalResults.Text = J1979RecipeText("Running");
@@ -143,7 +143,7 @@ internal sealed partial class BridgeDesktopForm
             busy = false;
             functionalCancel.Enabled = false;
             functionalGoogleSignIn.Enabled = functionalEvapVin.Enabled = true;
-            functionalRunNetwork.Enabled = functionalRunNativeUsb.Enabled = functionalRunAll.Enabled = functionalRunJ1979.Enabled = functionalRunEvap.Enabled = functionalRunClear.Enabled = functionalRunLegacy.Enabled = functionalRunLegacyMutation.Enabled =
+            functionalRunLive.Enabled = functionalRunNetwork.Enabled = functionalRunNativeUsb.Enabled = functionalRunAll.Enabled = functionalRunJ1979.Enabled = functionalRunEvap.Enabled = functionalRunClear.Enabled = functionalRunLegacy.Enabled = functionalRunLegacyMutation.Enabled =
                 DateTimeOffset.UtcNow < functionalAuthorizedUntil;
         }
     }

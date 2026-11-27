@@ -136,3 +136,7 @@ La recette `camarodiagconnectors-j1979-network` ajoute une découverte PID 00 su
 ### Windows — CAN network / réseau multicalculateurs
 
 Tests privés : sélectionner l'interface J2534, arrêter le pont et la console, ouvrir Réseau CAN J1979. Découverte seule sur profil 33–36 documenté, puis nouvelle campagne avec les identifiants de réponse documentés (séparés par virgules). CLI `--j1979-network` : voir `--help`. Un VIN facultatif impose une correspondance par ECU. Aucun Mode 04/08, aucun balayage physique implicite. / One functional PID00 discovery, explicit selected physical channels, individual evidence and no whole-vehicle claim.
+
+### J1979 — enregistrement physique des mesures / physical live recording
+
+Linux SocketCAN `camarodiagconnectors-j1979-live`, Windows J2534 `--j1979-live` ou bouton Enregistrement J1979 dans les tests privés. Canal physique et VIN attendus explicites, PID numériques sélectionnés et annoncés, limite de cycles/temps, contrôle VIN initial et final et périodique pour les campagnes longues. Export JSON/CSV : aucune mesure inventée à la suite d'un silence. Les lectures d'un cycle ne sont pas simultanées. Aucune mutation, aucun essai physique revendiqué.

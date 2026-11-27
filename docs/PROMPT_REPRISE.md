@@ -1,3 +1,7 @@
+## SAE J1979 — enregistrement de mesures Windows (27/11/2026)
+
+- Moteur de cycles Mode 01 numériques J2534, sélection explicite de PID confirmés par bitmaps, contrôle VIN initial/périodique/final, horodatage et statistiques, délais et annulation avec préfixe. CLI --j1979-live, écran privé FR/EN avec affichage progressif borné, JSON/CSV exclusifs et contrôle de l’autorisation originale. Régressions écrites non exécutées ; C6/J1979 ouverts, aucune qualification matérielle.
+
 ## SAE J1979 — enregistrement de mesures physiques Linux (27/11/2026)
 
 - Nouveau moteur de cycles Mode 01 numériques, VIN initial/périodique/final, inventaire continu des PID choisis, contrôle strict des formes, temporisation sans rattrapage en rafale, horodatage individuel, conservation du préfixe, statistiques des seules valeurs vérifiées. CLI SocketCAN avec JSON et CSV privés exclusifs, régressions écrites non exécutées. Aucune mutation ni qualification réelle ; C6/J1979 ouverts.
