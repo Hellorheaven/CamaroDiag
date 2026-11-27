@@ -36,6 +36,7 @@ internal object J1979NetworkEvidenceJson {
                         JSONObject().put("mode",it.mode).put("status",it.status)
                             .put("advertised",JSONArray(it.advertised)).put("pages",it.pages)
                     }))
+                    .put("extendedVehicleInfo",JSONArray(ecu.steps.mapNotNull { it.extendedVehicleInfo }.map(J1979ExtendedVehicleInfoJson::encode)))
                     .put("steps",JSONArray(ecu.steps.map {
                         val evidence=it.application
                         JSONObject().put("requestHex",it.requestHex).put("responseHex",n(it.responseHex))
