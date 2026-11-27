@@ -1,3 +1,13 @@
+## Reprise SAE J1979 — 27/11/2026 — transports Android Kotlin et contexte Linux C++20
+
+PR #117, branche `chore/unified-ci`. Base `e063c8914d299c02df98761d3c422a40e013ee23`, dernier SHA code `2f466499f6e0b3a2e9b506b4dd5675cc7291f77b`. Comparaison GitHub : **9 commits, 28 fichiers, +2681/-1609 lignes**. Objectif 10 000 lignes et dizaines de commits non atteint ; pas de gonflement artificiel.
+
+- Android : portage de l'authentification CU/1, CU/2, CU/3, des transports de capture, de l'adaptateur OTG, des sessions CU/4–CU/5 et du rejeu CL/1 indépendant vers Kotlin. Helpers bornés, contrôle des délais/révocation, conservation des preuves et refus de relance automatique. Huit sources Java remplacées. Tests Java historiques et les autres sources Java encore présentes restent à migrer ; CI adaptée mais non exécutée.
+- Linux : C++20 uniquement dans le pont ; admission des PID de contexte 1D/4F/50/01 selon capacités et besoins, calculs d'échelles dépendant de l'ECU, attribution des corrections carburant, moniteurs, exports de contexte, tests de régression écrits. Le rejeu indépendant et les autres fonctions Python doivent encore être portés avant suppression des originaux. Le noyau MPC5566 C (19 fichiers source/tests recensés) reste à migrer dans son périmètre, sans casser l'ABI ni la chaîne embarquée.
+- C6 et autres protocoles en pause. Aucun build, test, gate ni Release exécuté ; J1979 non clôturé. Référence J1979DA_202607 autorisée indisponible. Après intégration et gate unique réussi sur SHA exact, produire APK v2.0.47 signée (versionCode 64), avec preuve de signature et SHA-256 comme v2.0.46. Le workflow Release actuel est réservé à main ; circuit de publication depuis PR à adapter sans fusion. Aucune APK 47 produite et aucune fusion effectuée.
+
+---
+
 ## Reprise SAE J1979 — migration C++20 Linux, 27/11/2026 (directive définitive)
 
 - PR #117, branche `chore/unified-ci`. Android exclusivement Kotlin, Windows exclusivement C#, Linux exclusivement C++20 ; choix natif ESP32 délégué, moteurs C++ conservés.
