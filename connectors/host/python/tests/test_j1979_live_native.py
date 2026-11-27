@@ -113,5 +113,90 @@ class NativeLiveTests(unittest.TestCase):
         self.assertFalse(decode(io.BytesIO(stream(items)))["capture_integrity_verified"])
 
 
+class NativePrefixTests(unittest.TestCase):
+    def test_prefix_boundaries(self):
+        from camarodiagconnectors.j1979_live_native import inspect_prefix
+        items = fixture()
+        complete = stream(items[:-1])
+        for tail, reason in ((b"", "MISSING_TERMINAL"),
+                             (record(3, len(items)-1, items[-1][1])[:5], "TRUNCATED_HEADER"),
+                             (record(3, len(items)-1, items[-1][1])[:-1], "TRUNCATED_RECORD")):
+            with self.subTest(reason=reason):
+                value = inspect_prefix(complete + tail, expected_vin=VIN)
+                self.assertTrue(value["prefix_integrity_verified"])
+                self.assertFalse(value["capture_integrity_verified"])
+                self.assertFalse(value["execution_completed"])
+                self.assertFalse(value["terminal_present"])
+                self.assertEqual(value["interruption"], reason)
+                self.assertEqual(value["complete_observations"], 7)
+                self.assertEqual(value["raw_samples_in_prefix"], 4)
+                self.assertEqual(value["last_complete_offset"], len(complete))
+                self.assertEqual(value["discarded_tail_bytes"], len(tail))
+                self.assertTrue(value["initial_identity_verified_in_prefix"])
+                self.assertTrue(value["final_identity_observed_in_prefix"])
+                self.assertFalse(value["permits_programming"])
+
+    def test_prefix_corruption_is_not_a_truncation(self):
+        from camarodiagconnectors.j1979_live_native import inspect_prefix
+        items = fixture()
+        base = stream(items[:-1])
+        invalid_crc = bytearray(base)
+        invalid_crc[-1] ^= 1
+        wrong_order = items[:-1]
+        wrong_order[3], wrong_order[4] = wrong_order[4], wrong_order[3]
+        for invalid in (b"", b"CL", bytes(invalid_crc), stream(wrong_order),
+                        base+b"X", base+b"CL\x02", base+b"CL\x01\x01",
+                        base+b"CL\x01\x03\x00", stream(items), stream(items)+b"\0"):
+            with self.subTest(size=len(invalid)):
+                with self.assertRaises(ValueError):
+                    inspect_prefix(invalid, expected_vin=VIN)
+        with self.assertRaises(ValueError):
+            inspect_prefix(base, expected_vin="1FA6P8TH0L5100000")
+
+    def test_capacity_terminal_must_be_earned(self):
+        from camarodiagconnectors.j1979_live_native import MAX_RAW_BYTES
+        profile = dataclasses.replace(PROFILE, pids=tuple(range(1,32)), cycles=200,
+                                      interval_ms=100, budget_ms=600000)
+        identity = b"\x49\x02\x01" + VIN.encode("ascii")
+        items = [(1, profile.capture_plan()),
+                 (2, observation(1, b"\x09\x02", identity, 0)),
+                 (2, observation(2, b"\x01\x00", bytes.fromhex("4100FFFFFFFE"), 5))]
+        now = 10
+        raw_bytes = 26
+        samples = 0
+        counts = [0] * 32
+        for cycle in range(1,201):
+            for pid in profile.pids:
+                if MAX_RAW_BYTES - raw_bytes < 4095:
+                    break
+                response = bytes((0x41,pid)) + bytes(4093)
+                items.append((2, observation(4, bytes((1,pid)), response, now, cycle, pid, 2)))
+                raw_bytes += len(response)
+                samples += 1
+                counts[pid-1] += 1
+                now += 5
+            else:
+                continue
+            break
+        bitmap = bytearray(32)
+        for pid in profile.pids:
+            bitmap[pid//8] |= 1 << (pid%8)
+        terminal = FINAL.pack(11, 5, samples//31, len(items)-1, samples, samples,
+                              0, 0, now, raw_bytes, bytes(bitmap), *counts)
+        report = decode(io.BytesIO(stream(items + [(3,terminal)])), profile)
+        self.assertTrue(report["capture_integrity_verified"], report["error"])
+        self.assertEqual(report["summary"]["stop_reason"], "EVIDENCE_LIMIT")
+        self.assertFalse(report["summary"]["completed"])
+        self.assertEqual(report["summary"]["raw"], samples)
+        # A terminal claiming capacity with only two normal samples is forged.
+        forged = fixture()[:5]
+        bitmap = bytearray(32)
+        bitmap[0], bitmap[1] = 32, 16
+        terminal = FINAL.pack(11, 5, 1, 4, 2, 2, 0, 0, 135, 33,
+                              bytes(bitmap), 1, 1, *([0]*30))
+        self.assertFalse(decode(io.BytesIO(stream(forged + [(3,terminal)])), PROFILE)
+                         ["capture_integrity_verified"])
+
+
 if __name__ == "__main__":
     unittest.main()
