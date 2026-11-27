@@ -156,4 +156,9 @@
   <data name="FreezeNotRead" xml:space="preserve"><value>Not read: {0}</value></data>
   <data name="FreezeUnvisited" xml:space="preserve"><value>Frames not visited: {0}</value></data>
   <data name="FreezeScope" xml:space="preserve"><value>Recorded data only; additional OEM frames remain raw. No physical validation.</value></data>
+  <data name="FreezeNativeRun" xml:space="preserve"><value>Native USB freeze frames</value></data>
+  <data name="FreezeNativeInspect" xml:space="preserve"><value>Inspect CF/1 capture</value></data>
+  <data name="FreezeNativeSelected" xml:space="preserve"><value>Selected</value></data>
+  <data name="FreezeNativeOffline" xml:space="preserve"><value>Offline inspection</value></data>
+  <data name="FreezeNativeCaptureFilter" xml:space="preserve"><value>Native freeze capture (*.cf)|*.cf</value></data>
 </root>
