@@ -3,7 +3,7 @@ package com.camarodiag.gen5.ui
 import com.camarodiag.gen5.ui.J1979CatalogueJson.array
 import com.camarodiag.gen5.ui.J1979CatalogueJson.bool
 import com.camarodiag.gen5.ui.J1979CatalogueJson.get
-import com.camarodiag.gen5.ui.J1979CatalogueJson.int
+import com.camarodiag.gen5.ui.J1979CatalogueJson.int as jsonInt
 import com.camarodiag.gen5.ui.J1979CatalogueJson.obj
 import com.camarodiag.gen5.ui.J1979CatalogueJson.text
 import com.camarodiag.gen5.ui.J1979DocumentedCatalogue.Companion.hex
@@ -33,7 +33,7 @@ internal object J1979CatalogueProjection {
     private fun requiredText(row: Map<String, Any?>, key: String) = text(get(row, key))
     private fun optionalText(row: Map<String, Any?>, key: String): String? =
         get(row, key)?.let(::text)
-    private fun int(row: Map<String, Any?>, key: String, low: Int, high: Int) = int(get(row, key), low, high)
+    private fun int(row: Map<String, Any?>, key: String, low: Int, high: Int) = jsonInt(get(row, key), low, high)
     private fun flagFalse(row: Map<String, Any?>, key: String) = get(row, key).let { it == null || it == false }
     private fun id(row: Map<String, Any?>, key: String, max: Int): Int {
         val raw = requiredText(row, key)
@@ -48,7 +48,7 @@ internal object J1979CatalogueProjection {
             val bytes = Base64.getDecoder().decode(value)
             require(Base64.getEncoder().encodeToString(bytes) == value) { "Noncanonical PID list" }
             bytes.map { it.toInt() and 255 }
-        } else array(value, 1, 32).map { int(it, 1, 255) }
+        } else array(value, 1, 32).map { jsonInt(it, 1, 255) }
         require(pids.size in 1..32 && pids.distinct().size == pids.size &&
             pids.all { it in 1..255 && it % 32 != 0 }) { "Invalid selected PIDs" }
         return pids
@@ -212,7 +212,6 @@ internal object J1979CatalogueProjection {
                     }
                     val next = response[5].toInt() and 1 != 0
                     require(!next || nextPage < 224) { "Support bitmap exceeds PID FF" }
-                    if (next) advertised.add(nextPage + 32)
                     inventoryComplete = !next
                     nextPage += 32
                 } else terminal = true
@@ -221,10 +220,9 @@ internal object J1979CatalogueProjection {
         }
         require(initial && samples.isNotEmpty()) { "No admitted samples to project" }
         require(requiredText(result, "observed_vin") == expectedVin) { "Declared initial VIN differs" }
-        val declared = array(get(result, "advertised_pids"), 0, 255).map { int(it, 1, 255) }
+        val declared = array(get(result, "advertised_pids"), 0, 255).map { jsonInt(it, 1, 255) }
         require(declared.distinct().size == declared.size &&
-            declared.filter { it % 32 != 0 }.sorted() == advertised.filter { it % 32 != 0 } &&
-            declared.filter { it % 32 == 0 }.all { it in advertised }) { "Reported inventory differs" }
+            declared.sorted() == advertised.toList()) { "Reported inventory differs" }
         require(bool(get(result, "inventory_complete")) == inventoryComplete) { "Inventory completeness differs" }
         val recorded = int(result, "completed_cycles", 0, cycles)
         val possible = samples.size / pids.size
