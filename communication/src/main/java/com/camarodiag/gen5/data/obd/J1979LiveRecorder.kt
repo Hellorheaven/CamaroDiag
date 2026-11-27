@@ -25,9 +25,9 @@ data class J1979LiveTarget(val protocol: Int, val responseId: Int, val vin: Stri
 }
 
 data class J1979LivePlan(val target: J1979LiveTarget, val pids: List<Int>,
-    val cycles: Int = 30, val intervalMs: Long = 1000, val budgetMs: Long = 180000) {
+    val cycles: Int = 30, val intervalMs: Long = 1000, val budgetMs: Long = 180000, val rawOnly: Boolean = false) {
     val valid: Boolean get() = target.valid && pids.size in 1..32 && pids.distinct().size == pids.size &&
-        pids.all { if(target.legacy) J1979LiveRecorder.legacyNumericPid(it) else J1979LiveRecorder.numericPid(it) } && cycles in 1..1000 && cycles*pids.size <= 10000 &&
+        pids.all { if(rawOnly) J1979LiveRecorder.rawPid(it) else if(target.legacy) J1979LiveRecorder.legacyNumericPid(it) else J1979LiveRecorder.numericPid(it) } && cycles in 1..1000 && cycles*pids.size <= 10000 &&
         intervalMs in 100..60000 && budgetMs in 1..600000
 }
 data class J1979LiveValue(val name: String,val number: Double,val unit: String)
@@ -66,6 +66,7 @@ internal object J1979LiveRecorder {
     data class Reply(val payload: ByteArray?,val raw: String?)
     private fun hex(bytes: ByteArray) = ElmJ1979EvapTest.hex(bytes)
     private fun hex(n: Int) = ElmJ1979EvapTest.hex(n,2)
+    fun rawPid(pid: Int): Boolean = pid in 1..255 && pid%32!=0
     fun numericPid(pid: Int): Boolean {
         if(pid !in 1..255 || pid%32==0)return false
         if(ObdJ1979MultiSignal.width(pid)!=null||ObdJ1979OperatingContext.isTrim(pid))return true
@@ -75,9 +76,10 @@ internal object J1979LiveRecorder {
         }
     }
     fun legacyNumericPid(pid:Int):Boolean=numericPid(pid)&&(ObdJ1979MultiSignal.width(pid)?:0)<=5
-    fun allowed(request: ByteArray) = request.contentEquals(byteArrayOf(9,2)) ||
+    fun allowed(request: ByteArray, rawPlan: J1979LivePlan? = null) = request.contentEquals(byteArrayOf(9,2)) ||
         request.size==2 && request[0]==1.toByte() &&
-        ((request[1].toInt() and 255)%32==0 || (request[1].toInt() and 255)==0x1D || ObdJ1979ScalingContext.isConfiguration(request[1].toInt() and 255) || numericPid(request[1].toInt() and 255))
+        ((request[1].toInt() and 255)%32==0 || (request[1].toInt() and 255)==0x1D || ObdJ1979ScalingContext.isConfiguration(request[1].toInt() and 255) || numericPid(request[1].toInt() and 255) ||
+            (rawPlan?.rawOnly==true && (request[1].toInt() and 255) in rawPlan.pids))
     private class ChannelAccumulator(private val first:ObdJ1979MultiSignal.Signal) {
         private var count=0
         private var minimum=0.0
@@ -144,9 +146,9 @@ internal object J1979LiveRecorder {
         var lastIdentity: Long?=null
         var stop: String?=null
         var completeInventory=false
-        val requiredConfigs=plan.pids.mapNotNull(ObdJ1979ScalingContext::dependency).distinct().sorted()
+        val requiredConfigs=if(plan.rawOnly) emptyList() else plan.pids.mapNotNull(ObdJ1979ScalingContext::dependency).distinct().sorted()
         var scaling:ObdJ1979ScalingContext.Context?=null
-        val needsTrim=plan.pids.any(ObdJ1979OperatingContext::isTrim)
+        val needsTrim=!plan.rawOnly&&plan.pids.any(ObdJ1979OperatingContext::isTrim)
         var layout:ObdJ1979OperatingContext.Layout?=null
         fun buildLayout()=ObdJ1979OperatingContext.resolveLayout(admission.map {
             ObdJ1979OperatingContext.Observation(it.requestHex,it.responseHex,it.status)
@@ -155,6 +157,8 @@ internal object J1979LiveRecorder {
             ObdJ1979ScalingContext.Observation(it.requestHex,it.responseHex,it.status)
         })
         var cycles=0
+        var payloadBytes=0L
+        var transcriptChars=0L
         suspend fun active(): Boolean {
             if(stop!=null)return false
             currentCoroutineContext().ensureActive()
@@ -165,7 +169,7 @@ internal object J1979LiveRecorder {
         suspend fun query(request: ByteArray,phase: String,cycle: Int?=null,pid: Int?=null):
             Pair<J1979LiveObservation,J1979CampaignSemantics.Step?>? {
             if(!active())return null
-            check(allowed(request))
+            check(allowed(request,plan))
             val begun=elapsed()
             val command=hex(request)
             var reply: Reply?=null
@@ -179,11 +183,33 @@ internal object J1979LiveRecorder {
                 val limit=requestTimeout(request)
                 require(limit in 1..30000)
                 reply=exchange(request,minOf(limit,remaining()))
+                if(plan.rawOnly) {
+                    val size=reply.payload?.size?:0
+                    val chars=reply.raw?.length?:0
+                    if(size>4095||chars>262144||payloadBytes+size>16777216||transcriptChars+chars>16777216){
+                        reply=null
+                        error("RAW_EVIDENCE_LIMIT")
+                    }
+                    payloadBytes+=size
+                    transcriptChars+=chars
+                }
                 response=reply.payload?.let(::hex)
                 currentCoroutineContext().ensureActive()
                 requireCurrent()
                 if(remaining()<=0){stop="BUDGET_EXHAUSTED";detail="LATE_RESPONSE"}
                 else if(response==null){status="TIMEOUT";detail="NO_DATA"}
+                else if(plan.rawOnly&&phase=="SAMPLE"){
+                    val p=requireNotNull(reply.payload)
+                    val max=if(plan.target.legacy)7 else 4095
+                    val b=p.map { it.toInt() and 255 }
+                    if(b.size==3&&b[0]==0x7F&&b[1]==1&&b[2] !in setOf(0,0x78)){
+                        status="NEGATIVE";detail="NRC_"+hex(b[2])
+                    }else if(b.size in 3..max&&b[0]==0x41&&b[1]==pid){
+                        status="RAW";detail="RAW_UNINTERPRETED"
+                    }else{
+                        status="FAILED";stop="INVALID_APPLICATION_RESPONSE";detail=stop
+                    }
+                }
                 else {
                     val raw=response
                     evidence=J1979CampaignSemantics.decodePositive(command,raw)
@@ -328,7 +354,12 @@ internal object J1979LiveRecorder {
                 }
             }
             if(stop==null&&cycles==plan.cycles&&identity("FINAL_VIN"))protocol()
-            if(stop==null&&rows.none { it.value!=null||!it.multiSignals.isNullOrEmpty() })stop="NO_VERIFIED_MEASUREMENT"
+            if(stop==null){
+                if(plan.rawOnly&&plan.pids.any { pid->rows.none { it.pid==pid&&it.status=="RAW" } })
+                    stop="NO_RAW_RESPONSE_FOR_SELECTED_PID"
+                else if(!plan.rawOnly&&rows.none { it.value!=null||!it.multiSignals.isNullOrEmpty() })
+                    stop="NO_VERIFIED_MEASUREMENT"
+            }
         }catch(_:CancellationException){stop="CANCELLED"}
         catch(_:Exception){stop="TRANSPORT_OR_CONTEXT_ERROR"}
         return J1979LiveReport(plan,vin,observedProtocol,protocolRaw,advertised.toList(),pages.toList(),
