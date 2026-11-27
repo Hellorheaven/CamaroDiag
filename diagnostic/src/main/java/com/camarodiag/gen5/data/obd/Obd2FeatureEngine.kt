@@ -69,7 +69,8 @@ data class ObdMode01Read(
 
 data class ObdFreezeFrameRead(val pid: Int, val rawResponse: String, val verifiedBytes: List<Int>?)
 
-data class ObdVehicleInfoRead(val infoType: Int, val rawResponse: String, val positiveRecords: List<List<Int>>)
+data class ObdVehicleInfoRead(val infoType: Int, val rawResponse: String, val positiveRecords: List<List<Int>>,
+    val extendedRecords: List<ObdJ1979ExtendedVehicleInfo.Result> = emptyList())
 
 data class ObdScanReport(
     val supportedPids: Set<Int>,
@@ -728,7 +729,10 @@ class Obd2FeatureEngine(
             val response = ask("09%02X".format(Locale.ROOT, type), 2500L)
             val records = if (legacy) ObdLegacyRecords.infoRecords(type, response).orEmpty()
                 else mode09Records(response, type).filter { it.size > 2 && it[0] == 0x49 && it[1] == type }
-            reads += ObdVehicleInfoRead(type, response, records)
+            val extended = if (!legacy && type in ObdJ1979ExtendedVehicleInfo.extendedTypes)
+                records.mapNotNull { ObdJ1979ExtendedVehicleInfo.can(type,it) }
+            else emptyList() // Anonymous legacy fragments must never be merged.
+            reads += ObdVehicleInfoRead(type, response, records, extended)
         }
         val candidate = if (legacy) ObdLegacyRecords.anonymousVin(
             reads.firstOrNull { it.infoType == 1 }?.positiveRecords.orEmpty(),
