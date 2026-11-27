@@ -19,7 +19,7 @@ import struct
 import zlib
 
 from .j1979_live_native import (
-    NativeLiveProfile, hello, proof, decode, inspect_file, inspect_prefix_file, require, valid_vin,
+    NativeLiveProfile, hello, proof, decode, inspect_file, inspect_prefix, inspect_prefix_file, require, valid_vin,
     HEADER, MAX_BODY, MAX_CAPTURE, MAX_STEPS,
 )
 from .recovery_bundle import _regular, _json
@@ -219,6 +219,35 @@ def verify_files(capture, report, *, expected_vin):
             "hardware_provenance_verified": False, "permits_programming": False, "replayed": replay}
 
 
+def verify_prefix_files(capture, report, *, expected_vin):
+    """Independently verify an Android, Windows or Python prefix report.
+    This is not the normal verified capture schema. No terminal or successful
+    completion may be inferred from a consistent prefix report.
+    """
+    require(valid_vin(expected_vin), "Independently supplied VIN required")
+    capture, report = Path(capture), Path(report)
+    require(capture.resolve() != report.resolve(), "Evidence paths must differ")
+    raw, capture_stamp = _regular(capture, MAX_CAPTURE)
+    report_raw, report_stamp = _regular(report, MAX_REPORT)
+    actual = _json(report_raw)
+    expected = inspect_prefix(raw, expected_vin=expected_vin)
+    expected["capture_sha256"] = capture_stamp.digest
+    require(isinstance(actual, dict) and set(actual) == set(expected), "Unexpected prefix report schema")
+    _compare_history_value(actual, expected, "native_live_prefix")
+    raw_again, capture_after = _regular(capture, MAX_CAPTURE)
+    report_again, report_after = _regular(report, MAX_REPORT)
+    require(raw == raw_again and capture_stamp == capture_after and
+            report_raw == report_again and report_stamp == report_after,
+            "Prefix evidence changed during verification")
+    return {"schema": "camarodiag-j1979-native-live-prefix-verification-v1",
+            "consistent": True, "prefix_integrity_verified": True,
+            "capture_integrity_verified": False, "execution_completed": False,
+            "terminal_present": False, "capture_sha256": capture_stamp.digest,
+            "report_sha256": report_stamp.digest,
+            "physical_vehicle_verified": False, "evidence_authenticated": False,
+            "permits_programming": False, "replayed": expected}
+
+
 def export_csv(capture, output, *, expected_vin):
     """Replay original CL/1 before exporting raw samples, not engineering units."""
     require(valid_vin(expected_vin), "Independently supplied VIN required")
@@ -294,6 +323,12 @@ def parser():
     prefix.add_argument("--capture", type=Path, required=True)
     prefix.add_argument("--output", type=Path, required=True)
     prefix.add_argument("--vin", required=True)
+    prefix_verify = commands.add_parser("verify-prefix", allow_abbrev=False,
+                                        help="Verify an interrupted capture report against original CL/1 bytes")
+    prefix_verify.add_argument("--capture", type=Path, required=True)
+    prefix_verify.add_argument("--report", type=Path, required=True)
+    prefix_verify.add_argument("--output", type=Path, required=True)
+    prefix_verify.add_argument("--vin", required=True)
     csv_export = commands.add_parser("export-csv", allow_abbrev=False)
     csv_export.add_argument("--capture", type=Path, required=True)
     csv_export.add_argument("--output", type=Path, required=True)
@@ -324,11 +359,15 @@ def run(argv=None):
     args = parser().parse_args(argv)
     require(valid_vin(args.vin), "Expected VIN is invalid")
     paths = [args.capture, args.output]
-    if args.command == "verify":
+    if args.command in ("verify", "verify-prefix"):
         paths.append(args.report)
     if args.command == "capture":
         paths.append(args.key_file)
     require(len({p.resolve() for p in paths}) == len(paths), "Input and output paths must differ")
+    if args.command == "verify-prefix":
+        report = verify_prefix_files(args.capture,args.report,expected_vin=args.vin)
+        write_new(args.output,report)
+        return report
     if args.command == "inspect-prefix":
         report = inspect_prefix_file(args.capture, expected_vin=args.vin)
         write_new(args.output, report)
@@ -411,10 +450,12 @@ def main():
     except (OSError, ValueError, EOFError) as exc:
         print(str(exc), file=sys.stderr)
         raise SystemExit(2) from exc
-    if report["schema"] == "camarodiag-j1979-native-live-prefix-v1":
+    if report["schema"] in ("camarodiag-j1979-native-live-prefix-v1",
+                             "camarodiag-j1979-native-live-prefix-verification-v1"):
+        prefix = report.get("replayed", report)
         print(json.dumps({"prefix_integrity_verified": True,
-                          "complete_records": report["complete_records"],
-                          "discarded_tail_bytes": report["discarded_tail_bytes"],
+                          "complete_records": prefix["complete_records"],
+                          "discarded_tail_bytes": prefix["discarded_tail_bytes"],
                           "execution_completed": False}, ensure_ascii=True))
         raise SystemExit(7)
     if report["schema"] in ("camarodiag-j1979-native-live-verification-v1",
