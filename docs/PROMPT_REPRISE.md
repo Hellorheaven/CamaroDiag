@@ -1,3 +1,11 @@
+## Reprise — correction Android et SAE J1979 exclusivement (27 novembre 2026)
+
+PR #117 / chore/unified-ci. Demande propriétaire : corriger l'affichage des capacités de l'interface OBD-II sur téléphone, poursuivre exclusivement SAE J1979 (mettre C6 en pause pour ce lot), puis APK Release signé selon v2.0.46 après clôture logicielle validée, sans fusion.
+
+- Android : la branche avait déjà remplacé la rangée de badges débordante par quatre lignes explicites. Les deux colonnes ont désormais des largeurs contraintes, les boutons de simulation sont empilés et le titre déconnecté est traduit sans doublon. Le quatrième indicateur est la lecture des réponses diagnostiques longues (ATAL). Commit 8fa2aa2025afc72e3141250eddbafebfd8fd637f ; rendu sur téléphone non vérifié.
+- J1979 : rejeu des enregistrements ELM legacy numériques et bruts ; comparaison intégrale des trames projetées avec le texte original, bornes de taille, rejet de la contradiction ATDPN et du PID00 initial non conforme, validation des statuts de l'inventaire VIN. Préservation de l'ancien callback Python qui ne produit qu'un numéro de protocole et de la distinction J2534 sans checksum exposé. Régressions ajoutées (transcript manquant, altéré malgré CRC valide, autre source, probe contradictoire et étapes VIN échouées). Commits daf38049ec81f156cf76b1a2a4a90591c700494c, 79a236c8cfc3991c93d34632df0ac87400e9a827, 4c3181f5cd7fc759968af4dc672e93dde9eec0b2.
+- Aucun test, build ou checkpoint intermédiaire. Le catalogue normatif complet n'est pas disponible dans le dépôt ; acquisition de la référence autorisée et intégration des définitions documentées sur les hôtes, couverture firmware et gate de clôture restent à faire. SAE J1979 non terminé. Aucun travail C6, aucune fusion, aucun APK ni Release. Ne pas annoncer les 10 000 lignes atteintes.
+
 ## Reprise — J1979 : capture Mode 01 brute et catalogue documenté (27 novembre 2026)
 
 PR #117 / chore/unified-ci. Continuer le chantier C6 et le protocole SAE J1979; C8 reste en dernier.
