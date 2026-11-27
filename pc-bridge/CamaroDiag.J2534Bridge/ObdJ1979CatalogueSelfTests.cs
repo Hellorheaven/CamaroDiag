@@ -76,6 +76,43 @@ internal static class ObdJ1979CatalogueSelfTests
         byte[] reference=Encoding.UTF8.GetBytes("synthetic catalogue reference — not SAE data");
         string pin=ObdJ1979DocumentedCatalogue.Sha(reference);
         byte[] cat=Encoding.UTF8.GetBytes(Catalogue(pin));
+        // Same synthetic native CL/1 fixture as the Android regression.
+        byte[] native=Convert.FromHexString(
+            "434c010100004300e0070000e807000000314731464131525858523031323334353603f1f2f3000000000000000000000000" +
+            "000000000000000000000000000000000001006400e80300006f021499434c010201002e0001010100000000000000000005" +
+            "0000006400140005000000090249020131473146413152585852303132333435367d8eac1e434c0102020020000201010000" +
+            "000000050000000a00000064000600050000000100410000000001284d533a434c01020300200002010100000000000a0000" +
+            "000f00000064000600050000000120412000000001f354c069434c01020400200002010100000000000f0000001400000064" +
+            "0006000500000001404140000000011787631d434c0102050020000201010000000000140000001900000064000600050000" +
+            "0001604160000000011ca946c5434c0102060020000201010000000000190000001e00000064000600050000000180418000" +
+            "0000017fd2b851434c01020700200002010100000000001e00000023000000640006000500000001a041a00000000186dac7" +
+            "b7434c01020800200002010100000000002300000028000000640006000500000001c041c00000000190aeb200434c010209" +
+            "0020000201010000000000280000002d000000640006000500000001e041e00000e0006eea5e13434c01020a001f00040201" +
+            "000100f1002d00000032000000640005000500000001f141f181feff01c3c00d434c01020b001d00040201000100f2003200" +
+            "000037000000640003000500000001f241f20001dd414e434c01020c002400040201000100f300370000003c00000064000a" +
+            "000500000001f341f3fffffffffffffffff5ce1095434c01020d002e0005010100000000003c000000410000006400140005" +
+            "000000090249020131473146413152585852303132333435360667a450434c01030e008000000f01000d0000000300000003" +
+            "0000000000000000000000410000006a0000000000000000000000000000000000000000000000000000000000000000000e" +
+            "0001000100010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000" +
+            "0000000000000000000000000000009e60ab59");
+        var nativeProjection=ObdJ1979CatalogueProjection.Build(cat,pin,native,Vin);
+        Check((string?)nativeProjection["schema"]==ObdJ1979CatalogueProjection.NativeSchema&&
+            Equals(nativeProjection["source_replay_verified"],true)&&Equals(nativeProjection["transport_frames_replayed"],false),
+            "native source replay boundary");
+        Check((string?)nativeProjection["source_capture_sha256"]==ObdJ1979DocumentedCatalogue.Sha(native),"native digest");
+        using(var nativeDoc=JsonDocument.Parse(JsonSerializer.SerializeToUtf8Bytes(nativeProjection)))
+        {
+            var nativeRows=nativeDoc.RootElement.GetProperty("rows");
+            Check(nativeRows.GetArrayLength()==3,"native sample count");
+            Check(nativeRows[0].GetProperty("signals")[0].GetProperty("value").GetProperty("numerator").GetString()=="-1",
+                "native rational projection");
+            Check(nativeRows[1].GetProperty("projection_status").GetString()=="NO_DOCUMENTED_DEFINITION","unknown native PID");
+        }
+        var nativeReport=CamaroDiagConnectors.Windows.J1979LiveNative.Decode(new MemoryStream(native));
+        var nativeCsv=Encoding.ASCII.GetString(CamaroDiagConnectors.Windows.J1979LiveNativeCli.Csv(nativeReport));
+        Check(nativeCsv.Contains("1,F1,50,RAW,41F181FEFF,7E0,7E8,"+Vin+",true",StringComparison.Ordinal),"native raw CSV");
+        Reject(()=>ObdJ1979CatalogueProjection.Build(cat,pin,native[..^1],Vin),"truncated native source");
+        Reject(()=>ObdJ1979CatalogueProjection.Build(cat,pin,native,"1FA6P8TH0L5100000"),"native VIN mismatch");
         byte[] original=Original();
         var source=ObdJ1979CatalogueProjection.ReplayApplication(original,Vin);
         Check(source.Completed&&source.FinalIdentityVerified&&source.Samples.Count==12,"selected raw acquisition replay");
