@@ -106,6 +106,29 @@ internal static class ObdJ1979OperatingContext
         return new(cycle,trims);
     }
 
+    internal sealed record Layout(string State,int? RawEncoded);
+
+    internal static Layout ResolveLayout(IEnumerable<Observation> observations)
+    {
+        var rows=Correlated(observations).ToArray();
+        var pages=rows.Where(x=>x.Request.SequenceEqual(new byte[]{1,0})).ToArray();
+        var values=rows.Where(x=>x.Request.SequenceEqual(new byte[]{1,0x1D})).ToArray();
+        if(pages.Length!=1||pages[0].Data.Length!=4)return new("UNVERIFIED",null);
+        bool advertised=(pages[0].Data[3]&8)!=0;
+        if(!advertised)return new(values.Length==0?"NOT_ADVERTISED_BY_SELECTED_ECU":"UNVERIFIED",null);
+        if(values.Length!=1||values[0].Data.Length!=1)return new("UNVERIFIED",null);
+        return new("VERIFIED",values[0].Data[0]);
+    }
+
+    internal static IReadOnlyList<ObdJ1979MultiSignal.Signal>? LiveSignals(byte[] request,byte[] response,Layout layout)
+    {
+        if(request.Length!=2||request[0]!=1||response.Length<=2||response[0]!=0x41||
+            response[1]!=request[1])return null;
+        var decoded=DecodeTrim(request,response[2..],layout.RawEncoded);
+        return decoded?.Signals.Where(x=>x.Number.HasValue).Select(x=>
+            new ObdJ1979MultiSignal.Signal(request[1],x.Name,x.Unit,x.Number!.Value,x.RawEncoded)).ToArray();
+    }
+
     internal static object Evidence(Projection p)=>new {
         drive_cycle=p.DriveCycle is {} c?new {
             request_hex=c.RequestHex,raw_hex=c.RawHex,baseline_raw_hex=c.BaselineRawHex,
