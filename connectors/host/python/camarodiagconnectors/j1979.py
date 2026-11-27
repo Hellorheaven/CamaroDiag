@@ -13,6 +13,7 @@ from collections.abc import Callable
 from .j1979_campaign_evidence import decode_observation, summarize_observations
 from .j1979_monitor_scaling import scale_record, from_steps as scaled_monitor_records
 from .j1979_scaling_context import project as contextual_measurements, config_data, CONFIG_PIDS
+from .j1979_drive_cycle import project as operating_context, cycle_data
 from .j1979_vehicle_info import can_info
 from .j1979_multi_signal import width as multi_width, decode_response as multi_decode, from_steps as multi_records
 
@@ -274,6 +275,8 @@ def scan(exchange: Exchange, *, budget: float = 180.0,
             if request[0] == 1 and request[1] in CONFIG_PIDS and application["shape"] in ("RAW","PASSED"):
                 if config_data(request[1],response[2:]) is None:
                     raise ValueError("Invalid ECU measurement configuration")
+            if request==bytes((1,0x41)) and application["shape"] in ("RAW","PASSED") and cycle_data(response[2:],None) is None:
+                raise ValueError("Invalid current-cycle monitor data")
             if application["shape"] == "RAW":
                 # CJ/1 v1 records preserve their historical shape. Extended
                 # Mode 09 has a separately validated typed view.
@@ -380,6 +383,7 @@ def scan(exchange: Exchange, *, budget: float = 180.0,
             "multi_signal_records": multi_records(steps),
             "status_records": status_records(steps),
             "contextual_measurements": contextual_measurements(steps),
+            "operating_context": operating_context(steps),
             "scaled_monitor_records": scaled_monitor_records(steps),
             "extended_vehicle_info": [s["decoded"] for s in steps
                                       if s["status"] == "RAW" and s["decoded"] is not None
