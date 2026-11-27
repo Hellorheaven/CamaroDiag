@@ -6814,6 +6814,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun exportFunctionalLiveCsv() {
+        if(_functionalTestState.value.nativeLiveEvidence!=null) {
+            exportFunctionalNativeLiveCsv()
+            return
+        }
         val account=authenticatedAccountUid?:return
         val generation=accountSessionGeneration
         val snapshot=_functionalTestState.value
