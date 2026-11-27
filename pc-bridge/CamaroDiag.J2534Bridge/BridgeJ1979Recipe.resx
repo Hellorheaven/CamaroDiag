@@ -161,4 +161,6 @@
   <data name="FreezeNativeSelected" xml:space="preserve"><value>Selected</value></data>
   <data name="FreezeNativeOffline" xml:space="preserve"><value>Offline inspection</value></data>
   <data name="FreezeNativeCaptureFilter" xml:space="preserve"><value>Native freeze capture (*.cf)|*.cf</value></data>
+  <data name="FreezeLegacyRun" xml:space="preserve"><value>Legacy freeze frames</value></data>
+  <data name="FreezeLegacyConfirm" xml:space="preserve"><value>I confirm these functional requests may reach multiple ECUs; only replies from the selected source are used.</value></data>
 </root>
