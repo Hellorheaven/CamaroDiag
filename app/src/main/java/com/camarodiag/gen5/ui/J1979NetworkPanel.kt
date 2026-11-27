@@ -66,6 +66,8 @@ internal fun J1979NetworkPanel(protocol:Int?,state:FunctionalTestState,vehicle:V
             r.ecus.forEach { ecu->
                 Text("${id(ecu.responseId)} · ${ecu.status} · ${ecu.observedVin.orEmpty()}")
                 Text(stringResource(R.string.j1979_network_steps,ecu.steps.size),fontSize=11.sp)
+                val operating=ecu.operatingContext
+                val trims=operating.fuelTrims.associateBy { it.requestHex }
                 val contextual=ecu.contextualMeasurements.records.associateBy { it.requestHex }
                 val states=ecu.statusRecords.associateBy { it.requestHex }
                 val monitorResults=ecu.scaledMonitorRecords.groupBy { it.requestHex }
