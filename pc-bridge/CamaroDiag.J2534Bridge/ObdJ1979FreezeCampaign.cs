@@ -263,24 +263,41 @@ internal static class ObdJ1979FreezeCampaign
             bool attempted = false;
             Read Observation(string outcome,byte[]? response = null) =>
                 new(outcome,response,Math.Max(0,Elapsed()-begin),attempted);
+            // Guard failures must never be disguised as an ECU timeout.
+            bool StillCurrent()
+            {
+                try { requireCurrent(); return true; }
+                catch (Exception) { return false; }
+            }
             try
             {
                 requireCurrent();
                 long left = plan.BudgetMs - begin;
                 // The J2534 implementation clamps each request to at least 100ms.
                 if (left < 100) return Observation("BUDGET");
-                attempted = true;
                 int maximum=requestTimeout?.Invoke(request)??2500;
-                if(maximum is <100 or >20000)throw new ArgumentException("Invalid logical read deadline");
-                var response = exchange(request,(int)Math.Min(maximum,left));
-                if (response is null || response.Length is 0 or > MaximumResponse) return Observation("TRANSPORT_ERROR");
+                if(maximum is <100 or >20000)
+                    return Observation("CONTEXT_CHANGED"); // rejected locally, no bus TX
                 requireCurrent();
+                left = plan.BudgetMs - Elapsed();
+                if (left < 100) return Observation("BUDGET");
+                attempted = true;
+                var response = exchange(request,(int)Math.Min(maximum,left));
+                // Validate the exact same connector, ECU and session AFTER
+                // a blocking request, even if it yielded malformed bytes.
+                requireCurrent();
+                if (response is null || response.Length is 0 or > MaximumResponse)
+                    return Observation("TRANSPORT_ERROR");
                 return Elapsed() >= plan.BudgetMs ? Observation("LATE_RESPONSE",response) : Observation("RECEIVED",response);
             }
             catch (OperationCanceledException) { return Observation("CANCELLED"); }
-            catch (TimeoutException) { return Observation(attempted ? "TIMEOUT" : "CONTEXT_CHANGED"); }
+            catch (TimeoutException) {
+                return Observation(attempted && StillCurrent() ? "TIMEOUT" : "CONTEXT_CHANGED");
+            }
             catch (Exception e) when (e is IOException or InvalidDataException or InvalidOperationException or ArgumentException)
-            { return Observation(attempted ? "TRANSPORT_ERROR" : "CONTEXT_CHANGED"); }
+            {
+                return Observation(attempted && StillCurrent() ? "TRANSPORT_ERROR" : "CONTEXT_CHANGED");
+            }
         }
         return Execute(plan,Observe,Elapsed);
     }

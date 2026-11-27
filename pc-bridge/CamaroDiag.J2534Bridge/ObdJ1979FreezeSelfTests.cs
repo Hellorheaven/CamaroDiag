@@ -70,6 +70,32 @@ internal static class ObdJ1979FreezeSelfTests
         Assert(budget.StopReason=="BUDGET_EXHAUSTED" && !budget.Steps[0].TransmissionAttempted,"pre-TX budget exhaustion");
         var cancelled=ObdJ1979FreezeCampaign.Run(plan,(_,_)=>throw new OperationCanceledException(),()=>{});
         Assert(cancelled.StopReason=="CANCELLED","cancel without retry");
+        int attemptedReads=0;
+        var localDeadline=ObdJ1979FreezeCampaign.Run(plan,(_,_)=>{
+            attemptedReads++;return VinReply();},()=>{},requestTimeout:_=>99);
+        Assert(localDeadline.StopReason=="CONTEXT_CHANGED"&&attemptedReads==0&&
+            !localDeadline.Steps[0].TransmissionAttempted,
+            "invalid local timeout never reaches adapter");
+        bool current=true;
+        var changedDuringRead=ObdJ1979FreezeCampaign.Run(plan,(_,_)=>{
+            attemptedReads++;current=false;return VinReply();
+        },()=>{if(!current)throw new InvalidOperationException("Vehicle changed");});
+        Assert(changedDuringRead.StopReason=="CONTEXT_CHANGED"&&
+            changedDuringRead.Steps[0].TransmissionAttempted&&
+            changedDuringRead.Steps[0].ResponseHex is null&&
+            changedDuringRead.InitialVin is null,
+            "revoked route cannot accept a valid VIN from the old ECU");
+        current=true;
+        var timeoutAfterRevoke=ObdJ1979FreezeCampaign.Run(plan,(_,_)=>{
+            current=false;throw new TimeoutException();
+        },()=>{if(!current)throw new InvalidOperationException("ECU changed");});
+        Assert(timeoutAfterRevoke.StopReason=="CONTEXT_CHANGED"&&
+            timeoutAfterRevoke.Steps[0].TransmissionAttempted,
+            "timeout after session revocation is not a repeatable read");
+        var ordinaryTimeout=ObdJ1979FreezeCampaign.Run(plan,(_,_)=>throw new TimeoutException(),()=>{});
+        Assert(ordinaryTimeout.Steps[0].TransportOutcome=="TIMEOUT"&&
+            ordinaryTimeout.Steps[0].TransmissionAttempted,
+            "ordinary ECU timeout remains distinguishable from route revocation");
         foreach (var request in new byte[][]{[4],[8,0],[0x22,0xf1,0x90],[2,13,2]})
             Assert(!ObdJ1979FreezeCampaign.Allows(request,plan.Frames),"deny outside explicit read scope");
         Reject(()=> (plan with { Frames=[0,0] }).Validate(),"duplicate frame");
