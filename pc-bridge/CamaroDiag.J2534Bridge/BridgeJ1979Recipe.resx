@@ -183,4 +183,6 @@
   <data name="LiveNativeConfirm" xml:space="preserve"><value>I confirm the approved physical ECU, VIN, selected PIDs and stationary vehicle.</value></data>
   <data name="LiveNativePids" xml:space="preserve"><value>Raw PID IDs (hex, comma separated)</value></data>
   <data name="LiveNativeVinRequired" xml:space="preserve"><value>Enter the independently known VIN before inspection.</value></data>
+  <data name="LiveNativeCsv" xml:space="preserve"><value>Export CL/1 CSV</value></data>
+  <data name="LiveNativeCsvFilter" xml:space="preserve"><value>CSV samples (*.csv)|*.csv</value></data>
 </root>
