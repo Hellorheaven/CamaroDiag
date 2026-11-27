@@ -68,6 +68,31 @@ internal static class ObdJ1979FunctionalScanSelfTests
             "unknown InfoType retained as raw, not passed");
         Assert(rawReport.Measurements.Any(x=>x.Pid==0x21),"known measurement remains typed");
 
+        byte[] extendedResponse = [0x49,8,16,0xff,0xff,0x9c,0x40,0,12,0,6,0,1,0,0,
+            ..new byte[20]];
+        var extendedReport=ObdJ1979FunctionalScan.Run((request,timeout)=>
+            Convert.ToHexString(request) switch {
+                "0900"=>[0x49,0,0x41,0,0,0],
+                "0908"=>extendedResponse,
+                _=>Exchange(request,timeout)
+            },()=>{},TimeSpan.FromMinutes(1));
+        var ipt=extendedReport.ExtendedVehicleInfo.Single();
+        Assert(ipt is {GeneralDenominator:65535,IgnitionCycles:40000,CounterCount:16} &&
+            ipt.Monitors![0] is {Ratio:2d} && ipt.Monitors[1].Ratio is null,
+            "Extended IPT engineering view is independent of CJ/1 historical RAW state");
+        Assert(extendedReport.Steps.Single(x=>x.RequestHex=="0908") is {Status:"RAW",Detail:"EXTENDED_INFOTYPE_DECODED"},
+            "Retain historical application shape");
+        Assert(ObdJ1979Interpretation.Interpret([9,8],extendedResponse).Description.Contains("catalyst-bank-1=12/6"),
+            "Console displays counters");
+        var invalid=ObdJ1979FunctionalScan.Run((request,timeout)=>
+            Convert.ToHexString(request) switch {
+                "0900"=>[0x49,0,0x41,0,0,0],
+                "0908"=>extendedResponse[..^1],
+                _=>Exchange(request,timeout)
+            },()=>{},TimeSpan.FromMinutes(1));
+        Assert(invalid.ExtendedVehicleInfo.Count==0 &&
+            invalid.Steps.Single(x=>x.RequestHex=="0908").Status=="FAILED",
+            "Malformed extended counter vector rejected");
         var malformed = ObdJ1979FunctionalScan.Run((request, _) =>
             request[0] == 1 ? [0x41, 0x20, 0, 0, 0, 0] : [0x7F, request[0], 0x11],
             () => {}, TimeSpan.FromMinutes(1));
