@@ -42,10 +42,8 @@ internal static class ObdJ1979Interpretation
             return new Result(
                 $"SAE J1979 Mode 06 MID=0x{request[1]:X2} " +
                 $"tests={tests.Count} " +
-                string.Join("; ", tests.Select(t =>
-                    $"TID=0x{t.TestId:X2} UASID=0x{t.UnitScalingId:X2} " +
-                    $"raw={t.Value} min={t.Minimum} max={t.Maximum}")) +
-                " (raw values; no UASID conversion or pass verdict)",
+                string.Join("; ", tests.Select(FormatMonitorTest)) +
+                " (no monitor pass verdict)",
                 true, reply.Service);
         }
 
@@ -139,6 +137,15 @@ internal static class ObdJ1979Interpretation
             $"data={Convert.ToHexString(reply.Data)} (raw, no scaling or ECU effect verified)",
             true, reply.Service);
     }
+    private static string FormatMonitorTest(ObdJ1979Mode06.Test test)
+    {
+        string encoded = $"TID=0x{test.TestId:X2} UASID=0x{test.UnitScalingId:X2} " +
+            $"raw={test.Value} min={test.Minimum} max={test.Maximum}";
+        if (test.Scaled is not { } value) return encoded;
+        return encoded + FormattableString.Invariant(
+            $" value={value.Value:G} min_scaled={value.Minimum:G} max_scaled={value.Maximum:G} unit={value.Unit}");
+    }
+
     private static Result InterpretMultiplePids(ReadOnlySpan<byte> request, ObdJ1979Transaction.Reply reply)
     {
         var freeze = reply.Service == 0x02;
