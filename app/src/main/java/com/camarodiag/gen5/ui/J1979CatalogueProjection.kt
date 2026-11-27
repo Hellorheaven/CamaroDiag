@@ -256,8 +256,19 @@ internal object J1979CatalogueProjection {
         val result = requireNotNull(report.result)
         val samples = array(result["samples"],0,J1979LiveNativeReplay.MAX_SAMPLES).map { item ->
             val row=obj(item)
-            Sample(int(row,"pid",1,255),int(row,"cycle",1,1000),
-                int(row,"elapsed_ms",0,604000),requiredText(row,"status"),optionalText(row,"response_hex"))
+            // Native replay supplies JVM Int/Long values, not the strict
+            // JSON parser's BigInteger values. Do not coerce arbitrary Number.
+            fun nativeInt(key: String, low: Int, high: Int): Int {
+                val value=when(val rawValue=row[key]) {
+                    is Int -> rawValue.toLong()
+                    is Long -> rawValue
+                    else -> throw IllegalArgumentException("Unexpected native integer")
+                }
+                require(value in low.toLong()..high.toLong())
+                return value.toInt()
+            }
+            Sample(nativeInt("pid",1,255),nativeInt("cycle",1,1000),
+                nativeInt("elapsed_ms",0,604000),requiredText(row,"status"),optionalText(row,"response_hex"))
         }
         return Source(profile.vin,summary["completed"]==true,"CAN",
             mapOf("kind" to "can","tx" to profile.tx,"rx" to profile.rx),samples,
