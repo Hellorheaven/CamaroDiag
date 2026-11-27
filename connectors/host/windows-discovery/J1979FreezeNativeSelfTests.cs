@@ -139,13 +139,24 @@ internal static class J1979FreezeNativeSelfTests
             var verified=J1979FreezeNativeCli.VerifyPrefix(source,output,proof,Vin);
             Require(Equals(verified["consistent"],true)&&Equals(verified["execution_completed"],false),
                 "Windows prefix CLI verifies original CF/1 evidence");
-            string edited=File.ReadAllText(output).Replace(
-                "\\"execution_completed\\": false","\\"execution_completed\\": true",StringComparison.Ordinal);
+            string originalReport=File.ReadAllText(output);
+            string edited=originalReport.Replace("execution_completed","execution_COMPLETED",
+                StringComparison.Ordinal);
             File.WriteAllText(output,edited);
             bool denied=false;
             try{J1979FreezeNativeCli.VerifyPrefix(source,output,Path.Combine(root,"bad.json"),Vin);}
             catch(InvalidDataException){denied=true;}
             Require(denied,"forged Windows CF/1 JSON result is rejected");
+            string repeated=originalReport.Replace(
+                "\"execution_completed\"",
+                "\"execution_completed\": false, \"execution_completed\"",
+                StringComparison.Ordinal);
+            File.WriteAllText(output,repeated);
+            denied=false;
+            try{J1979FreezeNativeCli.VerifyPrefix(source,output,Path.Combine(root,"duplicate.json"),Vin);}
+            catch(InvalidDataException){denied=true;}
+            Require(denied,"ambiguous duplicate JSON assertion must not be accepted");
+
         }
         finally{Directory.Delete(root,true);}
         var sim=new Sim(challenge.Concat(capture).ToArray());
