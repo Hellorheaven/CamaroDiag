@@ -120,12 +120,19 @@ class J1979MaintenanceStorage final:public J1979MaintenanceJournal::Storage {
     return true;
   }
   bool read(size_t offset,uint8_t* out,size_t n)override{
+    if(!inspected_){size_t ignored=0;if(!size(ignored))return false;}
     size_t total=0;
-    if(!out||!n||!size(total)||offset>total||n>total-offset)return false;
+    for(unsigned i=0;i<count_;++i)total+=sizes_[i];
+    if(!out||!n||offset>total||n>total-offset)return false;
+    // The exclusive medium owner pins the inventory. The journal calls
+    // size() before each whole-record verification; per-chunk reads check
+    // only the addressed slot, avoiding quadratic scans of erased flash.
     for(unsigned i=0;i<count_&&n;++i){
       if(offset>=sizes_[i]){offset-=sizes_[i];continue;}
       const size_t take=n<sizes_[i]-offset?n:sizes_[i]-offset;
-      if(!medium_.readSlot(i,offset,out,take))return fail();
+      size_t actual=0;
+      if(medium_.slotSize(i,actual)!=Lookup::Present||actual!=sizes_[i]||
+         !medium_.readSlot(i,offset,out,take))return fail();
       out+=take;n-=take;offset=0;
     }
     return n==0;
@@ -133,6 +140,15 @@ class J1979MaintenanceStorage final:public J1979MaintenanceJournal::Storage {
   void latchRecovery()override{fail();}
   bool recoveryRequired()const{return locked_;}
   bool sealed()const{return sealed_;}
+  // Other J1979 operations may use an independently admitted read lease
+  // only when boot state is known and no maintenance intent is unresolved.
+  bool permitsOtherDiagnostic(){
+    if(!inspected_)(void)inspect();
+    State actual;
+    if(locked_||!load(actual)||!same(actual,state_)||!checkInventory())return fail();
+    return (state_.guard==Guard::Provisioned&&!count_&&!pendingSize_)||
+      (state_.guard==Guard::Sealed&&sealed_);
+  }
  private:
   static void p32(uint8_t* p,uint32_t v){for(unsigned i=0;i<4;++i)p[i]=uint8_t(v>>(8*i));}
   static uint32_t u32(const uint8_t* p){uint32_t v=0;for(unsigned i=0;i<4;++i)v|=uint32_t(p[i])<<(8*i);return v;}
@@ -160,8 +176,8 @@ class J1979MaintenanceStorage final:public J1979MaintenanceJournal::Storage {
     if(!locked_){
       locked_=true;
       State old;
-      // Do not invent a generation for a missing/corrupt guard. The
-      // missing/corrupt state itself prevents all future admission.
+      // Never provision a missing/corrupt guard. If an existing blank
+      // provisioned generation is valid, persist a nonzero recovery epoch.
       if(load(old)){
         if(!old.generation)old.generation=1;
         old.guard=Guard::Recovery;(void)persist(old);
