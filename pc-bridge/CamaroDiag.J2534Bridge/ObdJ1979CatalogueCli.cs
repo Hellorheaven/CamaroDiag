@@ -36,7 +36,8 @@ internal static class ObdJ1979CatalogueCli
                 options.Report,options.Vin);
             ObdJ1979CatalogueProjection.WriteNew(options.Output,result);
             Console.WriteLine(JsonSerializer.Serialize(new {
-                output=options.Output,source_application_replay_verified=true,source_replay_verified=false,
+                output=options.Output,source_application_replay_verified=true,source_replay_verified=result["source_replay_verified"],
+                native_capture_replayed=result.GetValueOrDefault("native_capture_replayed",false),
                 normative_compliance_verified=false,physical_vehicle_verified=false
             }));
             return 0;
