@@ -149,6 +149,29 @@ internal sealed class ObdLegacyJ2534Transport : IDisposable
         return ExchangeFrame(FrameRead(variant, request), timeoutMs);
     }
 
+    /// <summary>Dedicated Mode 02 scope. General read and mutation routes
+    /// are unchanged; the selected source filters RX, not broadcast TX.</summary>
+    internal (ObdJ1979FreezeCampaign.Result Result,IReadOnlyList<ObdJ1979LegacyLiveLink.Trace> Trace)
+        RunFreeze(ObdJ1979FreezeCampaign.Plan requested)
+    {
+        if(source is null)throw new InvalidOperationException("Selected legacy response source required.");
+        var plan=requested.Validate();
+        var scoped=new ObdJ1979LegacyLiveLink(source.Value,(request,timeout)=>
+        {
+            requireActive();
+            bool identity=request.SequenceEqual(new byte[]{1,0})||
+                request.Length==2&&request[0]==9&&request[1] is 0 or 1 or 2;
+            bool frame=request.Length==3&&request[0]==2&&plan.Frames.Contains((int)request[2])&&
+                (request[1]%32==0||request[1]==2||plan.SelectedPids.Length==0||
+                    plan.SelectedPids.Contains((int)request[1]));
+            if(!identity&&!frame)throw new ArgumentException("Request outside legacy freeze scope.");
+            return ExchangeFrame(FrameApplication(variant,request),timeout);
+        },requireActive,freeze:plan);
+        var result=ObdJ1979FreezeCampaign.Run(plan,scoped.Query,requireActive,
+            requestTimeout:req=>req.Length==2?20000:4000);
+        return (result,scoped.Traces);
+    }
+
     internal ObdJ1979LegacyMutation.Result RunVehicleMutation(ObdJ1979LegacyMutation.Operation operation,
         string vin, byte engineSource, IReadOnlyCollection<byte> documentedSources,
         bool warningAcknowledged, bool confirmedYes, Action<ObdJ1979LegacyMutation.Result> saveBaseline)
