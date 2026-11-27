@@ -165,4 +165,16 @@
   <data name="FreezeLegacyConfirm" xml:space="preserve"><value>Je confirme que les requêtes fonctionnelles peuvent atteindre plusieurs calculateurs ; seules les réponses de la source sélectionnée sont utilisées.</value></data>
   <data name="LiveRawOnly" xml:space="preserve"><value>Trames brutes uniquement (sans interprétation numérique)</value></data>
   <data name="LiveRawCount" xml:space="preserve"><value>PID {0} : {1}/{2} réponses brutes corrélées</value></data>
+  <data name="CatalogueProject" xml:space="preserve"><value>Projeter un catalogue PID</value></data>
+  <data name="CatalogueFile" xml:space="preserve"><value>Catalogue JSON</value></data>
+  <data name="CatalogueReference" xml:space="preserve"><value>Référence documentée</value></data>
+  <data name="CataloguePin" xml:space="preserve"><value>SHA-256 de la référence</value></data>
+  <data name="CatalogueRawReport" xml:space="preserve"><value>Capture brute Mode 01</value></data>
+  <data name="CatalogueOutput" xml:space="preserve"><value>Nouveau rapport JSON</value></data>
+  <data name="CatalogueBrowse" xml:space="preserve"><value>Choisir</value></data>
+  <data name="CatalogueAnyFile" xml:space="preserve"><value>Tous les fichiers (*.*)|*.*</value></data>
+  <data name="CatalogueScope" xml:space="preserve"><value>Projection hors ligne des octets. Rejeu du transport non vérifié, conformité normative et provenance physique non établies.</value></data>
+  <data name="CatalogueConfirm" xml:space="preserve"><value>Je confirme le VIN et l’empreinte de la référence.</value></data>
+  <data name="CatalogueSaved" xml:space="preserve"><value>Projection enregistrée.</value></data>
+  <data name="CatalogueRejected" xml:space="preserve"><value>Projection refusée. Vérifiez le catalogue, la référence et la capture.</value></data>
 </root>
