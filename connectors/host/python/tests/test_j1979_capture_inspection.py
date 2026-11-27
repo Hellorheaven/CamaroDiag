@@ -28,6 +28,7 @@ def windows_report(raw=CAPTURE):
     report = python_report(raw, live=True)
     report["schema"] = WINDOWS_SCHEMA
     report["frame_integrity_verified"] = report["capture_integrity_verified"]
+    report["records"] = len(report["steps"]) + 2
     if report["summary"]:
         del report["summary"]["counts"]
     return report
@@ -45,6 +46,16 @@ class CaptureInspectionTests(unittest.TestCase):
                 self.assertFalse(verified["device_credential_independently_verified"])
                 self.assertFalse(verified["physical_vehicle_verified"])
                 self.assertFalse(verified["write_authorized"])
+
+    def test_android_native_report_and_independent_vin(self):
+        report = windows_report()
+        report.update(app_version="1.0", declared_vin=None, vin_match="NOT_REQUESTED")
+        result = verify(CAPTURE, report, expected_vin=VIN.decode())
+        self.assertTrue(result["verified"])
+        self.assertEqual("ANDROID", result["host_platform"])
+        self.assertEqual("MATCH", result["vin_match"])
+        report["records"] -= 1
+        self.assertIn("records", verify(CAPTURE, report)["differences"])
 
     def test_modified_fields_fail_even_with_valid_capture(self):
         mutations = (
