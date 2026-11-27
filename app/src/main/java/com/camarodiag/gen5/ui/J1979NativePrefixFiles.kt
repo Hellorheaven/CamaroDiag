@@ -65,6 +65,49 @@ internal object J1979NativePrefixFiles {
         return Prepared(report.toMap(),output,hash)
     }
 
+    /** Keep the independently selected raw evidence and prior JSON report
+     * as separate immutable inputs. File providers can replace either URI
+     * between reads; both are hashed and reread before publishing proof. */
+    data class FreezeVerificationPrepared(
+        val bytes: ByteArray,
+        val document: Map<String,Any?>,
+        val captureSha: String,
+        val reportSha: String
+    )
+
+    suspend fun prepareFreezeVerification(resolver: ContentResolver,capture: Uri,report: Uri,
+                                          vin: String,current:()->Unit): FreezeVerificationPrepared {
+        require(capture != report && capture.scheme=="content" && report.scheme=="content") {
+            "Select distinct CF/1 capture and JSON evidence"
+        }
+        require(J1979CatalogueProjection.validVin(vin))
+        val captured=ByteArrayOutputStream()
+        val saved=ByteArrayOutputStream()
+        val maxCapture=J1979FreezeUsbCapture.MAX_CAPTURE.toInt()
+        read(resolver,capture,current,maxCapture) { block,n -> captured.write(block,0,n) }
+        read(resolver,report,current,J1979FreezePrefixVerification.MAX_REPORT_BYTES) {
+            block,n -> saved.write(block,0,n)
+        }
+        current()
+        val verified=J1979FreezePrefixVerification.verify(captured.toByteArray(),
+            saved.toByteArray(),vin)
+        revalidateFreezeVerification(resolver,capture,report,verified.captureSha,verified.reportSha,current)
+        return FreezeVerificationPrepared(verified.bytes,verified.document,
+            verified.captureSha,verified.reportSha)
+    }
+
+    fun revalidateFreezeVerification(resolver: ContentResolver,capture: Uri,report: Uri,
+                                     captureSha: String,reportSha: String,current:()->Unit) {
+        require(capture!=report && capture.scheme=="content" && report.scheme=="content")
+        check(digest(resolver,capture,current,J1979FreezeUsbCapture.MAX_CAPTURE.toInt())==captureSha) {
+            "CF/1 source changed before publication"
+        }
+        check(digest(resolver,report,current,J1979FreezePrefixVerification.MAX_REPORT_BYTES)==reportSha) {
+            "CF/1 report changed before publication"
+        }
+        current()
+    }
+
     suspend fun prepareFreeze(resolver: ContentResolver,uri: Uri,vin: String,
                               current:()->Unit): Prepared {
         require(J1979CatalogueProjection.validVin(vin))
