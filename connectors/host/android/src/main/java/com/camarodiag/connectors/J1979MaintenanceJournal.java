@@ -197,8 +197,8 @@ public final class J1979MaintenanceJournal {
             require(e.start>=now&&e.start<scope.budget&&e.timeout<=scope.budget-e.start,"Invalid deadline");
             if(i==scope.baseline()){require(baseline,"Missing baseline");s.a|=1;}
             if(i==scope.intent()){
-                require(intent&&baseline&&identity>=0&&speed>=0&&rpm>=0&&e.start-identity<=5000&&
-                    e.start-speed<=5000&&e.start-rpm<=5000,"Command without fresh checks and intent");
+                require(intent&&baseline&&identity>=0&&speed>=0&&rpm>=0&&e.start-identity+e.timeout<=5000&&
+                    e.start-speed+e.timeout<=5000&&e.start-rpm+e.timeout<=5000,"Command without fresh checks and intent");
                 s.a|=6;
             }
             now=e.end;s.count++;s.duration=now;
