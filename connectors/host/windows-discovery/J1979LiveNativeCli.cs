@@ -68,10 +68,11 @@ internal static class J1979LiveNativeCli
             throw new InvalidDataException("CL/1 capture changed during replay");
         return (report,hash);
     }
-    private static void Write(FileStream output,J1979LiveNative.Report report,string? digest=null,string? name=null)
+    private static void Write(FileStream output,J1979LiveNative.Report report,string? digest=null,string? name=null,
+        IReadOnlyDictionary<string,object?>? metadata=null)
     {
         using var writer=new StreamWriter(output,leaveOpen:true);
-        writer.WriteLine(J1979LiveNative.EncodeReport(report,digest,name));
+        writer.WriteLine(J1979LiveNative.EncodeReport(report,digest,name,metadata));
         writer.Flush();output.Flush(true);
     }
     private static J1979LiveNative.Report Failure(J1979LiveNative.Report report,Exception e,bool cancelled=false)=>
@@ -80,6 +81,7 @@ internal static class J1979LiveNativeCli
     internal static J1979LiveNative.Report Capture(Options options,Func<bool> current)
     {
         var profile=options.Profile.Validate();
+        var started=DateTime.UtcNow;
         byte[] key=new byte[32];
         try
         {
@@ -131,7 +133,16 @@ internal static class J1979LiveNativeCli
                 {report=Failure(report,e);}
             }
             if(!current())report=Failure(report,new OperationCanceledException("Owner revoked"),true);
-            Write(output,report,digest,created?Path.GetFileName(options.CapturePath):null);
+            var finished=DateTime.UtcNow;
+            var version=typeof(J1979LiveNativeCli).Assembly.GetName().Version?.ToString()??"source";
+            var metadata=new Dictionary<string,object?>{
+                ["version"]=version,["declared_connector"]=options.Port,
+                ["declared_ecu"]=$"CAN {profile.Tx:X}/{profile.Rx:X}",
+                ["started_at_utc"]=started.ToString("O",CultureInfo.InvariantCulture),
+                ["finished_at_utc"]=(finished<started?started:finished).ToString("O",CultureInfo.InvariantCulture),
+                ["observed_vin"]=report.CaptureIntegrityVerified&&report.Summary?.InitialIdentityVerified==true?profile.Vin:null
+            };
+            Write(output,report,digest,created?Path.GetFileName(options.CapturePath):null,metadata);
             return report;
         }
         finally{CryptographicOperations.ZeroMemory(key);}
