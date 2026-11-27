@@ -17,9 +17,10 @@ BEFORE = {"0902": bytes.fromhex("490201") + VIN.encode("ascii"),
 
 class ClearRecipeTests(unittest.TestCase):
     def recipe(self, *, before=None, after=None, expected=VIN, ack=b"\x44",
-               primary=True, ok=True, yes=True):
+               primary=True, ok=True, yes=True, fail_save=False, changed_identity=False, changed_motion=False):
         sent = []
         reset = False
+        baseline = None
 
         def read(request, _):
             key = request.hex().upper()
@@ -27,13 +28,27 @@ class ClearRecipeTests(unittest.TestCase):
             replies = BEFORE | (before or {})
             if reset:
                 replies |= {"03": bytes.fromhex("4300")} | (after or {})
+            if baseline is not None and not reset:
+                if changed_identity and key=="0902":
+                    return bytes.fromhex("490201")+b"1G1FA1RXXR0123457"
+                if changed_motion and key=="010D":
+                    return bytes.fromhex("410D01")
             reply = replies[key]
             if isinstance(reply, Exception):
                 raise reply
             return reply
 
+        def save(report):
+            nonlocal baseline
+            self.assertFalse(report["command_attempted"])
+            self.assertEqual("BASELINE_SAVED",report["outcome"])
+            if fail_save:
+                raise OSError("disk unavailable")
+            baseline=report
+
         def tx():
             nonlocal reset
+            self.assertIsNotNone(baseline)
             sent.append("04")
             reset = True
             if isinstance(ack, Exception):
@@ -41,7 +56,7 @@ class ClearRecipeTests(unittest.TestCase):
             return ack
 
         result = clear_recipe(read, tx, expected_vin=expected, primary=primary,
-                              warning_acknowledged=ok, confirmed_yes=yes)
+                              warning_acknowledged=ok, confirmed_yes=yes,save_baseline=save)
         return result, sent
 
     def test_before_after_and_permanent_records(self):
@@ -63,6 +78,13 @@ class ClearRecipeTests(unittest.TestCase):
         for kwargs in ({"primary": False}, {"ok": False}, {"yes": False}):
             with self.assertRaises(ValueError):
                 self.recipe(**kwargs)
+
+    def test_disk_failure_and_fresh_preconditions_block_reset(self):
+        for kwargs in ({"fail_save":True},{"changed_identity":True},{"changed_motion":True}):
+            result,sent=self.recipe(**kwargs)
+            self.assertEqual("NOT_TESTED",result["outcome"])
+            self.assertFalse(result["command_attempted"])
+            self.assertNotIn("04",sent)
 
     def test_partial_and_refused_are_not_verified_zero(self):
         report, sent = self.recipe(after={"03": TimeoutError()})
