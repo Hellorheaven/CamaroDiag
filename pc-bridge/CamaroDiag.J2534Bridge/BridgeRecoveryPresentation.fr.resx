@@ -55,4 +55,35 @@
   <data name="StateRecoveryRequired" xml:space="preserve"><value>Récupération / évaluation requise</value></data>
   <data name="StateInterrupted" xml:space="preserve"><value>Interrompu ou journal incomplet</value></data>
   <data name="RecoveryEvidenceOnly" xml:space="preserve"><value>Les preuves décrivent la transaction enregistrée, pas l’état physique actuel du calculateur.</value></data>
+  <data name="OpenHistory" xml:space="preserve"><value>Comparer les instantanés de récupération</value></data>
+  <data name="HistoryTitle" xml:space="preserve"><value>Historique de récupération — du plus ancien au plus récent</value></data>
+  <data name="HistoryAdd" xml:space="preserve"><value>Ajouter un journal</value></data>
+  <data name="HistoryRemove" xml:space="preserve"><value>Retirer</value></data>
+  <data name="HistoryUp" xml:space="preserve"><value>Monter</value></data>
+  <data name="HistoryDown" xml:space="preserve"><value>Descendre</value></data>
+  <data name="HistoryInspect" xml:space="preserve"><value>Analyser l’historique</value></data>
+  <data name="HistoryCancel" xml:space="preserve"><value>Annuler</value></data>
+  <data name="HistoryVerified" xml:space="preserve"><value>Continuité des journaux vérifiée : {0} instantanés</value></data>
+  <data name="HistoryRejected" xml:space="preserve"><value>Historique non vérifié</value></data>
+  <data name="HistorySnapshot" xml:space="preserve"><value>{0}. {1} · {2} entrées · {3}</value></data>
+  <data name="HistoryTransition" xml:space="preserve"><value>{0} → {1} : +{2} entrées, +{3} octets</value></data>
+  <data name="HistoryLatestState" xml:space="preserve"><value>Dernier état enregistré : {0}</value></data>
+  <data name="HistoryFailedOrdinal" xml:space="preserve"><value>Instantané refusé : {0}</value></data>
+  <data name="HistoryProblem_SnapshotCount" xml:space="preserve"><value>Sélectionnez 2 à 8 journaux distincts.</value></data>
+  <data name="HistoryProblem_DuplicatePath" xml:space="preserve"><value>Le même journal a été sélectionné deux fois.</value></data>
+  <data name="HistoryProblem_NotRegularJournal" xml:space="preserve"><value>Un journal est lié ou n’est pas un fichier ordinaire.</value></data>
+  <data name="HistoryProblem_JournalSize" xml:space="preserve"><value>Journal vide ou de taille supérieure à la limite.</value></data>
+  <data name="HistoryProblem_CombinedJournalSize" xml:space="preserve"><value>La taille cumulée des journaux dépasse la limite.</value></data>
+  <data name="HistoryProblem_IncompleteJournal" xml:space="preserve"><value>Entrée de journal incomplète.</value></data>
+  <data name="HistoryProblem_UnverifiedSnapshot" xml:space="preserve"><value>Secteurs originaux ou métadonnées non vérifiés.</value></data>
+  <data name="HistoryProblem_InvalidSequence" xml:space="preserve"><value>Séquence du journal invalide.</value></data>
+  <data name="HistoryProblem_JournalChanged" xml:space="preserve"><value>Le journal a changé pendant l’analyse.</value></data>
+  <data name="HistoryProblem_OriginalEvidenceChanged" xml:space="preserve"><value>Les métadonnées ou les secteurs originaux diffèrent.</value></data>
+  <data name="HistoryProblem_NotStrictExtension" xml:space="preserve"><value>Historique dupliqué, inversé ou divergent.</value></data>
+  <data name="HistoryProblem_TerminalExtension" xml:space="preserve"><value>Un journal terminal ne peut pas avoir de suite.</value></data>
+  <data name="HistoryProblem_NoCompleteNewRecord" xml:space="preserve"><value>Aucune nouvelle entrée complète.</value></data>
+  <data name="HistoryProblem_EvidenceChanged" xml:space="preserve"><value>Les preuves ont changé pendant l’analyse.</value></data>
+  <data name="HistoryProblem_Cancelled" xml:space="preserve"><value>Analyse annulée.</value></data>
+  <data name="HistoryProblem_EvidenceUnavailable" xml:space="preserve"><value>Preuves indisponibles ou illisibles.</value></data>
+  <data name="HistoryProblem_ProtectedDestination" xml:space="preserve"><value>Choisissez un emplacement hors des preuves originales.</value></data>
 </root>
