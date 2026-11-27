@@ -20,4 +20,6 @@
     <string name="j1979_freeze_unvisited">Trames non parcourues : %1$s</string>
     <string name="j1979_freeze_more">%1$d entrées supplémentaires dans l’export JSON</string>
     <string name="j1979_freeze_scope">Données enregistrées uniquement. Trames OEM supplémentaires brutes ; aucune validation physique.</string>
+    <string name="j1979_freeze_native_title">Trames figées USB natif (CU/2)</string>
+    <string name="j1979_freeze_native_verified">Capture native vérifiée par rejeu</string>
 </resources>
