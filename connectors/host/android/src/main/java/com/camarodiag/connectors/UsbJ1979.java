@@ -18,13 +18,31 @@ import java.util.function.BooleanSupplier;
  */
 public final class UsbJ1979 {
     private UsbJ1979() {}
+    @FunctionalInterface
+    private interface Session<T>{
+        T run(J1979UsbCapture.Link link,byte[] key)throws IOException;
+    }
     public static J1979UsbCapture.Result capture(UsbManager manager,UsbDevice device,
             int controlId,int dataId,int tx,int rx,boolean extended,int budget,byte[] credential,
             OutputStream raw,BooleanSupplier stillSelected) throws IOException {
+        if(!J1979UsbAuth.physicalPair(tx,rx,extended)||budget<1||budget>600000)
+            throw new IllegalArgumentException("Invalid CU/1 profile");
+        return open(manager,device,controlId,dataId,credential,raw,stillSelected,
+            (link,key)->new J1979UsbCapture(link).run(tx,rx,extended,budget,key,raw));
+    }
+    public static J1979FreezeUsbCapture.Result captureFreeze(UsbManager manager,UsbDevice device,
+            int controlId,int dataId,J1979FreezeUsbAuth.Profile profile,byte[] credential,
+            OutputStream raw,BooleanSupplier stillSelected)throws IOException{
+        if(profile==null)throw new IllegalArgumentException("Explicit CU/2 profile required");
+        return open(manager,device,controlId,dataId,credential,raw,stillSelected,
+            (link,key)->new J1979FreezeUsbCapture(link).run(profile,key,raw,stillSelected));
+    }
+    private static <T> T open(UsbManager manager,UsbDevice device,
+            int controlId,int dataId,byte[] credential,OutputStream raw,
+            BooleanSupplier stillSelected,Session<T> session)throws IOException{
         if(manager==null||device==null||credential==null||credential.length!=32||raw==null||
-           stillSelected==null||!stillSelected.getAsBoolean()||
-           !J1979UsbAuth.physicalPair(tx,rx,extended)||budget<1||budget>600000)
-            throw new IllegalArgumentException("Explicit CU/1 context required");
+           stillSelected==null||!stillSelected.getAsBoolean())
+            throw new IllegalArgumentException("Explicit native USB context required");
         if(!manager.hasPermission(device))throw new IOException("USB permission required");
         UsbInterface control=null,data=null;
         for(int i=0;i<device.getInterfaceCount();i++){
@@ -97,15 +115,15 @@ public final class UsbJ1979 {
                 }
                 @Override public void checkNoBufferedInput()throws IOException{
                     current();
-                    if(cursor!=limit)throw new IOException("Unexpected buffered CU/1 bytes");
+                    if(cursor!=limit)throw new IOException("Unexpected buffered native USB bytes");
                     // CDC has no EOF; detect immediate trailing data only.
                     int n=conn.bulkTransfer(input,pending,pending.length,50);
                     current();
-                    if(n>0)throw new IOException("Unexpected trailing CU/1 bytes");
+                    if(n>0)throw new IOException("Unexpected trailing native USB bytes");
                 }
                 @Override public void close(){closed=true;}
             };
-            return new J1979UsbCapture(link).run(tx,rx,extended,budget,key,raw);
+            return session.run(link,key);
         }finally{
             Arrays.fill(key,(byte)0);
             if(claimedData)conn.releaseInterface(data);
