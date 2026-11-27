@@ -107,6 +107,20 @@ int main(){
     assert(E::classify(variant,maxReq,2,maxReply,sizeof(maxReply)-1)==R::Invalid);
     assert(E::classify(variant,mafReq,2,mafReserved,sizeof(mafReserved))==R::Invalid);
   }
+  const uint8_t trimReq[]={1,6},trimOne[]={0x41,6,128},trimTwo[]={0x41,6,128,144},
+    trimTooLong[]={0x41,6,128,144,160},secondaryReq[]={1,0x55},secondary[]={0x41,0x55,128,144};
+  assert(E::classify(V::ClassicCan,trimReq,2,trimOne,sizeof(trimOne))==R::Positive);
+  assert(E::classify(V::ClassicCan,trimReq,2,trimTwo,sizeof(trimTwo))==R::Raw);
+  assert(E::classify(V::Legacy,trimReq,2,trimTwo,sizeof(trimTwo))==R::Raw);
+  assert(E::classify(V::ClassicCan,trimReq,2,trimTooLong,sizeof(trimTooLong))==R::Invalid);
+  assert(E::classify(V::ClassicCan,secondaryReq,2,secondary,sizeof(secondary))==R::Raw);
+  const uint8_t freezeTrimReq[]={2,6,0},freezeTrim[]={0x42,6,0,128,144};
+  assert(E::classify(V::ClassicCan,freezeTrimReq,3,freezeTrim,sizeof(freezeTrim))==R::Raw);
+  const uint8_t cycleReq[]={1,0x41},cycleReply[]={0x41,0x41,0,17,1,1},
+    cycleReserved[]={0x41,0x41,0,128,0,0};
+  assert(E::classify(V::ClassicCan,cycleReq,2,cycleReply,sizeof(cycleReply))==R::Raw);
+  assert(E::classify(V::ClassicCan,cycleReq,2,cycleReserved,sizeof(cycleReserved))==R::Invalid);
+  assert(E::classify(V::ClassicCan,cycleReq,2,cycleReply,sizeof(cycleReply)-1)==R::Invalid);
   // Feed only captured synthetic frames through the passive observer.
   const uint8_t vinReq[]={9,2};
   uint8_t vin[20]={0x49,2,1};
