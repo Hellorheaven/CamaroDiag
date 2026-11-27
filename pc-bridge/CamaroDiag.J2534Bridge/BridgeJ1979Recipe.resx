@@ -163,4 +163,6 @@
   <data name="FreezeNativeCaptureFilter" xml:space="preserve"><value>Native freeze capture (*.cf)|*.cf</value></data>
   <data name="FreezeLegacyRun" xml:space="preserve"><value>Legacy freeze frames</value></data>
   <data name="FreezeLegacyConfirm" xml:space="preserve"><value>I confirm these functional requests may reach multiple ECUs; only replies from the selected source are used.</value></data>
+  <data name="LiveRawOnly" xml:space="preserve"><value>Raw payload only (no numeric interpretation)</value></data>
+  <data name="LiveRawCount" xml:space="preserve"><value>PID {0}: {1}/{2} correlated raw replies</value></data>
 </root>
