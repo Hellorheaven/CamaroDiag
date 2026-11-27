@@ -1,0 +1,184 @@
+using System.Globalization;
+using System.IO.Ports;
+using System.Security.Cryptography;
+using System.Text.RegularExpressions;
+
+namespace CamaroDiagConnectors.Windows;
+
+internal static class J1979LiveNativeCli
+{
+    internal const string CaptureCommand="--j1979-live-native",InspectCommand="--inspect-j1979-live-native";
+    internal sealed record Options(string Port,string KeyPath,string CapturePath,string OutputPath,J1979LiveNative.Profile Profile);
+
+    internal static Options Parse(string[] args)
+    {
+        var values=new Dictionary<string,string>(StringComparer.Ordinal);
+        var pids=new List<int>();bool extended=false,confirmed=false;
+        for(int i=0;i<args.Length;i++)
+        {
+            string name=args[i];
+            if(name=="--extended"){if(extended)throw new ArgumentException("Duplicate extended flag");extended=true;continue;}
+            if(name=="--confirm-physical-channel")
+            {if(confirmed)throw new ArgumentException("Duplicate confirmation");confirmed=true;continue;}
+            if(name is not ("--port" or "--key-file" or "--capture" or "--output" or "--tx" or "--rx" or
+                "--vin" or "--pid" or "--cycles" or "--interval-ms" or "--budget-ms")||
+                i+1>=args.Length||args[i+1].StartsWith("--",StringComparison.Ordinal))
+                throw new ArgumentException("Unknown or incomplete CU/3 option");
+            string value=args[++i];
+            if(name=="--pid")
+            {
+                if(value.Length!=2||!byte.TryParse(value,NumberStyles.AllowHexSpecifier,CultureInfo.InvariantCulture,out byte pid)||
+                    pids.Count>=32)throw new ArgumentException("Expected selected hexadecimal byte");
+                pids.Add(pid);
+            }
+            else if(!values.TryAdd(name,value))throw new ArgumentException("Duplicate CU/3 option");
+        }
+        string Required(string name)=>values.TryGetValue(name,out var value)&&!string.IsNullOrWhiteSpace(value)?
+            value:throw new ArgumentException("Missing "+name);
+        int Number(string name,string fallback)=>int.TryParse(values.GetValueOrDefault(name,fallback),
+            NumberStyles.None,CultureInfo.InvariantCulture,out var n)?n:throw new ArgumentException("Invalid "+name);
+        uint Id(string name)
+        {
+            string value=Required(name);
+            if(value.StartsWith("0x",StringComparison.OrdinalIgnoreCase))value=value[2..];
+            if(value.Length is <1 or >8||!uint.TryParse(value,NumberStyles.AllowHexSpecifier,
+                CultureInfo.InvariantCulture,out var id))throw new ArgumentException("Invalid physical CAN ID");
+            return id;
+        }
+        string port=Required("--port");
+        if(!confirmed||!Regex.IsMatch(port,@"\ACOM[1-9][0-9]{0,3}\z",RegexOptions.IgnoreCase|RegexOptions.CultureInvariant))
+            throw new ArgumentException("Explicit COM and confirmation required");
+        var profile=new J1979LiveNative.Profile(Id("--tx"),Id("--rx"),extended,Required("--vin"),
+            pids.ToArray(),Number("--cycles","30"),Number("--interval-ms","1000"),Number("--budget-ms","180000")).Validate();
+        string key=Path.GetFullPath(Required("--key-file")),capture=Path.GetFullPath(Required("--capture")),
+            output=Path.GetFullPath(Required("--output"));
+        if(new[]{key,capture,output}.Distinct(StringComparer.OrdinalIgnoreCase).Count()!=3)
+            throw new ArgumentException("Credential and evidence paths must differ");
+        return new(port,key,capture,output,profile);
+    }
+
+    private static (J1979LiveNative.Report Report,string Digest) ReplayPersisted(FileStream input,J1979LiveNative.Profile? expected=null)
+    {
+        if(input.Length>J1979LiveNative.MaximumCapture)throw new InvalidDataException("CL/1 exceeds capture byte limit");
+        string hash=Convert.ToHexString(SHA256.HashData(input)).ToLowerInvariant();
+        input.Position=0;var report=J1979LiveNative.Decode(input,expected);
+        input.Position=0;
+        if(hash!=Convert.ToHexString(SHA256.HashData(input)).ToLowerInvariant())
+            throw new InvalidDataException("CL/1 capture changed during replay");
+        return (report,hash);
+    }
+    private static void Write(FileStream output,J1979LiveNative.Report report,string? digest=null,string? name=null)
+    {
+        using var writer=new StreamWriter(output,leaveOpen:true);
+        writer.WriteLine(J1979LiveNative.EncodeReport(report,digest,name));
+        writer.Flush();output.Flush(true);
+    }
+    private static J1979LiveNative.Report Failure(J1979LiveNative.Report report,Exception e,bool cancelled=false)=>
+        report with{CaptureIntegrityVerified=false,Summary=null,Result=null,
+            Cancelled=report.Cancelled||cancelled||e is OperationCanceledException,Error=e.Message};
+    internal static J1979LiveNative.Report Capture(Options options,Func<bool> current)
+    {
+        var profile=options.Profile.Validate();
+        byte[] key=new byte[32];
+        try
+        {
+            if(!current())throw new OperationCanceledException("Owner revoked");
+            using(var credential=new FileStream(options.KeyPath,FileMode.Open,FileAccess.Read,FileShare.Read))
+            {
+                if((File.GetAttributes(options.KeyPath)&(FileAttributes.ReparsePoint|FileAttributes.Directory))!=0)
+                    throw new InvalidDataException("Regular credential file required");
+                credential.ReadExactly(key);
+                if(credential.ReadByte()!=-1)throw new IOException("Invalid credential size");
+            }
+            if(!current())throw new OperationCanceledException("Owner revoked");
+            using var output=new FileStream(options.OutputPath,FileMode.CreateNew,FileAccess.Write,FileShare.None);
+            using var empty=new MemoryStream();
+            var report=J1979LiveNative.Decode(empty,profile) with{Source="LIVE_USB_CU3"};
+            bool created=false;
+            try
+            {
+                using var raw=new FileStream(options.CapturePath,FileMode.CreateNew,FileAccess.Write,FileShare.None);
+                created=true;
+                if(!current())throw new OperationCanceledException("Owner revoked");
+                using var serial=new SerialPort(options.Port,115200,Parity.None,8,StopBits.One){
+                    Handshake=Handshake.None,DtrEnable=true,RtsEnable=false,ReadTimeout=100,WriteTimeout=1000};
+                serial.Open();
+                report=new J1979LiveUsbCapture(new J1979SerialPortLink(serial,current)).Run(profile,key,raw,current);
+                raw.Flush(true);
+            }
+            catch(Exception e) when(e is InvalidDataException or IOException or TimeoutException or UnauthorizedAccessException or
+                InvalidOperationException or OperationCanceledException or ArgumentException)
+            {report=Failure(report,e,!current());}
+            string? digest=null;
+            if(created)
+            {
+                try
+                {
+                    using var saved=new FileStream(options.CapturePath,FileMode.Open,FileAccess.Read,FileShare.Read);
+                    var persisted=ReplayPersisted(saved,profile);digest=persisted.Digest;
+                    if(report.CaptureIntegrityVerified)
+                    {
+                        var adjusted=persisted.Report with{
+                            Source=report.Source,DeviceCredentialAuthenticated=report.DeviceCredentialAuthenticated,
+                            ClientProofSent=report.ClientProofSent,Cancelled=report.Cancelled,HostElapsedMs=report.HostElapsedMs};
+                        if(!persisted.Report.CaptureIntegrityVerified||
+                            J1979LiveNative.EncodeReport(adjusted)!=J1979LiveNative.EncodeReport(report))
+                            throw new InvalidDataException("Persisted CL/1 differs from live replay");
+                    }
+                }
+                catch(Exception e) when(e is IOException or InvalidDataException or UnauthorizedAccessException or OverflowException)
+                {report=Failure(report,e);}
+            }
+            if(!current())report=Failure(report,new OperationCanceledException("Owner revoked"),true);
+            Write(output,report,digest,created?Path.GetFileName(options.CapturePath):null);
+            return report;
+        }
+        finally{CryptographicOperations.ZeroMemory(key);}
+    }
+
+    internal static J1979LiveNative.Report Inspect(string source,string vin,string destination,Func<bool>? current=null)
+    {
+        if(!J1979LiveNative.ValidVin(vin)||Path.GetFullPath(source).Equals(Path.GetFullPath(destination),StringComparison.OrdinalIgnoreCase))
+            throw new ArgumentException("Independent VIN and distinct new output required");
+        if(current is not null&&!current())throw new OperationCanceledException("Owner revoked");
+        using var input=new FileStream(source,FileMode.Open,FileAccess.Read,FileShare.Read);
+        var (report,digest)=ReplayPersisted(input);
+        if(report.Profile?.ExpectedVin!=vin)throw new InvalidDataException("CL/1 plan differs from independently supplied VIN");
+        if(current is not null&&!current())throw new OperationCanceledException("Owner revoked");
+        using var output=new FileStream(destination,FileMode.CreateNew,FileAccess.Write,FileShare.None);
+        Write(output,report,digest,Path.GetFileName(source));return report;
+    }
+
+    internal static int Run(string[] args)
+    {
+        try
+        {
+            if(args.Length==0)return 2;
+            J1979LiveNative.Report report;
+            if(args[0]==InspectCommand)
+            {
+                if(args.Length!=4)throw new ArgumentException("Expected CL/1 source, independently supplied VIN and new JSON output");
+                report=Inspect(args[1],args[2],args[3]);
+            }
+            else
+            {
+                if(args[0]!=CaptureCommand||!OperatingSystem.IsWindows())return 2;
+                var options=Parse(args[1..]);
+                if(File.Exists(options.CapturePath)||File.Exists(options.OutputPath))
+                    throw new IOException("New evidence paths required");
+                Console.Write("Qualified locally approved connector, stationary vehicle, exact VIN and scope? [yes/no] ");
+                if(Console.ReadLine()!="yes")return 2;
+                using var cancel=new CancellationTokenSource();
+                ConsoleCancelEventHandler handler=(_,e)=>{e.Cancel=true;cancel.Cancel();};
+                Console.CancelKeyPress+=handler;
+                try{report=Capture(options,()=>!cancel.IsCancellationRequested);}
+                finally{Console.CancelKeyPress-=handler;}
+            }
+            Console.WriteLine(J1979LiveNative.EncodeReport(report));
+            return !report.CaptureIntegrityVerified||report.Cancelled?2:report.Summary?.Completed==true?0:7;
+        }
+        catch(Exception e) when(e is InvalidDataException or ArgumentException or IOException or UnauthorizedAccessException or
+            TimeoutException or InvalidOperationException or OperationCanceledException or OverflowException)
+        {Console.Error.WriteLine(e.Message);return 2;}
+    }
+}
