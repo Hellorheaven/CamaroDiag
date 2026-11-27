@@ -27,7 +27,8 @@ build/test_%.o: tests/test_%.cpp | build
 $(TARGET): $(CXX_OBJECTS)
 	$(CXX) $(CXXFLAGS) $(CXXSTRICT) $^ $(LDFLAGS) $(LDLIBS) -o $@
 
-test: test-j1979-can-network test-j1979-legacy-mutation test-j1979-legacy-live test-j1979-legacy-freeze test-j1979-legacy-scan test-j1979-legacy test-j1979-projection test-cu1 test-j1979-cj1 test-j1979-cm1 test-j1979-context test-j1979-measurement test-j1979-monitor test-j1979-vehicle-info test-j1979-native-c test-cf1 test-cu2 test-cu3 test-j1979-can test-j1979-isotp test-j1979-live test-j1979-cl1
+test: test-j1979-catalogue test-j1979-can-network test-j1979-legacy-mutation test-j1979-legacy-live test-j1979-legacy-freeze test-j1979-legacy-scan test-j1979-legacy test-j1979-projection test-cu1 test-j1979-cj1 test-j1979-cm1 test-j1979-context test-j1979-measurement test-j1979-monitor test-j1979-vehicle-info test-j1979-native-c test-cf1 test-cu2 test-cu3 test-j1979-can test-j1979-isotp test-j1979-live test-j1979-cl1
+	./test-j1979-catalogue
 	./test-j1979-can-network
 	./test-j1979-legacy-mutation
 	./test-j1979-legacy-live
@@ -50,6 +51,9 @@ test: test-j1979-can-network test-j1979-legacy-mutation test-j1979-legacy-live t
 	./test-j1979-isotp
 	./test-j1979-live
 	./test-j1979-cl1
+
+test-j1979-catalogue: build/test_j1979_catalogue.o build/native_json.o build/j1979_catalogue.o build/j1979_catalogue_exact.o build/j1979_catalogue_projection.o build/j1979_catalogue_report.o build/cf1.o build/cf1_complete.o build/cl1.o build/j1979_legacy_live_wire.o build/j1979_legacy_live.o build/j1979_legacy_live_plan.o build/j1979_legacy_identity.o build/j1979_legacy_freeze_plan.o build/j1979_legacy.o build/j1979_elm.o $(DECODER_OBJECTS) build/j1979_policy.o
+	$(CXX) $(LDFLAGS) $^ $(LDLIBS) -o $@
 
 test-j1979-can-network: build/test_j1979_can_network.o build/j1979_can_network.o build/j1979_can_network_report.o build/j1979_can_network_scan.o build/j1979_isotp.o build/j1979_can.o $(DECODER_OBJECTS) build/j1979_policy.o
 	$(CXX) $(LDFLAGS) $^ -o $@
@@ -119,7 +123,7 @@ test-j1979-cl1: build/test_j1979_cl1.o build/cl1.o build/cf1.o
 
 clean:
 	rm -rf build
-	rm -f $(TARGET) test-j1979-can-network test-j1979-legacy-mutation test-j1979-legacy-live test-j1979-legacy-freeze test-j1979-legacy-scan test-j1979-legacy test-j1979-projection test-cu1 test-j1979-cj1 test-j1979-cm1 test-j1979-context test-j1979-measurement test-j1979-monitor test-j1979-vehicle-info test-j1979-native-c test-cf1 test-cu2 test-cu3 test-j1979-can test-j1979-isotp test-j1979-live test-j1979-cl1
+	rm -f $(TARGET) test-j1979-catalogue test-j1979-can-network test-j1979-legacy-mutation test-j1979-legacy-live test-j1979-legacy-freeze test-j1979-legacy-scan test-j1979-legacy test-j1979-projection test-cu1 test-j1979-cj1 test-j1979-cm1 test-j1979-context test-j1979-measurement test-j1979-monitor test-j1979-vehicle-info test-j1979-native-c test-cf1 test-cu2 test-cu3 test-j1979-can test-j1979-isotp test-j1979-live test-j1979-cl1
 
 PREFIX ?= /usr/local
 DESTDIR ?=
