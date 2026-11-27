@@ -23,6 +23,15 @@ internal static class ObdJ1979FunctionalScan
             var step=Steps.SingleOrDefault(s=>s.RequestHex==mode.ToString("X2"));
             return new DtcModeSummary(mode,step?.ApplicationEvidence?.DtcCodes,step?.Status);
         }).ToArray();
+        // Keep the native CJ/1 evidence schema unchanged; this is a derived
+        // engineering view of correlated physical CAN Mode 06 scan records.
+        public IReadOnlyList<ObdJ1979Mode06.Test> MonitorTests => Steps
+            .Where(s=>s.Status=="PASSED" && s.RequestHex.Length==4 &&
+                s.RequestHex.StartsWith("06", StringComparison.Ordinal) &&
+                Convert.ToByte(s.RequestHex[2..],16)%32!=0 && s.ResponseHex is not null)
+            .SelectMany(s=>ObdJ1979Mode06.DecodeTests(
+                Convert.FromHexString(s.RequestHex),Convert.FromHexString(s.ResponseHex!)))
+            .ToArray();
         public IReadOnlyList<J1979CampaignSemantics.Measurement> Measurements => Steps
             .Where(s=>s.Status=="PASSED").Select(s=>s.ApplicationEvidence?.Measurement)
             .OfType<J1979CampaignSemantics.Measurement>().ToArray();
