@@ -128,8 +128,8 @@ jobs:
         run: |
           mkdir -p /tmp/android-protocol
           command -v kotlinc
-          kotlinc -Werror -jvm-target 17 -include-runtime -d /tmp/android-cu-auth.jar $(find connectors/host/android/src/main/java/com/camarodiag/connectors -name '*.kt' ! -name 'UsbJ1979.kt' | sort)
-          javac -Xlint:all -Werror -d /tmp/android-protocol connectors/host/android/src/main/java/com/camarodiag/connectors/BinaryDiscovery.java connectors/host/android/src/test/java/com/camarodiag/connectors/BinaryDiscoveryTest.java
+          kotlinc -Werror -jvm-target 17 -include-runtime -d /tmp/android-cu-auth.jar $(find connectors/host/android/src/main/java/com/camarodiag/connectors -name '*.kt' ! -name 'UsbJ1979.kt' ! -name 'UsbDiscovery.kt' | sort)
+          javac -Xlint:all -Werror -cp /tmp/android-cu-auth.jar -d /tmp/android-protocol connectors/host/android/src/test/java/com/camarodiag/connectors/BinaryDiscoveryTest.java
           java -ea -cp /tmp/android-protocol:/tmp/android-cu-auth.jar com.camarodiag.connectors.BinaryDiscoveryTest
           javac -Xlint:all -Werror -cp /tmp/android-cu-auth.jar -d /tmp/android-protocol connectors/host/android/src/test/java/com/camarodiag/connectors/J1979UsbTest.java
           java -ea -cp /tmp/android-protocol:/tmp/android-cu-auth.jar com.camarodiag.connectors.J1979UsbTest
@@ -148,8 +148,7 @@ jobs:
           test -f "$ANDROID_HOME/platforms/android-35/android.jar"
       - name: Compile native USB Host adapter
         run: |
-          kotlinc -Werror -jvm-target 17 -cp "$ANDROID_HOME/platforms/android-35/android.jar:/tmp/android-protocol:/tmp/android-cu-auth.jar" -d /tmp/android-protocol connectors/host/android/src/main/java/com/camarodiag/connectors/UsbJ1979.kt
-          javac -Xlint:all -Werror -cp "$ANDROID_HOME/platforms/android-35/android.jar:/tmp/android-protocol:/tmp/android-cu-auth.jar" -d /tmp/android-protocol connectors/host/android/src/main/java/com/camarodiag/connectors/*.java
+          kotlinc -Werror -jvm-target 17 -cp "$ANDROID_HOME/platforms/android-35/android.jar:/tmp/android-protocol:/tmp/android-cu-auth.jar" -d /tmp/android-protocol connectors/host/android/src/main/java/com/camarodiag/connectors/UsbJ1979.kt connectors/host/android/src/main/java/com/camarodiag/connectors/UsbDiscovery.kt
   python-host-tests:
     runs-on: ubuntu-latest
     strategy:
