@@ -11,6 +11,7 @@ from camarodiagconnectors.j1979_freeze_native import (
     NativeProfile, hello, proof, decode, HEADER, OBSERVATION, FINAL, OUTCOMES, STOPS, STATES,
 )
 from camarodiagconnectors.j1979_freeze_native_cli import capture_live
+from camarodiagconnectors.j1979_freeze_native_inspection import verify
 
 VIN = "1G1FA1E30D1234567"
 KEY = bytes(range(32))
@@ -161,6 +162,29 @@ class NativeFreezeTests(unittest.TestCase):
         self.assertFalse(report["evidence_authenticated"])
         self.assertEqual(len(port.writes), 2)
         self.assertEqual(capture.getvalue(), b"".join(records))
+
+    def test_native_binary_and_json_binding(self):
+        records, _ = fixture()
+        raw = b"".join(records)
+        digest = hashlib.sha256(raw).hexdigest()
+        report = decode(io.BytesIO(raw))
+        report["capture_sha256"] = digest
+        verified = verify(raw, report, expected_vin=VIN, capture_sha256=digest)
+        self.assertTrue(verified["verified"])
+        self.assertTrue(verified["host_digest_matched"])
+        self.assertFalse(verified["credential_independently_verified"])
+        for edit in (
+            lambda r:r.update(capture_sha256="00"*32),
+            lambda r:r.update(device_credential_authenticated=True),
+            lambda r:r.update(permits_programming=True),
+            lambda r:r["summary"].update(all_frames_stable=False),
+            lambda r:r["profile"]["plan"].update(frames=[0]),
+            lambda r:r["result"]["steps"][0].update(response_hex="490201"),
+        ):
+            forged = copy.deepcopy(report)
+            edit(forged)
+            with self.assertRaises(ValueError):
+                verify(raw, forged, capture_sha256=digest)
 
     def test_bad_auth_never_sends_client_proof(self):
         class Port:
