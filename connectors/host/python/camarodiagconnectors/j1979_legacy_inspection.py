@@ -7,8 +7,6 @@ Anonymous ELM reports are not eligible for selected-source verification.
 """
 from __future__ import annotations
 
-from collections import defaultdict
-import math
 import re
 
 from .j1979_legacy import allowed_read, PROTOCOLS
@@ -221,6 +219,9 @@ def _records(step,req,protocol,source,driver):
             return [],[],set()
     # A late response may have been preserved without processing its frames.
     late=step.get("detail")=="LATE_RESPONSE" and status=="NOT_TESTED" and not frames
+    if late:
+        _require(not accepted,"Late response cannot be accepted")
+        return [],[],set()
     if not late:
         _require(len(parsed)==len(frames),"Raw adapter response differs from saved frame count")
         for actual,claimed_frame in zip(parsed,frames):
@@ -476,6 +477,16 @@ def inspect(root,*,expected_vin=None):
         checked.append("multi_signal_records")
     if project_claims("status_records",states,("request_hex","states")):
         checked.append("status_records")
+    if claimed("readiness") is not None:
+        _require(_equal(_normalize(claimed("readiness")),readiness),"Readiness differs from selected ECU")
+        checked.append("readiness")
+    if claimed("advertised_control_tests") is not None:
+        controls=sorted(chains.get((8,None),{}).get("ids",set()))
+        _require(_equal(claimed("advertised_control_tests"),controls),"Advertised control tests differ from inventory")
+        checked.append("advertised_control_tests")
+    if claimed("freeze_triggers") is not None:
+        _require(freeze is not None and project_claims("freeze_triggers",[freeze],("present","dtc")),"Freeze trigger differs from selected ECU")
+        checked.append("freeze_triggers")
     context=contextual_project(normalized)
     if claimed("contextual_measurements") is not None:
         _require(_equal(_normalize(claimed("contextual_measurements")),context),
