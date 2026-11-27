@@ -179,6 +179,9 @@ L'hôte Linux peut utiliser une interface SocketCAN ISO-TP **externe** déjà co
 cd host/python
 python -m camarodiagconnectors.j1979_cli --interface can0 --tx 7E0 --rx 7E8 --confirm-physical-channel --output j1979-can.json
 ```
+
+Option `--vin VIN_ATTENDU` : remplacer par les 17 caractères du VIN documenté. Si le VIN initial ne peut pas être lu ou ne correspond pas, la recette s'arrête avant toute autre requête et conserve le rapport JSON (code de sortie non nul). Sans option, comparaison non demandée. / Optional `--vin`: use the documented 17-character VIN. An unavailable or mismatched initial VIN stops the recipe before further requests; the JSON report is retained with a nonzero exit status. A match does not establish physical provenance.
+
 Le rapport JSON privé est créé sans écrasement et contient le VIN observé, les requêtes/réponses et durées, les résultats individuels, les tests Mode 08 annoncés et les opérations non exécutées. Une réponse négative ou absente n'est pas une lecture réussie. Les données non décodées restent brutes ; aucun résultat matériel ne peut être déduit de la seule configuration de l'interface (y compris si elle est virtuelle). Aucun Mode 05 legacy ni opération mutatrice. La recette doit être qualifiée avec un véritable adaptateur et un véhicule compatible.
 
 The Linux host uses an independently configured SocketCAN ISO-TP interface, not the USB discovery firmware. Select a documented physical ECU pair; the command never configures bitrate, broadcasts or performs writes. Export is exclusive and records observed VIN, raw exchanges and individual results, including incomplete transport evidence. A virtual or simulated CAN interface is not a physical vehicle qualification.

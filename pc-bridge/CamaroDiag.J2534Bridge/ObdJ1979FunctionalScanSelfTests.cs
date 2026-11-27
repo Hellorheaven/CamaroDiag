@@ -95,6 +95,15 @@ internal static class ObdJ1979FunctionalScanSelfTests
         }
         catch (OperationCanceledException) { Assert(tx == 1, "no late request after cancellation"); }
 
+        int cancelCalls=0;
+        var cancelled=ObdJ1979FunctionalScan.Run((request,timeout)=>{
+            cancelCalls++;
+            return Exchange(request,timeout);
+        },()=>{if(cancelCalls==2)throw new OperationCanceledException();},
+            TimeSpan.FromMinutes(1),retainCancelledEvidence:true);
+        Assert(cancelCalls==2&&cancelled.Cancelled&&!cancelled.Completed&&
+            cancelled.Steps.Count==1&&cancelled.ObservedVin=="1G1FA1RXXR0123456",
+            "operator cancellation preserves only accepted prefix");
         return checks;
     }
 }

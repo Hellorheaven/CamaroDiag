@@ -14,6 +14,7 @@ internal static class ObdJ1979FunctionalScan
     internal sealed record Result(string? ObservedVin, IReadOnlyList<Step> Steps,
         bool Completed, string[] NotExecuted, string? StopReason)
     {
+        public bool Cancelled => StopReason=="CANCELLED";
         public IReadOnlyList<InventorySummary> Inventory => SummarizeInventory(Steps);
         public IReadOnlyList<DtcModeSummary> DtcModes => new[]{3,7,10}.Select(mode=>{
             var step=Steps.SingleOrDefault(s=>s.RequestHex==mode.ToString("X2"));
@@ -48,7 +49,7 @@ internal static class ObdJ1979FunctionalScan
     }
 
     internal static Result Run(Func<byte[], int, byte[]> exchange,
-        Action requireActive, TimeSpan budget)
+        Action requireActive, TimeSpan budget, bool retainCancelledEvidence=false)
     {
         ArgumentNullException.ThrowIfNull(exchange);
         ArgumentNullException.ThrowIfNull(requireActive);
@@ -142,6 +143,7 @@ internal static class ObdJ1979FunctionalScan
             }
         }
 
+        try {
         // Prioritize VIN and DTC evidence before the potentially large
         // supported-PID inventory consumes the campaign budget.
         Read([9, 2], data => vin = ObdJ1979Vin.DecodeIsoTp(data));
@@ -238,6 +240,10 @@ internal static class ObdJ1979FunctionalScan
             Read([9, type]);
         }
         requireActive();
+        } catch(OperationCanceledException) when(retainCancelledEvidence) {
+            expired=true;
+            stopReason="CANCELLED";
+        }
         return new(vin, steps.ToArray(), !expired,
             ["MODE_04_CLEAR", "MODE_05_LEGACY", "MODE_08_CONTROL"], stopReason);
     }

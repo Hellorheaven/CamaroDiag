@@ -220,10 +220,12 @@ def _validate(request: bytes, response: bytes) -> str | None:
 
 
 def scan(exchange: Exchange, *, budget: float = 180.0,
-         clock: Callable[[], float] = time.monotonic) -> dict:
+         clock: Callable[[], float] = time.monotonic, expected_vin: str | None = None) -> dict:
     """Per-request evidence; optional unsupported services remain NOT_TESTED."""
     if not 0 < budget <= 600:
         raise ValueError("Invalid campaign budget")
+    if expected_vin is not None and not re.fullmatch(r"[A-HJ-NPR-Z0-9]{17}", expected_vin):
+        raise ValueError("Invalid expected VIN")
     started = clock()
     steps = []
     stop = None
@@ -308,6 +310,10 @@ def scan(exchange: Exchange, *, budget: float = 180.0,
         return value
 
     vin = read(b"\x09\x02", decode_vin)
+    match = "NOT_REQUESTED" if expected_vin is None else (
+        "UNVERIFIED" if vin is None else "MATCH" if vin == expected_vin else "MISMATCH")
+    if stop is None and match in ("UNVERIFIED", "MISMATCH"):
+        stop = "VIN_" + match
     for mode in (3, 7, 10):
         read(bytes((mode,)))
     def odometer(response: bytes):
@@ -346,7 +352,7 @@ def scan(exchange: Exchange, *, budget: float = 180.0,
         if info != 2:
             read(bytes((9, info)))
     return {"observed_vin": vin, "steps": steps, "advertised_control_tests": controls,
-            "cancelled": stop == "CANCELLED",
+            "cancelled": stop == "CANCELLED", "declared_vin": expected_vin, "vin_match": match,
             **summarize_observations(steps),
             "completed": stop is None, "stop_reason": stop,
             "duration_ms": round((clock() - started) * 1000),

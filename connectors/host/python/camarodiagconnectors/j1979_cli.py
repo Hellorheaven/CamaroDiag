@@ -5,6 +5,7 @@ import argparse
 from datetime import datetime, timezone
 import json
 import os
+import re
 from pathlib import Path
 import sys
 
@@ -32,9 +33,12 @@ def run(argv=None) -> dict:
     parser.add_argument("--confirm-physical-channel", action="store_true", required=True,
                         help="Confirm the documented physical ECU and interface configuration")
     parser.add_argument("--budget", type=float, default=180.0)
+    parser.add_argument("--vin", help="Expected vehicle VIN; stop if the initial VIN cannot be matched")
     args = parser.parse_args(argv)
     if not physical_pair(args.tx, args.rx) or not 0 < args.budget <= 600:
         parser.error("Invalid physical address pair or budget")
+    if args.vin is not None and not re.fullmatch(r"[A-HJ-NPR-Z0-9]{17}", args.vin):
+        parser.error("Expected a 17-character uppercase VIN")
 
     # Reserve the destination before opening a live channel, never overwrite.
     # A private file may contain VINs and diagnostic records.
@@ -43,7 +47,7 @@ def run(argv=None) -> dict:
         start = datetime.now(timezone.utc).isoformat()
         try:
             with LinuxIsoTp(args.interface, args.tx, args.rx) as transport:
-                result = scan(transport.exchange, budget=args.budget)
+                result = scan(transport.exchange, budget=args.budget, expected_vin=args.vin)
         except KeyboardInterrupt:
             result = {"completed": False, "cancelled": True, "stop_reason": "CANCELLED",
                       "observed_vin": None, "steps": [],
@@ -58,6 +62,8 @@ def run(argv=None) -> dict:
                   "tx_can_id": f"{args.tx:X}", "rx_can_id": f"{args.rx:X}",
                   "physical_channel_confirmed_by_operator": True,
                   "physical_vehicle_verified": False,
+                  "declared_vin": args.vin,
+                  "vin_match": "NOT_REQUESTED" if args.vin is None else "UNVERIFIED",
                   "started_at_utc": start,
                   "finished_at_utc": datetime.now(timezone.utc).isoformat(),
                   **result}

@@ -85,22 +85,29 @@ internal sealed partial class BridgeDesktopForm
                     options.Can29Bit, options.ProtocolNumber);
                 RequireActive();
                 return ObdJ1979FunctionalScan.Run(device.Exchange, RequireActive,
-                    TimeSpan.FromMinutes(3));
+                    TimeSpan.FromMinutes(3),retainCancelledEvidence:true);
             });
-            RequireActive();
+            // Do not publish a prefix after expiry or replacement of the
+            // authorization. Explicit operator cancellation may retain it.
+            if(DateTimeOffset.UtcNow>=expires || functionalAuthorizedUntil!=expires)
+                throw new OperationCanceledException();
+            if(cancellation.IsCancellationRequested && !result.Cancelled)
+                result=result with {Completed=false,StopReason="CANCELLED"};
             var report = new WindowsJ1979Report("camarodiag-functional-j1979-can-v1",
                 "SAE-J1979", typeof(BridgeDesktopForm).Assembly.GetName().Version?.ToString() ?? "",
                 selected.Adapter.DisplayName, options.ProtocolNumber,
                 options.RequestCanId.ToString("X"), options.ResponseCanId.ToString("X"),
                 started, DateTimeOffset.UtcNow, result);
             var output = new StringBuilder();
-            output.AppendLine(J1979RecipeText(result.Completed ? "Completed" : "Partial"));
+            output.AppendLine(J1979RecipeText(result.Cancelled ? "ScanCancelledPartial" :
+                result.Completed ? "Completed" : "Partial"));
             output.AppendLine("VIN: " + (result.ObservedVin ?? J1979RecipeText("Unavailable")));
             output.AppendLine(J1979RecipeText("ScanInventory"));
             foreach(var item in result.Inventory)
                 output.AppendLine(string.Format(CultureInfo.CurrentUICulture,J1979RecipeText("ScanInventoryRow"),
                     item.Mode.ToString("X2"),item.AdvertisedIds.Count,J1979RecipeText(item.State switch {
                         "COMPLETE"=>"ScanInventoryComplete","NOT_APPLICABLE"=>"ScanInventoryNotApplicable",
+                        "UNAVAILABLE"=>"ScanInventoryUnavailable",
                         _=>"ScanInventoryPartial"})));
             foreach(var dtc in result.DtcModes)
                 output.AppendLine(string.Format(CultureInfo.CurrentUICulture,J1979RecipeText("ScanDtcMode"),

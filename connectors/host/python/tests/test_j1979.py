@@ -174,6 +174,21 @@ class J1979Tests(unittest.TestCase):
                 LinuxIsoTp("can0", 0x7DF, 0x7E8)
             factory.assert_not_called()
 
+    def test_expected_vin_stops_before_other_requests(self):
+        for response, state in ((REPLIES["0902"], "MISMATCH"), (b"\x7f\x09\x11", "UNVERIFIED")):
+            sent = []
+            def exchange(req, _):
+                sent.append(req.hex().upper())
+                return response
+            result = scan(exchange, expected_vin="1FA6P8TH0L5100000")
+            self.assertEqual(["0902"], sent)
+            self.assertEqual(state, result["vin_match"])
+            self.assertFalse(result["completed"])
+            self.assertEqual("VIN_" + state, result["stop_reason"])
+        matched = scan(lambda req, _: REPLIES[req.hex().upper()], expected_vin=VIN)
+        self.assertEqual("MATCH", matched["vin_match"])
+        self.assertTrue(matched["completed"])
+
     def test_cli_exclusive_file_and_report(self):
         with tempfile.TemporaryDirectory() as folder:
             output = Path(folder) / "report.json"

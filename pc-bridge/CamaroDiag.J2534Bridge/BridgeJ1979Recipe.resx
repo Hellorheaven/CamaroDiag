@@ -111,4 +111,6 @@
   <data name="ScanInventoryPartial" xml:space="preserve"><value>Partial or unavailable inventory</value></data>
   <data name="ScanInventoryNotApplicable" xml:space="preserve"><value>No freeze-frame trigger</value></data>
   <data name="ScanDtcMode" xml:space="preserve"><value>DTC mode {0}: {1}</value></data>
+  <data name="ScanCancelledPartial" xml:space="preserve"><value>Campaign cancelled. Previously received results only.</value></data>
+  <data name="ScanInventoryUnavailable" xml:space="preserve"><value>Inventory unavailable</value></data>
 </root>

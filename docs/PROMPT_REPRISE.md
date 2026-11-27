@@ -1,3 +1,7 @@
+## J1979 — intégration des recettes CAN : VIN Linux et annulation Windows (27/11/2026)
+
+- SocketCAN : paramètre VIN facultatif vérifié avant ouverture, comparaison sur première lecture ; arrêt avant les autres requêtes en cas de VIN discordant/non vérifié, export JSON du résultat et code non nul. Windows J2534 : conservation du préfixe accepté lors d'une annulation opérateur, uniquement si l'autorisation initiale reste valable ; aucune publication après expiration/remplacement. Inventaire indisponible distinct de partiel, ressources FR/EN. Régressions écrites sans exécution ; C6/J1979 ouverts, aucune CI intermédiaire, fusion ou Release.
+
 ## C6 — revalidation du préfixe journal aux frontières matérielles (27/11/2026)
 
 - Android relit le journal actif après le contrôle alimentation/identité et avant l'effacement, puis après le marqueur final ; un rollback vers un préfixe pourtant valide invalide définitivement le journal actif. Windows vérifie le préfixe du journal sur descripteur et chemin avant/après la relecture des originaux ; une divergence invalide également l'écriture du journal lui-même. Correction d'une ancienne attente de test incompatible avec l'invalidation définitive. Régression Android écrite, non exécutée. Aucun changement de capacité matérielle, aucun test intermédiaire, fusion ou Release. C6/J1979 ouverts.
