@@ -100,7 +100,9 @@ internal object J1979CatalogueJson {
             if (at + 4 > source.length) error("Truncated Unicode escape")
             var value = 0
             repeat(4) {
-                val digit = source[at++].digitToIntOrNull(16) ?: error("Invalid Unicode escape")
+                val c = source[at++]
+                if (c !in '0'..'9' && c !in 'a'..'f' && c !in 'A'..'F') error("Invalid Unicode escape")
+                val digit = c.digitToInt(16)
                 value = value * 16 + digit
             }
             return value.toChar()
