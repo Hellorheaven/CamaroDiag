@@ -1,4 +1,5 @@
 #include "../j1979_interprocessor_read.h"
+#include "../j1979_live_campaign.h"
 #include <cassert>
 #include <initializer_list>
 using namespace cd;
@@ -85,8 +86,102 @@ static void expiredFragment(){
   assert(encode(fetch,tx,Size)&&!endpoint.transact(tx,Size,rx,Size));
   assert(endpoint.closed()&&bus.sent==1);
 }
+// Exercise a real 24-bit mailbox sequence through both endpoints with
+// ISO-TP segmentation, not only encode/decode of an arbitrary sequence.
+struct LongBus final:J1979CanReadLink {
+  uint32_t now=0,requests=0,flowControls=0;
+  uint8_t data[4095]{};
+  size_t total=0,offset=0;
+  uint8_t sequence=1;
+  bool waitingFlow=false;
+  bool active()override{return authorized;}
+  uint32_t monotonicMs()override{return now;}
+  bool discardReceive()override{total=offset=0;waitingFlow=false;return true;}
+  bool send(const Frame& f,uint32_t timeout)override{
+    assert(f.id==0x7e0&&f.length==8&&timeout>0);
+    if(f.data[0]==0x30){
+      assert(waitingFlow&&offset==6);
+      waitingFlow=false;++flowControls;return true;
+    }
+    assert(f.data[0]==2&&total==0);
+    ++requests;now+=5;sequence=1;
+    const uint8_t mode=f.data[1],pid=f.data[2];
+    if(mode==9){
+      assert(pid==2);total=20;data[0]=0x49;data[1]=2;data[2]=1;
+      std::memcpy(data+3,"1G1FA1RXXR0123456",17);
+    }else if(pid==0){
+      assert(mode==1);total=6;
+      const uint8_t bits[]={0x41,0,0xff,0xff,0xff,0xfe};
+      std::memcpy(data,bits,6);
+    }else{
+      assert(mode==1&&pid<=31);total=4095;
+      std::memset(data,pid,total);data[0]=0x41;data[1]=pid;
+    }
+    return true;
+  }
+  Receive receive(Frame& frame,uint32_t timeout)override{
+    assert(timeout>0);
+    if(!total||offset>=total||waitingFlow)return Receive::Fault;
+    frame=Frame{};frame.id=0x7e8;frame.length=8;
+    if(total<=7){
+      frame.data[0]=uint8_t(total);std::memcpy(frame.data+1,data,total);offset=total;
+    }else if(offset==0){
+      frame.data[0]=uint8_t(0x10|(total>>8));frame.data[1]=uint8_t(total);
+      std::memcpy(frame.data+2,data,6);offset=6;waitingFlow=true;
+    }else{
+      frame.data[0]=uint8_t(0x20|sequence);sequence=uint8_t((sequence+1)&15);
+      const size_t count=total-offset<7?total-offset:7;
+      std::memcpy(frame.data+1,data+offset,count);offset+=count;
+    }
+    return Receive::Data;
+  }
+};
+struct LongWire final:Transport {
+  LongWire(Endpoint& endpoint,LongBus& bus):endpoint(endpoint),bus(bus){}
+  Endpoint& endpoint;LongBus& bus;
+  unsigned calls=0;uint32_t greatest=0;
+  bool active()override{return authorized;}
+  uint32_t monotonicMs()override{return bus.now;}
+  bool exchange(const uint8_t* req,uint8_t* res,uint32_t timeout)override{
+    Packet p;assert(timeout>0&&decode(req,Size,p)&&p.version==LiveVersion);
+    assert(p.seq==calls);++calls;greatest=p.seq;
+    return endpoint.transact(req,Size,res,Size);
+  }
+};
+struct LongWait final:J1979LiveCampaign::Waiter {
+  explicit LongWait(LongBus& bus):bus(bus){}
+  LongBus& bus;
+  bool waitMs(uint32_t duration)override{bus.now+=duration;return true;}
+};
+struct LongSink final:J1979LiveCampaign::Sink {
+  uint32_t samples=0,observations=0;
+  bool observation(const J1979LiveCampaign::Observation& e,const uint8_t* req,
+      size_t n,const Exchange::Result& result)override{
+    assert(e.accepted&&n==2);++observations;
+    if(e.phase==J1979LiveSequence::Phase::Sample){
+      assert(result.state==State::Raw&&result.responseSize==4095&&result.response[1]==req[1]);
+      ++samples;
+    }
+    return true;
+  }
+};
+static void longLiveSequence(){
+  J1979LiveScope scope{};std::memcpy(scope.vin,"1G1FA1RXXR0123456",17);
+  scope.count=31;for(unsigned i=0;i<31;++i)scope.pids[i]=uint8_t(i+1);
+  scope.cycles=10;scope.intervalMs=100;scope.budgetMs=60000;
+  LongBus bus;Exchange::Result scratch,out;
+  Endpoint endpoint(bus,scratch,0x7e0,0x7e8,false,admission,nullptr,&scope);
+  LongWire wire(endpoint,bus);
+  Client client(wire,0x7e0,0x7e8,false,nullptr,&scope);
+  LongWait waiter(bus);LongSink sink;
+  const auto result=J1979LiveCampaign::runApplication(client,0x7e0,0x7e8,false,scope,waiter,sink,out);
+  assert(result.completed&&result.raw==310&&result.finalIdentity&&result.completedCycles==10);
+  assert(sink.samples==310&&sink.observations==313&&bus.requests==313);
+  assert(wire.greatest>65535&&wire.calls==wire.greatest+1);
+  assert(bus.flowControls==312);
+}
 int main(){
-  versionBoundaries();expiredFragment();
+  versionBoundaries();expiredFragment();longLiveSequence();
   Bus bus;Exchange::Result scratch,out;
   Endpoint endpoint(bus,scratch,0x7e0,0x7e8,false,admission);
   Loop wire(endpoint);Client client(wire,0x7e0,0x7e8,false);
