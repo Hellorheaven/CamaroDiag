@@ -61,7 +61,7 @@ internal object J1979CatalogueFiles {
             return J1979DocumentedCatalogue.digestText(digest.digest())
         }
     }
-    fun prepare(resolver: ContentResolver, inputs: Inputs, expectedVin: String, current: () -> Unit): Prepared {
+    suspend fun prepare(resolver: ContentResolver, inputs: Inputs, expectedVin: String, current: () -> Unit): Prepared {
         inputs.validate()
         require(J1979CatalogueProjection.validVin(expectedVin))
         val cat = read(resolver, inputs.catalogue, J1979DocumentedCatalogue.MAX_CATALOGUE_BYTES, current)
@@ -69,7 +69,9 @@ internal object J1979CatalogueFiles {
         val digest = hash(resolver, inputs.reference, J1979DocumentedCatalogue.MAX_REFERENCE_BYTES, current)
         require(digest == inputs.referencePin) { "Reference digest mismatch" }
         current()
-        val result = J1979CatalogueProjection.build(cat, digest, source, expectedVin)
+        val result = if (source.size >= 3 && source[0] == 67.toByte() && source[1] == 70.toByte() && source[2] == 1.toByte())
+            J1979FreezeCatalogue.build(cat, digest, source, expectedVin)
+        else J1979CatalogueProjection.build(cat, digest, source, expectedVin)
         val output = J1979CatalogueJson.encode(result.document)
         revalidate(resolver, inputs, result, current)
         return Prepared(output, result)
