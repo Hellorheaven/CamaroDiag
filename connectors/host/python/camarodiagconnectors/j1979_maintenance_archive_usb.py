@@ -5,6 +5,7 @@ import hmac
 import secrets
 import struct
 import time
+import zlib
 from .j1979_maintenance_journal import inspect, MAX_JOURNAL, require
 from .j1979_maintenance_usb import scope_bytes
 
@@ -74,8 +75,12 @@ def capture_archive(port, scope, key, output, *, clock=time.monotonic, nonce=Non
         declared={"bytes":size,"records":header[5],"terminal_present":terminal,
                   "damaged_tail":damaged,"recovery_required":recovery}
         read(size,deadline,True)
+        trailer=read(12,deadline)
+        require(trailer[:4]==b"CU\x05\x05" and struct.unpack_from("<II",trailer,4)==(size,zlib.crc32(raw)),
+                "CU/5 closing receipt missing or inconsistent")
         guard(deadline)
-        require(not port.read(1),"Trailing CU/5 archive bytes")
+        trailing=port.read(1)
+        require(type(trailing) is bytes and not trailing,"Trailing CU/5 archive bytes")
         guard(deadline)
         result=inspect(bytes(raw),expected_vin=scope.vin)
         require(result["scope"]==scope.report() and result["terminal_present"]==terminal
@@ -86,7 +91,8 @@ def capture_archive(port, scope, key, output, *, clock=time.monotonic, nonce=Non
         error=str(exc) or type(exc).__name__
     return {"schema":"camarodiag-j1979-native-maintenance-archive-v1","protocol":"SAE-J1979",
             "source":"READ_ONLY_USB_CU5","scope":scope.report(),"device_credential_authenticated":authenticated,
-            "archive_transfer_verified":inspection is not None,"journal_bytes_received":len(raw),
+            "archive_transfer_verified":inspection is not None,"archive_close_receipt_verified":inspection is not None,
+            "journal_bytes_received":len(raw),
             "declared_archive":declared,"inspection":inspection,
             "recovery_required":inspection is None or declared["recovery_required"],
             "maintenance_command_sent":False,"physical_vehicle_verified":False,
