@@ -79,7 +79,7 @@ class J1979FreezeCampaign {
       scratch.state=State::Fault;scratch.responseSize=0;scratch.elapsedMs=0;
       if(!link.active()){
         summary.stop=Stop::ContextChanged;
-      }else if(begin>=budget){
+      }else if(begin>=budget||budget-begin<2u){
         outcome=Outcome::Budget;summary.stop=Stop::Budget;
       }else{
         attempted=true;
