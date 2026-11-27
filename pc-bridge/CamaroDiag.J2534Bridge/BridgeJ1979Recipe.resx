@@ -190,4 +190,17 @@
   <data name="LiveNativePrefixRecords" xml:space="preserve"><value>Complete records: {0}</value></data>
   <data name="LiveNativePrefixSamples" xml:space="preserve"><value>Correlated raw samples: {0}</value></data>
   <data name="LiveNativePrefixTail" xml:space="preserve"><value>Unverified trailing bytes: {0}</value></data>
+  <data name="NativeMaintenanceInspect" xml:space="preserve"><value>Inspect native maintenance journal</value></data>
+  <data name="NativeMaintenanceFilter" xml:space="preserve"><value>CM/1 journals (*.cm)|*.cm</value></data>
+  <data name="NativeMaintenanceOffline" xml:space="preserve"><value>Offline journal inspection</value></data>
+  <data name="NativeMaintenanceConsistent" xml:space="preserve"><value>Journal records are consistent.</value></data>
+  <data name="NativeMaintenanceRecovery" xml:space="preserve"><value>Recovery required: do not repeat the operation.</value></data>
+  <data name="NativeMaintenanceNotTested" xml:space="preserve"><value>Command not tested</value></data>
+  <data name="NativeMaintenanceRefused" xml:space="preserve"><value>ECU refused the command</value></data>
+  <data name="NativeMaintenanceUncertain" xml:space="preserve"><value>Command outcome uncertain</value></data>
+  <data name="NativeMaintenanceAckPartial" xml:space="preserve"><value>Acknowledged; incomplete readback</value></data>
+  <data name="NativeMaintenanceAckReadback" xml:space="preserve"><value>Acknowledged; readback recorded</value></data>
+  <data name="NativeMaintenanceAckEvap" xml:space="preserve"><value>EVAP preparation acknowledged; no leak-test result</value></data>
+  <data name="NativeMaintenanceNoTerminal" xml:space="preserve"><value>Missing terminal record</value></data>
+  <data name="NativeMaintenanceNoRetry" xml:space="preserve"><value>No automatic retry or physical proof.</value></data>
 </root>
