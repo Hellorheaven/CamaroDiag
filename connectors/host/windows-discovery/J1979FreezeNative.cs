@@ -128,7 +128,7 @@ internal static class J1979FreezeNative
             throw new InvalidDataException("CF/1 CRC mismatch");
         return tail[..length];
     }
-    private static Observation DecodeObservation(byte[] body)
+    internal static Observation DecodeObservation(byte[] body)
     {
         if(body.Length<10||body[0] is <1 or >6||body[1]>1||body[2] is <2 or >3||body[3]!=0)
             throw new InvalidDataException("Invalid CF/1 observation");
@@ -160,6 +160,106 @@ internal static class J1979FreezeNative
         }
         return new(Stops[body[0]],states.Length,(body[2]&1)!=0,(body[2]&2)!=0,
             (body[2]&4)!=0,observations.Count,duration,states);
+    }
+
+    /// <summary>Inspect an interrupted CF/1 stream without inventing a
+    /// terminal state. Whole-record CRC and deterministic recipe order must
+    /// still be checked, but no operational or physical verdict is issued.</summary>
+    internal static Dictionary<string,object?> InspectPrefix(byte[] raw,string expectedVin)
+    {
+        if(raw.Length is <1 or >MaximumCapture ||
+            !System.Text.RegularExpressions.Regex.IsMatch(expectedVin??"",
+                @"\A[A-HJ-NPR-Z0-9]{17}\z"))
+            throw new InvalidDataException("Invalid interrupted CF/1 scope or input");
+        int position=0,sequence=0;
+        string interruption="MISSING_TERMINAL";
+        Profile? profile=null;
+        var observations=new List<Observation>();
+        void Check(bool value,string error)
+        {
+            if(!value)throw new InvalidDataException(error);
+        }
+        while(position<raw.Length)
+        {
+            Check(sequence<ObdJ1979FreezeCampaign.MaximumSteps+2,"CF/1 record count exceeded");
+            int remaining=raw.Length-position;
+            var partial=raw.AsSpan(position,Math.Min(8,remaining));
+            byte[] magic=[(byte)'C',(byte)'F',1];
+            int n=Math.Min(3,partial.Length);
+            Check(partial[..n].SequenceEqual(magic.AsSpan(0,n)),"Invalid partial CF/1 header");
+            if(partial.Length>=4)Check(sequence==0?partial[3]==1:partial[3] is 2 or 3,
+                "Invalid CF/1 prefix kind");
+            if(partial.Length>=5)Check(partial[4]==(byte)(sequence&255),"Invalid CF/1 prefix sequence");
+            if(partial.Length>=6)Check(partial[5]==(byte)(sequence>>8),"Invalid CF/1 prefix sequence");
+            if(remaining<8){interruption="TRUNCATED_HEADER";break;}
+            byte[] header=partial.ToArray();
+            var (kind,length)=Header(header,sequence);
+            Check((kind!=1||length==PlanSize)&&
+                (kind!=2||length>=10+2)&&
+                (kind!=3||length==20),"Invalid CF/1 prefix body length");
+            int recordSize=8+length+4;
+            if(remaining<recordSize){interruption="TRUNCATED_RECORD";break;}
+            byte[] body=Body(header,raw.AsSpan(position+8,length+4).ToArray(),length);
+            if(kind==1)
+            {
+                profile=Profile.Decode(body);
+                Check(profile.Plan.ExpectedVin==expectedVin,"CF/1 expected VIN differs");
+            }
+            else if(kind==2)
+            {
+                Check(profile is not null&&observations.Count<ObdJ1979FreezeCampaign.MaximumSteps,
+                    "Observation without plan or beyond limit");
+                observations.Add(DecodeObservation(body));
+            }
+            else
+            {
+                Check(profile is not null,"CF/1 terminal without plan");
+                Check(position+recordSize==raw.Length,"Trailing CF/1 terminal bytes");
+                throw new InvalidDataException("CF/1 contains complete terminal; use normal inspect");
+            }
+            position+=recordSize;sequence++;
+        }
+        Check(profile is not null,"No complete CF/1 plan in prefix");
+        int index=0;bool synthesized=false;
+        var replay=ObdJ1979FreezeCampaign.Execute(profile!.Plan,request=>
+        {
+            if(index==observations.Count)
+            {
+                synthesized=true;
+                return new ObdJ1979FreezeCampaign.Read("CONTEXT_CHANGED",null,0,false);
+            }
+            var saved=observations[index++];
+            Check(request.AsSpan().SequenceEqual(saved.Request),"CF/1 prefix recipe mismatch");
+            return saved.Read;
+        },()=>observations.Sum(item=>item.Read.DurationMs));
+        Check(index==observations.Count&&replay.Steps.Length>=observations.Count,
+            "Unexpected CF/1 observations after deterministic recipe stop");
+        var p=profile!;
+        return new Dictionary<string,object?>{
+            ["schema"]="camarodiag-j1979-native-freeze-prefix-v1",
+            ["protocol"]="SAE-J1979",["source"]="OFFLINE_CF1_PREFIX",
+            ["profile"]=new Dictionary<string,object?>{
+                ["request_can_id"]=p.Tx.ToString("X"),["response_can_id"]=p.Rx.ToString("X"),
+                ["extended"]=p.Extended,["plan"]=new Dictionary<string,object?>{
+                    ["expected_vin"]=p.Plan.ExpectedVin,["frames"]=p.Plan.Frames,
+                    ["selected_pids"]=p.Plan.SelectedPids,["budget_ms"]=p.Plan.BudgetMs
+                }},
+            ["expected_vin_independently_supplied"]=true,["prefix_integrity_verified"]=true,
+            ["capture_integrity_verified"]=false,["execution_completed"]=false,
+            ["terminal_present"]=false,["physical_vehicle_verified"]=false,
+            ["hardware_provenance_verified"]=false,["evidence_authenticated"]=false,
+            ["permits_programming"]=false,["complete_records"]=sequence,
+            ["complete_observations"]=observations.Count,["last_complete_offset"]=position,
+            ["discarded_tail_bytes"]=raw.Length-position,["interruption"]=interruption,
+            ["replay_terminated_by_missing_observation"]=synthesized,
+            ["observed_initial_vin_in_prefix"]=replay.InitialVin,
+            ["observed_final_vin_in_prefix"]=replay.FinalVin,
+            ["independently_replayed_steps"]=replay.Steps.Take(observations.Count).ToArray(),
+            ["visited_frame_numbers_in_prefix"]=replay.Frames.Select(f=>f.Frame).ToArray(),
+            ["frame_states_are_provisional"]=true,["timing_independently_verified"]=false,
+            ["recorded_observation_duration_ms"]=observations.Sum(item=>item.Read.DurationMs),
+            ["authenticated"]=false,["diagnostic_verdict"]=null
+        };
     }
 
     internal static Report Decode(Stream input,Profile? expected=null)
