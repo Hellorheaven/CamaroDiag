@@ -304,6 +304,31 @@ class J1979CatalogueProjectionTest {
             assertEquals(false,partial["physical_vehicle_verified"])
             assertEquals(false,partial["permits_programming"])
             assertEquals("MISSING_TERMINAL",partial["interruption"])
+            val pinnedReport=partial.toMutableMap()
+            pinnedReport["capture_sha256"]=J1979DocumentedCatalogue.sha(withoutTerminal)
+            val encodedPrefix=J1979CatalogueJson.encode(pinnedReport)
+            val verified=J1979FreezePrefixVerification.verify(withoutTerminal,encodedPrefix,freezeVin)
+            assertEquals(J1979FreezePrefixVerification.SCHEMA,verified.document["schema"])
+            assertEquals(true,verified.document["consistent"])
+            assertEquals(false,verified.document["capture_integrity_verified"])
+            assertEquals(false,verified.document["execution_completed"])
+            assertEquals(false,verified.document["permits_programming"])
+            assertEquals(J1979DocumentedCatalogue.sha(withoutTerminal),verified.captureSha)
+            assertEquals(J1979DocumentedCatalogue.sha(encodedPrefix),verified.reportSha)
+            val promoted=pinnedReport.toMutableMap()
+            promoted["execution_completed"]=true
+            assertTrue(runCatching { J1979FreezePrefixVerification.verify(withoutTerminal,
+                J1979CatalogueJson.encode(promoted),freezeVin) }.isFailure)
+            val unbound=pinnedReport.toMutableMap()
+            unbound["capture_sha256"]="0".repeat(64)
+            assertTrue(runCatching { J1979FreezePrefixVerification.verify(withoutTerminal,
+                J1979CatalogueJson.encode(unbound),freezeVin) }.isFailure)
+            val otherRaw=withoutTerminal.copyOfRange(0,withoutTerminal.size-1)
+            assertTrue(runCatching { J1979FreezePrefixVerification.verify(otherRaw,
+                encodedPrefix,freezeVin) }.isFailure)
+            assertTrue(runCatching { J1979FreezePrefixVerification.verify(withoutTerminal,
+                encodedPrefix,"1G1FA1E30D7654321") }.isFailure)
+
             assertEquals(0,partial["discarded_tail_bytes"])
             assertEquals(withoutTerminal.size,partial["last_complete_offset"])
             assertEquals(freezeVin,partial["observed_final_vin_in_prefix"])
