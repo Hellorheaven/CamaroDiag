@@ -102,7 +102,7 @@ internal object J1979CatalogueProjection {
             flagFalse(it, "whole_vehicle_coverage_verified") }) { "Unsupported physical verification claim" }
         val channel: Map<String, Any> = if (legacy) {
             require(flagFalse(root, "physically_addressed")) { "Legacy cannot claim physical addressing" }
-            val protocol = int(get(root, "expected_protocol") ?: get(root, "profile"), 1, 5)
+            val protocol = jsonInt(get(root, "expected_protocol") ?: get(root, "profile"), 1, 5)
             val source = id(root, "selected_response_source", 254)
             require(source != 0 && source != 0xF1) { "Invalid legacy response source" }
             mapOf("kind" to "legacy", "protocol" to protocol, "source" to source)
