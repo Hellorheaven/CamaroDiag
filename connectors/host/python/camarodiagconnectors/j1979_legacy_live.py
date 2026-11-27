@@ -50,7 +50,7 @@ class LegacyLiveLink:
     def _read(self, command, deadline, logical):
         if not (command in ("0100","0900","0901","0902") or
             re.fullmatch(r"01[0-9A-F]{2}",command) and
-            (int(command[2:],16)%32==0 or int(command[2:],16) in CONFIG_PIDS or legacy_numeric_pid(int(command[2:],16)))):
+            (int(command[2:],16)%32==0 or int(command[2:],16) in CONFIG_PIDS or int(command[2:],16)==0x1D or legacy_numeric_pid(int(command[2:],16)))):
             raise ValueError("Unsupported request in legacy live recording")
         row={"logical_query":logical,"request_hex":command,"raw_response":None,
              "frames":[],"selected_records_hex":[],"status":"NOT_TESTED","detail":None}
@@ -170,7 +170,7 @@ class LegacyLiveLink:
         deadline=self.clock()+timeout
         if request==b"\x09\x02":
             return self._vin(deadline,logical)
-        if len(request)!=2 or request[0]!=1 or not (request[1]%32==0 or request[1] in CONFIG_PIDS or legacy_numeric_pid(request[1])):
+        if len(request)!=2 or request[0]!=1 or not (request[1]%32==0 or request[1] in CONFIG_PIDS or request[1]==0x1D or legacy_numeric_pid(request[1])):
             raise ValueError("Only Mode 01 numeric values, configuration and support pages allowed")
         return self._single(request.hex().upper(),deadline,logical)
 
