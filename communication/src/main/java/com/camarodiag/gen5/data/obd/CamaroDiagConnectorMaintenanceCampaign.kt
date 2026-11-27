@@ -149,6 +149,7 @@ object CamaroDiagConnectorMaintenanceCampaign {
                         value["source"]="READ_ONLY_USB_CU5"
                         if(value["archive_transfer_verified"]!=true||!current()){
                             value["archive_transfer_verified"]=false
+                            value["archive_close_receipt_verified"]=false
                             value["inspection"]=null
                             value["recovery_required"]=true
                         }
