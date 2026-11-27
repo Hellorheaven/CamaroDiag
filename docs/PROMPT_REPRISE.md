@@ -1,3 +1,10 @@
+## Reprise — 27 novembre 2026 — SAE J1979 / échelles par calculateur
+
+- PR #117, branche chore/unified-ci : moteur contextuel Mode 01 PID 4F/50 sur Android, Windows et Linux ; dépendances MAP, MAF, lambda commandée et sondes large bande ; projection Mode 02 frame 0.
+- Inventaire corrélé, distinction absence démontrée / configuration reçue / non vérifiée, aucune réutilisation entre ECU. Acquisition continue conditionnée à la configuration nécessaire, exports réseau/legacy/USB et vérification indépendante Python. Affichage contextuel Android réseau ; les anciennes projections restent disponibles pour compatibilité et ne sont pas la référence contextuelle.
+- Réconciliation des sources Kotlin dupliquées sous com/camaradiag et com/camarodiag (chemin canonique : camaro + diag), conservation des versions enrichies. Régressions ajoutées Python/Kotlin/C#/C++, non exécutées.
+- Restent la qualification des échelles (notamment courant large bande personnalisé selon édition normative), les parcours d'affichage historiques/natifs, les cas de protocole encore ouverts et la validation globale de clôture. Firmware natif toujours lecture seule ; pas de déclaration de conformité physique. C6 demeure ouvert. Aucun APK, merge, compilation ou CI déclenché par ce lot.
+
 ## Reprise — SAE J1979 diesel et états catégoriels (27 novembre 2026)
 
 - Extension du catalogue multicanal : 18 PID supplémentaires (67 au total, 230 champs potentiels), notamment AECD 32 bits, NOx, réactif SCR, FAP, oxygène, compteurs d'incitation. Masques de présence, plages alternatives EGR/pression et longueurs exactes.
