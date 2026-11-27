@@ -1,12 +1,15 @@
+// Native C++20 regression fixture; executed only by the final gate.
 #include "j1979_monitor_scaling.h"
 #include <assert.h>
 #include <stdio.h>
-#include <string.h>
+#include <cstring>
+#include <array>
+#include <span>
 /* Synthetic engineering projection: no conclusion about monitor completion. */
 int main(void) {
     const uint8_t request[2]={6,0x21};
     const uint8_t payload[10]={0x46,0x21,0x01,0x07,0x03,0xe8,0,0,0x07,0xd0};
-    j1979_monitor_record record={0};
+    j1979_monitor_record record{};
     assert(j1979_monitor_count(request,payload,sizeof(payload))==1);
     assert(j1979_monitor_decode(request,payload,sizeof(payload),0,&record));
     assert(record.monitor_id==0x21 && record.test_id==1 &&
@@ -47,6 +50,6 @@ int main(void) {
     assert(!j1979_monitor_decode(request,payload,sizeof(payload),1,&record));
     uint8_t wrong_service[2]={1,0x21};
     assert(!j1979_monitor_decode(wrong_service,payload,sizeof(payload),0,&record));
-    puts("Native SAE J1979 CAN Mode06 scaling/unknown record checks written");
+    puts("C++20 native SAE J1979 CAN Mode06 scaling/unknown record checks written");
     return 0;
 }

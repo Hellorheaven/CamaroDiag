@@ -1,7 +1,10 @@
+// Native C++20 regression fixture; executed only by the final gate.
 #include "j1979_vehicle_info.h"
 #include <assert.h>
 #include <stdio.h>
-#include <string.h>
+#include <cstring>
+#include <array>
+#include <span>
 
 int main(void) {
     /* Explicit 16-counter spark IPT vector, correlated to physical CAN.
@@ -11,7 +14,7 @@ int main(void) {
     spark[4]=10;spark[6]=20;
     spark[8]=3;spark[10]=6; /* first ratio = 1/2 */
     spark[12]=2;spark[14]=0; /* missing denominator */
-    j1979_vehicle_info info={0};
+    j1979_vehicle_info info{};
     assert(j1979_vehicle_info_decode(8,spark,sizeof(spark),&info));
     assert(info.counter_vector && info.counter_count==16);
     assert(info.general_denominator==10 && info.ignition_cycles==20);

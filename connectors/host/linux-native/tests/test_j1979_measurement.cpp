@@ -1,11 +1,14 @@
+// Native C++20 regression fixture; executed only by the final gate.
 #include "j1979_measurement.h"
 #include <assert.h>
 #include <stdio.h>
-#include <string.h>
+#include <cstring>
+#include <array>
+#include <span>
 static void measurement(const uint8_t *req,size_t qlen,
                         const uint8_t *res,size_t n,
                         const char *name,double expected) {
-    j1979_measurement m={0};
+    j1979_measurement m{};
     assert(j1979_measurement_decode(req,qlen,res,n,&m));
     assert(m.interpreted && !m.context_required);
     assert(!strcmp(m.name,name) && m.number==expected);
@@ -26,7 +29,7 @@ int main(void) {
     const uint8_t odo_req[2]={1,0xa6},odo[6]={0x41,0xa6,0,1,0x86,0xa0};
     measurement(odo_req,2,odo,6,"odometer",10000);
 
-    j1979_measurement m={0};
+    j1979_measurement m{};
     const uint8_t map_req[2]={1,0x0b},map[3]={0x41,0x0b,100};
     assert(j1979_measurement_decode(map_req,2,map,3,&m));
     assert(m.context_required && !m.interpreted);
