@@ -1,4 +1,5 @@
 #include "j1979_spi_port.h"
+#include "../../shared/j1979_maintenance_spi.h"
 
 namespace cd {
 bool StmJ1979SpiPort::admitted(){
@@ -21,6 +22,11 @@ void StmJ1979SpiPort::ready(bool value){
   if(!armed_||!admitted()){fault();return;}
   ready_(value);
 }
+bool StmJ1979SpiPort::finishResponse(){
+  if(armed_||!admitted()||HAL_SPI_GetState(&spi_)!=HAL_SPI_STATE_READY||
+     spi_.RxXferCount||spi_.TxXferCount){fault();return false;}
+  ready_(false);return admitted();
+}
 void StmJ1979SpiPort::fault(){
   if(failed_)return;
   failed_=true;armed_=false;
@@ -36,5 +42,12 @@ bool StmJ1979SpiPort::completed(readlink::SpiSlave& slave,uint32_t bits,bool cle
   }
   armed_=false;
   return slave.completed(readlink::Size,true);
+}
+bool StmJ1979SpiPort::completed(maintenance_link::SpiSlave& slave,uint32_t bits,bool clean){
+  if(!armed_||!admitted()||!clean||bits!=maintenance_link::Size*8u||
+     HAL_SPI_GetState(&spi_)!=HAL_SPI_STATE_READY||spi_.RxXferCount||spi_.TxXferCount){
+    slave.abort();fault();return false;
+  }
+  armed_=false;return slave.completed(maintenance_link::Size,true);
 }
 }
