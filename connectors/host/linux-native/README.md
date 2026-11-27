@@ -210,7 +210,7 @@ capacité CU/3 réelle avant une utilisation sur véhicule.
 
 ## Moniteurs Mode 06 — mise à l'échelle native
 
-`j1979_monitor_scaling.c` reprend les 79 définitions UASID explicites du
+`j1979_monitor_scaling.cpp` reprend les 79 définitions UASID explicites du
 module Python `j1979_monitor_scaling.py`. Les rapports du scan `--j1979-can`
 conservent les octets d'origine et présentent, pour une réponse CAN Mode 06
 cohérente, chaque MONID/TID/UASID et ses valeurs encodées. Les définitions
@@ -222,7 +222,7 @@ une preuve qu'un moniteur a effectivement fonctionné.
 
 ## Informations véhicule Mode 09 — reprise native
 
-Le décodeur C `j1979_vehicle_info.c` reprend les règles du module Python
+Le décodeur C++ `j1979_vehicle_info.cpp` reprend les règles du module Python
 `j1979_vehicle_info.py` pour les InfoTypes 08 et 0B (compteurs IPT
 essence/diesel) et 0D/0F (texte d'identification). Les rapports du scan
 contiennent le nombre de cycles, les compteurs et les ratios uniquement
@@ -233,7 +233,7 @@ attestation de conformité ni d'identité matérielle.
 
 ## Mesures physiques et trames figées Mode 01/02 natives
 
-`j1979_measurement.c` transpose les 55 définitions numériques explicites
+`j1979_measurement.cpp` transpose les 55 définitions numériques explicites
 du décodeur Python historique, et l'odomètre 0xA6. Les rapports du scan
 et de la surveillance live utilisent les mêmes valeurs strictement corrélées,
 sans interpréter les PID inconnus. Pour les paramètres sensibles à la

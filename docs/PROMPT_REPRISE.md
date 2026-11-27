@@ -1,3 +1,12 @@
+## Directive prioritaire actualisée — utiliser C++20, pas C (27/11/2026)
+
+L'utilisateur a expressément corrigé les échanges précédents : pour Linux ARM/x64 et ESP32-S3, **développer en C++**, pas en C. Sur Android conserver Kotlin, sur Windows C#. Ne plus écrire de nouveau Python ni de nouveau C pour les protocoles. Le C++ moderne n'est pas intrinsèquement sûr : exiger RAII, propriété claire, containers bornés, spans et validation stricte des octets/tailles.
+
+La PR #117, branche `chore/unified-ci`, porte désormais les nouveaux modules de décodage J1979, le moteur CAN, le moteur Mode01 live, la CLI et SocketCAN en C++20. Le précédent noyau partagé `j1979_native_c.c` a été remplacé par le C++ `j1979_policy.cpp`. Le firmware ESP32 conserve ses composants C++ sans doublon C ajouté.
+
+**Transition non terminée** : CF/1, CL/1, USB et point d'entrée Linux ont encore du C historique ; Python n'est pas entièrement supprimé ; SAE J1979 n'a pas passé la validation finale ; **aucune APK v2.0.47 n'a été produite ou signée**. Respecter l'interdiction des builds/tests intermédiaires ; ne déclencher le gate final qu'à la clôture du protocole. Reprendre la migration C++ des derniers hôtes et les fonctionnalités Python manquantes, puis traiter les autres protocoles et le reliquat PR.
+
+---
 ## Correction du périmètre natif — directive propriétaire (27/11/2026)
 
 L'objectif est **zéro Python dans le produit final**, avec le langage natif pertinent par plateforme : Kotlin Android, C# Windows, C/C++ Linux, C++ ESP32. Le développement C++ existant doit être préservé et prolongé, non réécrit arbitrairement en C. Prioriser le remplacement effectif des fonctionnalités Python par leurs équivalents natifs, puis supprimer leurs appels, dépendances, scripts et modules seulement après parité fonctionnelle prouvée. Continuer uniquement le protocole SAE J1979 tant qu'il n'est pas clôturé ; les autres domaines Python seront migrés dans leur chantier dédié. Aucune APK Release tant que la PR n'a pas passé la validation finale prescrite.
