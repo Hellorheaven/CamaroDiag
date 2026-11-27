@@ -42,7 +42,7 @@ internal object ObdLegacyRecords {
     fun infoRecords(type: Int, raw: String): List<List<Int>>? {
         val rows = parse("09%02X".format(Locale.ROOT, type), raw) ?: return null
         return rows.takeIf { it.all { row ->
-            row.size == (if (type % 2 == 1) 3 else 7) &&
+            row.size == (if (type in ObdJ1979ExtendedVehicleInfo.legacyCountTypes) 3 else 7) &&
                 row[0] == 0x49 && row[1] == type && row[2] > 0
         } }
     }
