@@ -11,7 +11,7 @@ internal sealed partial class BridgeDesktopForm
     private sealed record WindowsClearReport(string Schema, string Protocol, string Version,
         string ExpectedVin, string Adapter, int ProtocolNumber, string RequestCanId,
         string ResponseCanId, DateTimeOffset StartedAtUtc, DateTimeOffset FinishedAtUtc,
-        ObdJ1979ClearRecipe.Result Result);
+        ObdJ1979ClearRecipe.Result Result, ObdJ1979ClearRecipe.Result? Baseline=null);
 
     private readonly Button functionalRunClear = Button(J1979RecipeText("ClearRun"));
     private WindowsClearReport? completedClear;
@@ -86,6 +86,7 @@ internal sealed partial class BridgeDesktopForm
         try
         {
             var started = DateTimeOffset.UtcNow;
+            ObdJ1979ClearRecipe.Result? baselineEvidence=null;
             var result = await Task.Run(() =>
             {
                 RequireActive();
@@ -111,6 +112,7 @@ internal sealed partial class BridgeDesktopForm
                         using var file=new FileStream(path,FileMode.CreateNew,FileAccess.Write,FileShare.None);
                         file.Write(payload);file.Flush(true);
                         RequireActive();
+                        baselineEvidence=baseline;
                     });
             });
             // Preserve evidence if the user cancels after possible TX.
@@ -124,7 +126,7 @@ internal sealed partial class BridgeDesktopForm
                 "SAE-J1979", typeof(BridgeDesktopForm).Assembly.GetName().Version?.ToString() ?? "",
                 expectedVin, selected.Adapter.DisplayName, options.ProtocolNumber,
                 options.RequestCanId.ToString("X"), options.ResponseCanId.ToString("X"),
-                started, DateTimeOffset.UtcNow, result);
+                started, DateTimeOffset.UtcNow, result,baselineEvidence);
             var output = new StringBuilder(J1979RecipeText("ClearOutcome_" + result.Outcome));
             output.AppendLine().AppendLine(J1979RecipeText("ClearNotCompletion"));
             if (result.Reason is not null) output.AppendLine(result.Reason);
