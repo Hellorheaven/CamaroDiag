@@ -436,6 +436,114 @@ def decode(stream, expected=None):
             "result": result, "error": error}
 
 
+def inspect_prefix(raw, *, expected_vin):
+    """Inspect complete records of an interrupted CL/1 stream.
+
+    A partial last record is never replayed. A complete but malformed record,
+    forged sequence, bad CRC, invalid state transition or trailing bytes after
+    a terminal record invalidate the entire inspection. This is intentionally
+    a different schema from a capture, cannot be projected as verified live
+    data, and makes no statement about why recording stopped or ECU provenance.
+    """
+    require(valid_vin(expected_vin), "Independently supplied VIN required")
+    require(type(raw) is bytes and 0 < len(raw) <= MAX_CAPTURE, "Invalid CL/1 input size")
+    position = 0
+    sequence = 0
+    profile = replay = None
+    tail_kind = None
+    while position < len(raw):
+        require(sequence < MAX_STEPS + 2, "CL/1 record count exceeded")
+        remaining = len(raw) - position
+        header = raw[position:position + HEADER.size]
+        # Check every available fixed header field even in a truncated header.
+        expected = b"CL\x01"
+        require(header[:min(3, len(header))] == expected[:min(3, len(header))],
+                "Invalid partial CL/1 header")
+        if len(header) >= 4:
+            kind = header[3]
+            require(kind == 1 if sequence == 0 else kind in (2, 3),
+                    "Invalid CL/1 record kind")
+        if len(header) >= 5:
+            require(header[4] == sequence & 255, "Invalid partial CL/1 sequence")
+        if len(header) >= 6:
+            require(header[5] == sequence >> 8, "Invalid partial CL/1 sequence")
+        if remaining < HEADER.size:
+            tail_kind = "TRUNCATED_HEADER"
+            break
+        magic, version, kind, actual, length = HEADER.unpack(header)
+        require(magic == b"CL" and version == 1 and actual == sequence and 1 <= length <= MAX_BODY,
+                "Invalid CL/1 framing")
+        require((kind != 1 or length == CHANNEL.size + SCOPE.size) and
+                (kind != 2 or length >= OBSERVATION.size) and
+                (kind != 3 or length == FINAL.size), "Invalid CL/1 body length")
+        size = HEADER.size + length + 4
+        if remaining < size:
+            tail_kind = "TRUNCATED_RECORD"
+            break
+        body = raw[position + HEADER.size:position + HEADER.size + length]
+        crc, = struct.unpack_from("<I", raw, position + HEADER.size + length)
+        require(zlib.crc32(header + body) == crc, "CL/1 CRC mismatch")
+        if kind == 1:
+            profile = NativeLiveProfile.from_capture_plan(body)
+            require(profile.vin == expected_vin, "CL/1 plan differs from independent VIN")
+            replay = Replay(profile)
+        elif kind == 2:
+            replay.observe(Event.decode(body))
+        else:
+            # Even an incomplete or negative campaign with a valid terminal
+            # belongs to the normal complete-stream inspection, not this path.
+            replay.finish(body)
+            require(position + size == len(raw), "Trailing CL/1 bytes")
+            raise ValueError("CL/1 contains a terminal record; use inspect")
+        position += size
+        sequence += 1
+    require(profile is not None and replay is not None, "No complete CL/1 plan")
+    require(sequence <= MAX_STEPS + 1, "CL/1 record count exceeded")
+    tail = len(raw) - position
+    if tail_kind is None:
+        tail_kind = "MISSING_TERMINAL"
+    return {
+        "schema": "camarodiag-j1979-native-live-prefix-v1",
+        "protocol": "SAE-J1979",
+        "source": "OFFLINE_CL1_PREFIX",
+        "profile": profile.report(),
+        "prefix_integrity_verified": True,
+        "capture_integrity_verified": False,
+        "execution_completed": False,
+        "terminal_present": False,
+        "expected_vin_independently_supplied": True,
+        "initial_identity_verified_in_prefix": replay.initial,
+        "final_identity_observed_in_prefix": replay.final,
+        "complete_records": sequence,
+        "complete_observations": replay.steps,
+        "last_complete_offset": position,
+        "discarded_tail_bytes": tail,
+        "interruption": tail_kind,
+        "last_elapsed_ms": replay.duration,
+        "raw_bytes": replay.raw_bytes,
+        "completed_cycles_in_prefix": replay.completed_cycles,
+        "raw_samples_in_prefix": replay.raw,
+        "negative_samples_in_prefix": replay.negative,
+        "timeout_samples_in_prefix": replay.timeout,
+        "observations": replay.rows,
+        "samples": replay.sample_rows,
+        "physical_vehicle_verified": False,
+        "hardware_provenance_verified": False,
+        "evidence_authenticated": False,
+        "permits_programming": False,
+    }
+
+
+def inspect_prefix_file(path, *, expected_vin):
+    source = Path(path)
+    raw, stamp = _regular(source, MAX_CAPTURE)
+    report = inspect_prefix(raw, expected_vin=expected_vin)
+    again, final = _regular(source, MAX_CAPTURE)
+    require(raw == again and stamp == final, "CL/1 changed during prefix inspection")
+    report["capture_sha256"] = stamp.digest
+    return report
+
+
 def inspect_file(path, expected=None):
     source = Path(path)
     raw, stamp = _regular(source, MAX_CAPTURE)
