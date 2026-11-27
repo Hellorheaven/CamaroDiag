@@ -57,6 +57,63 @@ internal static class ObdJ1979CatalogueSelfTests
             completed=true,physicalVehicleVerified=false,wholeVehicleCoverageVerified=false,result=report
         },Camel);
     }
+    // Semantically corrupt a synthetic record but update both CRC and final
+    // verdict. A frame decoder must reject unsafe values independently of CRC.
+    private static byte[] AlterFreeze(byte[] original,bool trigger)
+    {
+        byte[] bytes=(byte[])original.Clone();
+        bool changed=false,terminal=false;
+        void Crc(int offset,int bodyLength)
+        {
+            uint crc=0xffffffffu;
+            for(int index=offset;index<offset+8+bodyLength;++index)
+            {
+                crc^=bytes[index];
+                for(int bit=0;bit<8;++bit)
+                    crc=(crc>>1)^((crc&1)!=0?0xedb88320u:0u);
+            }
+            crc=~crc;
+            for(int index=0;index<4;++index)
+                bytes[offset+8+bodyLength+index]=(byte)(crc>>(8*index));
+        }
+        for(int offset=0;offset<bytes.Length;)
+        {
+            if(offset+12>bytes.Length||bytes[offset]!='C'||bytes[offset+1]!='F'||bytes[offset+2]!=1)
+                throw new InvalidDataException("Invalid synthetic CF/1 record");
+            int kind=bytes[offset+3],seq=bytes[offset+4]|bytes[offset+5]<<8;
+            int size=bytes[offset+6]|bytes[offset+7]<<8,body=offset+8;
+            if(size<=0||body+size+4>bytes.Length)throw new InvalidDataException("Truncated fixture");
+            if(kind==2&&seq==(trigger?6:12))
+            {
+                int requestSize=bytes[body+2],response=body+10+requestSize;
+                if(trigger)
+                {
+                    if(requestSize!=3||bytes[response]!=0x42||bytes[response+1]!=2||
+                        bytes[response+2]!=0)throw new InvalidDataException("Wrong trigger fixture");
+                    bytes[response+4]=2;
+                }
+                else
+                {
+                    if(requestSize!=2||bytes[response]!=0x49||bytes[response+1]!=2)
+                        throw new InvalidDataException("Wrong VIN fixture");
+                    bytes[response+3]=(byte)'2';
+                }
+                Crc(offset,size);changed=true;
+            }
+            else if(kind==3)
+            {
+                if(!changed||size!=20)throw new InvalidDataException("Invalid fixture terminal");
+                if(trigger){bytes[body+2]=3;bytes[body+12]=4;}
+                else{bytes[body]=7;bytes[body+2]=0;}
+                Crc(offset,size);terminal=true;
+            }
+            offset=body+size+4;
+            if(offset==bytes.Length&&(!changed||!terminal))
+                throw new InvalidDataException("Incomplete CF/1 synthetic mutation");
+        }
+        return bytes;
+    }
+
     internal static int Run()
     {
         int count=0;
@@ -161,6 +218,34 @@ internal static class ObdJ1979CatalogueSelfTests
                 "complete inventory permits determining unadvertised definitions");
             Check(freezeDoc.RootElement.GetProperty("source_capture_sha256").GetString()==
                 ObdJ1979DocumentedCatalogue.Sha(freeze),"CF/1 original digest");
+        }
+        var changedTrigger=ObdJ1979CatalogueProjection.Build(freezeCat,pin,AlterFreeze(freeze,true),freezeVin);
+        using(var changedDoc=JsonDocument.Parse(JsonSerializer.SerializeToUtf8Bytes(changedTrigger)))
+        {
+            var root=changedDoc.RootElement;
+            var rows=root.GetProperty("rows");
+            Check(root.GetProperty("final_identity_verified").GetBoolean()&&
+                root.GetProperty("source_completed").GetBoolean(),"changed trigger retains independent VIN");
+            Check(root.GetProperty("frames")[0].GetProperty("source_status").GetString()=="CHANGED",
+                "CF/1 trigger change is diagnosed with valid framing CRC");
+            Check(rows.EnumerateArray().Where(row=>row.GetProperty("frame").GetInt32()==0).All(row=>
+                row.GetProperty("projection_status").GetString()=="TRIGGER_NOT_STABLE"&&
+                row.GetProperty("signals").GetArrayLength()==0),"changed trigger blocks frame-zero values");
+            Check(rows.EnumerateArray().Where(row=>row.GetProperty("frame").GetInt32()==1).Any(row=>
+                row.GetProperty("projection_status").GetString()=="PROJECTED"),
+                "independent stable frame may still be projected");
+        }
+        var changedVin=ObdJ1979CatalogueProjection.Build(freezeCat,pin,AlterFreeze(freeze,false),freezeVin);
+        using(var changedDoc=JsonDocument.Parse(JsonSerializer.SerializeToUtf8Bytes(changedVin)))
+        {
+            var root=changedDoc.RootElement;
+            Check(!root.GetProperty("source_completed").GetBoolean()&&
+                !root.GetProperty("final_identity_verified").GetBoolean(),
+                "mismatched final VIN prevents completed capture claim");
+            Check(root.GetProperty("rows").EnumerateArray().All(row=>
+                row.GetProperty("projection_status").GetString()=="IDENTITY_NOT_RECHECKED"&&
+                row.GetProperty("signals").GetArrayLength()==0),
+                "mismatched VIN suppresses every frame's documented values");
         }
         Reject(()=>ObdJ1979CatalogueProjection.Build(freezeCat,pin,freeze[..^1],freezeVin),"truncated CF/1");
         Reject(()=>ObdJ1979CatalogueProjection.Build(freezeCat,pin,freeze,Vin),"wrong independent CF/1 VIN");
