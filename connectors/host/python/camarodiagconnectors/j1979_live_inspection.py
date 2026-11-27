@@ -313,7 +313,7 @@ def inspect(root, *, expected_vin=None):
             if multi_width(pid) is not None and status in ("RAW","PASSED"):
                 signals=multi_decode(req,res)
                 _require(signals is not None and value is None,"Invalid multi-signal response")
-                claimed=_array(declared_multi,8,"multi-signal values")
+                claimed=_array(declared_multi,10,"multi-signal values")
                 _require(len(claimed)==len(signals),"Missing or extra signal values")
                 for raw,signal in zip(claimed,signals):
                     raw=_dict(raw,"multi-signal value")
@@ -410,7 +410,7 @@ def inspect(root, *, expected_vin=None):
             "last_verified_value":seq[-1][0],"last_verified_elapsed_ms":seq[-1][1]})
     declared_signals=_get(result,"multi_signal_summary")
     if declared_signals is not None or any(multi_width(pid) is not None for pid in pids):
-        declared_signals=_array(declared_signals,256,"multi-signal summary")
+        declared_signals=_array(declared_signals,320,"multi-signal summary")
         _require(len(declared_signals)==len(signal_summaries),"Missing or excess channel summaries")
         for raw,wanted in zip(declared_signals,signal_summaries):
             raw=_dict(raw,"channel summary")
