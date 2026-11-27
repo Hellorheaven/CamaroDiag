@@ -124,7 +124,7 @@ object CamaroDiagConnectorMaintenanceCampaign {
                             "proof_transmission_attempted" to null,"journal_bytes_received" to null,
                             "declared_recovery_in_envelope" to null,"host_elapsed_ms" to null).also { document=it }
                         val possible=value["proof_transmission_attempted"]!=false&&enteredUsb
-                        value["journal_transfer_verified"]=false
+                        value[if(target.archive) "archive_transfer_verified" else "journal_transfer_verified"]=false
                         value["terminal_present"]=false
                         value["inspection"]=null
                         value["recovery_required"]=possible
@@ -135,12 +135,12 @@ object CamaroDiagConnectorMaintenanceCampaign {
                     if(!current()){
                         val possible=value["proof_transmission_attempted"]!=false&&enteredUsb
                         value["cancelled"]=true
-                        value["journal_transfer_verified"]=false
+                        value[if(target.archive) "archive_transfer_verified" else "journal_transfer_verified"]=false
                         value["terminal_present"]=false
                         value["inspection"]=null
                         value["recovery_required"]=possible
                         value["command_outcome_unknown"]=possible
-                        value["error"]="CU/4 context revoked"
+                        value["error"]=if(target.archive) "CU/5 context revoked" else "CU/4 context revoked"
                     }
                     if(target.archive){
                         // Archive acquisition never sends a maintenance command. Keep
