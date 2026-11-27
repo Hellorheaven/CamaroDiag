@@ -54,7 +54,7 @@ class Socket final:public Campaign::Owner,public Campaign::Link{
         auto finish=[&](State state,size_t size=0){
             const auto end=now();
             result.elapsedMs=end>=start?static_cast<uint32_t>(std::min<std::uint64_t>(end-start,UINT32_MAX)):UINT32_MAX;
-            if(!active()||!end||end>=deadline){result.state=State::Fault;result.responseSize=0;}
+            if(!active()||!end||(end>=deadline&&state!=State::Timeout)){result.state=State::Fault;result.responseSize=0;}
             else{result.state=state;result.responseSize=size;}
             if(result.state==State::Fault)retired_=true;
         };
@@ -157,6 +157,7 @@ Result run_socket(const Scope& scope,const char* interface,const char* directory
     Socket socket(scope,interface,journal,approved,cancel);
     Scratch exchange_scratch{};
     Campaign::run(socket,journal,socket,scope,result.evidence,exchange_scratch);
+    result.local_socket_closed=result.evidence.physicalStopVerified;
     result.recovery_latched=storage.latched()||socket.latched()||result.evidence.recoveryRequired;
     if(!result.evidence.terminalPersisted)result.error="TERMINAL_NOT_PERSISTED";
     return result;

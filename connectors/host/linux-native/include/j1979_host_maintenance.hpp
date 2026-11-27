@@ -12,7 +12,7 @@ using Journal=J1979MaintenanceJournal;
 using Current=std::function<bool()>;
 struct Result{
     Campaign::Evidence evidence;
-    bool journal_created{},recovery_latched{};
+    bool journal_created{},recovery_latched{},local_socket_closed{};
     std::string error;
 };
 Result run_socket(const Scope&,const char* interface,const char* directory,const char* journal_name,
