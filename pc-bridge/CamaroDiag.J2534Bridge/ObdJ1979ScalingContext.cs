@@ -116,8 +116,13 @@ internal static class ObdJ1979ScalingContext
                     string prefix=$"wideband-o2-sensor-{pid-(voltage?0x24:0x34)+1}-";
                     fields.Add(Field(prefix+"equivalence-ratio","ratio",a,0,1d/32768,x=>x/65535d));
                     int b=(data[2]<<8)|data[3];
-                    fields.Add(voltage?Field(prefix+"voltage","V",b,1,1d/8192,x=>x/65535d):
-                        Field(prefix+"current","mA",b,2,1d/256,x=>x/32768d,32768));
+                    if(voltage)fields.Add(Field(prefix+"voltage","V",b,1,1d/8192,x=>x/65535d));
+                    else {
+                        var current=Field(prefix+"current","mA",b,2,1d/256,x=>x/32768d,32768);
+                        if(maxima[2]!=0&&config.State!="UNVERIFIED")
+                            current=current with {Number=(b>=32768?b-65536:b)*maxima[2]/32768d};
+                        fields.Add(current);
+                    }
                     break;
             }
             return new(Convert.ToHexString(request),dep,fields.AsReadOnly());
