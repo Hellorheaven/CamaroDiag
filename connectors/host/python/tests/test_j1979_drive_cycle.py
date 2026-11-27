@@ -1,11 +1,14 @@
 import copy
+import json
+import tempfile
 import unittest
+from pathlib import Path
 
 from camarodiagconnectors.j1979_drive_cycle import (
     TRIMS, decode_trim, cycle_data, project, legacy_project, trim_layout,
 )
 from camarodiagconnectors.j1979_live import Plan, record, csv_rows
-from camarodiagconnectors.j1979_live_inspection import inspect
+from camarodiagconnectors.j1979_live_inspection import inspect, compare_files
 
 VIN = "1G1FF3D36C9104199"
 
@@ -119,6 +122,23 @@ class OperatingContextTests(unittest.TestCase):
             mutate(altered)
             with self.assertRaises(ValueError):
                 inspect(altered)
+
+    def test_compare_preserves_missing_channels(self):
+        a, _ = self.recording(True)
+        b, _ = self.recording(False)
+        with tempfile.TemporaryDirectory() as directory:
+            first, second = Path(directory)/"a.json", Path(directory)/"b.json"
+            first.write_text(json.dumps(a), encoding="utf-8")
+            second.write_text(json.dumps(b), encoding="utf-8")
+            compared = compare_files([first, second])
+        channels = compared["channel_comparison"]
+        self.assertEqual(len(channels), 2)
+        self.assertEqual(channels[0]["mean_range"], 0)
+        self.assertTrue(channels[0]["all_recordings_have_channel"])
+        self.assertFalse(channels[1]["all_recordings_have_channel"])
+        self.assertIsNone(channels[1]["recordings"][1])
+        self.assertIsNone(channels[1]["mean_range"])
+        self.assertFalse(compared["time_aligned"])
 
     def test_unadvertised_layout_never_queried(self):
         report, queries = self.recording(False)
