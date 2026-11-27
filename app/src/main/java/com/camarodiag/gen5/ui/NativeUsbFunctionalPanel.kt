@@ -19,6 +19,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.camarodiag.gen5.R
 import com.camarodiag.gen5.data.obd.CamaroDiagConnectorNativeCampaign
+import com.camarodiag.gen5.data.obd.CamaroDiagConnectorFreezeCampaign
 import com.camarodiag.gen5.data.obd.UsbPermissionResultBus
 import com.camarodiag.gen5.domain.model.VehicleProfile
 
@@ -27,7 +28,8 @@ import com.camarodiag.gen5.domain.model.VehicleProfile
 internal fun NativeUsbFunctionalPanel(
     enabled: Boolean, generation: Long, vehicle: VehicleProfile,
     onRun: (UsbDevice, CamaroDiagConnectorNativeCampaign.Target, Uri, Long, VehicleProfile) -> Unit,
-    asScan:Boolean=false
+    asScan:Boolean=false,
+    onRunFreeze: ((UsbDevice, CamaroDiagConnectorFreezeCampaign.Target, Uri, Long, VehicleProfile) -> Unit)? = null
 ) {
     val context = LocalContext.current
     val manager = context.getSystemService(UsbManager::class.java)
@@ -39,7 +41,11 @@ internal fun NativeUsbFunctionalPanel(
     var extended by remember(generation, vehicle) { mutableStateOf(false) }
     var confirmed by remember(generation, vehicle) { mutableStateOf(false) }
     var credential by remember(generation, vehicle) { mutableStateOf<Uri?>(null) }
-    var granted by remember { mutableStateOf(false) }
+    var granted by remember(generation, vehicle) { mutableStateOf(false) }
+    var freeze by remember(generation,vehicle) { mutableStateOf(false) }
+    var frames by remember(generation,vehicle) { mutableStateOf("00") }
+    var pids by remember(generation,vehicle) { mutableStateOf("") }
+    var budget by remember(generation,vehicle) { mutableStateOf("180") }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         credential = uri; confirmed = false
     }
@@ -65,7 +71,14 @@ internal fun NativeUsbFunctionalPanel(
     val response = address(rx)
     val target = if (device != null && control != null && data != null && request != null && response != null)
         CamaroDiagConnectorNativeCampaign.Target(control.id, data.id, request, response,
-            extended, 60000, vehicle.vin, "ECM", device.deviceName, maxOf(1L,generation)) else null
+            extended, if(freeze) (budget.toIntOrNull() ?: 0)*1000 else 60000, vehicle.vin, "ECM", device.deviceName, maxOf(1L,generation)) else null
+    val freezeTarget = if (freeze && target != null) {
+        val selectedFrames=parseFreezeIds(frames,8,false)
+        val selectedPids=parseFreezeIds(pids,64,true)
+        if(selectedFrames != null && selectedPids != null)
+            CamaroDiagConnectorFreezeCampaign.Target(target,selectedFrames,selectedPids) else null
+    } else null
+    val scopeValid = if(freeze) freezeTarget?.valid == true else target?.valid == true
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(stringResource(if(asScan) R.string.functional_native_usb_scan_title else R.string.functional_native_usb_title))
         Box {
@@ -102,21 +115,40 @@ internal fun NativeUsbFunctionalPanel(
             Checkbox(extended, { extended = it; confirmed = false }, enabled = enabled)
             Text(stringResource(R.string.functional_native_usb_extended))
         }
+        if(onRunFreeze != null && !asScan) {
+            Row(verticalAlignment=Alignment.CenterVertically) {
+                Checkbox(freeze,{ freeze=it; confirmed=false },enabled=enabled)
+                Text(stringResource(R.string.j1979_freeze_native_title))
+            }
+            if(freeze) {
+                OutlinedTextField(frames,{frames=it.take(23).uppercase(java.util.Locale.ROOT);confirmed=false},
+                    singleLine=true,label={Text(stringResource(R.string.j1979_freeze_frames))},
+                    enabled=enabled,modifier=Modifier.fillMaxWidth())
+                OutlinedTextField(pids,{pids=it.take(191).uppercase(java.util.Locale.ROOT);confirmed=false},
+                    singleLine=true,label={Text(stringResource(R.string.j1979_freeze_pids))},
+                    enabled=enabled,modifier=Modifier.fillMaxWidth())
+                OutlinedTextField(budget,{budget=it.take(3);confirmed=false},singleLine=true,
+                    label={Text(stringResource(R.string.j1979_live_budget))},
+                    enabled=enabled,modifier=Modifier.fillMaxWidth())
+            }
+        }
         OutlinedButton(onClick = { picker.launch(arrayOf("*/*")) }, enabled = enabled) {
             Text(stringResource(if (credential == null) R.string.functional_native_usb_key else R.string.functional_native_usb_key_selected))
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Checkbox(confirmed, { confirmed = it }, enabled = enabled)
-            Text(stringResource(R.string.functional_native_usb_confirm))
+            Text(if(freeze) stringResource(R.string.j1979_freeze_confirm,vehicle.vin)
+                else stringResource(R.string.functional_native_usb_confirm))
         }
         Button(onClick = {
             val uri = credential
-            if (device != null && target?.valid == true && uri != null && confirmed &&
+            if (device != null && target != null && scopeValid && uri != null && confirmed &&
                 manager?.hasPermission(device) == true) {
                 confirmed = false; credential = null
-                onRun(device, target, uri, generation, vehicle)
+                if(freeze) freezeTarget?.let { onRunFreeze?.invoke(device,it,uri,generation,vehicle) }
+                else onRun(device, target, uri, generation, vehicle)
             }
-        }, enabled = enabled && granted && confirmed && credential != null && target?.valid == true,
-            modifier = Modifier.fillMaxWidth()) { Text(stringResource(if(asScan) R.string.functional_native_usb_scan_run else R.string.functional_native_usb_run)) }
+        }, enabled = enabled && granted && confirmed && credential != null && scopeValid,
+            modifier = Modifier.fillMaxWidth()) { Text(stringResource(if(freeze) R.string.j1979_freeze_run else if(asScan) R.string.functional_native_usb_scan_run else R.string.functional_native_usb_run)) }
     }
 }
