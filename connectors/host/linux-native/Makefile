@@ -14,12 +14,13 @@ all: $(TARGET)
 $(TARGET): $(SOURCES) include/cf1.h include/cl1.h include/j1979_can.h include/j1979_isotp.h include/j1979_can_cli.h include/j1979_live.h
 	$(CC) $(CPPFLAGS) $(INCLUDES) $(CFLAGS) $(STRICT) $(SOURCES) $(LDFLAGS) $(LDLIBS) -o $@
 
-test: test-cf1 test-cu2 test-j1979-can test-j1979-isotp test-j1979-live
+test: test-cf1 test-cu2 test-j1979-can test-j1979-isotp test-j1979-live test-j1979-cl1
 	./test-cf1
 	./test-cu2
 	./test-j1979-can
 	./test-j1979-isotp
 	./test-j1979-live
+	./test-j1979-cl1
 
 test-cf1: tests/test_cf1.c src/cf1.c src/cf1_complete.c include/cf1.h
 	$(CC) $(CPPFLAGS) $(INCLUDES) $(CFLAGS) $(STRICT) tests/test_cf1.c src/cf1.c src/cf1_complete.c $(LDFLAGS) -o $@
@@ -37,8 +38,11 @@ test-j1979-isotp: tests/test_j1979_isotp.c src/j1979_isotp.c src/j1979_can.c inc
 test-j1979-live: tests/test_j1979_live.c src/j1979_live.c src/j1979_can.c include/j1979_live.h
 	$(CC) $(CPPFLAGS) $(INCLUDES) $(CFLAGS) $(STRICT) tests/test_j1979_live.c src/j1979_live.c src/j1979_can.c $(LDFLAGS) -o $@
 
+test-j1979-cl1: tests/test_j1979_cl1.c src/cl1.c src/cf1.c include/cl1.h include/cf1.h
+	$(CC) $(CPPFLAGS) $(INCLUDES) $(CFLAGS) $(STRICT) tests/test_j1979_cl1.c src/cl1.c src/cf1.c $(LDFLAGS) -o $@
+
 clean:
-	rm -f $(TARGET) test-cf1 test-cu2 test-j1979-can test-j1979-isotp test-j1979-live
+	rm -f $(TARGET) test-cf1 test-cu2 test-j1979-can test-j1979-isotp test-j1979-live test-j1979-cl1
 
 PREFIX ?= /usr/local
 DESTDIR ?=

@@ -247,10 +247,14 @@ static int terminal(replay *r, const uint8_t *data, size_t size,
     cl1_result *e = r->result;
     if (size != CL1_TERMINAL_SIZE || data[0] > 11 ||
         data[0] == 1 || data[0] == 9 || data[0] == 10 ||
-        (data[1] & 0xf0u) || u32(data + 20) > 604000 ||
-        u32(data + 20) < e->duration_ms)
+        (data[1] & 0xf0u) || u32(data + 24) > 604000 ||
+        u32(data + 24) < e->duration_ms)
         return deny(err, capacity, "CL/1 invalid terminal summary");
-    uint32_t end = u32(data + 20);
+    /* Offset 20 is the timeout-sample counter; 24 is elapsed time.
+     * Comparing the former to the last observation erroneously rejects
+     * valid complete recordings whenever no sample timed out.
+     */
+    uint32_t end = u32(data + 24);
     if (r->stage != ST_STOP) {
         uint8_t stop = data[0];
         if (stop != 2 && stop != 3 && stop != 11)
