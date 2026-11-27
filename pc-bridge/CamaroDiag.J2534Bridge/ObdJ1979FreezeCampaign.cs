@@ -250,7 +250,7 @@ internal static class ObdJ1979FreezeCampaign
     }
 
     internal static Result Run(Plan requested, Func<byte[],int,byte[]> exchange, Action requireCurrent,
-        Func<long>? monotonicMs = null)
+        Func<long>? monotonicMs = null,Func<byte[],int>? requestTimeout=null)
     {
         var plan = requested.Validate();
         var watch = Stopwatch.StartNew();
@@ -270,7 +270,9 @@ internal static class ObdJ1979FreezeCampaign
                 // The J2534 implementation clamps each request to at least 100ms.
                 if (left < 100) return Observation("BUDGET");
                 attempted = true;
-                var response = exchange(request,(int)Math.Min(2500,left));
+                int maximum=requestTimeout?.Invoke(request)??2500;
+                if(maximum is <100 or >20000)throw new ArgumentException("Invalid logical read deadline");
+                var response = exchange(request,(int)Math.Min(maximum,left));
                 if (response is null || response.Length > MaximumResponse) return Observation("TRANSPORT_ERROR");
                 requireCurrent();
                 return Elapsed() >= plan.BudgetMs ? Observation("LATE_RESPONSE",response) : Observation("RECEIVED",response);
