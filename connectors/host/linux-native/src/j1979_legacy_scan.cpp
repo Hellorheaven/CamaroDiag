@@ -16,33 +16,40 @@ bool prefix(const Data& row,Bytes required){
     return row.size()>=required.size()&&std::equal(required.begin(),required.end(),row.begin());
 }
 class Campaign {
-    Elm& elm_;
-    Clock clock_;
-    Current current_;
+    using Observe=std::function<ScanExchange(std::string_view)>;
+    Observe observe_;
     unsigned budget_;
-    std::uint64_t start_;
+    unsigned last_{};
     std::size_t raw_size_{};
     Scan result_;
-    unsigned remaining(){
-        if(!current_())throw Cancelled();
-        const auto now=clock_();
-        if(now<start_||now-start_>=budget_){
-            result_.budget_expired=true;
-            throw TransportError("BUDGET_EXHAUSTED");
+    ScanExchange exchange(std::string_view command){
+        if(result_.trace.size()>=scan_max_exchanges)throw TransportError("OBSERVATION_LIMIT");
+        auto row=observe_(command);
+        const auto kind=static_cast<unsigned>(row.outcome);
+        if(row.command!=command||kind<1||kind>4||row.started_ms<last_||
+            row.ended_ms<row.started_ms||row.ended_ms>3600000||row.raw.size()>32768||
+            row.raw.size()>max_raw-raw_size_||
+            (row.outcome==ScanOutcome::received&&(!row.attempted||row.ended_ms>=budget_||
+             row.ended_ms-row.started_ms>(command=="ATDPN"?2000u:4000u)))||
+            (row.outcome==ScanOutcome::transport&&!row.attempted)||
+            (row.outcome!=ScanOutcome::received&&!row.raw.empty()))
+            throw std::logic_error("Invalid scan transcript");
+        last_=row.ended_ms;raw_size_+=row.raw.size();result_.trace.push_back(row);
+        switch(row.outcome){
+        case ScanOutcome::received:return row;
+        case ScanOutcome::cancelled:throw Cancelled();
+        case ScanOutcome::budget:result_.budget_expired=true;throw TransportError("BUDGET_EXHAUSTED");
+        case ScanOutcome::transport:throw TransportError("TRANSPORT_ERROR");
         }
-        return static_cast<unsigned>(budget_-(now-start_));
+        throw std::logic_error("Invalid scan outcome");
     }
     std::vector<Data> read(Data request,Validator valid,bool single){
         if(result_.steps.size()>=max_steps)throw TransportError("OBSERVATION_LIMIT");
-        const unsigned timeout=std::min(4000u,remaining());
         ScanStep step{};step.request=std::move(request);
         step.status="NOT_TESTED";
-        const auto begin=clock_();
         try{
-            step.raw=elm_.exchange(step.request,timeout);
-            if(step.raw.size()>max_raw-raw_size_)throw TransportError("RAW_EVIDENCE_LIMIT");
-            raw_size_+=step.raw.size();
-            (void)remaining();
+            const auto row=exchange(hex(step.request));
+            step.raw=row.raw;step.duration_ms=row.ended_ms-row.started_ms;
             step.observations=frames(result_.protocol,hex(step.request),step.raw);
             std::vector<Data> selected;
             for(const auto& f:step.observations){
@@ -61,12 +68,15 @@ class Campaign {
             }
         }catch(const std::invalid_argument&){
             step.status="FAILED";step.detail="MALFORMED_LEGACY_FRAME";
-        }catch(...){
+        }catch(const TransportError&){
             step.status="FAILED";step.detail="TRANSPORT_CANCELLED_OR_LIMIT";
-            const auto now=clock_();step.duration_ms=now>=begin?now-begin:0;
+            if(!result_.trace.empty())step.duration_ms=result_.trace.back().ended_ms-result_.trace.back().started_ms;
+            result_.steps.push_back(std::move(step));throw;
+        }catch(const Cancelled&){
+            step.status="FAILED";step.detail="TRANSPORT_CANCELLED_OR_LIMIT";
+            if(!result_.trace.empty())step.duration_ms=result_.trace.back().ended_ms-result_.trace.back().started_ms;
             result_.steps.push_back(std::move(step));throw;
         }
-        const auto now=clock_();step.duration_ms=now>=begin?now-begin:0;
         auto selected=step.selected;result_.steps.push_back(std::move(step));
         return selected;
     }
@@ -146,15 +156,15 @@ class Campaign {
         },true);
     }
 public:
-    Campaign(Elm& elm,unsigned source,std::string_view vin,unsigned budget,Clock clock,Current current)
-        :elm_(elm),clock_(std::move(clock)),current_(std::move(current)),budget_(budget),start_(clock_()){
-        result_.protocol=elm.protocol();result_.source=source;result_.expected_vin=vin;
+    Campaign(Protocol protocol,unsigned source,std::string_view vin,unsigned budget,Observe observe)
+        :observe_(std::move(observe)),budget_(budget){
+        result_.protocol=protocol;result_.source=source;result_.expected_vin=vin;result_.budget_ms=budget;
     }
     Scan run(){
         try{
             const auto first=page(1,0,0);
             if(first.empty())throw TransportError("NO_SELECTED_PID00");
-            result_.initial_probe=elm_.probe(std::min(2000u,remaining()));
+            result_.initial_probe=exchange("ATDPN").raw;
             if(fixed_protocol(result_.initial_probe)!=result_.protocol)throw TransportError("PROTOCOL_MISMATCH");
             const auto info=inventory(9,0);
             if(!info.advertised.contains(1)||!info.advertised.contains(2))throw TransportError("VIN_NOT_ADVERTISED");
@@ -187,11 +197,10 @@ public:
                 read({6,static_cast<std::uint8_t>(tid)},[=](const Data& r){return r.size()==7&&r[0]==0x46&&r[1]==tid;},false);
             // Mode 08 availability only, never send a control request.
             (void)inventory(8,0);
-            result_.final_probe=elm_.probe(std::min(2000u,remaining()));
+            result_.final_probe=exchange("ATDPN").raw;
             if(fixed_protocol(result_.final_probe)!=result_.protocol)throw TransportError("FINAL_PROTOCOL_MISMATCH");
             result_.final_vin=read_vin();
             if(result_.final_vin!=result_.expected_vin)throw TransportError("FINAL_VIN_UNVERIFIED_OR_CHANGED");
-            (void)remaining();
             result_.identity_rechecked=true;
             result_.completed=mode1.complete&&std::none_of(result_.steps.begin(),result_.steps.end(),[](const ScanStep& step){return step.status=="FAILED";});
             if(!result_.completed)result_.error=mode1.complete?"OBSERVATION_FAILED":"MODE01_INVENTORY_PARTIAL";
@@ -205,6 +214,39 @@ Scan scan_selected(Elm& elm,unsigned source,std::string_view vin,unsigned budget
     if(!elm.headered()||!elm.ready()||!valid_source(source)||!valid_vin(vin)||
         !clock||!current||!budget||budget>600000)
         throw std::invalid_argument("Explicit selected source, documented VIN and bounded headered session required");
-    return Campaign(elm,source,vin,budget,std::move(clock),std::move(current)).run();
+    const auto start=clock();std::uint64_t previous=start;std::size_t retained=0;
+    auto elapsed=[&](){
+        const auto now=clock();
+        if(now<previous||now-start>3600000)throw std::logic_error("Invalid monotonic clock");
+        previous=now;return static_cast<unsigned>(now-start);
+    };
+    return Campaign(elm.protocol(),source,vin,budget,[&](std::string_view command){
+        ScanExchange row{};row.command=command;row.started_ms=row.ended_ms=elapsed();
+        if(!current()||max_raw-retained<32768){row.outcome=ScanOutcome::cancelled;return row;}
+        if(row.started_ms>=budget){row.outcome=ScanOutcome::budget;return row;}
+        const auto timeout=std::min(budget-row.started_ms,command=="ATDPN"?2000u:4000u);
+        row.attempted=true;
+        try{
+            row.raw=command=="ATDPN"?elm.probe(timeout):elm.exchange(unhex(command),timeout);
+            row.ended_ms=elapsed();
+            if(!current())row.outcome=ScanOutcome::cancelled;
+            else if(row.ended_ms>=budget)row.outcome=ScanOutcome::budget;
+            else if(row.ended_ms-row.started_ms>timeout)row.outcome=ScanOutcome::transport;
+        }catch(const Cancelled&){row.outcome=ScanOutcome::cancelled;row.ended_ms=elapsed();}
+        catch(const TransportError&){row.outcome=ScanOutcome::transport;row.ended_ms=elapsed();}
+        if(row.outcome!=ScanOutcome::received)row.raw.clear();
+        retained+=row.raw.size();return row;
+    }).run();
+}
+Scan replay_scan(Protocol protocol,unsigned source,std::string_view vin,unsigned budget,std::span<const ScanExchange> trace){
+    if(!valid_protocol(protocol)||!valid_source(source)||!valid_vin(vin)||!budget||budget>600000||
+       trace.empty()||trace.size()>scan_max_exchanges)throw std::invalid_argument("Invalid independent scan scope");
+    std::size_t offset=0;
+    auto result=Campaign(protocol,source,vin,budget,[&](std::string_view command){
+        if(offset>=trace.size()||trace[offset].command!=command)throw std::logic_error("Missing or reordered scan exchange");
+        return trace[offset++];
+    }).run();
+    if(offset!=trace.size())throw std::invalid_argument("Extra scan exchanges");
+    return result;
 }
 }

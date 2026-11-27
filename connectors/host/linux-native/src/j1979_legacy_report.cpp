@@ -80,6 +80,7 @@ std::string scan_report(const Scan& s){
      <<",\"protocol_name\":";quote(o,name(s.protocol));
     o<<",\"selected_response_source\":";quote(o,source_hex(s.source));
     o<<",\"expected_vin\":";quote(o,s.expected_vin);
+    o<<",\"budget_ms\":"<<s.budget_ms;
     o<<",\"observed_initial_vin\":";nullable(o,s.initial_vin);
     o<<",\"observed_final_vin\":";nullable(o,s.final_vin);
     o<<",\"initial_protocol_probe\":";quote(o,s.initial_probe);
