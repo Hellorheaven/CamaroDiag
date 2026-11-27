@@ -5,6 +5,8 @@ using CamaroDiagConnectors.Windows;
 if (args is ["--self-test"])
     return SelfTests.Run();
 
+if (args.Contains(J1979MaintenanceUsbCli.Command,StringComparer.OrdinalIgnoreCase))
+    return J1979MaintenanceUsbCli.Run(args);
 if (args.Contains(J1979MaintenanceJournal.Command,StringComparer.OrdinalIgnoreCase))
 
     return J1979MaintenanceJournal.Run(args);
