@@ -11,7 +11,7 @@ class J1979MaintenanceArchiveUsb {
   using Archive=J1979MaintenanceArchive;
   using Channel=J1979UsbService::Channel;
   static constexpr size_t HelloSize=67,ChallengeSize=68,ProofSize=36,TranscriptSize=96;
-  static constexpr size_t HeaderSize=12,NonceSize=32,TagSize=32;
+  static constexpr size_t HeaderSize=12,TrailerSize=12,NonceSize=32,TagSize=32;
   class Security {
    public:
     virtual ~Security()=default;
@@ -66,13 +66,26 @@ class J1979MaintenanceArchiveUsb {
     const uint32_t start=security.monotonicMs();
     auto admitted=[&](){return current()&&source.current()&&uint32_t(security.monotonicMs()-start)<15000u;};
     if(!admitted()||!channel.writeExact(out,sizeof(out),1000))return close();
+    uint32_t crc=0xffffffffu;
     uint8_t buffer[256]{};
     while(result.bytes<result.info.bytes){
       const size_t n=result.info.bytes-result.bytes<sizeof(buffer)?result.info.bytes-result.bytes:sizeof(buffer);
       if(!admitted()||!source.read(result.bytes,buffer,n)||!admitted()||!channel.writeExact(buffer,n,1000))return close();
+      for(size_t i=0;i<n;++i){crc^=buffer[i];for(unsigned bit=0;bit<8;++bit)crc=(crc>>1)^((crc&1u)?0xedb88320u:0u);}
       result.bytes+=n;
     }
-    result.complete=admitted()&&source.finish();return close();
+    // All journal bytes alone are not evidence that the read lease closed.
+    // Send a separate terminal only after the remote close was acknowledged.
+    if(!admitted()||!source.finish()||!current()||
+       uint32_t(security.monotonicMs()-start)>=15000u)return close();
+    uint8_t trailer[TrailerSize]={'C','U',5,5,0,0,0,0,0,0,0,0};
+    for(unsigned i=0;i<4;++i){
+      trailer[4+i]=uint8_t(result.bytes>>(8*i));
+      trailer[8+i]=uint8_t((crc^0xffffffffu)>>(8*i));
+    }
+    result.complete=channel.writeExact(trailer,sizeof(trailer),1000)&&current()&&
+      uint32_t(security.monotonicMs()-start)<15000u;
+    return close();
   }
  private:
   static bool header(const uint8_t* p,uint8_t op){return p[0]=='C'&&p[1]=='U'&&p[2]==5&&p[3]==op;}
