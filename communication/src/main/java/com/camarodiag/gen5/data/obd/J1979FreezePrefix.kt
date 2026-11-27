@@ -81,6 +81,23 @@ object J1979FreezePrefix {
         require(position == observed.size && result.steps.size >= observed.size) {
             "Unexpected CF/1 prefix observations after recipe stop"
         }
+        // A completed local frame recipe does not imply a complete CF/1
+        // capture or physical verification when no terminal exists.
+        val progress = result.frames.map { frame ->
+            linkedMapOf<String,Any?>(
+                "frame" to frame.frame,
+                "provisional_status" to frame.status,
+                "status_finalized" to false,
+                "inventory_complete_in_prefix" to frame.inventoryComplete,
+                "trigger_dtc_in_prefix" to frame.triggerDtc,
+                "trigger_recheck_dtc_in_prefix" to frame.finalTriggerDtc,
+                "trigger_stable_in_prefix" to frame.triggerStable,
+                "advertised_measurement_pids" to frame.advertisedPids
+                    .filter { it != 2 && it % 32 != 0 }.sorted(),
+                "read_measurement_pids" to frame.readPids.sorted(),
+                "measurement_observation_count" to frame.measurementSteps.size
+            )
+        }
         currentCoroutineContext().ensureActive()
         val profileData = mapOf(
             "request_can_id" to profile.tx.toString(16).uppercase(Locale.ROOT),
@@ -110,6 +127,7 @@ object J1979FreezePrefix {
             "observed_final_vin_in_prefix" to result.finalVin,
             "independently_replayed_steps" to result.steps.take(observed.size).map(::step),
             "visited_frame_numbers_in_prefix" to result.frames.map { it.frame },
+            "observed_frame_progress" to progress,
             "frame_states_are_provisional" to true,
             "timing_independently_verified" to false,
             "recorded_observation_duration_ms" to observed.sumOf { it.durationMs },
