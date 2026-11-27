@@ -14,11 +14,15 @@ all: $(TARGET)
 $(TARGET): $(SOURCES) include/cf1.h
 	$(CC) $(CPPFLAGS) $(INCLUDES) $(CFLAGS) $(STRICT) $(SOURCES) $(LDFLAGS) $(LDLIBS) -o $@
 
-test: test-cf1
+test: test-cf1 test-cu2
 	./test-cf1
+	./test-cu2
 
 test-cf1: tests/test_cf1.c src/cf1.c src/cf1_complete.c include/cf1.h
 	$(CC) $(CPPFLAGS) $(INCLUDES) $(CFLAGS) $(STRICT) tests/test_cf1.c src/cf1.c src/cf1_complete.c $(LDFLAGS) -o $@
 
+test-cu2: tests/test_cu2.c src/cf1.c src/cf1_crypto.c include/cf1.h include/cf1_transport.h
+	$(CC) $(CPPFLAGS) $(INCLUDES) $(CFLAGS) $(STRICT) tests/test_cu2.c src/cf1.c src/cf1_crypto.c $(LDFLAGS) $(LDLIBS) -o $@
+
 clean:
-	rm -f $(TARGET) test-cf1
+	rm -f $(TARGET) test-cf1 test-cu2

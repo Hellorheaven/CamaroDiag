@@ -190,7 +190,32 @@ static bool measurement_response(const cf1_observation *o, uint8_t pid,
     if (!o || o->outcome != 1 || o->response_length < 4 ||
         o->response[0] != 0x42 || o->response[1] != pid ||
         o->response[2] != frame) return false;
-    /* Nonzero data, correct echo only. Unknown values MUST remain RAW. */
+    /* Match the established SAE J1979 classical width checks for frame 00.
+     * Further frames can have manufacturer-specific encodings: keep RAW.
+     * Undocumented frame-00 PIDs remain RAW too; never apply live Mode 01
+     * scaling context to a frozen historical measurement.
+     */
+    if (frame != 0) return true;
+    size_t data_length = o->response_length - 3;
+    static const uint8_t one[] = {
+        0x04,0x05,0x06,0x07,0x08,0x09,0x0a,0x0b,0x0d,0x0e,0x0f,
+        0x11,0x13,0x1d,0x2c,0x2d,0x2e,0x2f,0x30,0x33,0x45,0x46,
+        0x47,0x48,0x49,0x4a,0x4b,0x4c,0x52,0x5a,0x5b,0x5c,
+        0x61,0x62
+    };
+    static const uint8_t two[] = {
+        0x0c,0x10,0x1f,0x21,0x22,0x23,0x31,0x32,0x3c,0x3d,
+        0x3e,0x3f,0x42,0x43,0x44,0x4d,0x4e,0x53,0x54,0x59,
+        0x5d,0x5e,0x63
+    };
+    if (pid == 0x55 || pid == 0x56 || pid == 0x57 || pid == 0x58 ||
+        pid == 0x06 || pid == 0x07 || pid == 0x08 || pid == 0x09)
+        return data_length == 1 || data_length == 2;
+    if (pid == 0x01 || pid == 0xa6) return data_length == 4;
+    for (size_t i = 0; i < sizeof(one); ++i)
+        if (one[i] == pid) return data_length == 1;
+    for (size_t i = 0; i < sizeof(two); ++i)
+        if (two[i] == pid) return data_length == 2;
     return true;
 }
 static const cf1_observation *request_frame(replay *r, uint8_t pid, uint8_t frame) {
