@@ -53,9 +53,9 @@ Discovery discover(Elm& elm,unsigned budget,Clock clock,Current current){
     };
     try{
         const Data request{1,0};
-        const auto first_timeout=remaining();
+        const auto first_timeout=std::min(4000u,remaining());
         d.queried=true;d.response=elm.exchange(request,first_timeout);
-        const auto probe_timeout=remaining();
+        const auto probe_timeout=std::min(2000u,remaining());
         d.probed=true;d.probe=elm.probe(probe_timeout);
         (void)remaining();
         return replay_discovery(d.protocol,d.response,d.probe);
