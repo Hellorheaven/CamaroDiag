@@ -41,7 +41,7 @@ class NativeUsbFunctionalEvidenceTest {
     }
     @Test fun attemptedNegativeIsNotUntestedAndCancellationCannotPublishValues() {
         val input=report(true)
-        input.getJSONArray("steps").put(JSONObject().put("request_hex","07").put("status","NEGATIVE"))
+        input.getJSONArray("steps").put(JSONObject().put("request_hex","07").put("status","NEGATIVE").put("response_hex","7F0711"))
         val checks=NativeUsbFunctionalEvidence.results(state,input).checks.associateBy { it.key }
         assertEquals(FunctionalTestOutcome.FAILED,checks["native:dtc7"]?.outcome)
         assertEquals(FunctionalTestOutcome.NOT_TESTED,checks["native:dtca"]?.outcome)
@@ -130,6 +130,28 @@ class NativeUsbFunctionalEvidenceTest {
         assertEquals(FunctionalTestOutcome.FAILED,result.checks.single { it.key=="native:integrity" }.outcome)
         assertNull(result.context?.observedVin)
         assertNull(NativeUsbFunctionalEvidence.diagnosticValues(input))
+    }
+    @Test fun invalidObservationCannotPassIntegrityOrPublishVin() {
+        val cases=listOf(
+            Triple("0105","4105","PASSED"),
+            Triple("07","7F0311","NEGATIVE"),
+            Triple("07","7F0778","NEGATIVE"),
+            Triple("0105","41055A","TIMEOUT"),
+            Triple("04","","FAILED"),
+            Triple("0801","4801","RAW"),
+            Triple("0105","","UNKNOWN"))
+        for((request,response,status) in cases) {
+            val input=report(true)
+            input.getJSONArray("steps").put(JSONObject().put("request_hex",request)
+                .put("response_hex",response).put("status",status))
+            assertNull(request,NativeUsbFunctionalEvidence.diagnosticValues(input))
+            val result=NativeUsbFunctionalEvidence.results(state,input)
+            assertEquals(FunctionalTestOutcome.FAILED,result.checks.single { it.key=="native:integrity" }.outcome)
+            assertNull(result.context?.observedVin)
+        }
+        val mismatch=report(true)
+        mismatch.getJSONObject("summary").put("steps",99)
+        assertNull(NativeUsbFunctionalEvidence.diagnosticValues(mismatch))
     }
     @Test fun missingInventoryPagesDoNotPassRecipeFromSummaryAlone() {
         val input=report(true)

@@ -85,6 +85,14 @@ class NativeUsbObdScanProjectionTest {
         input.getJSONObject("summary").put("steps",rows.length())
         assertNull(NativeUsbObdScanProjection.project(input,vin,0x7E0,0x7E8,false))
     }
+    @Test fun malformedUnrelatedObservationInvalidatesOrdinaryScan() {
+        val input=fixture()
+        val rows=input.getJSONArray("steps")
+        rows.put(JSONObject().put("request_hex","010C").put("response_hex","410CFF")
+            .put("status","PASSED"))
+        input.getJSONObject("summary").put("steps",rows.length())
+        assertNull(NativeUsbObdScanProjection.project(input,vin,0x7E0,0x7E8,false))
+    }
     @Test fun incompatibleOrCancelledCaptureCannotBecomeScan() {
         val input=fixture()
         assertNull(NativeUsbObdScanProjection.project(input,vin,0x7E1,0x7E9,false))

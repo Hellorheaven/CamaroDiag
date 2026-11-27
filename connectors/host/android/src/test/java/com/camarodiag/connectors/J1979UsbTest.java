@@ -117,6 +117,17 @@ public final class J1979UsbTest {
         assert odo.measurement().number==123456.7&&odo.measurement().unit.equals("km");
         assert new J1979CampaignSemantics.Step(19,1,1,hex("01A6"),hex("41A6FFFFFFFF")).measurement().number==429496729.5;
         assert new J1979CampaignSemantics.Step(20,2,1,hex("01A6"),hex("41A60012D687")).measurement()==null;
+        assert J1979CampaignSemantics.decodeObservation("03","4300","PASSED")!=null;
+        assert J1979CampaignSemantics.decodeObservation("07","7F0711","NEGATIVE")!=null;
+        assert J1979CampaignSemantics.decodeObservation("07","7F0778","NEGATIVE")==null;
+        assert J1979CampaignSemantics.decodeObservation("07","7F0311","NEGATIVE")==null;
+        assert J1979CampaignSemantics.decodeObservation("07",null,"NEGATIVE")==null;
+        assert J1979CampaignSemantics.decodeObservation("0105",null,"TIMEOUT")!=null;
+        assert J1979CampaignSemantics.decodeObservation("0105","41055A","TIMEOUT")==null;
+        assert J1979CampaignSemantics.decodeObservation("0105","4105","PASSED")==null;
+        assert J1979CampaignSemantics.decodeObservation("04",null,"FAILED")==null;
+        assert J1979CampaignSemantics.decodeObservation("0801","4801","RAW")==null;
+        assert J1979CampaignSemantics.decodeObservation("01A6","41A60012D687","RAW").measurement()==null;
         Sim partial=new Sim(concat(challenge,Arrays.copyOf(capture,capture.length-1)));
         raw=new ByteArrayOutputStream();
         result=new J1979UsbCapture(partial).runRequest(hello,10000,key,raw);

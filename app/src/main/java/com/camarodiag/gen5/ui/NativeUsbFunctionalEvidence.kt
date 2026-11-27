@@ -155,8 +155,18 @@ internal object NativeUsbFunctionalEvidence {
         if (report.optBoolean("cancelled") || !report.optBoolean("device_credential_authenticated") ||
             !report.optBoolean("capture_integrity_verified")) return null
         val steps = report.optJSONArray("steps") ?: return null
-        val requests=(0 until steps.length()).map { steps.optJSONObject(it)?.optString("request_hex") ?: return null }
-        if(requests.any { it.isBlank() } || requests.distinct().size!=requests.size) return null
+        val requests=mutableSetOf<String>()
+        for(i in 0 until steps.length()) {
+            val step=steps.optJSONObject(i) ?: return null
+            val request=step.opt("request_hex") as? String ?: return null
+            val status=step.opt("status") as? String ?: return null
+            val response=if(step.isNull("response_hex")) null
+                else step.opt("response_hex") as? String ?: return null
+            if(!requests.add(request) ||
+                J1979CampaignSemantics.decodeObservation(request,response,status)==null) return null
+        }
+        val summary=report.optJSONObject("summary")
+        if(summary?.has("steps")==true && summary.optInt("steps",-1)!=steps.length()) return null
         val vin = observedVin(report)
         val dtcs = linkedMapOf<Int, List<String>?>(3 to null, 7 to null, 10 to null)
         val measured = linkedMapOf<Pair<Int, Int>, Measurement>()

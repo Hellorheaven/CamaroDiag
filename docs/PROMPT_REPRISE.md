@@ -1,3 +1,7 @@
+## J1979 — revalidation des observations JSON Android (27/11/2026)
+
+- Le décodeur Java CU/1 vérifie désormais chaque ligne exportée (requête lecture seule, état, forme positive/RAW/NRC, absence de réponse en timeout/échec). Android refuse la cohérence et toute publication de VIN/scan si une ligne est invalide ou si le nombre d'étapes déclaré diverge, même lorsqu'elle est sans rapport avec les valeurs affichées. Compatibilité RAW A6 préservée. Régressions Java et Kotlin écrites, non exécutées. C6/J1979 restent ouverts ; aucun test intermédiaire, fusion ou Release.
+
 ## J1979 — cohérence de la recette (27/11/2026)
 
 - Les doublons dans les requêtes invalident aussi le contrôle d'intégrité Android et empêchent la publication du VIN. Correction des variables locales homonymes des recettes Java et .NET (détectées à la lecture, compilation non lancée). Tests écrits non exécutés.

@@ -247,6 +247,17 @@ public final class J1979CampaignSemantics {
         try{return new Step(0,1,0,request,response);}
         catch(IOException malformed){return null;}
     }
+    /** Recheck every exported observation against the same rules as CJ/1.
+     * A missing response is legal only for TIMEOUT/FAILED. No transport or
+     * physical authentication is inferred from a successfully decoded row. */
+    public static Step decodeObservation(String requestHex,String responseHex,String status){
+        int state=Arrays.asList(STATES).indexOf(status);
+        byte[] request=parseHex(requestHex,3);
+        byte[] response=responseHex==null||responseHex.isEmpty()?new byte[0]:parseHex(responseHex,4095);
+        if(state<1||request==null||response==null)return null;
+        try{return new Step(0,state,0,request,response);}
+        catch(IOException malformed){return null;}
+    }
     private static byte[] parseHex(String value,int maxBytes){
         if(value==null||value.length()<2||value.length()>maxBytes*2||value.length()%2!=0)return null;
         byte[] result=new byte[value.length()/2];String digits="0123456789ABCDEF";
