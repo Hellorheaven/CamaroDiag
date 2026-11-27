@@ -2,6 +2,7 @@
 #include "interprocessor_link.h"
 #include "j1979_can_campaign.h"
 #include "j1979_freeze_sequence.h"
+#include "j1979_live_sequence.h"
 
 namespace cd { namespace readlink {
 // CI/2 application mailbox. Separate from CI/1 discovery; no implicit upgrade.
@@ -57,12 +58,14 @@ inline State stateFromWire(uint8_t s){
   }
 }
 inline bool validResult(const uint8_t* req,size_t n,const Exchange::Result& r,
-    const J1979FreezeScope* freeze=nullptr){
+    const J1979FreezeScope* freeze=nullptr,const J1979LiveScope* live=nullptr){
+  if(freeze&&live)return false;
   const auto s=wireState(r.state);
   if(!s||r.responseSize>4095||(s<=3)!=(r.responseSize>0))return false;
   if(s>3)return true;
   using R=J1979ReadEvidence::Result;
   const auto evidence=freeze?J1979ReadEvidence::classifyFreeze(*freeze,req,n,r.response,r.responseSize):
+    live?J1979ReadEvidence::classifyLive(*live,req,n,r.response,r.responseSize):
     J1979ReadEvidence::classify(J1979ReadEvidence::Variant::ClassicCan,req,n,r.response,r.responseSize);
   return (s==1&&evidence==R::Positive)||(s==2&&evidence==R::Raw)||
     (s==3&&evidence==R::Negative);
@@ -71,15 +74,18 @@ class Endpoint {
  public:
   using Admission=bool(*)();
   Endpoint(J1979CanReadLink& bus,Exchange::Result& scratch,uint32_t tx,uint32_t rx,
-      bool ext,Admission admitted,const J1979FreezeScope* freeze=nullptr):bus_(bus),scratch_(scratch),tx_(tx),rx_(rx),
-      ext_(ext),admitted_(admitted),scoped_(freeze!=nullptr),scope_(freeze?*freeze:J1979FreezeScope{}),sequence_(scope_){}
+      bool ext,Admission admitted,const J1979FreezeScope* freeze=nullptr,const J1979LiveScope* live=nullptr):
+      bus_(bus),scratch_(scratch),tx_(tx),rx_(rx),ext_(ext),admitted_(admitted),
+      scoped_(freeze!=nullptr),scope_(freeze?*freeze:J1979FreezeScope{}),sequence_(scope_),
+      liveScoped_(live!=nullptr),liveScope_(live?*live:J1979LiveScope{}),liveSequence_(liveScope_){}
   Endpoint(const Endpoint&)=delete;
   Endpoint& operator=(const Endpoint&)=delete;
   bool closed()const{return closed_;}
   bool transact(const uint8_t* in,size_t n,uint8_t* out,size_t m){
     Packet p,r;
     if(closed_||!admitted_||!admitted_()||!bus_.active()||
-       !J1979CanReadSession::physicalPair(tx_,rx_,ext_)||(scoped_&&!scope_.valid())||!out||m!=Size||
+       !J1979CanReadSession::physicalPair(tx_,rx_,ext_)||(scoped_&&!scope_.valid())||
+       (liveScoped_&&!liveScope_.valid())||(scoped_&&liveScoped_)||!out||m!=Size||
        !decode(in,n,p)||p.seq!=next_)return fail();
     r.seq=p.seq;
     if(p.op==Op::Read){
@@ -88,11 +94,18 @@ class Endpoint {
       const size_t reqSize=p.length-11;
       if(timeout<1||timeout>4000||get32(p.body+2)!=tx_||
          get32(p.body+6)!=rx_||p.body[10]!=(ext_?1:0)||
-         !(scoped_?sequence_.allows(p.body+11,reqSize):
+         !(scoped_?sequence_.allows(p.body+11,reqSize):liveScoped_?liveScope_.allows(p.body+11,reqSize):
            J1979ReadEvidence::readRequest(J1979ReadEvidence::Variant::ClassicCan,p.body+11,reqSize)))
         return fail();
-      Exchange::run(bus_,tx_,rx_,ext_,p.body+11,reqSize,timeout,scratch_,scoped_?&scope_:nullptr);
-      if(!validResult(p.body+11,reqSize,scratch_,scoped_?&scope_:nullptr))return fail();
+      if(liveScoped_){
+        const auto now=bus_.monotonicMs();
+        if(!liveBegun_){liveBegun_=liveSequence_.begin(now);if(!liveBegun_)return fail();}
+        if(!liveSequence_.admit(p.body+11,reqSize,now,timeout))return fail();
+      }
+      Exchange::run(bus_,tx_,rx_,ext_,p.body+11,reqSize,timeout,scratch_,scoped_?&scope_:nullptr,
+        liveScoped_?&liveScope_:nullptr);
+      if(!validResult(p.body+11,reqSize,scratch_,scoped_?&scope_:nullptr,liveScoped_?&liveScope_:nullptr))return fail();
+      if(liveScoped_&&!liveSequence_.observe(p.body+11,reqSize,scratch_,bus_.monotonicMs()))return fail();
       if(scoped_&&!sequence_.observe(p.body+11,reqSize,scratch_))return fail();
       scratchSize_=scratch_.responseSize;offset_=0;
       r.op=Op::Result;r.length=7;r.body[0]=wireState(scratch_.state);
@@ -116,6 +129,8 @@ class Endpoint {
   uint32_t tx_,rx_;bool ext_;Admission admitted_;
   bool scoped_;const J1979FreezeScope scope_;
   J1979FreezeSequence sequence_;
+  bool liveScoped_;const J1979LiveScope liveScope_;J1979LiveSequence liveSequence_;
+  bool liveBegun_=false;
   size_t scratchSize_=0,offset_=0;
   uint16_t next_=0;bool closed_=false;
 };
@@ -131,19 +146,23 @@ class Transport {
 };
 class Client final:public J1979CanCampaign::ApplicationLink {
  public:
-  Client(Transport& transport,uint32_t tx,uint32_t rx,bool ext,const J1979FreezeScope* freeze=nullptr)
-    :transport_(transport),tx_(tx),rx_(rx),ext_(ext),scoped_(freeze!=nullptr),scope_(freeze?*freeze:J1979FreezeScope{}){}
+  Client(Transport& transport,uint32_t tx,uint32_t rx,bool ext,const J1979FreezeScope* freeze=nullptr,
+      const J1979LiveScope* live=nullptr)
+    :transport_(transport),tx_(tx),rx_(rx),ext_(ext),scoped_(freeze!=nullptr),scope_(freeze?*freeze:J1979FreezeScope{}),
+      sequence_(scope_),liveScoped_(live!=nullptr),liveScope_(live?*live:J1979LiveScope{}),liveSequence_(liveScope_){}
   Client(const Client&)=delete;
   Client& operator=(const Client&)=delete;
   bool closed()const{return closed_;}
   bool active()override{
     return !closed_&&J1979CanReadSession::physicalPair(tx_,rx_,ext_)&&
-      (!scoped_||scope_.valid())&&transport_.active();
+      (!scoped_||scope_.valid())&&(!liveScoped_||liveScope_.valid())&&
+      !(scoped_&&liveScoped_)&&transport_.active();
   }
   bool matches(uint32_t tx,uint32_t rx,bool ext)const override{
     return tx==tx_&&rx==rx_&&ext==ext_;
   }
-  bool matchesFreeze(const J1979FreezeScope& scope)const override{return scoped_&&scope_.same(scope);}
+  bool matchesFreeze(const J1979FreezeScope& scope)const override{return scoped_&&!liveScoped_&&scope_.same(scope);}
+  bool matchesLive(const J1979LiveScope& scope)const override{return liveScoped_&&!scoped_&&liveScope_.same(scope);}
   uint32_t monotonicMs()override{return transport_.monotonicMs();}
   void exchange(const uint8_t* req,size_t n,uint32_t timeout,Exchange::Result& out)override{
     if(timeout>4000u||!read(req,n,uint16_t(timeout),out)){
@@ -153,12 +172,16 @@ class Client final:public J1979CanCampaign::ApplicationLink {
   bool read(const uint8_t* req,size_t n,uint16_t timeout,Exchange::Result& out){
     out.state=State::Fault;out.responseSize=0;out.elapsedMs=0;
     if(!active()||!req||n>7||timeout<2||timeout>4000||
-       !(scoped_?sequence_.allows(req,n):
+       !(scoped_?sequence_.allows(req,n):liveScoped_?liveScope_.allows(req,n):
          J1979ReadEvidence::readRequest(J1979ReadEvidence::Variant::ClassicCan,req,n)))return fail();
     Packet p,r;p.op=Op::Read;p.length=uint8_t(n+11);
     // Reserve part of the absolute exchange budget for mailbox overhead.
     // Every chunk shares the same deadline; no per-fragment extension.
     const uint32_t started=monotonicMs();
+    if(liveScoped_){
+      if(!liveBegun_){liveBegun_=liveSequence_.begin(started);if(!liveBegun_)return fail();}
+      if(!liveSequence_.admit(req,n,started,timeout))return fail();
+    }
     const uint16_t reserve=timeout>400?100:uint16_t(timeout/2);
     const uint16_t vehicleTimeout=uint16_t(timeout-reserve);
     put16(p.body,vehicleTimeout);put32(p.body+2,tx_);put32(p.body+6,rx_);
@@ -179,10 +202,13 @@ class Client final:public J1979CanCampaign::ApplicationLink {
       std::memcpy(out.response+offset,chunk.body+2,count);offset+=count;
     }
     out.state=stateFromWire(state);out.elapsedMs=elapsed;out.responseSize=total;
-    if(!validResult(req,n,out,scoped_?&scope_:nullptr)){
+    if(!validResult(req,n,out,scoped_?&scope_:nullptr,liveScoped_?&liveScope_:nullptr)){
       out.state=State::Fault;out.responseSize=0;return fail();
     }
-    if(scoped_&&!sequence_.observe(req,n,out))return fail();
+    if((scoped_&&!sequence_.observe(req,n,out))||
+       (liveScoped_&&!liveSequence_.observe(req,n,out,monotonicMs()))){
+      out.state=State::Fault;out.responseSize=0;return fail();
+    }
     if(out.state==State::Fault)closed_=true;
     return true;
   }
@@ -202,6 +228,8 @@ class Client final:public J1979CanCampaign::ApplicationLink {
   Transport& transport_;uint32_t tx_,rx_;bool ext_;
   bool scoped_;const J1979FreezeScope scope_;
   J1979FreezeSequence sequence_;
+  bool liveScoped_;const J1979LiveScope liveScope_;J1979LiveSequence liveSequence_;
+  bool liveBegun_=false;
   uint16_t next_=0;bool closed_=false;
 };
 } }
