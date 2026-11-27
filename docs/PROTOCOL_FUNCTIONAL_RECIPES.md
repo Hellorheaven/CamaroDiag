@@ -354,3 +354,24 @@ Pour le catalogue Windows, la commande existante `--j1979-project-catalogue` acc
 
 **EN:** Native live capture is a read-only, explicitly approved physical CAN recording for qualified boards. The CU/3 credential exchange binds the selected scope, and the CL/1 stream preserves ordered application responses and a replayable terminal summary. Android, Windows and Linux can export raw CSV; catalogue projection reads the original binary stream. Neither replay nor HMAC establishes vehicle provenance or full normative compliance. Firmware, host and GUI regression cases have been written but have not been executed. The normative J1979DA catalogue and the closing software validation remain open; real-vehicle tests are separate.
 
+
+
+### SAE J1979 Mode 01 — longues captures et interruptions (développement)
+
+La liaison interprocesseur du Mode 01 natif passe à **CI/3**, toujours 32 octets par paquet, séquence 24 bits et CRC. Les campagnes de scan et trames figées gardent CI/2 (séquence 16 bits, octet réservé à zéro). Les deux microcontrôleurs choisissent la version depuis le périmètre local approuvé ; aucune négociation ou repli sur CI/2 à partir de données reçues. Mettre à jour ensemble les deux firmwares si le Mode 01 natif est déployé. Le format USB CU/3 et le flux hôte CL/1 ne changent pas de version.
+
+Avant chaque demande, réserver la capacité maximale de réponse applicative (20 octets VIN, 6 octets bitmap, 4095 octets PID brut). Un manque de capacité donne un terminal partiel `EVIDENCE_LIMIT` seulement si le rejeu indépendant confirme que la prochaine réponse ne peut être conservée dans le plafond 16 Mio. Aucun paquet ne peut prolonger indéfiniment le délai en envoyant des fragments ; les réponses d'une autre version ou d'une autre séquence sont refusées.
+
+En cas de déconnexion ou arrêt avant le terminal, conserver le fichier original. L'inspection partielle est distincte des exports de capture complète :
+
+- Android : Tests fonctionnels SAE J1979 → Inspecter une capture CL/1 interrompue → sélectionner le fichier, confirmer le VIN connu indépendamment, exporter JSON.
+- Windows : bouton Inspecter CL/1 interrompu, VIN indépendant dans le formulaire, sélection du fichier et d'un nouveau chemin JSON.
+- Linux : `camarodiagconnectors-j1979-live-native inspect-prefix --capture interrupted.cl --vin DOCUMENTED_VIN --output partial.json`.
+- Vérification indépendante des exports des trois hôtes : `camarodiagconnectors-j1979-live-native verify-prefix --capture interrupted.cl --report partial.json --vin DOCUMENTED_VIN --output checked.json`.
+
+Les rapports `camarodiag-j1979-native-live-prefix-v1` distinguent nombre d'enregistrements vérifiés, position de fin du dernier enregistrement, octets finaux incomplets non vérifiés, échantillons corrélés, VIN initial/final observé. Ils gardent `capture_integrity_verified=false`, `execution_completed=false`, `terminal_present=false`. Pas de CSV normal, projection catalogue normalisée, preuve matérielle ni verdict positif à partir de ce rapport. Un enregistrement complet à CRC incorrect, séquence incohérente ou terminal suivi d'octets supplémentaires invalide l'inspection entière ; on ne saute pas les erreurs. Un flux doté d'un terminal valide, même partiel, relève d'`inspect`, pas d'`inspect-prefix`. Les commandes de préfixe retournent 7 pour un rapport partiel cohérent, 2 en cas de rejet.
+
+**EN:** CU/3 raw live recording uses a new CI/3 interprocessor envelope with a 24-bit sequence. CI/2 scan and freeze remain unchanged. Both microcontrollers must be updated together; no automatic downgrade. A capacity stop is independently replayable. The separate interrupted-capture inspection retains only complete, ordered and CRC-valid application records, verifies the expected VIN and source digest, and cannot claim a verified complete capture or allow programming. Android, Windows and Linux expose the same prefix schema; Linux independently verifies exported reports. The added positive/negative regression cases, including a simulated mailbox sequence beyond 65,535, remain unexecuted until the protocol closure gate.
+
+Référence normative : le catalogue public de l'éditeur SAE identifie [J1979DA_202607](https://saemobilus.sae.org/standards/j1979da_202607-j1979-da-digital-annex-e-e-diagnostic-test-modes), révision du 16 juillet 2026. La fiche publique ne contient pas les tables détaillées sous accès réservé. Le moteur de catalogue accepte une référence autorisée locale ; aucune donnée normative exhaustive de cette édition n'est revendiquée sans son contenu.
+
