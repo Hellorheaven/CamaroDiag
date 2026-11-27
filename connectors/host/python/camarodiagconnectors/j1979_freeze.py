@@ -67,7 +67,7 @@ class Read:
         if type(self.duration_ms) is not int or not 0 <= self.duration_ms <= 3600000:
             raise ValueError("Invalid read duration")
         if self.response is not None and (not isinstance(self.response, bytes)
-                                           or len(self.response) > MAX_RESPONSE):
+                                           or not self.response or len(self.response) > MAX_RESPONSE):
             raise ValueError("Response exceeds application evidence bound")
         if self.outcome in ("RECEIVED", "LATE_RESPONSE"):
             if not self.transmission_attempted or self.response is None:
@@ -353,7 +353,7 @@ def scan_freeze(exchange, plan: FreezePlan, *, clock=time.monotonic, require_cur
             if not isinstance(maximum, (int, float)) or not math.isfinite(maximum) or not 0 < maximum <= 20:
                 return result("TRANSPORT_ERROR")
             response = exchange(request, min(maximum, left))
-            if not isinstance(response, bytes) or len(response) > MAX_RESPONSE:
+            if not isinstance(response, bytes) or not response or len(response) > MAX_RESPONSE:
                 return result("TRANSPORT_ERROR")
             current()
             if clock() - start >= plan.budget_ms / 1000:
