@@ -93,6 +93,7 @@ internal object J1979FreezeEvidenceJson {
         require(adapter.isNotBlank() && version.isNotBlank())
         val result = report.result
         val target = result.plan.target
+        if(target.legacy)return encodeLegacy(report,adapter,version)
         return JSONObject()
             .put("schema","camarodiag-functional-j1979-freeze-v1")
             .put("protocol","SAE-J1979")
@@ -116,6 +117,44 @@ internal object J1979FreezeEvidenceJson {
             }))
             .put("result",body(result))
     }
+    private fun encodeLegacy(report:J1979FreezeReport,adapter:String,version:String):JSONObject {
+        val result=report.result
+        val target=result.plan.target
+        val otherSources=report.legacyExchanges.flatMap { it.frames }.map { it.source }
+            .filter { it!=target.idHex(target.responseId) }.distinct().sorted()
+        return JSONObject()
+            .put("schema","camarodiag-functional-j1979-legacy-freeze-v1")
+            .put("protocol","SAE-J1979")
+            .put("transport","ANDROID_ELM_LEGACY_HEADERED")
+            .put("version",version)
+            .put("adapter",adapter)
+            .put("scope","FUNCTIONAL_SELECTED_RESPONSE_FREEZE")
+            .put("physically_addressed",false)
+            .put("functional_scope_confirmed_by_operator",true)
+            .put("expected_protocol",target.protocol)
+            .put("observed_protocol",nullable(report.observedProtocol))
+            .put("selected_response_source",target.idHex(target.responseId))
+            .put("other_response_sources",JSONArray(otherSources))
+            .put("response_attribution","CHECKSUM_VERIFIED_LEGACY_HEADER")
+            .put("response_hex_representation","NORMALIZED_APPLICATION_PAYLOAD")
+            .put("started_at_utc",Instant.ofEpochMilli(report.startedAtMillis).toString())
+            .put("finished_at_utc",Instant.ofEpochMilli(report.finishedAtMillis).toString())
+            .put("transport_problem",nullable(report.transportProblem))
+            .put("execution_completed",report.executionCompleted)
+            .put("transport_exchanges",JSONArray(report.legacyExchanges.map { row ->
+                JSONObject().put("logical_query",row.logicalQuery)
+                    .put("request_hex",row.requestHex)
+                    .put("raw_response",nullable(row.rawResponse))
+                    .put("frames",JSONArray(row.frames.map { frame ->
+                        JSONObject().put("source",frame.source).put("raw_hex",frame.rawHex)
+                            .put("payload_hex",frame.payloadHex)
+                    }))
+                    .put("selected_records_hex",JSONArray(row.selectedRecordsHex))
+                    .put("status",row.status).put("detail",nullable(row.detail))
+            }))
+            .put("result",body(result))
+    }
+
     fun encodeNative(evidence: CamaroDiagConnectorFreezeCampaign.Evidence,version:String,
         exportedCaptureName:String?):JSONObject {
         val profile=evidence.target.profile
