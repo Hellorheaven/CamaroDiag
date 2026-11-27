@@ -190,4 +190,17 @@
   <data name="LiveNativePrefixRecords" xml:space="preserve"><value>Enregistrements complets : {0}</value></data>
   <data name="LiveNativePrefixSamples" xml:space="preserve"><value>Échantillons bruts corrélés : {0}</value></data>
   <data name="LiveNativePrefixTail" xml:space="preserve"><value>Octets finaux non vérifiés : {0}</value></data>
+  <data name="NativeMaintenanceInspect" xml:space="preserve"><value>Inspecter le journal de maintenance natif</value></data>
+  <data name="NativeMaintenanceFilter" xml:space="preserve"><value>Journaux CM/1 (*.cm)|*.cm</value></data>
+  <data name="NativeMaintenanceOffline" xml:space="preserve"><value>Inspection du journal hors ligne</value></data>
+  <data name="NativeMaintenanceConsistent" xml:space="preserve"><value>Les enregistrements du journal sont cohérents.</value></data>
+  <data name="NativeMaintenanceRecovery" xml:space="preserve"><value>Récupération requise : ne pas répéter cette opération.</value></data>
+  <data name="NativeMaintenanceNotTested" xml:space="preserve"><value>Commande non testée</value></data>
+  <data name="NativeMaintenanceRefused" xml:space="preserve"><value>Commande refusée par le calculateur</value></data>
+  <data name="NativeMaintenanceUncertain" xml:space="preserve"><value>Résultat de la commande incertain</value></data>
+  <data name="NativeMaintenanceAckPartial" xml:space="preserve"><value>Acquittement ; relecture incomplète</value></data>
+  <data name="NativeMaintenanceAckReadback" xml:space="preserve"><value>Acquittement ; relecture enregistrée</value></data>
+  <data name="NativeMaintenanceAckEvap" xml:space="preserve"><value>Préparation EVAP acquittée ; aucun résultat de test de fuite</value></data>
+  <data name="NativeMaintenanceNoTerminal" xml:space="preserve"><value>Enregistrement terminal absent</value></data>
+  <data name="NativeMaintenanceNoRetry" xml:space="preserve"><value>Aucune relance automatique ni preuve physique.</value></data>
 </root>
