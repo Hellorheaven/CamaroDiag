@@ -33,15 +33,15 @@ bool j1979_vehicle_info_decode(uint8_t kind,const uint8_t *reply,
         const std::span<const uint8_t> raw=response.subspan(3);
         out->info_type=kind;out->counter_vector=true;
         out->counter_count=(unsigned)count;
-        out->general_denominator=be16(raw);
-        out->ignition_cycles=be16(raw+2);
+        out->general_denominator=be16(raw.data());
+        out->ignition_cycles=be16(raw.data()+2);
         out->monitor_count=(unsigned)((count-2)/2);
         const char *const *names=kind==8?spark.data():diesel.data();
         for (unsigned i=0;i<out->monitor_count;++i) {
             j1979_info_monitor *m=&out->monitors[i];
             m->name=names[i];
-            m->numerator=be16(raw+4+4*i);
-            m->denominator=be16(raw+6+4*i);
+            m->numerator=be16(raw.data()+4+4*i);
+            m->denominator=be16(raw.data()+6+4*i);
             m->ratio_valid=m->denominator!=0;
             if (m->ratio_valid) m->ratio=(double)m->numerator/m->denominator;
         }

@@ -147,9 +147,9 @@ bool j1979_monitor_decode(const uint8_t request[2],const uint8_t *response,
                           size_t length,size_t index,j1979_monitor_record *out) {
     if (!out) return false;
     *out = {};
-    const std::span<const uint8_t> bytes{response,length};
     const size_t count=j1979_monitor_count(request,response,length);
     if (!count || index>=count) return false;
+    const std::span<const uint8_t> bytes{response,length};
     const std::span<const uint8_t> entry=bytes.subspan(1u+9u*index,9u);
     const uint8_t *p=entry.data();
     out->monitor_id=p[0];
