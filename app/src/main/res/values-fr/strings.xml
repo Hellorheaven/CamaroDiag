@@ -1320,7 +1320,7 @@
     <string name="j1979_catalogue_title">Catalogue PID documenté (hors ligne)</string>
     <string name="j1979_catalogue_file">Catalogue JSON</string>
     <string name="j1979_catalogue_reference">Référence documentée</string>
-    <string name="j1979_catalogue_report">Capture brute Mode 01</string>
+    <string name="j1979_catalogue_report">Capture brute Mode 01, CL/1 ou capture Mode 02 CF/1</string>
     <string name="j1979_catalogue_selected">Sélectionné</string>
     <string name="j1979_catalogue_not_selected">À sélectionner</string>
     <string name="j1979_catalogue_pin">SHA-256 indépendant de la référence</string>
