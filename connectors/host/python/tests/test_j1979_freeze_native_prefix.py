@@ -1,5 +1,4 @@
 """Interrupted CF/1 tests use synthetic ECU responses, never real vehicle data."""
-import copy
 import hashlib
 import io
 import struct
@@ -132,6 +131,47 @@ class FreezeNativePrefixTests(unittest.TestCase):
         self.assertFalse(result["replay_terminated_by_missing_observation"])
         self.assertEqual(result["independently_replayed_steps"][1]["transport_outcome"], "CONTEXT_CHANGED")
 
+    def test_cli_inspect_and_verify_roundtrip(self):
+        import json
+        from camarodiagconnectors.j1979_freeze_native_cli import run
+        data = b"".join(original()[:-1])
+        with tempfile.TemporaryDirectory() as name:
+            root = Path(name)
+            capture, output, proof = (root / x for x in ("source.cf1", "prefix.json", "proof.json"))
+            capture.write_bytes(data)
+            args = ["--capture", str(capture), "--vin", VIN]
+            report = run(["inspect-prefix", *args, "--output", str(output)])
+            self.check_no_promotion(report, count=len(original()) - 2)
+            self.assertEqual(json.loads(output.read_text()), report)
+            verified = run(["verify-prefix", *args, "--report", str(output),
+                            "--output", str(proof)])
+            self.assertTrue(verified["consistent"])
+            self.assertFalse(verified["capture_integrity_verified"])
+            self.assertEqual(verified["capture_sha256"], hashlib.sha256(data).hexdigest())
+            self.assertEqual(json.loads(proof.read_text()), verified)
+            with self.assertRaises(FileExistsError):
+                run(["inspect-prefix", *args, "--output", str(output)])
+            corrupted = json.loads(output.read_text())
+            corrupted["execution_completed"] = True
+            output.write_text(json.dumps(corrupted))
+            with self.assertRaises(ValueError):
+                run(["verify-prefix", *args, "--report", str(output),
+                     "--output", str(root / "bad.json")])
+
+    def test_cli_verifier_refuses_report_of_another_capture(self):
+        import json
+        from camarodiagconnectors.j1979_freeze_native_cli import run
+        with tempfile.TemporaryDirectory() as name:
+            root = Path(name)
+            capture, report, result = (root / x for x in ("source.cf1", "prefix.json", "proof.json"))
+            capture.write_bytes(b"".join(original()[:-1]))
+            data = run(["inspect-prefix", "--capture", str(capture), "--vin", VIN,
+                        "--output", str(report)])
+            capture.write_bytes(capture.read_bytes()[:-1])
+            with self.assertRaises(ValueError):
+                run(["verify-prefix", "--capture", str(capture), "--vin", VIN,
+                     "--report", str(report), "--output", str(result)])
+
     def test_file_replay_is_pinned_to_original_sha256(self):
         parts = original()
         raw = b"".join(parts[:-1])
@@ -141,7 +181,7 @@ class FreezeNativePrefixTests(unittest.TestCase):
             document = inspect_prefix_file(path, expected_vin=VIN)
             self.assertEqual(document["capture_sha256"], hashlib.sha256(raw).hexdigest())
             self.check_no_promotion(document, count=len(parts)-2)
-            path.write_bytes(raw + b"X")
+            path.write_bytes(raw + b"C")
             self.assertNotEqual(inspect_prefix_file(path, expected_vin=VIN)["capture_sha256"],
                                 document["capture_sha256"])
 
