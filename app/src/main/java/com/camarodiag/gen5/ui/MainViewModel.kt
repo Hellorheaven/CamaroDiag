@@ -3883,7 +3883,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         fun current() = canResumeExport(generation, owner) && hasPremiumLicense()
         _calibrationWorkspace.update { it.copy(physicalRecoveryReading = true, physicalRecoveryResult = null,
             physicalRecoveryFolderUri = null, physicalRecoveryIdentity = identity,
-            physicalRecoveryFailed = false, physicalRecoveryExportMessage = null) }
+            physicalRecoveryFailed = false, physicalRecoveryExportMessage = null,
+            physicalRecoveryHistory = null, physicalRecoveryHistoryUris = emptyList(),
+            physicalRecoveryHistoryMessage = null) }
         viewModelScope.launch {
             try {
                 val report = withContext(Dispatchers.IO) {
@@ -3962,6 +3964,117 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             } finally {
                 if(isCurrentAccountGeneration(generation))
                     _calibrationWorkspace.update { it.copy(physicalRecoveryExporting=false) }
+            }
+        }
+    }
+
+    fun inspectPhysicalRecoveryHistory(identity: PhysicalRecoveryIdentity, trees: List<Uri>) {
+        if (!requirePremiumLicense() || !identity.valid ||
+            trees.size !in 2..PhysicalRecoveryHistory.MAX_SNAPSHOTS) return
+        val sources = trees.toList()
+        val owner = authenticatedAccountUid ?: return
+        val generation = accountSessionGeneration
+        val profile = _vehicle.value
+        if (_calibrationWorkspace.value.physicalRecoveryReading ||
+            _calibrationWorkspace.value.physicalRecoveryExporting) return
+        fun current() = canResumeExport(generation, owner) && hasPremiumLicense() &&
+            _vehicle.value == profile && _calibrationWorkspace.value.physicalRecoveryHistoryUris == sources
+        _calibrationWorkspace.update { it.copy(
+            physicalRecoveryReading = true,
+            physicalRecoveryHistory = null,
+            physicalRecoveryHistoryUris = sources,
+            physicalRecoveryHistoryMessage = null,
+            physicalRecoveryResult = null,
+            physicalRecoveryFolderUri = null,
+            physicalRecoveryIdentity = null,
+            physicalRecoveryFailed = false,
+            physicalRecoveryExportMessage = null) }
+        viewModelScope.launch {
+            try {
+                val report = withContext(Dispatchers.IO) {
+                    val app = getApplication<Application>()
+                    PhysicalRecoveryHistory.inspect(app.contentResolver, sources, app.cacheDir,
+                        identity, ::current)
+                }
+                if (current()) _calibrationWorkspace.update { it.copy(physicalRecoveryHistory = report) }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                if (current()) _calibrationWorkspace.update { it.copy(
+                    physicalRecoveryHistoryMessage = localizedContext.getString(R.string.cal_recovery_folder_failed)) }
+            } finally {
+                if (isCurrentAccountGeneration(generation)) _calibrationWorkspace.update {
+                    it.copy(physicalRecoveryReading = false)
+                }
+            }
+        }
+    }
+
+    fun exportPhysicalRecoveryHistory(report: PhysicalRecoveryHistory.Report) {
+        if (!requirePremiumLicense() || !report.verified) return
+        val owner = authenticatedAccountUid ?: return
+        val generation = accountSessionGeneration
+        val profile = _vehicle.value
+        val sources = _calibrationWorkspace.value.physicalRecoveryHistoryUris.toList()
+        fun current(): Boolean {
+            val state = _calibrationWorkspace.value
+            return canResumeExport(generation, owner) && hasPremiumLicense() &&
+                _vehicle.value == profile && !state.physicalRecoveryReading &&
+                state.physicalRecoveryHistory === report &&
+                state.physicalRecoveryHistoryUris == sources
+        }
+        if (!current() || sources.size !in 2..PhysicalRecoveryHistory.MAX_SNAPSHOTS ||
+            _calibrationWorkspace.value.physicalRecoveryExporting) return
+        _calibrationWorkspace.update { it.copy(physicalRecoveryExporting = true,
+            physicalRecoveryHistoryMessage = null) }
+        viewModelScope.launch(Dispatchers.IO) {
+            var evidenceChanged = false
+            suspend fun requireSourceUnchanged() {
+                check(current())
+                try {
+                    val app = getApplication<Application>()
+                    val fresh = PhysicalRecoveryHistory.inspect(app.contentResolver, sources,
+                        app.cacheDir, report.identity, ::current)
+                    PhysicalRecoveryHistory.requireSameVerifiedEvidence(report, fresh)
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (error: Exception) {
+                    evidenceChanged = true
+                    throw error
+                }
+                check(current())
+            }
+            try {
+                requireSourceUnchanged()
+                val bytes = PhysicalRecoveryHistoryJson.encode(report).toByteArray(Charsets.UTF_8)
+                val now = System.currentTimeMillis()
+                val path = CamaroDiagExportStorage.write(getApplication<Application>(),
+                    "CamaroDiag_ECU_recovery_history_${now}.json", "application/json",
+                    category = CamaroDiagExportStorage.Category.REPORTS,
+                    beforePublish = { check(current()) },
+                    verifyStaged = { input ->
+                        PhysicalRecoveryEvidenceJson.requireExactJson(input, bytes)
+                        requireSourceUnchanged()
+                    }) { it.write(bytes) }
+                _calibrationWorkspace.update { state ->
+                    if (current()) state.copy(physicalRecoveryHistoryMessage =
+                        localizedContext.getString(R.string.cal_recovery_export_success, path))
+                    else state
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                _calibrationWorkspace.update { state ->
+                    if (!current()) state
+                    else if (evidenceChanged) state.copy(physicalRecoveryHistory = null,
+                        physicalRecoveryHistoryMessage = localizedContext.getString(R.string.recovery_source_changed))
+                    else state.copy(physicalRecoveryHistoryMessage =
+                        localizedContext.getString(R.string.cal_recovery_export_failed))
+                }
+            } finally {
+                if (isCurrentAccountGeneration(generation)) _calibrationWorkspace.update {
+                    it.copy(physicalRecoveryExporting = false)
+                }
             }
         }
     }
