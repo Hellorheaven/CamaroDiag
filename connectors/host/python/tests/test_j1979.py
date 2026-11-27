@@ -26,6 +26,20 @@ REPLIES = {
 
 
 class J1979Tests(unittest.TestCase):
+    def test_monitor_scaling_signed_unknown_and_limits(self):
+        from camarodiagconnectors.j1979_monitor_scaling import scale_record
+        decoded = scale_record(0x90, 65535, 32768, 0)
+        self.assertEqual((-1, -32768, 0, "WITHIN"),
+                         tuple(decoded[key] for key in ("value", "minimum", "maximum", "numeric_relation")))
+        self.assertEqual("ms", decoded["unit"])
+        self.assertAlmostEqual(122.0, scale_record(0x0A, 1000, 0, 2000)["value"])
+        self.assertEqual("INVERTED_LIMITS", scale_record(0x24, 2, 3, 1)["numeric_relation"])
+        self.assertEqual("ABOVE", scale_record(0x24, 3, 0, 2)["numeric_relation"])
+        self.assertEqual("BELOW", scale_record(0x24, 0, 1, 2)["numeric_relation"])
+        self.assertIsNone(scale_record(0xFF, 0, 0, 0))
+        with self.assertRaises(ValueError):
+            scale_record(0x24, 65536, 0, 0)
+
     def test_physical_pairs_and_read_scope(self):
         self.assertTrue(physical_pair(0x7E0, 0x7E8))
         self.assertTrue(physical_pair(0x18DA10F1, 0x18DAF110))
@@ -55,6 +69,10 @@ class J1979Tests(unittest.TestCase):
         self.assertEqual("NOT_TESTED", steps["0A"]["status"])
         self.assertEqual("PASSED", steps["03"]["status"])
         self.assertEqual(100, steps["0601"]["decoded"][0]["raw"])
+        scaled = steps["0601"]["decoded"][0]["scaled"]
+        self.assertEqual(("count", 100, 0, 200, "WITHIN"),
+                         tuple(scaled[key] for key in ("unit", "value", "minimum", "maximum", "numeric_relation")))
+        self.assertIsNone(scaled["monitor_verdict"])
         self.assertNotIn("0801", sent)
         inventories = {row["mode"]: row for row in result["inventory"]}
         self.assertEqual("COMPLETE", inventories[1]["state"])
