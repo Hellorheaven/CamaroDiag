@@ -22,6 +22,8 @@ def parse(argv=None):
     parser.add_argument("--rx",required=True,help="Physical response CAN ID in hex")
     parser.add_argument("--vin",required=True,help="Expected 17-character VIN on this ECU")
     parser.add_argument("--pid",action="append",required=True,help="Numeric Mode 01 PID in hex; repeat to select")
+    parser.add_argument("--raw-only",action="store_true",
+                        help="Retain exact advertised Mode 01 payloads, without numeric interpretations")
     parser.add_argument("--cycles",type=int,default=30)
     parser.add_argument("--interval",type=float,default=1.0,help="Minimum cycle start-to-start seconds")
     parser.add_argument("--budget",type=float,default=180.0,help="Total recording seconds")
@@ -40,7 +42,7 @@ def parse(argv=None):
             raise ValueError("Invalid physical address pair")
         if any(not re.fullmatch(r"[0-9A-Fa-f]{2}",x) for x in args.pid):
             raise ValueError("Expected two-digit numeric PID")
-        plan=Plan(tuple(int(x,16) for x in args.pid),args.vin,args.cycles,args.interval,args.budget).validate()
+        plan=Plan(tuple(int(x,16) for x in args.pid),args.vin,args.cycles,args.interval,args.budget,args.raw_only).validate()
         if args.csv is not None and args.csv.resolve()==args.output.resolve():
             raise ValueError("JSON and CSV need distinct new paths")
     except (ValueError,OSError) as exc:
@@ -72,7 +74,7 @@ def run(argv=None):
                 value=row["measurement"]
                 signals=row.get("multi_signals")
                 display=("; ".join(f'{v["name"]}={v["number"]:.3f} {v["unit"]}' for v in signals)
-                         if signals else f'{value["number"]:.3f} {value["unit"]}' if value else row["status"])
+                         if signals else f'{value["number"]:.3f} {value["unit"]}' if value else (row["response_hex"] or row["status"]) if plan.raw_only else row["status"])
                 print(f'{row["elapsed_ms"]} ms {row["pid"]:02X} {display}',flush=True)
             try:
                 with LinuxIsoTp(args.interface,args.tx,args.rx) as transport:
