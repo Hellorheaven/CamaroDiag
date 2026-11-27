@@ -93,6 +93,24 @@ internal static class ObdJ1979LegacyScanSelfTests
             Check(complete.TransportObserved && complete.Completed && complete.ObservedVin == vin, "complete selected ECU recipe");
             Check(sent.ToHashSet().SetEquals(replies.Keys) && sent.Distinct().Count() == sent.Count, "only advertised reads");
             Check(complete.Steps.Single(x => x.RequestHex == "03").Detail == "P0123", "legacy DTC without count");
+            Check(complete.DtcModes.Single(x=>x.Mode==3).Codes!.SequenceEqual(new[]{"P0123"})&&
+                complete.DtcModes.Single(x=>x.Mode==7).Codes!.Count==0&&complete.DtcModes.Single(x=>x.Mode==10).Codes is null,
+                "Structured DTC evidence distinguishes empty from unavailable");
+            Check(complete.Inventory.Single(x=>x.Mode==1).AdvertisedIds.SequenceEqual(new byte[]{1,19})&&
+                complete.Inventory.Single(x=>x.Mode==2).State=="NOT_APPLICABLE"&&
+                complete.Inventory.Single(x=>x.Mode==8).AdvertisedIds.SequenceEqual(new byte[]{1}),
+                "Independent structured service inventories");
+            Check(complete.Readiness is {MilOn:false}&&complete.FreezeFrameTrigger is {Present:false},
+                "Structured readiness and absent freeze trigger");
+            Check(complete.IdentificationRecords.Single(x=>x.InfoType==2).Values.Single()==vin,
+                "Structured selected-source identity");
+            Check(complete.MonitorRecords.Single(x=>x.Mode==5).EncodedDataHex=="2A"&&
+                complete.MonitorRecords.Single(x=>x.Mode==6) is {ValueEncoded:1,LimitEncoded:2},
+                "Monitor encoded values retained without verdict");
+            sent.Clear();
+            var mismatch=ObdJ1979LegacyScan.Run(source,Exchange,()=>{},TimeSpan.FromSeconds(10),"1FA6P8TH0L5100000");
+            Check(mismatch.VinMatch=="MISMATCH"&&!mismatch.Completed&&
+                sent.SequenceEqual(new[]{"0100","0900","0901","0902"}),"Expected VIN stops before diagnostic values");
             Check(complete.Steps.Single(x => x.RequestHex == "0A").Status == "NOT_TESTED", "silence not zero");
             Check(complete.Steps.Single(x => x.RequestHex == "0902").Responses.All(x => x.Source == "10"), "VIN evidence attributed");
             sent.Clear();
@@ -119,6 +137,9 @@ internal static class ObdJ1979LegacyScanSelfTests
             string[] cli = [ObdJ1979LegacyCli.Command, "--adapter-index", "0", "--variant", "2", "--source", "10",
                 "--confirm-legacy-profile", "--output", "new.json"];
             Check(ObdJ1979LegacyCli.Parse(cli).Variant == vpw, "independent CLI variant");
+            Check(ObdJ1979LegacyCli.Parse([..cli,"--vin",vin]).ExpectedVin==vin,"CLI optional documented VIN");
+            Reject(()=>ObdJ1979LegacyCli.Parse([..cli.Select(x=>x=="10"?"discover":x),"--vin",vin]),
+                "VIN binding cannot be requested during discovery");
             var discoveryOptions = ObdJ1979LegacyCli.Parse(cli.Select(x => x == "10" ? "discover" : x).ToArray());
             Check(discoveryOptions.Source is null, "explicit unpinned discovery");
             var discovery = ObdJ1979LegacyDiscovery.Run((request, _) =>

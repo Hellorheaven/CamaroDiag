@@ -1,3 +1,7 @@
+## J1979 — recettes legacy Windows : résultat structuré et contrôle VIN (27/11/2026)
+
+- Recette J2534 legacy : inventaires par mode et sonde, DTC zéro distinct d'inconnu, mesures Mode 01/02, readiness, déclencheur freeze, CALID/CVN/VIN et résultats encodés Mode 05/06. Contrôle VIN facultatif dans la sélection GUI et CLI --vin ; arrêt avant les autres mesures si discordant ou indisponible, découverte sans VIN. Présentation structurée et ressources FR/EN, préservation du résultat lors d'une erreur de fermeture. Aucun changement mutateur ni preuve de couverture véhicule. Régressions écrites, non exécutées. C6/J1979 ouverts.
+
 ## C6 — rapport CDJ/1 et export de preuves connecteur (27/11/2026)
 
 - Lecture bornée et double acquisition des 64 octets, SHA-256 de l'instantané, comparaison optionnelle transaction/manifeste via CLI, export JSON exclusif réévalué avant publication. Windows : sélection CDJ/1 distincte du journal E39, export du rapport correspondant, états localisés FR/EN et conservation des avertissements utiles ; aucune autorisation implicite. Rapports corrompus de taille exacte exportables comme preuves négatives, fichiers de taille incorrecte sans empreinte non exportables. Régressions CLI/JSON écrites non exécutées ; C6/J1979 ouverts, aucune CI intermédiaire.

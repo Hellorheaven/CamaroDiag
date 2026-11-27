@@ -118,4 +118,5 @@
   <data name="ScanVinMismatch" xml:space="preserve"><value>VIN mismatch — scan stopped.</value></data>
   <data name="ScanVinUnverified" xml:space="preserve"><value>VIN unavailable — scan stopped.</value></data>
   <data name="ScanVinNotRequested" xml:space="preserve"><value>VIN comparison not requested.</value></data>
+  <data name="LegacyOptionalVin" xml:space="preserve"><value>Expected VIN (optional)</value></data>
 </root>
