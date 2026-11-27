@@ -41,7 +41,9 @@ internal static class J1979NativeReport
                 }:null}),
             scaled_monitor_records=result.Steps.SelectMany(s=>ObdJ1979Mode06.Project(s.RequestHex,s.ResponseHex,s.Status))
                 .Select(ObdJ1979Mode06.Evidence),
-            contextual_measurements=ObdJ1979ScalingContext.Evidence(ObdJ1979ScalingContext.Project(
+            operating_context=ObdJ1979OperatingContext.Evidence(ObdJ1979OperatingContext.Project(
+                 result.Steps.Select(s=>new ObdJ1979OperatingContext.Observation(s.RequestHex,s.ResponseHex,s.Status)))),
+             contextual_measurements=ObdJ1979ScalingContext.Evidence(ObdJ1979ScalingContext.Project(
                 result.Steps.Select(s=>new ObdJ1979ScalingContext.Observation(s.RequestHex,s.ResponseHex,s.Status)))),
             status_records=result.Steps.Select(s=>ObdJ1979Status.TryRecord(s.RequestHex,s.ResponseHex,s.Status))
                 .OfType<ObdJ1979Status.Record>().Select(r=>new {request_hex=r.RequestHex,
