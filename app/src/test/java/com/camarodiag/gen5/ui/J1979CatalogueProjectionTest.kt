@@ -223,6 +223,40 @@ class J1979CatalogueProjectionTest {
         reject { J1979CatalogueProjection.build(catalogue(),pin,raw,"1FA6P8TH0L5100000") }
     }
 
+    @Test fun freezeCatalogueUsesFrameSpecificDefinitionsAndOriginalCapture() {
+        kotlinx.coroutines.runBlocking {
+            val freezeVin = "1G1FA1E30D1234567"
+            val wire = "4346010100006800e0070000e80700000060ea00003147314641314533304431323334353637020001000000000000020c0d" +
+            "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000" +
+            "0000000000000000000000001be52aa643460102010020000101020005000000140009024902013147314641314533304431" +
+            "3233343536370fee793343460102020014000101030005000000070002000042000040180000a518bfa24346010203001200" +
+            "0101030005000000050002020042020003014bdf4814434601020400120001010300050000000500020c00420c001f403ec1" +
+            "dd26434601020500110001010300050000000400020d00420d0050b116910c43460102060012000101030005000000050002" +
+            "020042020003018b28c15f43460102070014000101030005000000070002000142000140180000f3ca56bb43460102080012" +
+            "0001010300050000000500020201420201030199eded5e434601020900120001010300050000000500020c01420c011f406c" +
+            "a9891e434601020a00110001010300050000000400020d01420d01506e81ff64434601020b00120001010300050000000500" +
+            "0202014202010301d9409567434601020c002000010102000500000014000902490201314731464131453330443132333435" +
+            "363723d3f9ee434601030d001400000207000c0000003c0000000202000000000000937d821a"
+            val capture = wire.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
+            val definition = """{"schema":"camarodiag-j1979-freeze-catalogue-v1","edition":"synthetic","reference_name":"synthetic","reference_sha256":"PIN","frames":[{"frame":0,"definitions":[{"pid":12,"payload_bytes":2,"protocols":["CAN"],"reference":"synthetic","signals":[{"name":"sample","unit":"fixture","bits":{"offset":0,"width":16,"order":"MSB0"},"signed":false,"scale":[1,2],"offset":[0,1],"reference":"test only"}]},{"pid":13,"payload_bytes":1,"protocols":["CAN"],"reference":"synthetic","signals":[{"name":"sample","unit":"fixture","bits":{"offset":0,"width":8,"order":"MSB0"},"signed":false,"scale":[1,2],"offset":[0,1],"reference":"test only"}]}]},{"frame":1,"definitions":[{"pid":12,"payload_bytes":2,"protocols":["CAN"],"reference":"synthetic","signals":[{"name":"sample","unit":"fixture","bits":{"offset":0,"width":16,"order":"MSB0"},"signed":false,"scale":[1,2],"offset":[100,1],"reference":"test only"}]}]}]}""".replace("PIN",pin)
+            val result = J1979FreezeCatalogue.build(definition.toByteArray(),pin,capture,freezeVin)
+            assertEquals(J1979FreezeCatalogue.PROJECTION,result.document["schema"])
+            assertEquals(true,result.document["final_identity_verified"])
+            assertEquals(false,result.document["permits_programming"])
+            assertEquals(false,result.document["physical_vehicle_verified"])
+            assertEquals(J1979DocumentedCatalogue.sha(capture),result.document["source_capture_sha256"])
+            val entries = projected(result)
+            assertEquals(4,entries.size)
+            assertEquals(mapOf("numerator" to "4000","denominator" to "1"),signal(entries[0],0)["value"])
+            assertEquals(mapOf("numerator" to "4100","denominator" to "1"),signal(entries[2],0)["value"])
+            assertEquals("NO_DOCUMENTED_DEFINITION",J1979CatalogueJson.obj(entries[3])["projection_status"])
+            assertTrue(runCatching { J1979FreezeCatalogue.build(definition.toByteArray(),pin,capture.copyOf(capture.size-1),freezeVin) }.isFailure)
+            assertTrue(runCatching { J1979FreezeCatalogue.build(definition.toByteArray(),pin,capture,vin) }.isFailure)
+            assertTrue(runCatching { J1979FreezeCatalogue.parse(catalogue(),pin) }.isFailure)
+            assertTrue(runCatching { J1979FreezeCatalogue.parse(definition.toByteArray(),"b".repeat(64)) }.isFailure)
+        }
+    }
+
     @Test fun strictJsonAndCataloguePreventAmbiguousOrExecutableDefinitions() {
         val raw = catalogue().toString(Charsets.UTF_8)
         for (value in listOf(
