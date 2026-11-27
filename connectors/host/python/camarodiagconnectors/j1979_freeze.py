@@ -328,7 +328,8 @@ def execute_plan(plan: FreezePlan, observe: Callable[[bytes], Read]):
     }
 
 
-def scan_freeze(exchange, plan: FreezePlan, *, clock=time.monotonic, require_current=lambda: None):
+def scan_freeze(exchange, plan: FreezePlan, *, clock=time.monotonic, require_current=lambda: None,
+                request_timeout=lambda request: 2.5):
     """Acquire bounded actual replies; never synthesize a vehicle response."""
     plan.validate()
     start = clock()
@@ -348,7 +349,10 @@ def scan_freeze(exchange, plan: FreezePlan, *, clock=time.monotonic, require_cur
             if not math.isfinite(left) or left <= 0:
                 return result("BUDGET")
             attempted = True
-            response = exchange(request, min(2.5, left))
+            maximum = request_timeout(request)
+            if not isinstance(maximum, (int, float)) or not math.isfinite(maximum) or not 0 < maximum <= 20:
+                return result("TRANSPORT_ERROR")
+            response = exchange(request, min(maximum, left))
             if not isinstance(response, bytes) or len(response) > MAX_RESPONSE:
                 return result("TRANSPORT_ERROR")
             current()
