@@ -13,7 +13,7 @@ from .doip_archive import verify_archive
 from .memory import Geometry, Patch, Region, Technology, plan_patches
 from .recovery_bundle import AndroidIdentity,inspect_bundle,write_report
 from .recovery_report_inspection import verify_recovery_report
-from .recovery_history import inspect_history as inspect_recovery_history
+from .recovery_history import inspect_history as inspect_recovery_history, verify_history_report
 from .j1979_live_inspection import inspect_file, compare_files
 from .j1979_network_inspection import inspect_network_file
 from .j1979_legacy_inspection import inspect_file as inspect_legacy_file
@@ -78,16 +78,21 @@ def _parser() -> argparse.ArgumentParser:
     recovery.add_argument("--expected-snapshot")
     recovery.add_argument("--output",type=Path,required=True)
 
-    recovery_history = commands.add_parser("verify-recovery-history",
-        help="Check explicitly ordered original-sector snapshots for rollback or divergence")
-    recovery_history.add_argument("--journal", type=Path, action="append", required=True)
-    recovery_history.add_argument("--platform", choices=("android", "windows"), required=True)
-    recovery_history.add_argument("--family")
-    recovery_history.add_argument("--controller")
-    recovery_history.add_argument("--firmware")
-    recovery_history.add_argument("--vin")
-    recovery_history.add_argument("--osid", type=_number)
-    recovery_history.add_argument("--output", type=Path, required=True)
+    for name, help_text in (
+        ("verify-recovery-history", "Check explicitly ordered original-sector snapshots for rollback or divergence"),
+        ("verify-recovery-history-report", "Replay an exported recovery history against its original bundles"),
+    ):
+        recovery_history = commands.add_parser(name, help=help_text)
+        recovery_history.add_argument("--journal", type=Path, action="append", required=True)
+        recovery_history.add_argument("--platform", choices=("android", "windows"), required=True)
+        recovery_history.add_argument("--family")
+        recovery_history.add_argument("--controller")
+        recovery_history.add_argument("--firmware")
+        recovery_history.add_argument("--vin")
+        recovery_history.add_argument("--osid", type=_number)
+        recovery_history.add_argument("--output", type=Path, required=True)
+        if name == "verify-recovery-history-report":
+            recovery_history.add_argument("--report", type=Path, required=True)
 
     recovery_report = commands.add_parser("verify-recovery-report",
         help="Reproduce an Android or Windows recovery assessment from the original files")
@@ -198,7 +203,7 @@ def run(argv: Sequence[str] | None = None) -> dict[str, object]:
                               original_bin=args.original_bin,expected_snapshot=args.expected_snapshot)
         return write_report(args.output,report)
 
-    if args.action == "verify-recovery-history":
+    if args.action in ("verify-recovery-history", "verify-recovery-history-report"):
         identity = None
         if args.platform == "android":
             if not all((args.family, args.controller, args.firmware, args.vin)) or args.osid is not None:
@@ -206,10 +211,17 @@ def run(argv: Sequence[str] | None = None) -> dict[str, object]:
             identity = AndroidIdentity(args.family, args.controller, args.firmware, args.vin).validate()
         elif any((args.family, args.controller, args.firmware)):
             raise ValueError("Windows target identity is read from metadata")
-        if args.output.resolve() in {p.resolve() for p in args.journal}:
-            raise ValueError("History output must differ from journal inputs")
-        return write_report(args.output, inspect_recovery_history(args.journal, args.platform,
-            android_identity=identity, expected_vin=args.vin, expected_osid=args.osid))
+        inputs = {p.resolve() for p in args.journal}
+        options = dict(android_identity=identity, expected_vin=args.vin, expected_osid=args.osid)
+        if args.action == "verify-recovery-history-report":
+            inputs.add(args.report.resolve())
+        if args.output.resolve() in inputs:
+            raise ValueError("History output must differ from original evidence")
+        if args.action == "verify-recovery-history-report":
+            result = verify_history_report(args.report, args.journal, args.platform, **options)
+        else:
+            result = inspect_recovery_history(args.journal, args.platform, **options)
+        return write_report(args.output, result)
 
     if args.action == "verify-recovery-report":
         return write_report(args.output, verify_recovery_report(
@@ -295,7 +307,11 @@ def main() -> None:
         raise SystemExit(7)
     if result.get("schema") == "camarodiag-j1979-capture-inspection-v1" and not result["verified"]:
         raise SystemExit(2)
-    if result.get("schema")=="camarodiag-offline-recovery-bundle-v1" and not result["verified"]:
+    if result.get("schema") in (
+        "camaradiag-offline-recovery-bundle-v1",
+        "camaradiag-offline-recovery-history-v1",
+        "camaradiag-offline-recovery-history-report-verification-v1",
+    ) and not result["verified"]:
         raise SystemExit(2)
     if result.get("schema")=="camarodiag-offline-connector-checkpoint-v1" and result["inspection"]["status"]!="SAFE_BUT_BLOCKED":
         raise SystemExit(8)
