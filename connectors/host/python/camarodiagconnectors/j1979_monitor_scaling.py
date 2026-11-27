@@ -112,3 +112,44 @@ def scale_record(uasid: int, value: int, minimum: int, maximum: int) -> dict | N
     return {"definition": "ISO15031-5:2006-ANNEX-E-SUBSET",
             "unit": unit, "value": decoded, "minimum": low, "maximum": high,
             "numeric_relation": relation, "monitor_verdict": None}
+
+
+def from_steps(steps):
+    """Independent CAN Mode 06 engineering projection from original bytes.
+
+    The service status describes the diagnostic exchange, not the monitor.
+    Preserve unknown scaling and malformed state encodings without claiming
+    a monitor verdict. A legacy seven-byte response cannot enter this view.
+    """
+    result = []
+    for step in steps:
+        if step.get("status") != "PASSED":
+            continue
+        request, response = step.get("request_hex"), step.get("response_hex")
+        if not isinstance(request, str) or not isinstance(response, str):
+            continue
+        if len(request) != 4 or len(response) > 8190:
+            continue
+        try:
+            req, res = bytes.fromhex(request), bytes.fromhex(response)
+        except ValueError:
+            continue
+        if len(req) != 2 or req[0] != 6 or req[1] % 32 == 0:
+            continue
+        if len(res) < 10 or res[0] != 0x46 or (len(res)-1) % 9:
+            continue
+        if any(res[i] != req[1] for i in range(1, len(res), 9)):
+            continue
+        for index in range(1, len(res), 9):
+            mid, tid, uasid = res[index:index+3]
+            value = int.from_bytes(res[index+3:index+5], "big")
+            minimum = int.from_bytes(res[index+5:index+7], "big")
+            maximum = int.from_bytes(res[index+7:index+9], "big")
+            scaled = scale_record(uasid,value,minimum,maximum)
+            result.append({
+                "request_hex":req.hex().upper(), "record_index":(index-1)//9,
+                "monitor_id":mid, "test_id":tid, "unit_scaling_id":uasid,
+                "value_encoded":value, "minimum_encoded":minimum, "maximum_encoded":maximum,
+                "scaled":scaled,
+            })
+    return result
