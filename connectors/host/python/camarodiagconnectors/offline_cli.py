@@ -174,6 +174,25 @@ def _parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _recovery_output(output: Path, journals, extra_inputs=()):
+    """Do not place new reports inside an original-sector evidence directory.
+
+    Exclusive creation alone prevents overwrites, but adding a new file to
+    a .blocks directory would invalidate its strict inventory. Resolve both
+    spellings to catch symlinked parents; this is not a hostile-race guarantee.
+    """
+    destination = output.resolve()
+    for journal in journals:
+        protected = (journal, Path(str(journal) + ".meta.json"))
+        if any(destination == path.resolve() for path in protected):
+            raise ValueError("Recovery output must differ from original evidence")
+        blocks = Path(str(journal) + ".blocks").resolve()
+        if destination == blocks or blocks in destination.parents:
+            raise ValueError("Recovery output must be outside original-sector evidence")
+    if any(destination == path.resolve() for path in extra_inputs if path is not None):
+        raise ValueError("Recovery output must differ from original evidence")
+
+
 def run(argv: Sequence[str] | None = None) -> dict[str, object]:
     args = _parser().parse_args(argv)
     if args.action == "backup":
@@ -191,6 +210,7 @@ def run(argv: Sequence[str] | None = None) -> dict[str, object]:
         return verify_archive(args.archive, args.profile)
 
     if args.action == "verify-recovery":
+        _recovery_output(args.output, [args.journal], [args.original_bin])
         identity=None
         if args.platform=="android":
             if not all((args.family,args.controller,args.firmware,args.vin)) or args.osid is not None:
@@ -211,12 +231,8 @@ def run(argv: Sequence[str] | None = None) -> dict[str, object]:
             identity = AndroidIdentity(args.family, args.controller, args.firmware, args.vin).validate()
         elif any((args.family, args.controller, args.firmware)):
             raise ValueError("Windows target identity is read from metadata")
-        inputs = {p.resolve() for p in args.journal}
         options = dict(android_identity=identity, expected_vin=args.vin, expected_osid=args.osid)
-        if args.action == "verify-recovery-history-report":
-            inputs.add(args.report.resolve())
-        if args.output.resolve() in inputs:
-            raise ValueError("History output must differ from original evidence")
+        _recovery_output(args.output, args.journal, [getattr(args, "report", None)])
         if args.action == "verify-recovery-history-report":
             result = verify_history_report(args.report, args.journal, args.platform, **options)
         else:
@@ -224,6 +240,7 @@ def run(argv: Sequence[str] | None = None) -> dict[str, object]:
         return write_report(args.output, result)
 
     if args.action == "verify-recovery-report":
+        _recovery_output(args.output, [args.journal], [args.report, args.original_bin])
         return write_report(args.output, verify_recovery_report(
             args.report, args.journal, original_bin=args.original_bin, expected_vin=args.vin))
 
