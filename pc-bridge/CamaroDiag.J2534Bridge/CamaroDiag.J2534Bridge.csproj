@@ -18,5 +18,8 @@
     <Compile Include="../../connectors/host/windows-discovery/J1979CampaignSemantics.cs" Link="Connectors/J1979CampaignSemantics.cs" />
     <Compile Include="../../connectors/host/windows-discovery/J1979SerialPortLink.cs" Link="Connectors/J1979SerialPortLink.cs" />
     <Compile Include="../../connectors/host/windows-discovery/J1979NativeReport.cs" Link="Connectors/J1979NativeReport.cs" />
+    <Compile Include="../../connectors/host/windows-discovery/J1979FreezeNative.cs" Link="Connectors/J1979FreezeNative.cs" />
+    <Compile Include="../../connectors/host/windows-discovery/J1979FreezeUsbCapture.cs" Link="Connectors/J1979FreezeUsbCapture.cs" />
+    <Compile Include="../../connectors/host/windows-discovery/J1979FreezeNativeCli.cs" Link="Connectors/J1979FreezeNativeCli.cs" />
   </ItemGroup>
 </Project>
