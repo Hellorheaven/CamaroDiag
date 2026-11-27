@@ -18,6 +18,7 @@ from .j1979_live_inspection import inspect_file, compare_files
 from .j1979_network_inspection import inspect_network_file
 from .j1979_legacy_inspection import inspect_file as inspect_legacy_file
 from .j1979_mutation_inspection import inspect_files as inspect_legacy_mutation
+from .j1979_can_mutation_inspection import inspect_files as inspect_can_mutation
 from .j1979_legacy_discovery_inspection import inspect_file as inspect_legacy_discovery, bind_files as bind_legacy_scan
 from .j1979_capture_inspection import verify_files as verify_j1979_capture
 from .connector_checkpoint import inspect_file as inspect_checkpoint, inspect_history, verify_report as verify_checkpoint_report
@@ -138,6 +139,12 @@ def _parser() -> argparse.ArgumentParser:
     binding.add_argument("--scan", type=Path, required=True)
     binding.add_argument("--output", type=Path, required=True)
 
+    can_mutation = commands.add_parser("verify-can-mutation", help="Replay physical CAN clear/EVAP reports without hardware")
+    can_mutation.add_argument("--report", type=Path, required=True)
+    can_mutation.add_argument("--baseline", type=Path)
+    can_mutation.add_argument("--vin")
+    can_mutation.add_argument("--output", type=Path, required=True)
+
     mutation = commands.add_parser("verify-legacy-mutation", help="Replay recorded legacy clear/EVAP evidence; never transmit")
     mutation.add_argument("--report", type=Path, required=True)
     mutation.add_argument("--baseline", type=Path)
@@ -236,13 +243,14 @@ def run(argv: Sequence[str] | None = None) -> dict[str, object]:
         if args.output.resolve() in (args.discovery.resolve(),args.scan.resolve()):
             raise ValueError("Output must differ from original reports")
         return write_report(args.output, bind_legacy_scan(args.discovery,args.scan))
-    if args.action == "verify-legacy-mutation":
+    if args.action in ("verify-legacy-mutation","verify-can-mutation"):
         inputs = {args.report.resolve()}
         if args.baseline is not None:
             inputs.add(args.baseline.resolve())
         if args.output.resolve() in inputs:
             raise ValueError("Inspection output must differ from original evidence")
-        return write_report(args.output, inspect_legacy_mutation(args.report, args.baseline, expected_vin=args.vin))
+        inspector = inspect_can_mutation if args.action == "verify-can-mutation" else inspect_legacy_mutation
+        return write_report(args.output, inspector(args.report, args.baseline, expected_vin=args.vin))
 
     if args.action == "verify-j1979-capture":
         if args.output.resolve() in (args.capture.resolve(), args.report.resolve()):
@@ -282,7 +290,8 @@ def main() -> None:
     except (OSError, ValueError) as exc:
         parser.exit(status=2, message=f"OFFLINE ERROR: {exc}\n")
     print(json.dumps(result, indent=2, sort_keys=True))
-    if result.get("schema") == "camarodiag-j1979-legacy-mutation-inspection-v1" and result["baseline_required_missing"]:
+    if result.get("schema") in ("camarodiag-j1979-legacy-mutation-inspection-v1",
+                                "camarodiag-j1979-can-mutation-inspection-v1") and result["baseline_required_missing"]:
         raise SystemExit(7)
     if result.get("schema") == "camarodiag-j1979-capture-inspection-v1" and not result["verified"]:
         raise SystemExit(2)
