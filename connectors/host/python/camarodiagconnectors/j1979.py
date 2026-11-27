@@ -13,7 +13,7 @@ from collections.abc import Callable
 from .j1979_campaign_evidence import decode_observation, summarize_observations
 from .j1979_monitor_scaling import scale_record, from_steps as scaled_monitor_records
 from .j1979_scaling_context import project as contextual_measurements, config_data, CONFIG_PIDS
-from .j1979_drive_cycle import project as operating_context, cycle_data
+from .j1979_drive_cycle import project as operating_context, cycle_data, TRIMS, trim_width
 from .j1979_vehicle_info import can_info
 from .j1979_multi_signal import width as multi_width, decode_response as multi_decode, from_steps as multi_records
 
@@ -216,7 +216,13 @@ def _validate(request: bytes, response: bytes) -> str | None:
         }
         width = (4 if pid % 32 == 0 else
                  2 if request[0] == 2 and pid == 2 else lengths.get(pid))
-        if width is not None and len(response) != len(request) + width:
+        # Fuel trims can carry a second bank byte. Validate the width here
+        # without assigning that byte to a bank; contextual attribution is
+        # performed later from the same responder's PID 1D evidence.
+        if pid in TRIMS:
+            if not trim_width(pid, len(response) - len(request)):
+                raise ValueError("Wrong fuel-trim PID data width")
+        elif width is not None and len(response) != len(request) + width:
             raise ValueError("Wrong PID data width")
     if request[0] == 9 and request[1] in (4, 6, 10):
         width = {4: 16, 6: 4, 10: 20}[request[1]]
