@@ -4,6 +4,7 @@
 #include "j1979_monitor_scaling.h"
 #include "j1979_vehicle_info.h"
 #include "j1979_multi.hpp"
+#include "j1979_status.hpp"
 #include <algorithm>
 #include <array>
 #include <charconv>
@@ -311,6 +312,8 @@ std::string report(const Evidence& e,std::string_view expected,std::string_view 
     out<<"],\"multi_signal_records\":";
     // CJ/1 has no final VIN recheck; do not attribute ECU-specific ranges.
     cd::j1979::write_multi_json(out,observations);
+    out<<",\"status_records\":";
+    cd::j1979::write_status_json(out,observations);
     out<<",\"capture_sha256\":";quote(out,digest);out<<"}\n";
     auto result=out.str();require(result.size()<=max_report,"CJ/1 report byte limit");return result;
 }
