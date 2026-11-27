@@ -141,6 +141,10 @@ def verify(capture, report, *, expected_vin=None):
             for field in STEP_FIELDS:
                 compare(actual, field, wanted[field], f"steps[{index}].{field}")
     compare(report, "service_observations", replay["service_observations"])
+    # Older v1 reports did not provide this derived view; if present it must
+    # exactly match the captured response, not a producer-supplied claim.
+    if "extended_vehicle_info" in report:
+        compare(report, "extended_vehicle_info", replay["extended_vehicle_info"])
     wanted_summary = replay["summary"]
     actual_summary = report.get("summary")
     if wanted_summary is None:
@@ -219,6 +223,7 @@ def verify(capture, report, *, expected_vin=None):
         "summary": wanted_summary,
         "verified_prefix_steps": len(replay["steps"]),
         "service_observations": replay["service_observations"],
+        "extended_vehicle_info": replay["extended_vehicle_info"],
         "capture_error": replay["error"],
         "host_error": report.get("error"),
         "device_credential_independently_verified": False,
