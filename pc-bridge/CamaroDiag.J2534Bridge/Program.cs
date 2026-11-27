@@ -41,6 +41,11 @@ internal static class Program
         if (args.Contains(ObdJ1979CatalogueCli.Command, StringComparer.OrdinalIgnoreCase))
             return ObdJ1979CatalogueCli.Run(args);
 
+        // Reject mixed native live options before any other driver path.
+        if (args.Contains(CamaroDiagConnectors.Windows.J1979LiveNativeCli.CaptureCommand,StringComparer.OrdinalIgnoreCase) ||
+            args.Contains(CamaroDiagConnectors.Windows.J1979LiveNativeCli.InspectCommand,StringComparer.OrdinalIgnoreCase))
+            return CamaroDiagConnectors.Windows.J1979LiveNativeCli.Run(args);
+
         // Parse the complete backup invocation first; a mixed command never
         // falls through to an unrelated driver, programming or network path.
         if (args.Contains(DoIpBackupCli.BackupCommand, StringComparer.OrdinalIgnoreCase) ||
