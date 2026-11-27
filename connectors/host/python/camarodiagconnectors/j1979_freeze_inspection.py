@@ -108,7 +108,7 @@ def replay_result(result, *, expected_vin=None):
             _require(isinstance(value, dict), "Missing decoded measurement")
             number = value.get("number")
             target = expected["measurement"]["number"]
-            _require(type(number) in (int, float) and math.isfinite(number) and
+            _require(type(number) in (int, float) and -1e100 <= number <= 1e100 and math.isfinite(number) and
                      math.isclose(number, target, rel_tol=1e-12, abs_tol=1e-12),
                      "Decoded measurement differs")
             value["number"] = target
