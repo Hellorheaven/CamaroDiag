@@ -11,6 +11,7 @@ internal static class ObdJ1979MultiSignal
         int Multiplier,int Divisor,int Bias,int Bit,bool Signed,long? Unavailable);
     private sealed record Definition(int Width,int SupportMask,Field[] Fields);
     internal sealed record Signal(int Pid,string Name,string Unit,double Number,long RawEncoded);
+    internal sealed record Record(string RequestHex,IReadOnlyList<Signal> Signals);
 
     private static readonly Dictionary<int,Definition> Definitions = new()
     {
@@ -289,6 +290,16 @@ internal static class ObdJ1979MultiSignal
         try{return DecodeResponse(Convert.FromHexString(requestHex),Convert.FromHexString(responseHex));}
         catch(FormatException){return null;}
     }
+
+    internal static Record? TryRecord(string requestHex,string? responseHex,string status)
+    {
+        var signals=TryRaw(requestHex,responseHex,status);
+        return signals is null?null:new(requestHex,signals);
+    }
+
+    internal static object Evidence(Record record)=>new {request_hex=record.RequestHex,
+        signals=record.Signals.Select(s=>new{pid=s.Pid,name=s.Name,unit=s.Unit,
+            number=s.Number,raw_encoded=s.RawEncoded})};
 
     internal static string Format(IReadOnlyList<Signal> signals)=>signals.Count==0?"No supported signal in record":
         string.Join("; ",signals.Select(s=>$"{s.Name}={s.Number.ToString("0.######",CultureInfo.InvariantCulture)} {s.Unit}"));
