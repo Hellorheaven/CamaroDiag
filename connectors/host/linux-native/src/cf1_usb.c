@@ -1,5 +1,6 @@
 #define _POSIX_C_SOURCE 200809L
 #include "cf1_usb.h"
+#include "cl1_usb.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -270,6 +271,168 @@ cleanup:
     OPENSSL_cleanse(profile, sizeof(profile));
     if (result != 0) {
         failed(err, cap, why);
+        return -1;
+    }
+    return 0;
+}
+
+/* Native C CU/3 CL/1 capture, transport only. The same bound, locally
+ * approved USB CDC port and existing fail-closed serial deadline primitives
+ * are deliberately shared with the CU/2 implementation above. This
+ * cannot silently fall back to CU/1, CU/2, Python, or another ECU.
+ */
+int cl1_usb_capture(const char *port_path,const cl1_plan *plan,
+                    const uint8_t key[32],const char *capture_path,
+                    cf1_usb_capture_result *out,char *err,size_t cap) {
+    if (!out) return failed(err,cap,"Missing native CU/3 capture state");
+    memset(out,0,sizeof(*out));
+    cancelled=0;
+    if (!tty_name(port_path) || !cl1_valid_plan(plan) || !key || !capture_path)
+        return failed(err,cap,"Selected USB CDC, approved VIN and CU/3 scope required");
+    uint8_t nonce[32]={0};
+    uint8_t hello[CL1_CU3_HELLO_SIZE]={0};
+    uint8_t challenge[CL1_CU3_CHALLENGE_SIZE]={0};
+    uint8_t proof[CL1_CU3_PROOF_SIZE]={0};
+    uint8_t canonical[CL1_PLAN_SIZE]={0};
+    int serial=-1,file=-1,result=-1;
+    struct termios previous={0};
+    bool has_previous=false;
+    uint8_t *raw=NULL;
+    const char *why="CU/3 CL/1 recording interrupted";
+    if (!cl1_cu3_random_nonce(nonce) ||
+        !cl1_cu3_hello(plan,nonce,hello,err,cap) ||
+        !cl1_encode_plan(plan,canonical,err,cap)) {
+        why="Cannot prepare canonical CU/3 authorization";
+        goto cleanup;
+    }
+    serial=open(port_path,O_RDWR|O_NOCTTY|O_NONBLOCK|O_NOFOLLOW|O_CLOEXEC);
+    if (serial<0 || !configure_serial(serial,&previous)) {
+        why="Selected native USB CDC port cannot be configured";
+        goto cleanup;
+    }
+    has_previous=true;
+    file=open(capture_path,O_WRONLY|O_CREAT|O_EXCL|O_NOFOLLOW|O_CLOEXEC,0600);
+    if (file<0) {
+        why="CL/1 evidence destination already exists or is unsafe";
+        goto cleanup;
+    }
+    out->capture_file_created=true;
+    raw=malloc(CL1_MAX_CAPTURE);
+    if (!raw) {
+        why="CL/1 bounded capture allocation unavailable";
+        goto cleanup;
+    }
+    const uint64_t now=monotonic_ms();
+    if (!now) {
+        why="CU/3 monotonic clock unavailable";
+        goto cleanup;
+    }
+    const uint64_t auth_deadline=now+5000u;
+    if (write_deadline(serial,hello,sizeof(hello),auth_deadline) ||
+        read_deadline(serial,challenge,sizeof(challenge),auth_deadline)) {
+        why="CU/3 hello/challenge interrupted or expired; no retry";
+        goto cleanup;
+    }
+    if (!cl1_cu3_proof(hello,challenge,key,proof,err,cap)) {
+        why="CU/3 server HMAC proof rejected; client proof not transmitted";
+        goto cleanup;
+    }
+    out->authenticated=true;
+    if (write_deadline(serial,proof,sizeof(proof),auth_deadline)) {
+        why="CU/3 client proof uncertain; no retry or channel recovery";
+        goto cleanup;
+    }
+    out->client_proof_sent=true;
+    const uint64_t capture_started=monotonic_ms();
+    if (!capture_started) {
+        why="CU/3 capture monotonic clock unavailable";
+        goto cleanup;
+    }
+    const uint64_t deadline=capture_started+plan->budget_ms+15000u;
+    for (size_t seq=0;seq<CL1_MAX_STEPS+2u && !cancelled;++seq) {
+        if (out->raw_bytes_received+8u>CL1_MAX_CAPTURE) {
+            why="CL/1 input exceeds the preapproved maximum";
+            goto cleanup;
+        }
+        uint8_t *h=raw+out->raw_bytes_received;
+        if (receive_to_capture(serial,file,h,8,deadline,out)) {
+            why="CU/3 CL/1 header interrupted; received bytes preserved";
+            goto cleanup;
+        }
+        const uint16_t length=little16(h+6);
+        if (h[0]!='C' || h[1]!='L' || h[2]!=1 ||
+            little16(h+4)!=seq ||
+            (seq==0 ? h[3]!=1 : (h[3]!=2 && h[3]!=3)) ||
+            length<1 || length>CL1_MAX_BODY ||
+            (h[3]==1 && length!=CL1_PLAN_SIZE) ||
+            (h[3]==2 && length<CL1_EVENT_SIZE) ||
+            (h[3]==3 && length!=CL1_TERMINAL_SIZE)) {
+            why="CU/3 CL/1 record framing, sequence or size mismatch";
+            goto cleanup;
+        }
+        if (out->raw_bytes_received+(size_t)length+4u>CL1_MAX_CAPTURE) {
+            why="CL/1 evidence exceeds retained byte bound";
+            goto cleanup;
+        }
+        uint8_t *body=raw+out->raw_bytes_received;
+        if (receive_to_capture(serial,file,body,(size_t)length+4u,
+                               deadline,out)) {
+            why="CU/3 CL/1 body interrupted; received bytes preserved";
+            goto cleanup;
+        }
+        if (cf1_crc32(h,(size_t)length+8u)!=little32(body+length)) {
+            why="CL/1 observed record CRC mismatch";
+            goto cleanup;
+        }
+        if (seq==0 && memcmp(body,canonical,CL1_PLAN_SIZE)) {
+            why="CL/1 plan differs from authenticated CU/3 read scope";
+            goto cleanup;
+        }
+        if (h[3]==3) {
+            out->terminal_received=true;
+            struct pollfd poller={.fd=serial,.events=POLLIN};
+            int extra;
+            do {extra=poll(&poller,1,100);}
+            while (extra<0 && errno==EINTR && !cancelled);
+            if (extra<0 || cancelled ||
+                (extra>0 && (poller.revents&(POLLIN|POLLERR|POLLHUP|POLLNVAL)))) {
+                why="CU/3 trailing data or channel failure after CL/1 terminal";
+                goto cleanup;
+            }
+            if (monotonic_ms()>=deadline) {
+                why="CU/3 terminal verification exceeded deadline";
+                goto cleanup;
+            }
+            if (fsync(file)!=0) {
+                why="CL/1 complete capture cannot be durably synchronized";
+                goto cleanup;
+            }
+            result=0;
+            break;
+        }
+    }
+    if (result!=0)
+        why=cancelled?"CU/3 operator cancelled":"CL/1 sequence bound reached without terminal";
+cleanup:
+    if (file>=0) {
+        if (result!=0) fsync(file); /* Persist partial evidence if possible. */
+        close(file);
+    }
+    if (serial>=0) {
+        if (has_previous) tcsetattr(serial,TCSANOW,&previous);
+        close(serial);
+    }
+    if (raw) {
+        OPENSSL_cleanse(raw,out->raw_bytes_received);
+        free(raw);
+    }
+    OPENSSL_cleanse(nonce,sizeof(nonce));
+    OPENSSL_cleanse(hello,sizeof(hello));
+    OPENSSL_cleanse(challenge,sizeof(challenge));
+    OPENSSL_cleanse(proof,sizeof(proof));
+    OPENSSL_cleanse(canonical,sizeof(canonical));
+    if (result!=0) {
+        failed(err,cap,why);
         return -1;
     }
     return 0;
