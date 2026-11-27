@@ -108,6 +108,49 @@ internal static class ObdJ1979FreezeCatalogue
                 Check(rows.Count<=SignalLimit,"Projection row limit");
             }
         }
+        // Catalogue coverage reports observed evidence, not SAE normative completeness.
+        // A truncated inventory must never mark a documented PID as unsupported.
+        var auditedFrames=new List<Dictionary<string,object?>>();
+        var capturedFrames=result.Frames.ToDictionary(frame=>frame.Frame);
+        foreach(int number in result.Plan.Frames)
+        {
+            capturedFrames.TryGetValue(number,out var captured);
+            var defined=catalogue.Definitions.Keys.Where(key=>key.Frame==number)
+                .Select(key=>key.Pid).ToHashSet();
+            var advertised=(captured?.AdvertisedPids??System.Array.Empty<int>())
+                .Where(pid=>pid!=2&&pid%32!=0).ToHashSet();
+            var frameRows=rows.Where(row=>(int)row["frame"]! ==number).ToArray();
+            var requested=frameRows.Select(row=>(int)row["pid"]!).ToHashSet();
+            var answered=frameRows.Where(row=>(string)row["source_status"]! is "RAW" or "PASSED")
+                .Select(row=>(int)row["pid"]!).ToHashSet();
+            var projected=frameRows.Where(row=>(string)row["projection_status"]! =="PROJECTED")
+                .Select(row=>(int)row["pid"]!).ToHashSet();
+            int[] Sorted(IEnumerable<int> values)=>values.OrderBy(value=>value).ToArray();
+            auditedFrames.Add(new(){
+                ["frame"]=number,
+                ["source_status"]=captured?.Status??"UNVISITED",
+                ["inventory_complete"]=captured?.InventoryComplete??false,
+                ["trigger_stable"]=captured?.TriggerStable??false,
+                ["documented_pids"]=Sorted(defined),
+                ["advertised_measurement_pids"]=Sorted(advertised),
+                ["requested_measurement_pids"]=Sorted(requested),
+                ["responded_measurement_pids"]=Sorted(answered),
+                ["projected_measurement_pids"]=Sorted(projected),
+                ["advertised_without_documentation"]=Sorted(advertised.Except(defined)),
+                ["documented_without_advertisement"]=captured?.InventoryComplete==true?
+                    Sorted(defined.Except(advertised)):null,
+                ["advertised_not_requested"]=Sorted(advertised.Except(requested)),
+                ["documented_responses_not_projected"]=Sorted(answered.Intersect(defined).Except(projected)),
+            });
+        }
+        var catalogueCoverage=new Dictionary<string,object?>{
+            ["scope"]="EXPLICIT_FREEZE_FRAMES_ONLY",
+            ["normative_compliance_verified"]=false,
+            ["hardware_provenance_verified"]=false,
+            ["unrequested_catalogue_frames"]=catalogue.Definitions.Keys.Select(key=>key.Frame)
+                .Distinct().Except(result.Plan.Frames.Select(frame=>(int)frame)).OrderBy(frame=>frame).ToArray(),
+            ["frames"]=auditedFrames,
+        };
         return new(){
             ["schema"]=Projection,["reference_edition"]=catalogue.Edition,["reference_sha256"]=catalogue.ReferenceSha256,
             ["catalogue_sha256"]=catalogue.Sha256,["source_capture_sha256"]=Sha(capture),
@@ -117,6 +160,7 @@ internal static class ObdJ1979FreezeCatalogue
             ["native_capture_replayed"]=true,["transport_frames_replayed"]=false,["reference_authenticity_verified"]=false,
             ["normative_compliance_verified"]=false,["physical_vehicle_verified"]=false,["authenticated"]=false,
             ["permits_programming"]=false,["diagnostic_verdict"]=null,["frames"]=frames,
-            ["unvisited_frames"]=result.UnvisitedFrames,["counts"]=counts,["rows"]=rows};
+            ["unvisited_frames"]=result.UnvisitedFrames,["counts"]=counts,["rows"]=rows,
+            ["catalogue_coverage"]=catalogueCoverage};
     }
 }

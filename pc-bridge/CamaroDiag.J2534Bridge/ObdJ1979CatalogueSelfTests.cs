@@ -142,6 +142,23 @@ internal static class ObdJ1979CatalogueSelfTests
             Check(entries[2].GetProperty("signals")[0].GetProperty("value").GetProperty("numerator").GetString()=="4100",
                 "frame one definition differs");
             Check(entries[3].GetProperty("projection_status").GetString()=="NO_DOCUMENTED_DEFINITION","unknown frame PID");
+            var coverage=freezeDoc.RootElement.GetProperty("catalogue_coverage");
+            Check(coverage.GetProperty("scope").GetString()=="EXPLICIT_FREEZE_FRAMES_ONLY"&&
+                !coverage.GetProperty("normative_compliance_verified").GetBoolean()&&
+                !coverage.GetProperty("hardware_provenance_verified").GetBoolean(),
+                "CF/1 audit never implies normative or physical qualification");
+            var audited=coverage.GetProperty("frames");
+            Check(audited.GetArrayLength()==2&&audited[0].GetProperty("frame").GetInt32()==0&&
+                audited[1].GetProperty("frame").GetInt32()==1,"CF/1 audit scopes both requested frames");
+            Check(audited[0].GetProperty("advertised_without_documentation").GetArrayLength()==0&&
+                audited[0].GetProperty("documented_pids").GetArrayLength()==2,
+                "frame zero has separately documented PIDs");
+            Check(audited[1].GetProperty("advertised_without_documentation")[0].GetInt32()==13&&
+                audited[1].GetProperty("responded_measurement_pids").GetArrayLength()==2&&
+                audited[1].GetProperty("projected_measurement_pids").GetArrayLength()==1,
+                "frame one unrecognised value is retained without cross-frame interpretation");
+            Check(audited[1].GetProperty("documented_without_advertisement").GetArrayLength()==0,
+                "complete inventory permits determining unadvertised definitions");
             Check(freezeDoc.RootElement.GetProperty("source_capture_sha256").GetString()==
                 ObdJ1979DocumentedCatalogue.Sha(freeze),"CF/1 original digest");
         }
