@@ -103,6 +103,8 @@ internal sealed partial class BridgeDesktopForm
                     J1979RecipeText("ScanDtcMode"),mode.Mode.ToString("X2"),mode.Codes is null?J1979RecipeText("Unavailable"):
                         mode.Codes.Count==0?J1979RecipeText("NativeUsbZeroDtc"):string.Join(", ",mode.Codes)));
                 foreach(var value in result.Measurements)output.AppendLine($"{value.Mode:X2}/{value.Pid:X2}: {value.Number} {value.Unit}");
+                foreach(var record in result.MultiSignalRecords)
+                    output.AppendLine(record.RequestHex+": "+ObdJ1979MultiSignal.Format(record.Signals));
                 foreach(var step in result.Steps)output.AppendLine($"{step.RequestHex} [{step.Status}] {step.ResponseHex}");
             }
             output.AppendLine(J1979RecipeText("NetworkScope"));
