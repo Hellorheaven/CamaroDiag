@@ -114,7 +114,7 @@ internal sealed partial class BridgeDesktopForm
             output.AppendLine(J1979RecipeText("CatalogueScope"));
             MessageBox.Show(this,output.ToString(),J1979RecipeText("CatalogueProject"),MessageBoxButtons.OK,MessageBoxIcon.Information);
         }
-        catch(Exception e) when(e is IOException or UnauthorizedAccessException or ArgumentException or
+        catch(Exception e) when(e is IOException or InvalidDataException or UnauthorizedAccessException or ArgumentException or
             System.Text.Json.JsonException or FormatException or InvalidOperationException or KeyNotFoundException or OverflowException)
         {
             if(!IsDisposed&&DateTimeOffset.UtcNow<expiry&&functionalAuthorizedUntil==expiry)
