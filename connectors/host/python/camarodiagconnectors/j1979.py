@@ -10,6 +10,7 @@ import socket
 import time
 from collections.abc import Callable
 from .j1979_campaign_evidence import decode_observation, summarize_observations
+from .j1979_monitor_scaling import scale_record
 
 _MAX_PAYLOAD = 4095
 Exchange = Callable[[bytes, float], bytes]
@@ -342,7 +343,10 @@ def scan(exchange: Exchange, *, budget: float = 180.0,
             records.append({"mid": part[0], "tid": part[1], "uasid": part[2],
                             "raw": int.from_bytes(part[3:5], "big"),
                             "min_raw": int.from_bytes(part[5:7], "big"),
-                            "max_raw": int.from_bytes(part[7:9], "big")})
+                            "max_raw": int.from_bytes(part[7:9], "big"),
+                            "scaled": scale_record(part[2], int.from_bytes(part[3:5], "big"),
+                                                   int.from_bytes(part[5:7], "big"),
+                                                   int.from_bytes(part[7:9], "big"))})
         return records
 
     for mid in inventory(6):
