@@ -214,4 +214,10 @@
   <data name="NativeMaintenanceUnverified" xml:space="preserve"><value>Journal not verified; no successful operation claimed.</value></data>
   <data name="NativeMaintenancePrefixInspect" xml:space="preserve"><value>Inspect interrupted maintenance journal</value></data>
   <data name="NativeMaintenancePrefixConsistent" xml:space="preserve"><value>Complete prefix records checked; terminal absent. Recovery remains required.</value></data>
+  <data name="NativeArchiveRun" xml:space="preserve"><value>Retrieve existing maintenance archive</value></data>
+  <data name="NativeArchiveBudget" xml:space="preserve"><value>Original operation budget (ms)</value></data>
+  <data name="NativeArchiveWarning" xml:space="preserve"><value>Read-only export; no maintenance command is sent. Select the original scope.</value></data>
+  <data name="NativeArchiveAccept" xml:space="preserve"><value>I authorize read-only export</value></data>
+  <data name="NativeArchiveConfirm" xml:space="preserve"><value>Confirm retrieval of the existing journal</value></data>
+  <data name="NativeArchiveReadOnly" xml:space="preserve"><value>Read-only archive (no new vehicle test)</value></data>
 </root>
