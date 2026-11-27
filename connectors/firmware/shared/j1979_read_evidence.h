@@ -46,6 +46,68 @@ class J1979ReadEvidence {
     }
   }
 
+  // These are separately decoded engineering views on the host. Preserve
+  // CJ/1 RAW status (not a claim of sensor validity), but reject incorrect
+  // lengths/reserved presence bits on new firmware acquisitions.
+  struct MultiLayout { size_t width; uint8_t mask; uint8_t rangeOffset; };
+  static MultiLayout multiLayout(uint8_t pid){
+    if(pid>=0x14&&pid<=0x1b)return {2,0,0};
+    if((pid>=0x24&&pid<=0x2b)||(pid>=0x34&&pid<=0x3b))return {4,0,0};
+    switch(pid){
+      case 0x64:return {5,0,0};
+      case 0x66:case 0x73:case 0x74:case 0x87:return {5,3,0};
+      case 0x67:return {3,3,0};
+      case 0x68:case 0x69:return {7,0x3f,0};
+      case 0x6a:case 0x6c:case 0x72:case 0x77:return {5,15,0};
+      case 0x6b:return {5,0xff,4};
+      case 0x6d:return {11,0x3f,0};
+      case 0x6e:case 0x78:case 0x79:case 0x7c:case 0x83:case 0x98:case 0x99:return {9,15,0};
+      case 0x6f:return {3,15,2};
+      case 0x70:return {10,0x3f,0};
+      case 0x71:return {6,0x3f,0};
+      case 0x75:case 0x76:case 0x8f:return {7,15,0};
+      case 0x7a:case 0x7b:return {7,7,0};
+      case 0x7f:return {13,7,0};
+      case 0x81:case 0x82:case 0x89:case 0x8a:return {41,31,0};
+      case 0x84:case 0x8d:case 0x8e:return {1,0,0};
+      case 0x85:return {10,15,0};
+      case 0x8b:return {7,127,0};
+      case 0x8c:case 0x9c:return {17,255,0};
+      case 0x93:return {3,1,0};
+      case 0x94:return {12,63,0};
+      default:return {0,0,0};
+    }
+  }
+
+  static bool validMulti(MultiLayout layout,const uint8_t* data,size_t size){
+    if(!data||!layout.width||size!=layout.width)return false;
+    if(layout.mask&&(data[0]&uint8_t(~layout.mask)))return false;
+    if(layout.rangeOffset){
+      const unsigned mask=(1u<<layout.rangeOffset)-1u;
+      if(data[0]&(data[0]>>layout.rangeOffset)&mask)return false;
+    }
+    return true;
+  }
+
+  static bool validExtendedInfo(uint8_t type,const uint8_t* reply,size_t len){
+    if(len<3)return false;
+    const size_t count=reply[2];
+    if(type==8||type==11){
+      if(type==8&&count!=16&&count!=20)return false;
+      if(type==11&&count!=16&&count!=18)return false;
+      return len==3+count*2;
+    }
+    if(type==13||type==15){
+      if(count!=1||len!=20)return false;
+      size_t start=3;
+      while(start<len&&reply[start]==0)++start;
+      if(start==len)return false;
+      for(size_t i=start;i<len;++i)if(reply[i]<32||reply[i]>126)return false;
+      return true;
+    }
+    return false;
+  }
+
   static Result classify(Variant variant,const uint8_t* req,size_t n,
                          const uint8_t* reply,size_t len) {
     if(!readRequest(variant,req,n)||!reply||!len||len>4095)return Result::Invalid;
@@ -80,6 +142,11 @@ class J1979ReadEvidence {
     if(mode==1||mode==2){
       size_t offset=mode==2?3u:2u;
       if(mode==2&&req[1]==2)return len==5?Result::Positive:Result::Invalid;
+      if(legacy&&len>7)return Result::Invalid;
+      if(mode==1){
+        const auto layout=multiLayout(req[1]);
+        if(layout.width)return validMulti(layout,reply+offset,len-offset)?Result::Raw:Result::Invalid;
+      }
       const size_t width=pidWidth(req[1]);
       if(width)return len==offset+width?Result::Positive:Result::Invalid;
       return len>offset&&(!legacy||len<=7)?Result::Raw:Result::Invalid;
@@ -107,6 +174,8 @@ class J1979ReadEvidence {
         }
         return Result::Positive;
       }
+      if(req[1]==8||req[1]==11||req[1]==13||req[1]==15)
+        return validExtendedInfo(req[1],reply,len)?Result::Raw:Result::Invalid;
       size_t width=req[1]==4?16u:req[1]==6?4u:req[1]==10?20u:0u;
       if(width)return len>=3&&reply[2]>0&&len==3u+reply[2]*width?
         Result::Positive:Result::Invalid;
