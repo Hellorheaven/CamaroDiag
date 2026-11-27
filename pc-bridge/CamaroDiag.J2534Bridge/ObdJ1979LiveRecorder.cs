@@ -39,6 +39,7 @@ internal static class ObdJ1979LiveRecorder
         IReadOnlyList<Summary> Summary,bool Completed,string? StopReason,long DurationMs)
     {
         public IReadOnlyList<ChannelSummary> MultiSignalSummary {get;init;}=[];
+        public IReadOnlyList<ObdJ1979ScalingContext.Configuration>? ScalingConfiguration {get;init;}
         public string VinMatch=>ObservedVin is null?"UNVERIFIED":ObservedVin==DeclaredVin?"MATCH":"MISMATCH";
         public IReadOnlyList<byte> UnverifiedSelectedPids=>SelectedPids.Except(AdvertisedPids).ToArray();
         public bool Cancelled=>StopReason=="CANCELLED";
@@ -107,6 +108,10 @@ internal static class ObdJ1979LiveRecorder
         long? lastIdentity=null;
         int completedCycles=0;
         bool inventoryComplete=false;
+        var requiredConfigs=plan.Pids.Select(p=>ObdJ1979ScalingContext.Dependency(p)).OfType<int>().Distinct().Order().ToArray();
+        ObdJ1979ScalingContext.Context? scaling=null;
+        ObdJ1979ScalingContext.Context BuildScaling()=>ObdJ1979ScalingContext.Context.Build(admission.Select(
+            s=>new ObdJ1979ScalingContext.Observation(s.RequestHex,s.ResponseHex,s.Status)));
         bool Active(){
             if(stop is not null)return false;
             requireActive();
@@ -137,6 +142,9 @@ internal static class ObdJ1979LiveRecorder
                     if(status=="NEGATIVE"){
                         var nrc=ObdJ1979Transaction.Decode(request,raw).NegativeResponseCode;
                         detail=$"NRC_{nrc:X2}";
+                    }else if(phase=="SCALING"&&status is ("RAW" or "PASSED") &&
+                        !ObdJ1979ScalingContext.ValidConfiguration(request[1],raw.AsSpan(2))){
+                        throw new InvalidDataException("Invalid ECU measurement configuration.");
                     }else if(phase=="SAMPLE"&&status is ("RAW" or "PASSED") &&
                         pid is byte selected&&ObdJ1979MultiSignal.Width(selected) is not null){
                         if(ObdJ1979Status.Width(selected) is not null &&
@@ -144,9 +152,21 @@ internal static class ObdJ1979LiveRecorder
                             throw new InvalidDataException("Invalid categorical fields in multi-signal response.");
                         multi=ObdJ1979MultiSignal.DecodeResponse(request,raw)
                             ?? throw new InvalidDataException("Invalid multi-signal response.");
+                        if(scaling is not null&&ObdJ1979ScalingContext.Dependency(selected) is not null){
+                            var contextual=scaling.Decode(request,raw);
+                            if(contextual is null||contextual.Signals.Count!=multi.Count||
+                                contextual.Signals.Any(x=>x.Number is null))
+                                throw new InvalidDataException("Missing ECU scaling.");
+                            multi=multi.Select((signal,index)=>signal with {Number=contextual.Signals[index].Number!.Value}).ToArray();
+                        }
                     }else if(phase=="SAMPLE"&&status=="PASSED"){
                         value=ObdJ1979PidValues.Decode(request,raw);
                         if(value is null||value.Pid!=pid||value.Mode!=1)throw new InvalidDataException("Uncorrelated measurement.");
+                        if(scaling is not null&&ObdJ1979ScalingContext.Dependency(value.Pid) is not null){
+                            if(scaling.Decode(request,raw)?.Signals.Single().Number is not double number)
+                                throw new InvalidDataException("Missing ECU scaling.");
+                            value=value with {Number=number};
+                        }
                     }
                 }
             }catch(OperationCanceledException){stop=detail="CANCELLED";status="NOT_TESTED";evidence=null;value=null;multi=null;}
@@ -195,7 +215,7 @@ internal static class ObdJ1979LiveRecorder
                 pages.Add(page);
                 advertised.UnionWith(page.SupportedPids.Where(x=>x%32!=0));
                 if(!page.HasNextPage){inventoryComplete=true;break;}
-                if(plan.Pids.All(advertised.Contains))break;
+                if(plan.Pids.All(advertised.Contains)&&(requiredConfigs.Length==0||basePid>=0x40))break;
             }
             if(!plan.Pids.All(advertised.Contains))stop="SELECTED_PID_NOT_VERIFIED";
         }
@@ -209,6 +229,15 @@ internal static class ObdJ1979LiveRecorder
         }
         try{
             if(Identity("INITIAL_VIN"))Inventory();
+            if(stop is null&&requiredConfigs.Length>0){
+                foreach(int config in requiredConfigs){
+                    if(advertised.Contains((byte)config))Query([1,(byte)config],"SCALING");
+                    if(stop is not null)break;
+                }
+                scaling=BuildScaling();
+                if(stop is null&&scaling.Configurations.Any(c=>requiredConfigs.Contains(c.Pid)&&c.State=="UNVERIFIED"))
+                    stop="SCALING_UNVERIFIED";
+            }
             if(stop is null){
                 long next=Elapsed();
                 for(int cycle=1;cycle<=plan.Cycles;cycle++){
@@ -234,6 +263,7 @@ internal static class ObdJ1979LiveRecorder
         return new(plan.ExpectedVin,vin,plan.Pids,advertised.ToArray(),pages.ToArray(),inventoryComplete,
             plan.Cycles,completedCycles,plan.IntervalMs,plan.BudgetMs,admission.ToArray(),observations.ToArray(),
             plan.Pids.Select(pid=>stats[pid].Report()).ToArray(),stop is null&&completedCycles==plan.Cycles,stop,Elapsed()){
+                ScalingConfiguration=requiredConfigs.Length==0?null:(scaling??BuildScaling()).Configurations,
                 MultiSignalSummary=channels.OrderBy(x=>x.Key.Pid).ThenBy(x=>x.Key.Name,StringComparer.Ordinal)
                     .Select(x=>x.Value.Report(stats[(byte)x.Key.Pid].Report().Attempted)).ToArray()
             };
