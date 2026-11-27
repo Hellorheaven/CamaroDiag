@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.Json;
+using CamaroDiag.J2534Bridge;
 
 namespace CamaroDiagConnectors.Windows;
 
@@ -38,6 +39,8 @@ internal static class J1979NativeReport
                 measurement=s.PidMeasurement is { } value?new {
                     mode=value.Mode,pid=value.Pid,name=value.Name,number=value.Number,unit=value.Unit
                 }:null}),
+            extended_vehicle_info=result.Steps.Select(s=>ObdJ1979ExtendedVehicleInfo.TryRaw(s.RequestHex,s.ResponseHex,s.Status))
+                .OfType<ObdJ1979ExtendedVehicleInfo.Record>().Select(ObdJ1979ExtendedVehicleInfo.Evidence),
             service_observations=new[]{1,2,3,6,7,8,9,10}.Select(mode=>{
                 string hex=mode.ToString("X2",CultureInfo.InvariantCulture);
                 var rows=result.Steps.Where(s=>s.RequestHex.StartsWith(hex,StringComparison.Ordinal)).ToArray();
