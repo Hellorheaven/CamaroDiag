@@ -139,7 +139,7 @@ def mutation_recipe(protocol, read, protocol_check, transmit, *, operation, expe
         if not scope() or not stationary("010D", b"\x41\x0d\x00") or not stationary("010C", b"\x41\x0c\x00\x00"):
             return finish("NOT_TESTED", "STATIONARY_OR_SCOPE_UNVERIFIED")
         save_baseline(finish("BASELINE_SAVED"))
-        if protocol_check() != protocol or not stationary("010D", b"\x41\x0d\x00") or not stationary("010C", b"\x41\x0c\x00\x00"):
+        if protocol_check() != protocol or not scope() or not stationary("010D", b"\x41\x0d\x00") or not stationary("010C", b"\x41\x0c\x00\x00"):
             return finish("NOT_TESTED", "STATIONARY_OR_PROTOCOL_CHANGED")
         require_current()
         command = "04" if operation == "clear" else "08010000000000"
