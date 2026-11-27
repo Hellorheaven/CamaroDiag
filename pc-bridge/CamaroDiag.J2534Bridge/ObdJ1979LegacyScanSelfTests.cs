@@ -107,6 +107,25 @@ internal static class ObdJ1979LegacyScanSelfTests
             Check(complete.MonitorRecords.Single(x=>x.Mode==5).EncodedDataHex=="2A"&&
                 complete.MonitorRecords.Single(x=>x.Mode==6) is {ValueEncoded:1,LimitEncoded:2},
                 "Monitor encoded values retained without verdict");
+            // Diesel IPT is an odd-numbered data type, not a count. The
+            // shared count is InfoType 07, and only the selected source counts.
+            replies["0900"]=[[0x49,0,1,0xC2,0x20,0,0]];
+            replies["0907"]=[[0x49,7,9]];
+            byte[] dieselBytes=Enumerable.Range(0,18).SelectMany(n=>new byte[]{0,(byte)n}).ToArray();
+            replies["090B"]=dieselBytes.Chunk(4).Select((chunk,i)=>
+                new byte[]{0x49,11,(byte)(i+1),..chunk}).ToArray();
+            sent.Clear();
+            var diesel=Run().IdentificationRecords.Single(x=>x.InfoType==11).Extended;
+            Check(diesel is {CounterCount:18,GeneralDenominator:0,IgnitionCycles:1} &&
+                diesel.Monitors!.Last().Name=="fuel-system","Legacy diesel data reconstructed using 07 count");
+            var malformedDiesel=replies["090B"];
+            replies["090B"]=malformedDiesel.Reverse().ToArray();
+            var invalidDiesel=Run();
+            Check(invalidDiesel.IdentificationRecords.All(x=>x.InfoType!=11)&&
+                invalidDiesel.Steps.Single(x=>x.RequestHex=="090B").Status=="FAILED",
+                "Unordered legacy counter fragments rejected");
+            replies.Remove("0907");replies.Remove("090B");
+            replies["0900"]=[[0x49,0,1,0xC0,0,0,0]];
             sent.Clear();
             var mismatch=ObdJ1979LegacyScan.Run(source,Exchange,()=>{},TimeSpan.FromSeconds(10),"1FA6P8TH0L5100000");
             Check(mismatch.VinMatch=="MISMATCH"&&!mismatch.Completed&&
