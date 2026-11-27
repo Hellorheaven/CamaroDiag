@@ -8,6 +8,7 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="System.IO.Ports" Version="8.0.0" />
+    <Compile Include="../../../pc-bridge/CamaroDiag.J2534Bridge/ObdJ1979Mode06.cs" Link="ObdJ1979Mode06.cs" />
     <Compile Include="../../../pc-bridge/CamaroDiag.J2534Bridge/ObdJ1979ScalingContext.cs" Link="ObdJ1979ScalingContext.cs" />
     <Compile Include="../../../pc-bridge/CamaroDiag.J2534Bridge/ObdJ1979Status.cs" Link="ObdJ1979Status.cs" />
     <Compile Include="../../../pc-bridge/CamaroDiag.J2534Bridge/ObdJ1979MultiSignal.cs" Link="ObdJ1979MultiSignal.cs" />
