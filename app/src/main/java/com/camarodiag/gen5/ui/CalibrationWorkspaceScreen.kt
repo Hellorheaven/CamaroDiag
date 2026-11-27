@@ -156,6 +156,8 @@ data class CalibrationWorkspaceState(
     val canTraceReport: CanTraceAnalysisReport? = null,
     val archiveVerification: ArchiveVerification? = null,
     val physicalRecoveryReading: Boolean = false,
+    val physicalRecoveryExporting: Boolean = false,
+    val physicalRecoveryFolderUri: android.net.Uri? = null,
     val physicalRecoveryResult: com.camarodiag.gen5.data.obd.EcuPhysicalBackupInspection.Report? = null,
     val physicalRecoveryIdentity: PhysicalRecoveryIdentity? = null,
     val physicalRecoveryFailed: Boolean = false,
@@ -2814,7 +2816,7 @@ private fun PhysicalRecoveryPanel(state: CalibrationWorkspaceState, defaultVin: 
     var controller by remember(accountUid) { mutableStateOf("") }
     var firmware by remember(accountUid) { mutableStateOf("") }
     val identity = PhysicalRecoveryIdentity(vin, family.trim(), controller.trim(), firmware.trim())
-    val editable = !state.physicalRecoveryReading
+    val editable = !state.physicalRecoveryReading && !state.physicalRecoveryExporting
     Text(stringResource(R.string.cal_recovery_title), fontWeight = FontWeight.Bold, color = TextPrimary)
     Text(stringResource(R.string.cal_recovery_folder_hint), color = TextMuted, fontSize = 12.sp)
     OutlinedTextField(vin, { vin = it.uppercase().filter { ch -> ch in "ABCDEFGHJKLMNPRSTUVWXYZ0123456789" }.take(17) },
@@ -2830,13 +2832,21 @@ private fun PhysicalRecoveryPanel(state: CalibrationWorkspaceState, defaultVin: 
         modifier = Modifier.fillMaxWidth()) {
         Text(stringResource(R.string.cal_recovery_choose_folder))
     }
-    if (state.physicalRecoveryReading) CircularProgressIndicator()
+    if (state.physicalRecoveryReading || state.physicalRecoveryExporting) CircularProgressIndicator()
     if (state.physicalRecoveryIdentity == identity) {
         if (state.physicalRecoveryFailed) Text(stringResource(R.string.cal_recovery_folder_failed), color = WarnRed)
         state.physicalRecoveryResult?.let { report ->
             Text(stringResource(if (report.verified) R.string.cal_recovery_verified else R.string.cal_recovery_failed),
                 color = if (report.verified) OkGreen else WarnRed)
             Text(stringResource(R.string.cal_recovery_counts, report.sectors.size, report.expectedSectors, report.verifiedBytes))
+            report.journalAudit?.let { audit ->
+                Text(stringResource(R.string.recovery_journal_counts,audit.records,audit.baselineSectors,
+                    audit.verifiedSectors,audit.finalReadbackSectors),fontSize=12.sp)
+            }
+            report.journalSha256?.let { hash ->
+                Text(stringResource(R.string.recovery_journal_sha256),fontSize=12.sp)
+                Text(hash,fontFamily=FontFamily.Monospace,fontSize=10.sp)
+            }
             report.snapshotSha256?.let {
                 Text(stringResource(R.string.cal_recovery_snapshot_sha256), fontSize = 12.sp)
                 Text(it, fontFamily = FontFamily.Monospace, fontSize = 10.sp)
@@ -2859,10 +2869,16 @@ private fun PhysicalRecoveryPanel(state: CalibrationWorkspaceState, defaultVin: 
                 Text(stringResource(R.string.cal_recovery_sector, sector.region.name, sector.address, sector.length),
                     fontSize = 12.sp)
                 Text(sector.sha256, fontFamily = FontFamily.Monospace, fontSize = 10.sp)
+                sector.envelopeSha256?.let {
+                    Text(stringResource(R.string.recovery_envelope_sha256),fontSize=11.sp)
+                    Text(it,fontFamily=FontFamily.Monospace,fontSize=10.sp)
+                }
             }
             if (report.sectors.size > 20) Text(stringResource(R.string.cal_recovery_more, report.sectors.size - 20))
             Text(stringResource(R.string.cal_recovery_no_restore), color = CamaroAmber, fontSize = 12.sp)
-            OutlinedButton(onClick = { onExport(identity, report) }, enabled = editable && accountUid != null,
+            OutlinedButton(onClick = { onExport(identity, report) }, enabled = editable && accountUid != null &&
+                report.verified && report.snapshotSha256 != null && report.journalSha256 != null &&
+                state.physicalRecoveryFolderUri != null,
                 modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.cal_recovery_export)) }
             state.physicalRecoveryExportMessage?.let { Text(it, fontSize = 12.sp) }
         }

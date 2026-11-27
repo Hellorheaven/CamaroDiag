@@ -52,6 +52,7 @@ fun FunctionalTestsScreen(
     onRunClear: (EcuWriteConsentFlow.Approval, Long, VehicleProfile) -> Unit,
     legacyAvailableProtocol: Int?,
     onRunLegacy: (LegacyMutationTarget, EcuWriteConsentFlow.Approval, Long, VehicleProfile) -> Unit,
+    onRunLegacyRead: (com.camarodiag.gen5.data.obd.LegacyReadTarget, Long, VehicleProfile) -> Unit,
     nativeUsbEnabled: Boolean,
     onRunNativeUsb: (android.hardware.usb.UsbDevice, com.camarodiag.gen5.data.obd.CamaroDiagConnectorNativeCampaign.Target,
         android.net.Uri, Long, VehicleProfile) -> Unit
@@ -71,12 +72,16 @@ fun FunctionalTestsScreen(
     var engineSource by remember { mutableStateOf("") }
     var documentedSources by remember { mutableStateOf("") }
     var legacyProfileConfirmed by remember { mutableStateOf(false) }
+    var readSource by remember { mutableStateOf("") }
+    var readProfileConfirmed by remember { mutableStateOf(false) }
     var legacyPending by remember { mutableStateOf<Triple<Long, VehicleProfile, LegacyMutationTarget>?>(null) }
     var legacyStep by remember { mutableStateOf(EcuWriteConsentFlow.Step.WARNING) }
     LaunchedEffect(vehicle, connectionGeneration, legacyAvailableProtocol, selected) {
         legacyPending = null
         legacyProfileConfirmed = false
         engineSource = ""
+        readSource = ""
+        readProfileConfirmed = false
         documentedSources = ""
         legacyStep = EcuWriteConsentFlow.Step.WARNING
     }
@@ -245,6 +250,31 @@ fun FunctionalTestsScreen(
                     }
                 }
                 if (legacyProtocol != null) {
+                    val sourceTarget=parseSource(readSource)?.let {
+                        com.camarodiag.gen5.data.obd.LegacyReadTarget(legacyProtocol,it,vehicle.vin)
+                    }
+                    OutlinedTextField(readSource,{readSource=it.uppercase().take(2);readProfileConfirmed=false},
+                        label={Text(stringResource(R.string.legacy_read_source))},
+                        enabled=!state.running,singleLine=true,modifier=Modifier.fillMaxWidth())
+                    state.legacyDiscovery?.takeIf {
+                        it.protocol==legacyProtocol && state.context?.connectionGeneration==connectionGeneration &&
+                            state.context?.selectedVin==vehicle.vin
+                    }?.verifiedSources?.forEach { source ->
+                        OutlinedButton(onClick={readSource=source;readProfileConfirmed=false},enabled=!state.running) {
+                            Text(stringResource(R.string.legacy_read_select_source,source))
+                        }
+                    }
+                    Row(verticalAlignment=Alignment.CenterVertically) {
+                        Checkbox(readProfileConfirmed,{readProfileConfirmed=it},
+                            enabled=!state.running && legacyAvailableProtocol==legacyProtocol)
+                        Text(stringResource(R.string.legacy_read_confirm,vehicle.vin))
+                    }
+                    OutlinedButton(onClick={
+                        sourceTarget?.let { onRunLegacyRead(it,connectionGeneration,vehicle) }
+                        readProfileConfirmed=false
+                    },enabled=!state.running && legacyAvailableProtocol==legacyProtocol &&
+                        sourceTarget?.valid==true && readProfileConfirmed,
+                        modifier=Modifier.fillMaxWidth()) { Text(stringResource(R.string.legacy_read_run)) }
                     Text(stringResource(R.string.functional_legacy_mutation_scope),style=MaterialTheme.typography.bodySmall)
                     OutlinedTextField(engineSource,{ engineSource=it.uppercase().take(2);legacyProfileConfirmed=false },
                         label={ Text(stringResource(R.string.functional_legacy_engine_source)) },
@@ -270,6 +300,7 @@ fun FunctionalTestsScreen(
                         }
                     },enabled=legacyReady,modifier=Modifier.fillMaxWidth()) { Text(stringResource(R.string.functional_evap_run)) }
                 }
+                state.legacyRead?.let { LegacyReadReportContent(it) }
                 state.legacyTarget?.let { Text(stringResource(if (it.clear) R.string.functional_clear_run else R.string.functional_evap_run)) }
                 state.legacyResult?.reason?.let { Text(it,style=MaterialTheme.typography.bodySmall) }
                 state.protocol?.let { Text(stringResource(R.string.functional_protocol_report, it.title)) }

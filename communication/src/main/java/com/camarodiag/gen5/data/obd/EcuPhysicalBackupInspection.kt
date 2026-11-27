@@ -23,7 +23,8 @@ object EcuPhysicalBackupInspection {
         val region: EcuBackupCoverage.Region,
         val address: Long,
         val length: Long,
-        val sha256: String
+        val sha256: String,
+        val envelopeSha256: String? = null
     )
 
     data class Report(
@@ -38,8 +39,21 @@ object EcuPhysicalBackupInspection {
         val journalDisposition: PersistentEcuWriteJournal.RecoveryDisposition? = null,
         val problemAddress: Long? = null,
         val uncertainRegion: EcuBackupCoverage.Region? = null,
-        val snapshotSha256: String? = null
+        val snapshotSha256: String? = null,
+        val journalSha256: String? = null,
+        val journalAudit: PersistentEcuWriteJournal.Audit? = null
     )
+
+    /** A verified snapshot is comparable only with an independently acquired
+     * report. Failed backup inspections do not have a full snapshot and are
+     * never silently treated as current, even if the error text matches. */
+    fun requireSameVerifiedEvidence(previous: Report, current: Report) {
+        check(previous.verified && current.verified &&
+            previous.snapshotSha256 != null && previous.journalSha256 != null &&
+            previous == current) { "Recovery evidence changed or could not be independently verified." }
+    }
+
+    private fun digestHex(bytes: ByteArray) = bytes.joinToString("") { "%02x".format(it.toInt() and 255) }
 
     private const val MAX_JOURNAL_BYTES = 8L * 1024 * 1024
     private const val MAX_BLOCK_BYTES = 64L * 1024 * 1024
@@ -246,7 +260,9 @@ object EcuPhysicalBackupInspection {
                     verified += Sector(region, address, size, actualSha)
                     verifiedBytes = Math.addExact(verifiedBytes, size)
                 }
-                envelopeHashes[file.name] = envelopeHash.digest()
+                val envelope = envelopeHash.digest()
+                envelopeHashes[file.name] = envelope
+                verified[verified.lastIndex] = verified.last().copy(envelopeSha256 = digestHex(envelope))
             }
             current = null
             validateRanges(verified)
@@ -285,7 +301,9 @@ object EcuPhysicalBackupInspection {
                 { it.address })), verifiedBytes, "",
                 uncertainAddress = audit.uncertainAddress,
                 journalDisposition = audit.recoveryDisposition, uncertainRegion = audit.uncertainRegion,
-                snapshotSha256 = computeSnapshotDigest(data, envelopeHashes))
+                snapshotSha256 = computeSnapshotDigest(data, envelopeHashes),
+                journalSha256 = digestHex(MessageDigest.getInstance("SHA-256").digest(data)),
+                journalAudit = audit)
         } catch (cancelled: java.util.concurrent.CancellationException) {
             throw cancelled
         } catch (error: Exception) {
@@ -310,7 +328,10 @@ object EcuPhysicalBackupInspection {
                 error.message ?: "ECU recovery evidence cannot be inspected.",
                 uncertainAddress = stableAudit?.uncertainAddress,
                 journalDisposition = stableAudit?.recoveryDisposition,
-                problemAddress = current, uncertainRegion = stableAudit?.uncertainRegion)
+                problemAddress = current, uncertainRegion = stableAudit?.uncertainRegion,
+                journalSha256 = if (stableAudit != null && auditedSnapshot != null)
+                    digestHex(MessageDigest.getInstance("SHA-256").digest(auditedSnapshot!!)) else null,
+                journalAudit = stableAudit)
         }
     }
 }

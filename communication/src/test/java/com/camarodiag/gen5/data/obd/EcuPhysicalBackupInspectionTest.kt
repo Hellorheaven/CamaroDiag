@@ -71,7 +71,18 @@ class EcuPhysicalBackupInspectionTest {
             assertEquals(2, normal.sectors.size)
             assertEquals(16L, normal.verifiedBytes)
             assertTrue(normal.snapshotSha256?.matches(Regex("[0-9A-F]{64}")) == true)
-            assertEquals(normal.snapshotSha256, EcuPhysicalBackupInspection.inspect(journalFile, target, vin).snapshotSha256)
+            val reread=EcuPhysicalBackupInspection.inspect(journalFile,target,vin)
+            assertEquals(normal.snapshotSha256,reread.snapshotSha256)
+            assertTrue(normal.journalSha256?.matches(Regex("[0-9a-f]{64}"))==true)
+            assertEquals(2,normal.journalAudit?.baselineSectors)
+            assertTrue(normal.sectors.all { it.envelopeSha256?.matches(Regex("[0-9a-f]{64}"))==true })
+            EcuPhysicalBackupInspection.requireSameVerifiedEvidence(normal,reread)
+            assertTrue(runCatching {
+                EcuPhysicalBackupInspection.requireSameVerifiedEvidence(normal,reread.copy(journalSha256="f".repeat(64)))
+            }.isFailure)
+            assertTrue(runCatching {
+                EcuPhysicalBackupInspection.requireSameVerifiedEvidence(normal,reread.copy(verified=false))
+            }.isFailure)
 
             // Cancellation at the last possible checkpoint must not publish
             // an already computed but no longer authorized success.

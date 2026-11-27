@@ -716,6 +716,9 @@ fun CamaroDiagApp(
                         onRunLegacy = { target, approval, epoch, profile ->
                             viewModel.runFunctionalLegacyMutation(target, approval, epoch, profile)
                         },
+                        onRunLegacyRead = { target, epoch, profile ->
+                            viewModel.runFunctionalLegacyRead(target,epoch,profile)
+                        },
                         nativeUsbEnabled = adapter.tier == AdapterTier.DISCONNECTED && !calibrationWorkspace.isJ2534BridgeConnected,
                         onRunNativeUsb = viewModel::runNativeUsbFunctionalTest,
                         onRunAll = { viewModel.runFunctionalTests() },
