@@ -71,14 +71,17 @@ class J1979LiveCampaign {
       if(!link.active()||!link.matches(tx,rx,ext)||!link.matchesLive(scope)){
         sequence.abort(Stop::Context,now);break;
       }
-      const auto phase=sequence.phase(now);
+      const auto phase=sequence.recommendedPhase(now);
       if(phase==Phase::Done)break;
-      if(phase==Phase::Waiting){
+      const uint32_t hostWait=sequence.hostWaitRemaining(now);
+      if(phase==Phase::Waiting||hostWait){
         const uint32_t remaining=sequence.remaining(now);
         if(!remaining){sequence.abort(Stop::Budget,now);break;}
         // At most 30,000 nominal 20ms waits over the maximum 10min
         // budget. A stalled/non-monotonic clock cannot loop forever.
-        if(++waitIterations>60000u||!waiter.waitMs(remaining<20u?remaining:20u)){
+        uint32_t pause=remaining<20u?remaining:20u;
+        if(hostWait&&hostWait<pause)pause=hostWait;
+        if(++waitIterations>60000u||!waiter.waitMs(pause)){
           sequence.abort(Stop::Context,link.monotonicMs());break;
         }
         if(link.monotonicMs()==now){
@@ -89,7 +92,10 @@ class J1979LiveCampaign {
       uint8_t req[2]{};
       const uint32_t timeout=sequence.remaining(now)<2500u?sequence.remaining(now):2500u;
       if(timeout<2u){sequence.abort(Stop::Budget,now);break;}
-      if(sequence.summary().steps>=MaximumSteps||!sequence.next(now,req)||
+      bool next=false;
+      if(phase==Phase::PeriodicVin){req[0]=9;req[1]=2;next=true;}
+      else next=sequence.next(now,req);
+      if(sequence.summary().steps>=MaximumSteps||!next||
           !sequence.admit(req,sizeof(req),now,timeout)){
         sequence.abort(Stop::InvalidSequence,now);break;
       }
