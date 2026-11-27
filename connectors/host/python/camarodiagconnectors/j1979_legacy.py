@@ -422,6 +422,7 @@ def scan(exchange, protocol_check, expected_protocol: int, *, budget=180.0,
     if source is None:
         read_identity()
 
+    from .j1979_legacy_monitor import project as monitor_projection
     return {"expected_protocol": expected_protocol, "observed_protocol": observed_protocol,
             "protocol_name": PROTOCOLS[expected_protocol], "responder_attribution": attribution,
             "scope": "FUNCTIONAL_SELECTED_RESPONSE" if source is not None else "FUNCTIONAL_ANONYMOUS",
@@ -433,7 +434,8 @@ def scan(exchange, protocol_check, expected_protocol: int, *, budget=180.0,
             "steps": steps, "measurements": measurements, "multi_signal_records": multi_signal_records,
             "status_records": status_records, "dtc_modes": dtc_modes,
             "contextual_measurements": contextual_measurements(steps, legacy_source=source_hex, legacy=True),
-            "monitor_records": monitor_records, "freeze_triggers": freeze_triggers,
+            "monitor_records": monitor_records, "legacy_monitor_results": monitor_projection(steps),
+            "freeze_triggers": freeze_triggers,
             "advertised_control_tests": controls, "completed": stop is None,
             "stop_reason": stop, "cancelled": stop == "CANCELLED", "duration_ms": round((clock() - start) * 1000),
             "not_executed": ["MODE_04_CLEAR", "MODE_08_CONTROL"]}
