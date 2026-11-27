@@ -162,6 +162,75 @@ public final class J1979FreezeUsbCapture {
         return new Result(false,false,error==null,false,profile,rows,summary,error);
     }
 
+    /** Complete records of an interrupted CF/1 capture. They are NOT a
+     * replacement for the missing terminal, nor physical vehicle evidence. */
+    public static final class Prefix {
+        public final J1979FreezeUsbAuth.Profile profile;
+        public final List<Observation> observations;
+        public final int completeRecords,lastCompleteOffset,discardedTailBytes;
+        public final String interruption;
+        private Prefix(J1979FreezeUsbAuth.Profile profile,List<Observation> observations,
+                       int records,int offset,int discarded,String interruption){
+            this.profile=profile;
+            this.observations=Collections.unmodifiableList(new ArrayList<>(observations));
+            completeRecords=records;lastCompleteOffset=offset;
+            discardedTailBytes=discarded;this.interruption=interruption;
+        }
+    }
+
+    public static Prefix inspectPrefix(byte[] raw,String expectedVin)throws IOException{
+        if(raw==null||raw.length<1||raw.length>MAX_CAPTURE||expectedVin==null||
+           !expectedVin.matches("[A-HJ-NPR-Z0-9]{17}"))
+            throw new IOException("Invalid interrupted CF/1 input or independently supplied VIN");
+        J1979FreezeUsbAuth.Profile profile=null;
+        List<Observation> observations=new ArrayList<>();
+        int position=0,sequence=0;
+        String interruption="MISSING_TERMINAL";
+        while(position<raw.length){
+            if(sequence>=MAX_STEPS+2)throw new IOException("CF/1 prefix record limit");
+            int remaining=raw.length-position;
+            int known=Math.min(8,remaining);
+            byte[] magic={(byte)'C',(byte)'F',1};
+            for(int i=0;i<Math.min(3,known);i++)
+                if(raw[position+i]!=magic[i])throw new IOException("Invalid CF/1 partial header");
+            if(known>=4){
+                int kind=u(raw[position+3]);
+                if(sequence==0?kind!=1:kind!=2&&kind!=3)
+                    throw new IOException("Invalid CF/1 prefix kind");
+            }
+            if(known>=5&&u(raw[position+4])!=(sequence&255))
+                throw new IOException("Invalid CF/1 low sequence");
+            if(known>=6&&u(raw[position+5])!=(sequence>>8))
+                throw new IOException("Invalid CF/1 high sequence");
+            if(remaining<8){interruption="TRUNCATED_HEADER";break;}
+            byte[] head=Arrays.copyOfRange(raw,position,position+8);
+            int length=header(head,sequence);
+            int kind=u(head[3]);
+            if((kind==1&&length!=J1979FreezeUsbAuth.PLAN_SIZE)||
+               (kind==2&&length<12)||(kind==3&&length!=20))
+                throw new IOException("Invalid CF/1 prefix length");
+            int size=8+length+4;
+            if(remaining<size){interruption="TRUNCATED_RECORD";break;}
+            byte[] payload=body(head,Arrays.copyOfRange(raw,position+8,position+size),length);
+            if(kind==1){
+                profile=J1979FreezeUsbAuth.Profile.decode(payload);
+                if(!profile.vin.equals(expectedVin))
+                    throw new IOException("CF/1 prefix VIN differs from independently supplied VIN");
+            }else if(kind==2){
+                if(profile==null||observations.size()>=MAX_STEPS)
+                    throw new IOException("CF/1 prefix observation without plan or beyond limit");
+                observations.add(observation(payload));
+            }else{
+                if(profile==null)throw new IOException("CF/1 terminal without plan");
+                if(position+size!=raw.length)throw new IOException("Trailing complete CF/1 terminal bytes");
+                throw new IOException("CF/1 has a terminal; use ordinary inspection");
+            }
+            position+=size;sequence++;
+        }
+        if(profile==null)throw new IOException("No complete CF/1 prefix plan");
+        return new Prefix(profile,observations,sequence,position,raw.length-position,interruption);
+    }
+
     private int remaining(long start,int budget)throws IOException{
         long elapsed=clock.getAsLong()-start;
         if(elapsed<0||elapsed>=budget)throw new SocketTimeoutException("CU/2 deadline exceeded");
