@@ -145,6 +145,58 @@ internal static class NativeE39RecoveryImageAssessmentSelfTests
                     exportedJson.RootElement.GetProperty("backup").GetProperty("verifiedBytes").GetInt64()==sectorBytes,
                     "Portable report has explicit non-authorization and verified byte count");
             }
+            // A later snapshot retains the exact journal prefix and original evidence.
+            var historyFolder = Path.Combine(folder, "history");
+            Directory.CreateDirectory(historyFolder);
+            var laterJournal = Path.Combine(historyFolder, "transaction.jsonl");
+            File.Copy(journalPath, laterJournal);
+            File.Copy(metadataPath, laterJournal + ".meta.json");
+            Directory.CreateDirectory(laterJournal + ".blocks");
+            foreach (var originalBlock in Directory.GetFiles(journalPath + ".blocks"))
+                File.Copy(originalBlock, Path.Combine(laterJournal + ".blocks", Path.GetFileName(originalBlock)));
+            // Use the same serialized record shape as the persisted journal.
+            using (var firstRecord = JsonDocument.Parse(File.ReadLines(journalPath).First()))
+            {
+                var record = firstRecord.RootElement;
+                var properties = record.EnumerateObject().ToDictionary(
+                    p => p.Name, p => (object)p.Value.Clone(), StringComparer.Ordinal);
+                var phaseKey = properties.Keys.Single(k => k.Equals("phase", StringComparison.OrdinalIgnoreCase));
+                var detailKey = properties.Keys.Single(k => k.Equals("detail", StringComparison.OrdinalIgnoreCase));
+                properties[phaseKey] = record.GetProperty(phaseKey).ValueKind == JsonValueKind.String
+                    ? (object)"TestWriteAccepted" : (int)NativeE39WriteSequence.Phase.TestWriteAccepted;
+                properties[detailKey] = "accepted";
+                File.AppendAllText(laterJournal, JsonSerializer.Serialize(properties) + "\n");
+            }
+            var history = BridgeRecoveryHistory.Inspect([journalPath, laterJournal]);
+            Check(history.Verified && history.OrderedPrefixVerified && history.Transitions.Count == 1 &&
+                history.Transitions[0].AddedRecords == 1 && history.Transitions[0].OriginalEnvelopesUnchanged &&
+                !history.RestoreAuthorized && !history.CurrentEcuStateVerified,
+                "History verifies exact prefix and original evidence without physical authorization");
+            Check(!BridgeRecoveryHistory.Inspect([laterJournal, journalPath]).Verified,
+                "Reversed history is rejected");
+            var historyExport = Path.Combine(folder, "history.json");
+            BridgeRecoveryHistory.ExportCurrent(historyExport, [journalPath, laterJournal], history);
+            using (var json = JsonDocument.Parse(File.ReadAllBytes(historyExport)))
+                Check(json.RootElement.GetProperty("orderedPrefixVerified").GetBoolean() &&
+                    !json.RootElement.GetProperty("restoreAuthorized").GetBoolean(),
+                    "History JSON preserves offline-only conclusion");
+            File.AppendAllText(laterJournal + ".meta.json", " ");
+            Check(!BridgeRecoveryHistory.Inspect([journalPath, laterJournal]).Verified,
+                "History rejects metadata changes even with identical VIN and OSID");
+            var staleHistoryPath = Path.Combine(folder, "stale-history.json");
+            bool staleHistoryRejected = false;
+            try { BridgeRecoveryHistory.ExportCurrent(staleHistoryPath, [journalPath, laterJournal], history); }
+            catch (InvalidDataException) { staleHistoryRejected = true; }
+            Check(staleHistoryRejected && !File.Exists(staleHistoryPath),
+                "History export rechecks all sources before publication");
+            File.Copy(metadataPath, laterJournal + ".meta.json", overwrite: true);
+            var protectedOutput = Path.Combine(laterJournal + ".blocks", "history.json");
+            bool protectedRejected = false;
+            try { BridgeRecoveryHistory.ExportCurrent(protectedOutput, [journalPath, laterJournal], history); }
+            catch (InvalidDataException) { protectedRejected = true; }
+            Check(protectedRejected && !File.Exists(protectedOutput),
+                "History export cannot pollute an original-sector directory");
+
             var existing=File.ReadAllBytes(exportPath);
             bool refusedOverwrite=false;
             try { BridgeRecoveryReport.ExportCurrent(exportPath,journalPath,imagePath,exported); }
