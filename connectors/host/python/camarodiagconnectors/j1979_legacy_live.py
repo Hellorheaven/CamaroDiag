@@ -47,11 +47,15 @@ class LegacyLiveLink:
             raise TimeoutError("Legacy logical query deadline")
         return min(maximum,left)
 
+    def _allows_command(self, command):
+        return (command in ("0100","0900","0901","0902") or
+                re.fullmatch(r"01[0-9A-F]{2}",command) is not None and
+                (int(command[2:],16)%32==0 or int(command[2:],16) in CONFIG_PIDS or
+                 int(command[2:],16)==0x1D or legacy_numeric_pid(int(command[2:],16))))
+
     def _read(self, command, deadline, logical):
-        if not (command in ("0100","0900","0901","0902") or
-            re.fullmatch(r"01[0-9A-F]{2}",command) and
-            (int(command[2:],16)%32==0 or int(command[2:],16) in CONFIG_PIDS or int(command[2:],16)==0x1D or legacy_numeric_pid(int(command[2:],16)))):
-            raise ValueError("Unsupported request in legacy live recording")
+        if not self._allows_command(command):
+            raise ValueError("Unsupported request in selected legacy recording")
         row={"logical_query":logical,"request_hex":command,"raw_response":None,
              "frames":[],"selected_records_hex":[],"status":"NOT_TESTED","detail":None}
         self.exchanges.append(row)
