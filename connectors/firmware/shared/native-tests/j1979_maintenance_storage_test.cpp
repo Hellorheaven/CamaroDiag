@@ -138,14 +138,14 @@ static void guardCodec(){
   assert(!Store::encode(state,bytes,sizeof(bytes)));
 }
 struct ArchiveOwner final:cd::J1979MaintenanceArchive::Owner{
-  Scope scope=target();bool allowed=true,acquired=false;unsigned acquisitions=0,releases=0;
+  Scope scope=target();bool allowed=true,acquired=false,releaseAllowed=true;unsigned acquisitions=0,releases=0;
   bool acquire(const Scope& expected)override{++acquisitions;acquired=scope.same(expected);return acquired&&allowed;}
   bool admitted(const Scope& expected)override{return acquired&&allowed&&scope.same(expected);}
-  void release()override{++releases;acquired=false;}
+  bool release()override{++releases;acquired=false;return releaseAllowed;}
 };
 static void archive(){
   using Archive=cd::J1979MaintenanceArchive;
-  for(unsigned scenario=0;scenario<5;++scenario){
+  for(unsigned scenario=0;scenario<6;++scenario){
     Fixture f;assert(f.journal.begin(target()));
     if(scenario==0){
       Campaign::Evidence e{};e.scope=target();e.summary.outcome=Sequence::Outcome::NotTested;
@@ -169,7 +169,8 @@ static void archive(){
     }
     assert(data[0]=='C'&&data[1]=='M'&&data[3]==1);
     if(scenario==4)f.flash.memory[f.flash.slots.start+Medium::SlotHeader+10]^=1;
-    assert(source.finish()==(scenario!=4));
+    if(scenario==5)owner.releaseAllowed=false;
+    assert(source.finish()==(scenario!=4&&scenario!=5));
     source.close();source.close();assert(owner.releases==1&&!owner.acquired);
     assert(f.flash.writes==writes); // retrieval never changes durable guard or slots
   }
