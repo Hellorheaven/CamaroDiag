@@ -138,6 +138,70 @@ class J1979MaintenanceStorage final:public J1979MaintenanceJournal::Storage {
     return n==0;
   }
   void latchRecovery()override{fail();}
+  struct Archive {
+    size_t size=0;
+    unsigned records=0;
+    bool terminal=false,damagedTail=false,recoveryRequired=true;
+    J1979MaintenanceScope scope{};
+  };
+  // Boot-time archive access is independent of maintenance admission.
+  // Report only complete, CRC-checked contiguous records; do not discard
+  // or repair damaged bytes on the original medium. The caller must
+  // hold a read-only storage lease and independently verify CAN quiescence.
+  bool archive(Archive& out){
+    out=Archive{};
+    if(!inspected_)(void)inspect();
+    if(pendingSize_||(!locked_&&!sealed_&&state_.guard==Guard::Active))return false;
+    Archive found;
+    unsigned prior=0;
+    bool stopped=false;
+    for(unsigned i=0;i<Slots;++i){
+      size_t n=0;const auto lookup=medium_.slotSize(i,n);
+      if(lookup==Lookup::Missing){stopped=true;continue;}
+      if(lookup!=Lookup::Present||stopped||n>Journal::MaximumRecord||!n||
+         !medium_.readSlot(i,0,scratch_.pending,n)||
+         !recordHeader(scratch_.pending,n,i,prior)){
+        found.damagedTail=true;stopped=true;continue;
+      }
+      J1979MaintenanceScope scope;
+      if(!J1979MaintenanceScope::decode(scratch_.pending+Journal::Header,J1979MaintenanceScope::WireSize,scope)||
+         (i&& !found.scope.same(scope))){
+        found.damagedTail=true;stopped=true;continue;
+      }
+      if(!i)found.scope=scope;
+      found.size+=n;++found.records;prior=scratch_.pending[3];
+      if(prior==4){found.terminal=true;stopped=true;}
+    }
+    if(!found.records||!found.scope.valid()||found.size>Journal::MaximumJournal)return false;
+    found.recoveryRequired=locked_||!sealed_||!found.terminal||found.damagedTail;
+    if(found.damagedTail||!found.terminal)(void)fail();
+    out=found;return true;
+  }
+  bool readArchive(const Archive& pinned,size_t offset,uint8_t* out,size_t n){
+    if(!out||!n||offset>pinned.size||n>pinned.size-offset||!pinned.records||pinned.records>Slots)return false;
+    // Revalidate every complete record before publishing a chunk. This
+    // access path never opens an active writer and does not clear recovery.
+    if(pendingSize_||(!locked_&&!sealed_&&state_.guard==Guard::Active))return false;
+    size_t total=0;unsigned prior=0;
+    for(unsigned i=0;i<pinned.records;++i){
+      size_t length=0;
+      if(medium_.slotSize(i,length)!=Lookup::Present||!length||length>Journal::MaximumRecord||
+         !medium_.readSlot(i,0,scratch_.pending,length)||
+         !recordHeader(scratch_.pending,length,i,prior))return false;
+      J1979MaintenanceScope scope;
+      if(!J1979MaintenanceScope::decode(scratch_.pending+Journal::Header,J1979MaintenanceScope::WireSize,scope)||
+         !scope.same(pinned.scope))return false;
+      prior=scratch_.pending[3];total+=length;
+      if(n){
+        if(offset>=length)offset-=length;
+        else{
+          const size_t take=n<length-offset?n:length-offset;
+          std::memcpy(out,scratch_.pending+offset,take);out+=take;n-=take;offset=0;
+        }
+      }
+    }
+    return total==pinned.size&&!n&&(prior==4)==pinned.terminal;
+  }
   bool recoveryRequired()const{return locked_;}
   bool sealed()const{return sealed_;}
   // Other J1979 operations may use an independently admitted read lease
