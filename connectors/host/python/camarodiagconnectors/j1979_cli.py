@@ -45,17 +45,21 @@ def run(argv=None) -> dict:
     fd = os.open(args.output, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     with os.fdopen(fd, "w", encoding="utf-8") as output:
         start = datetime.now(timezone.utc).isoformat()
+        result = None
         try:
             with LinuxIsoTp(args.interface, args.tx, args.rx) as transport:
                 result = scan(transport.exchange, budget=args.budget, expected_vin=args.vin)
-        except KeyboardInterrupt:
-            result = {"completed": False, "cancelled": True, "stop_reason": "CANCELLED",
-                      "observed_vin": None, "steps": [],
-                      "not_executed": ["MODE_04_CLEAR", "MODE_05_LEGACY", "MODE_08_CONTROL"]}
-        except (OSError, ValueError) as exc:
-            result = {"completed": False, "stop_reason": type(exc).__name__,
-                      "observed_vin": None, "steps": [],
-                      "not_executed": ["MODE_04_CLEAR", "MODE_05_LEGACY", "MODE_08_CONTROL"]}
+        except (OSError, ValueError, KeyboardInterrupt) as exc:
+            # A failure during transport close must not erase the observations
+            # acquired before close. It cannot be a completed recipe.
+            if result is None:
+                result = {"observed_vin": None, "steps": [],
+                          "not_executed": ["MODE_04_CLEAR", "MODE_05_LEGACY", "MODE_08_CONTROL"]}
+            result["completed"] = False
+            result["cancelled"] = isinstance(exc, KeyboardInterrupt) or result.get("cancelled", False)
+            result["stop_reason"] = result.get("stop_reason") or (
+                "CANCELLED" if isinstance(exc, KeyboardInterrupt) else type(exc).__name__)
+            result["transport_error"] = type(exc).__name__
         report = {"schema": "camarodiag-functional-j1979-can-v1",
                   "protocol": "SAE-J1979", "transport": "LINUX_SOCKETCAN_ISOTP",
                   "version": __version__, "interface": args.interface,

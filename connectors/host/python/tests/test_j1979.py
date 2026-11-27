@@ -189,6 +189,23 @@ class J1979Tests(unittest.TestCase):
         self.assertEqual("MATCH", matched["vin_match"])
         self.assertTrue(matched["completed"])
 
+    def test_cli_preserves_observations_on_close_failure(self):
+        with tempfile.TemporaryDirectory() as folder:
+            output = Path(folder) / "close.json"
+            args = ["--interface", "can0", "--tx", "7E0", "--rx", "7E8",
+                    "--confirm-physical-channel", "--output", str(output)]
+            with patch.object(j1979_cli, "LinuxIsoTp") as factory:
+                transport = factory.return_value
+                transport.__enter__.return_value.exchange.side_effect = (
+                    lambda req, _: REPLIES[req.hex().upper()])
+                transport.__exit__.side_effect = OSError("close")
+                result = j1979_cli.run(args)
+            self.assertFalse(result["completed"])
+            self.assertEqual("OSError", result["transport_error"])
+            self.assertEqual(VIN, result["observed_vin"])
+            self.assertEqual(len(REPLIES), len(result["steps"]))
+            self.assertEqual(result, json.loads(output.read_text()))
+
     def test_cli_exclusive_file_and_report(self):
         with tempfile.TemporaryDirectory() as folder:
             output = Path(folder) / "report.json"
