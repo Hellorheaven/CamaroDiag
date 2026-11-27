@@ -7,6 +7,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.sp
 import com.camarodiag.gen5.R
 import com.camarodiag.gen5.data.obd.LegacyReadReport
+import com.camarodiag.gen5.data.obd.ObdLegacyMonitorValues
 import java.util.Locale
 
 @Composable
@@ -63,7 +64,11 @@ internal fun LegacyReadReportContent(report: LegacyReadReport) {
         Text(stringResource(if(it.present) R.string.legacy_read_freeze_present else R.string.legacy_read_freeze_absent))
         it.dtc?.let { code -> Text(code) }
     }
-    report.monitors.forEach {
+    report.legacyMonitorResults.forEach { item ->
+        Text(item.requestHex+": "+ObdLegacyMonitorValues.format(item.record),
+            fontFamily=FontFamily.Monospace,fontSize=11.sp)
+    }
+    if(report.legacyMonitorResults.isEmpty()) report.monitors.forEach {
         Text("${hex(it.mode)}/${hex(it.testId)}${it.sensorMask?.let { mask -> "/"+hex(mask) }?:""}: ${it.encodedDataHex}",
             fontFamily=FontFamily.Monospace,fontSize=11.sp)
     }
