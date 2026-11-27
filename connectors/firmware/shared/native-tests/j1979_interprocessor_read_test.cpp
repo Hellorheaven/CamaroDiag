@@ -1,5 +1,6 @@
 #include "../j1979_interprocessor_read.h"
 #include <cassert>
+#include <initializer_list>
 using namespace cd;
 using namespace cd::readlink;
 static bool authorized=true;
@@ -43,7 +44,49 @@ struct Sink final:J1979CanCampaign::Sink {
   unsigned count=0;
   bool observation(const uint8_t*,size_t,const Exchange::Result&)override{++count;return true;}
 };
+static void versionBoundaries(){
+  Packet p,q;uint8_t tx[Size]{};
+  p.op=Op::Fetch;p.length=2;p.seq=0xffff;
+  assert(encode(p,tx,Size)&&decode(tx,Size,q)&&q.seq==0xffff&&q.version==ClassicVersion);
+  p.seq=0x10000;assert(!encode(p,tx,Size));
+  p.version=LiveVersion;
+  for(uint32_t n:{0u,65535u,65536u,0x123456u,0xffffffu}){
+    p.seq=n;
+    assert(encode(p,tx,Size)&&decode(tx,Size,q)&&q.seq==n&&q.version==LiveVersion);
+  }
+  p.seq=0x1000000u;assert(!encode(p,tx,Size));
+  p.seq=0x10000;assert(encode(p,tx,Size));
+  tx[2]=ClassicVersion;put32(tx+28,link::crc(tx,28));
+  assert(!decode(tx,Size,q));
+  Bus bus;Exchange::Result scratch;
+  J1979LiveScope scope{};
+  std::memcpy(scope.vin,"1G1FA1RXXR0123456",17);
+  scope.count=1;scope.pids[0]=5;scope.cycles=1;scope.intervalMs=100;scope.budgetMs=1000;
+  Endpoint live(bus,scratch,0x7e0,0x7e8,false,admission,nullptr,&scope);
+  p=Packet{};p.op=Op::Read;p.length=13;put16(p.body,1000);
+  put32(p.body+2,0x7e0);put32(p.body+6,0x7e8);p.body[11]=9;p.body[12]=2;
+  uint8_t rx[Size]{};
+  assert(encode(p,tx,Size));
+  assert(!live.transact(tx,Size,rx,Size)&&live.closed()&&bus.sent==0);
+  Endpoint classic(bus,scratch,0x7e0,0x7e8,false,admission);
+  p.version=LiveVersion;
+  assert(encode(p,tx,Size));
+  assert(!classic.transact(tx,Size,rx,Size)&&classic.closed()&&bus.sent==0);
+}
+static void expiredFragment(){
+  Bus bus;Exchange::Result scratch;Endpoint endpoint(bus,scratch,0x7e0,0x7e8,false,admission);
+  Packet request;request.op=Op::Read;request.length=13;
+  put16(request.body,1000);put32(request.body+2,0x7e0);put32(request.body+6,0x7e8);
+  request.body[11]=1;request.body[12]=0;
+  uint8_t tx[Size]{},rx[Size]{};
+  assert(encode(request,tx,Size)&&endpoint.transact(tx,Size,rx,Size));
+  bus.now=MaximumExchangeMs;
+  Packet fetch;fetch.op=Op::Fetch;fetch.length=2;fetch.seq=1;
+  assert(encode(fetch,tx,Size)&&!endpoint.transact(tx,Size,rx,Size));
+  assert(endpoint.closed()&&bus.sent==1);
+}
 int main(){
+  versionBoundaries();expiredFragment();
   Bus bus;Exchange::Result scratch,out;
   Endpoint endpoint(bus,scratch,0x7e0,0x7e8,false,admission);
   Loop wire(endpoint);Client client(wire,0x7e0,0x7e8,false);
