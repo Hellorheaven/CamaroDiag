@@ -26,7 +26,8 @@ data class LegacyReadDtc(val mode: Int, val codes: List<String>?, val status: St
 data class LegacyReadMeasurement(val mode: Int, val pid: Int, val name: String, val number: Double, val unit: String)
 data class LegacyReadReadiness(val milOn: Boolean, val confirmedDtcCount: Int, val compressionIgnition: Boolean,
     val byteB: Int, val byteC: Int, val byteD: Int, val supportedMonitors: Map<String, Boolean>)
-data class LegacyReadIdentification(val infoType: Int, val values: List<String>)
+data class LegacyReadIdentification(val infoType: Int, val values: List<String>,
+    val extended: ObdJ1979ExtendedVehicleInfo.Result? = null)
 data class LegacyReadFreeze(val present: Boolean, val dtc: String?)
 data class LegacyReadMonitor(val mode: Int, val testId: Int, val sensorMask: Int?,
     val encodedDataHex: String, val componentAndLimitEncoded: Int? = null,
@@ -214,14 +215,14 @@ internal object ElmJ1979LegacyRead {
         val counts = mutableMapOf<Int,Int>()
         for (kind in inventory(9,3,1) { cmd(9,it) }) {
             if (stop != null) break
-            if (kind % 2 == 1) {
+            if (kind in ObdJ1979ExtendedVehicleInfo.legacyCountTypes) {
                 read(cmd(9,kind),true) { it.size == 3 && it.take(2) == listOf(0x49,kind) && it[2] > 0 }
                     .singleOrNull()?.let { counts[kind] = it[2] }
                 continue
             }
             val rows = read(cmd(9,kind)) { it.size == 7 && it.take(2) == listOf(0x49,kind) && it[2] > 0 }
             if (rows.isEmpty()) continue
-            val count = counts[kind-1]
+            val count = counts[ObdJ1979ExtendedVehicleInfo.countType(kind)]
             fun mark(status: String, detail: String) {
                 steps[steps.lastIndex] = steps.last().copy(status=status,detail=detail)
             }
@@ -248,6 +249,11 @@ internal object ElmJ1979LegacyRead {
                     else mark("FAILED","INVALID_CALID_RECORD")
                 }
                 6 -> identification += LegacyReadIdentification(kind,rows.map { hex(it.drop(3)) })
+                8,10,11,13,15 -> {
+                    val decoded = ObdJ1979ExtendedVehicleInfo.legacy(kind,count,rows)
+                    if (decoded == null) mark("FAILED","INVALID_EXTENDED_INFOTYPE")
+                    else identification += LegacyReadIdentification(kind,decoded.values,decoded)
+                }
                 else -> mark("RAW","UNINTERPRETED_INFOTYPE")
             }
         }
