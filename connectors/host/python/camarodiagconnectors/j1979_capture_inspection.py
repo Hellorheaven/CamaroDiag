@@ -156,6 +156,8 @@ def verify(capture, report, *, expected_vin=None):
         compare(report, "status_records", replay["status_records"])
     if "contextual_measurements" in report:
         compare(report, "contextual_measurements", replay["contextual_measurements"])
+    if "scaled_monitor_records" in report:
+        compare(report, "scaled_monitor_records", replay["scaled_monitor_records"])
     if "extended_vehicle_info" in report:
         compare(report, "extended_vehicle_info", replay["extended_vehicle_info"])
     wanted_summary = replay["summary"]
@@ -241,6 +243,7 @@ def verify(capture, report, *, expected_vin=None):
         "multi_signal_report_catalog": catalog,
         "status_records": replay["status_records"],
         "contextual_measurements": replay["contextual_measurements"],
+        "scaled_monitor_records": replay["scaled_monitor_records"],
         "capture_error": replay["error"],
         "host_error": report.get("error"),
         "device_credential_independently_verified": False,
