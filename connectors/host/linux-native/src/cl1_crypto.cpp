@@ -23,7 +23,7 @@ static uint32_t read32(const uint8_t *p) {
            ((uint32_t)p[2]<<16) | ((uint32_t)p[3]<<24);
 }
 static bool fail(char *err,size_t n,const char *reason) {
-    if (n) snprintf(err,n,"%s",reason);
+    if (err && n) snprintf(err,n,"%s",reason);
     return false;
 }
 bool cl1_encode_plan(const cl1_plan *p,uint8_t wire[CL1_PLAN_SIZE],

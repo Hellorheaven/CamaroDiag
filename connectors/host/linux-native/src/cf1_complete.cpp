@@ -19,7 +19,7 @@ static uint32_t le32(const uint8_t *p) {
            ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24);
 }
 static int denial(char *buffer, size_t capacity, const char *detail) {
-    if (capacity) snprintf(buffer, capacity, "%s", detail);
+    if (buffer && capacity) snprintf(buffer, capacity, "%s", detail);
     return -1;
 }
 static unsigned stop_code(const cf1_evidence *e) {

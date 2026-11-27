@@ -32,7 +32,7 @@ static void put32(uint8_t *p, uint32_t n) {
     for (unsigned i = 0; i < 4; ++i) p[i] = (uint8_t)(n >> (8 * i));
 }
 static int deny(char *err, size_t n, const char *reason) {
-    if (n) snprintf(err, n, "%s", reason);
+    if (err && n) snprintf(err, n, "%s", reason);
     return -1;
 }
 static bool physical_pair(uint32_t tx, uint32_t rx, bool ext) {
@@ -42,7 +42,7 @@ static bool physical_pair(uint32_t tx, uint32_t rx, bool ext) {
            rx == (0x18daf100u | ((tx >> 8) & 255u));
 }
 bool cl1_valid_plan(const cl1_plan *p) {
-    if (!physical_pair(p->tx, p->rx, p->extended) || !cf1_valid_vin(p->vin) ||
+    if (!p || !physical_pair(p->tx, p->rx, p->extended) || !cf1_valid_vin(p->vin) ||
         !p->pid_count || p->pid_count > CL1_MAX_PIDS ||
         !p->cycles || p->cycles > 1000 ||
         (uint32_t)p->cycles * p->pid_count > CL1_MAX_SAMPLES ||
@@ -300,7 +300,9 @@ static int inspect(const uint8_t *data, size_t length, const char *vin,
     memset(out, 0, sizeof(*out));
     if (!data || !length || length > CL1_MAX_CAPTURE || !cf1_valid_vin(vin))
         return deny(err, capacity, "Invalid CL/1 evidence size or independently supplied VIN");
-    replay r = { .result = out, .stage = ST_INITIAL };
+    replay r{};
+    r.result=out;
+    r.stage=ST_INITIAL;
     size_t pos = 0;
     while (pos < length) {
         size_t remaining = length - pos;

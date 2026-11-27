@@ -14,7 +14,7 @@ static void le32(uint8_t *p, uint32_t v) {
     for (size_t i = 0; i < 4; ++i) p[i] = (uint8_t)(v >> (i * 8));
 }
 static bool deny(char *error, size_t n, const char *why) {
-    if (n) snprintf(error, n, "%s", why);
+    if (error && n) snprintf(error, n, "%s", why);
     return false;
 }
 bool cf1_encode_profile(const cf1_plan *p, uint8_t wire[CF1_PLAN_SIZE],

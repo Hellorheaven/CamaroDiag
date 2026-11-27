@@ -18,7 +18,7 @@ static uint32_t little32(const uint8_t *p) {
         ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24);
 }
 static int reject(char *error, size_t size, const char *message) {
-    if (size) snprintf(error, size, "%s", message);
+    if (error && size) snprintf(error, size, "%s", message);
     return -1;
 }
 static bool distinct(const uint8_t *values, size_t length) {
