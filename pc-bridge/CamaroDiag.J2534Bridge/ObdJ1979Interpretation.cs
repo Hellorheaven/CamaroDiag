@@ -147,6 +147,18 @@ internal static class ObdJ1979Interpretation
                     ?? throw new InvalidDataException("Invalid multi-signal PID record.");
                 return new Result(ObdJ1979MultiSignal.Format(signals),true,reply.Service);
             }
+            if(ObdJ1979OperatingContext.IsTrim(request[1])){
+                var trim=ObdJ1979OperatingContext.DecodeTrim(request.ToArray(),response[(request[0]==2?3:2)..].ToArray(),null)
+                    ?? throw new InvalidDataException("Invalid fuel trim width.");
+                return new Result(string.Join("; ",trim.Signals.Select(signal=>signal.Name+"="+
+                    (signal.Number is double number?number.ToString("0.###",CultureInfo.InvariantCulture)+" %":
+                        "RAW="+signal.RawEncoded.ToString("X2",CultureInfo.InvariantCulture)))),true,reply.Service);
+            }
+            if(request[0]==1&&request[1]==0x41){
+                var cycle=ObdJ1979OperatingContext.DecodeCycle(response[2..].ToArray(),null)
+                    ?? throw new InvalidDataException("Invalid monitoring-cycle record.");
+                return new Result("PID 41 RAW="+cycle.RawHex,true,reply.Service);
+            }
             var value = ObdJ1979PidValues.Decode(request, response);
             if (value is not null)
                 return new Result(ObdJ1979PidValues.Format(value),
@@ -197,7 +209,7 @@ internal static class ObdJ1979Interpretation
             if (!pending.Remove((pid, frame)))
                 throw new InvalidDataException("Unexpected PID, frame number or excess duplicate.");
             int? length = pid % 32 == 0 || (!freeze && pid == 0x01) ? 4 :
-                freeze && pid == 0x02 ? 2 : ObdJ1979PidValues.DataLength(pid) ??
+                freeze && pid == 0x02 ? 2 : ObdJ1979OperatingContext.IsTrim(pid)?null:ObdJ1979PidValues.DataLength(pid) ??
                     (freeze?null:ObdJ1979MultiSignal.Width(pid) ?? ObdJ1979Status.Width(pid));
             if (length is null)
             {
