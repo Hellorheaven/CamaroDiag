@@ -48,10 +48,10 @@ class J1979MaintenanceUsb {
     Report report;
     uint8_t hello[HelloSize]{},challenge[ChallengeSize]{},proof[ProofSize]{},transcript[TranscriptSize]{},tag[TagSize]{};
     Scope scope;
-    bool granted=false;
+    bool grantAttempted=false;
     auto close=[&](){
       std::memset(transcript,0,sizeof(transcript));std::memset(tag,0,sizeof(tag));
-      if(granted)security.revokeMaintenance();
+      if(grantAttempted)security.revokeMaintenance();
       channel.close();
       return report;
     };
@@ -77,8 +77,8 @@ class J1979MaintenanceUsb {
     report.credentialVerified=true;
     // Consume the grant before calling the runner. The local owner checks
     // presence and exact scope throughout execution independently.
-    granted=security.grantMaintenance(scope);
-    if(!granted||!current())return close();
+    grantAttempted=true;
+    if(!security.grantMaintenance(scope)||!current())return close();
     report.executionInvoked=true;
     runner.run(scope);
     report.recovery=runner.recoveryRequired();report.physicalStop=runner.physicalStopVerified();
