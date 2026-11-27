@@ -97,6 +97,29 @@ object ObdJ1979OperatingContext {
             monitors.all { it.consistent })
     }
 
+    data class Layout(val state:String,val rawEncoded:Int?)
+
+    fun resolveLayout(observations:List<Observation>):Layout {
+        val rows=correlated(observations)
+        val pages=rows.filter { it.first==listOf(1,0) }
+        val values=rows.filter { it.first==listOf(1,0x1D) }
+        val page=pages.singleOrNull()?.second
+        if(page==null||page.size!=4)return Layout("UNVERIFIED",null)
+        if(page[3] and 8==0)return Layout(
+            if(values.isEmpty())"NOT_ADVERTISED_BY_SELECTED_ECU" else "UNVERIFIED",null)
+        val value=values.singleOrNull()?.second?.singleOrNull()?:return Layout("UNVERIFIED",null)
+        return Layout("VERIFIED",value)
+    }
+
+    fun liveSignals(requestHex:String,responseHex:String?,layout:Layout):List<ObdJ1979MultiSignal.Signal>? {
+        val req=bytes(requestHex)?:return null
+        val res=bytes(responseHex)?:return null
+        if(req.size!=2||req[0]!=1||res.size<=2||res.take(2)!=listOf(0x41,req[1]))return null
+        return decodeTrim(req,res.drop(2),layout.rawEncoded)?.signals?.mapNotNull { s ->
+            s.number?.let { ObdJ1979MultiSignal.Signal(req[1],s.name,s.unit,it,s.rawEncoded.toLong()) }
+        }
+    }
+
     fun project(observations:List<Observation>):Projection {
         val rows=correlated(observations)
         val layout=rows.filter { (req,data)->req==listOf(1,0x1D)&&data.size==1 }
