@@ -1,6 +1,7 @@
 #define _POSIX_C_SOURCE 200809L
 #include "j1979_live.h"
 #include "j1979_measurement.h"
+#include "j1979_context.hpp"
 #include <limits.h>
 #include <stdlib.h>
 #include <string.h>
@@ -9,6 +10,7 @@
 #include <algorithm>
 #include <memory>
 #include <new>
+#include <utility>
 
 static uint64_t uptime_ms(void) {
     struct timespec ts{};
@@ -66,7 +68,7 @@ static j1979_live_step *query(const j1979_live_plan *p,j1979_live_result *r,
     uint64_t end=tick(p);
     if (end>=now && end-now<=UINT_MAX) s->duration_ms=(unsigned)(end-now);
     s->elapsed_ms=end>=start?end-start:0;
-    if (length>raw.size()) {halt(r,"UNBOUNDED_REPLY");return s;}
+    if (length>J1979_CAN_MAX_PAYLOAD) {halt(r,"UNBOUNDED_REPLY");return s;}
     if (rc==0 && length && r->raw_bytes+length<=J1979_LIVE_MAX_RAW) {
         std::unique_ptr<uint8_t[]> owned{new (std::nothrow) uint8_t[length]};
         if (!owned) {halt(r,"MEMORY_EXHAUSTED");return s;}
@@ -80,6 +82,10 @@ static j1979_live_step *query(const j1979_live_plan *p,j1979_live_result *r,
         halt(r,"BUDGET_EXHAUSTED");return s;
     }
     if (!current(p)) {halt(r,"CONTEXT_CHANGED");return s;}
+    if (end<now || end-now>timeout) {
+        snprintf(s->detail,sizeof(s->detail),"EXCHANGE_DEADLINE_EXCEEDED");
+        halt(r,"TRANSPORT_ERROR");return s;
+    }
     if (rc==1) {
         snprintf(s->status,sizeof(s->status),"TIMEOUT");
         return s;
@@ -149,6 +155,30 @@ static bool support(const j1979_live_plan *p,j1979_live_result *r,uint64_t start
         }
     return true;
 }
+/* Read only the prerequisites for the selected measurement set. A missing
+ * or malformed optional prerequisite leaves its engineering value unknown,
+ * not a fabricated default. Never ask an unadvertised PID. */
+static bool admit_context(const j1979_live_plan *p,j1979_live_result *r,uint64_t start) {
+    bool layout=false,first=false,second=false,baseline=false;
+    for (unsigned i=0;i<p->pid_count;++i) {
+        const unsigned pid=p->pids[i];
+        layout=layout||cd::j1979::trim_pid(pid);
+        baseline=baseline||pid==0x41;
+        if (const auto dep=cd::j1979::dependency(pid)) {
+            first=first||*dep==0x4f;
+            second=second||*dep==0x50;
+        }
+    }
+    const std::array<std::pair<unsigned,bool>,4> prerequisites{{
+        {0x1d,layout},{0x4f,first},{0x50,second},{0x01,baseline}}};
+    for (const auto& [pid,needed]:prerequisites) {
+        if (!needed||!r->advertised[pid]) continue;
+        const auto* step=query(p,r,start,"CONTEXT",0,1,static_cast<uint8_t>(pid));
+        if (!step||r->stop_reason[0]) return false;
+        // Optional application failure/timeout is retained, not retried.
+    }
+    return true;
+}
 static bool delay_until(const j1979_live_plan *p,j1979_live_result *r,
                         uint64_t start,uint64_t target) {
     for (;;) {
@@ -183,6 +213,7 @@ int j1979_live_record(const j1979_live_plan *p,j1979_live_result *r) {
     if (!start) {halt(r,"CLOCK_UNAVAILABLE");goto finish;}
     if (!identity(p,r,start,"INITIAL_VIN",false)) goto finish;
     if (!support(p,r,start)) goto finish;
+    if (!admit_context(p,r,start)) goto finish;
     for (unsigned cycle=1;cycle<=p->cycles && !r->stop_reason[0];++cycle) {
         uint64_t cycle_start=tick(p);
         if (cycle>1 && !delay_until(p,r,start,
@@ -311,5 +342,19 @@ bool j1979_live_write_json(FILE *f,const j1979_live_plan *p,
             (unsigned long long)s->started_ms,
             (unsigned long long)s->elapsed_ms,s->duration_ms)<0) return false;
     }
-    return fputs("]}\n",f)!=EOF;
+    if (fputs("],\"operating_context\":",f)==EOF) return false;
+    std::vector<cd::j1979::Observation> observations;
+    if (r->step_count>J1979_LIVE_MAX_STEPS) return false;
+    observations.reserve(r->step_count);
+    for (size_t i=0;i<r->step_count;++i) {
+        const auto& step=r->steps[i];
+        if (step.response_size>J1979_CAN_MAX_PAYLOAD || (step.response_size&&!step.response)) return false;
+        const bool admission=!strcmp(step.phase,"CONTEXT") || !strcmp(step.phase,"INVENTORY");
+        observations.push_back({{step.request,2},{step.response,step.response_size},
+            !strcmp(step.status,"RAW") || !strcmp(step.status,"PASSED"),admission});
+    }
+    const bool identity=r->initial_vin_valid&&r->final_vin_valid &&
+        !strcmp(r->initial_vin,r->final_vin) && !strcmp(r->final_vin,p->channel.expected_vin);
+    if (!cd::j1979::write_context_json(f,observations,identity)) return false;
+    return fputs("}\n",f)!=EOF;
 }
