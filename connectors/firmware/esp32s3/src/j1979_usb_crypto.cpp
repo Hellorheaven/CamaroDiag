@@ -5,7 +5,7 @@
 namespace cd {
 bool j1979UsbHmacSha256(const uint8_t* key,size_t keySize,const uint8_t* data,
     size_t dataSize,uint8_t* tag){
-  if(!key||keySize!=32||!data||dataSize!=J1979UsbAuthSession::TranscriptSize||!tag)return false;
+  if(!key||keySize!=32||!data||(dataSize!=J1979UsbAuthSession::TranscriptSize&&dataSize!=J1979FreezeUsbAuthSession::TranscriptSize)||!tag)return false;
   const auto* md=mbedtls_md_info_from_type(MBEDTLS_MD_SHA256);
   return md&&mbedtls_md_hmac(md,key,keySize,data,dataSize,tag)==0;
 }
