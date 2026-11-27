@@ -26,10 +26,17 @@ class J1979UsbService {
       J1979CanCampaign::ApplicationLink& link,J1979CanReadExchange::Result& scratch){
     return serveTyped<J1979FreezeUsbAuthSession>(channel,security,arbiter,owner,link,scratch);
   }
+  static J1979UsbCampaign::Report serveLive(Channel& channel,Auth::Security& security,
+      HostSessionArbiter& arbiter,J1979UsbCampaign::Owner& owner,
+      J1979CanCampaign::ApplicationLink& link,J1979CanReadExchange::Result& scratch,
+      J1979LiveCampaign::Waiter& waiter){
+    return serveTyped<J1979LiveUsbAuthSession>(channel,security,arbiter,owner,link,scratch,&waiter);
+  }
  private:
   template<class Session> static J1979UsbCampaign::Report serveTyped(Channel& channel,Auth::Security& security,
       HostSessionArbiter& arbiter,J1979UsbCampaign::Owner& owner,
-      J1979CanCampaign::ApplicationLink& link,J1979CanReadExchange::Result& scratch){
+      J1979CanCampaign::ApplicationLink& link,J1979CanReadExchange::Result& scratch,
+      J1979LiveCampaign::Waiter* waiter=nullptr){
     Session auth(security);
     J1979UsbCampaign::Report report;
     uint8_t hello[Session::HelloSize]{},challenge[Session::ChallengeSize]{},proof[Session::ProofSize]{};
@@ -49,7 +56,7 @@ class J1979UsbService {
      private:
       Channel& channel_;
     } output(channel);
-    report=auth.execute(proof,sizeof(proof),arbiter,owner,link,output,scratch);
+    report=auth.execute(proof,sizeof(proof),arbiter,owner,link,output,scratch,waiter);
     channel.close();
     return report;
   }
