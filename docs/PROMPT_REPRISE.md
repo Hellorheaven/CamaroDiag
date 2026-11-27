@@ -1,3 +1,16 @@
+# Reprise SAE J1979 — stockage, archives CU/5 et CI/5 — 27/11/2026
+
+PR #117, branche `chore/unified-ci`, base du lot `3ae7a3dcd2098ea634c58bf53540dd2e0adf62ea`. Exclusivement SAE J1979 ; C6 et autres protocoles en pause.
+
+- MG/1 persistant, stockage CM/1 immuable : backend NVS ESP32 et flash STM32 à régions réservées, détection coupure/redémarrage, verrou de récupération. HAL FDCAN maintenance distincte de SPI. Aucun adressage mémoire ou câblage inventé ; aucun démarrage sur firmware découverte.
+- Corrections HMAC CU/3-CU/4, révocation partielle, fenêtre fraîcheur incluant relecture de l'intention, délais bornés. Tests de stockage et régressions CU/4 Java/C# écrits et inscrits au gate, non exécutés.
+- Inspection préfixe CM/1 sur Python/Android/C#, UI et CLI ; CRC invalide d'un enregistrement complet refusé, terminal absent jamais assimilé à une réussite.
+- CU/5–CI/5 lecture seule distincte, récupération archive persistante malgré queue interrompue, preuve HMAC R/r, aucun Start ni commande de maintenance, sans effacement du verrou. Clients Android (sélection UI), CLI Windows et Python raccordés, preuves séparées. Restent tests dédiés CU/5/CI/5 et UI graphique Windows, revue de compilation, intégration et qualification matérielle des contrats de carte.
+- Source autorisée J1979DA_202607 toujours absente : ne pas inventer les définitions. Pas de clôture ni de gate exécuté, pas d'APK. Après clôture logicielle et gate unique réussi, procédure v2.0.46 de release signée sur SHA exact sans fusion.
+- Diff intermédiaire au SHA b03c78105162d04d38ac87573970c27c60182b02 : 75 commits, 54 fichiers, +2656/-123. Objectif 10000 lignes non atteint ; ne pas gonfler artificiellement.
+
+---
+
 # Reprise SAE J1979 — maintenance native CU/4, CI/4, CM/1 — 27/11/2026
 
 PR #117, branche `chore/unified-ci`, base du lot `fa6d365ac48286953ded269d0d63c3cde7133f9a`. Exclusivement SAE J1979. C6 et autres protocoles en pause.
