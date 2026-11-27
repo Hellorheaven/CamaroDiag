@@ -1,4 +1,4 @@
-#include "j1979_legacy_scan.hpp"
+#include "j1979_legacy_scan_wire.hpp"
 #include <cassert>
 #include <deque>
 #include <utility>
@@ -71,6 +71,23 @@ int main(){
     assert(report.find("P0133")!=std::string::npos);
     assert(report.find("\"identity_rechecked\":true")!=std::string::npos);
     assert(report.find("\"number\":2000")!=std::string::npos);
+    const auto capture=encode_scan_capture({s.protocol,s.source,s.budget_ms,s.expected_vin,s.trace});
+    const auto parsed=decode_scan_capture(capture);
+    assert(parsed.trace==s.trace&&parsed.vin==vin);
+    assert(scan_report(inspect_scan_capture(capture,Protocol::vpw,0x10,vin))==report);
+    auto rejects=[](auto f){bool failed=false;try{f();}catch(const std::exception&){failed=true;}assert(failed);};
+    auto tampered=capture;tampered.back()^=1;
+    rejects([&]{decode_scan_capture(tampered);});
+    tampered=capture;tampered.pop_back();
+    rejects([&]{decode_scan_capture(tampered);});
+    rejects([&]{inspect_scan_capture(capture,Protocol::vpw,0x20,vin);});
+    auto trace=s.trace;trace.erase(trace.begin()+1);
+    rejects([&]{replay_scan(s.protocol,s.source,vin,s.budget_ms,trace);});
+    trace=s.trace;trace.push_back(trace.back());
+    rejects([&]{replay_scan(s.protocol,s.source,vin,s.budget_ms,trace);});
+    trace=s.trace;trace.resize(1);trace[0].outcome=ScanOutcome::cancelled;trace[0].raw.clear();
+    const auto cancelled=replay_scan(s.protocol,s.source,vin,s.budget_ms,trace);
+    assert(!cancelled.completed&&cancelled.error=="CANCELLED");
     Fake wrong;beginning(wrong,"1G1YY22G965109877");
     const auto refused=run(wrong);
     assert(!refused.completed&&!refused.identity_rechecked&&wrong.script.empty());

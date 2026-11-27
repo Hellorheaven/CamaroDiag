@@ -55,7 +55,7 @@ test-j1979-legacy-live: build/test_j1979_legacy_live.o build/j1979_legacy_live_p
 test-j1979-legacy-freeze: build/test_j1979_legacy_freeze.o build/j1979_legacy_identity.o build/j1979_legacy_freeze_plan.o build/j1979_legacy_freeze.o build/j1979_legacy_freeze_acquire.o build/j1979_legacy_freeze_wire.o build/j1979_legacy_freeze_report.o build/j1979_legacy.o build/j1979_elm.o build/j1979_measurement.o build/j1979_policy.o
 	$(CXX) $(LDFLAGS) $^ -o $@
 
-test-j1979-legacy-scan: build/test_j1979_legacy_scan.o build/j1979_legacy_scan.o build/j1979_legacy_report.o build/j1979_legacy.o build/j1979_legacy_identity.o build/j1979_legacy_freeze_plan.o build/j1979_elm.o build/j1979_policy.o $(DECODER_OBJECTS)
+test-j1979-legacy-scan: build/test_j1979_legacy_scan.o build/j1979_legacy_scan_wire.o build/j1979_legacy_scan.o build/j1979_legacy_report.o build/j1979_legacy.o build/j1979_legacy_identity.o build/j1979_legacy_freeze_plan.o build/j1979_elm.o build/j1979_policy.o $(DECODER_OBJECTS)
 	$(CXX) $(LDFLAGS) $^ -o $@
 
 test-j1979-legacy: build/test_j1979_legacy.o build/j1979_legacy.o build/j1979_legacy_identity.o build/j1979_legacy_freeze_plan.o build/j1979_elm.o build/j1979_discovery.o
