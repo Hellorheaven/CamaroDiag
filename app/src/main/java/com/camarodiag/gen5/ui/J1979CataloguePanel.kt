@@ -69,7 +69,7 @@ internal fun J1979CataloguePanel(enabled: Boolean, vehicle: VehicleProfile, epoc
         }
         Picker(R.string.j1979_catalogue_report, report) {
             pendingReport = current
-            selectReport.launch(arrayOf("application/json", "text/plain", "application/octet-stream"))
+            selectReport.launch(arrayOf("*/*"))
         }
         OutlinedTextField(value = pin, onValueChange = {
             pin = it.take(64); confirmed = false
