@@ -8,6 +8,8 @@ import com.camarodiag.gen5.ui.J1979CatalogueJson.obj
 import com.camarodiag.gen5.ui.J1979CatalogueJson.text
 import com.camarodiag.gen5.ui.J1979DocumentedCatalogue.Companion.hex
 import java.util.Base64
+import java.io.ByteArrayInputStream
+import com.camarodiag.connectors.J1979LiveNativeReplay
 import java.util.Locale
 
 /**
@@ -237,10 +239,36 @@ internal object J1979CatalogueProjection {
         return Source(expectedVin, complete, if (legacy) "LEGACY" else "CAN", channel, samples.toList(), final)
     }
 
+    const val NATIVE_SCHEMA = "camarodiag-j1979-native-catalogue-projection-v1"
+    private fun isNative(bytes: ByteArray) = bytes.size >= 3 &&
+        bytes[0] == 'C'.code.toByte() && bytes[1] == 'L'.code.toByte() && bytes[2] == 1.toByte()
+
+    /** Original native bytes, independently replayed by the connector module.
+     * A verified CL/1 application sequence is not a CAN frame replay. */
+    private fun replayNative(raw: ByteArray, expectedVin: String): Source {
+        require(validVin(expectedVin) && raw.size <= J1979LiveNativeReplay.MAX_CAPTURE)
+        val report = J1979LiveNativeReplay.decode(ByteArrayInputStream(raw),null)
+        require(report.captureIntegrityVerified && report.profile != null &&
+            report.summary != null && report.result != null) { "Invalid or incomplete CL/1 evidence" }
+        val profile = requireNotNull(report.profile)
+        require(profile.vin == expectedVin) { "Native capture VIN differs from independently supplied VIN" }
+        val summary = requireNotNull(report.summary)
+        val result = requireNotNull(report.result)
+        val samples = array(result["samples"],0,J1979LiveNativeReplay.MAX_SAMPLES).map { item ->
+            val row=obj(item)
+            Sample(int(row,"pid",1,255),int(row,"cycle",1,1000),
+                int(row,"elapsed_ms",0,604000),requiredText(row,"status"),optionalText(row,"response_hex"))
+        }
+        return Source(profile.vin,summary["completed"]==true,"CAN",
+            mapOf("kind" to "can","tx" to profile.tx,"rx" to profile.rx),samples,
+            summary["final_identity_verified"]==true)
+    }
+
     fun build(catalogueBytes: ByteArray, verifiedReferenceSha: String,
               sourceBytes: ByteArray, expectedVin: String): Result {
         val catalogue = J1979DocumentedCatalogue.parse(catalogueBytes, verifiedReferenceSha)
-        val source = replay(sourceBytes, expectedVin)
+        val native = isNative(sourceBytes)
+        val source = if(native) replayNative(sourceBytes,expectedVin) else replay(sourceBytes, expectedVin)
         val counts = sortedMapOf<String, Int>()
         var remaining = J1979DocumentedCatalogue.MAX_ROWS
         val rows = source.samples.map { sample ->
@@ -253,16 +281,20 @@ internal object J1979CatalogueProjection {
         }
         val sourceSha = J1979DocumentedCatalogue.sha(sourceBytes)
         val output = linkedMapOf<String, Any?>(
-            "schema" to SCHEMA, "reference_edition" to catalogue.edition,
+            "schema" to (if(native) NATIVE_SCHEMA else SCHEMA), "reference_edition" to catalogue.edition,
             "reference_sha256" to catalogue.referenceSha256, "catalogue_sha256" to catalogue.catalogueSha256,
-            "source_report_sha256" to sourceSha, "expected_vin_independently_supplied" to true,
+            (if(native) "source_capture_sha256" else "source_report_sha256") to sourceSha, "expected_vin_independently_supplied" to true,
             "declared_vin" to source.vin, "channel" to source.channel, "source_completed" to source.completed,
-            "final_identity_verified" to source.finalIdentityVerified, "source_application_replay_verified" to true,
-            "source_replay_verified" to false, "reference_authenticity_verified" to false,
+            "final_identity_verified" to source.finalIdentityVerified,
+            "source_replay_verified" to native, "reference_authenticity_verified" to false,
             "normative_compliance_verified" to false, "physical_vehicle_verified" to false,
             "authenticated" to false, "permits_programming" to false, "diagnostic_verdict" to null,
             "counts" to counts.toMap(), "rows" to rows
         )
+        if(native) {
+            output["native_capture_replayed"]=true
+            output["transport_frames_replayed"]=false
+        } else output["source_application_replay_verified"]=true
         return Result(output, catalogue.catalogueSha256, catalogue.referenceSha256, sourceSha, counts.toMap())
     }
 }
