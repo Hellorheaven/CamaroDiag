@@ -44,7 +44,8 @@ internal static class Program
         // Reject mixed native live options before any other driver path.
         if (args.Contains(CamaroDiagConnectors.Windows.J1979MaintenanceUsbCli.Command,StringComparer.OrdinalIgnoreCase))
             return CamaroDiagConnectors.Windows.J1979MaintenanceUsbCli.Run(args);
-        if (args.Contains(CamaroDiagConnectors.Windows.J1979MaintenanceJournal.Command,StringComparer.OrdinalIgnoreCase))
+        if (args.Contains(CamaroDiagConnectors.Windows.J1979MaintenanceJournal.Command,StringComparer.OrdinalIgnoreCase) ||
+            args.Contains(CamaroDiagConnectors.Windows.J1979MaintenanceJournal.PrefixCommand,StringComparer.OrdinalIgnoreCase))
             return CamaroDiagConnectors.Windows.J1979MaintenanceJournal.Run(args);
         if (args.Contains(CamaroDiagConnectors.Windows.J1979LiveNativeCli.CaptureCommand,StringComparer.OrdinalIgnoreCase) ||
             args.Contains(CamaroDiagConnectors.Windows.J1979LiveNativeCli.InspectCommand,StringComparer.OrdinalIgnoreCase) ||
