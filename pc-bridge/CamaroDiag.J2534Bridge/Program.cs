@@ -71,7 +71,7 @@ internal static class Program
 
         // Explicit bidirectional ISO/SAE exchanges. No default startup
         // programming and no network-listener fallback on malformed CLI.
-        if (args.Length > 0 && args[0] is CamaroDiagConnectors.Windows.J1979FreezeNativeCli.CaptureCommand or CamaroDiagConnectors.Windows.J1979FreezeNativeCli.InspectCommand)
+        if (args.Length > 0 && args[0] is CamaroDiagConnectors.Windows.J1979FreezeNativeCli.CaptureCommand or CamaroDiagConnectors.Windows.J1979FreezeNativeCli.InspectCommand or CamaroDiagConnectors.Windows.J1979FreezeNativeCli.PrefixCommand or CamaroDiagConnectors.Windows.J1979FreezeNativeCli.VerifyPrefixCommand)
             return CamaroDiagConnectors.Windows.J1979FreezeNativeCli.Run(args);
         if (args.Contains(ObdJ1979LegacyFreezeCli.Command, StringComparer.OrdinalIgnoreCase))
             return ObdJ1979LegacyFreezeCli.Run(args);

@@ -1,6 +1,8 @@
 using System.Globalization;
 using System.IO.Ports;
 using System.Security.Cryptography;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using CamaroDiag.J2534Bridge;
 
@@ -10,6 +12,78 @@ internal static class J1979FreezeNativeCli
 {
     internal const string CaptureCommand="--j1979-freeze-native";
     internal const string InspectCommand="--inspect-j1979-freeze-native";
+    internal const string PrefixCommand="--inspect-j1979-freeze-native-prefix";
+    internal const string VerifyPrefixCommand="--verify-j1979-freeze-native-prefix";
+    private static readonly JsonSerializerOptions PrefixJsonOptions=new(){
+        PropertyNamingPolicy=JsonNamingPolicy.SnakeCaseLower,WriteIndented=true
+    };
+    private static (byte[] Raw,string Hash) ReadPrefixSource(string path)
+    {
+        using var file=new FileStream(path,FileMode.Open,FileAccess.Read,FileShare.Read);
+        if(file.Length is <1 || file.Length>J1979FreezeNative.MaximumCapture)
+            throw new InvalidDataException("CF/1 prefix exceeds source limit");
+        byte[] bytes=new byte[checked((int)file.Length)];
+        file.ReadExactly(bytes);
+        if(file.ReadByte()!=-1)throw new InvalidDataException("CF/1 changed during read");
+        return (bytes,Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant());
+    }
+    private static void DistinctPaths(params string[] paths)
+    {
+        if(paths.Select(Path.GetFullPath).Distinct(StringComparer.OrdinalIgnoreCase).Count()!=paths.Length)
+            throw new ArgumentException("Evidence paths must be distinct");
+    }
+    internal static Dictionary<string,object?> InspectPrefix(string source,string output,string vin)
+    {
+        DistinctPaths(source,output);
+        var (raw,sha)=ReadPrefixSource(source);
+        var result=J1979FreezeNative.InspectPrefix(raw,vin);
+        var again=ReadPrefixSource(source);
+        if(sha!=again.Hash||!raw.AsSpan().SequenceEqual(again.Raw))
+            throw new InvalidDataException("CF/1 changed during prefix inspection");
+        result["capture_sha256"]=sha;
+        byte[] bytes=JsonSerializer.SerializeToUtf8Bytes(result,PrefixJsonOptions);
+        using var file=new FileStream(output,FileMode.CreateNew,FileAccess.Write,FileShare.None);
+        file.Write(bytes);file.Flush(true);
+        return result;
+    }
+    internal static Dictionary<string,object?> VerifyPrefix(string source,string report,string output,string vin)
+    {
+        DistinctPaths(source,report,output);
+        var (raw,sha)=ReadPrefixSource(source);
+        var expected=J1979FreezeNative.InspectPrefix(raw,vin);
+        expected["capture_sha256"]=sha;
+        byte[] sourceJson=JsonSerializer.SerializeToUtf8Bytes(expected,PrefixJsonOptions);
+        using var saved=new FileStream(report,FileMode.Open,FileAccess.Read,FileShare.Read);
+        if(saved.Length is <1 or >67108864)throw new InvalidDataException("CF/1 report exceeds limit");
+        byte[] reportBytes=new byte[checked((int)saved.Length)];
+        saved.ReadExactly(reportBytes);
+        string reportSha=Convert.ToHexString(SHA256.HashData(reportBytes)).ToLowerInvariant();
+        using(var original=JsonDocument.Parse(reportBytes,new JsonDocumentOptions{MaxDepth=64}))
+        using(var recomputed=JsonDocument.Parse(sourceJson,new JsonDocumentOptions{MaxDepth=64}))
+        {
+            if(!JsonNode.DeepEquals(JsonNode.Parse(original.RootElement.GetRawText()),
+                                    JsonNode.Parse(recomputed.RootElement.GetRawText())))
+                throw new InvalidDataException("CF/1 prefix report differs from independent replay");
+        }
+        var again=ReadPrefixSource(source);
+        if(sha!=again.Hash||!raw.AsSpan().SequenceEqual(again.Raw)||
+           !reportBytes.AsSpan().SequenceEqual(File.ReadAllBytes(report)))
+            throw new InvalidDataException("CF/1 evidence changed during verification");
+        var result=new Dictionary<string,object?>{
+            ["schema"]="camarodiag-j1979-native-freeze-prefix-verification-v1",
+            ["consistent"]=true,["prefix_integrity_verified"]=true,
+            ["capture_integrity_verified"]=false,["execution_completed"]=false,
+            ["physical_vehicle_verified"]=false,["permits_programming"]=false,
+            ["capture_sha256"]=sha,["report_sha256"]=reportSha,
+            ["complete_records"]=expected["complete_records"],
+            ["complete_observations"]=expected["complete_observations"],
+            ["interruption"]=expected["interruption"]
+        };
+        byte[] outputBytes=JsonSerializer.SerializeToUtf8Bytes(result,PrefixJsonOptions);
+        using var target=new FileStream(output,FileMode.CreateNew,FileAccess.Write,FileShare.None);
+        target.Write(outputBytes);target.Flush(true);
+        return result;
+    }
     internal sealed record Options(string Port,string KeyPath,string CapturePath,string OutputPath,
         J1979FreezeNative.Profile Profile);
 
@@ -154,6 +228,18 @@ internal static class J1979FreezeNativeCli
         try
         {
             if(args.Length==0)return 2;
+            if(args[0]==PrefixCommand&&args.Length==4)
+            {
+                var value=InspectPrefix(args[1],args[3],args[2]);
+                Console.WriteLine(JsonSerializer.Serialize(value,PrefixJsonOptions));
+                return 0;
+            }
+            if(args[0]==VerifyPrefixCommand&&args.Length==5)
+            {
+                var value=VerifyPrefix(args[1],args[2],args[4],args[3]);
+                Console.WriteLine(JsonSerializer.Serialize(value,PrefixJsonOptions));
+                return 0;
+            }
             J1979FreezeNative.Report report;
             if(args[0]==InspectCommand)
             {
