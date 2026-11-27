@@ -6785,7 +6785,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun inspectFunctionalNativeLivePrefix(source: Uri,confirmedConnection: Long,confirmedVehicle: VehicleProfile) {
+    fun inspectFunctionalNativeLivePrefix(source: Uri,confirmedConnection: Long,confirmedVehicle: VehicleProfile) =
+        inspectFunctionalNativeFile(source,confirmedConnection,confirmedVehicle,false)
+
+    fun inspectFunctionalNativeMaintenance(source: Uri,confirmedConnection: Long,confirmedVehicle: VehicleProfile) =
+        inspectFunctionalNativeFile(source,confirmedConnection,confirmedVehicle,true)
+
+    private fun inspectFunctionalNativeFile(source: Uri,confirmedConnection: Long,confirmedVehicle: VehicleProfile,
+                                            maintenance: Boolean) {
         val account=authenticatedAccountUid ?: return
         val generation=accountSessionGeneration
         if(source.scheme!="content" || functionalCatalogueJob?.isActive==true || _functionalTestState.value.running ||
@@ -6803,21 +6810,24 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     val resolver=context.contentResolver
                     val job=currentCoroutineContext()[Job]
                     fun requireCurrent(){check(job?.isActive==true&&current())}
-                    val prepared=J1979NativePrefixFiles.prepare(resolver,source,confirmedVehicle.vin,::requireCurrent)
+                    val prepared=if(maintenance) J1979NativePrefixFiles.prepareMaintenance(resolver,source,confirmedVehicle.vin,::requireCurrent)
+                        else J1979NativePrefixFiles.prepare(resolver,source,confirmedVehicle.vin,::requireCurrent)
                     CamaroDiagExportStorage.write(context,
-                        "CamaroDiag_SAE-J1979_NATIVE_PREFIX_"+System.currentTimeMillis()+".json",
+                        "CamaroDiag_SAE-J1979_NATIVE_"+(if(maintenance) "MAINTENANCE_" else "PREFIX_")+System.currentTimeMillis()+".json",
                         "application/json",category=CamaroDiagExportStorage.Category.TESTS,
                         beforePublish={
                             requireCurrent()
-                            check(J1979NativePrefixFiles.digest(resolver,source,::requireCurrent)==prepared.sha256)
+                            check(J1979NativePrefixFiles.digest(resolver,source,::requireCurrent,
+                                if(maintenance) com.camarodiag.connectors.J1979MaintenanceJournal.MAX_JOURNAL
+                                else com.camarodiag.connectors.J1979LiveNativeReplay.MAX_CAPTURE)==prepared.sha256)
                         },verifyStaged={input -> PhysicalRecoveryEvidenceJson.requireExactJson(input,prepared.bytes)}) {
                         it.write(prepared.bytes)
                     }
                 }
-                if(current())_connectionMessage.value=localizedContext.getString(R.string.j1979_native_prefix_saved)+"\n"+path
+                if(current())_connectionMessage.value=localizedContext.getString(if(maintenance) R.string.j1979_native_maintenance_saved else R.string.j1979_native_prefix_saved)+"\n"+path
             }catch(cancelled:CancellationException){throw cancelled}
             catch(_:Exception){
-                if(current())_connectionMessage.value=localizedContext.getString(R.string.j1979_native_prefix_rejected)
+                if(current())_connectionMessage.value=localizedContext.getString(if(maintenance) R.string.j1979_native_maintenance_rejected else R.string.j1979_native_prefix_rejected)
             }
         }
     }
