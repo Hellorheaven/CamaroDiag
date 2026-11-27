@@ -257,21 +257,149 @@ internal static class ObdJ1979MultiSignal
             new Field("egt-bank-2-sensor-7", "degC", 5, 2, 1, 10, -40, 2, false, ),
             new Field("egt-bank-2-sensor-8", "degC", 7, 2, 1, 10, -40, 3, false, ),
         ]),
+        [0x6B] = new(5,0xFF,[
+            new Field("egr-temperature-a", "degC", 1, 1, 1, 1, -40, 0, false, null),
+            new Field("egr-temperature-c", "degC", 2, 1, 1, 1, -40, 1, false, null),
+            new Field("egr-temperature-b", "degC", 3, 1, 1, 1, -40, 2, false, null),
+            new Field("egr-temperature-d", "degC", 4, 1, 1, 1, -40, 3, false, null),
+        ]),
+        [0x6F] = new(3,0x0F,[
+            new Field("compressor-inlet-pressure-a", "kPa", 1, 1, 1, 1, 0, 0, false, null),
+            new Field("compressor-inlet-pressure-b", "kPa", 2, 1, 1, 1, 0, 1, false, null),
+        ]),
+        [0x81] = new(41,0x1F,[
+            new Field("aecd-1-timer-1", "s", 1, 4, 1, 1, 0, 0, false, null),
+            new Field("aecd-1-timer-2", "s", 5, 4, 1, 1, 0, 0, false, null),
+            new Field("aecd-2-timer-1", "s", 9, 4, 1, 1, 0, 1, false, null),
+            new Field("aecd-2-timer-2", "s", 13, 4, 1, 1, 0, 1, false, null),
+            new Field("aecd-3-timer-1", "s", 17, 4, 1, 1, 0, 2, false, null),
+            new Field("aecd-3-timer-2", "s", 21, 4, 1, 1, 0, 2, false, null),
+            new Field("aecd-4-timer-1", "s", 25, 4, 1, 1, 0, 3, false, null),
+            new Field("aecd-4-timer-2", "s", 29, 4, 1, 1, 0, 3, false, null),
+            new Field("aecd-5-timer-1", "s", 33, 4, 1, 1, 0, 4, false, null),
+            new Field("aecd-5-timer-2", "s", 37, 4, 1, 1, 0, 4, false, null),
+        ]),
+        [0x82] = new(41,0x1F,[
+            new Field("aecd-6-timer-1", "s", 1, 4, 1, 1, 0, 0, false, null),
+            new Field("aecd-6-timer-2", "s", 5, 4, 1, 1, 0, 0, false, null),
+            new Field("aecd-7-timer-1", "s", 9, 4, 1, 1, 0, 1, false, null),
+            new Field("aecd-7-timer-2", "s", 13, 4, 1, 1, 0, 1, false, null),
+            new Field("aecd-8-timer-1", "s", 17, 4, 1, 1, 0, 2, false, null),
+            new Field("aecd-8-timer-2", "s", 21, 4, 1, 1, 0, 2, false, null),
+            new Field("aecd-9-timer-1", "s", 25, 4, 1, 1, 0, 3, false, null),
+            new Field("aecd-9-timer-2", "s", 29, 4, 1, 1, 0, 3, false, null),
+            new Field("aecd-10-timer-1", "s", 33, 4, 1, 1, 0, 4, false, null),
+            new Field("aecd-10-timer-2", "s", 37, 4, 1, 1, 0, 4, false, null),
+        ]),
+        [0x83] = new(9,0x0F,[
+            new Field("nox-bank-1-sensor-1", "ppm", 1, 2, 1, 1, 0, 0, false, null),
+            new Field("nox-bank-1-sensor-2", "ppm", 3, 2, 1, 1, 0, 1, false, null),
+            new Field("nox-bank-2-sensor-1", "ppm", 5, 2, 1, 1, 0, 2, false, null),
+            new Field("nox-bank-2-sensor-2", "ppm", 7, 2, 1, 1, 0, 3, false, null),
+        ]),
+        [0x84] = new(1,0x00,[
+            new Field("intake-manifold-surface-temperature", "degC", 0, 1, 1, 1, -40, -1, false, null),
+        ]),
+        [0x85] = new(10,0x0F,[
+            new Field("reagent-consumption", "L/h", 1, 2, 1, 200, 0, 0, false, null),
+            new Field("reagent-demand", "L/h", 3, 2, 1, 200, 0, 1, false, null),
+            new Field("reagent-level", "%", 5, 1, 100, 255, 0, 2, false, null),
+            new Field("nox-warning-runtime", "s", 6, 4, 1, 1, 0, 3, false, null),
+        ]),
+        [0x87] = new(5,0x03,[
+            new Field("manifold-pressure-a", "kPa", 1, 2, 1, 32, 0, 0, false, null),
+            new Field("manifold-pressure-b", "kPa", 3, 2, 1, 32, 0, 1, false, null),
+        ]),
+        [0x89] = new(41,0x1F,[
+            new Field("aecd-11-timer-1", "s", 1, 4, 1, 1, 0, 0, false, null),
+            new Field("aecd-11-timer-2", "s", 5, 4, 1, 1, 0, 0, false, null),
+            new Field("aecd-12-timer-1", "s", 9, 4, 1, 1, 0, 1, false, null),
+            new Field("aecd-12-timer-2", "s", 13, 4, 1, 1, 0, 1, false, null),
+            new Field("aecd-13-timer-1", "s", 17, 4, 1, 1, 0, 2, false, null),
+            new Field("aecd-13-timer-2", "s", 21, 4, 1, 1, 0, 2, false, null),
+            new Field("aecd-14-timer-1", "s", 25, 4, 1, 1, 0, 3, false, null),
+            new Field("aecd-14-timer-2", "s", 29, 4, 1, 1, 0, 3, false, null),
+            new Field("aecd-15-timer-1", "s", 33, 4, 1, 1, 0, 4, false, null),
+            new Field("aecd-15-timer-2", "s", 37, 4, 1, 1, 0, 4, false, null),
+        ]),
+        [0x8A] = new(41,0x1F,[
+            new Field("aecd-16-timer-1", "s", 1, 4, 1, 1, 0, 0, false, null),
+            new Field("aecd-16-timer-2", "s", 5, 4, 1, 1, 0, 0, false, null),
+            new Field("aecd-17-timer-1", "s", 9, 4, 1, 1, 0, 1, false, null),
+            new Field("aecd-17-timer-2", "s", 13, 4, 1, 1, 0, 1, false, null),
+            new Field("aecd-18-timer-1", "s", 17, 4, 1, 1, 0, 2, false, null),
+            new Field("aecd-18-timer-2", "s", 21, 4, 1, 1, 0, 2, false, null),
+            new Field("aecd-19-timer-1", "s", 25, 4, 1, 1, 0, 3, false, null),
+            new Field("aecd-19-timer-2", "s", 29, 4, 1, 1, 0, 3, false, null),
+            new Field("aecd-20-timer-1", "s", 33, 4, 1, 1, 0, 4, false, null),
+            new Field("aecd-20-timer-2", "s", 37, 4, 1, 1, 0, 4, false, null),
+        ]),
+        [0x8B] = new(7,0x7F,[
+            new Field("dpf-regeneration-trigger", "%", 2, 1, 100, 255, 0, 4, false, null),
+            new Field("dpf-regeneration-interval", "min", 3, 2, 1, 1, 0, 5, false, null),
+            new Field("dpf-regeneration-distance", "km", 5, 2, 1, 1, 0, 6, false, null),
+        ]),
+        [0x8C] = new(17,0xFF,[
+            new Field("oxygen-concentration-bank-1-sensor-1", "%", 1, 2, 1526, 1000000, 0, 0, false, null),
+            new Field("oxygen-concentration-bank-1-sensor-2", "%", 3, 2, 1526, 1000000, 0, 1, false, null),
+            new Field("oxygen-concentration-bank-2-sensor-1", "%", 5, 2, 1526, 1000000, 0, 2, false, null),
+            new Field("oxygen-concentration-bank-2-sensor-2", "%", 7, 2, 1526, 1000000, 0, 3, false, null),
+            new Field("oxygen-lambda-bank-1-sensor-1", "ratio", 9, 2, 122, 1000000, 0, 4, false, null),
+            new Field("oxygen-lambda-bank-1-sensor-2", "ratio", 11, 2, 122, 1000000, 0, 5, false, null),
+            new Field("oxygen-lambda-bank-2-sensor-1", "ratio", 13, 2, 122, 1000000, 0, 6, false, null),
+            new Field("oxygen-lambda-bank-2-sensor-2", "ratio", 15, 2, 122, 1000000, 0, 7, false, null),
+        ]),
+        [0x8D] = new(1,0x00,[
+            new Field("absolute-throttle-g", "%", 0, 1, 100, 255, 0, -1, false, null),
+        ]),
+        [0x8E] = new(1,0x00,[
+            new Field("engine-friction-torque", "%", 0, 1, 1, 1, -125, -1, false, null),
+        ]),
+        [0x8F] = new(7,0x0F,[
+            new Field("pm-sensor-bank-1-output", "%", 2, 2, 1, 100, 0, 1, false, null),
+            new Field("pm-sensor-bank-2-output", "%", 5, 2, 1, 100, 0, 3, false, null),
+        ]),
+        [0x93] = new(3,0x01,[
+            new Field("cumulative-continuous-mi", "h", 1, 2, 1, 1, 0, 0, false, null),
+        ]),
+        [0x94] = new(12,0x3F,[
+            new Field("reagent-quality-counter", "h", 2, 2, 1, 1, 0, 1, false, null),
+            new Field("reagent-consumption-counter", "h", 4, 2, 1, 1, 0, 2, false, null),
+            new Field("reagent-dosing-counter", "h", 6, 2, 1, 1, 0, 3, false, null),
+            new Field("egr-valve-counter", "h", 8, 2, 1, 1, 0, 4, false, null),
+            new Field("nox-monitoring-counter", "h", 10, 2, 1, 1, 0, 5, false, null),
+        ]),
+        [0x9C] = new(17,0xFF,[
+            new Field("oxygen-concentration-bank-1-sensor-3", "%", 1, 2, 1526, 1000000, 0, 0, false, null),
+            new Field("oxygen-concentration-bank-1-sensor-4", "%", 3, 2, 1526, 1000000, 0, 1, false, null),
+            new Field("oxygen-concentration-bank-2-sensor-3", "%", 5, 2, 1526, 1000000, 0, 2, false, null),
+            new Field("oxygen-concentration-bank-2-sensor-4", "%", 7, 2, 1526, 1000000, 0, 3, false, null),
+            new Field("oxygen-lambda-bank-1-sensor-3", "ratio", 9, 2, 122, 1000000, 0, 4, false, null),
+            new Field("oxygen-lambda-bank-1-sensor-4", "ratio", 11, 2, 122, 1000000, 0, 5, false, null),
+            new Field("oxygen-lambda-bank-2-sensor-3", "ratio", 13, 2, 122, 1000000, 0, 6, false, null),
+            new Field("oxygen-lambda-bank-2-sensor-4", "ratio", 15, 2, 122, 1000000, 0, 7, false, null),
+        ]),
     };
     internal static int? Width(int pid)=>Definitions.TryGetValue(pid,out var definition)?definition.Width:null;
     internal static IReadOnlyList<Signal>? DecodeData(int pid,ReadOnlySpan<byte> data)
     {
         if(!Definitions.TryGetValue(pid,out var definition)||data.Length!=definition.Width)return null;
         if(definition.SupportMask!=0&&(data[0]&~definition.SupportMask)!=0)return null;
+        int alternate=pid==0x6B?4:pid==0x6F?2:0;
+        if(alternate!=0&&(data[0]&(data[0]>>alternate)&((1<<alternate)-1))!=0)return null;
         var result=new List<Signal>();
         foreach(var field in definition.Fields){
-            if(field.Bit>=0&&(data[0]&(1<<field.Bit))==0)continue;
+            int multiplier=field.Multiplier;
+            if(alternate!=0){
+                if((data[0]&(1<<(field.Bit+alternate)))!=0)multiplier=pid==0x6B?4:8;
+                else if((data[0]&(1<<field.Bit))==0)continue;
+            }else if(field.Bit>=0&&(data[0]&(1<<field.Bit))==0)continue;
             long raw=0;
             for(int i=field.Offset;i<field.Offset+field.Width;i++)raw=(raw<<8)|data[i];
             if(raw==field.Unavailable)continue;
             long encoded=field.Signed&&raw>=(1L<<(field.Width*8-1))?
                 raw-(1L<<(field.Width*8)):raw;
-            result.Add(new(pid,field.Name,field.Unit,(double)encoded*field.Multiplier/field.Divisor+field.Bias,raw));
+            result.Add(new(pid,field.Name,field.Unit,(double)encoded*multiplier/field.Divisor+field.Bias,raw));
         }
         return result.AsReadOnly();
     }
