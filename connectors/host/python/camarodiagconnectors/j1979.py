@@ -112,6 +112,23 @@ class LinuxIsoTp:
             return response
 
 
+    def run_freeze(self, plan, *, require_current=lambda: None) -> dict:
+        """An explicitly scoped Mode 02 campaign, separate from the CJ/1 scan.
+
+        The ordinary exchange method remains restricted to frame zero. This
+        read-only path admits exactly the frame numbers selected in the plan.
+        """
+        from .j1979_freeze import allowed_request, scan_freeze
+        plan.validate()
+
+        def exchange(request, timeout):
+            if not allowed_request(request, plan.frames):
+                raise ValueError("Request outside the selected freeze-frame plan")
+            require_current()
+            return self._exchange(request, timeout, require_current)
+
+        return scan_freeze(exchange, plan, require_current=require_current)
+
     def run_clear(self, expected_vin: str, *, warning_acknowledged: bool,
                   confirmed_yes: bool, save_baseline, require_current=lambda: None) -> dict:
         from .j1979_clear import clear_recipe
