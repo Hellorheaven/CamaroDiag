@@ -203,4 +203,13 @@
   <data name="NativeMaintenanceAckEvap" xml:space="preserve"><value>EVAP preparation acknowledged; no leak-test result</value></data>
   <data name="NativeMaintenanceNoTerminal" xml:space="preserve"><value>Missing terminal record</value></data>
   <data name="NativeMaintenanceNoRetry" xml:space="preserve"><value>No automatic retry or physical proof.</value></data>
+  <data name="NativeMaintenanceRun" xml:space="preserve"><value>Run one native maintenance operation</value></data>
+  <data name="NativeMaintenanceOperation" xml:space="preserve"><value>Operation</value></data>
+  <data name="NativeMaintenanceClear" xml:space="preserve"><value>Mode 04 — clear diagnostic information</value></data>
+  <data name="NativeMaintenanceEvap" xml:space="preserve"><value>Mode 08 — EVAP preparation</value></data>
+  <data name="NativeMaintenanceClearWarning" xml:space="preserve"><value>Clearing resets diagnostic information and readiness states. Stationary vehicle, engine stopped, ventilated area and qualified board required.</value></data>
+  <data name="NativeMaintenanceEvapWarning" xml:space="preserve"><value>Preparation only, not a leak test. Stationary vehicle, engine stopped, ventilated area and qualified board required.</value></data>
+  <data name="NativeMaintenanceAccept" xml:space="preserve"><value>I acknowledge the consequences and prerequisites</value></data>
+  <data name="NativeMaintenanceConfirm" xml:space="preserve"><value>I confirm one operation with independent local approval on the selected VIN.</value></data>
+  <data name="NativeMaintenanceUnverified" xml:space="preserve"><value>Journal not verified; no successful operation claimed.</value></data>
 </root>
