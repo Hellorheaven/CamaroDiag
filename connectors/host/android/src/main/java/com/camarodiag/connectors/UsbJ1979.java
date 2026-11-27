@@ -44,6 +44,13 @@ public final class UsbJ1979 {
         return open(manager,device,controlId,dataId,credential,raw,stillSelected,
             (link,key)->new J1979LiveUsbCapture(link).run(profile,key,raw,stillSelected));
     }
+    public static java.util.Map<String,Object> captureMaintenance(UsbManager manager,UsbDevice device,
+            int controlId,int dataId,J1979MaintenanceUsb.Profile profile,byte[] credential,
+            OutputStream raw,BooleanSupplier stillSelected)throws IOException{
+        if(profile==null)throw new IllegalArgumentException("Explicit CU/4 profile required");
+        return open(manager,device,controlId,dataId,credential,raw,stillSelected,
+            (link,key)->new J1979MaintenanceUsb(link).run(profile,key,raw,stillSelected));
+    }
     private static <T> T open(UsbManager manager,UsbDevice device,
             int controlId,int dataId,byte[] credential,OutputStream raw,
             BooleanSupplier stillSelected,Session<T> session)throws IOException{
