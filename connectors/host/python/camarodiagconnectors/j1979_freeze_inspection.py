@@ -121,7 +121,8 @@ def inspect(report, *, expected_vin=None):
     transport = report.get("transport")
     extra = {"LINUX_SOCKETCAN_ISOTP": ("interface",),
              "WINDOWS_J2534_ISOTP": ("adapter", "profile"),
-             "ANDROID_ELM_ISOTP": ("adapter", "profile")}.get(transport) if isinstance(transport, str) else None
+             "ANDROID_ELM_ISOTP": ("adapter", "profile", "raw_protocol_response",
+                                   "observed_protocol", "adapter_exchanges")}.get(transport) if isinstance(transport, str) else None
     _require(extra is not None, "Unsupported freeze-frame evidence transport")
     root = _object(report, ("schema", "protocol", "transport", "version",
         "tx_can_id", "rx_can_id", "physical_channel_confirmed_by_operator",
@@ -154,7 +155,11 @@ def inspect(report, *, expected_vin=None):
     _require(root["transport_problem"] in (None, "TRANSPORT_ERROR", "CANCELLED"),
              "Unknown transport problem")
     result = replay_result(root["result"], expected_vin=expected_vin)
-    complete = result["completed"] and root["transport_problem"] is None
+    protocol_verified = True
+    if transport == "ANDROID_ELM_ISOTP":
+        from .j1979_freeze_elm import verify as verify_elm
+        protocol_verified = verify_elm(root, result, rx)
+    complete = result["completed"] and root["transport_problem"] is None and protocol_verified
     _require(type(root["execution_completed"]) is bool and root["execution_completed"] == complete,
              "Recorded execution completion differs")
     return {
@@ -163,6 +168,7 @@ def inspect(report, *, expected_vin=None):
         "execution_completed": complete,
         "all_frames_stable": complete and result["all_frames_stable"],
         "source_transport": root["transport"],
+        "adapter_transcript_replayed": transport == "ANDROID_ELM_ISOTP",
         "tx_can_id": root["tx_can_id"], "rx_can_id": root["rx_can_id"],
         "expected_vin_independently_supplied": expected_vin is not None,
         "transport_problem": root["transport_problem"],
