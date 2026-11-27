@@ -4,7 +4,7 @@ import java.util.Locale
 
 /** SAE J1979 CAN Mode 06: support pages and complete 9-byte test records.
  * The functional ELM channel is anonymous, so never invent an ECU address. */
-internal object ObdCanMonitorRecords {
+object ObdCanMonitorRecords {
     // ISO 15031-5:2006 Annex E, explicitly supported subset.
     // No legacy or OEM-specific scaling; no monitor verdict inferred.
     private data class Scale(val unit: String, val factor: Double, val signed: Boolean, val offset: Double)
@@ -118,6 +118,26 @@ internal object ObdCanMonitorRecords {
             val decoded = scaled() ?: return encoded
             return encoded + " VALUE=%s MIN=%s MAX=%s UNIT=%s"
                 .format(Locale.ROOT, decoded.value, decoded.minimum, decoded.maximum, decoded.unit)
+        }
+    }
+
+    data class EngineeringRecord(val requestHex:String,val recordIndex:Int,val result:Result)
+
+    /** Original correlated CAN payload, not an adapter-formatted legacy reply. */
+    fun project(requestHex:String,responseHex:String?,status:String):List<EngineeringRecord> {
+        if(status!="PASSED"||!requestHex.matches(Regex("06[0-9A-Fa-f]{2}"))||
+            responseHex==null||responseHex.length>8190||responseHex.length%2!=0||
+            !responseHex.matches(Regex("[0-9A-Fa-f]+")))return emptyList()
+        val mid=requestHex.takeLast(2).toInt(16)
+        if(mid%32==0)return emptyList()
+        val bytes=responseHex.chunked(2).map { it.toInt(16) }
+        if(bytes.size<10||bytes[0]!=0x46||(bytes.size-1)%9!=0)return emptyList()
+        val data=bytes.drop(1).chunked(9)
+        if(data.any { it[0]!=mid })return emptyList()
+        return data.mapIndexed { index,row->
+            fun word(offset:Int)=(row[offset] shl 8) or row[offset+1]
+            EngineeringRecord(requestHex.uppercase(Locale.ROOT),index,
+                Result(mid,row[1],row[2],word(3),word(5),word(7)))
         }
     }
 
