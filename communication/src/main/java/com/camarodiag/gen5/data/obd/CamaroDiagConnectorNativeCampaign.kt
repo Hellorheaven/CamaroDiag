@@ -127,6 +127,9 @@ object CamaroDiagConnectorNativeCampaign {
             put("status_records",J1979DerivedEvidenceJson.states(steps.mapNotNull {
                 ObdJ1979Status.tryRecord(it.requestHex,it.responseHex,it.status)
             }))
+            put("operating_context",J1979OperatingContextJson.encode(ObdJ1979OperatingContext.project(steps.map {
+                ObdJ1979OperatingContext.Observation(it.requestHex,it.responseHex,it.status)
+            })))
             put("contextual_measurements",J1979ScalingJson.encode(ObdJ1979ScalingContext.project(steps.map {
                 ObdJ1979ScalingContext.Observation(it.requestHex,it.responseHex,it.status)
             })))
