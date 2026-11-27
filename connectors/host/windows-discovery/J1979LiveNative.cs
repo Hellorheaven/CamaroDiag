@@ -287,9 +287,75 @@ internal static class J1979LiveNative
                 negative,timeouts,duration,rawBytes,advertised.ToArray(),
                 profile.Pids.Select((pid,i)=>new PidCount(pid,rawPerPid[i])).ToArray());
         }
+        internal Dictionary<string,object?> Prefix()=>new(){
+            ["initial_identity_verified_in_prefix"]=initial,["final_identity_observed_in_prefix"]=final,
+            ["complete_observations"]=steps,["last_elapsed_ms"]=duration,["raw_bytes"]=rawBytes,
+            ["completed_cycles_in_prefix"]=cycles,["raw_samples_in_prefix"]=raw,
+            ["negative_samples_in_prefix"]=negative,["timeout_samples_in_prefix"]=timeouts,
+            ["observations"]=observations.ToArray(),["samples"]=rows.ToArray()
+        };
         internal Result Build()=>new("camarodiag-j1979-live-inspection-v1",true,true,profile.Vin,
             new(){["kind"]="can",["tx"]=profile.Tx,["rx"]=profile.Rx},completed,final,
             rows.ToArray(),observations.ToArray());
+    }
+
+    // Deliberately separate from Decode: no partial data can satisfy the
+    // standard capture/report/CSV/catalogue contract without a terminal.
+    internal static Dictionary<string,object?> InspectPrefix(byte[] bytes,string expectedVin)
+    {
+        Require(ValidVin(expectedVin),"Independently supplied VIN required");
+        Require(bytes.Length is >0 and <=MaximumCapture,"Invalid CL/1 input size");
+        int position=0,sequence=0;
+        Profile? profile=null;Replay? replay=null;
+        string interruption="MISSING_TERMINAL";
+        while(position<bytes.Length)
+        {
+            Require(sequence<MaximumSteps+2,"CL/1 record count exceeded");
+            int remaining=bytes.Length-position;
+            var partial=bytes.AsSpan(position,Math.Min(8,remaining));
+            byte[] magic=[(byte)'C',(byte)'L',1];
+            int prefix=Math.Min(3,partial.Length);
+            Require(partial[..prefix].SequenceEqual(magic.AsSpan(0,prefix)),"Invalid partial CL/1 header");
+            if(partial.Length>=4)
+                Require(sequence==0?partial[3]==1:partial[3] is 2 or 3,"Invalid CL/1 record kind");
+            if(partial.Length>=5)Require(partial[4]==(byte)(sequence&255),"Invalid partial CL/1 sequence");
+            if(partial.Length>=6)Require(partial[5]==(byte)(sequence>>8),"Invalid partial CL/1 sequence");
+            if(remaining<8){interruption="TRUNCATED_HEADER";break;}
+            var head=partial.ToArray();
+            var (kind,length)=Header(head,sequence);
+            Require((kind!=1||length==PlanSize)&&(kind!=2||length>=ObservationSize)&&
+                (kind!=3||length==FinalSize),"Invalid CL/1 body length");
+            int size=8+length+4;
+            if(remaining<size){interruption="TRUNCATED_RECORD";break;}
+            var body=Body(head,bytes.AsSpan(position+8,length+4).ToArray(),length);
+            if(kind==1)
+            {
+                profile=Profile.Decode(body);
+                Require(profile.Vin==expectedVin,"CL/1 plan differs from independent VIN");
+                replay=new Replay(profile);
+            }
+            else if(kind==2)replay!.Observe(Event.Decode(body));
+            else
+            {
+                replay!.Finish(body);
+                Require(position+size==bytes.Length,"Trailing CL/1 bytes");
+                throw new InvalidDataException("CL/1 contains a terminal record; use inspect");
+            }
+            position+=size;sequence++;
+        }
+        Require(profile is not null&&replay is not null,"No complete CL/1 plan");
+        Require(sequence<=MaximumSteps+1,"CL/1 record count exceeded");
+        var result=replay!.Prefix();
+        result["schema"]="camarodiag-j1979-native-live-prefix-v1";
+        result["protocol"]="SAE-J1979";result["source"]="OFFLINE_CL1_PREFIX";
+        result["profile"]=profile!.View();result["prefix_integrity_verified"]=true;
+        result["capture_integrity_verified"]=false;result["execution_completed"]=false;
+        result["terminal_present"]=false;result["expected_vin_independently_supplied"]=true;
+        result["complete_records"]=sequence;result["last_complete_offset"]=position;
+        result["discarded_tail_bytes"]=bytes.Length-position;result["interruption"]=interruption;
+        result["physical_vehicle_verified"]=false;result["hardware_provenance_verified"]=false;
+        result["evidence_authenticated"]=false;result["permits_programming"]=false;
+        return result;
     }
 
     internal static Report Decode(Stream stream,Profile? expected=null)
