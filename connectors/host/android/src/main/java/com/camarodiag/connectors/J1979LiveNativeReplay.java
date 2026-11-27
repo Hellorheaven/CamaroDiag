@@ -1,4 +1,4 @@
-package com.camaradiag.connectors;
+package com.camarodiag.connectors;
 
 import java.io.EOFException;
 import java.io.IOException;
@@ -15,8 +15,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.zip.CRC32;
 
-import static com.camaradiag.connectors.J1979LiveUsbAuth.require;
-import static com.camaradiag.connectors.J1979LiveUsbAuth.u;
+import static com.camarodiag.connectors.J1979LiveUsbAuth.require;
+import static com.camarodiag.connectors.J1979LiveUsbAuth.u;
 
 /** Independent CL/1 application evidence replay. No device, credential or
  * physical provenance can be established from a saved stream. */
