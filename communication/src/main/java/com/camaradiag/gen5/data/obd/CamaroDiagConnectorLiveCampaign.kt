@@ -45,7 +45,8 @@ object CamaroDiagConnectorLiveCampaign {
                 "source" to "LIVE_USB_CU3", "device_credential_authenticated" to false,
                 "client_proof_sent" to false, "physical_vehicle_verified" to false,
                 "hardware_provenance_verified" to false, "evidence_authenticated" to false,
-                "permits_programming" to false, "observations_received" to 0)
+                "permits_programming" to false, "observations_received" to 0,
+                "profile" to null, "summary" to null, "result" to null, "error" to null)
             base["capture_integrity_verified"] = captureIntegrityVerified
             base["summary"] = if(captureIntegrityVerified) replay?.summary else null
             base["result"] = if(captureIntegrityVerified) replay?.result else null
@@ -55,6 +56,21 @@ object CamaroDiagConnectorLiveCampaign {
             base["raw_capture_name"] = capture.name
             return base
         }
+    }
+
+    /** Read the persisted capture again immediately before a derived export. */
+    fun verifiedReplay(evidence: Evidence): J1979LiveNativeReplay.Result {
+        require(evidence.captureIntegrityVerified)
+        val expected=requireNotNull(evidence.sha256)
+        check(digest(evidence.capture)==expected) { "CL/1 digest mismatch" }
+        val result=evidence.capture.inputStream().buffered().use {
+            J1979LiveNativeReplay.decode(it,evidence.target.profile)
+        }
+        check(result.captureIntegrityVerified && result.summary==evidence.replay?.summary &&
+            result.result==evidence.replay?.result && digest(evidence.capture)==expected) {
+            "CL/1 changed before derived export"
+        }
+        return result
     }
 
     fun digest(file: File): String {
