@@ -1,3 +1,9 @@
+## Reprise — SAE J1979 — moniteurs et vérification legacy (27 novembre 2026)
+
+- PR #117 / chore/unified-ci : 79 UASID CAN historiques (Annexe E 2006), décodeurs Mode 05 standard TID 01–0A (Annexe C), distinction du Mode 06 legacy et des échelles OEM. Projections Android/Windows/Linux, réexamen des captures natives, affichage réseau et USB. Correction du courant large bande personnalisé (PID 4F, complément à deux), sans changer l'encodage par défaut.
+- Nouvelle commande Python hors ligne `verify-legacy --report ... --vin ... --output ...` : reconstruction des réponses sélectionnées, vérification des chaînes d'inventaire, VIN, défauts, mesures et champs dérivés pris en charge. CRC/checksum ELM contrôlé ; pas de prétention de checksum pour le pilote J2534. Aucun rapport anonyme promu en preuve physique.
+- Régressions Python/Kotlin/C# écrites ; aucune compilation ni exécution de tests intermédiaires conformément à AGENTS.md. Les anciens rapports et valeurs brutes sont conservés. Le catalogue J1979DA moderne exhaustif et les cas firmware restant ouverts doivent être traités avant le gate de clôture ; ni SAE J1979 ni C6 ne sont déclarés terminés. La demande de prerelease APK signé après clôture validée reste applicable ; aucun lancement de Release ni merge.
+ 
 ## Reprise — 27 novembre 2026 — SAE J1979 / échelles par calculateur
 
 - PR #117, branche chore/unified-ci : moteur contextuel Mode 01 PID 4F/50 sur Android, Windows et Linux ; dépendances MAP, MAF, lambda commandée et sondes large bande ; projection Mode 02 frame 0.
