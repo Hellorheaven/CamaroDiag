@@ -162,6 +162,53 @@ class FreezeTests(unittest.TestCase):
         self.assertEqual(result["stop_reason"], "CANCELLED")
         self.assertTrue(result["steps"][0]["transmission_attempted"])
 
+    def test_freeze_route_is_admitted_before_transmission(self):
+        ecu = FakeECU()
+        plan = FreezePlan(VIN)
+        for invalid in (0, -1, 21, float("inf"), float("nan"), "2.5"):
+            with self.subTest(timeout=invalid):
+                result = scan_freeze(ecu.exchange, plan, request_timeout=lambda request: invalid)
+                self.assertEqual(result["stop_reason"], "CONTEXT_CHANGED")
+                self.assertFalse(result["steps"][0]["transmission_attempted"])
+                self.assertEqual(ecu.requests, [])
+        def broken_timeout(request):
+            raise OSError("No active adapter timing profile")
+        result = scan_freeze(ecu.exchange, plan, request_timeout=broken_timeout)
+        self.assertEqual(result["stop_reason"], "CONTEXT_CHANGED")
+        self.assertFalse(result["steps"][0]["transmission_attempted"])
+        self.assertEqual(ecu.requests, [])
+
+    def test_freeze_context_revoked_during_exchange_never_accepts_reply(self):
+        ecu = FakeECU()
+        state = {"active": True}
+        def require_current():
+            if not state["active"]:
+                raise RuntimeError("vehicle or ECU changed")
+        def exchange(request, timeout):
+            value = ecu.exchange(request, timeout)
+            state["active"] = False
+            return value
+        report = scan_freeze(exchange, FreezePlan(VIN), require_current=require_current)
+        self.assertEqual(ecu.requests, [b"\\x09\\x02"])
+        self.assertEqual(report["stop_reason"], "CONTEXT_CHANGED")
+        self.assertIsNone(report["initial_vin"])
+        self.assertTrue(report["steps"][0]["transmission_attempted"])
+        self.assertIsNone(report["steps"][0]["response_hex"])
+        self.assertFalse(report["identity_rechecked"])
+
+    def test_freeze_transport_timeout_after_revoke_is_not_safe_retry(self):
+        state = {"active": True}
+        def require_current():
+            if not state["active"]:
+                raise OSError("session revoked")
+        def exchange(request, timeout):
+            state["active"] = False
+            raise TimeoutError("response after route loss")
+        report = scan_freeze(exchange, FreezePlan(VIN), require_current=require_current)
+        self.assertEqual(report["steps"][0]["transport_outcome"], "CONTEXT_CHANGED")
+        self.assertTrue(report["steps"][0]["transmission_attempted"])
+        self.assertFalse(report["completed"])
+
     def test_read_only_boundaries_and_invalid_plans(self):
         for request in ("04", "0800", "22F190", "020002"):
             self.assertFalse(allowed_request(bytes.fromhex(request), (0, 1)))

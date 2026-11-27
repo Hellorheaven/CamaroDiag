@@ -340,31 +340,61 @@ def scan_freeze(exchange, plan: FreezePlan, *, clock=time.monotonic, require_cur
     def observed(request):
         begin = clock()
         attempted = False
+
         def result(outcome, response=None):
             elapsed = clock() - begin
             return Read(outcome, response, max(0, round(elapsed * 1000)), attempted)
+
+        def context_ok():
+            # A revoked vehicle/ECU/session context is never a completed read.
+            # It remains uncertain whether an already issued request reached
+            # the ECU, so keep the actual transmission_attempted flag.
+            try:
+                current()
+                return True
+            except (OSError, ValueError, RuntimeError):
+                return False
+
+        if not context_ok():
+            return result("CONTEXT_CHANGED")
+        left = plan.budget_ms / 1000 - (begin - start)
+        if not math.isfinite(left) or left <= 0:
+            return result("BUDGET")
         try:
-            current()
-            left = plan.budget_ms / 1000 - (begin - start)
-            if not math.isfinite(left) or left <= 0:
-                return result("BUDGET")
-            attempted = True
             maximum = request_timeout(request)
-            if not isinstance(maximum, (int, float)) or not math.isfinite(maximum) or not 0 < maximum <= 20:
-                return result("TRANSPORT_ERROR")
-            response = exchange(request, min(maximum, left))
-            if not isinstance(response, bytes) or not response or len(response) > MAX_RESPONSE:
-                return result("TRANSPORT_ERROR")
-            current()
-            if clock() - start >= plan.budget_ms / 1000:
-                return result("LATE_RESPONSE", response)
-            return result("RECEIVED", response)
+        except KeyboardInterrupt:
+            return result("CANCELLED")
+        except (OSError, ValueError, RuntimeError):
+            return result("CONTEXT_CHANGED")
+        if (not isinstance(maximum, (int, float)) or
+                not math.isfinite(maximum) or not 0 < maximum <= 20):
+            # Local admission failed before the actual exchange. Do not
+            # incorrectly record a transmitted request.
+            return result("CONTEXT_CHANGED")
+        if not context_ok():
+            return result("CONTEXT_CHANGED")
+        remaining = plan.budget_ms / 1000 - (clock() - start)
+        if remaining <= 0:
+            return result("BUDGET")
+
+        attempted = True
+        try:
+            response = exchange(request, min(maximum, remaining))
         except KeyboardInterrupt:
             return result("CANCELLED")
         except TimeoutError:
-            return result("TIMEOUT") if attempted else result("CONTEXT_CHANGED")
+            return result("TIMEOUT" if context_ok() else "CONTEXT_CHANGED")
         except (OSError, ValueError, RuntimeError):
-            return result("TRANSPORT_ERROR") if attempted else result("CONTEXT_CHANGED")
+            return result("TRANSPORT_ERROR" if context_ok() else "CONTEXT_CHANGED")
+        # Even an apparently valid reply cannot be used once ownership has
+        # changed during the exchange.
+        if not context_ok():
+            return result("CONTEXT_CHANGED")
+        if not isinstance(response, bytes) or not response or len(response) > MAX_RESPONSE:
+            return result("TRANSPORT_ERROR")
+        if clock() - start >= plan.budget_ms / 1000:
+            return result("LATE_RESPONSE", response)
+        return result("RECEIVED", response)
 
     result = execute_plan(plan, observed)
     result["duration_ms"] = max(0, round((clock() - start) * 1000))
