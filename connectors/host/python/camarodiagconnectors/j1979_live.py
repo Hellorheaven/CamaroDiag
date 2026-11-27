@@ -13,6 +13,7 @@ import time
 
 from .j1979_campaign_evidence import decode_observation
 from .j1979_multi_signal import width as multi_width, decode_response as multi_decode
+from .j1979_status import width as status_width, decode_response as status_decode
 
 MAX_PIDS = 32
 MAX_CYCLES = 1000
@@ -198,7 +199,7 @@ def record(exchange, plan: Plan, *, clock=time.monotonic, sleep=time.sleep,
                         row["detail"]=f'NRC_{evidence["negative_response_code"]:02X}'
                     if phase=="SAMPLE" and evidence["shape"] in ("RAW","PASSED") and multi_width(pid) is not None:
                         signals=multi_decode(request,raw)
-                        if signals is None:
+                        if signals is None or (status_width(pid) is not None and status_decode(request,raw) is None):
                             stop="INVALID_MEASUREMENT"
                             row.update(status="FAILED",detail=stop,application_evidence=None)
                         else:
