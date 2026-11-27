@@ -219,7 +219,7 @@ internal static class J1979FreezeNative
             false,false,error is null,false,observations.Count,error,profile,terminal,result);
     }
 
-    internal static string EncodeReport(Report report)
+    internal static string EncodeReport(Report report, string? captureSha256=null, string? rawCaptureName=null)
     {
         // Explicit profile representation agrees with the Python CF/1 inspector.
         var p=report.Profile;
@@ -230,7 +230,8 @@ internal static class J1979FreezeNative
             Profile=p is null?null:new {RequestCanId=p.Tx.ToString("X"),ResponseCanId=p.Rx.ToString("X"),
                 p.Extended,p.Plan},
             report.Summary,report.Result,report.HardwareProvenanceVerified,
-            report.EvidenceAuthenticated,report.PhysicalVehicleVerified,report.PermitsProgramming
+            report.EvidenceAuthenticated,report.PhysicalVehicleVerified,report.PermitsProgramming,
+            CaptureSha256=captureSha256,RawCaptureName=rawCaptureName
         };
         return JsonSerializer.Serialize(row,new JsonSerializerOptions{
             PropertyNamingPolicy=JsonNamingPolicy.SnakeCaseLower,WriteIndented=true});
