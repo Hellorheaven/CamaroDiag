@@ -30,8 +30,7 @@ bool cf1_valid_vin(const char *s) {
         if (!(c >= '0' && c <= '9') &&
             !(c >= 'A' && c <= 'H') &&
             !(c >= 'J' && c <= 'N') &&
-            !(c == 'P' || (c >= 'R' && c <= 'Z')) &&
-            false) return false;
+            !(c == 'P' || (c >= 'R' && c <= 'Z'))) return false;
     }
     return true;
 }
