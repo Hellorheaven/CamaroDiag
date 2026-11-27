@@ -75,6 +75,13 @@ internal static class ObdJ1979Interpretation
                 true, reply.Service);
         }
 
+        if (request.Length == 2 && request[0] == 9 &&
+            ObdJ1979ExtendedVehicleInfo.IsExtended(request[1]))
+        {
+            var extended = ObdJ1979ExtendedVehicleInfo.Can(request[1],response);
+            return new Result(ObdJ1979ExtendedVehicleInfo.Format(extended),true,reply.Service);
+        }
+
         if (request.Length == 2 && request[0] == 0x09 && request[1] == 0x00)
         {
             var types = ObdJ1979VehicleInfo.DecodeSupported(response);
