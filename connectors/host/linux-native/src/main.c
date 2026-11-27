@@ -220,6 +220,50 @@ static void write_prefix(json_writer *j, const cf1_evidence *e, const char *capt
     else write_literal(j, "null");
     write_literal(j, "}\n");
 }
+static void write_complete(json_writer *j, const cf1_evidence *e, const char *digest) {
+    write_literal(j, "{\n"
+        "\"schema\":\"camarodiag-functional-j1979-native-freeze-v1\","
+        "\"protocol\":\"SAE-J1979\","
+        "\"source\":\"OFFLINE_CF1\","
+        "\"capture_integrity_verified\":");
+    write_bool(j, e->capture_integrity_verified);
+    write_literal(j, ",\"execution_completed\":"); write_bool(j, e->execution_completed);
+    write_literal(j,
+        ",\"terminal_present\":true,"
+        "\"device_credential_authenticated\":false,"
+        "\"client_proof_sent\":false,"
+        "\"physical_vehicle_verified\":false,"
+        "\"hardware_provenance_verified\":false,"
+        "\"permits_programming\":false,"
+        "\"evidence_authenticated\":false,"
+        "\"profile\":{\"request_can_id\":");
+    write_can_hex(j, e->plan.tx);
+    write_literal(j, ",\"response_can_id\":"); write_can_hex(j, e->plan.rx);
+    write_literal(j, ",\"extended\":"); write_bool(j, e->plan.extended);
+    write_literal(j, ",\"plan\":{\"expected_vin\":"); write_string(j, e->plan.vin);
+    write_literal(j, ",\"frames\":"); write_array(j, e->plan.frames, e->plan.frame_count);
+    write_literal(j, ",\"selected_pids\":"); write_array(j, e->plan.pids, e->plan.pid_count);
+    write_literal(j, ",\"budget_ms\":"); write_unsigned(j, e->plan.budget_ms);
+    write_literal(j, "}},\"observations\":"); write_unsigned(j, e->observation_count);
+    write_literal(j, ",\"duration_ms\":"); write_unsigned(j, e->terminal_duration_ms);
+    write_literal(j, ",\"stop_reason\":");
+    if (e->recipe_stopped) write_string(j, e->terminal_stop_reason);
+    else write_literal(j, "null");
+    write_literal(j, ",\"initial_vin\":");
+    if (e->initial_vin_observed) write_string(j, e->initial_vin);
+    else write_literal(j, "null");
+    write_literal(j, ",\"final_vin\":");
+    if (e->final_vin_observed) write_string(j, e->final_vin);
+    else write_literal(j, "null");
+    write_literal(j, ",\"frame_states\":[");
+    for (size_t i = 0; i < e->visited_frames; ++i) {
+        if (i) write_literal(j, ",");
+        write_string(j, e->progress[i].provisional_status);
+    }
+    write_literal(j, "],\"capture_sha256\":");
+    write_string(j, digest);
+    write_literal(j, "}\n");
+}
 static bool atomic_create(const char *path, const char *content, size_t n) {
     int fd = open(path, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0600);
     if (fd < 0) return false;
@@ -267,6 +311,29 @@ static int inspect(const char *capture_path, const char *vin, const char *output
     free(report); free_input(&again); free_input(&original);
     return ok ? 0 : error("CF/1 inspection failed, source changed, or output exists");
 }
+static int inspect_complete(const char *capture_path, const char *vin, const char *output) {
+    input original = {0}, again = {0};
+    bool ok = load_regular(capture_path, CF1_MAX_BYTES, &original);
+    cf1_evidence evidence = {0};
+    char err[256] = {0};
+    if (ok) ok = cf1_inspect_complete(original.bytes, original.length, vin,
+                                     &evidence, err, sizeof(err)) == 0;
+    if (!ok && *err) fprintf(stderr, "CF/1 rejected: %s\n", err);
+    json_writer writer = { .capacity = 65536 };
+    if (ok) {
+        writer.bytes = calloc(1, writer.capacity);
+        ok = writer.bytes != NULL;
+        if (ok) write_complete(&writer, &evidence, original.digest);
+        if (writer.failed) ok = false;
+    }
+    if (ok) ok = load_regular(capture_path, CF1_MAX_BYTES, &again) &&
+                 same_input(&original, &again);
+    if (ok) ok = atomic_create(output, writer.bytes, writer.used);
+    free(writer.bytes);
+    cf1_evidence_free(&evidence);
+    free_input(&again); free_input(&original);
+    return ok ? 0 : error("Full CF/1 inspection failed or output exists");
+}
 static int verify(const char *capture_path, const char *report_path,
                   const char *output_path, const char *vin) {
     input capture = {0}, stored = {0}, recheck_capture = {0}, recheck_report = {0};
@@ -307,6 +374,7 @@ static void usage(FILE *stream) {
         "CamaroDiag Linux native C — SAE J1979 Mode 02 CF/1 (offline, read-only)\n"
         "Usage:\n"
         "  camarodiag-native --inspect-j1979-freeze-native-prefix CAPTURE.cf VIN PREFIX.json\n"
+        "  camarodiag-native --inspect-j1979-freeze-native CAPTURE.cf VIN REPORT.json\n"
         "  camarodiag-native --verify-j1979-freeze-native-prefix CAPTURE.cf PREFIX.json PROOF.json VIN\n"
         "  camarodiag-native --help\n"
         "Examples:\n"
@@ -318,6 +386,8 @@ int main(int argc, char **argv) {
     if (argc == 2 && (!strcmp(argv[1], "--help") || !strcmp(argv[1], "-h"))) {
         usage(stdout); return 0;
     }
+    if (argc == 5 && !strcmp(argv[1], "--inspect-j1979-freeze-native"))
+        return inspect_complete(argv[2], argv[3], argv[4]);
     if (argc == 5 && !strcmp(argv[1], "--inspect-j1979-freeze-native-prefix"))
         return inspect(argv[2], argv[3], argv[4]);
     if (argc == 6 && !strcmp(argv[1], "--verify-j1979-freeze-native-prefix"))

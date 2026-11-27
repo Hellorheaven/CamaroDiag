@@ -19,8 +19,14 @@ Python ni de dépendance pyserial.
 
 ## Commandes déjà implémentées
 
+La voie complète vérifie aussi l'enregistrement terminal, les états par frame,
+la durée, les drapeaux et la cohérence avec le rejeu déterministe. L'absence
+d'attestation du calculateur est toujours indiquée.
+
+
 ~~~sh
 ./camarodiag-native --inspect-j1979-freeze-native-prefix capture.cf VIN prefix.json
+./camarodiag-native --inspect-j1979-freeze-native complete.cf VIN complete.json
 ./camarodiag-native --verify-j1979-freeze-native-prefix capture.cf prefix.json preuve.json VIN
 ~~~
 

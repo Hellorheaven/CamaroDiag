@@ -157,6 +157,35 @@ static void checks(void) {
     refused(data, position, vin);
     allowed(data, full_size);
 
+    /* The distinct full inspector must recompute a coherent terminal. */
+    make_capture();
+    size_t prefix_size = position;
+    memset(terminal, 0, sizeof(terminal));
+    terminal[0] = 0; terminal[1] = 1; terminal[2] = 7;
+    put32(terminal + 4, 6); put32(terminal + 8, 100);
+    terminal[12] = 2; /* COMPLETE frame 00 */
+    append(3, terminal, sizeof(terminal));
+    assert(cf1_inspect_complete(data, position, vin, &e, err, sizeof(err)) == 0);
+    assert(e.capture_integrity_verified && e.execution_completed);
+    assert(!e.physical_vehicle_verified && e.terminal_present);
+    assert(e.terminal_duration_ms == 100);
+    cf1_evidence_free(&e);
+    /* Even with an updated CRC, a forged completion flag is rejected. */
+    size_t terminal_at = prefix_size;
+    data[terminal_at + 8 + 2] ^= 4;
+    put32(data + terminal_at + 8 + sizeof(terminal),
+          cf1_crc32(data + terminal_at, 8 + sizeof(terminal)));
+    refused(data, position, vin);
+    assert(cf1_inspect_complete(data, position, vin, &e, err, sizeof(err)) != 0);
+    cf1_evidence_free(&e);
+    data[terminal_at + 8 + 2] ^= 4;
+    put32(data + terminal_at + 8 + sizeof(terminal),
+          cf1_crc32(data + terminal_at, 8 + sizeof(terminal)));
+    assert(cf1_inspect_complete(data, position - 1, vin, &e, err, sizeof(err)) != 0);
+    cf1_evidence_free(&e);
+    assert(cf1_inspect_complete(data, prefix_size, vin, &e, err, sizeof(err)) != 0);
+    cf1_evidence_free(&e);
+
     /* No valid profile can be invented from an incomplete first record. */
     refused(data, just_plan - 1, vin);
     refused(data, 0, vin);
