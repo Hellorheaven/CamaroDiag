@@ -12,20 +12,20 @@ typedef struct {
     bool suppress_advertisement, retire_context;
     uint8_t emitted[64][2];
 } fake;
-static uint64_t clock_fake(void *ctx) {return ((fake *)ctx)->clock;}
+static uint64_t clock_fake(void *ctx) {return static_cast<fake *>(ctx)->clock;}
 static bool current_fake(void *ctx) {
-    fake *f=ctx;
+    auto *f = static_cast<fake *>(ctx);
     return !f->retire_context || f->requests<3;
 }
 static bool wait_fake(void *ctx,unsigned milliseconds) {
-    fake *f=ctx;
+    auto *f = static_cast<fake *>(ctx);
     assert(milliseconds>0 && milliseconds<=100);
     f->clock+=milliseconds;
     return true;
 }
 static int exchange_fake(void *ctx,const uint8_t *request,size_t n,
                          uint8_t *reply,size_t *length,unsigned timeout) {
-    fake *f=ctx;
+    auto *f = static_cast<fake *>(ctx);
     assert(n==2 && timeout>0 && timeout<=2500);
     assert(request[0]==1 || request[0]==9);
     assert(f->requests<sizeof(f->emitted)/sizeof(f->emitted[0]));
@@ -71,7 +71,7 @@ static int exchange_fake(void *ctx,const uint8_t *request,size_t n,
     return -1;
 }
 static j1979_live_plan plan(fake *f) {
-    j1979_live_plan p={0};
+    j1979_live_plan p{};
     p.channel.exchange=exchange_fake;
     p.channel.clock=clock_fake;
     p.channel.current=current_fake;
@@ -84,7 +84,7 @@ static j1979_live_plan plan(fake *f) {
     return p;
 }
 int main(void) {
-    fake f={.clock=1000};
+    fake f{}; f.clock=1000;
     j1979_live_plan p=plan(&f);
     assert(j1979_live_plan_valid(&p));
     j1979_live_plan missing=p;
@@ -93,7 +93,7 @@ int main(void) {
     missing=p;missing.channel.expected_vin=NULL;
     assert(!j1979_live_plan_valid(&missing));
     assert(p.channel.expected_vin && p.pid_count==2);
-    j1979_live_result r={0};
+    j1979_live_result r{};
     assert(j1979_live_record(&p,&r)==0);
     assert(r.completed && r.initial_vin_valid && r.final_vin_valid);
     assert(r.inventory_complete && r.cycles_completed==2);
@@ -119,36 +119,36 @@ int main(void) {
     j1979_live_free(&r);
     assert(!r.steps && !r.step_count);
 
-    f=(fake){.clock=1000};
+    f = fake{}; f.clock=1000;
     p=plan(&f);p.interval_ms=35000;
     assert(j1979_live_record(&p,&r)==0);
     assert(r.completed && f.vin_requests==3 && r.step_count==8);
     assert(!strcmp(r.steps[4].phase,"PERIODIC_VIN"));
     j1979_live_free(&r);
 
-    f=(fake){.clock=1000,.bad_final_vin=true};
+    f = fake{}; f.clock=1000; f.bad_final_vin=true;
     p=plan(&f);assert(j1979_live_record(&p,&r)==0);
     assert(!r.completed && !strcmp(r.stop_reason,"VIN_MISMATCH"));
     assert(!r.final_vin_valid);j1979_live_free(&r);
 
-    f=(fake){.clock=1000,.negative_sample=true};
+    f = fake{}; f.clock=1000; f.negative_sample=true;
     p=plan(&f);assert(j1979_live_record(&p,&r)==0);
     assert(!r.completed && r.final_vin_valid && r.missing_samples==2);
     assert(!strcmp(r.stop_reason,"INCOMPLETE_SAMPLES"));
     j1979_live_free(&r);
 
-    f=(fake){.clock=1000,.timeout_sample=true};
+    f = fake{}; f.clock=1000; f.timeout_sample=true;
     p=plan(&f);assert(j1979_live_record(&p,&r)==0);
     assert(!r.completed && r.missing_samples==2);
     assert(!strcmp(r.stop_reason,"INCOMPLETE_SAMPLES"));
     j1979_live_free(&r);
 
-    f=(fake){.clock=1000,.suppress_advertisement=true};
+    f = fake{}; f.clock=1000; f.suppress_advertisement=true;
     p=plan(&f);assert(j1979_live_record(&p,&r)==0);
     assert(!r.completed && !strcmp(r.stop_reason,"PID_NOT_ADVERTISED"));
     assert(f.requests==2);j1979_live_free(&r);
 
-    f=(fake){.clock=1000,.retire_context=true};
+    f = fake{}; f.clock=1000; f.retire_context=true;
     p=plan(&f);assert(j1979_live_record(&p,&r)==0);
     assert(!r.completed && !strcmp(r.stop_reason,"CONTEXT_CHANGED"));
     assert(f.requests==3);j1979_live_free(&r);

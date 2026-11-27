@@ -14,7 +14,7 @@ int main(void) {
     assert(!j1979_isotp_valid_interface("../can0/path"));
     assert(!j1979_isotp_valid_interface("can\n0"));
     assert(!j1979_isotp_valid_interface("1234567890123456"));
-    j1979_isotp_link link={.socket_fd=-1};
+    j1979_isotp_link link{}; link.socket_fd=-1;
     /* Function must reject an unapproved physical pair before socket(). */
     assert(!j1979_isotp_open(&link,"can0",0x7df,0x7e8,NULL));
     assert(link.socket_fd==-1);

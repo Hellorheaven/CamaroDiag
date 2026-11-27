@@ -14,11 +14,11 @@ typedef struct {
     bool force_bad_vin, force_final_vin_mismatch, force_partial_mode06;
     bool force_nrc, force_dtc, force_monitor, force_info, force_measurement, force_late, force_transport, refuse_mutation;
 } stub;
-static uint64_t clock_fake(void *ctx) { return ((stub *)ctx)->now; }
-static bool current_fake(void *ctx) { return ((stub *)ctx)->current; }
+static uint64_t clock_fake(void *ctx) { return static_cast<stub *>(ctx)->now; }
+static bool current_fake(void *ctx) { return static_cast<stub *>(ctx)->current; }
 static int exchange_fake(void *ctx, const uint8_t *req, size_t n,
                         uint8_t *reply, size_t *length, unsigned timeout) {
-    stub *s = ctx;
+    auto *s = static_cast<stub *>(ctx);
     assert(timeout > 0 && timeout <= 2500);
     assert(j1979_can_allowed_read(req,n));
     if (s->count < 24) {
@@ -54,6 +54,7 @@ static int exchange_fake(void *ctx, const uint8_t *req, size_t n,
     } else if (n == 2 && (req[0] == 1 || req[0] == 6 ||
                           req[0] == 8 || req[0] == 9) && req[1] == 0) {
         static uint8_t bitmap[6];
+        memset(bitmap, 0, sizeof(bitmap));
         bitmap[0]=(uint8_t)(req[0]+0x40);bitmap[1]=0;
         bitmap[2]=req[0] == 1 ? 0x80 :
             (s->force_monitor && req[0] == 6 ? 0x00 : 0);
@@ -63,7 +64,6 @@ static int exchange_fake(void *ctx, const uint8_t *req, size_t n,
             bitmap[2]=0x01; /* InfoType 08 */
             bitmap[3]=0x08; /* InfoType 0D */
         }
-        bitmap[3]=bitmap[4]=bitmap[5]=0;
         bytes=bitmap;size=6;
     } else if (n == 2 && req[0] == 6 && req[1] == 0x20 &&
                s->force_monitor) {
@@ -103,7 +103,7 @@ static int exchange_fake(void *ctx, const uint8_t *req, size_t n,
     memcpy(reply,bytes,size);*length=size;return 0;
 }
 static j1979_can_plan plan(stub *s) {
-    j1979_can_plan p={0};
+    j1979_can_plan p{};
     p.exchange=exchange_fake;p.clock=clock_fake;p.current=current_fake;
     p.context=s;p.tx=0x7e0;p.rx=0x7e8;p.budget_ms=30000;p.expected_vin=vin;
     return p;
@@ -120,9 +120,9 @@ int main(void) {
     assert(!j1979_can_allowed_read(bad3,3));
     assert(j1979_can_allowed_read(good,3));
 
-    stub s={.current=true};
+    stub s{}; s.current=true;
     j1979_can_plan p=plan(&s);
-    j1979_can_result refused={0};
+    j1979_can_result refused{};
     j1979_can_plan missing=p;
     missing.current=NULL;
     assert(j1979_can_scan(&missing,&refused)!=0);
@@ -130,7 +130,7 @@ int main(void) {
     missing=p;missing.expected_vin=NULL;
     assert(j1979_can_scan(&missing,&refused)!=0);
     assert(refused.steps==NULL);
-    j1979_can_result r={0};
+    j1979_can_result r{};
     assert(j1979_can_scan(&p,&r)==0);
     assert(r.completed && r.vin_valid && !strcmp(r.observed_vin,vin));
     assert(!strcmp(r.vin_match,"MATCH"));
@@ -154,11 +154,11 @@ int main(void) {
     fclose(output);
     j1979_can_result_free(&r);
 
-    s=(stub){.current=true,.force_bad_vin=true};
+    s = stub{}; s.current=true; s.force_bad_vin=true;
     p=plan(&s);assert(j1979_can_scan(&p,&r)==0);
     assert(!r.completed && !strcmp(r.stop_reason,"VIN_MISMATCH"));
     assert(s.count==1);j1979_can_result_free(&r);
-    s=(stub){.current=true,.force_dtc=true};
+    s = stub{}; s.current=true; s.force_dtc=true;
     p=plan(&s);assert(j1979_can_scan(&p,&r)==0);
     assert(r.completed && r.step_count==11);
     output=tmpfile();assert(output);
@@ -167,7 +167,7 @@ int main(void) {
     assert(fread(text,1,sizeof(text)-1,output)>0);
     assert(strstr(text,"\"dtc_codes\":[\"P0301\"]"));
     fclose(output);j1979_can_result_free(&r);
-    s=(stub){.current=true,.force_monitor=true};
+    s = stub{}; s.current=true; s.force_monitor=true;
     p=plan(&s);assert(j1979_can_scan(&p,&r)==0);
     assert(r.completed);
     output=tmpfile();assert(output);
@@ -179,7 +179,7 @@ int main(void) {
     assert(strstr(text,"\"numeric_relation\":\"WITHIN\""));
     assert(strstr(text,"\"monitor_verdict\":null"));
     fclose(output);j1979_can_result_free(&r);
-    s=(stub){.current=true,.force_info=true};
+    s = stub{}; s.current=true; s.force_info=true;
     p=plan(&s);assert(j1979_can_scan(&p,&r)==0);
     assert(r.completed && r.inventory_state[9]==1);
     output=tmpfile();assert(output);
@@ -193,7 +193,7 @@ int main(void) {
     assert(strstr(text,"\"vehicle_info\":{\"info_type\":13"));
     assert(strstr(text,"ECU-CAMARO-ENG1"));
     fclose(output);j1979_can_result_free(&r);
-    s=(stub){.current=true,.force_measurement=true};
+    s = stub{}; s.current=true; s.force_measurement=true;
     p=plan(&s);assert(j1979_can_scan(&p,&r)==0);
     assert(r.completed);
     output=tmpfile();assert(output);
@@ -204,28 +204,28 @@ int main(void) {
     assert(strstr(text,"\"name\":\"engine-rpm\""));
     assert(strstr(text,"\"number\":1726"));
     fclose(output);j1979_can_result_free(&r);
-    s=(stub){.current=true,.force_final_vin_mismatch=true};
+    s = stub{}; s.current=true; s.force_final_vin_mismatch=true;
     p=plan(&s);assert(j1979_can_scan(&p,&r)==0);
     assert(!r.completed && !strcmp(r.stop_reason,"VIN_CHANGED"));
     assert(!strcmp(r.final_vin_match,"MISMATCH"));
     assert(s.count==11);j1979_can_result_free(&r);
-    s=(stub){.current=true,.force_partial_mode06=true};
+    s = stub{}; s.current=true; s.force_partial_mode06=true;
     p=plan(&s);assert(j1979_can_scan(&p,&r)==0);
     assert(!r.completed && !strcmp(r.stop_reason,"INVENTORY_INCOMPLETE"));
     assert(r.timeout_responses==1);j1979_can_result_free(&r);
-    s=(stub){.current=true,.force_nrc=true};
+    s = stub{}; s.current=true; s.force_nrc=true;
     p=plan(&s);assert(j1979_can_scan(&p,&r)==0);
     assert(!r.completed && !strcmp(r.stop_reason,"OBSERVATION_INCOMPLETE"));
     assert(r.negative_responses==1);j1979_can_result_free(&r);
-    s=(stub){.current=true,.force_transport=true};
+    s = stub{}; s.current=true; s.force_transport=true;
     p=plan(&s);assert(j1979_can_scan(&p,&r)==0);
     assert(!r.completed && !strcmp(r.stop_reason,"TRANSPORT_ERROR"));
     assert(s.count==2);j1979_can_result_free(&r);
-    s=(stub){.current=false};
+    s = stub{}; s.current=false;
     p=plan(&s);assert(j1979_can_scan(&p,&r)==0);
     assert(!r.completed && !strcmp(r.stop_reason,"CONTEXT_CHANGED"));
     assert(s.count==0);j1979_can_result_free(&r);
-    s=(stub){.current=true,.force_late=true};
+    s = stub{}; s.current=true; s.force_late=true;
     p=plan(&s);p.budget_ms=100;
     assert(j1979_can_scan(&p,&r)==0);
     assert(!r.completed && !strcmp(r.stop_reason,"BUDGET_EXHAUSTED"));

@@ -41,7 +41,7 @@ static void observation(fixture *f,unsigned *sequence,unsigned phase,
     record(f,2,(*sequence)++,data,CL1_EVENT_SIZE+size);
 }
 static fixture complete(void) {
-    fixture f={0};
+    fixture f{};
     uint8_t plan[CL1_PLAN_SIZE]={0};
     le32(plan,0x7e0);le32(plan+4,0x7e8);
     memcpy(plan+9,vin,17);
@@ -77,7 +77,7 @@ static fixture complete(void) {
 }
 int main(void) {
     fixture f=complete();
-    cl1_result result={0};char error[256]={0};
+    cl1_result result{};char error[256]={0};
     assert(cl1_inspect_complete(f.bytes,f.used,vin,&result,error,sizeof(error))==0);
     assert(result.completed && result.terminal_present &&
            result.capture_integrity_verified);

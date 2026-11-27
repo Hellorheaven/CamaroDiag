@@ -72,7 +72,7 @@ static void make_capture(void) {
     append_observation(1, 1, vin_req, 2, vin_response, sizeof(vin_response));
 }
 static void allowed(const uint8_t *bytes, size_t length) {
-    cf1_evidence e = {0}; char err[200] = {0};
+    cf1_evidence e{}; char err[200] = {0};
     int status = cf1_inspect_prefix(bytes, length, vin, &e, err, sizeof(err));
     if (status) fprintf(stderr, "Unexpected native CF/1 denial: %s\n", err);
     assert(status == 0);
@@ -81,7 +81,7 @@ static void allowed(const uint8_t *bytes, size_t length) {
     cf1_evidence_free(&e);
 }
 static void refused(const uint8_t *bytes, size_t length, const char *expected) {
-    cf1_evidence e = {0}; char err[200] = {0};
+    cf1_evidence e{}; char err[200] = {0};
     assert(cf1_inspect_prefix(bytes, length, expected, &e, err, sizeof(err)) != 0);
     assert(!e.execution_completed);
     cf1_evidence_free(&e);
@@ -96,7 +96,7 @@ static void checks(void) {
     make_capture();
     size_t full_size = position;
     allowed(data, position);
-    cf1_evidence e = {0}; char err[200] = {0};
+    cf1_evidence e{}; char err[200] = {0};
     assert(cf1_inspect_prefix(data, position, vin, &e, err, sizeof(err)) == 0);
     assert(e.record_count == 7 && e.observation_count == 6);
     assert(e.visited_frames == 1 && !strcmp(e.progress[0].provisional_status, "COMPLETE"));
@@ -192,6 +192,6 @@ static void checks(void) {
 }
 int main(void) {
     checks();
-    puts("CF/1 native C fixture assertions passed (offline simulation only)");
+    puts("CF/1 native C++ fixture assertions passed (offline simulation only)");
     return 0;
 }
