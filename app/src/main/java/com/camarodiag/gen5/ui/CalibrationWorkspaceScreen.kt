@@ -160,6 +160,9 @@ data class CalibrationWorkspaceState(
     val physicalRecoveryFolderUri: android.net.Uri? = null,
     val physicalRecoveryResult: com.camarodiag.gen5.data.obd.EcuPhysicalBackupInspection.Report? = null,
     val physicalRecoveryIdentity: PhysicalRecoveryIdentity? = null,
+    val physicalRecoveryHistory: PhysicalRecoveryHistory.Report? = null,
+    val physicalRecoveryHistoryUris: List<android.net.Uri> = emptyList(),
+    val physicalRecoveryHistoryMessage: String? = null,
     val physicalRecoveryFailed: Boolean = false,
     val physicalRecoveryExportMessage: String? = null,
     val importedFileName: String? = null,
@@ -307,6 +310,8 @@ fun CalibrationWorkspaceScreen(
     onImportFile: () -> Unit,
     onVerifyEcuBackup: () -> Unit,
     onInspectPhysicalRecovery: (PhysicalRecoveryIdentity) -> Unit,
+    onInspectPhysicalRecoveryHistory: (PhysicalRecoveryIdentity, List<android.net.Uri>) -> Unit,
+    onExportPhysicalRecoveryHistory: (PhysicalRecoveryHistory.Report) -> Unit,
     onExportPhysicalRecovery: (PhysicalRecoveryIdentity, com.camarodiag.gen5.data.obd.EcuPhysicalBackupInspection.Report) -> Unit,
     onImportTrace: () -> Unit,
     onImportComparisonFile: () -> Unit,
@@ -2486,7 +2491,8 @@ fun CalibrationWorkspaceScreen(
                         color = CamaroAmber, fontSize = 12.sp
                     )
                     HorizontalDivider()
-                    PhysicalRecoveryPanel(state, vehicle.vin, doIpAccountUid, onInspectPhysicalRecovery, onExportPhysicalRecovery)
+                    PhysicalRecoveryPanel(state, vehicle.vin, doIpAccountUid, onInspectPhysicalRecovery, onExportPhysicalRecovery,
+                        onInspectPhysicalRecoveryHistory, onExportPhysicalRecoveryHistory)
                 }
             }
         }
@@ -2810,7 +2816,9 @@ fun CalibrationWorkspaceScreen(
 @Composable
 private fun PhysicalRecoveryPanel(state: CalibrationWorkspaceState, defaultVin: String,
                                   accountUid: String?, onInspect: (PhysicalRecoveryIdentity) -> Unit,
-                                  onExport: (PhysicalRecoveryIdentity, com.camarodiag.gen5.data.obd.EcuPhysicalBackupInspection.Report) -> Unit) {
+                                  onExport: (PhysicalRecoveryIdentity, com.camarodiag.gen5.data.obd.EcuPhysicalBackupInspection.Report) -> Unit,
+                                  onInspectHistory: (PhysicalRecoveryIdentity, List<android.net.Uri>) -> Unit,
+                                  onExportHistory: (PhysicalRecoveryHistory.Report) -> Unit) {
     var vin by remember(accountUid, defaultVin) { mutableStateOf(defaultVin.uppercase().take(17)) }
     var family by remember(accountUid) { mutableStateOf("") }
     var controller by remember(accountUid) { mutableStateOf("") }
@@ -2883,4 +2891,5 @@ private fun PhysicalRecoveryPanel(state: CalibrationWorkspaceState, defaultVin: 
             state.physicalRecoveryExportMessage?.let { Text(it, fontSize = 12.sp) }
         }
     }
+    PhysicalRecoveryHistoryPanel(identity, accountUid, state, onInspectHistory, onExportHistory)
 }
