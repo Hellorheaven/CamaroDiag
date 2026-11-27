@@ -66,12 +66,17 @@ internal fun J1979NetworkPanel(protocol:Int?,state:FunctionalTestState,vehicle:V
             r.ecus.forEach { ecu->
                 Text("${id(ecu.responseId)} · ${ecu.status} · ${ecu.observedVin.orEmpty()}")
                 Text(stringResource(R.string.j1979_network_steps,ecu.steps.size),fontSize=11.sp)
+                val contextual=ecu.contextualMeasurements.records.associateBy { it.requestHex }
                 ecu.steps.forEach { step->
+                    val scaled=contextual[step.requestHex]
+                    scaled?.signals?.forEach { signal ->
+                        Text("${signal.name}: ${signal.number ?: "—"} ${signal.unit}",fontSize=11.sp)
+                    }
                     step.extendedVehicleInfo?.let { J1979ExtendedVehicleInfoContent(it) }
-                    step.multiSignalRecord?.signals?.forEach { signal ->
+                    if(scaled==null) step.multiSignalRecord?.signals?.forEach { signal ->
                         Text("${signal.name}: ${signal.number} ${signal.unit}",fontSize=11.sp)
                     }
-                    val value=step.application?.measurement()
+                    val value=if(scaled==null)step.application?.measurement()else null
                     val codes=step.application?.dtcCodes()
                     Text("${step.requestHex} · ${step.status}"+
                         (value?.let { " · ${it.number} ${it.unit}" }?:"")+
