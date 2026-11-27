@@ -24,6 +24,9 @@ internal sealed partial class BridgeDesktopForm
         };
         var choose = Button(T("OpenJournal"));
         var chooseConnector = Button(T("OpenCheckpoint"));
+        var chooseHistory = Button(T("OpenHistory"));
+        string[]? selectedHistory = null;
+        BridgeRecoveryHistory.Report? displayedHistory = null;
         var verifyOriginal = Button(BridgeRecoveryPresentation.Text("VerifyOriginalButton"));
         verifyOriginal.Enabled = false;
         string? selectedJournal = null;
@@ -51,6 +54,7 @@ internal sealed partial class BridgeDesktopForm
             if (dialog.ShowDialog(this) != DialogResult.OK) return;
             selectedJournal = dialog.FileName;
             selectedCheckpoint=null;displayedCheckpoint=null;
+            selectedHistory=null;displayedHistory=null;
             selectedOriginal = null;
             displayed = null;
             verifyOriginal.Enabled = export.Enabled = false;
@@ -115,11 +119,13 @@ internal sealed partial class BridgeDesktopForm
         export.Click += async (_, _) =>
         {
             if(busy || (selectedJournal is null || displayed is null) &&
-                (selectedCheckpoint is null || displayedCheckpoint is null))return;
+                (selectedCheckpoint is null || displayedCheckpoint is null) &&
+                (selectedHistory is null || displayedHistory?.Verified != true))return;
             using var save = new SaveFileDialog {
                 Title=BridgeRecoveryPresentation.Text("ExportAssessment"),
                 Filter=BridgeRecoveryPresentation.Text("AssessmentJsonFilter"),
-                FileName=displayedCheckpoint is null?"CamaroDiag_E39_Recovery.json":"CamaroDiag_CDJ_Checkpoint.json",
+                FileName=displayedHistory is not null?"CamaroDiag_Recovery_History.json":
+                    displayedCheckpoint is null?"CamaroDiag_E39_Recovery.json":"CamaroDiag_CDJ_Checkpoint.json",
                 AddExtension=true,DefaultExt="json",
                 OverwritePrompt=true
             };
@@ -129,11 +135,17 @@ internal sealed partial class BridgeDesktopForm
             var previous=displayed;
             var checkpoint=selectedCheckpoint;
             var previousCheckpoint=displayedCheckpoint;
+            var history=selectedHistory;
+            var previousHistory=displayedHistory;
             export.Enabled=verifyOriginal.Enabled=false;
             try {
                 await RunBusyAsync(async ()=>{
                     try {
-                        if(checkpoint is not null && previousCheckpoint is not null){
+                        if(history is not null && previousHistory?.Verified==true){
+                            var current=await Task.Run(()=>BridgeRecoveryHistory.ExportCurrent(save.FileName,history,previousHistory));
+                            displayedHistory=current;
+                            results.Lines=RecoveryHistoryLines(current);
+                        }else if(checkpoint is not null && previousCheckpoint is not null){
                             var current=await Task.Run(()=>ConnectorCheckpoint.ExportCurrent(save.FileName,checkpoint,previousCheckpoint));
                             displayedCheckpoint=current;
                             results.Lines=CheckpointAssessmentLines(current);
@@ -143,9 +155,13 @@ internal sealed partial class BridgeDesktopForm
                             results.Lines=RecoveryAssessmentLines(current);
                         }else return;
                         results.AppendText(Environment.NewLine+BridgeRecoveryPresentation.Text("AssessmentExported"));
-                    } catch(InvalidDataException) {
+                    } catch(InvalidDataException error) {
+                        if(history is not null && error.Message=="ProtectedDestination"){
+                            ShowError(T("HistoryProblem_ProtectedDestination"));
+                            return;
+                        }
                         displayed=null;selectedOriginal=null;
-                        displayedCheckpoint=null;
+                        displayedCheckpoint=null;displayedHistory=null;
                         results.Text=T("EvidenceChanged");
                     } catch(IOException) {
                         ShowError(T("ExportFailed"));
@@ -155,7 +171,7 @@ internal sealed partial class BridgeDesktopForm
                 });
             } finally {
                 verifyOriginal.Enabled=displayed?.Backup.Verified==true && displayed.Target.Verified;
-                export.Enabled=displayed?.Journal.Sha256 is not null || displayedCheckpoint?.SnapshotSha256 is not null;
+                export.Enabled=displayed?.Journal.Sha256 is not null || displayedCheckpoint?.SnapshotSha256 is not null || displayedHistory?.Verified==true;
             }
         };
         chooseConnector.Click += async (_, _) =>
@@ -171,6 +187,7 @@ internal sealed partial class BridgeDesktopForm
             // CDJ/1 is not an E39 write journal; do not retain the previous
             // E39 selection when showing unrelated connector evidence.
             selectedJournal = null;
+            selectedHistory=null;displayedHistory=null;
             selectedCheckpoint=dialog.FileName;
             displayedCheckpoint=null;
             selectedOriginal = null;
@@ -193,11 +210,43 @@ internal sealed partial class BridgeDesktopForm
                 export.Enabled=displayedCheckpoint?.SnapshotSha256 is not null;
             }
         };
+        chooseHistory.Click += async (_, _) =>
+        {
+            if (busy) return;
+            var paths = ChooseRecoveryHistory();
+            if (paths is null) return;
+            selectedJournal = null;
+            selectedOriginal = null;
+            displayed = null;
+            selectedCheckpoint = null;
+            displayedCheckpoint = null;
+            selectedHistory = paths;
+            displayedHistory = null;
+            verifyOriginal.Enabled = export.Enabled = false;
+            chooseHistory.Enabled = choose.Enabled = chooseConnector.Enabled = false;
+            results.Text = T("Inspecting");
+            try
+            {
+                await RunBusyAsync(async () =>
+                {
+                    var report = await Task.Run(() => BridgeRecoveryHistory.Inspect(paths));
+                    displayedHistory = report;
+                    results.Lines = RecoveryHistoryLines(report);
+                });
+                if (displayedHistory is null) results.Text = T("InspectionFailed");
+            }
+            finally
+            {
+                chooseHistory.Enabled = choose.Enabled = chooseConnector.Enabled = true;
+                export.Enabled = displayedHistory?.Verified == true;
+            }
+        };
         layout.Controls.Add(instructions, 0, 0);
         var actions = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true };
         actions.Controls.Add(choose);
         actions.Controls.Add(verifyOriginal);
         actions.Controls.Add(chooseConnector);
+        actions.Controls.Add(chooseHistory);
         actions.Controls.Add(export);
         layout.Controls.Add(actions, 0, 1);
         layout.Controls.Add(results, 0, 2);
