@@ -1,3 +1,17 @@
+# Reprise du lot J1979 natif Mode 01 — 27/11/2026
+
+PR #117, branche `chore/unified-ci`, base du lot `e9d143567078e99a021fe18cd53d190758d53a04`. Exclusivement SAE J1979 ; C6 et autres protocoles en pause.
+
+- Firmware ESP32-S3 / STM32G4 : périmètre raw-only explicite VIN/PID/cycles/cadence/budget, admission par pages de PID, revalidation VIN, séquence indépendante CI/2, échéances, limites mémoire et transport. CU/3 authentifie le périmètre avec des domaines HMAC distincts ; CL/1 enregistre les observations et le bilan rejoué, sans revendiquer une preuve physique.
+- Linux : client CU/3, inspection/rejeu CL/1 et projection via catalogue documenté depuis les octets originaux ; CLI et tests de falsification CRC valide.
+- Windows : client natif et inspection hors ligne, commandes de la console du connecteur et du pont J2534.
+- Android : profil et preuve CU/3, capture USB exclusive, rejeu CL/1, couche Kotlin de conservation privée et empreinte. Le raccordement complet de l'écran, de l'état ViewModel et des exports reste à faire : plusieurs lectures de fichiers par l'API GitHub ont retourné 404 ou un contenu incohérent avec l'ancre attendue. Ne pas considérer l'interface terminée.
+- Tests firmware et Python ajoutés et test firmware inscrit à la CI, non exécutés ; compléter les tests Android/C# et qualification de la liaison réelle. Ne pas confondre code committé et recette validée.
+- Catalogue J1979DA exhaustif : source normative autorisée toujours nécessaire, aucune définition inventée. Pas de fusion, pas d'APK, pas de gate intermédiaire volontairement déclenché. Après clôture logicielle : gate de validation puis APK Release signé et vérifié selon v2.0.46, depuis le SHA exact, prerelease sans fusion.
+- Les chiffres du lot se vérifient par comparaison GitHub avec la base ci-dessus ; objectif de 10 000 lignes utiles non atteint à ce stade.
+
+---
+
 ## Reprise — SAE J1979 exclusivement, projection documentée multiplateforme (27 novembre 2026)
 
 PR #117 / chore/unified-ci. Demande propriétaire : grands lots de 10 000 lignes utiles et une dizaine de commits, exclusivement SAE J1979 ; C6 et les autres protocoles en pause. APK Release signé uniquement après clôture logicielle validée, selon le précédent v2.0.46, sans fusion.
