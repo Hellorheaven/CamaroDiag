@@ -148,7 +148,7 @@ internal static class J1979MaintenanceJournal
             if(i==scope.Intent)
             {
                 Require(intent&&baseline&&identity>=0&&speed>=0&&rpm>=0&&
-                    e.Start-identity<=5000&&e.Start-speed<=5000&&e.Start-rpm<=5000,"Command without fresh checks and intent");
+                    e.Start-identity+e.Timeout<=5000&&e.Start-speed+e.Timeout<=5000&&e.Start-rpm+e.Timeout<=5000,"Command without fresh checks and intent");
                 a|=6;
             }
             now=e.End;count++;
