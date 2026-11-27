@@ -69,7 +69,10 @@ object ObdJ1979ScalingContext {
                     val b=(data[2] shl 8) or data[3]
                     listOf(field(prefix+"equivalence-ratio","ratio",a,0,1.0/32768){it/65535.0},
                         if(voltage)field(prefix+"voltage","V",b,1,1.0/8192){it/65535.0}
-                        else field(prefix+"current","mA",b,2,1.0/256,32768){it/32768.0})
+                        else field(prefix+"current","mA",b,2,1.0/256,32768){it/32768.0}.let { current ->
+                            if(maxima[2]!=0&&cfg.state!="UNVERIFIED")current.copy(number=
+                                (if(b>=32768)b-65536 else b)*maxima[2]/32768.0) else current
+                        })
                 }
             }
             return Measurement(hex(request),dep,signals)
