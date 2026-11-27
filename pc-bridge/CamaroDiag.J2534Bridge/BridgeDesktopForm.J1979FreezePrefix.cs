@@ -13,6 +13,16 @@ internal sealed partial class BridgeDesktopForm
     private readonly Button functionalVerifyNativeFreezePrefix=
         Button(J1979RecipeText("FreezePrefixVerify"));
 
+    // Internal machine status remains unchanged in JSON. Keep the
+    // functional-test display understandable in the selected UI language.
+    private string FreezePrefixInterruptionLabel(object? code)=>code as string switch
+    {
+        "MISSING_TERMINAL"=>J1979RecipeText("FreezePrefixMissingTerminal"),
+        "TRUNCATED_HEADER"=>J1979RecipeText("FreezePrefixTruncatedHeader"),
+        "TRUNCATED_RECORD"=>J1979RecipeText("FreezePrefixTruncatedRecord"),
+        _=>J1979RecipeText("FreezePrefixIncomplete"),
+    };
+
     private async Task InspectWindowsNativeFreezePrefixAsync()
     {
         if(busy||functionalCancellation is not null||DateTimeOffset.UtcNow>=functionalAuthorizedUntil)return;
@@ -45,7 +55,7 @@ internal sealed partial class BridgeDesktopForm
             message.AppendLine(destination.FileName);
             message.AppendLine(string.Format(CultureInfo.CurrentCulture,
                 J1979RecipeText("FreezePrefixSummary"),report["complete_observations"],
-                report["discarded_tail_bytes"],report["interruption"]));
+                report["discarded_tail_bytes"],FreezePrefixInterruptionLabel(report["interruption"])));
             if(report.TryGetValue("observed_frame_progress",out var frameValue)&&
                frameValue is Dictionary<string,object?>[] progress&&progress.Length>0)
             {
@@ -109,7 +119,7 @@ internal sealed partial class BridgeDesktopForm
             message.AppendLine(target.FileName);
             message.AppendLine(string.Format(CultureInfo.CurrentCulture,
                 J1979RecipeText("FreezePrefixSummary"),verified["complete_observations"],
-                verified["discarded_tail_bytes"],verified["interruption"]));
+                verified["discarded_tail_bytes"],FreezePrefixInterruptionLabel(verified["interruption"])));
             functionalResults.Text=message.ToString();
         }
         catch(Exception e) when(e is IOException or InvalidDataException or ArgumentException or

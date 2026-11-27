@@ -234,4 +234,8 @@
   <data name="FreezePrefixReport" xml:space="preserve"><value>Select saved CF/1 JSON report</value></data>
   <data name="FreezePrefixVerified" xml:space="preserve"><value>Original capture and partial report match. Recording remains incomplete.</value></data>
   <data name="FreezePrefixRejected" xml:space="preserve"><value>CF/1 report does not match the original capture</value></data>
+  <data name="FreezePrefixMissingTerminal" xml:space="preserve"><value>no terminal record</value></data>
+  <data name="FreezePrefixTruncatedHeader" xml:space="preserve"><value>incomplete final header</value></data>
+  <data name="FreezePrefixTruncatedRecord" xml:space="preserve"><value>incomplete final record</value></data>
+  <data name="FreezePrefixIncomplete" xml:space="preserve"><value>interrupted capture</value></data>
 </root>

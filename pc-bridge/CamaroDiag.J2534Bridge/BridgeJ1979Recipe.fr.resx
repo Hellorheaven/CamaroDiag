@@ -234,4 +234,8 @@
   <data name="FreezePrefixReport" xml:space="preserve"><value>Sélectionner le rapport CF/1 JSON enregistré</value></data>
   <data name="FreezePrefixVerified" xml:space="preserve"><value>La capture originale correspond au rapport partiel. La campagne reste incomplète.</value></data>
   <data name="FreezePrefixRejected" xml:space="preserve"><value>Le rapport CF/1 ne correspond pas à la capture originale</value></data>
+  <data name="FreezePrefixMissingTerminal" xml:space="preserve"><value>enregistrement final absent</value></data>
+  <data name="FreezePrefixTruncatedHeader" xml:space="preserve"><value>en-tête final incomplet</value></data>
+  <data name="FreezePrefixTruncatedRecord" xml:space="preserve"><value>dernier enregistrement incomplet</value></data>
+  <data name="FreezePrefixIncomplete" xml:space="preserve"><value>capture interrompue</value></data>
 </root>
