@@ -70,15 +70,22 @@ internal fun J1979FreezePanel(protocol: Int?,state: FunctionalTestState,vehicle:
         }
         if (!enabled && !state.running) Text(stringResource(R.string.j1979_live_unavailable),fontSize=11.sp)
     }
-    state.freezeReport?.let { report ->
-        val result=report.result
-        Text(stringResource(if (report.executionCompleted && result.allFramesStable)
+    val native=state.nativeFreezeEvidence
+    val result=state.freezeReport?.result ?: native?.report
+    if(native!=null) {
+        Text(stringResource(R.string.j1979_freeze_native_title))
+        Text(stringResource(if(native.captureIntegrityVerified) R.string.j1979_freeze_native_verified else R.string.j1979_freeze_incomplete))
+        native.error?.let { Text(it,fontSize=11.sp) }
+    }
+    if(result!=null) {
+        val completed=state.freezeReport?.executionCompleted ?: (native?.executionCompleted==true)
+        Text(stringResource(if (completed && result.allFramesStable)
             R.string.j1979_freeze_complete else R.string.j1979_freeze_incomplete))
         Text("VIN: ${result.initialVin ?: "—"}")
         Text(stringResource(R.string.j1979_freeze_identity,
             stringResource(if (result.identityRechecked) R.string.j1979_freeze_verified
                 else R.string.j1979_freeze_unavailable)),fontSize=11.sp)
-        report.transportProblem?.let { Text(it,fontSize=11.sp) }
+        state.freezeReport?.transportProblem?.let { Text(it,fontSize=11.sp) }
         result.stopReason?.let { Text(it,fontSize=11.sp) }
         fun ids(values: List<Int>) = values.joinToString(", ") { "%02X".format(Locale.ROOT,it) }
         for (frame in result.frames) {
