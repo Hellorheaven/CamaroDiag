@@ -122,6 +122,20 @@ class NativeUsbFunctionalEvidenceTest {
         input.put("observed_vin","1FA6P8TH0L5100000")
         assertNull(NativeUsbFunctionalEvidence.diagnosticValues(input)!!.observedVin)
     }
+    @Test fun missingInventoryPagesDoNotPassRecipeFromSummaryAlone() {
+        val input=report(true)
+        assertEquals(FunctionalTestOutcome.NOT_TESTED,
+            NativeUsbFunctionalEvidence.results(state,input).checks.single { it.key=="native:pid" }.outcome)
+        val first=NativeUsbFunctionalEvidence.InventoryPage(1,0,listOf(5),true)
+        val orphan=NativeUsbFunctionalEvidence.InventoryPage(1,64,listOf(65),false)
+        val partial=NativeUsbFunctionalEvidence.inventory(listOf(first,orphan),1)
+        assertFalse(partial.complete)
+        assertEquals(setOf(5),partial.ids)
+        val end=NativeUsbFunctionalEvidence.InventoryPage(1,32,listOf(33),false)
+        val full=NativeUsbFunctionalEvidence.inventory(listOf(first,end,orphan),1)
+        assertTrue(full.complete)
+        assertEquals(setOf(5,33),full.ids)
+    }
     @Test fun inconsistentCampaignAndWrongVinAreNotPasses() {
         val bad=NativeUsbFunctionalEvidence.results(state,report(false)).checks.associateBy { it.key }
         assertEquals(FunctionalTestOutcome.FAILED,bad["native:integrity"]?.outcome)

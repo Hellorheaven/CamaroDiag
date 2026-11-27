@@ -2,6 +2,7 @@ package com.camarodiag.gen5.ui
 
 import com.camarodiag.gen5.data.obd.*
 import org.json.JSONObject
+import com.camarodiag.connectors.J1979CampaignSemantics
 import java.util.Locale
 
 /** Projection of a locally produced, authenticated CU/1 capture, never a
@@ -32,7 +33,8 @@ internal object NativeUsbObdScanProjection {
         if(steps.none { it.optString("request_hex")=="0902" && it.optString("status")=="PASSED" &&
                 it.optString("response_hex")==vinRaw }) return null
         val responder=rx.toString(16).uppercase(Locale.ROOT)
-        fun positive(row:JSONObject)=row.optString("status")=="PASSED"
+        fun positive(row:JSONObject)=row.optString("status")=="PASSED" &&
+            J1979CampaignSemantics.decodePositive(row.optString("request_hex"),row.optString("response_hex"))!=null
         fun raw(row:JSONObject)=row.optString("response_hex").takeUnless { row.isNull("response_hex") }.orEmpty()
         fun bytes(row:JSONObject):List<Int> {
             val data=raw(row)
@@ -56,8 +58,13 @@ internal object NativeUsbObdScanProjection {
         }
         val confirmed=codes(3,"confirmed");val pending=codes(7,"pending");val permanent=codes(10,"permanent")
         val verified=buildSet { if(confirmed!=null)add(3);if(pending!=null)add(7);if(permanent!=null)add(10) }
-        fun inventory(mode:Int)=values.pages.filter { it.mode==mode }.flatMap { it.ids }.toSet()
-        val live=values.measurements.filter { it.mode==1 }.mapNotNull { value ->
+        fun chain(mode:Int)=NativeUsbFunctionalEvidence.inventory(values.pages,mode)
+        fun inventory(mode:Int)=chain(mode).ids
+        fun complete(mode:Int,key:String)=chain(mode).complete&&summary.opt(key)==true
+        if(chain(1).pages.isEmpty()) return null
+        fun advertised(mode:Int,id:Int)=id in inventory(mode)
+        fun pageVerified(mode:Int,id:Int)=chain(mode).pages.any { it.base==id }
+        val live=values.measurements.filter { it.mode==1&&advertised(1,it.pid) }.mapNotNull { value ->
             val row=modeRows(1).singleOrNull { positive(it)&&pid(it)==value.pid } ?: return@mapNotNull null
             val data=bytes(row)
             if(data.size<3||data[0]!=65||data[1]!=value.pid) return@mapNotNull null
@@ -66,7 +73,7 @@ internal object NativeUsbObdScanProjection {
         val reads=modeRows(1).mapNotNull { row ->
             val id=pid(row)?.takeIf { it%32!=0 } ?: return@mapNotNull null
             val data=bytes(row)
-            val eligible=positive(row)&&data.size>2&&data[0]==65&&data[1]==id
+            val eligible=advertised(1,id)&&positive(row)&&data.size>2&&data[0]==65&&data[1]==id
             val observation=if(data.size>2&&data[0]==65&&data[1]==id)
                 listOf(ObdMode01Observation(responder,data.drop(2),eligible,live.count { it.pid==id })) else emptyList()
             ObdMode01Read(id,raw(row).ifEmpty { row.optString("status") },observation)
@@ -74,7 +81,12 @@ internal object NativeUsbObdScanProjection {
         val freezeReads=modeRows(2).mapNotNull { row ->
             val id=pid(row) ?: return@mapNotNull null
             val data=bytes(row)
-            val valid=positive(row)&&data.size>3&&data.take(3)==listOf(66,id,0)
+            val valid=positive(row)&&data.size>3&&data.take(3)==listOf(66,id,0)&&when {
+                id==2 -> values.freeze!=null
+                values.freeze?.present!=true -> false
+                id%32==0 -> pageVerified(2,id)
+                else -> advertised(2,id)
+            }
             ObdFreezeFrameRead(id,raw(row).ifEmpty { row.optString("status") },data.drop(3).takeIf { valid })
         }
         val freeze=if(values.freeze?.present==true) freezeReads.filter { it.pid!=2&&it.pid%32!=0 }
@@ -83,21 +95,23 @@ internal object NativeUsbObdScanProjection {
             val id=pid(row) ?: return@mapNotNull null
             val data=bytes(row)
             ObdVehicleInfoRead(id,raw(row).ifEmpty { row.optString("status") },
-                if(positive(row)&&data.size>2&&data.take(2)==listOf(73,id)) listOf(data) else emptyList())
+                if(positive(row)&&data.size>2&&data.take(2)==listOf(73,id)&&
+                    (id==2||if(id%32==0) pageVerified(9,id) else advertised(9,id))) listOf(data) else emptyList())
         }
         val controls=modeRows(8).mapNotNull { row ->
             val id=pid(row) ?: return@mapNotNull null
             val data=bytes(row)
             ObdMode08Page(id,row.optString("request_hex"),raw(row).ifEmpty { row.optString("status") },
-                if(values.pages.any { it.mode==8&&it.base==id }&&positive(row)) listOf(data) else emptyList())
+                if(pageVerified(8,id)&&positive(row)) listOf(data) else emptyList())
         }
         val support=inventory(1)
         return ObdScanReport(
             supportedPids=support,liveData=live,confirmedDtcs=confirmed.orEmpty(),
             pendingDtcs=pending.orEmpty(),permanentDtcs=permanent.orEmpty(),vin=expectedVin,
-            calibrationIds=values.identity[4].orEmpty(),calibrationVerificationNumbers=values.identity[6].orEmpty(),
-            ecuNames=values.identity[10].orEmpty(),
-            readiness=modeRows(1).firstOrNull { pid(it)==1&&positive(it)&&values.readiness!=null }?.let(::raw),
+            calibrationIds=values.identity[4].orEmpty().filter { advertised(9,4) },
+            calibrationVerificationNumbers=values.identity[6].orEmpty().filter { advertised(9,6) },
+            ecuNames=values.identity[10].orEmpty().filter { advertised(9,10) },
+            readiness=modeRows(1).firstOrNull { pid(it)==1&&advertised(1,1)&&positive(it)&&values.readiness!=null }?.let(::raw),
             freezeFrame=freeze,monitorTestRaw=modeRows(6).filter { pid(it)?.let { id->id%32!=0 }==true }
                 .joinToString("\n") { it.optString("request_hex")+" "+it.optString("status")+" "+raw(it) }.ifBlank { null },
             adapterInfo=mapOf("IDENTIFICATION" to "CamaroDiagConnectors CU/1","PROTOCOL" to "SAE J1979 / CAN",
@@ -108,12 +122,12 @@ internal object NativeUsbObdScanProjection {
             physicalCanResponder=responder,unavailableDtcModes=setOf(3,7,10)-verified,
             supportedPidsByResponder=mapOf(responder to support),mode01Reads=reads,
             freezeFrameSupportedPids=inventory(2),freezeFrameReads=freezeReads,
-            freezeFrameSupportComplete=summary.optBoolean("freeze_inventory_complete").takeIf { values.freeze?.present==true },
+            freezeFrameSupportComplete=complete(2,"freeze_inventory_complete").takeIf { values.freeze?.present==true },
             freezeFrameResponder=responder.takeIf { values.freeze!=null },
-            vehicleInfoSupportedTypes=inventory(9),vehicleInfoSupportComplete=summary.optBoolean("identity_inventory_complete"),
+            vehicleInfoSupportedTypes=inventory(9),vehicleInfoSupportComplete=complete(9,"identity_inventory_complete"),
             vehicleInfoReads=identityReads,mode08=ObdMode08Inventory(inventory(8),
-                summary.optBoolean("control_inventory_complete"),controls,responder).takeIf { controls.isNotEmpty() },
-            pidInventoryComplete=summary.optBoolean("pid_inventory_complete"),verifiedDtcModes=verified,
+                complete(8,"control_inventory_complete"),controls,responder).takeIf { controls.isNotEmpty() },
+            pidInventoryComplete=complete(1,"pid_inventory_complete"),verifiedDtcModes=verified,
             nativeUsbEvidence=report.toString())
     }
 }

@@ -26,6 +26,17 @@ internal object NativeUsbFunctionalEvidence {
     data class Monitor(val mid: Int, val tid: Int, val scaling: Int, val value: Int, val minimum: Int, val maximum: Int)
     data class Readiness(val milOn:Boolean,val dtcCount:Int,val compression:Boolean,val monitors:Map<String,Boolean>)
     data class InventoryPage(val mode:Int,val base:Int,val ids:List<Int>,val next:Boolean)
+    data class Inventory(val ids:Set<Int>,val complete:Boolean,val pages:List<InventoryPage>)
+    /** A disconnected or duplicated page is not evidence of advertised support. */
+    fun inventory(pages:List<InventoryPage>,mode:Int):Inventory {
+        val accepted=mutableListOf<InventoryPage>()
+        for(base in 0..224 step 32){
+            val page=pages.filter { it.mode==mode&&it.base==base }.singleOrNull() ?: break
+            accepted+=page
+            if(!page.next) return Inventory(accepted.flatMap { it.ids }.toSet(),true,accepted.toList())
+        }
+        return Inventory(accepted.flatMap { it.ids }.toSet(),false,accepted.toList())
+    }
     data class FreezeTrigger(val present:Boolean,val dtc:String?)
     data class DiagnosticValues(val observedVin: String?, val dtcs: Map<Int, List<String>?>,
         val measurements: List<Measurement>, val monitors: List<Monitor>, val identity: Map<Int,List<String>>, val readiness: Readiness?, val pages:List<InventoryPage>, val freeze:FreezeTrigger?)
@@ -144,6 +155,8 @@ internal object NativeUsbFunctionalEvidence {
         if (report.optBoolean("cancelled") || !report.optBoolean("device_credential_authenticated") ||
             !report.optBoolean("capture_integrity_verified")) return null
         val steps = report.optJSONArray("steps") ?: return null
+        val requests=(0 until steps.length()).map { steps.optJSONObject(it)?.optString("request_hex") ?: return null }
+        if(requests.any { it.isBlank() } || requests.distinct().size!=requests.size) return null
         val vin = observedVin(report)
         val dtcs = linkedMapOf<Int, List<String>?>(3 to null, 7 to null, 10 to null)
         val measured = linkedMapOf<Pair<Int, Int>, Measurement>()
@@ -221,22 +234,23 @@ internal object NativeUsbFunctionalEvidence {
         fun attempted(req: String): Boolean = consistent && steps != null &&
             (0 until steps.length()).any { i -> steps.optJSONObject(i)?.optString("request_hex") == req }
         val dtcRequests = mapOf("dtc3" to "03", "dtc7" to "07", "dtca" to "0A")
-        fun flag(name: String) = consistent && summary?.optBoolean(name) == true
+        fun flag(name: String) = consistent && summary?.opt(name)==true
+        fun complete(mode:Int,name:String)=flag(name)&&values?.let { inventory(it.pages,mode).complete }==true
         val checks = initial().map { row ->
             val key = row.key.substringAfter(':')
             val passed = when (key) {
                 "auth" -> auth
                 "integrity" -> consistent
-                "transport" -> flag("transport_observed")
+                "transport" -> flag("transport_observed") && values?.let { inventory(it.pages,1).pages.isNotEmpty() }==true
                 "vin" -> matches
-                "pid" -> flag("pid_inventory_complete")
+                "pid" -> complete(1,"pid_inventory_complete")
                 "dtc3" -> positive("03")
                 "dtc7" -> positive("07")
                 "dtca" -> positive("0A")
-                "freeze" -> flag("freeze_trigger_observed")
-                "monitor" -> flag("monitor_inventory_complete")
-                "control" -> flag("control_inventory_complete")
-                "identity" -> flag("identity_inventory_complete")
+                "freeze" -> flag("freeze_trigger_observed") && values?.freeze!=null
+                "monitor" -> complete(6,"monitor_inventory_complete")
+                "control" -> complete(8,"control_inventory_complete")
+                "identity" -> complete(9,"identity_inventory_complete")
                 else -> false
             }
             val failed = key == "auth" && !auth || key == "integrity" && !consistent ||

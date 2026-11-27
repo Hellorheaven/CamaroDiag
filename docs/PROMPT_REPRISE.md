@@ -1,3 +1,7 @@
+## J1979 — inventaires natifs et projection Android (27/11/2026)
+
+- Inventaires reconstruits depuis une chaîne continue de bitmaps vérifiés, pas depuis le seul résumé. Pages orphelines ignorées, doublons refusés, PID non annoncés exclus du scan courant, contrôle de forme et trigger freeze requis. Les réponses brutes restent exportées. Régressions écrites non exécutées ; C6/J1979 restent ouverts, aucune CI intermédiaire.
+
 ## J1979 — harmonisation des recettes physiques J2534 et SocketCAN (26/11/2026)
 
 - Le décodeur d'observations CAN du connecteur natif devient réutilisable par les recettes standard Windows et Linux : valeurs numériques, DTC/NRC, readiness, identification, Mode 06, freeze et bitmaps en champs structurés avec brut conservé. Rapport par service des inventaires complets/partiels/indisponibles et absence vérifiée de freeze-frame, indépendant de la simple fin de campagne. DTC zéro distinct d'inconnu, affichage de synthèse Windows FR/EN. Régressions écrites non exécutées. Aucune extension mutatrice ; C6/J1979 ouverts, aucune CI intermédiaire, fusion ou Release.

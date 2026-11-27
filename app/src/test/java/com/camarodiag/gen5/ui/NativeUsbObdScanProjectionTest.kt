@@ -38,6 +38,31 @@ class NativeUsbObdScanProjectionTest {
         assertEquals(setOf(3,10),result.verifiedDtcModes)
         assertNotNull(JSONObject(ObdScanJsonExport.encode(result,0)).optJSONObject("nativeUsbEvidence"))
     }
+    @Test fun missingContinuationAndUnadvertisedValuesDoNotBecomeVerified() {
+        val input=fixture()
+        val rows=input.getJSONArray("steps")
+        rows.getJSONObject(0).put("response_hex","410008000001")
+            .getJSONObject("supported_page").put("has_next_page",true)
+        rows.put(JSONObject().put("request_hex","0140").put("response_hex","414080000000")
+            .put("status","PASSED").put("supported_page",JSONObject().put("mode",1).put("base",64)
+                .put("supported_ids",JSONArray().put(65)).put("has_next_page",false)))
+        rows.put(JSONObject().put("request_hex","010C").put("response_hex","410C1AF8")
+            .put("status","PASSED").put("measurement",JSONObject().put("mode",1).put("pid",12)
+                .put("name","engine-rpm").put("number",1726).put("unit","rpm")))
+        input.getJSONObject("summary").put("steps",rows.length())
+        val result=NativeUsbObdScanProjection.project(input,vin,0x7E0,0x7E8,false)!!
+        assertEquals(setOf(5),result.supportedPids)
+        assertFalse(result.pidInventoryComplete)
+        assertEquals(listOf(5),result.liveData.map { it.pid })
+        assertFalse(result.mode01Reads.single { it.pid==12 }.observations.single().eligibleForDecode)
+    }
+    @Test fun duplicatedRequestsCannotPublishScan() {
+        val input=fixture()
+        val rows=input.getJSONArray("steps")
+        rows.put(rows.getJSONObject(0))
+        input.getJSONObject("summary").put("steps",rows.length())
+        assertNull(NativeUsbObdScanProjection.project(input,vin,0x7E0,0x7E8,false))
+    }
     @Test fun incompatibleOrCancelledCaptureCannotBecomeScan() {
         val input=fixture()
         assertNull(NativeUsbObdScanProjection.project(input,vin,0x7E1,0x7E9,false))
