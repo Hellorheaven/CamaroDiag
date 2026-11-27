@@ -2,6 +2,7 @@ package com.camarodiag.gen5.ui
 
 import com.camarodiag.gen5.data.obd.J1979NetworkReport
 import com.camarodiag.gen5.data.obd.J1979ScalingJson
+import com.camarodiag.gen5.data.obd.J1979DerivedEvidenceJson
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -37,6 +38,8 @@ internal object J1979NetworkEvidenceJson {
                         JSONObject().put("mode",it.mode).put("status",it.status)
                             .put("advertised",JSONArray(it.advertised)).put("pages",it.pages)
                     }))
+                    .put("scaledMonitorRecords",J1979DerivedEvidenceJson.monitors(ecu.scaledMonitorRecords))
+                    .put("statusRecords",J1979DerivedEvidenceJson.states(ecu.statusRecords))
                     .put("contextualMeasurements",J1979ScalingJson.encode(ecu.contextualMeasurements))
                     .put("multiSignalRecords",JSONArray(ecu.steps.mapNotNull { it.multiSignalRecord }.map(J1979MultiSignalJson::encode)))
                     .put("extendedVehicleInfo",JSONArray(ecu.steps.mapNotNull { it.extendedVehicleInfo }.map(J1979ExtendedVehicleInfoJson::encode)))
