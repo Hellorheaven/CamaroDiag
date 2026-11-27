@@ -338,3 +338,72 @@ def inspect(data, *, expected_vin):
             "durable_before_tx_independently_verified": False, "operator_consent_verified": False,
             "monitor_completion_verified": False, "evidence_authenticated": False,
             "permits_automatic_retry": False, "permits_programming": False}
+
+
+def inspect_prefix(data, *, expected_vin):
+    """Examine only complete CM/1 records of an interrupted acquisition.
+
+    Never repair bytes, accept a bad CRC, authenticate a torn record, or
+    treat a missing terminal as a completed operation. The unverified tail
+    remains separate from the original byte count and verified prefix.
+    """
+    require(type(data) is bytes and 0 < len(data) <= MAX_JOURNAL, "Invalid CM/1 journal size")
+    require(isinstance(expected_vin,str) and VIN.fullmatch(expected_vin), "Independent VIN required")
+    pos = number = prior = 0
+    declared_kind = None
+    while pos < len(data):
+        require(number < 4 and prior != 4, "Trailing bytes after CM/1 terminal")
+        h = data[pos:pos+HEADER.size]
+        fixed = b"CM\x01"
+        require(h[:min(3,len(h))] == fixed[:min(3,len(h))], "Invalid CM/1 prefix magic/version")
+        if len(h) >= 4:
+            kind = h[3]
+            require(kind in KINDS and (kind == 1 if number == 0 else kind == prior+1 or kind == 4),
+                    "Unexpected CM/1 prefix record")
+            declared_kind = KINDS[kind]
+        if len(h) >= 5:
+            require(h[4] == number, "Invalid CM/1 prefix sequence")
+        if len(h) >= 6:
+            require(h[5] <= MAX_ROWS and (number != 0 or h[5] == 0), "Invalid CM/1 prefix observation count")
+        require(not any(h[6:8]), "Invalid CM/1 prefix reserved fields")
+        if len(h) < HEADER.size:
+            break
+        _,_,kind,_,count,_,length = HEADER.unpack(h)
+        require(SCOPE.size <= length <= MAX_RECORD-HEADER.size-4, "Invalid CM/1 prefix body size")
+        if kind == 1:
+            require(length == SCOPE.size and count == 0,"Invalid CM/1 open length")
+        else:
+            require(length >= SCOPE.size+SUMMARY_SIZE+count*ROW.size,"Invalid CM/1 record minimum size")
+        end = pos+HEADER.size+length+4
+        # The full scope in an incomplete record is still not verified,
+        # but a visibly inconsistent declaration is not a valid prefix.
+        if len(data)-pos >= HEADER.size+SCOPE.size:
+            declared = Scope.parse(data[pos+HEADER.size:pos+HEADER.size+SCOPE.size])
+            require(declared.vin == expected_vin, "CM/1 prefix VIN differs")
+            if number:
+                original = Scope.parse(data[HEADER.size:HEADER.size+SCOPE.size])
+                require(original == declared,"CM/1 prefix scope changed")
+        if end > len(data):
+            break
+        require(zlib.crc32(data[pos:end-4]) == struct.unpack_from("<I",data,end-4)[0],
+                "Complete CM/1 prefix record has bad CRC")
+        pos = end
+        number += 1
+        prior = kind
+        declared_kind = None
+    require(number > 0 and prior != 4,"Interrupted CM/1 requires verified open and no terminal")
+    verified = inspect(data[:pos],expected_vin=expected_vin)
+    require(not verified["terminal_present"] and verified["recovery_required"],"Invalid CM/1 prefix state")
+    return {"schema":"camarodiag-j1979-native-maintenance-prefix-v1","protocol":"SAE-J1979",
+            "scope":verified["scope"],"prefix_integrity_verified":True,
+            "record_consistency_verified":False,"terminal_present":False,
+            "verified_prefix_bytes":pos,"unverified_trailing_bytes":len(data)-pos,
+            "journal_bytes_received":len(data),"next_record_kind_declared":declared_kind,
+            "verified_records":verified["records"],
+            "baseline_record_present":verified["baseline_record_present"],
+            "intent_record_present":verified["intent_record_present"],
+            "observations":verified["observations"],"recovery_required":True,
+            "command_outcome_unknown":True,"physical_vehicle_verified":False,
+            "physical_stop_independently_verified":False,"durable_before_tx_independently_verified":False,
+            "operator_consent_verified":False,"monitor_completion_verified":False,
+            "evidence_authenticated":False,"permits_automatic_retry":False,"permits_programming":False}
