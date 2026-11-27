@@ -14,7 +14,10 @@ internal static class J1979FreezeNativeCli
     internal const string InspectCommand="--inspect-j1979-freeze-native";
     internal const string PrefixCommand="--inspect-j1979-freeze-native-prefix";
     internal const string VerifyPrefixCommand="--verify-j1979-freeze-native-prefix";
-    // The executable entry point and direct CLI self-tests must use the same router.\n    internal static bool IsCommand(string value)=>value is\n        CaptureCommand or InspectCommand or PrefixCommand or VerifyPrefixCommand;\n    private static readonly JsonSerializerOptions PrefixJsonOptions=new(){
+    // The executable entry point and direct CLI self-tests must use the same router.
+    internal static bool IsCommand(string value)=>value is
+        CaptureCommand or InspectCommand or PrefixCommand or VerifyPrefixCommand;
+    private static readonly JsonSerializerOptions PrefixJsonOptions=new(){
         PropertyNamingPolicy=JsonNamingPolicy.SnakeCaseLower,WriteIndented=true
     };
     private static (byte[] Raw,string Hash) ReadPrefixSource(string path)

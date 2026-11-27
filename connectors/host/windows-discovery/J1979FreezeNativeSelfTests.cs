@@ -139,7 +139,13 @@ internal static class J1979FreezeNativeSelfTests
             catch(InvalidDataException){denied=true;}
             Require(denied,"independent VIN binds CF/1 prefix");
         }
-        Require(J1979FreezeNativeCli.IsCommand(J1979FreezeNativeCli.PrefixCommand)&&\n            J1979FreezeNativeCli.IsCommand(J1979FreezeNativeCli.VerifyPrefixCommand)&&\n            J1979FreezeNativeCli.IsCommand(J1979FreezeNativeCli.InspectCommand)&&\n            J1979FreezeNativeCli.IsCommand(J1979FreezeNativeCli.CaptureCommand)&&\n            !J1979FreezeNativeCli.IsCommand("--unknown"),\n            "all four native freeze CLI commands are reachable through the executable");\n        string root=Path.Combine(Path.GetTempPath(),"camarodiag-cf1-prefix-"+Guid.NewGuid().ToString("N"));
+        Require(J1979FreezeNativeCli.IsCommand(J1979FreezeNativeCli.PrefixCommand)&&
+            J1979FreezeNativeCli.IsCommand(J1979FreezeNativeCli.VerifyPrefixCommand)&&
+            J1979FreezeNativeCli.IsCommand(J1979FreezeNativeCli.InspectCommand)&&
+            J1979FreezeNativeCli.IsCommand(J1979FreezeNativeCli.CaptureCommand)&&
+            !J1979FreezeNativeCli.IsCommand("--unknown"),
+            "all four native freeze CLI commands are reachable through the executable");
+        string root=Path.Combine(Path.GetTempPath(),"camarodiag-cf1-prefix-"+Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
         try
         {
