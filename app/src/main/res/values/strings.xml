@@ -1314,4 +1314,16 @@
     <string name="functional_legacy_mutation_uncertain">Legacy campaign interrupted or failed. Operation state may be uncertain. Do not retry automatically.</string>
     <string name="j1979_live_raw_only">Raw payload only (no numeric interpretation)</string>
     <string name="j1979_live_raw_count">PID %1$s: %2$d/%3$d correlated raw replies</string>
+    <string name="j1979_catalogue_title">Documented PID catalogue (offline)</string>
+    <string name="j1979_catalogue_file">JSON catalogue</string>
+    <string name="j1979_catalogue_reference">Documented reference</string>
+    <string name="j1979_catalogue_report">Raw Mode 01 recording</string>
+    <string name="j1979_catalogue_selected">Selected</string>
+    <string name="j1979_catalogue_not_selected">Select file</string>
+    <string name="j1979_catalogue_pin">Independent reference SHA-256</string>
+    <string name="j1979_catalogue_scope">Offline byte projection. Transport replay, normative compliance and physical provenance are not verified.</string>
+    <string name="j1979_catalogue_confirm">I confirm VIN %1$s and the reference digest.</string>
+    <string name="j1979_catalogue_project">Project and export</string>
+    <string name="j1979_catalogue_working">Projecting PID catalogue…</string>
+    <string name="j1979_catalogue_rejected">Projection rejected. Check the catalogue, reference, recording and size limits.</string>
 </resources>
