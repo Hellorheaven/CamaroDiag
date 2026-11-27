@@ -1,4 +1,4 @@
-package com.camaradiag.connectors;
+package com.camarodiag.connectors;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
