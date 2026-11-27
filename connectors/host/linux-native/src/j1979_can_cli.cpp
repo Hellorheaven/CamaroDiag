@@ -1,4 +1,5 @@
 #define _POSIX_C_SOURCE 200809L
+#include "j1979_can_cli.h"
 #include "j1979_can.h"
 #include "j1979_isotp.h"
 #include "j1979_live.h"

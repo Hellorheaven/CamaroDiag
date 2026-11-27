@@ -11,7 +11,7 @@
 #include <new>
 
 static uint64_t uptime_ms(void) {
-    struct timespec ts={0};
+    struct timespec ts{};
     if (clock_gettime(CLOCK_MONOTONIC,&ts)) return 0;
     return (uint64_t)ts.tv_sec*1000u+(uint64_t)ts.tv_nsec/1000000u;
 }
@@ -109,7 +109,7 @@ static bool identity(const j1979_live_plan *p,j1979_live_result *r,
         halt(r,final?"FINAL_VIN_UNVERIFIED":"VIN_UNVERIFIED");
         return false;
     }
-    char observed[18]={0};
+    char observed[18]{};
     memcpy(observed,s->response+3,17);
     if (!j1979_can_valid_vin(observed) ||
         strcmp(observed,p->channel.expected_vin) ||
@@ -284,7 +284,7 @@ bool j1979_live_write_json(FILE *f,const j1979_live_plan *p,
         if (s->response ? !hex(f,s->response,s->response_size) :
             fputs("null",f)==EOF) return false;
         if (fputs(",\"measurement\":",f)==EOF) return false;
-        j1979_measurement m={0};
+        j1979_measurement m{};
         if (!strcmp(s->status,"RAW") && s->response &&
             j1979_measurement_decode(s->request,2,s->response,
                                      s->response_size,&m)) {

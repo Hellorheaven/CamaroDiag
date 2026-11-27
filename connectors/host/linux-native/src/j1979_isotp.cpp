@@ -103,7 +103,9 @@ static int ready(const j1979_isotp_link *link, short events,
         uint64_t remaining = deadline - now;
         int wait_ms = remaining < 100u ? (int)remaining : 100;
         if (!wait_ms) wait_ms = 1;
-        struct pollfd pfd = {.fd = link->socket_fd, .events = events};
+        struct pollfd pfd{};
+        pfd.fd=link->socket_fd;
+        pfd.events=events;
         int rc = poll(&pfd, 1, wait_ms);
         if (rc < 0 && errno == EINTR) continue;
         if (rc < 0 || (pfd.revents & (POLLERR | POLLHUP | POLLNVAL))) return -1;

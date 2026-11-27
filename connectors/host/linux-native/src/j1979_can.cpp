@@ -16,7 +16,7 @@
 #include <new>
 
 static uint64_t monotonic_ms(void) {
-    struct timespec now = {0};
+    struct timespec now{};
     if (clock_gettime(CLOCK_MONOTONIC, &now)) return 0;
     return (uint64_t)now.tv_sec * 1000u + (uint64_t)now.tv_nsec / 1000000u;
 }
@@ -106,7 +106,7 @@ static bool valid_response(const uint8_t *request, size_t count,
     if (request[0]==9 &&
         (request[1]==8 || request[1]==11 ||
          request[1]==13 || request[1]==15)) {
-        j1979_vehicle_info info={0};
+        j1979_vehicle_info info{};
         if (!j1979_vehicle_info_decode(request[1],response,n,&info)) {
             snprintf(step->detail,sizeof(step->detail),"INVALID_MODE09_INFO");
             return false;
@@ -443,7 +443,7 @@ bool j1979_can_write_json(FILE *f, const j1979_can_plan *p,
         if (s->response ? !hex(f,s->response,s->response_size) :
             fputs("null",f)==EOF) return false;
         if (fputs(",\"measurement\":",f)==EOF) return false;
-        j1979_measurement m={0};
+        j1979_measurement m{};
         if (s->response && (!strcmp(s->status,"RAW") ||
                             !strcmp(s->status,"PASSED")) &&
             j1979_measurement_decode(s->request,s->request_size,
@@ -471,7 +471,7 @@ bool j1979_can_write_json(FILE *f, const j1979_can_plan *p,
             size_t record_count=j1979_monitor_count(s->request,s->response,
                                                     s->response_size);
             for (size_t j=0;j<record_count;++j) {
-                j1979_monitor_record monitor={0};
+                j1979_monitor_record monitor{};
                 if (!j1979_monitor_decode(s->request,s->response,
                                          s->response_size,j,&monitor)) return false;
                 if ((j&&fputc(',',f)==EOF) ||
@@ -503,7 +503,7 @@ bool j1979_can_write_json(FILE *f, const j1979_can_plan *p,
          * a hardware provenance proof.
          */
         if (fputs(",\"vehicle_info\":",f)==EOF) return false;
-        j1979_vehicle_info info={0};
+        j1979_vehicle_info info{};
         if (s->request_size==2 && s->request[0]==9 &&
             !strcmp(s->status,"RAW") && s->response &&
             j1979_vehicle_info_decode(s->request[1],s->response,
@@ -546,7 +546,7 @@ bool j1979_can_write_json(FILE *f, const j1979_can_plan *p,
             !strcmp(s->status,"PASSED") &&
             s->response && valid_dtc(s->response,s->response_size)) {
             for (size_t j=2;j<s->response_size;j+=2) {
-                char code[6]={0};
+                char code[6]{};
                 if (!cd_j1979_native_dtc_code(s->response+j,code) ||
                     (j!=2 && fputc(',',f)==EOF) || !quoted(f,code))
                     return false;
