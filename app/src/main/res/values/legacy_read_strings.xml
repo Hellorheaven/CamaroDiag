@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="legacy_read_source">Response source (hex)</string>
+    <string name="legacy_read_select_source">Select source %1$s</string>
+    <string name="legacy_read_confirm">Confirm documented response source and VIN %1$s</string>
+    <string name="legacy_read_run">Read selected legacy ECU</string>
+    <string name="legacy_read_result">Legacy response source: %1$s</string>
+    <string name="legacy_read_completed">Read campaign completed</string>
+    <string name="legacy_read_incomplete">Read campaign incomplete</string>
+    <string name="legacy_read_vin_match">VIN matches selected vehicle</string>
+    <string name="legacy_read_vin_mismatch">VIN mismatch; scan stopped</string>
+    <string name="legacy_read_vin_unverified">VIN unavailable; scan stopped</string>
+    <string name="legacy_read_vin_not_requested">VIN comparison not requested</string>
+    <string name="legacy_read_inventory_complete">Complete</string>
+    <string name="legacy_read_inventory_partial">Partial</string>
+    <string name="legacy_read_inventory_na">Not applicable</string>
+    <string name="legacy_read_inventory_unavailable">Unavailable</string>
+    <string name="legacy_read_inventory">Mode %1$s: %2$d identifiers — %3$s</string>
+    <string name="legacy_read_dtc">DTC mode %1$s: %2$s</string>
+    <string name="legacy_read_readiness">MIL %1$s · confirmed DTC count %2$d</string>
+    <string name="legacy_read_mil_on">on</string>
+    <string name="legacy_read_mil_off">off</string>
+    <string name="legacy_read_monitor_ready">Ready</string>
+    <string name="legacy_read_monitor_incomplete">Incomplete</string>
+    <string name="legacy_read_freeze_present">Freeze-frame trigger present</string>
+    <string name="legacy_read_freeze_absent">No freeze-frame trigger</string>
+    <string name="legacy_read_scope">Response filtering only; no physical addressing or whole-vehicle coverage. Monitor data encoded.</string>
+</resources>

@@ -1,3 +1,8 @@
+## SAE J1979 — intégration Android de la lecture legacy par source (27/11/2026)
+
+- Recette dédiée Android, source explicite et VIN attendu du véhicule sélectionné, session ELM exclusive ATH1 et restauration du profil, vérification PID00/ATDPN, inventaires et mesures typées, DTC, readiness, VIN/CALID/CVN, freeze et moniteurs legacy. Export JSON dans les tests privés, conservation des autres trames en preuve sans mélange des mesures. Pas de mutation ni revendication d'adressage physique, pas de qualification réelle. Régressions écrites sur les cinq variantes, non exécutées. C6/J1979 ouverts.
+- Nouvelle consigne propriétaire : lots de 10 000 lignes minimum de développement utile, sans découpage ou remplissage artificiel ; indiquer le volume effectivement publié et les éventuels écarts.
+
 ## C6 — parité CDJ/1 Android et Windows (27/11/2026)
 
 - Android : inspection CDJ/1 sur deux acquisitions bornées, empreinte SHA-256, transaction/manifeste facultatifs, rapport JSON sans autorisation de programmation ni restauration. Écran FR/EN avec nouvelle inspection, sélection du dossier CamaroDiag autorisé et export via le stockage vérifié existant, nouvelle acquisition avant publication. Régressions de capture et JSON écrites sans exécution. Windows : traitement explicite des erreurs de taille et de changement de checkpoint. Les deux plateformes ne prétendent pas authentifier les preuves ni qualifier la récupération physique. C6/J1979 ouverts, aucune CI intermédiaire, fusion ou Release.
