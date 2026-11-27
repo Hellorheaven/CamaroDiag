@@ -80,7 +80,7 @@ int main(){
   scr[2]=0x10;
   assert(E::classify(V::ClassicCan,scrReq,2,scr,sizeof(scr))==R::Invalid);
   const uint8_t sparkIpt[]={9,8};
-  uint8_t sparkReply[35]={0x49,8,1};
+  uint8_t sparkReply[35]={0x49,8,16};
   assert(E::classify(V::ClassicCan,sparkIpt,2,sparkReply,sizeof(sparkReply))==R::Raw);
   assert(E::classify(V::ClassicCan,sparkIpt,2,sparkReply,sizeof(sparkReply)-1)==R::Invalid);
   sparkReply[2]=2;
