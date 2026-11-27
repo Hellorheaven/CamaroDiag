@@ -136,6 +136,7 @@ internal object J1979FreezeCampaign {
         require(read.outcome in outcomes && read.durationMs in 0..3600000 &&
             (read.response?.size ?: 0) <= MAX_RESPONSE && (read.raw?.length ?: 0) <= MAX_RAW)
         require((read.outcome in setOf("RECEIVED","LATE_RESPONSE")) == (read.response != null))
+        require(read.response == null || read.response.isNotEmpty())
         require(read.outcome !in setOf("RECEIVED","LATE_RESPONSE","TIMEOUT","TRANSPORT_ERROR") ||
             read.transmissionAttempted)
         require(read.outcome != "BUDGET" || !read.transmissionAttempted)
@@ -304,7 +305,7 @@ internal object J1979FreezeCampaign {
                     currentCoroutineContext().ensureActive()
                     val response = reply.payload
                     when {
-                        (reply.raw?.length ?: 0) > MAX_RAW || (response?.size ?: 0) > MAX_RESPONSE ->
+                        (reply.raw?.length ?: 0) > MAX_RAW || (response?.size ?: 0) > MAX_RESPONSE || response?.isEmpty() == true ->
                             observed("TRANSPORT_ERROR")
                         response == null -> observed("TIMEOUT")
                         elapsed() >= plan.budgetMs -> observed("LATE_RESPONSE",response)
