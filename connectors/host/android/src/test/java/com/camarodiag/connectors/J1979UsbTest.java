@@ -108,9 +108,9 @@ public final class J1979UsbTest {
         J1979CampaignSemantics.SupportedPage page=new J1979CampaignSemantics.Step(15,1,1,new byte[]{1,0},
             hex("410080000003")).supportedPage();
         assert page.hasNextPage&&page.supportedIds.equals(java.util.Arrays.asList(1,31));
-        J1979CampaignSemantics.FreezeTrigger freeze=new J1979CampaignSemantics.Step(16,1,1,new byte[]{2,2,0},
+        J1979CampaignSemantics.FreezeTrigger trigger=new J1979CampaignSemantics.Step(16,1,1,new byte[]{2,2,0},
             hex("4202000123")).freezeTrigger();
-        assert freeze.present&&freeze.dtc.equals("P0123");
+        assert trigger.present&&trigger.dtc.equals("P0123");
         assert !new J1979CampaignSemantics.Step(17,1,1,new byte[]{2,2,0},
             hex("4202000000")).freezeTrigger().present;
         J1979CampaignSemantics.Step odo=new J1979CampaignSemantics.Step(18,1,1,hex("01A6"),hex("41A60012D687"));

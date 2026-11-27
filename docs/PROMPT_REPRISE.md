@@ -1,3 +1,7 @@
+## J1979 — cohérence de la recette (27/11/2026)
+
+- Les doublons dans les requêtes invalident aussi le contrôle d'intégrité Android et empêchent la publication du VIN. Correction des variables locales homonymes des recettes Java et .NET (détectées à la lecture, compilation non lancée). Tests écrits non exécutés.
+
 ## J1979 — même périmètre de valeurs pour Scan OBD et affichage natif (27/11/2026)
 
 - Les valeurs affichées dans le scan courant, y compris readiness, résultats Mode 06 et identité, sont limitées à la chaîne d'inventaire vérifiée. La recette indépendante conserve les observations brutes ; aucun résultat hors inventaire ne devient une mesure ordinaire. Régressions écrites non exécutées.

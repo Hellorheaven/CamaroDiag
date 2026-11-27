@@ -122,6 +122,15 @@ class NativeUsbFunctionalEvidenceTest {
         input.put("observed_vin","1FA6P8TH0L5100000")
         assertNull(NativeUsbFunctionalEvidence.diagnosticValues(input)!!.observedVin)
     }
+    @Test fun duplicateRequestsCannotPassIntegrityOrPublishVin() {
+        val input=report(true)
+        val rows=input.getJSONArray("steps")
+        rows.put(rows.getJSONObject(0))
+        val result=NativeUsbFunctionalEvidence.results(state,input)
+        assertEquals(FunctionalTestOutcome.FAILED,result.checks.single { it.key=="native:integrity" }.outcome)
+        assertNull(result.context?.observedVin)
+        assertNull(NativeUsbFunctionalEvidence.diagnosticValues(input))
+    }
     @Test fun missingInventoryPagesDoNotPassRecipeFromSummaryAlone() {
         val input=report(true)
         assertEquals(FunctionalTestOutcome.NOT_TESTED,

@@ -89,8 +89,8 @@ internal static class J1979UsbSelfTests
             !diesel.SupportedMonitors.ContainsKey("oxygen-sensor-heater"));
         var page=new J1979CampaignSemantics.Step(15,1,1,[1,0],Convert.FromHexString("410080000003")).InventoryPage!;
         Require(page.HasNextPage&&page.SupportedIds.SequenceEqual(new[]{1,31}));
-        var freeze=new J1979CampaignSemantics.Step(16,1,1,[2,2,0],Convert.FromHexString("4202000123")).FreezeFrameTrigger!;
-        Require(freeze.Present&&freeze.Dtc=="P0123");
+        var trigger=new J1979CampaignSemantics.Step(16,1,1,[2,2,0],Convert.FromHexString("4202000123")).FreezeFrameTrigger!;
+        Require(trigger.Present&&trigger.Dtc=="P0123");
         Require(new J1979CampaignSemantics.Step(17,1,1,[2,2,0],Convert.FromHexString("4202000000")).FreezeFrameTrigger is {Present:false,Dtc:null});
         var odo=new J1979CampaignSemantics.Step(18,1,1,[1,0xA6],Convert.FromHexString("41A60012D687"));
         Require(odo.PidMeasurement is {Number:123456.7,Unit:"km"});

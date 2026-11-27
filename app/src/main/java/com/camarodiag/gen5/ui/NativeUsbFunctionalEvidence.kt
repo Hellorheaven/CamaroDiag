@@ -240,7 +240,7 @@ internal object NativeUsbFunctionalEvidence {
 
     fun results(state: FunctionalTestState, report: JSONObject): FunctionalTestState {
         val auth = report.optBoolean("device_credential_authenticated")
-        val consistent = auth && !report.optBoolean("cancelled") && report.optBoolean("capture_integrity_verified")
+        val consistent = auth && !report.optBoolean("cancelled") && report.optBoolean("capture_integrity_verified") && diagnosticValues(report)!=null
         val summary = report.optJSONObject("summary")
         val vin = observedVin(report)
         val matches = consistent && vin != null && vin == state.context?.selectedVin
