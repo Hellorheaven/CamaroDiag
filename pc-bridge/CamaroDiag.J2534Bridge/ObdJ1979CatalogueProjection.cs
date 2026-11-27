@@ -58,7 +58,7 @@ internal static class ObdJ1979CatalogueProjection
             Check(Convert.ToBase64String(decoded)==encoded,"Noncanonical PID list");
             pids=decoded.Select(x=>(int)x).ToArray();
         }
-        else pids=Array(value,1,32).Select(x=>Int(x,1,255)).ToArray();
+        else pids=ObdJ1979DocumentedCatalogue.Array(value,1,32).Select(x=>Int(x,1,255)).ToArray();
         Check(pids.Length is >=1 and <=32&&pids.Distinct().Count()==pids.Length&&
             pids.All(x=>x is >=1 and <=255&&x%32!=0),"Invalid selected PIDs");
         return pids;
@@ -128,8 +128,8 @@ internal static class ObdJ1979CatalogueProjection
         int interval=Int(Get(result,"interval_ms"),100,60000);
         int budget=Int(Get(result,"budget_ms"),1,600000);
         Check(cycles*selected.Length<=10000,"Too many requested observations");
-        var admission=Array(Get(result,"admission"),1,256);
-        var observations=Array(Get(result,"observations"),0,10000);
+        var admission=ObdJ1979DocumentedCatalogue.Array(Get(result,"admission"),1,256);
+        var observations=ObdJ1979DocumentedCatalogue.Array(Get(result,"observations"),0,10000);
         foreach(var group in new[]{admission,observations})
         {
             int previous=0;
@@ -228,7 +228,6 @@ internal static class ObdJ1979CatalogueProjection
                     // inventories may list it as a supported identifier.
                     bool hasNext=(response![5]&1)!=0;
                     Check(!hasNext||nextPage<224,"Support bitmap exceeds PID FF");
-                    if(hasNext)advertised.Add(nextPage+32);
                     inventoryComplete=!hasNext;nextPage+=32;
                 }
                 else terminal=true;
@@ -238,10 +237,9 @@ internal static class ObdJ1979CatalogueProjection
         }
         Check(initial&&samples.Count>0,"No admitted samples to project");
         Check(RequiredText(Get(result,"observed_vin"))==expectedVin,"Declared initial VIN differs");
-        var declared=Array(Get(result,"advertised_pids"),0,255).Select(x=>Int(x,1,255)).ToArray();
+        var declared=ObdJ1979DocumentedCatalogue.Array(Get(result,"advertised_pids"),0,255).Select(x=>Int(x,1,255)).ToArray();
         Check(declared.Distinct().Count()==declared.Length&&
-            declared.Where(x=>x%32!=0).Order().SequenceEqual(advertised.Where(x=>x%32!=0))&&
-            declared.Where(x=>x%32==0).All(advertised.Contains),"Reported inventory differs from bitmaps");
+            declared.Order().SequenceEqual(advertised),"Reported inventory differs from bitmaps");
         Check(Bool(Get(result,"inventory_complete"))==inventoryComplete,"Inventory completeness differs");
         int recorded=Int(Get(result,"completed_cycles"),0,cycles),possible=samples.Count/selected.Length;
         bool complete=Bool(Get(result,"completed"));
