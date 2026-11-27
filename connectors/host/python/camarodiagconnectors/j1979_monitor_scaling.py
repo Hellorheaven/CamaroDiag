@@ -78,7 +78,6 @@ _DEFINITIONS = {
     0x8E: ("A", 0.001, True, 0),
     0x90: ("ms", 1, True, 0),
     0x96: ("degC", 0.1, True, 0),
-    0x99: ("kPa", 0.1, True, 0),
     0x9C: ("deg", 0.01, True, 0),
     0x9D: ("deg", 0.5, True, 0),
     0xA8: ("g/s", 1, True, 0),
