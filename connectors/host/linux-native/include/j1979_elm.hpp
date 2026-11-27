@@ -19,7 +19,7 @@ class Elm {
     friend class MutationSession;
     Link& link_;
     Protocol protocol_;
-    bool headered_,ready_{},used_{};
+    bool headered_,ready_{},used_{},maintenance_used_{};
     Current current_;
     std::string command(std::string_view,unsigned timeout);
 public:

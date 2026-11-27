@@ -230,10 +230,10 @@ public:
 };
 }
 MutationResult MutationSession::run(const MutationPlan& p,bool warning,bool confirmed,Clock clock,Current current,MutationJournal journal){
-    if(used_||!p.valid()||!warning||!confirmed||!clock||!current||!journal||
+    if(used_||elm_.maintenance_used_||!p.valid()||!warning||!confirmed||!clock||!current||!journal||
         !elm_.ready()||!elm_.headered()||elm_.protocol()!=p.protocol||!current())
         throw std::invalid_argument("Single-use maintenance requires explicit consent, scope and durable journal");
-    used_=true;
+    used_=true;elm_.maintenance_used_=true;
     bool sent=false;
     return Recipe(p,[&](Bytes q,unsigned t){return elm_.exchange(q,t);},
         [&](unsigned t){return elm_.probe(t);},
