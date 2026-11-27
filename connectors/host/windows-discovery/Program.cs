@@ -5,6 +5,10 @@ using CamaroDiagConnectors.Windows;
 if (args is ["--self-test"])
     return SelfTests.Run();
 
+if (args.Contains(J1979MaintenanceJournal.Command,StringComparer.OrdinalIgnoreCase))
+
+    return J1979MaintenanceJournal.Run(args);
+
 if (args.Contains(J1979LiveNativeCli.CaptureCommand,StringComparer.OrdinalIgnoreCase) ||
     args.Contains(J1979LiveNativeCli.InspectCommand,StringComparer.OrdinalIgnoreCase) ||
     args.Contains(J1979LiveNativeCli.CsvCommand,StringComparer.OrdinalIgnoreCase) ||
