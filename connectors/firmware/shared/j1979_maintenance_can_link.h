@@ -55,8 +55,10 @@ class J1979MaintenanceCanLink final:public J1979MaintenanceCampaign::Link {
     J1979CanReadLink::Frame frame{};
     frame.id=scope_.tx;frame.extended=scope_.extended;frame.length=8;
     frame.data[0]=uint8_t(size);std::memcpy(frame.data+1,req,size);
-    uint32_t remaining=timeout-uint32_t(monotonicMs()-started);
-    if(!remaining||!bus_.send(frame,remaining)||!active()){finishFault();return;}
+    const uint32_t beforeSend=uint32_t(monotonicMs()-started);
+    if(beforeSend>=timeout){finishFault();return;}
+    uint32_t remaining=timeout-beforeSend;
+    if(!bus_.send(frame,remaining)||!active()){finishFault();return;}
     for(unsigned i=0;i<8192;++i){
       const auto spent=uint32_t(monotonicMs()-started);
       if(!active()){finishFault();return;}
