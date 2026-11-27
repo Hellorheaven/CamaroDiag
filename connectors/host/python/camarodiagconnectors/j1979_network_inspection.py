@@ -12,6 +12,7 @@ import re
 from .j1979_can_network import CanFrame, decode_frame, response_pair, validate_targets
 from .j1979 import allowed_read
 from .j1979_vehicle_info import can_info
+from .j1979_multi_signal import from_steps as multi_records
 from .j1979_campaign_evidence import decode_observation, summarize_observations
 from .j1979_live_inspection import load, _get, _require, _hex, _array, _dict, _id
 
@@ -352,8 +353,12 @@ def replay_ecu(row,android,vin):
             return {"info_type":kind,"values":record.get("values")}
         _require(_equal([canonical(x) for x in _array(declared,4,"extended Mode 09 records")],extended),
                  "Extended Mode 09 data differs from physical response")
+    multi=multi_records(steps)
+    claimed=_get(body,"multi_signal_records")
+    if claimed is not None:
+        _require(_equal(_normalize(claimed),multi),"Multi-signal records differ from physical responses")
     return {"completed":completed,"observed_vin":first,"final_vin":last,
-            "steps":steps,"extended_vehicle_info":extended,**summary}
+            "steps":steps,"extended_vehicle_info":extended,"multi_signal_records":multi,**summary}
 
 
 def inspect_network(root,expected_vin=None):
