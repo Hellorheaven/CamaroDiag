@@ -17,7 +17,7 @@ if (args.Contains(J1979LiveNativeCli.CaptureCommand,StringComparer.OrdinalIgnore
     args.Contains(J1979LiveNativeCli.CsvCommand,StringComparer.OrdinalIgnoreCase) ||
     args.Contains(J1979LiveNativeCli.PrefixCommand,StringComparer.OrdinalIgnoreCase))
     return J1979LiveNativeCli.Run(args);
-if (args.Length>0 && args[0] is J1979FreezeNativeCli.CaptureCommand or J1979FreezeNativeCli.InspectCommand)
+if (args.Length>0 && J1979FreezeNativeCli.IsCommand(args[0]))
     return J1979FreezeNativeCli.Run(args);
 
 if (args.Length>0 && args[0]=="--j1979-usb")
