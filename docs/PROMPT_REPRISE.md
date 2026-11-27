@@ -1,3 +1,10 @@
+## Reprise — SAE J1979 diesel et états catégoriels (27 novembre 2026)
+
+- Extension du catalogue multicanal : 18 PID supplémentaires (67 au total, 230 champs potentiels), notamment AECD 32 bits, NOx, réactif SCR, FAP, oxygène, compteurs d'incitation. Masques de présence, plages alternatives EGR/pression et longueurs exactes.
+- Décodeurs d'états catégoriels pour 17 PID Mode 01 : carburant, boucle de régulation, air secondaire, présence des sondes, norme déclarée, PTO, turbo, zones NTE, régénération, PM, WWH et incitation NOx. États distincts des moyennes numériques. Diagnostic Android, console et scans CAN/legacy Windows, scans CAN/legacy Python ; vues dérivées CJ/1 et vérification réseau Python. Firmware vérifie les longueurs et bits réservés sans autoriser d'écriture. Ancienne projection des 49 PID vérifiable séparément.
+- Régressions Python, Android, Windows et C++ écrites mais non exécutées. Accès GitHub aux deux sources Android J1979NetworkCampaign.kt / ElmJ1979LegacyRead.kt renvoie 404 malgré leur présence dans la liste de fichiers PR : intégration des nouveaux états dans ces deux parcours et correction de la sélection RAW à reprendre, sans recréer de fichier existant.
+- Catalogue J1979DA encore incomplet, échelles dépendantes des PID 4F/50 à traiter, activation matérielle firmware non démontrée. Mode 08 EVAP normalisé historique déjà implémenté côté hôtes, pas de TID d'actionnement inventé. C6 et J1979 restent ouverts. Aucun gate intermédiaire, merge, APK signé ou Release.
+
 ## Reprise — SAE J1979 Mode 01 multicanal (27 novembre 2026)
 
 - 49 PID multicanaux / 144 champs potentiels : O2, couple, débit, températures, EGR, admission, injection, turbo, échappement, DPF et durées. Décodeurs stricts Kotlin/C#/Python, longueur exacte, masques de présence, signés/non signés, absence distincte de zéro ; pas d'attribution de banc O2 non justifiée. Sous-ensemble historique, pas le J1979DA complet.
