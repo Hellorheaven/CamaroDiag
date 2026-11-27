@@ -17,4 +17,6 @@
     <string name="j1979_native_maintenance_recovery">Résultat incertain ou récupération requise. Ne pas relancer automatiquement.</string>
     <string name="j1979_native_maintenance_journal_checked">Cohérence du journal contrôlée ; aucune validation physique revendiquée.</string>
     <string name="j1979_native_maintenance_unverified">Journal non vérifié ; aucun succès revendiqué.</string>
+    <string name="j1979_native_maintenance_prefix_title">Inspecter un journal de maintenance interrompu</string>
+    <string name="j1979_native_maintenance_prefix_scope">Seuls les enregistrements complets sont contrôlés. Un terminal absent ou incomplet laisse le résultat incertain. Ne pas relancer automatiquement.</string>
 </resources>
