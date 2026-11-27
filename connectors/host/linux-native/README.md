@@ -13,7 +13,7 @@ make
 ./camarodiag-native --help
 ~~~
 
-Le même code C se compile sur ARM et x64; **aucun paquet .deb ni binaire
+Le même code C++20 est prévu pour sur ARM et x64; **aucun paquet .deb ni binaire
 précompilé n'est encore livré**. L'utilisation ne requiert pas d'interpréteur
 Python ni de dépendance pyserial.
 
@@ -34,11 +34,11 @@ Le VIN est fourni explicitement, indépendamment de la capture.
 Le flux CF/1 est borné : en-têtes, séquences, tailles, CRC32, plan
 CAN/VIN canonique, réponse et tentative transport, ordre exact des
 requêtes Mode 09/02, inventaire propre à chaque freeze frame, PID 02
-déclencheur, pages et relecture sont vérifiés en C. Les enregistrements
+déclencheur, pages et relecture sont vérifiés en C++20. Les enregistrements
 tronqués ne sont jamais comptés comme observations complètes. Une
 requête à venir est **théorique**, jamais déclarée transmise.
 
-Les JSON produits par cet outil C sont canoniques pour son vérificateur
+Les JSON produits par cet outil C++20 sont canoniques pour son vérificateur
 natif : le vérificateur impose une égalité octet à octet avec le rejeu
 indépendant. Les rapports historiques Python/Kotlin/C# ont d'autres
 projections et ne sont **pas encore acceptés par ce vérificateur**.
@@ -74,7 +74,7 @@ n'est déclenché par --help, ni par l'analyse hors connexion.
   --confirm-physical-channel
 ~~~
 
-Le C authentifie le défi CU/2 par HMAC-SHA256 avant d'envoyer la preuve client,
+Le code C++20 authentifie le défi CU/2 par HMAC-SHA256 avant d'envoyer la preuve client,
 puis enregistre les octets CF/1 de la liaison, y compris les fins tronquées.
 L'outil relit le fichier et vérifie la campagne hors connexion avant export.
 Un rapport d'échec reste non validé et une capture interrompue est conservée
@@ -98,17 +98,17 @@ sont une attestation d'identité matérielle.
 
 ## Compatibilité et versionnement des preuves
 
-Les sorties C natives emploient intentionnellement les schémas
+Les sorties C++20 natives emploient intentionnellement les schémas
 `*-linux-c-v1` : elles exposent un sous-ensemble strict des champs du rejeu
 historique Python, C# et Kotlin, sans prétendre que le JSON est interchangeable.
 Le nom de schéma commun ne doit **jamais** être conservé pour des objets dont
-les champs de preuve diffèrent. Les vérificateurs C n'acceptent que les
+les champs de preuve diffèrent. Les vérificateurs C++20 n'acceptent que les
 rapports exacts de leur propre sortie canonique. Un import portable complet
 demande le rapprochement explicite des schémas et de leurs règles de contrôle.
 
 ## Paquet Linux natif (.deb)
 
-Sur Debian, Ubuntu ou Raspberry Pi OS, installer la chaîne C et `dpkg-dev`,
+Sur Debian, Ubuntu ou Raspberry Pi OS, installer la chaîne C++20 et `dpkg-dev`,
 puis construire nativement sur l'architecture ciblée :
 
 ```sh
@@ -118,12 +118,12 @@ make deb
 # Fichier local : out/camarodiag-native-j1979_0.1.0_<arch>.deb
 ```
 
-Le paquet ne comporte qu'un exécutable C natif et de la documentation. Les
+Le paquet ne comporte qu'un exécutable C++20 natif et de la documentation. Les
 dépendances `libc` / `libcrypto` sont calculées sur le système cible par
 `dpkg-shlibdeps`. Il s'agit du **pont SAE J1979 partiel**, pas encore de
 l'interface graphique ni du paquet de livraison définitif.
 
-## SAE J1979 SocketCAN / ISO-TP directement en C (sans Python)
+## SAE J1979 SocketCAN / ISO-TP directement en C++20 (sans Python)
 
 La campagne native de lecture physique offre un premier remplacement de la
 commande Linux Python `j1979_cli`. L'interface CAN (`can0`, `can1`, ...), la
@@ -146,13 +146,13 @@ pas être promu automatiquement en mesure étalonnée. Le socket Linux ISO-TP
 contrôle les réponses obsolètes, la liaison et la fenêtre temporelle, sans
 retransmission après une émission incertaine.
 
-**État : raccordement C nouvellement écrit et non encore compilé/testé** selon
-le gate de clôture unique du protocole SAE J1979. Le rapport C possède un
+**État : raccordement C++20 nouvellement écrit et non encore compilé/testé** selon
+le gate de clôture unique du protocole SAE J1979. Le rapport C++20 possède un
 schéma distinct du rapport Python historique, et les autres sous-commandes
 Python doivent encore être migrées puis comparées avant suppression du code.
 L'absence de recette physique ne vaut ni validation ECU ni certificat SAE.
 
-## Surveillance native SAE J1979 Mode 01 en C
+## Surveillance native SAE J1979 Mode 01 en C++20
 
 ```sh
 ./camarodiag-native --j1979-live --interface can0 --tx 7E0 --rx 7E8 \
@@ -168,7 +168,7 @@ Une lecture manquante n'est pas promue en mesure ni en preuve physique. La
 mise à l'échelle des valeurs et l'intégration CU/3 restent à porter depuis
 les anciens outils Python. Tests non exécutés avant le gate de clôture.
 
-## Rejeu CL/1 Mode 01 natif en C (sans Python)
+## Rejeu CL/1 Mode 01 natif en C++20 (sans Python)
 
 ```sh
 ./camarodiag-native --inspect-j1979-live-native-prefix incomplete.cl VIN prefix.json
@@ -177,7 +177,7 @@ les anciens outils Python. Tests non exécutés avant le gate de clôture.
 ./camarodiag-native --verify-j1979-live-native complete.cl report.json proof.json VIN
 ```
 
-Le rejeu indépendant vérifie en C les trames CL/1, l'ordre, CRC, les
+Le rejeu indépendant vérifie en C++20 les trames CL/1, l'ordre, CRC, les
 horodatages, les requêtes et réponses Mode 01/09, les PID autorisés et
 les compteurs du terminal. Un rapport incomplet reste explicitement
 incomplet ; un rapport ancien ou réécrit ne passe pas la vérification
@@ -185,7 +185,7 @@ canonique octet par octet. Les sources sont relues avant création privée
 et exclusive du rapport ou de la preuve. Aucun de ces contrôles
 hors ligne ne contacte l'ECU ou n'authentifie un transport physique.
 
-## Acquisition CU/3 USB CL/1 Mode 01 native en C
+## Acquisition CU/3 USB CL/1 Mode 01 native en C++20
 
 ```sh
 ./camarodiag-native --j1979-live-usb-native \
@@ -198,7 +198,7 @@ hors ligne ne contacte l'ECU ou n'authentifie un transport physique.
 
 Cette voie utilise une authentification CU/3 HMAC-SHA256, la conservation
 en lecture seule des octets CL/1 (y compris troncatures), CRC/séquences,
-puis un rejeu C indépendant et relecture de la source avant le rapport.
+puis un rejeu C++20 indépendant et relecture de la source avant le rapport.
 Le fichier original est conservé en cas d'échec. Aucun repli sur Python,
 CU/1/CU/2 ou autre ECU. Le rapport de succès est expressément une preuve
 de cohérence CL/1 hors ligne, **pas une attestation de véhicule physique**.
@@ -270,3 +270,18 @@ programming permission is inferred. Linux CU/4 and CU/5 acquisition remain separ
 FR : ces commandes n'envoient aucune requête au véhicule. Le code 7 indique
 une récupération nécessaire, pas une autorisation de réessayer. Conserver le
 journal original ; ne jamais déduire une opération réussie d'un préfixe tronqué.
+
+## CU/1 et réseau legacy ELM — développement non validé
+
+Les commandes ci-dessous sont raccordées au code C++20 et au Makefile, sans exécution de test ni construction de paquet à ce stade. Le choix de la liaison reste explicite, et la confirmation locale n'autorise que les lectures. Les schémas natifs ne constituent pas encore une compatibilité intégrale avec les exports Python.
+
+```sh
+./camarodiag-native --j1979-usb --port /dev/ttyACM0 --key-file key.bin --capture session.cj --output session.json --tx 7E0 --rx 7E8 --vin VIN --confirm-physical-channel
+./camarodiag-native --inspect-j1979-campaign session.cj VIN offline.json
+./camarodiag-native --verify-j1979-campaign session.cj offline.json proof.json VIN
+./camarodiag-native --j1979-legacy-discover --port /dev/ttyUSB0 --protocol 2 --baud 38400 --output sources.json --confirm-physical-channel
+./camarodiag-native --j1979-legacy --port /dev/ttyUSB0 --protocol 2 --source 10 --vin VIN --output scan.json --confirm-physical-channel
+./camarodiag-native --inspect-j1979-legacy-discovery 2 response.txt atdpn.txt replay.json
+```
+
+Codes ELM fixes : 1 PWM, 2 VPW, 3 ISO 9141-2, 4 ISO 14230-4 lente, 5 ISO 14230-4 rapide. Le scan exige la source documentée et le VIN ; la découverte ne choisit jamais automatiquement un ECU. Les mesures dérivées et les preuves d'identité sont séparées de la capture brute. Une réponse valide n'atteste pas l'identité physique de l'ECU. Les opérations mutatrices, le rejeu indépendant complet du scan, les formats historiques et les autres fonctions Python restent à rapprocher avant suppression des outils existants.
