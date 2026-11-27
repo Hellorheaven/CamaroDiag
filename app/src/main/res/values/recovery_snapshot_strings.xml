@@ -23,4 +23,23 @@
     <string name="recovery_journal_sha256">Journal SHA-256</string>
     <string name="recovery_envelope_sha256">Envelope SHA-256</string>
     <string name="recovery_source_changed">Evidence changed. Select and inspect the folder again.</string>
+    <string name="recovery_history_title">Recovery history — oldest to newest</string>
+    <string name="recovery_history_folder">%1$d. %2$s</string>
+    <string name="recovery_history_add">Add snapshot folder</string>
+    <string name="recovery_history_up">Move up</string>
+    <string name="recovery_history_down">Move down</string>
+    <string name="recovery_history_remove">Remove</string>
+    <string name="recovery_history_inspect">Compare snapshots</string>
+    <string name="recovery_history_duplicate">Select a different snapshot folder.</string>
+    <string name="recovery_history_verified">Journal continuity verified</string>
+    <string name="recovery_history_rejected">History not verified</string>
+    <string name="recovery_history_failed_ordinal">Snapshot rejected: %1$d</string>
+    <string name="recovery_history_snapshot">%1$d. %2$s — %3$d records</string>
+    <string name="recovery_history_transition">%1$d → %2$d: +%3$d records, +%4$d bytes</string>
+    <string name="recovery_history_latest">Last recorded state: %1$s</string>
+    <string name="recovery_history_invalid_selection">Select 2 to 8 distinct snapshot folders.</string>
+    <string name="recovery_history_unverified_snapshot">A journal or its original sectors could not be verified.</string>
+    <string name="recovery_history_original_changed">Original sector evidence differs between snapshots.</string>
+    <string name="recovery_history_not_extension">Duplicate, reversed or divergent journal history.</string>
+    <string name="recovery_history_terminal_extension">A completed journal cannot have a successor.</string>
 </resources>
