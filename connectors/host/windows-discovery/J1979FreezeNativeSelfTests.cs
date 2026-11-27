@@ -150,6 +150,11 @@ internal static class J1979FreezeNativeSelfTests
             Require(File.Exists(output)&&Equals(saved["prefix_integrity_verified"],true),
                 "Windows prefix CLI persists separate report");
             var verified=J1979FreezeNativeCli.VerifyPrefix(source,output,proof,Vin);
+            bool expired=false;
+            string cancelled=Path.Combine(root,"revoked.json");
+            try{J1979FreezeNativeCli.VerifyPrefix(source,output,cancelled,Vin,()=>false);}
+            catch(OperationCanceledException){expired=true;}
+            Require(expired&&!File.Exists(cancelled),"revoked owner cannot publish CF/1 verification");
             Require(Equals(verified["consistent"],true)&&Equals(verified["execution_completed"],false)&&
                 (int)verified["last_complete_offset"]! == interrupted.Length &&
                 (int)verified["discarded_tail_bytes"]! == 0,

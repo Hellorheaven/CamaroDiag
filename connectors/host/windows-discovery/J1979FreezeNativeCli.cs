@@ -60,8 +60,10 @@ internal static class J1979FreezeNativeCli
                 break;
         }
     }
-    internal static Dictionary<string,object?> InspectPrefix(string source,string output,string vin)
+    internal static Dictionary<string,object?> InspectPrefix(string source,string output,string vin,
+        Func<bool>? current=null)
     {
+        if(current is not null&&!current())throw new OperationCanceledException("CF/1 session expired");
         DistinctPaths(source,output);
         var (raw,sha)=ReadPrefixSource(source);
         var result=J1979FreezeNative.InspectPrefix(raw,vin);
@@ -70,12 +72,15 @@ internal static class J1979FreezeNativeCli
             throw new InvalidDataException("CF/1 changed during prefix inspection");
         result["capture_sha256"]=sha;
         byte[] bytes=JsonSerializer.SerializeToUtf8Bytes(result,PrefixJsonOptions);
+        if(current is not null&&!current())throw new OperationCanceledException("CF/1 session expired");
         using var file=new FileStream(output,FileMode.CreateNew,FileAccess.Write,FileShare.None);
         file.Write(bytes);file.Flush(true);
         return result;
     }
-    internal static Dictionary<string,object?> VerifyPrefix(string source,string report,string output,string vin)
+    internal static Dictionary<string,object?> VerifyPrefix(string source,string report,string output,string vin,
+        Func<bool>? current=null)
     {
+        if(current is not null&&!current())throw new OperationCanceledException("CF/1 session expired");
         DistinctPaths(source,report,output);
         var (raw,sha)=ReadPrefixSource(source);
         var expected=J1979FreezeNative.InspectPrefix(raw,vin);
@@ -108,6 +113,7 @@ internal static class J1979FreezeNativeCli
             ["interruption"]=expected["interruption"]
         };
         byte[] outputBytes=JsonSerializer.SerializeToUtf8Bytes(result,PrefixJsonOptions);
+        if(current is not null&&!current())throw new OperationCanceledException("CF/1 session expired");
         using var target=new FileStream(output,FileMode.CreateNew,FileAccess.Write,FileShare.None);
         target.Write(outputBytes);target.Flush(true);
         return result;

@@ -37,7 +37,8 @@ internal sealed partial class BridgeDesktopForm
         try
         {
             var report=await Task.Run(()=>J1979FreezeNativeCli.InspectPrefix(
-                source.FileName,destination.FileName,vin));
+                source.FileName,destination.FileName,vin,
+                ()=>DateTimeOffset.UtcNow<expiry&&functionalAuthorizedUntil==expiry));
             if(IsDisposed||Disposing||DateTimeOffset.UtcNow>=expiry||
                functionalAuthorizedUntil!=expiry)return;
             var message=new StringBuilder(J1979RecipeText("FreezePrefixSaved")).AppendLine();
@@ -62,7 +63,7 @@ internal sealed partial class BridgeDesktopForm
             functionalResults.Text=message.ToString();
         }
         catch(Exception e) when(e is IOException or InvalidDataException or ArgumentException or
-            UnauthorizedAccessException or InvalidOperationException)
+            UnauthorizedAccessException or OperationCanceledException or InvalidOperationException)
         {
             if(!IsDisposed&&!Disposing)
                 functionalResults.Text=J1979RecipeText("CatalogueRejected")+" ("+e.GetType().Name+")";
@@ -100,7 +101,8 @@ internal sealed partial class BridgeDesktopForm
         try
         {
             var verified=await Task.Run(()=>J1979FreezeNativeCli.VerifyPrefix(
-                capture.FileName,report.FileName,target.FileName,vin));
+                capture.FileName,report.FileName,target.FileName,vin,
+                ()=>DateTimeOffset.UtcNow<expiry&&functionalAuthorizedUntil==expiry));
             if(IsDisposed||Disposing||DateTimeOffset.UtcNow>=expiry||
                functionalAuthorizedUntil!=expiry)return;
             var message=new StringBuilder(J1979RecipeText("FreezePrefixVerified")).AppendLine();
@@ -111,7 +113,7 @@ internal sealed partial class BridgeDesktopForm
             functionalResults.Text=message.ToString();
         }
         catch(Exception e) when(e is IOException or InvalidDataException or ArgumentException or
-            UnauthorizedAccessException or InvalidOperationException or System.Text.Json.JsonException)
+            UnauthorizedAccessException or OperationCanceledException or InvalidOperationException or System.Text.Json.JsonException)
         {
             if(!IsDisposed&&!Disposing)
                 functionalResults.Text=J1979RecipeText("FreezePrefixRejected")+" ("+e.GetType().Name+")";
