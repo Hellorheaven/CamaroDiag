@@ -6922,6 +6922,51 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun inspectFunctionalNativeMaintenancePrefix(source: Uri,confirmedConnection: Long,confirmedVehicle: VehicleProfile) =
         inspectFunctionalNativeFile(source,confirmedConnection,confirmedVehicle,true,true)
 
+    fun verifyFunctionalNativeFreezePrefix(capture: Uri,report: Uri,
+                                           confirmedConnection: Long,confirmedVehicle: VehicleProfile) {
+        val account=authenticatedAccountUid ?: return
+        val generation=accountSessionGeneration
+        if(capture.scheme!="content"||report.scheme!="content"||capture==report||
+            functionalCatalogueJob?.isActive==true||_functionalTestState.value.running||
+            confirmedConnection!=connectionAttemptGeneration||confirmedVehicle!=_vehicle.value||
+            !J1979CatalogueProjection.validVin(confirmedVehicle.vin))return
+        fun current()=isCurrentAccountGeneration(generation)&&authenticatedAccountUid==account&&
+            currentLicenseLevel==LicenseLevel.OWNER&&confirmedConnection==connectionAttemptGeneration&&
+            confirmedVehicle==_vehicle.value&&!_functionalTestState.value.running
+        functionalCatalogueJob=viewModelScope.launch {
+            if(!confirmFunctionalTestOwner(account)||!current())return@launch
+            _connectionMessage.value=localizedContext.getString(R.string.j1979_catalogue_working)
+            try {
+                val path=withContext(Dispatchers.IO) {
+                    val context=getApplication<Application>()
+                    val resolver=context.contentResolver
+                    val job=currentCoroutineContext()[Job]
+                    fun requireCurrent(){check(job?.isActive==true&&current())}
+                    val prepared=J1979NativePrefixFiles.prepareFreezeVerification(
+                        resolver,capture,report,confirmedVehicle.vin,::requireCurrent)
+                    requireCurrent()
+                    CamaroDiagExportStorage.write(context,
+                        "CamaroDiag_SAE-J1979_FREEZE_PREFIX_VERIFICATION_"+
+                            System.currentTimeMillis()+".json",
+                        "application/json",category=CamaroDiagExportStorage.Category.TESTS,
+                        beforePublish={
+                            requireCurrent()
+                            J1979NativePrefixFiles.revalidateFreezeVerification(resolver,
+                                capture,report,prepared.captureSha,prepared.reportSha,::requireCurrent)
+                        },verifyStaged={
+                            input -> PhysicalRecoveryEvidenceJson.requireExactJson(input,prepared.bytes)
+                        }) { stream -> stream.write(prepared.bytes) }
+                }
+                if(current())_connectionMessage.value=localizedContext.getString(
+                    R.string.j1979_freeze_prefix_verify_saved)+"\n"+path
+            }catch(cancelled:CancellationException){throw cancelled}
+            catch(_:Exception){
+                if(current())_connectionMessage.value=localizedContext.getString(
+                    R.string.j1979_freeze_prefix_verify_rejected)
+            }
+        }
+    }
+
     fun inspectFunctionalNativeFreezePrefix(source: Uri,confirmedConnection: Long,
                                             confirmedVehicle: VehicleProfile) =
         inspectFunctionalNativeFile(source,confirmedConnection,confirmedVehicle,false,false,true)
