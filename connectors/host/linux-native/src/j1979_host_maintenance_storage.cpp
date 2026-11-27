@@ -45,19 +45,20 @@ FileStorage::FileStorage(const char* directory,const char* name){
         if(fsync(fd_)||fsync(dir_))throw std::runtime_error("JOURNAL_RESERVATION_NOT_DURABLE");
         // A durable marker exists before vehicle access and is never
         // automatically removed. Operator recovery is explicitly external.
-        const int marker=openat(dir_,recovery_name,O_WRONLY|O_CREAT|O_EXCL|O_NOFOLLOW|O_CLOEXEC,0600);
-        if(marker<0)throw std::runtime_error("RECOVERY_MARKER_UNAVAILABLE");
+        marker_=openat(dir_,recovery_name,O_RDWR|O_CREAT|O_EXCL|O_NOFOLLOW|O_CLOEXEC,0600);
+        if(marker_<0)throw std::runtime_error("RECOVERY_MARKER_UNAVAILABLE");
         const std::string message="Maintenance reserved; inspect the journal before any further operation.\n"+journal_name_+"\n";
-        const bool written=write_all(marker,reinterpret_cast<const uint8_t*>(message.data()),message.size());
-        const bool synced=fsync(marker)==0;
-        const bool closed=close(marker)==0;
-        if(!written||!synced||!closed||fsync(dir_))throw std::runtime_error("RECOVERY_MARKER_NOT_DURABLE");
+        const bool written=write_all(marker_,reinterpret_cast<const uint8_t*>(message.data()),message.size());
+        const bool synced=fsync(marker_)==0;
+        if(!written||!synced||fsync(dir_))throw std::runtime_error("RECOVERY_MARKER_NOT_DURABLE");
     }catch(...){
+        if(marker_>=0)close(marker_);
         if(fd_>=0)close(fd_);
-        close(dir_);fd_=dir_=-1;throw;
+        close(dir_);marker_=fd_=dir_=-1;throw;
     }
 }
 FileStorage::~FileStorage(){
+    if(marker_>=0)close(marker_);
     if(fd_>=0)close(fd_);
     if(dir_>=0)close(dir_);
 }
@@ -68,7 +69,13 @@ bool FileStorage::same_file()const{
         opened.st_dev==named.st_dev&&opened.st_ino==named.st_ino&&opened.st_nlink==1&&
         opened.st_uid==geteuid()&&!(opened.st_mode&077);
 }
-bool FileStorage::ready(){return !failed_&&same_file();}
+bool FileStorage::same_marker()const{
+    struct stat a{},b{};
+    return marker_>=0&&dir_>=0&&!fstat(marker_,&a)&&
+        !fstatat(dir_,recovery_name,&b,AT_SYMLINK_NOFOLLOW)&&S_ISREG(a.st_mode)&&
+        a.st_dev==b.st_dev&&a.st_ino==b.st_ino&&a.st_nlink==1&&a.st_uid==geteuid()&&!(a.st_mode&077)&&a.st_size>0;
+}
+bool FileStorage::ready(){return !failed_&&same_file()&&same_marker();}
 bool FileStorage::size(size_t& n){
     struct stat s{};
     if(!ready()||fstat(fd_,&s)||s.st_size<0||static_cast<uint64_t>(s.st_size)>Journal::MaximumJournal)return false;
@@ -94,7 +101,7 @@ bool FileStorage::read(size_t offset,uint8_t* data,size_t n){
         if(count<=0)return false;
         offset+=static_cast<size_t>(count);data+=count;n-=static_cast<size_t>(count);
     }
-    return same_file();
+    return same_file()&&same_marker();
 }
 void FileStorage::latchRecovery(){failed_=true;latched_=true;}
 }
