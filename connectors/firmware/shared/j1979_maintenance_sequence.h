@@ -51,6 +51,17 @@ class J1979MaintenanceSequence {
     const auto elapsed=uint32_t(now-start_);
     return elapsed<scope_.budgetMs?scope_.budgetMs-elapsed:0;
   }
+  // Remaining freshness at the actual command boundary. The transport
+  // must include persistent intent readback and all pre-send work in this
+  // same timeout, not restart its deadline after storage operations.
+  uint32_t commandWindow(uint32_t now)const{
+    if(!fresh(now))return 0;
+    uint32_t age=uint32_t(now-identityAt_);
+    const uint32_t speedAge=uint32_t(now-speedAt_),rpmAge=uint32_t(now-rpmAt_);
+    if(speedAge>age)age=speedAge;
+    if(rpmAge>age)age=rpmAge;
+    return age<FreshnessMs?FreshnessMs-age:0;
+  }
   Stage stage()const{
     if(finished())return Stage::Finished;
     if(index_==baselineBoundary()&&!summary_.baselinePersisted)return Stage::Persist;
@@ -93,7 +104,7 @@ class J1979MaintenanceSequence {
       abort(Reason::Sequence,now);return false;
     }
     if(expected.stage==Stage::Command){
-      if(summary_.attempted||!summary_.baselinePersisted||!summary_.intentPersisted||!fresh(now)){
+      if(summary_.attempted||!summary_.baselinePersisted||!summary_.intentPersisted||timeout>commandWindow(now)){
         abort(Reason::Stationary,now);return false;
       }
       // This marks the boundary before transport invocation, not proof
