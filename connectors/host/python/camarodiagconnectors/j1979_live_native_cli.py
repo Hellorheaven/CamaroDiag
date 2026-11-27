@@ -6,6 +6,7 @@ a provisioned credential. No discovery fallback or automatic pairing.
 from __future__ import annotations
 
 import argparse
+import csv
 import io
 import json
 import os
@@ -186,6 +187,40 @@ def verify_files(capture, report, *, expected_vin):
             "hardware_provenance_verified": False, "permits_programming": False, "replayed": replay}
 
 
+def export_csv(capture, output, *, expected_vin):
+    """Replay original CL/1 before exporting raw samples, not engineering units."""
+    require(valid_vin(expected_vin), "Independently supplied VIN required")
+    capture, output = Path(capture), Path(output)
+    require(capture.resolve() != output.resolve(), "Input and output must differ")
+    raw, stamp = _regular(capture, MAX_CAPTURE)
+    report = decode(io.BytesIO(raw))
+    require(report["capture_integrity_verified"] and
+            report["profile"]["expected_vin"] == expected_vin, "Invalid capture or mismatched VIN")
+    profile = report["profile"]
+    result = report["result"]
+    buffer = io.StringIO(newline="")
+    writer = csv.writer(buffer, lineterminator="\r\n")
+    writer.writerow(("cycle", "pid_hex", "elapsed_ms", "status", "response_hex",
+                     "request_can_id", "response_can_id", "vin", "source_completed"))
+    for sample in result["samples"]:
+        writer.writerow((sample["cycle"], f'{sample["pid"]:02X}', sample["elapsed_ms"],
+                         sample["status"], sample["response_hex"] or "", profile["request_can_id"],
+                         profile["response_can_id"], expected_vin, str(result["completed"]).lower()))
+    content = buffer.getvalue().encode("ascii")
+    require(len(content) <= 40 * 1024 * 1024, "CSV size limit exceeded")
+    again, current = _regular(capture, MAX_CAPTURE)
+    require(raw == again and stamp == current, "CL/1 changed during export")
+    fd = os.open(output, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(fd, "wb") as target:
+        target.write(content)
+        target.flush()
+        os.fsync(target.fileno())
+    return {"schema": "camarodiag-j1979-native-live-csv-export-v1",
+            "verified": True, "execution_completed": result["completed"],
+            "capture_sha256": stamp.digest, "samples": len(result["samples"]),
+            "physical_vehicle_verified": False, "permits_programming": False}
+
+
 def write_new(path, value):
     data = (json.dumps(value, ensure_ascii=True, allow_nan=False, indent=2) + "\n").encode("utf-8")
     require(len(data) <= MAX_REPORT, "Native live report too large")
@@ -222,6 +257,10 @@ def parser():
     offline.add_argument("--capture", type=Path, required=True)
     offline.add_argument("--output", type=Path, required=True)
     offline.add_argument("--vin", required=True)
+    csv_export = commands.add_parser("export-csv", allow_abbrev=False)
+    csv_export.add_argument("--capture", type=Path, required=True)
+    csv_export.add_argument("--output", type=Path, required=True)
+    csv_export.add_argument("--vin", required=True)
     verify = commands.add_parser("verify", allow_abbrev=False)
     verify.add_argument("--capture", type=Path, required=True)
     verify.add_argument("--report", type=Path, required=True)
@@ -253,6 +292,8 @@ def run(argv=None):
     if args.command == "capture":
         paths.append(args.key_file)
     require(len({p.resolve() for p in paths}) == len(paths), "Input and output paths must differ")
+    if args.command == "export-csv":
+        return export_csv(args.capture, args.output, expected_vin=args.vin)
     if args.command == "verify":
         report = verify_files(args.capture, args.report, expected_vin=args.vin)
         write_new(args.output, report)
@@ -318,7 +359,8 @@ def main():
     except (OSError, ValueError, EOFError) as exc:
         print(str(exc), file=sys.stderr)
         raise SystemExit(2) from exc
-    if report["schema"] == "camarodiag-j1979-native-live-verification-v1":
+    if report["schema"] in ("camarodiag-j1979-native-live-verification-v1",
+                             "camarodiag-j1979-native-live-csv-export-v1"):
         integrity = report["verified"]
         complete = report["execution_completed"]
     else:
