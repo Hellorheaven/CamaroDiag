@@ -122,3 +122,32 @@ Le paquet ne comporte qu'un exécutable C natif et de la documentation. Les
 dépendances `libc` / `libcrypto` sont calculées sur le système cible par
 `dpkg-shlibdeps`. Il s'agit du **pont SAE J1979 partiel**, pas encore de
 l'interface graphique ni du paquet de livraison définitif.
+
+## SAE J1979 SocketCAN / ISO-TP directement en C (sans Python)
+
+La campagne native de lecture physique offre un premier remplacement de la
+commande Linux Python `j1979_cli`. L'interface CAN (`can0`, `can1`, ...), la
+paire physique de CAN IDs et le VIN attendu sont sélectionnés **avant** toute
+ouverture de canal. Aucun broadcast fonctionnel, aucun effacement de défauts,
+aucune fonction Mode 08 de commande ou de programmation n'est envoyé.
+
+```sh
+./camarodiag-native --j1979-can --interface can0 --tx 7E0 --rx 7E8 \
+  --vin 2G1FA1E30D7654321 --budget-ms 180000 \
+  --output evidence.json --confirm-physical-channel
+```
+
+Une confirmation interactive locale supplémentaire est nécessaire. Le
+rapport privé JSON (mode `0600`) conserve l'ordre, les requêtes et réponses
+hexadécimales brutes, les durées, le VIN observé, les inventaires indépendants
+Mode 01/02/06/08/09, les DTC et les arrêts de campagne. Les statuts `RAW`
+restent non interprétés; un NRC, un timeout ou un PID non documenté ne peut
+pas être promu automatiquement en mesure étalonnée. Le socket Linux ISO-TP
+contrôle les réponses obsolètes, la liaison et la fenêtre temporelle, sans
+retransmission après une émission incertaine.
+
+**État : raccordement C nouvellement écrit et non encore compilé/testé** selon
+le gate de clôture unique du protocole SAE J1979. Le rapport C possède un
+schéma distinct du rapport Python historique, et les autres sous-commandes
+Python doivent encore être migrées puis comparées avant suppression du code.
+L'absence de recette physique ne vaut ni validation ECU ni certificat SAE.

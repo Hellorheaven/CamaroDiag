@@ -26,7 +26,7 @@ static uint64_t monotonic_ms(void) {
 bool j1979_isotp_valid_interface(const char *name) {
     if (!name) return false;
     size_t length = strlen(name);
-    if (length == 0 || length >= IFNAMSIZ) return false;
+    if (length == 0 || length >= IF_NAMESIZE) return false;
     for (size_t i = 0; i < length; ++i) {
         const char c = name[i];
         if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
@@ -113,7 +113,7 @@ int j1979_isotp_exchange(void *context, const uint8_t *request,
         uint8_t stale[J1979_CAN_MAX_PAYLOAD + 1] = {0};
         ssize_t got = recv(link->socket_fd, stale, sizeof(stale), MSG_DONTWAIT);
         if (got < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) break;
-        if (got < 0 && errno == EINTR) { --drained; continue; }
+        if (got < 0 && errno == EINTR) continue;
         if (got < 0 || !j1979_isotp_current(link) || monotonic_ms() >= deadline)
             return -1;
         if (drained == 63) return -1;

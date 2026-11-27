@@ -5,18 +5,20 @@ LDFLAGS ?=
 LDLIBS ?= -lcrypto
 STRICT = -std=c11 -Wall -Wextra -Wpedantic -Werror -D_FILE_OFFSET_BITS=64
 INCLUDES = -Iinclude
-SOURCES = src/cf1.c src/cf1_complete.c src/cf1_crypto.c src/cf1_usb.c src/main.c
+SOURCES = src/cf1.c src/cf1_complete.c src/cf1_crypto.c src/cf1_usb.c src/j1979_can.c src/j1979_isotp.c src/j1979_can_cli.c src/main.c
 TARGET = camarodiag-native
 
 .PHONY: all clean test install deb
 all: $(TARGET)
 
-$(TARGET): $(SOURCES) include/cf1.h
+$(TARGET): $(SOURCES) include/cf1.h include/j1979_can.h include/j1979_isotp.h include/j1979_can_cli.h
 	$(CC) $(CPPFLAGS) $(INCLUDES) $(CFLAGS) $(STRICT) $(SOURCES) $(LDFLAGS) $(LDLIBS) -o $@
 
-test: test-cf1 test-cu2
+test: test-cf1 test-cu2 test-j1979-can test-j1979-isotp
 	./test-cf1
 	./test-cu2
+	./test-j1979-can
+	./test-j1979-isotp
 
 test-cf1: tests/test_cf1.c src/cf1.c src/cf1_complete.c include/cf1.h
 	$(CC) $(CPPFLAGS) $(INCLUDES) $(CFLAGS) $(STRICT) tests/test_cf1.c src/cf1.c src/cf1_complete.c $(LDFLAGS) -o $@
@@ -24,8 +26,14 @@ test-cf1: tests/test_cf1.c src/cf1.c src/cf1_complete.c include/cf1.h
 test-cu2: tests/test_cu2.c src/cf1.c src/cf1_crypto.c include/cf1.h include/cf1_transport.h
 	$(CC) $(CPPFLAGS) $(INCLUDES) $(CFLAGS) $(STRICT) tests/test_cu2.c src/cf1.c src/cf1_crypto.c $(LDFLAGS) $(LDLIBS) -o $@
 
+test-j1979-can: tests/test_j1979_can.c src/j1979_can.c include/j1979_can.h
+	$(CC) $(CPPFLAGS) $(INCLUDES) $(CFLAGS) $(STRICT) tests/test_j1979_can.c src/j1979_can.c $(LDFLAGS) -o $@
+
+test-j1979-isotp: tests/test_j1979_isotp.c src/j1979_isotp.c src/j1979_can.c include/j1979_isotp.h include/j1979_can.h
+	$(CC) $(CPPFLAGS) $(INCLUDES) $(CFLAGS) $(STRICT) tests/test_j1979_isotp.c src/j1979_isotp.c src/j1979_can.c $(LDFLAGS) -o $@
+
 clean:
-	rm -f $(TARGET) test-cf1 test-cu2
+	rm -f $(TARGET) test-cf1 test-cu2 test-j1979-can test-j1979-isotp
 
 PREFIX ?= /usr/local
 DESTDIR ?=

@@ -1,6 +1,7 @@
 #define _POSIX_C_SOURCE 200809L
 #include "cf1.h"
 #include "cf1_usb.h"
+#include "j1979_can_cli.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -623,6 +624,7 @@ static void usage(FILE *stream) {
     fprintf(stream,
         "CamaroDiag Linux native C — SAE J1979 Mode 02 CF/1\n"
         "Usage:\n"
+        "  camarodiag-native --j1979-can --interface can0 --tx 7E0 --rx 7E8 --output evidence.json --vin VIN --budget-ms 180000 --confirm-physical-channel\n"
         "  camarodiag-native --j1979-freeze-native --port /dev/ttyACM0 --key-file key.bin --capture capture.cf --output rapport.json --tx 7E0 --rx 7E8 --vin VIN --frame 00 --pid 0C --budget-ms 60000 --confirm-physical-channel\n"
         "  camarodiag-native --inspect-j1979-freeze-native-prefix CAPTURE.cf VIN PREFIX.json\n"
         "  camarodiag-native --inspect-j1979-freeze-native CAPTURE.cf VIN REPORT.json\n"
@@ -639,6 +641,8 @@ int main(int argc, char **argv) {
     if (argc == 2 && (!strcmp(argv[1], "--help") || !strcmp(argv[1], "-h"))) {
         usage(stdout); return 0;
     }
+    if (argc >= 3 && !strcmp(argv[1], "--j1979-can"))
+        return j1979_can_cli(argc, argv);
     if (argc >= 3 && !strcmp(argv[1], "--j1979-freeze-native"))
         return capture_native(argc, argv);
     if (argc == 5 && !strcmp(argv[1], "--inspect-j1979-freeze-native"))
