@@ -101,6 +101,16 @@ internal static class J1979FreezeNativeSelfTests
             (string)partial["interruption"]! == "MISSING_TERMINAL","CF/1 prefix preserves complete reads");
         Require((string)partial["observed_final_vin_in_prefix"]! == Vin&&
             !(bool)partial["replay_terminated_by_missing_observation"]!,"full observation set without terminal");
+        var progress=(Dictionary<string,object?>[])
+            partial["observed_frame_progress"]!;
+        Require(progress.Length==1&&(int)progress[0]["frame"]! == 0 &&
+            (string)progress[0]["provisional_status"]! == "COMPLETE" &&
+            !(bool)progress[0]["status_finalized"]! &&
+            (bool)progress[0]["trigger_stable_in_prefix"]! &&
+            ((int[])progress[0]["advertised_measurement_pids"]!).SequenceEqual(new[]{12}) &&
+            ((int[])progress[0]["read_measurement_pids"]!).SequenceEqual(new[]{12}) &&
+            (int)progress[0]["measurement_observation_count"]! == 1,
+            "CF/1 frame-level inventory is provisional even after all observations");
         var planOnly=J1979FreezeNative.InspectPrefix(capture[..(12+J1979FreezeNative.PlanSize)],Vin);
         Require((int)planOnly["complete_observations"]! == 0&&
             (bool)planOnly["replay_terminated_by_missing_observation"]!,

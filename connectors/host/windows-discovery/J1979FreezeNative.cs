@@ -234,6 +234,21 @@ internal static class J1979FreezeNative
         },()=>observations.Sum(item=>item.Read.DurationMs));
         Check(index==observations.Count&&replay.Steps.Length>=observations.Count,
             "Unexpected CF/1 observations after deterministic recipe stop");
+        // The recipe may have completed a frame before CF/1 was interrupted.
+        // Never promote a local recipe verdict into an attested campaign.
+        var progress=replay.Frames.Select(frame=>new Dictionary<string,object?>{
+            ["frame"]=frame.Frame,
+            ["provisional_status"]=frame.Status,
+            ["status_finalized"]=false,
+            ["inventory_complete_in_prefix"]=frame.InventoryComplete,
+            ["trigger_dtc_in_prefix"]=frame.TriggerDtc,
+            ["trigger_recheck_dtc_in_prefix"]=frame.FinalTriggerDtc,
+            ["trigger_stable_in_prefix"]=frame.TriggerStable,
+            ["advertised_measurement_pids"]=frame.AdvertisedPids
+                .Where(pid=>pid!=2&&pid%32!=0).OrderBy(pid=>pid).ToArray(),
+            ["read_measurement_pids"]=frame.ReadPids.OrderBy(pid=>pid).ToArray(),
+            ["measurement_observation_count"]=frame.MeasurementSteps.Length,
+        }).ToArray();
         var p=profile!;
         return new Dictionary<string,object?>{
             ["schema"]="camarodiag-j1979-native-freeze-prefix-v1",
@@ -256,6 +271,7 @@ internal static class J1979FreezeNative
             ["observed_final_vin_in_prefix"]=replay.FinalVin,
             ["independently_replayed_steps"]=replay.Steps.Take(observations.Count).ToArray(),
             ["visited_frame_numbers_in_prefix"]=replay.Frames.Select(f=>f.Frame).ToArray(),
+            ["observed_frame_progress"]=progress,
             ["frame_states_are_provisional"]=true,["timing_independently_verified"]=false,
             ["recorded_observation_duration_ms"]=observations.Sum(item=>item.Read.DurationMs),
             ["authenticated"]=false,["diagnostic_verdict"]=null
