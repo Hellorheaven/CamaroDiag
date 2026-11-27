@@ -88,7 +88,7 @@ internal static class J1979FreezeNativeCli
                 report=new J1979FreezeUsbCapture(new J1979SerialPortLink(serial,current)).Run(profile,key,raw,current);
                 raw.Flush(true);
             }
-            catch(Exception e) when(e is IOException or TimeoutException or UnauthorizedAccessException or
+            catch(Exception e) when(e is InvalidDataException or IOException or TimeoutException or UnauthorizedAccessException or
                 InvalidOperationException or OperationCanceledException)
             {
                 report=report with {CaptureIntegrityVerified=false,Error=e.Message,
@@ -146,7 +146,7 @@ internal static class J1979FreezeNativeCli
             Console.WriteLine(J1979FreezeNative.EncodeReport(report));
             return report.CaptureIntegrityVerified&&!report.Cancelled&&report.Summary?.AllFramesStable==true?0:2;
         }
-        catch(Exception e) when(e is ArgumentException or IOException or UnauthorizedAccessException or
+        catch(Exception e) when(e is InvalidDataException or ArgumentException or IOException or UnauthorizedAccessException or
             TimeoutException or InvalidOperationException or OperationCanceledException)
         {Console.Error.WriteLine(e.Message);return 2;}
     }
