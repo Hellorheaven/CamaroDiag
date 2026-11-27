@@ -121,6 +121,9 @@ object CamaroDiagConnectorNativeCampaign {
             put("frame_integrity_verified", frames)
             put("capture_integrity_verified", semantic)
             put("cancelled", cancelled)
+            put("contextual_measurements",J1979ScalingJson.encode(ObdJ1979ScalingContext.project(steps.map {
+                ObdJ1979ScalingContext.Observation(it.requestHex,it.responseHex,it.status)
+            })))
             put("multi_signal_records",JSONArray(steps.mapNotNull {
                 ObdJ1979MultiSignal.tryRecord(it.requestHex,it.responseHex,it.status)
             }.map { record ->
