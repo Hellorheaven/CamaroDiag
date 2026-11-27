@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="j1979_network_title">J1979 CAN network</string>
+    <string name="j1979_network_scope">Functional PID00 discovery, then separate read-only campaigns on explicitly selected responding ECUs. Not a full vehicle topology scan.</string>
+    <string name="j1979_network_confirm">Confirm network and VIN %1$s</string>
+    <string name="j1979_network_discover">Discover responding ECUs</string>
+    <string name="j1979_network_scan">Read selected ECUs</string>
+    <string name="j1979_network_completed">Network campaign complete</string>
+    <string name="j1979_network_incomplete">Network campaign incomplete</string>
+    <string name="j1979_network_steps">Requests recorded: %1$d</string>
+</resources>

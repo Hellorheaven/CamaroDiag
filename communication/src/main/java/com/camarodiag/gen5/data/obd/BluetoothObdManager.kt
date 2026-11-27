@@ -1122,6 +1122,75 @@ class BluetoothObdManager(context: Context) {
 
     val j1979LiveProtocol: Int? get() = legacyMutationProtocol ?: standardElmProfile.protocol.takeIf { isElmEvapCandidate }
 
+    suspend fun runJ1979Network(plan:J1979NetworkPlan,isCurrent:()->Boolean,
+        retain:(J1979NetworkReport)->Unit):J1979NetworkReport {
+        require(plan.valid)
+        val epoch=transportSessionEpoch.capture()
+        val original=standardElmProfile
+        fun guard(){
+            transportSessionEpoch.requireQueuedCurrent(epoch)
+            check(isCurrent()){"Network campaign context changed."}
+        }
+        return commandSessionMutex.withLock {
+            guard()
+            check(isElmEvapCandidate&&j1979LiveProtocol==plan.protocol&&standardElmProfile==original)
+            suspend fun command(value:String,timeout:Long)=sendAtCommandInternal(value,timeout,
+                expectedEpoch=epoch,preserveLines=true,beforeTransmit=::guard)
+            suspend fun configure(values:List<String>,budget:Long){
+                val start=System.nanoTime()/1000000
+                for(value in values){
+                    guard()
+                    val remaining=budget-(System.nanoTime()/1000000-start)
+                    check(remaining>0){"Network setup budget exhausted."}
+                    check(CanConsoleAdapterRestorationPolicy.accepted(command(value,minOf(1500,remaining))))
+                }
+            }
+            try {
+                J1979NetworkCampaign.run(plan,discover={timeout->
+                    val start=System.nanoTime()/1000000
+                    val header=if(plan.extended)"18DB33F1"else "7DF"
+                    // Disable automatic flow control for the single functional
+                    // support bitmap. Only physical sessions below enable FC.
+                    configure(listOf("ATSP${plan.protocol}","ATE0","ATL0","ATH1","ATS1","ATD0",
+                        "ATCAF0","ATFCSM0","ATCFC0","ATCRA","ATSH $header"),timeout)
+                    fun remaining()=timeout-(System.nanoTime()/1000000-start)
+                    check(remaining()>0)
+                    val raw=command("020100CCCCCCCC",remaining())
+                    check(remaining()>0)
+                    val protocol=command("ATDPN",minOf(1500,remaining()))
+                    J1979NetworkCampaign.DiscoveryReply(raw,protocol)
+                },open={target,budget->
+                    val tx=target.idHex(requireNotNull(target.requestId))
+                    val rx=target.idHex(target.responseId)
+                    configure(listOf("ATSH $tx","ATCRA $rx","ATFCSH $tx","ATFCSD 30 00 00",
+                        "ATFCSM1","ATCFC1"),budget)
+                },exchange={target,payload,timeout->
+                    check(J1979NetworkCampaign.allowed(payload))
+                    val raw=command(ElmJ1979EvapTest.hex(byteArrayOf(payload.size.toByte())+payload),timeout)
+                    val lines=raw.replace('>','\n').lineSequence().map { it.trim().uppercase(java.util.Locale.ROOT) }
+                        .filter { it.isNotEmpty() }.toList()
+                    val data=if(lines==listOf("NO DATA"))null else
+                        ElmUdsPayloadTransport.decode(raw,target.responseId,target.extended)
+                    J1979LiveRecorder.Reply(data,raw)
+                },requireCurrent=::guard).also(retain)
+            }finally {
+                withContext(NonCancellable){
+                    if(transportSessionEpoch.isCurrent(epoch)){
+                        var restored=true
+                        for(value in ElmUdsPayloadTransport.restoreCommandsFor(original.protocol)){
+                            val response=runCatching { sendAtCommandInternal(value,1500L,expectedEpoch=epoch) }.getOrNull()
+                            if(response==null||!CanConsoleAdapterRestorationPolicy.accepted(response))restored=false
+                        }
+                        if(!restored){
+                            disconnectIfCurrent(epoch)
+                            throw CanAdapterRestorationException(activeTransport)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     /** Hold the same exclusive lock as the console and other ELM sessions.
      * Only the recorder's exact Mode 01/09 allowlist may cross this boundary. */
     suspend fun runJ1979Live(plan: J1979LivePlan,isCurrent: ()->Boolean,

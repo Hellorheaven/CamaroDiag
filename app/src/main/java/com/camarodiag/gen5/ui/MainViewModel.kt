@@ -5807,6 +5807,65 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun functionalLiveProtocol(): Int? = obdManager.j1979LiveProtocol
 
+    fun runFunctionalNetwork(requested: com.camarodiag.gen5.data.obd.J1979NetworkPlan,
+        confirmedConnection: Long, confirmedVehicle: VehicleProfile) {
+        val plan=requested.copy(selectedResponseIds=requested.selectedResponseIds.toList())
+        if(!plan.valid||plan.vin!=confirmedVehicle.vin||
+            confirmedConnection!=connectionAttemptGeneration||confirmedVehicle!=_vehicle.value||
+            functionalTestJob?.isCompleted==false||enhancedUdsJob?.isCompleted==false||
+            nativeFunctionalCleanup?.isCompleted==false||_liveCanMonitorState.value.isCapturing||
+            _liveCanMonitorState.value.isSendingRequest||obdManager.j1979LiveProtocol!=plan.protocol)return
+        val account=authenticatedAccountUid?:return
+        val generation=accountSessionGeneration
+        val execution=++functionalTestGeneration
+        fun current()=execution==functionalTestGeneration&&isCurrentAccountGeneration(generation)&&
+            authenticatedAccountUid==account&&confirmedConnection==connectionAttemptGeneration&&
+            confirmedVehicle==_vehicle.value&&currentLicenseLevel==LicenseLevel.OWNER
+        functionalTestJob=viewModelScope.launch {
+            if(!confirmFunctionalTestOwner(account)||!current())return@launch
+            _functionalTestState.value=FunctionalTestState(running=true,startedAtMillis=System.currentTimeMillis(),
+                protocol=FunctionalProtocol.J1979,networkPlan=plan,checks=FunctionalTestPlanner.j1979Checks(),
+                context=FunctionalTestContext(confirmedVehicle.vin,_adapter.value.deviceName,
+                    obdManager.currentTransportKind,confirmedConnection))
+            var report:com.camarodiag.gen5.data.obd.J1979NetworkReport?=null
+            var failure:String?=null
+            try {
+                report=obdManager.runJ1979Network(plan,::current){report=it}
+            }catch(cancelled:CancellationException){
+                failure="CANCELLED";throw cancelled
+            }catch(e:Exception){failure=e.javaClass.simpleName}
+            finally {
+                if(current()){
+                    val retained=report?.let { if(failure==null)it else it.copy(completed=false,stopReason=failure) }
+                    val rows=retained?.let { r->
+                        r.discovery.responders.map {
+                            val label="%X".format(it.responseId)
+                            FunctionalTestCheck("network:discovery:$label","j1979_network",label,label,
+                                when(it.status){
+                                    "PASSED"->FunctionalTestOutcome.PASSED
+                                    "FAILED"->FunctionalTestOutcome.FAILED
+                                    else->FunctionalTestOutcome.NOT_TESTED
+                                },it.detail?:it.status,it.detail?:it.status)
+                        }+r.ecus.map {
+                            val label="%X".format(it.responseId)
+                            FunctionalTestCheck("network:ecu:$label","j1979_network",label,label,
+                                when(it.status){
+                                    "PASSED"->FunctionalTestOutcome.PASSED
+                                    "FAILED"->FunctionalTestOutcome.FAILED
+                                    else->FunctionalTestOutcome.NOT_TESTED
+                                },it.stopReason?:it.status,it.stopReason?:it.status)
+                        }
+                    }
+                    _functionalTestState.update { state->state.copy(running=false,finishedAtMillis=System.currentTimeMillis(),
+                        networkReport=retained,checks=rows?.takeIf { it.isNotEmpty() }?:state.checks,
+                        context=state.context?.copy(observedVin=retained?.ecus?.mapNotNull { it.observedVin }
+                            ?.distinct()?.singleOrNull()),
+                        error=if(retained?.completed==true)null else localizedContext.getString(R.string.j1979_network_incomplete)) }
+                }
+            }
+        }
+    }
+
     fun runFunctionalLive(requested: com.camarodiag.gen5.data.obd.J1979LivePlan,
         confirmedConnection: Long, confirmedVehicle: VehicleProfile) {
         val plan=requested.copy(pids=requested.pids.toList())
@@ -6046,7 +6105,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun cancelFunctionalTests() {
         // Live read cancellation retains its prefix after exclusive transport
         // restoration. Account/connection changes still invalidate generation.
-        if(_functionalTestState.value.running&&_functionalTestState.value.livePlan!=null){
+        if(_functionalTestState.value.running&&(_functionalTestState.value.livePlan!=null||_functionalTestState.value.networkPlan!=null)){
             functionalTestJob?.cancel()
             return
         }
@@ -6120,6 +6179,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             json.put("checks", checks)
             json.put("rawObdExchanges", JSONArray(snapshot.rawObdExchanges))
             snapshot.liveReport?.let { json.put("live",J1979LiveEvidenceJson.encode(it)) }
+            snapshot.networkReport?.let { json.put("network",J1979NetworkEvidenceJson.encode(it)) }
             snapshot.nativeUsbEvidence?.let { json.put("nativeUsb", JSONObject(it)) }
             snapshot.legacyRead?.let { json.put("legacyRead", LegacyReadEvidenceJson.encode(it)) }
             json.put("error", snapshot.error ?: JSONObject.NULL)

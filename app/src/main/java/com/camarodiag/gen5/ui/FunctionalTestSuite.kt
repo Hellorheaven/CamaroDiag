@@ -95,6 +95,8 @@ data class FunctionalTestState(
     val livePlan: com.camarodiag.gen5.data.obd.J1979LivePlan? = null,
     val liveReport: com.camarodiag.gen5.data.obd.J1979LiveReport? = null,
     val liveRecent: List<com.camarodiag.gen5.data.obd.J1979LiveObservation> = emptyList(),
+    val networkPlan: com.camarodiag.gen5.data.obd.J1979NetworkPlan? = null,
+    val networkReport: com.camarodiag.gen5.data.obd.J1979NetworkReport? = null,
     val nativeUsbEvidence: String? = null
 ) {
     val canExport: Boolean get() = !running && finishedAtMillis != null && context != null && checks.isNotEmpty()
