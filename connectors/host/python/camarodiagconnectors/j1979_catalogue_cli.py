@@ -9,6 +9,7 @@ import sys
 
 from .j1979_catalogue import read_catalogue, project, require, digest
 from .j1979_live_inspection import inspect, _unwrap, MAX_REPORT_BYTES
+from .j1979_freeze_catalogue import build_freeze_projection, read_freeze_catalogue
 from .recovery_bundle import _regular, _json
 from .recovery_history import _compare_history_value
 
@@ -124,7 +125,14 @@ def main(argv=None):
     local.add_argument("--projection", type=Path, required=True)
     native = commands.add_parser("project-native-live", help="Project original CL/1 capture")
     native_verify = commands.add_parser("verify-native-projection", help="Verify native CL/1 projection")
-    for command in (native, native_verify):
+    freeze_inventory = commands.add_parser("inspect-freeze-catalogue")
+    common(freeze_inventory)
+    freeze_inventory.add_argument("--output", type=Path, required=True)
+    freeze = commands.add_parser("project-native-freeze")
+    freeze_verify = commands.add_parser("verify-native-freeze-projection")
+    freeze.add_argument("--output", type=Path, required=True)
+    freeze_verify.add_argument("--projection", type=Path, required=True)
+    for command in (native, native_verify, freeze, freeze_verify):
         common(command)
         command.add_argument("--capture", type=Path, required=True)
         command.add_argument("--vin", required=True)
@@ -133,9 +141,10 @@ def main(argv=None):
     args = parser.parse_args(argv)
     try:
         digest(args.reference_sha256)
-        if args.command == "inspect-catalogue":
-            catalogue, sha = read_catalogue(args.catalogue, args.reference, args.reference_sha256)
-            report = {"schema": "camarodiag-j1979-catalogue-inspection-v1",
+        if args.command in ("inspect-catalogue", "inspect-freeze-catalogue"):
+            reader = read_freeze_catalogue if args.command == "inspect-freeze-catalogue" else read_catalogue
+            catalogue, sha = reader(args.catalogue, args.reference, args.reference_sha256)
+            report = {"schema": ("camarodiag-j1979-freeze-catalogue-inspection-v1" if args.command == "inspect-freeze-catalogue" else "camarodiag-j1979-catalogue-inspection-v1"),
                       "edition": catalogue.edition, "reference_name": catalogue.reference_name,
                       "reference_sha256": catalogue.reference_sha256,
                       "catalogue_sha256": sha, "definitions": catalogue.inventory(),
@@ -147,10 +156,13 @@ def main(argv=None):
             write_new(args.output, build_projection(args))
         elif args.command == "project-native-live":
             write_new(args.output, build_native_projection(args))
+        elif args.command == "project-native-freeze":
+            write_new(args.output, build_freeze_projection(args))
         else:
             raw, stamp = _regular(args.projection, MAX_PROJECTION)
             actual = _json(raw)
-            expected = (build_native_projection(args) if args.command == "verify-native-projection" else
+            expected = (build_freeze_projection(args) if args.command == "verify-native-freeze-projection" else
+                        build_native_projection(args) if args.command == "verify-native-projection" else
                         build_projection(args, local=args.command == "verify-local-projection"))
             _compare_history_value(actual, expected, "catalogue projection")
             again, final = _regular(args.projection, MAX_PROJECTION)
