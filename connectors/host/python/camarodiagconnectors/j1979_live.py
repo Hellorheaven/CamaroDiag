@@ -12,6 +12,7 @@ import re
 import time
 
 from .j1979_campaign_evidence import decode_observation
+from .j1979_multi_signal import width as multi_width, decode_response as multi_decode
 
 MAX_PIDS = 32
 MAX_CYCLES = 1000
@@ -23,11 +24,17 @@ MAX_BUDGET = 600.0
 def numeric_pid(pid):
     if not isinstance(pid, int) or isinstance(pid, bool) or not 1 <= pid <= 255 or pid % 32 == 0:
         return False
+    if multi_width(pid) is not None:
+        return True
     for width in (1, 2, 4):
         evidence = decode_observation(bytes((1,pid)), bytes((0x41,pid))+bytes(width))
         if evidence and evidence.get("measurement") is not None:
             return True
     return False
+
+
+def legacy_numeric_pid(pid):
+    return numeric_pid(pid) and (multi_width(pid) or 0) <= 5
 
 
 @dataclass(frozen=True)
@@ -91,6 +98,32 @@ class _Accumulator:
                 "last_verified_value":self.last,"last_verified_elapsed_ms":self.last_elapsed_ms}
 
 
+class _ChannelAccumulator:
+    """Keep separate online statistics by PID and stable signal identity."""
+    def __init__(self, signal):
+        self.pid = signal["pid"]
+        self.name = signal["name"]
+        self.unit = signal["unit"]
+        self.count = 0
+        self.minimum = self.maximum = self.mean = self.last = self.last_time = None
+
+    def add(self, signal, elapsed):
+        value = signal["number"]
+        if not math.isfinite(value) or signal["unit"] != self.unit:
+            raise ValueError("Invalid multi-channel sample")
+        self.count += 1
+        self.minimum = value if self.minimum is None else min(self.minimum, value)
+        self.maximum = value if self.maximum is None else max(self.maximum, value)
+        self.mean = value if self.mean is None else self.mean + (value-self.mean)/self.count
+        self.last, self.last_time = value, elapsed
+
+    def report(self, attempts):
+        return {"pid":self.pid,"name":self.name,"unit":self.unit,"count":self.count,
+                "attempted":attempts,"missing":attempts-self.count,
+                "minimum":self.minimum,"maximum":self.maximum,"mean":self.mean,
+                "last_verified_value":self.last,"last_verified_elapsed_ms":self.last_time}
+
+
 def record(exchange, plan: Plan, *, clock=time.monotonic, sleep=time.sleep,
            require_current=lambda:None, on_observation=lambda _:None,
            request_timeout=lambda _:2.5):
@@ -105,6 +138,7 @@ def record(exchange, plan: Plan, *, clock=time.monotonic, sleep=time.sleep,
     admission=[]
     rows=[]
     stats={pid:_Accumulator(pid) for pid in plan.pids}
+    channels={}
     pages=[]
     advertised=set()
     observed=None
@@ -137,7 +171,7 @@ def record(exchange, plan: Plan, *, clock=time.monotonic, sleep=time.sleep,
         row={"phase":phase,"cycle":cycle,"pid":pid,"request_hex":request.hex().upper(),
              "response_hex":None,"started_elapsed_ms":max(0,round((began-started)*1000)),
              "elapsed_ms":None,"duration_ms":None,"status":"NOT_TESTED","detail":None,
-             "measurement":None,"application_evidence":None}
+             "measurement":None,"application_evidence":None,"multi_signals":None}
         try:
             allowed_timeout=request_timeout(request)
             if not math.isfinite(allowed_timeout) or not 0<allowed_timeout<=30:
@@ -162,7 +196,14 @@ def record(exchange, plan: Plan, *, clock=time.monotonic, sleep=time.sleep,
                     row["status"]=evidence["shape"]
                     if evidence["shape"]=="NEGATIVE":
                         row["detail"]=f'NRC_{evidence["negative_response_code"]:02X}'
-                    if phase=="SAMPLE" and evidence["shape"]=="PASSED":
+                    if phase=="SAMPLE" and evidence["shape"] in ("RAW","PASSED") and multi_width(pid) is not None:
+                        signals=multi_decode(request,raw)
+                        if signals is None:
+                            stop="INVALID_MEASUREMENT"
+                            row.update(status="FAILED",detail=stop,application_evidence=None)
+                        else:
+                            row["multi_signals"]=signals
+                    elif phase=="SAMPLE" and evidence["shape"]=="PASSED":
                         value=evidence.get("measurement")
                         if value is None or value["pid"]!=pid or value["mode"]!=1:
                             stop="INVALID_MEASUREMENT"
@@ -185,6 +226,11 @@ def record(exchange, plan: Plan, *, clock=time.monotonic, sleep=time.sleep,
         (rows if phase=="SAMPLE" else admission).append(row)
         if phase=="SAMPLE":
             stats[pid].append(row)
+            for signal in row["multi_signals"] or ():
+                key=(pid,signal["name"])
+                if key not in channels:
+                    channels[key]=_ChannelAccumulator(signal)
+                channels[key].add(signal,row["elapsed_ms"])
             on_observation(dict(row))
         return row
 
@@ -259,7 +305,7 @@ def record(exchange, plan: Plan, *, clock=time.monotonic, sleep=time.sleep,
                 next_start=max(actual_start+plan.interval,clock())
         if stop is None and completed_cycles==plan.cycles:
             identity("FINAL_VIN")
-        if stop is None and not any(row["status"]=="PASSED" for row in rows):
+        if stop is None and not any(row["measurement"] is not None or row["multi_signals"] for row in rows):
             stop="NO_VERIFIED_MEASUREMENT"
     except KeyboardInterrupt:
         stop="CANCELLED"
@@ -275,6 +321,7 @@ def record(exchange, plan: Plan, *, clock=time.monotonic, sleep=time.sleep,
             "interval_ms":round(plan.interval*1000),"budget_ms":round(plan.budget*1000),
             "duration_ms":elapsed(),"admission":admission,"observations":rows,
             "summary":[stats[pid].report() for pid in plan.pids],
+            "multi_signal_summary":[channels[k].report(sum(stats[k[0]].counts.values())) for k in sorted(channels)],
             "completed":stop is None and completed_cycles==plan.cycles,
             "stop_reason":stop,"cancelled":stop=="CANCELLED",
             "physical_vehicle_verified":False,"whole_vehicle_coverage_verified":False,
@@ -283,10 +330,14 @@ def record(exchange, plan: Plan, *, clock=time.monotonic, sleep=time.sleep,
 
 def csv_rows(report):
     """Stable long-form CSV; empty fields represent missing values, never zero."""
-    yield ("cycle","pid_hex","started_elapsed_ms","elapsed_ms","duration_ms","status",
-           "value","unit","request_hex","response_hex","detail")
+    multi=any(multi_width(pid) is not None for pid in report.get("selected_pids",()))
+    header=("cycle","pid_hex","started_elapsed_ms","elapsed_ms","duration_ms","status",
+            "value","unit","request_hex","response_hex","detail")
+    yield header+("signal_name","raw_encoded") if multi else header
     for row in report["observations"]:
-        value=row.get("measurement") or {}
-        yield (row["cycle"],f'{row["pid"]:02X}',row["started_elapsed_ms"],row["elapsed_ms"],
-               row["duration_ms"],row["status"],value.get("number"),value.get("unit"),
-               row["request_hex"],row["response_hex"],row["detail"])
+        values=row.get("multi_signals") or [row.get("measurement") or {}]
+        for value in values:
+            fields=(row["cycle"],f'{row["pid"]:02X}',row["started_elapsed_ms"],row["elapsed_ms"],
+                row["duration_ms"],row["status"],value.get("number"),value.get("unit"),
+                row["request_hex"],row["response_hex"],row["detail"])
+            yield fields+(value.get("name"),value.get("raw_encoded")) if multi else fields
