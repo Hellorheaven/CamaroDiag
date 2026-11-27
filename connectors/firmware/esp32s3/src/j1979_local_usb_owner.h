@@ -51,7 +51,7 @@ class J1979LocalUsbOwner final:public J1979UsbAuthSession::Security,
     return board_.randomNonce(data,n)&&localApproval(profile_)&&board_.snapshot(profile_).entropyReady;
   }
   bool hmac(const uint8_t* data,size_t n,uint8_t* tag)override{
-    return data&&tag&&n==J1979UsbAuthSession::TranscriptSize&&localApproval(profile_)&&
+    return data&&tag&&n==(profile_.freeze?J1979FreezeUsbAuthSession::TranscriptSize:J1979UsbAuthSession::TranscriptSize)&&localApproval(profile_)&&
       board_.hmac(initial_.credential,data,n,tag)&&localApproval(profile_);
   }
   uint32_t monotonicMs()override{return board_.monotonicMs();}
@@ -109,7 +109,8 @@ class J1979LocalUsbOwner final:public J1979UsbAuthSession::Security,
  private:
   bool matches(const Profile& p)const{
     return p.tx==profile_.tx&&p.rx==profile_.rx&&p.extended==profile_.extended&&
-      p.budgetMs==profile_.budgetMs;
+      p.budgetMs==profile_.budgetMs&&p.freeze==profile_.freeze&&
+      (!p.freeze||p.freezeScope.same(profile_.freezeScope));
   }
   bool same(const Snapshot& s)const{
     return initial_.connection&&initial_.credential&&initial_.approval&&
