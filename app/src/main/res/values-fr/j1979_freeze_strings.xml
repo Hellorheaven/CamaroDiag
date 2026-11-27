@@ -22,4 +22,5 @@
     <string name="j1979_freeze_scope">Données enregistrées uniquement. Trames OEM supplémentaires brutes ; aucune validation physique.</string>
     <string name="j1979_freeze_native_title">Trames figées USB natif (CU/2)</string>
     <string name="j1979_freeze_native_verified">Capture native vérifiée par rejeu</string>
+    <string name="j1979_legacy_freeze_confirm">Je confirme que les requêtes fonctionnelles legacy peuvent atteindre plusieurs calculateurs ; seules les réponses sélectionnées sont retenues, VIN %1$s.</string>
 </resources>
