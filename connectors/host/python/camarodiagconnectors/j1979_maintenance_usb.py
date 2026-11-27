@@ -110,7 +110,7 @@ def capture(port, scope, key, output, *, clock=time.monotonic, nonce=None, curre
         proof_attempted = True
         send(answer,auth_deadline)
         proof_sent = True
-        deadline = clock()+scope.budget_ms/1000+20
+        deadline = clock()+scope.budget_ms/1000+40
         length,envelope_recovery = result_header(receive(RESULT_SIZE,deadline))
         receive(length,deadline,persist=True)
         ensure(deadline)
