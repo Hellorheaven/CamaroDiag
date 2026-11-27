@@ -736,6 +736,7 @@ fun CamaroDiagApp(
                         nativeUsbEnabled = adapter.tier == AdapterTier.DISCONNECTED && !calibrationWorkspace.isJ2534BridgeConnected,
                         onRunNativeUsb = viewModel::runNativeUsbFunctionalTest,
                         onRunNativeFreeze = viewModel::runNativeFreezeFunctionalTest,
+                        onRunNativeMaintenance = viewModel::runNativeMaintenanceFunctionalTest,
                         onRunNativeLive = viewModel::runNativeLiveFunctionalTest,
                         onRunAll = { viewModel.runFunctionalTests() },
                         onRunProtocol = { protocol, target -> viewModel.runFunctionalTests(protocol, target) },
