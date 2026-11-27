@@ -1,5 +1,6 @@
 #define _POSIX_C_SOURCE 200809L
 #include "j1979_can.h"
+#include "j1979_native_c.h"
 #include <ctype.h>
 #include <errno.h>
 #include <limits.h>
@@ -16,27 +17,13 @@ static uint64_t now_ms(const j1979_can_plan *p) {
     return p->clock ? p->clock(p->context) : monotonic_ms();
 }
 bool j1979_can_physical_pair(uint32_t tx, uint32_t rx) {
-    if (tx >= 0x7e0u && tx <= 0x7e7u) return rx == tx + 8u;
-    if (tx > 0x1fffffffu || (tx & ~0xff00u) != 0x18da00f1u) return false;
-    unsigned ecu = (tx >> 8) & 255u;
-    return ecu != 0xf1u && ecu != 0xfeu && ecu != 0xffu &&
-        rx == (0x18daf100u | ecu);
+    return cd_j1979_native_physical_pair(tx,rx,tx>0x7ffu);
 }
 bool j1979_can_valid_vin(const char *vin) {
-    if (!vin || strlen(vin) != 17) return false;
-    for (size_t i = 0; i < 17; ++i) {
-        char c = vin[i];
-        if (!((c >= 'A' && c <= 'Z' && c != 'I' && c != 'O' && c != 'Q') ||
-            (c >= '0' && c <= '9'))) return false;
-    }
-    return true;
+    return vin && cd_j1979_native_vin(vin,strlen(vin));
 }
-bool j1979_can_allowed_read(const uint8_t *r, size_t n) {
-    if (!r) return false;
-    if (n == 2 && (r[0] == 1 || r[0] == 6 || r[0] == 9)) return true;
-    if (n == 3 && r[0] == 2 && r[2] == 0) return true;
-    if (n == 2 && r[0] == 8 && r[1] % 32 == 0) return true;
-    return n == 1 && (r[0] == 3 || r[0] == 7 || r[0] == 10);
+bool j1979_can_allowed_read(const uint8_t *request,size_t count) {
+    return cd_j1979_native_read_only(request,count);
 }
 static void stop(j1979_can_result *r, const char *reason) {
     if (!r->stop_reason[0]) {
@@ -440,14 +427,10 @@ bool j1979_can_write_json(FILE *f, const j1979_can_plan *p,
             (s->request[0]==3 || s->request[0]==7 || s->request[0]==10) &&
             !strcmp(s->status,"PASSED") &&
             s->response && valid_dtc(s->response,s->response_size)) {
-            static const char letters[]="PCBU";
-            static const char digits[]="0123456789ABCDEF";
             for (size_t j=2;j<s->response_size;j+=2) {
-                uint8_t first=s->response[j],second=s->response[j+1];
-                char code[6]={letters[first>>6],
-                    digits[(first>>4)&3],digits[first&15],
-                    digits[second>>4],digits[second&15],0};
-                if ((j!=2 && fputc(',',f)==EOF) || !quoted(f,code))
+                char code[6]={0};
+                if (!cd_j1979_native_dtc_code(s->response+j,code) ||
+                    (j!=2 && fputc(',',f)==EOF) || !quoted(f,code))
                     return false;
             }
         }
