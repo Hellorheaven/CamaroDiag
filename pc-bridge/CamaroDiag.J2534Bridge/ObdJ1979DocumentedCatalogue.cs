@@ -207,7 +207,7 @@ internal sealed class ObdJ1979DocumentedCatalogue
         }
         var scale=Fraction(node.GetProperty("scale"));var offset=Fraction(node.GetProperty("offset"));
         Rational? min=null,max=null;
-        if(node.TryGetProperty("range",out var limits))
+        if(node.TryGetProperty("range",out var limits)&&limits.ValueKind!=JsonValueKind.Null)
         {
             var values=Array(limits,2,2);min=Fraction(values[0]);max=Fraction(values[1]);
             Check(min.Compare(max)<=0,"Inverted engineering range");
