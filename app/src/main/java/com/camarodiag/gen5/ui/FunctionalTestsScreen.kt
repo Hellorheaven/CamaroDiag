@@ -232,7 +232,7 @@ fun FunctionalTestsScreen(
                 if (selected == FunctionalProtocol.J1979) {
                     J1979NetworkPanel(liveProtocol?.takeIf { it in 6..9 },state,vehicle,connectionGeneration,onRunNetwork)
                     J1979LivePanel(liveProtocol?.takeIf { it in 6..9 },state,vehicle,connectionGeneration,onRunLive,onExportLiveCsv)
-                    J1979FreezePanel(liveProtocol?.takeIf { it in 6..9 },state,vehicle,connectionGeneration,onRunFreeze)
+                    J1979FreezePanel(liveProtocol?.takeIf { it in 1..9 },state,vehicle,connectionGeneration,onRunFreeze)
                     NativeUsbFunctionalPanel(nativeUsbEnabled && !state.running, connectionGeneration, vehicle, onRunNativeUsb,onRunFreeze=onRunNativeFreeze)
                     Text(stringResource(R.string.functional_evap_scope), style = MaterialTheme.typography.bodySmall)
                     Row(verticalAlignment = Alignment.CenterVertically) {
