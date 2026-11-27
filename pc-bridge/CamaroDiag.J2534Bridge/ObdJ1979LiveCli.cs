@@ -6,26 +6,36 @@ namespace CamaroDiag.J2534Bridge;
 internal static class ObdJ1979LiveCli
 {
     internal const string Command="--j1979-live";
+    internal const string LegacyCommand="--j1979-legacy-live";
     internal sealed record Options(int AdapterIndex,int Profile,int Tx,int Rx,ObdJ1979LiveRecorder.Plan Plan,
-        string Output,string? Csv,bool Quiet);
+        string Output,string? Csv,bool Quiet,ObdLegacyJ2534Transport.Variant? LegacyVariant=null,
+        byte? LegacySource=null);
     internal sealed record Report(string Schema,string Protocol,string Version,string Adapter,int Profile,
-        string TxCanId,string RxCanId,DateTimeOffset StartedAtUtc,DateTimeOffset FinishedAtUtc,
-        ObdJ1979LiveRecorder.Result? Result,string? Error)
+        string? TxCanId,string? RxCanId,DateTimeOffset StartedAtUtc,DateTimeOffset FinishedAtUtc,
+        ObdJ1979LiveRecorder.Result? Result,string? Error,string? LegacyVariant=null,
+        string? SelectedResponseSource=null,string? InitializationEvidence=null,
+        IReadOnlyList<ObdJ1979LegacyLiveLink.Trace>? TransportExchanges=null)
     {
         public bool Completed=>Error is null&&Result is {Completed:true};
         public bool WholeVehicleCoverageVerified=>false;
         public bool PhysicalVehicleVerified=>false;
+        public bool PhysicallyAddressed=>LegacyVariant is null;
+        public string Scope=>PhysicallyAddressed?"PHYSICAL_SELECTED_ECU_LIVE":"FUNCTIONAL_SELECTED_RESPONSE_LIVE";
+        public string ResponseHexRepresentation=>PhysicallyAddressed?"APPLICATION_PAYLOAD":"NORMALIZED_APPLICATION_PAYLOAD";
     }
     internal static Options Parse(string[] args)
     {
-        if(args.Length<2||!args[0].Equals(Command,StringComparison.OrdinalIgnoreCase))throw new ArgumentException("Expected live recorder command.");
+        if(args.Length<2||!args[0].Equals(Command,StringComparison.OrdinalIgnoreCase)&&
+            !args[0].Equals(LegacyCommand,StringComparison.OrdinalIgnoreCase))throw new ArgumentException("Expected live recorder command.");
+        bool legacy=args[0].Equals(LegacyCommand,StringComparison.OrdinalIgnoreCase);
         var values=new Dictionary<string,string>(StringComparer.Ordinal);
-        var pids=new List<byte>();bool confirm=false,quiet=false;
+        var pids=new List<byte>();bool confirm=false,quiet=false,functional=false;
         for(int i=1;i<args.Length;i++){
             string key=args[i];
-            if(key=="--confirm-physical-channel"&&!confirm){confirm=true;continue;}
+            if(key==(legacy?"--confirm-legacy-profile":"--confirm-physical-channel")&&!confirm){confirm=true;continue;}
+            if(legacy&&key=="--confirm-functional-scope"&&!functional){functional=true;continue;}
             if(key=="--quiet"&&!quiet){quiet=true;continue;}
-            if(key is not ("--adapter-index" or "--protocol" or "--tx" or "--rx" or "--vin" or "--pid" or
+            if(key is not ("--adapter-index" or "--protocol" or "--variant" or "--source" or "--tx" or "--rx" or "--vin" or "--pid" or
                 "--cycles" or "--interval-ms" or "--budget-seconds" or "--output" or "--csv")||
                 i+1>=args.Length||args[i+1].StartsWith("--",StringComparison.Ordinal))throw new ArgumentException("Unexpected option.");
             string value=args[++i];
@@ -45,36 +55,63 @@ internal static class ObdJ1979LiveCli
                 !int.TryParse(text,NumberStyles.AllowHexSpecifier,CultureInfo.InvariantCulture,out int id)||id<0)
                 throw new ArgumentException("Expected physical CAN ID.");return id;
         }
-        int index=Number("--adapter-index"),profile=Number("--protocol"),tx=Id("--tx"),rx=Id("--rx");
+        int index=Number("--adapter-index");
+        int profile=0,tx=0,rx=0;
+        ObdLegacyJ2534Transport.Variant? variant=null;
+        byte? source=null;
+        if(legacy){
+            if(!functional||values.ContainsKey("--protocol")||values.ContainsKey("--tx")||values.ContainsKey("--rx"))
+                throw new ArgumentException("Explicit legacy functional scope required.");
+            var number=Number("--variant");
+            if(number is <1 or >5||!values.TryGetValue("--source",out var sourceText)||sourceText.Length!=2||
+                !byte.TryParse(sourceText,NumberStyles.AllowHexSpecifier,CultureInfo.InvariantCulture,out var selected)||
+                selected is 0 or 0xF1 or 0xFF)throw new ArgumentException("Documented legacy variant and response source required.");
+            variant=(ObdLegacyJ2534Transport.Variant)number;source=selected;profile=number;
+        }else{
+            if(values.ContainsKey("--variant")||values.ContainsKey("--source"))throw new ArgumentException("Expected physical CAN channel.");
+            profile=Number("--protocol");tx=Id("--tx");rx=Id("--rx");
+        }
         int budget=Number("--budget-seconds",180);
         var output=values.GetValueOrDefault("--output");var csv=values.GetValueOrDefault("--csv");
-        if(!confirm||index<0||!StandardObdPhysicalPolicy.SupportsChannel(tx,rx,profile)||
+        if(!confirm||index<0||!legacy&&!StandardObdPhysicalPolicy.SupportsChannel(tx,rx,profile)||
             budget is <1 or >600||string.IsNullOrWhiteSpace(output)||
             csv is not null&&(string.IsNullOrWhiteSpace(csv)||Path.GetFullPath(output).Equals(Path.GetFullPath(csv),StringComparison.OrdinalIgnoreCase)))
             throw new ArgumentException("Explicit physical channel, VIN, confirmations and distinct new files required.");
         var plan=new ObdJ1979LiveRecorder.Plan(pids.ToArray(),values.GetValueOrDefault("--vin")??"",
             Number("--cycles",30),Number("--interval-ms",1000),budget*1000).Validate();
-        return new(index,profile,tx,rx,plan,output,csv,quiet);
+        return new(index,profile,tx,rx,plan,output,csv,quiet,variant,source);
     }
     internal static Report Execute(J2534Adapter adapter,Options options,Action requireActive,
         Action<ObdJ1979LiveRecorder.Observation>? onSample=null)
     {
         var started=DateTimeOffset.UtcNow;
         ObdJ1979LiveRecorder.Result? result=null;
-        string? error=null;
+        string? error=null,initialization=null;
+        ObdJ1979LegacyLiveLink? legacyLink=null;
         try{
             requireActive();
-            using var device=new J2534Device(adapter);
-            device.Open(options.Tx,options.Rx,ObdJ1979CanNetwork.Extended(options.Profile),options.Profile);
-            requireActive();
-            result=ObdJ1979LiveRecorder.Run(device.Exchange,options.Plan,requireActive,onSample);
+            if(options.LegacyVariant is {} variant&&options.LegacySource is byte source){
+                using var session=ObdLegacyJ2534Transport.Open(adapter,variant,source,requireActive);
+                initialization=session.InitEvidence;
+                legacyLink=new ObdJ1979LegacyLiveLink(source,session.Read,requireActive);
+                result=ObdJ1979LiveRecorder.Run(legacyLink.Query,options.Plan,requireActive,onSample,
+                    requestTimeout:req=>req[0]==9?20000:4000);
+            }else{
+                using var device=new J2534Device(adapter);
+                device.Open(options.Tx,options.Rx,ObdJ1979CanNetwork.Extended(options.Profile),options.Profile);
+                requireActive();
+                result=ObdJ1979LiveRecorder.Run(device.Exchange,options.Plan,requireActive,onSample);
+            }
         }catch(OperationCanceledException){error="CANCELLED";}
         catch(Exception e) when(e is IOException or InvalidDataException or ArgumentException or InvalidOperationException or
             TimeoutException or DllNotFoundException or EntryPointNotFoundException or BadImageFormatException or
             System.Runtime.InteropServices.SEHException){error=e.GetType().Name;}
         if(error is not null&&result is {Completed:true})result=result with{Completed=false,StopReason=error};
-        return new("camarodiag-j1979-live-v1","SAE-J1979",typeof(ObdJ1979LiveCli).Assembly.GetName().Version?.ToString()??"",
-            adapter.DisplayName,options.Profile,options.Tx.ToString("X"),options.Rx.ToString("X"),started,DateTimeOffset.UtcNow,result,error);
+        return new(options.LegacyVariant.HasValue?"camarodiag-j1979-legacy-live-v1":"camarodiag-j1979-live-v1",
+            "SAE-J1979",typeof(ObdJ1979LiveCli).Assembly.GetName().Version?.ToString()??"",
+            adapter.DisplayName,options.Profile,options.LegacyVariant.HasValue?null:options.Tx.ToString("X"),
+            options.LegacyVariant.HasValue?null:options.Rx.ToString("X"),started,DateTimeOffset.UtcNow,result,error,
+            options.LegacyVariant?.ToString(),options.LegacySource?.ToString("X2"),initialization,legacyLink?.Traces);
     }
     private static string Encode(Report report)=>JsonSerializer.Serialize(report,new JsonSerializerOptions{
         WriteIndented=true,PropertyNamingPolicy=JsonNamingPolicy.CamelCase});

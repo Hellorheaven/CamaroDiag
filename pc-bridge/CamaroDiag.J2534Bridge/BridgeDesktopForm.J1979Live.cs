@@ -9,7 +9,14 @@ internal sealed partial class BridgeDesktopForm
 {
     private ObdJ1979LiveCli.Options? ChooseLiveOptions(){
         using var dialog=new Form{Text=J1979RecipeText("LiveRun"),StartPosition=FormStartPosition.CenterParent,
-            ClientSize=new Size(560,370),FormBorderStyle=FormBorderStyle.FixedDialog,MaximizeBox=false,MinimizeBox=false};
+            ClientSize=new Size(560,430),FormBorderStyle=FormBorderStyle.FixedDialog,MaximizeBox=false,MinimizeBox=false};
+        var routes=new ComboBox{DropDownStyle=ComboBoxStyle.DropDownList,Dock=DockStyle.Fill};
+        routes.Items.Add(J1979RecipeText("LivePhysicalCan"));
+        routes.Items.AddRange(new object[]{
+            "SAE J1850 PWM","SAE J1850 VPW","ISO 9141-2","ISO 14230-4 slow init","ISO 14230-4 fast init"
+        });
+        routes.SelectedIndex=0;
+        var source=new TextBox{MaxLength=2,CharacterCasing=CharacterCasing.Upper,Dock=DockStyle.Fill};
         var pids=new TextBox{Text="05,0C",Dock=DockStyle.Fill,CharacterCasing=CharacterCasing.Upper,MaxLength=95};
         var vin=new TextBox{Text=functionalEvapVin.Text.Trim(),MaxLength=17,Dock=DockStyle.Fill,CharacterCasing=CharacterCasing.Upper};
         var cycles=new NumericUpDown{Minimum=1,Maximum=1000,Value=30,Dock=DockStyle.Fill};
@@ -18,31 +25,43 @@ internal sealed partial class BridgeDesktopForm
         var confirm=new CheckBox{Text=J1979RecipeText("LiveConfirm"),AutoSize=true};
         var run=Button(J1979RecipeText("LiveRun"));
         var cancel=Button(J1979RecipeText("LegacyCancel"));cancel.DialogResult=DialogResult.Cancel;
-        var grid=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=2,RowCount=8,Padding=new Padding(12)};
+        var grid=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=2,RowCount=10,Padding=new Padding(12)};
         grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,42));grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,58));
-        foreach(var height in new[]{32,32,32,32,32,32,58,45})grid.RowStyles.Add(new RowStyle(SizeType.Absolute,height));
+        foreach(var height in new[]{32,32,32,32,32,32,32,32,58,45})grid.RowStyles.Add(new RowStyle(SizeType.Absolute,height));
         void Field(string key,Control control,int row){
             grid.Controls.Add(new Label{Text=J1979RecipeText(key),Dock=DockStyle.Fill},0,row);grid.Controls.Add(control,1,row);
         }
         var channel=new Label{Text=$"{requestId.Text.Trim()} → {responseId.Text.Trim()} · {protocol.SelectedItem}",Dock=DockStyle.Fill};
-        Field("LiveChannel",channel,0);Field("LivePids",pids,1);Field("LiveVin",vin,2);
-        Field("LiveCycles",cycles,3);Field("LiveInterval",interval,4);Field("LiveBudget",budget,5);
-        grid.Controls.Add(confirm,0,6);grid.SetColumnSpan(confirm,2);
+        Field("LiveRoute",routes,0);Field("LiveChannel",channel,1);Field("LegacySource",source,2);
+        Field("LivePids",pids,3);Field("LiveVin",vin,4);
+        Field("LiveCycles",cycles,5);Field("LiveInterval",interval,6);Field("LiveBudget",budget,7);
+        grid.Controls.Add(confirm,0,8);grid.SetColumnSpan(confirm,2);
         var buttons=new FlowLayoutPanel{Dock=DockStyle.Fill};buttons.Controls.Add(run);buttons.Controls.Add(cancel);
-        grid.Controls.Add(buttons,0,7);grid.SetColumnSpan(buttons,2);
+        grid.Controls.Add(buttons,0,9);grid.SetColumnSpan(buttons,2);
         ObdJ1979LiveCli.Options? Candidate(){
-            var args=new List<string>{ObdJ1979LiveCli.Command,"--adapter-index",adapter.SelectedIndex.ToString(CultureInfo.InvariantCulture),
-                "--protocol",protocol.SelectedItem?.ToString()??"","--tx",requestId.Text.Trim(),"--rx",responseId.Text.Trim(),
+            bool legacy=routes.SelectedIndex>0;
+            var args=new List<string>{legacy?ObdJ1979LiveCli.LegacyCommand:ObdJ1979LiveCli.Command,
+                "--adapter-index",adapter.SelectedIndex.ToString(CultureInfo.InvariantCulture),
                 "--vin",vin.Text,"--cycles",cycles.Value.ToString(CultureInfo.InvariantCulture),
                 "--interval-ms",interval.Value.ToString(CultureInfo.InvariantCulture),
-                "--budget-seconds",budget.Value.ToString(CultureInfo.InvariantCulture),"--confirm-physical-channel","--output","gui.json"};
+                "--budget-seconds",budget.Value.ToString(CultureInfo.InvariantCulture),"--output","gui.json"};
+            if(legacy)args.AddRange(["--variant",routes.SelectedIndex.ToString(CultureInfo.InvariantCulture),"--source",source.Text,
+                "--confirm-legacy-profile","--confirm-functional-scope"]);
+            else args.AddRange(["--protocol",protocol.SelectedItem?.ToString()??"","--tx",requestId.Text.Trim(),
+                "--rx",responseId.Text.Trim(),"--confirm-physical-channel"]);
             foreach(var pid in pids.Text.Split(',',StringSplitOptions.TrimEntries|StringSplitOptions.RemoveEmptyEntries)){
                 args.Add("--pid");args.Add(pid);
             }
             try{return ObdJ1979LiveCli.Parse(args.ToArray());}catch(ArgumentException){return null;}
         }
-        void Refresh()=>run.Enabled=confirm.Checked&&Candidate() is not null;
+        void Refresh(){
+            bool legacy=routes.SelectedIndex>0;
+            source.Enabled=legacy;channel.Enabled=!legacy;
+            confirm.Text=J1979RecipeText(legacy?"LiveLegacyConfirm":"LiveConfirm");
+            run.Enabled=confirm.Checked&&Candidate() is not null;
+        }
         void Changed(){confirm.Checked=false;Refresh();}
+        routes.SelectedIndexChanged+=(_,_)=>Changed();source.TextChanged+=(_,_)=>Changed();
         pids.TextChanged+=(_,_)=>Changed();vin.TextChanged+=(_,_)=>Changed();
         cycles.ValueChanged+=(_,_)=>Changed();interval.ValueChanged+=(_,_)=>Changed();budget.ValueChanged+=(_,_)=>Changed();
         confirm.CheckedChanged+=(_,_)=>Refresh();
@@ -103,7 +122,10 @@ internal sealed partial class BridgeDesktopForm
                             item.Minimum?.ToString("0.###")??"—",item.Maximum?.ToString("0.###")??"—",
                             item.Mean?.ToString("0.###")??"—",item.Unit??""));
             }
-            output.AppendLine(J1979RecipeText("LiveScope"));
+            if(report.LegacyVariant is not null){
+                output.AppendLine(report.LegacyVariant+" / "+report.SelectedResponseSource);
+                output.AppendLine(J1979RecipeText("LiveLegacyScope"));
+            }else output.AppendLine(J1979RecipeText("LiveScope"));
             functionalResults.Text=output.ToString();functionalExport.Enabled=true;
         }catch(OperationCanceledException){functionalResults.Text=J1979RecipeText("Cancelled");}
         catch(Exception e){functionalResults.Text=J1979RecipeText("Failed")+" "+e.GetType().Name;}
@@ -116,7 +138,7 @@ internal sealed partial class BridgeDesktopForm
     }
     private void ExportWindowsLive(ObdJ1979LiveCli.Report report){
         using var dialog=new SaveFileDialog{Filter=J1979RecipeText("JsonFilter")+"|CSV (*.csv)|*.csv",
-            FileName="CamaroDiag_J1979_Live.json",AddExtension=true,DefaultExt="json",OverwritePrompt=true};
+            FileName=report.LegacyVariant is null?"CamaroDiag_J1979_Live.json":"CamaroDiag_J1979_Legacy_Live.json",AddExtension=true,DefaultExt="json",OverwritePrompt=true};
         if(dialog.ShowDialog(this)!=DialogResult.OK||DateTimeOffset.UtcNow>=liveReportAuthorization||
             functionalAuthorizedUntil!=liveReportAuthorization||!ReferenceEquals(completedLive,report))return;
         try{ObdJ1979LiveCli.WriteNew(dialog.FileName,report,dialog.FilterIndex==2);}

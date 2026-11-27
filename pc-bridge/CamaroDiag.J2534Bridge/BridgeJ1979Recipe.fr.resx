@@ -136,4 +136,8 @@
   <data name="LiveCycleCount" xml:space="preserve"><value>Cycles : {0}/{1}</value></data>
   <data name="LiveSummary" xml:space="preserve"><value>min {0} · max {1} · moyenne {2} {3}</value></data>
   <data name="LiveScope" xml:space="preserve"><value>Lectures horodatées distinctes ; ni mesure simultanée ni mutation.</value></data>
+  <data name="LivePhysicalCan" xml:space="preserve"><value>CAN classique physique</value></data>
+  <data name="LiveRoute" xml:space="preserve"><value>Transport / variante</value></data>
+  <data name="LiveLegacyConfirm" xml:space="preserve"><value>Confirmer variante legacy, source et VIN documentés. Les requêtes sont fonctionnelles.</value></data>
+  <data name="LiveLegacyScope" xml:space="preserve"><value>Requêtes fonctionnelles ; filtrage de la source uniquement. Trames gérées par le pilote.</value></data>
 </root>

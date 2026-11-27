@@ -60,7 +60,8 @@ internal static class ObdJ1979LiveRecorder
     }
 
     internal static Result Run(Func<byte[],int,byte[]> exchange,Plan requested,Action requireActive,
-        Action<Observation>? onObservation=null,Func<long>? clock=null,Action<int>? delay=null)
+        Action<Observation>? onObservation=null,Func<long>? clock=null,Action<int>? delay=null,
+        Func<byte[],int>? requestTimeout=null)
     {
         var plan=requested.Validate();
         var watch=Stopwatch.StartNew();
@@ -95,7 +96,9 @@ internal static class ObdJ1979LiveRecorder
             ObdJ1979PidValues.Value? value=null;
             J1979CampaignSemantics.Observation? evidence=null;
             try{
-                raw=exchange(request,(int)Math.Min(2500,Math.Max(1,Remaining())));
+                var limit=requestTimeout?.Invoke(request)??2500;
+                if(limit is <100 or >30000)throw new ArgumentException("Invalid logical request deadline.");
+                raw=exchange(request,(int)Math.Min(limit,Math.Max(1,Remaining())));
                 requireActive();
                 if(Remaining()<=0){stop="BUDGET_EXHAUSTED";detail="LATE_RESPONSE";}
                 else{

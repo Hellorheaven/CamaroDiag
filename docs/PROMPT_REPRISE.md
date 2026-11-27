@@ -1,3 +1,7 @@
+## SAE J1979 — enregistrement legacy J2534 Windows (27/11/2026)
+
+- Les cinq variantes J2534 legacy sont accessibles depuis le même enregistreur privé Windows, sélection de la variante/source/VIN, confirmations distinctes de la portée fonctionnelle. Réassemblage VIN 0900/0901/0902 sur la source filtrée, traces du pilote distinctes de la réponse normalisée, budget logique partagé, cycles et statistiques réutilisés, CLI --j1979-legacy-live et JSON/CSV. Pas de prétention d'adressage physique ou de contrôle du checksum par l'application J2534 ; aucun Mode 04/08. Régressions écrites non exécutées, C6/J1979 ouverts.
+
 ## SAE J1979 — enregistreur legacy ELM hôte (27/11/2026)
 
 - Nouvelle recette continue sur les cinq variantes ELM, source documentée et VIN vérifié par cinq fragments avec PID00 et ATDPN à chaque contrôle d'identité. Moteur de cycles réutilisé avec budget par requête logique et conservation de toutes les trames brutes, distinction explicite entre réponse normalisée et transport legacy. CLI, JSON/CSV, documentation FR/EN, régressions écrites non exécutées. Aucun adressage physique revendiqué, aucune mutation. C6/J1979 ouverts.

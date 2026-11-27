@@ -144,3 +144,5 @@ Linux SocketCAN `camarodiagconnectors-j1979-live`, Windows J2534 `--j1979-live` 
 ### J1979 legacy — enregistrement continu / legacy live
 
 CLI hôte ELM `camarodiagconnectors-j1979-legacy-live` : cinq variantes fixes, sélection de la source de réponse, contrôle du VIN fragmenté et du protocole, acquisition des seuls PID numériques annoncés, rapport et CSV exclusifs. La source filtre la réponse, non la portée de transmission. Traces originales et représentation applicative normalisée distinctes. Aucun Mode 04/08. Les essais matériels sont à réaliser séparément.
+
+Windows J2534 local : bouton Enregistrement J1979, sélectionner CAN classique physique ou une des cinq variantes legacy. La CLI `--j1979-legacy-live` utilise `--variant`, `--source`, `--confirm-legacy-profile` et `--confirm-functional-scope` au lieu du canal CAN. Même moteur de cycles, rapport des trames gérées par le pilote et VIN fragmenté ; source filtrée, transmission fonctionnelle. / Same live recorder with explicit legacy variant and source, no physical-address claim.
