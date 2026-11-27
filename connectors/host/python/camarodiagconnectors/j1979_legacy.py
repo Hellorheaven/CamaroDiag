@@ -109,6 +109,33 @@ class LegacyElmSerial:
             raise ValueError("Unsupported legacy read")
         return self._command(command, timeout)
 
+    def run_freeze(self, source, plan, *, require_current=lambda: None):
+        if not self._ready or not self.headered:
+            raise ValueError("Dedicated headered legacy adapter required")
+        from .j1979_freeze import allowed_request
+        from .j1979_legacy_freeze import acquire
+        plan.validate()
+
+        def exchange(command, timeout):
+            require_current()
+            request = bytes.fromhex(command)
+            if (not self._ready or not 0 < timeout <= 4 or
+                    not (command in ("0100", "0900", "0901", "0902") or
+                         allowed_request(request, plan.frames) and len(request) == 3 and
+                         (request[1] % 32 == 0 or request[1] == 2 or
+                          not plan.pids or request[1] in plan.pids))):
+                raise ValueError("Request outside explicit legacy freeze scope")
+            return self._command(command, timeout)
+
+        def protocol_probe(timeout):
+            require_current()
+            if not self._ready or not 0 < timeout <= 2:
+                raise ValueError("Invalid fixed legacy protocol probe")
+            return self._command("ATDPN", timeout)
+
+        return acquire(exchange, protocol_probe, self.protocol, source, plan,
+                       require_current=require_current)
+
     def run_vehicle_mutation(self, operation, *, expected_vin, engine_source, documented_sources,
                              warning_acknowledged, confirmed_yes, save_baseline,
                              require_current=lambda: None):
