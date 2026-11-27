@@ -128,7 +128,7 @@ public final class J1979MaintenanceUsb {
                 link.checkNoBufferedInput();int timeout=remaining(start,5000,allowed);
                 attempted=true;link.write(answer,timeout);sent=true;
             }finally{Arrays.fill(answer,(byte)0);}
-            start=clock.getAsLong();int budget=profile.budgetMs+20000;
+            start=clock.getAsLong();int budget=profile.budgetMs+40000;
             byte[] envelope=read(RESULT_SIZE,start,budget,allowed,null,null);
             require(header(envelope,RESULT_SIZE,4)&&(envelope[4]==2||envelope[4]==3)&&
                 envelope[5]==0&&envelope[6]==0&&envelope[7]==0,"Invalid CU/4 result envelope");
