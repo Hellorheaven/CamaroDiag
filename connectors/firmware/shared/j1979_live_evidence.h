@@ -19,7 +19,7 @@ class J1979LiveEvidence final:public J1979LiveCampaign::Sink {
   using Writer=J1979CampaignEvidence::Writer;
   static constexpr size_t HeaderSize=8,TrailerSize=4;
   static constexpr size_t PlanSize=9+J1979LiveScope::WireSize;
-  static constexpr size_t ObservationSize=22,FinalSize=128;
+  static constexpr size_t ObservationSize=26,FinalSize=128;
   static constexpr size_t MaximumBody=ObservationSize+4095;
 
   J1979LiveEvidence(Writer& writer,const J1979LiveScope& scope)
@@ -53,7 +53,8 @@ class J1979LiveEvidence final:public J1979LiveCampaign::Sink {
     put16(body+4,e.cycle);body[6]=e.pid;
     put32(body+8,e.startedElapsed);put32(body+12,e.endedElapsed);
     put16(body+16,uint16_t(e.timeoutMs));put16(body+18,uint16_t(r.responseSize));
-    body[20]=req[0];body[21]=req[1];
+    put32(body+20,r.elapsedMs);
+    body[24]=req[0];body[25]=req[1];
     if(!emit(2,body,sizeof(body),r.response,r.responseSize))return false;
     ++observations_;lastEnd_=e.endedElapsed;return true;
   }
