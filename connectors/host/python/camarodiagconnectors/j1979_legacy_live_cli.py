@@ -12,7 +12,7 @@ import sys
 from . import __version__
 from .j1979_legacy import LegacyElmSerial,PROTOCOLS
 from .j1979_legacy_discovery import valid_source
-from .j1979_live import Plan,csv_rows
+from .j1979_live import Plan,csv_rows,legacy_numeric_pid
 from .j1979_live_cli import _open,_flush
 from .j1979_legacy_live import record_legacy
 
@@ -43,6 +43,8 @@ def parse(argv=None):
         if any(not re.fullmatch(r"[0-9A-Fa-f]{2}",x) for x in args.pid):
             raise ValueError("Expected two-digit numeric PID")
         plan=Plan(tuple(int(x,16) for x in args.pid),args.vin,args.cycles,args.interval,args.budget).validate()
+        if not all(legacy_numeric_pid(pid) for pid in plan.pids):
+            raise ValueError("Selected PID exceeds supported legacy application width")
         if args.csv is not None and args.csv.resolve()==args.output.resolve():
             raise ValueError("JSON and CSV paths must be distinct")
     except (ValueError,OSError) as exc:
@@ -60,7 +62,9 @@ def run(argv=None):
             def show(row):
                 if not args.quiet:
                     value=row["measurement"]
-                    text=f'{value["number"]:.3f} {value["unit"]}' if value else row["status"]
+                    signals=row.get("multi_signals")
+                    text=("; ".join(f'{v["name"]}={v["number"]:.3f} {v["unit"]}' for v in signals)
+                          if signals else f'{value["number"]:.3f} {value["unit"]}' if value else row["status"])
                     print(f'{row["elapsed_ms"]} ms {args.source:02X}/{row["pid"]:02X} {text}',flush=True)
             try:
                 with LegacyElmSerial(args.port,args.baud,args.protocol,headered=True) as link:
