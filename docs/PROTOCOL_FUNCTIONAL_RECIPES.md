@@ -148,3 +148,32 @@ CLI hôte ELM `camarodiagconnectors-j1979-legacy-live` : cinq variantes fixes, s
 Windows J2534 local : bouton Enregistrement J1979, sélectionner CAN classique physique ou une des cinq variantes legacy. La CLI `--j1979-legacy-live` utilise `--variant`, `--source`, `--confirm-legacy-profile` et `--confirm-functional-scope` au lieu du canal CAN. Même moteur de cycles, rapport des trames gérées par le pilote et VIN fragmenté ; source filtrée, transmission fonctionnelle. / Same live recorder with explicit legacy variant and source, no physical-address claim.
 
 Android : sélectionner la variante SAE J1979 legacy effectivement connectée dans les tests privés, ouvrir Enregistrement J1979 et renseigner source de réponse, PID numériques, VIN du véhicule sélectionné et durée. Le rapport conserve les en-têtes/checksums et fragments VIN d'origine. Réutilise le moteur de mesure, pas les en-têtes ISO-TP CAN. Export JSON/CSV. / Select the negotiated legacy variant and documented response source; no physical-address claim or mutation.
+
+
+### J1979 — relecture indépendante des preuves USB CJ/1 / independent USB evidence replay
+
+Conserver le fichier binaire CJ/1 et le JSON individuel exporté par Android, Windows ou l'hôte Python. Sur un ordinateur hors véhicule :
+
+```sh
+camarodiagconnectors-offline verify-j1979-capture \
+  --capture capture.cj --report campaign.json --vin 1G1FA1RXXR0123456 \
+  --output inspection.json
+```
+
+Remplacer le VIN d'exemple par celui du véhicule documenté ; l'option est facultative. Le vérificateur relit deux fois les fichiers bornés et recalcule les étapes, profils, inventaires, défauts, mesures, données figées, moniteurs, identifiants et résumé à partir des octets CJ/1. Le rapport conserve les deux SHA-256 et les différences. Une campagne interrompue ou un rapport négatif ne devient pas positif ; le code de sortie 2 signale une vérification non concluante ou négative. Le VIN indépendant ne prouve pas l'origine physique. Aucune communication véhicule ni authentification de la capture non signée ; ne pas transmettre publiquement les VIN et traces.
+
+Keep the original CJ/1 binary and individual host JSON. Run the same offline command, optionally with an independently documented VIN. It checks the profile, every recorded row and derived observation, service counters and summary. A partial/cancelled run cannot pass. The output is exclusive, contains hashes and mismatches, and does not authenticate the hardware, capture or vehicle.
+
+### C6 — historique des sauvegardes originales / original-sector snapshot history
+
+Conserver chaque instantané dans un répertoire distinct, avec le journal, son dossier `.blocks` et les métadonnées Windows `.meta.json` le cas échéant. Ne pas reconstruire ni modifier les journaux pour créer un historique. Fournir entre deux et huit instantanés dans l'ordre explicite du plus ancien au plus récent :
+
+```sh
+camarodiagconnectors-offline verify-recovery-history --platform windows \
+  --journal old/journal.jsonl --journal new/journal.jsonl \
+  --vin 1G1FA1RXXR0123456 --output history.json
+```
+
+Android : utiliser `--platform android --family E39 --controller ECM --firmware OS-A --vin VIN_DOCUMENTE` avec les journaux TSV correspondants ; remplacer toutes les valeurs d'exemple par les identifiants exacts du manifeste. Windows accepte aussi `--osid` pour comparer un OSID connu. Chaque jeu est réinspecté intégralement ; le journal doit s'étendre strictement octet pour octet, la cible et les enveloppes originales doivent rester identiques. Les duplications, retours arrière et bifurcations sont rejetés. Le dernier état enregistré n'est pas l'état actuel du calculateur. Le rapport n'autorise ni restauration ni écriture, même lorsqu'il établit une continuité locale. Le code de sortie 2 signale un historique non vérifié.
+
+Keep snapshots in separate folders with their original sector envelopes and Windows metadata if applicable. Select two to eight in explicit oldest-to-newest order. Every bundle is independently rechecked; strict journal extension and unchanged target/original envelopes are required. Duplicate, reverted or forked inputs are rejected. The latest recorded disposition is not the current ECU state; no hardware or restore authorization is inferred. The commands above have written regression cases; execution is deferred to the respective protocol/ chantier closure.
