@@ -15,6 +15,7 @@ from .j1979_campaign_evidence import decode_observation
 from .j1979_multi_signal import width as multi_width, decode_response as multi_decode
 from .j1979_status import width as status_width, decode_response as status_decode
 from .j1979_scaling_context import dependency, context_from_steps, config_data
+from .j1979_drive_cycle import TRIMS, trim_layout, live_signals as trim_signals
 
 MAX_PIDS = 32
 MAX_CYCLES = 1000
@@ -26,7 +27,7 @@ MAX_BUDGET = 600.0
 def numeric_pid(pid):
     if not isinstance(pid, int) or isinstance(pid, bool) or not 1 <= pid <= 255 or pid % 32 == 0:
         return False
-    if multi_width(pid) is not None:
+    if pid in TRIMS or multi_width(pid) is not None:
         return True
     for width in (1, 2, 4):
         evidence = decode_observation(bytes((1,pid)), bytes((0x41,pid))+bytes(width))
@@ -150,6 +151,8 @@ def record(exchange, plan: Plan, *, clock=time.monotonic, sleep=time.sleep,
     inventory_complete=False
     required_configs=sorted({dependency(pid) for pid in plan.pids if dependency(pid) is not None})
     scaling=None
+    needs_trim=any(pid in TRIMS for pid in plan.pids)
+    layout=None
 
     def elapsed():
         return max(0,round((clock()-started)*1000))
@@ -203,6 +206,15 @@ def record(exchange, plan: Plan, *, clock=time.monotonic, sleep=time.sleep,
                     if phase=="SCALING" and evidence["shape"] in ("RAW","PASSED") and config_data(request[1],raw[2:]) is None:
                         stop="INVALID_APPLICATION_RESPONSE"
                         row.update(status="FAILED",detail=stop,application_evidence=None)
+                    elif phase=="SAMPLE" and evidence["shape"] in ("RAW","PASSED") and pid in TRIMS:
+                        signals=trim_signals(request,raw,layout or trim_layout(admission))
+                        if signals is None:
+                            stop="INVALID_MEASUREMENT"
+                            row.update(status="FAILED",detail=stop,application_evidence=None)
+                        else:
+                            row["multi_signals"]=signals
+                            if len(signals)<len(raw)-2:
+                                row["detail"]="UPPER_BANK_UNVERIFIED"
                     elif phase=="SAMPLE" and evidence["shape"] in ("RAW","PASSED") and multi_width(pid) is not None:
                         signals=multi_decode(request,raw)
                         if signals is None or (status_width(pid) is not None and status_decode(request,raw) is None):
@@ -311,6 +323,10 @@ def record(exchange, plan: Plan, *, clock=time.monotonic, sleep=time.sleep,
             scaling=context_from_steps(admission)
             if stop is None and any(scaling.get(config).state=="UNVERIFIED" for config in required_configs):
                 stop="SCALING_UNVERIFIED"
+        if stop is None and needs_trim:
+            if 0x1D in advertised:
+                query(bytes((1,0x1D)),"TRIM_LAYOUT")
+            layout=trim_layout(admission)
         if stop is None:
             next_start=clock()
             for cycle in range(1,plan.cycles+1):
@@ -350,6 +366,7 @@ def record(exchange, plan: Plan, *, clock=time.monotonic, sleep=time.sleep,
             "requested_cycles":plan.cycles,"completed_cycles":completed_cycles,
             "interval_ms":round(plan.interval*1000),"budget_ms":round(plan.budget*1000),
             "duration_ms":elapsed(),"admission":admission,"observations":rows,
+            "trim_layout":(layout or trim_layout(admission)) if needs_trim else None,
             "scaling_configuration":(scaling or context_from_steps(admission)).report() if required_configs else None,
             "summary":[stats[pid].report() for pid in plan.pids],
             "multi_signal_summary":[channels[k].report(sum(stats[k[0]].counts.values())) for k in sorted(channels)],
@@ -361,7 +378,7 @@ def record(exchange, plan: Plan, *, clock=time.monotonic, sleep=time.sleep,
 
 def csv_rows(report):
     """Stable long-form CSV; empty fields represent missing values, never zero."""
-    multi=any(multi_width(pid) is not None for pid in report.get("selected_pids",()))
+    multi=any(pid in TRIMS or multi_width(pid) is not None for pid in report.get("selected_pids",()))
     header=("cycle","pid_hex","started_elapsed_ms","elapsed_ms","duration_ms","status",
             "value","unit","request_hex","response_hex","detail")
     yield header+("signal_name","raw_encoded") if multi else header
