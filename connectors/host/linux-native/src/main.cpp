@@ -5,6 +5,7 @@
 #include "cl1_usb.h"
 #include "j1979_can_cli.h"
 #include "j1979_can_network.hpp"
+#include "j1979_elm_can.hpp"
 #include "j1979_catalogue_projection.hpp"
 #include "j1979_isotp.h"
 #include "j1979_cm1.hpp"
@@ -2162,11 +2163,134 @@ static int direct_maintenance_cli(int argc,char** argv){
     }catch(const std::exception& e){return error(e.what());}
 }
 
+struct ElmCanOptions{
+    cd::elmcan::Scope scope;
+    const char* port{},*vin{},*output{};
+    unsigned baud{38400},budget{180000},cycles{30},interval{1000};
+    std::vector<uint8_t> pids;
+    bool profile{},tx{},rx{},confirmed{},baud_set{},budget_set{},cycles_set{},interval_set{};
+};
+static bool parse_elm_can(int argc,char** argv,ElmCanOptions& o,bool live){
+    for(int i=2;i<argc;++i){
+        std::string_view flag=argv[i];
+        if(flag=="--confirm-physical-channel"){
+            if(o.confirmed)return false;
+            o.confirmed=true;continue;
+        }
+        if(i+1>=argc||!*argv[i+1]||argv[i+1][0]=='-')return false;
+        const char* value=argv[++i];
+        if(flag=="--tx"||flag=="--rx"){
+            auto& seen=flag=="--tx"?o.tx:o.rx;
+            auto& id=flag=="--tx"?o.scope.tx:o.scope.rx;
+            if(seen||!hex_uint32(value,&id))return false;
+            seen=true;
+        }else if(flag=="--pid"&&live){
+            uint32_t pid=0;
+            if(o.pids.size()>=J1979_LIVE_MAX_PIDS||!hex_uint32(value,&pid)||!pid||pid>255||pid%32==0||
+                std::find(o.pids.begin(),o.pids.end(),pid)!=o.pids.end())return false;
+            o.pids.push_back(static_cast<uint8_t>(pid));
+        }else if(flag=="--profile"||flag=="--baud"||flag=="--budget-ms"||
+                 (live&&(flag=="--cycles"||flag=="--interval-ms"))){
+            bool* seen=nullptr;unsigned* dest=nullptr;
+            if(flag=="--profile"){seen=&o.profile;dest=&o.scope.profile;}
+            else if(flag=="--baud"){seen=&o.baud_set;dest=&o.baud;}
+            else if(flag=="--budget-ms"){seen=&o.budget_set;dest=&o.budget;}
+            else if(flag=="--cycles"){seen=&o.cycles_set;dest=&o.cycles;}
+            else{seen=&o.interval_set;dest=&o.interval;}
+            uint32_t n=0;if(*seen||!decimal_uint32(value,&n))return false;
+            *seen=true;*dest=n;
+        }else{
+            const char** dest=nullptr;
+            if(flag=="--port")dest=&o.port;
+            else if(flag=="--vin")dest=&o.vin;
+            else if(flag=="--output")dest=&o.output;
+            if(!dest||*dest)return false;
+            *dest=value;
+        }
+    }
+    return o.profile&&o.tx&&o.rx&&o.confirmed&&o.port&&o.vin&&cf1_valid_vin(o.vin)&&o.output&&o.scope.valid()&&
+        o.budget>=1000&&o.budget<=600000&&(!live||(!o.pids.empty()&&o.cycles>=1&&o.cycles<=1000&&
+        o.interval>=100&&o.interval<=60000&&o.pids.size()*o.cycles<=J1979_LIVE_MAX_SAMPLES));
+}
+static int elm_can_cli(int argc,char** argv,bool live){
+    ElmCanOptions o;
+    if(!parse_elm_can(argc,argv,o,live))return error("Explicit fixed ELM CAN profile, port, physical ECU, VIN and output required");
+    if(!isatty(STDIN_FILENO))return error("Interactive local consent required");
+    fputs("Confirm dedicated ELM adapter, documented physical ECU and stationary vehicle. Read only. Type yes: ",stderr);
+    char answer[16]{};
+    if(!fgets(answer,sizeof(answer),stdin)||strcmp(answer,"yes\n"))return error("Consent refused");
+    struct File{int fd;~File(){if(fd>=0)close(fd);}} out{open(o.output,O_WRONLY|O_CREAT|O_EXCL|O_NOFOLLOW|O_CLOEXEC,0600)};
+    if(out.fd<0)return error("ELM CAN report destination unavailable");
+    legacy_cancelled=0;
+    struct Signals{
+        struct sigaction oldint{},oldterm{};
+        bool intr{},term{};
+        Signals(){
+            struct sigaction act{};act.sa_handler=legacy_signal;sigemptyset(&act.sa_mask);
+            intr=sigaction(SIGINT,&act,&oldint)==0;
+            term=intr&&sigaction(SIGTERM,&act,&oldterm)==0;
+        }
+        ~Signals(){if(term)sigaction(SIGTERM,&oldterm,nullptr);if(intr)sigaction(SIGINT,&oldint,nullptr);}
+    } signals;
+    std::unique_ptr<cd::legacy::Link> link;
+    std::unique_ptr<cd::elmcan::Session> session;
+    std::string native_report,reason;
+    bool completed=false;
+    try{
+        if(!signals.term)throw std::runtime_error("SIGNAL_HANDLERS_UNAVAILABLE");
+        const auto current=[](){return legacy_cancelled==0;};
+        link=cd::legacy::serial_link(o.port,o.baud,current);
+        session=std::make_unique<cd::elmcan::Session>(*link,o.scope,current);
+        session->configure();
+        j1979_can_plan plan{cd::elmcan::Session::exchange_callback,nullptr,cd::elmcan::Session::current_callback,
+            session.get(),o.scope.tx,o.scope.rx,o.budget,o.vin};
+        char* buffer=nullptr;size_t size=0;
+        FILE* stream=open_memstream(&buffer,&size);
+        if(!stream)throw std::runtime_error("REPORT_ALLOCATION_FAILED");
+        bool serialized=false;
+        if(live){
+            struct Result{j1979_live_result value{};~Result(){j1979_live_free(&value);}} r;
+            j1979_live_plan lp{};lp.channel=plan;lp.pid_count=static_cast<unsigned>(o.pids.size());
+            lp.cycles=o.cycles;lp.interval_ms=o.interval;std::copy(o.pids.begin(),o.pids.end(),lp.pids);
+            const int status=j1979_live_record(&lp,&r.value);
+            if(status==0&&r.value.steps){
+                serialized=j1979_live_write_json_transport(stream,&lp,&r.value,o.port,"ELM_SERIAL_CLASSIC_ISOTP");
+                completed=r.value.completed&&r.value.initial_vin_valid&&r.value.final_vin_valid;
+                if(!completed)reason=r.value.stop_reason;
+            }
+        }else{
+            struct Result{j1979_can_result value{};~Result(){j1979_can_result_free(&value);}} r;
+            const int status=j1979_can_scan(&plan,&r.value);
+            if(status==0&&r.value.steps){
+                serialized=j1979_can_write_json_transport(stream,&plan,&r.value,o.port,"ELM_SERIAL_CLASSIC_ISOTP");
+                completed=r.value.completed&&r.value.vin_valid&&r.value.final_vin_valid;
+                if(!completed)reason=r.value.stop_reason;
+            }
+        }
+        const bool closed=fclose(stream)==0;
+        std::unique_ptr<char,decltype(&std::free)> owned(buffer,&std::free);
+        if(!serialized||!closed||!buffer||!size||size>64*1024*1024){
+            completed=false;throw std::runtime_error("NATIVE_REPORT_UNAVAILABLE");
+        }
+        native_report.assign(buffer,size);
+    }catch(const std::exception& e){reason=e.what();completed=false;}
+    if(legacy_cancelled){completed=false;reason="CANCELLED";}
+    try{
+        const std::span<const cd::elmcan::Observation> evidence=session?
+            std::span<const cd::elmcan::Observation>(session->evidence()):std::span<const cd::elmcan::Observation>{};
+        const auto json=cd::elmcan::report(o.scope,o.vin,live?"LIVE":"SCAN",native_report,evidence,reason,completed);
+        if(!write_owned_file(out.fd,json.data(),json.size())||!sync_parent(o.output))return error("ELM CAN report persistence failed");
+        return completed?0:2;
+    }catch(const std::exception& e){return error(e.what());}
+}
+
 static void usage(FILE *stream) {
     fprintf(stream,
         "CamaroDiag Linux native C++20 — SAE J1979\n"
         "Usage:\n"
         "  camarodiag-native --j1979-can-discover --interface can0 --window-ms 1500 --output responders.json --confirm-functional-scope [--extended]\n"
+        "  camarodiag-native --j1979-elm-can --profile 6 --port /dev/ttyUSB0 --tx 7E0 --rx 7E8 --vin VIN --output scan.json --confirm-physical-channel\n"
+        "  camarodiag-native --j1979-elm-live --profile 6 --port /dev/ttyUSB0 --tx 7E0 --rx 7E8 --vin VIN --pid 0C --output live.json --confirm-physical-channel\n"
         "  camarodiag-native --j1979-can-network --interface can0 --rx 7E8 --rx 7E9 --vin VIN --output network.json --confirm-functional-scope [--extended]\n"
         "  camarodiag-native --j1979-can --interface can0 --tx 7E0 --rx 7E8 --output evidence.json --vin VIN --budget-ms 180000 --confirm-physical-channel\n"
         "  camarodiag-native --j1979-live-usb-native --port /dev/ttyACM0 --key-file key.bin --capture session.cl --output report.json --tx 7E0 --rx 7E8 --vin VIN --pid 0C --cycles 30 --interval-ms 1000 --budget-ms 180000 --confirm-physical-channel\n"
@@ -2248,6 +2372,8 @@ int main(int argc, char **argv) {
         return cm1_cli(argv[2],argv[3],argv[4],argv[5],true);
     if (argc >= 3 && !strcmp(argv[1], "--j1979-live-usb-native"))
         return capture_cl1_native(argc,argv);
+    if (argc>=3 && !strcmp(argv[1],"--j1979-elm-can"))return elm_can_cli(argc,argv,false);
+    if (argc>=3 && !strcmp(argv[1],"--j1979-elm-live"))return elm_can_cli(argc,argv,true);
     if (argc>=3 && !strcmp(argv[1],"--j1979-can-discover"))return network_cli(argc,argv,false);
     if (argc>=3 && !strcmp(argv[1],"--j1979-can-network"))return network_cli(argc,argv,true);
     if (argc >= 3 && (!strcmp(argv[1], "--j1979-can") ||

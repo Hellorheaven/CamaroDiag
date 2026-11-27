@@ -25,6 +25,8 @@ struct Observation{
     unsigned duration_ms{};
     int status{-1};
 };
+std::string report(const Scope&,std::string_view vin,std::string_view operation,std::string_view native_report,
+    std::span<const Observation>,std::string_view error,bool completed);
 class Session{
     legacy::Link& link_;
     Scope scope_;
