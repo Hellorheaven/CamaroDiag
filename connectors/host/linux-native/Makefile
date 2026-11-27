@@ -5,13 +5,13 @@ LDFLAGS ?=
 LDLIBS ?= -lcrypto
 STRICT = -std=c11 -Wall -Wextra -Wpedantic -Werror -D_FILE_OFFSET_BITS=64
 INCLUDES = -Iinclude
-SOURCES = src/cf1.c src/cf1_complete.c src/cf1_crypto.c src/cf1_usb.c src/j1979_can.c src/j1979_isotp.c src/j1979_live.c src/j1979_can_cli.c src/main.c
+SOURCES = src/cf1.c src/cf1_complete.c src/cf1_crypto.c src/cf1_usb.c src/cl1.c src/j1979_can.c src/j1979_isotp.c src/j1979_live.c src/j1979_can_cli.c src/main.c
 TARGET = camarodiag-native
 
 .PHONY: all clean test install deb
 all: $(TARGET)
 
-$(TARGET): $(SOURCES) include/cf1.h include/j1979_can.h include/j1979_isotp.h include/j1979_can_cli.h include/j1979_live.h
+$(TARGET): $(SOURCES) include/cf1.h include/cl1.h include/j1979_can.h include/j1979_isotp.h include/j1979_can_cli.h include/j1979_live.h
 	$(CC) $(CPPFLAGS) $(INCLUDES) $(CFLAGS) $(STRICT) $(SOURCES) $(LDFLAGS) $(LDLIBS) -o $@
 
 test: test-cf1 test-cu2 test-j1979-can test-j1979-isotp test-j1979-live

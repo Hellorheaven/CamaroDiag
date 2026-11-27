@@ -1,6 +1,7 @@
 #define _POSIX_C_SOURCE 200809L
 #include "cf1.h"
 #include "cf1_usb.h"
+#include "cl1.h"
 #include "j1979_can_cli.h"
 
 #include <errno.h>
@@ -620,12 +621,174 @@ static int capture_native(int argc, char **argv) {
     cf1_evidence_free(&evidence);
     return status;
 }
+
+/* Native CL/1 offline replay reuses the same secure input loading, source
+ * reread and exclusive 0600 publication as CF/1. It never contacts an ECU.
+ * Prefix observations cannot be promoted to a complete terminal receipt.
+ */
+static bool cl1_project(const input *capture, const char *vin, bool prefix,
+                        char **json_out, size_t *size_out, cl1_result *state) {
+    char reason[256] = {0};
+    memset(state, 0, sizeof(*state));
+    int replay = prefix ?
+        cl1_inspect_prefix(capture->bytes, capture->length, vin,
+                           state, reason, sizeof(reason)) :
+        cl1_inspect_complete(capture->bytes, capture->length, vin,
+                             state, reason, sizeof(reason));
+    if (replay != 0) {
+        fprintf(stderr, "CL/1 replay rejected: %s\n", reason);
+        return false;
+    }
+    json_writer w = { .capacity = 65536 };
+    w.bytes = calloc(1, w.capacity);
+    if (!w.bytes) return false;
+    write_literal(&w, "{\"schema\":");
+    write_string(&w, prefix ? "camarodiag-j1979-live-prefix-linux-c-v1" :
+                             "camarodiag-j1979-live-complete-linux-c-v1");
+    write_literal(&w, ",\"protocol\":\"SAE-J1979\","
+        "\"transport\":\"OFFLINE_CL1\",\"source\":");
+    write_string(&w, prefix ? "OFFLINE_CL1_PREFIX" : "OFFLINE_CL1");
+    write_literal(&w, ",\"physical_vehicle_verified\":false,"
+        "\"device_credential_authenticated\":false,"
+        "\"hardware_provenance_verified\":false,"
+        "\"permits_programming\":false,"
+        "\"raw_only\":true,\"profile\":{\"request_can_id\":");
+    write_can_hex(&w,state->plan.tx);
+    write_literal(&w,",\"response_can_id\":");
+    write_can_hex(&w,state->plan.rx);
+    write_literal(&w,",\"extended\":");
+    write_bool(&w,state->plan.extended);
+    write_literal(&w,",\"expected_vin\":");
+    write_string(&w,state->plan.vin);
+    write_literal(&w,",\"selected_pids\":");
+    write_array(&w,state->plan.pids,state->plan.pid_count);
+    write_literal(&w,",\"requested_cycles\":");
+    write_unsigned(&w,state->plan.cycles);
+    write_literal(&w,",\"interval_ms\":");
+    write_unsigned(&w,state->plan.interval_ms);
+    write_literal(&w,",\"budget_ms\":");
+    write_unsigned(&w,state->plan.budget_ms);
+    write_literal(&w,"},\"terminal_present\":");
+    write_bool(&w,state->terminal_present);
+    write_literal(&w,",\"prefix_integrity_verified\":");
+    write_bool(&w,state->prefix_integrity_verified);
+    write_literal(&w,",\"capture_integrity_verified\":");
+    write_bool(&w,state->capture_integrity_verified);
+    write_literal(&w,",\"execution_completed\":");
+    write_bool(&w,state->completed && !prefix);
+    write_literal(&w,",\"initial_vin_verified\":");
+    write_bool(&w,state->initial_vin);
+    write_literal(&w,",\"final_vin_verified\":");
+    write_bool(&w,state->final_vin);
+    write_literal(&w,",\"inventory_complete\":");
+    write_bool(&w,state->inventory_complete);
+    write_literal(&w,",\"complete_records\":");
+    write_unsigned(&w,state->records);
+    write_literal(&w,",\"observed_steps\":");
+    write_unsigned(&w,state->steps);
+    write_literal(&w,",\"completed_cycles\":");
+    write_unsigned(&w,state->completed_cycles);
+    write_literal(&w,",\"samples\":");
+    write_unsigned(&w,state->samples);
+    write_literal(&w,",\"raw_samples\":");
+    write_unsigned(&w,state->raw_samples);
+    write_literal(&w,",\"negative_samples\":");
+    write_unsigned(&w,state->negative_samples);
+    write_literal(&w,",\"timeout_samples\":");
+    write_unsigned(&w,state->timeout_samples);
+    write_literal(&w,",\"raw_bytes\":");
+    write_unsigned(&w,state->raw_bytes);
+    write_literal(&w,",\"recorded_duration_ms\":");
+    write_unsigned(&w,state->duration_ms);
+    write_literal(&w,",\"last_complete_offset\":");
+    write_unsigned(&w,state->last_complete_offset);
+    write_literal(&w,",\"discarded_tail_bytes\":");
+    write_unsigned(&w,state->discarded_tail_bytes);
+    write_literal(&w,",\"interruption\":");
+    if (prefix) write_string(&w,state->interruption);
+    else write_literal(&w,"null");
+    write_literal(&w,",\"stop_code\":");
+    write_unsigned(&w,state->stop);
+    write_literal(&w,",\"raw_per_selected_pid\":[");
+    for (unsigned i=0;i<state->plan.pid_count;++i) {
+        if (i) write_literal(&w,",");
+        write_unsigned(&w,state->raw_per_pid[i]);
+    }
+    write_literal(&w,"],\"capture_sha256\":");
+    write_string(&w,capture->digest);
+    write_literal(&w,"}\n");
+    if (w.failed) {free(w.bytes);return false;}
+    *json_out=w.bytes;
+    *size_out=w.used;
+    return true;
+}
+static int cl1_inspect_cli(const char *capture_path, const char *vin,
+                           const char *output, bool prefix) {
+    input capture={0}, again={0};
+    cl1_result state={0};
+    char *report=NULL;
+    size_t n=0;
+    bool ok=load_regular(capture_path,CL1_MAX_CAPTURE,&capture);
+    if (ok) ok=cl1_project(&capture,vin,prefix,&report,&n,&state);
+    if (ok) ok=load_regular(capture_path,CL1_MAX_CAPTURE,&again) &&
+               same_input(&capture,&again);
+    if (ok) ok=atomic_create(output,report,n);
+    free(report);free_input(&capture);free_input(&again);
+    return ok?0:error("CL/1 inspection refused: invalid capture, source changed or output exists");
+}
+static int cl1_verify_cli(const char *capture_path, const char *report_path,
+                          const char *proof_path, const char *vin, bool prefix) {
+    input capture={0}, stored={0}, reread_capture={0}, reread_report={0};
+    cl1_result state={0};
+    char *canonical=NULL;
+    size_t size=0;
+    bool ok=load_regular(capture_path,CL1_MAX_CAPTURE,&capture) &&
+            load_regular(report_path,65536,&stored);
+    if (ok) ok=separate(&capture,&stored);
+    if (ok) ok=cl1_project(&capture,vin,prefix,&canonical,&size,&state);
+    /* No JSON field can be independently asserted by an untrusted saved
+     * report: exact canonical equality is required after strict CL/1 replay.
+     */
+    if (ok) ok=stored.length==size && !memcmp(stored.bytes,canonical,size);
+    if (ok) ok=load_regular(capture_path,CL1_MAX_CAPTURE,&reread_capture) &&
+               load_regular(report_path,65536,&reread_report) &&
+               same_input(&capture,&reread_capture) &&
+               same_input(&stored,&reread_report);
+    if (ok) {
+        char proof[1024];
+        int n=snprintf(proof,sizeof(proof),
+            "{\"schema\":\"camarodiag-j1979-live-verification-linux-c-v1\","
+            "\"consistent\":true,\"prefix\":%s,"
+            "\"capture_integrity_verified\":%s,"
+            "\"execution_completed\":%s,"
+            "\"physical_vehicle_verified\":false,"
+            "\"device_credential_authenticated\":false,"
+            "\"permits_programming\":false,"
+            "\"capture_sha256\":\"%s\",\"report_sha256\":\"%s\","
+            "\"verification_scope\":\"CANONICAL_OFFLINE_CL1\"}\n",
+            prefix?"true":"false",
+            state.capture_integrity_verified?"true":"false",
+            state.completed && !prefix?"true":"false",
+            capture.digest,stored.digest);
+        ok=n>0 && (size_t)n<sizeof(proof) &&
+            atomic_create(proof_path,proof,(size_t)n);
+    }
+    free(canonical);
+    free_input(&capture);free_input(&stored);
+    free_input(&reread_capture);free_input(&reread_report);
+    return ok?0:error("CL/1 verification refused: altered report, unstable input or output exists");
+}
+
 static void usage(FILE *stream) {
     fprintf(stream,
         "CamaroDiag Linux native C — SAE J1979 Mode 02 CF/1\n"
         "Usage:\n"
         "  camarodiag-native --j1979-can --interface can0 --tx 7E0 --rx 7E8 --output evidence.json --vin VIN --budget-ms 180000 --confirm-physical-channel\n"
         "  camarodiag-native --j1979-live --interface can0 --tx 7E0 --rx 7E8 --vin VIN --pid 0C --cycles 30 --interval-ms 1000 --budget-ms 180000 --output live.json --confirm-physical-channel\n"
+        "  camarodiag-native --inspect-j1979-live-native-prefix CAPTURE.cl VIN PREFIX.json\n"
+        "  camarodiag-native --inspect-j1979-live-native CAPTURE.cl VIN REPORT.json\n"
+        "  camarodiag-native --verify-j1979-live-native-prefix CAPTURE.cl PREFIX.json PROOF.json VIN\n"
+        "  camarodiag-native --verify-j1979-live-native CAPTURE.cl REPORT.json PROOF.json VIN\n"
         "  camarodiag-native --j1979-freeze-native --port /dev/ttyACM0 --key-file key.bin --capture capture.cf --output rapport.json --tx 7E0 --rx 7E8 --vin VIN --frame 00 --pid 0C --budget-ms 60000 --confirm-physical-channel\n"
         "  camarodiag-native --inspect-j1979-freeze-native-prefix CAPTURE.cf VIN PREFIX.json\n"
         "  camarodiag-native --inspect-j1979-freeze-native CAPTURE.cf VIN REPORT.json\n"
@@ -647,6 +810,14 @@ int main(int argc, char **argv) {
         return j1979_can_cli(argc, argv);
     if (argc >= 3 && !strcmp(argv[1], "--j1979-freeze-native"))
         return capture_native(argc, argv);
+    if (argc == 5 && !strcmp(argv[1], "--inspect-j1979-live-native-prefix"))
+        return cl1_inspect_cli(argv[2],argv[3],argv[4],true);
+    if (argc == 5 && !strcmp(argv[1], "--inspect-j1979-live-native"))
+        return cl1_inspect_cli(argv[2],argv[3],argv[4],false);
+    if (argc == 6 && !strcmp(argv[1], "--verify-j1979-live-native-prefix"))
+        return cl1_verify_cli(argv[2],argv[3],argv[4],argv[5],true);
+    if (argc == 6 && !strcmp(argv[1], "--verify-j1979-live-native"))
+        return cl1_verify_cli(argv[2],argv[3],argv[4],argv[5],false);
     if (argc == 5 && !strcmp(argv[1], "--inspect-j1979-freeze-native"))
         return inspect_complete(argv[2], argv[3], argv[4]);
     if (argc == 5 && !strcmp(argv[1], "--inspect-j1979-freeze-native-prefix"))

@@ -167,3 +167,20 @@ RAW, son horodatage relatif, l'identité initiale et finale et toute interruptio
 Une lecture manquante n'est pas promue en mesure ni en preuve physique. La
 mise à l'échelle des valeurs et l'intégration CU/3 restent à porter depuis
 les anciens outils Python. Tests non exécutés avant le gate de clôture.
+
+## Rejeu CL/1 Mode 01 natif en C (sans Python)
+
+```sh
+./camarodiag-native --inspect-j1979-live-native-prefix incomplete.cl VIN prefix.json
+./camarodiag-native --inspect-j1979-live-native complete.cl VIN report.json
+./camarodiag-native --verify-j1979-live-native-prefix incomplete.cl prefix.json proof.json VIN
+./camarodiag-native --verify-j1979-live-native complete.cl report.json proof.json VIN
+```
+
+Le rejeu indépendant vérifie en C les trames CL/1, l'ordre, CRC, les
+horodatages, les requêtes et réponses Mode 01/09, les PID autorisés et
+les compteurs du terminal. Un rapport incomplet reste explicitement
+incomplet ; un rapport ancien ou réécrit ne passe pas la vérification
+canonique octet par octet. Les sources sont relues avant création privée
+et exclusive du rapport ou de la preuve. Aucun de ces contrôles
+hors ligne ne contacte l'ECU ou n'authentifie un transport physique.
