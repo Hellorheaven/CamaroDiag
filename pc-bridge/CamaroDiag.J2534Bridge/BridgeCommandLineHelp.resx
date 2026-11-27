@@ -20,6 +20,8 @@ Usage:
   CamaroDiag.J2534Bridge.exe --j1979-freeze --adapter-index 0 --protocol 33 --tx 7E0 --rx 7E8 --vin DOCUMENTED_VIN --frame 00 --frame 01 --pid 0C --confirm-physical-channel --output freeze.json
   CamaroDiag.J2534Bridge.exe --j1979-live --adapter-index 0 --protocol 33 --tx 7E0 --rx 7E8 --vin DOCUMENTED_VIN --pid 05 --pid 0C --cycles 30 --interval-ms 1000 --confirm-physical-channel --output live.json --csv live.csv
   CamaroDiag.J2534Bridge.exe --j1979-legacy-live --adapter-index 0 --variant 2 --source 10 --vin DOCUMENTED_VIN --pid 05 --pid 0C --confirm-legacy-profile --confirm-functional-scope --output legacy-live.json --csv legacy-live.csv
+  Offline documented PID catalogue (live --raw-only capture, independently supplied reference SHA-256):
+  CamaroDiag.J2534Bridge.exe --j1979-project-catalogue --catalogue catalogue.json --reference reference.pdf --reference-sha256 REFERENCE_SHA256 --report raw-live.json --vin DOCUMENTED_VIN --output projection.json
   CamaroDiag.J2534Bridge.exe --j1979-network --adapter-index 0 --protocol 33 --source 7E8 --source 7E9 --confirm-functional-pid00 --confirm-physical-channels --output can-network.json
     Read legacy emissions records for one documented response source. Variant 1=PWM, 2=VPW, 3=ISO9141, 4=KWP slow, 5=KWP fast. New JSON file required; no reset/control.
   CamaroDiag.J2534Bridge.exe --discover-connector COM5
