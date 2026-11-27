@@ -133,9 +133,33 @@ internal object PhysicalRecoveryFolder {
         Files.delete(root.toPath())
     }
 
+    internal data class Captured(
+        val journalName: String,
+        val journalBytes: ByteArray,
+        val report: EcuPhysicalBackupInspection.Report
+    )
+
     suspend fun inspect(
         resolver: ContentResolver, tree: Uri, cacheDir: File, identity: PhysicalRecoveryIdentity,
         current: () -> Boolean
+    ): EcuPhysicalBackupInspection.Report =
+        inspectInternal(resolver, tree, cacheDir, identity, current, null)
+
+    suspend fun capture(
+        resolver: ContentResolver, tree: Uri, cacheDir: File, identity: PhysicalRecoveryIdentity,
+        current: () -> Boolean
+    ): Captured {
+        var captured: Captured? = null
+        val report = inspectInternal(resolver, tree, cacheDir, identity, current) {
+            captured = it
+        }
+        check(report.verified)
+        return checkNotNull(captured)
+    }
+
+    private suspend fun inspectInternal(
+        resolver: ContentResolver, tree: Uri, cacheDir: File, identity: PhysicalRecoveryIdentity,
+        current: () -> Boolean, capture: ((Captured) -> Unit)?
     ): EcuPhysicalBackupInspection.Report {
         require(identity.valid)
         val scope = currentCoroutineContext()
@@ -270,6 +294,26 @@ internal object PhysicalRecoveryFolder {
             // still does not provide an atomic or authenticated snapshot.
             verifySourceTree()
             verifyStaging()
+            if (capture != null && result.verified) {
+                val (length, expectedHash) = digests.getValue(journal)
+                check(length in 1L..MAX_JOURNAL)
+                val data = ByteArray(length.toInt())
+                requireStagedIdentity(journalFile, stagedIdentities.getValue(journal))
+                java.io.DataInputStream(Files.newInputStream(journalFile.toPath(),
+                    java.nio.file.LinkOption.NOFOLLOW_LINKS)).use { input ->
+                    input.readFully(data)
+                    check(input.read() == -1)
+                }
+                requireStagedIdentity(journalFile, stagedIdentities.getValue(journal))
+                val actual = MessageDigest.getInstance("SHA-256").digest(data)
+                check(MessageDigest.isEqual(actual, expectedHash))
+                check(result.journalSha256.equals(actual.joinToString("") {
+                    "%02x".format(it.toInt() and 0xff)
+                }, ignoreCase = true))
+                check(data.last() == '\n'.code.toByte())
+                active()
+                capture(Captured(name, data, result))
+            }
             active()
             return result
         } catch(failure:Throwable) {
