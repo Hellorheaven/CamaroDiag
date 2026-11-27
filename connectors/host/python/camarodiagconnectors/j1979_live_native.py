@@ -253,6 +253,24 @@ class Replay:
                 return 3
         return self.stage
 
+    @staticmethod
+    def maximum_reply(phase):
+        return {1: 20, 2: 6, 3: 20, 4: 4095, 5: 20}.get(phase, 0)
+
+    def can_retain(self, phase):
+        maximum = self.maximum_reply(phase)
+        return maximum > 0 and maximum <= MAX_RAW_BYTES - self.raw_bytes
+
+    def capacity_stop(self, now):
+        phase = self.expected_phase(now)
+        if (phase == 4 and self.index == 0 and not self.early_identity
+                and now - self.last_identity >= 29000):
+            phase = 3
+        if (self.stage == 4 and self.index == 0 and self.cycle_start is not None
+                and now - self.cycle_start < self.profile.interval_ms + 25):
+            return False
+        return phase in PHASES and not self.can_retain(phase)
+
     def next_request(self, phase):
         if phase in (1, 3, 5):
             return b"\x09\x02"
@@ -269,6 +287,7 @@ class Replay:
         if event.phase == 3 and phase == 4 and self.index == 0 and not self.early_identity:
             phase = 3
         require(event.phase == phase and phase in PHASES, "Unexpected CL/1 phase")
+        require(self.can_retain(phase), "CL/1 request exceeds remaining evidence capacity")
         req = self.next_request(phase)
         require(req == event.request and event.timeout <= self.profile.budget_ms - event.start,
                 "CL/1 request or deadline outside approved scope")
@@ -361,10 +380,11 @@ class Replay:
     def finish(self, body):
         require(len(body) == FINAL.size, "Invalid CL/1 final length")
         stop, flags, completed, steps, samples, raw, neg, timeout, duration, byte_count, bitmap, *per_pid = FINAL.unpack(body)
-        require(stop in STOPS and stop not in (1, 9, 10, 11) and not flags & ~15
+        require(stop in STOPS and stop not in (1, 9, 10) and not flags & ~15
                 and self.duration <= duration <= 604000, "Invalid CL/1 terminal state")
         if self.stage != 7:
-            require(stop in (2, 3), "CL/1 incomplete sequence without external stop")
+            require(stop in (2, 3, 11), "CL/1 incomplete sequence without external stop")
+            require(stop != 11 or self.capacity_stop(duration), "Premature CL/1 capacity stop")
             require(stop != 2 or self.profile.budget_ms - duration <= 1, "Premature CL/1 budget stop")
             self.abort(stop, duration)
         require(self.summary() == body, "CL/1 terminal counters differ from independent replay")
