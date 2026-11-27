@@ -151,3 +151,19 @@ le gate de clôture unique du protocole SAE J1979. Le rapport C possède un
 schéma distinct du rapport Python historique, et les autres sous-commandes
 Python doivent encore être migrées puis comparées avant suppression du code.
 L'absence de recette physique ne vaut ni validation ECU ni certificat SAE.
+
+## Surveillance native SAE J1979 Mode 01 en C
+
+```sh
+./camarodiag-native --j1979-live --interface can0 --tx 7E0 --rx 7E8 \
+  --vin 2G1FA1E30D7654321 --pid 0C --pid 0D --cycles 30 \
+  --interval-ms 1000 --budget-ms 180000 --output live.json \
+  --confirm-physical-channel
+```
+
+Le choix du VIN, des PID et la confirmation interactive sont obligatoires.
+La limite est de 32 PID et 10 000 lectures. Le JSON conserve chaque réponse
+RAW, son horodatage relatif, l'identité initiale et finale et toute interruption.
+Une lecture manquante n'est pas promue en mesure ni en preuve physique. La
+mise à l'échelle des valeurs et l'intégration CU/3 restent à porter depuis
+les anciens outils Python. Tests non exécutés avant le gate de clôture.

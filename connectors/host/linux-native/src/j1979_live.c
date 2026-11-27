@@ -170,14 +170,14 @@ int j1979_live_record(const j1979_live_plan *p,j1979_live_result *r) {
     if (!j1979_live_plan_valid(p)) return -1;
     r->steps=calloc(J1979_LIVE_MAX_STEPS,sizeof(*r->steps));
     if (!r->steps) return -1;
-    uint64_t start=tick(p),last_identity=start;
+    uint64_t start=tick(p),last_identity=start,last_cycle_start=start;
     if (!start) {halt(r,"CLOCK_UNAVAILABLE");goto finish;}
     if (!identity(p,r,start,"INITIAL_VIN",false)) goto finish;
     if (!support(p,r,start)) goto finish;
     for (unsigned cycle=1;cycle<=p->cycles && !r->stop_reason[0];++cycle) {
         uint64_t cycle_start=tick(p);
         if (cycle>1 && !delay_until(p,r,start,
-                                   last_identity + p->interval_ms)) break;
+                                   last_cycle_start + p->interval_ms)) break;
         cycle_start=tick(p);
         if (cycle_start<start) {halt(r,"CLOCK_REGRESSION");break;}
         if (cycle_start-last_identity>=30000u) {
@@ -197,7 +197,7 @@ int j1979_live_record(const j1979_live_plan *p,j1979_live_result *r) {
         }
         if (r->stop_reason[0]) break;
         ++r->cycles_completed;
-        last_identity=cycle_start;
+        last_cycle_start=cycle_start;
     }
     if (!r->stop_reason[0] && r->cycles_completed==p->cycles)
         identity(p,r,start,"FINAL_VIN",true);

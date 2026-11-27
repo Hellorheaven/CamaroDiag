@@ -1,6 +1,7 @@
 #define _POSIX_C_SOURCE 200809L
 #include "j1979_can.h"
 #include "j1979_isotp.h"
+#include "j1979_live.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -21,8 +22,9 @@ static void cancel_handler(int signal_number) {
 typedef struct {
     const char *interface_name, *output, *vin;
     uint32_t tx, rx;
-    unsigned budget_ms;
-    bool confirmed, tx_set, rx_set;
+    unsigned budget_ms, cycles, interval_ms, pid_count;
+    uint8_t pids[J1979_LIVE_MAX_PIDS];
+    bool live, confirmed, tx_set, rx_set, cycles_set, interval_set;
 } options;
 static bool parse_hex(const char *s, uint32_t *out) {
     if (!s || !*s || *s == '-' || *s == '+') return false;
@@ -46,6 +48,8 @@ static bool parse_milliseconds(const char *s, unsigned *out) {
 }
 static bool parse(int argc, char **argv, options *o) {
     memset(o,0,sizeof(*o));o->budget_ms=180000;
+    o->live=!strcmp(argv[1],"--j1979-live");
+    o->cycles=30;o->interval_ms=1000;
     bool has_budget=false;
     for (int i=2;i<argc;++i) {
         const char *flag=argv[i];
@@ -75,9 +79,26 @@ static bool parse(int argc, char **argv, options *o) {
         } else if (!strcmp(flag,"--budget-ms")) {
             if (has_budget||!parse_milliseconds(value,&o->budget_ms)) return false;
             has_budget=true;
+        } else if (!strcmp(flag,"--pid") && o->live) {
+            uint32_t pid=0;
+            if (o->pid_count==J1979_LIVE_MAX_PIDS ||
+                !parse_hex(value,&pid) || !pid || pid>255 || pid%32u==0) return false;
+            for (unsigned j=0;j<o->pid_count;++j)
+                if (o->pids[j]==pid) return false;
+            o->pids[o->pid_count++]=(uint8_t)pid;
+        } else if (!strcmp(flag,"--cycles") && o->live) {
+            if (o->cycles_set || !parse_milliseconds(value,&o->cycles) ||
+                o->cycles>1000) return false;
+            o->cycles_set=true;
+        } else if (!strcmp(flag,"--interval-ms") && o->live) {
+            if (o->interval_set || !parse_milliseconds(value,&o->interval_ms) ||
+                o->interval_ms<100 || o->interval_ms>60000) return false;
+            o->interval_set=true;
         } else return false;
     }
     return o->confirmed && o->tx_set && o->rx_set && o->output &&
+        o->vin && (!o->live || (o->pid_count &&
+        o->pid_count * o->cycles <= J1979_LIVE_MAX_SAMPLES)) &&
         j1979_isotp_valid_interface(o->interface_name) &&
         j1979_can_physical_pair(o->tx,o->rx);
 }
@@ -85,7 +106,8 @@ int j1979_can_cli(int argc, char **argv) {
     options o={0};
     if (!parse(argc,argv,&o)) {
         fprintf(stderr,"Native J1979: explicit --interface, --tx, --rx, "
-            "--output and --confirm-physical-channel required\n");
+            "--vin, --output and --confirm-physical-channel required; "
+            "live additionally requires --pid\n");
         return 2;
     }
     if (!isatty(STDIN_FILENO)) {
@@ -131,16 +153,33 @@ int j1979_can_cli(int argc, char **argv) {
     plan.budget_ms=o.budget_ms;
     plan.expected_vin=o.vin;
     j1979_can_result result={0};
-    int scan_status=opened ? j1979_can_scan(&plan,&result) : -1;
+    j1979_live_result live_result={0};
+    j1979_live_plan live_plan={.channel=plan,.pid_count=o.pid_count,
+                              .cycles=o.cycles,.interval_ms=o.interval_ms};
+    memcpy(live_plan.pids,o.pids,o.pid_count);
+    int scan_status=opened ?
+        (o.live ? j1979_live_record(&live_plan,&live_result) :
+                  j1979_can_scan(&plan,&result)) : -1;
     if (!opened) fprintf(stderr,"Native J1979: selected SocketCAN ISO-TP unavailable\n");
     if (cancel_requested) {
-        result.cancelled=true;
-        result.completed=false;
-        snprintf(result.stop_reason,sizeof(result.stop_reason),"CANCELLED");
+        if (o.live) {
+            live_result.completed=false;
+            snprintf(live_result.stop_reason,sizeof(live_result.stop_reason),"CANCELLED");
+        } else {
+            result.cancelled=true;
+            result.completed=false;
+            snprintf(result.stop_reason,sizeof(result.stop_reason),"CANCELLED");
+        }
     } else if (scan_status || !opened) {
-        result.completed=false;
-        snprintf(result.stop_reason,sizeof(result.stop_reason),"%s",
-                 !opened ? "TRANSPORT_UNAVAILABLE":"CAMPAIGN_FAILED");
+        if (o.live) {
+            live_result.completed=false;
+            snprintf(live_result.stop_reason,sizeof(live_result.stop_reason),"%s",
+                     !opened ? "TRANSPORT_UNAVAILABLE":"CAMPAIGN_FAILED");
+        } else {
+            result.completed=false;
+            snprintf(result.stop_reason,sizeof(result.stop_reason),"%s",
+                     !opened ? "TRANSPORT_UNAVAILABLE":"CAMPAIGN_FAILED");
+        }
     }
     j1979_isotp_close(&link);
     if (restored_handlers) {
@@ -148,19 +187,29 @@ int j1979_can_cli(int argc, char **argv) {
         sigaction(SIGTERM,&old_term,NULL);
     }
     bool saved=false;
-    if (result.steps) {
+    if (o.live && live_result.steps) {
+        saved=j1979_live_write_json(stream,&live_plan,&live_result,o.interface_name);
+    } else if (!o.live && result.steps) {
         saved=j1979_can_write_json(stream,&plan,&result,o.interface_name);
     } else {
-        saved=fputs("{\"schema\":\"camarodiag-functional-j1979-can-linux-c-v1\","
-           "\"protocol\":\"SAE-J1979\",\"completed\":false,"
-           "\"physical_vehicle_verified\":false,"
-           "\"permits_programming\":false,"
-           "\"stop_reason\":\"TRANSPORT_UNAVAILABLE\",\"steps\":[]}\n",stream)!=EOF;
+        saved=fputs(o.live ?
+            "{\"schema\":\"camarodiag-j1979-live-linux-c-v1\","
+            "\"protocol\":\"SAE-J1979\",\"completed\":false,"
+            "\"physical_vehicle_verified\":false,"
+            "\"permits_programming\":false,"
+            "\"stop_reason\":\"TRANSPORT_UNAVAILABLE\",\"steps\":[]}\n":
+            "{\"schema\":\"camarodiag-functional-j1979-can-linux-c-v1\","
+            "\"protocol\":\"SAE-J1979\",\"completed\":false,"
+            "\"physical_vehicle_verified\":false,"
+            "\"permits_programming\":false,"
+            "\"stop_reason\":\"TRANSPORT_UNAVAILABLE\",\"steps\":[]}\n",stream)!=EOF;
     }
     if (saved) saved=fflush(stream)==0 && fsync(fd)==0;
     if (fclose(stream)!=0) saved=false;
-    int status=opened && scan_status==0 && result.completed && saved ? 0:2;
+    int status=opened && scan_status==0 && saved &&
+        (o.live ? live_result.completed : result.completed) ? 0:2;
     if (!saved) fprintf(stderr,"Native J1979: output was not persisted completely\n");
     j1979_can_result_free(&result);
+    j1979_live_free(&live_result);
     return status;
 }
