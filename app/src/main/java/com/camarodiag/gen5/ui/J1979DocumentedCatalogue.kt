@@ -43,7 +43,7 @@ internal class J1979DocumentedCatalogue private constructor(
         }
     }
 
-    private data class Bits(val offset: Int, val width: Int, val order: String) {
+    internal data class Bits(val offset: Int, val width: Int, val order: String) {
         fun extract(data: ByteArray): BigInteger {
             require(offset + width <= data.size * 8) { "Signal outside received payload" }
             var value = BigInteger.ZERO
@@ -60,11 +60,11 @@ internal class J1979DocumentedCatalogue private constructor(
         }
     }
 
-    private data class Presence(val bits: Bits, val mask: BigInteger, val expected: BigInteger) {
+    internal data class Presence(val bits: Bits, val mask: BigInteger, val expected: BigInteger) {
         fun matches(data: ByteArray) = bits.extract(data).and(mask) == expected
     }
 
-    private data class Signal(
+    internal data class Signal(
         val name: String, val unit: String, val bits: Bits, val signed: Boolean,
         val scale: Rational, val offset: Rational, val unavailable: Set<BigInteger>,
         val presence: Presence?, val minimum: Rational?, val maximum: Rational?,
@@ -96,7 +96,7 @@ internal class J1979DocumentedCatalogue private constructor(
         }
     }
 
-    private data class Definition(val pid: Int, val width: Int, val protocols: List<String>,
+    internal data class Definition(val pid: Int, val width: Int, val protocols: List<String>,
                                   val reference: String, val signals: List<Signal>)
 
     fun inventory(): List<Map<String, Any>> = definitions
@@ -213,7 +213,7 @@ internal class J1979DocumentedCatalogue private constructor(
                 unavailable.toSet(), if ("presence" in row) presence(row["presence"], width) else null,
                 limits?.get(0), limits?.get(1), enums, label(row["reference"]))
         }
-        private fun definition(value: Any?): Definition {
+        internal fun definition(value: Any?): Definition {
             val row = fields(value, setOf("pid", "payload_bytes", "protocols", "reference", "signals"))
             val pid = int(row["pid"], 1, 255); val width = int(row["payload_bytes"], 1, 4093)
             require(pid % 32 != 0) { "Support bitmap is not a measurement" }
