@@ -27,7 +27,8 @@ build/test_%.o: tests/test_%.cpp | build
 $(TARGET): $(CXX_OBJECTS)
 	$(CXX) $(CXXFLAGS) $(CXXSTRICT) $^ $(LDFLAGS) $(LDLIBS) -o $@
 
-test: test-j1979-measurement test-j1979-monitor test-j1979-vehicle-info test-j1979-native-c test-cf1 test-cu2 test-cu3 test-j1979-can test-j1979-isotp test-j1979-live test-j1979-cl1
+test: test-j1979-context test-j1979-measurement test-j1979-monitor test-j1979-vehicle-info test-j1979-native-c test-cf1 test-cu2 test-cu3 test-j1979-can test-j1979-isotp test-j1979-live test-j1979-cl1
+	./test-j1979-context
 	./test-j1979-measurement
 	./test-j1979-monitor
 	./test-j1979-vehicle-info
@@ -39,6 +40,9 @@ test: test-j1979-measurement test-j1979-monitor test-j1979-vehicle-info test-j19
 	./test-j1979-isotp
 	./test-j1979-live
 	./test-j1979-cl1
+
+test-j1979-context: build/test_j1979_context.o build/j1979_context.o
+	$(CXX) $(LDFLAGS) $^ -o $@
 
 test-j1979-measurement: build/test_j1979_measurement.o build/j1979_measurement.o
 	$(CXX) $(LDFLAGS) $^ -o $@
@@ -75,7 +79,7 @@ test-j1979-cl1: build/test_j1979_cl1.o build/cl1.o build/cf1.o
 
 clean:
 	rm -rf build
-	rm -f $(TARGET) test-j1979-measurement test-j1979-monitor test-j1979-vehicle-info test-j1979-native-c test-cf1 test-cu2 test-cu3 test-j1979-can test-j1979-isotp test-j1979-live test-j1979-cl1
+	rm -f $(TARGET) test-j1979-context test-j1979-measurement test-j1979-monitor test-j1979-vehicle-info test-j1979-native-c test-cf1 test-cu2 test-cu3 test-j1979-can test-j1979-isotp test-j1979-live test-j1979-cl1
 
 PREFIX ?= /usr/local
 DESTDIR ?=

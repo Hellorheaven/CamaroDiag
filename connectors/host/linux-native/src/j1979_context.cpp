@@ -2,7 +2,7 @@
 #include <algorithm>
 #include <array>
 #include <bitset>
-#include <limits>
+#include <utility>
 
 namespace cd::j1979 {
 namespace {
@@ -87,11 +87,11 @@ bool signal_json(std::FILE* f, const Signal& s) {
         std::fprintf(f,",\"raw_encoded\":%u,\"number\":",s.raw)>=0 && number(f,s.number) &&
         literal(f,",\"scale_source\":") && text(f,s.scale_source) && literal(f,"}");
 }
-bool trim_signal_json(std::FILE* f, const TrimSignal& s) {
+bool trim_signal_json(std::FILE* f, const TrimSignal& s, bool identity) {
     return std::fprintf(f,"{\"bank\":%u,\"raw_encoded\":%u,\"name\":",s.bank,s.raw)>=0 &&
         text(f,s.name) && literal(f,",\"number\":") && number(f,s.number) &&
         literal(f,",\"unit\":\"%\",\"attribution\":") &&
-        text(f,s.number ? "DEFINED" : "UNVERIFIED_UPPER_BANK") && literal(f,"}");
+        text(f,!identity ? "IDENTITY_NOT_RECHECKED" : s.number ? "DEFINED" : "UNVERIFIED_UPPER_BANK") && literal(f,"}");
 }
 bool cycle_json(std::FILE* f, const std::optional<DriveCycle>& c,
                 const std::optional<std::array<std::uint8_t,4>>& baseline) {
@@ -328,7 +328,7 @@ bool write_context_json(std::FILE* f,std::span<const Observation> observations,b
             !literal(f,",\"signals\":[")) return false;
         bool first_signal=true;
         for (const auto& signal:record->signals)
-            if (!comma(f,first_signal)||!trim_signal_json(f,signal)) return false;
+            if (!comma(f,first_signal)||!trim_signal_json(f,signal,identity_rechecked)) return false;
         if (!literal(f,"]}")) return false;
     }
     return literal(f,"]}");
