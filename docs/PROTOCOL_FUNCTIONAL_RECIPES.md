@@ -201,3 +201,32 @@ Acceptance: use a confirmed responding ECU, read its Mode 09 inventory and reque
 Integration: Android diagnostic, network/legacy/native projection and live recorder; Windows J2534 scan/console, legacy and native reports, live recorder; Linux/Python scan, network/legacy, live recorder, and offline evidence inspection. Legacy live selection limits multi-signal data width to five bytes. Native CJ/1 RAW status is preserved; decoded channels are derived from the original response. Each live channel has its own count, missing count, min/max/mean and last verified sample. CSV adds signal_name and raw_encoded only for multi-signal plans; scalar-only header is unchanged. Independent inspection replays each channel and its statistics, rejecting tampered values.
 
 Acceptance cases written: exact lengths, masks, reserved bits, signed pressure, unsigned runtime, missing second sensor, independent channel mean, CSV and tampered replay. No tests executed yet. Firmware physical transport, remaining Mode 08 controls and full J1979DA coverage remain outside this lot. No release or closure claimed.
+
+
+### J1979 contextual measurements (Mode 01 equipment configuration)
+
+The ECU-specific interpretation of MAP (0B), MAF (10), commanded equivalence
+ratio (44), and wideband oxygen sensor PIDs (24–2B, 34–3B) uses the equipment
+configuration advertised by the same ECU (4F and 50). A complete terminating
+support page can establish absence; a failed or missing advertised configuration
+cannot. Freeze-frame zero uses the correlated ECU's Mode 01 equipment settings.
+Reports preserve the original application evidence and include a separate
+contextual_measurements projection, with raw encoding, scale source and nullable
+engineering value. Legacy anonymous observations cannot establish ECU scope.
+
+Continuous recording on Android, Windows and Linux resolves the required
+configuration before acquisition; SCALING_UNVERIFIED prevents publishing
+statistics calculated using an assumed scale. Historical exports retain their
+original interpretation. Custom current scaling requires qualification against the
+applicable J1979 revision and real ECU responses before claiming conformity.
+
+### Mesures contextuelles J1979
+
+Les PID 4F et 50 fournissent les plages propres au calculateur sélectionné.
+Une configuration annoncée mais non obtenue reste non vérifiée, contrairement
+à une absence démontrée par les bitmaps. Le rapport conserve les octets bruts,
+la provenance de l'échelle et les valeurs physiques éventuellement nulles.
+L'enregistrement continu ne calcule pas de statistiques sur une échelle supposée.
+Les scénarios de régression couvrent les plages spécifiques, l'absence vérifiée,
+les réponses tronquées, les doublons et l'isolation des sources. Leur exécution
+reste réservée à la validation de clôture du protocole.
