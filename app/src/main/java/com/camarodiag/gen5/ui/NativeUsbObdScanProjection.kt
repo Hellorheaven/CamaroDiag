@@ -64,16 +64,25 @@ internal object NativeUsbObdScanProjection {
         if(chain(1).pages.isEmpty()) return null
         fun advertised(mode:Int,id:Int)=id in inventory(mode)
         fun pageVerified(mode:Int,id:Int)=chain(mode).pages.any { it.base==id }
-        val live=values.measurements.filter { it.mode==1&&advertised(1,it.pid) }.mapNotNull { value ->
+        val singleLive=values.measurements.filter { it.mode==1&&advertised(1,it.pid) }.mapNotNull { value ->
             val row=modeRows(1).singleOrNull { positive(it)&&pid(it)==value.pid } ?: return@mapNotNull null
             val data=bytes(row)
             if(data.size<3||data[0]!=65||data[1]!=value.pid) return@mapNotNull null
             ObdValue(value.pid,value.name,value.number.toString(),value.unit,data.drop(2),responder)
         }
+        val multiLive=values.multiSignalRecords.flatMap { record ->
+            val row=modeRows(1).singleOrNull { it.optString("request_hex")==record.requestHex } ?: return@flatMap emptyList()
+            val data=bytes(row)
+            record.signals.map { signal ->
+                ObdValue(signal.pid,signal.name,signal.number.toString(),signal.unit,data.drop(2),responder)
+            }
+        }
+        val live=singleLive+multiLive
         val reads=modeRows(1).mapNotNull { row ->
             val id=pid(row)?.takeIf { it%32!=0 } ?: return@mapNotNull null
             val data=bytes(row)
-            val eligible=advertised(1,id)&&positive(row)&&data.size>2&&data[0]==65&&data[1]==id
+            val eligible=advertised(1,id)&&(positive(row)||values.multiSignalRecords.any { it.requestHex==row.optString("request_hex") })&&
+                data.size>2&&data[0]==65&&data[1]==id
             val observation=if(data.size>2&&data[0]==65&&data[1]==id)
                 listOf(ObdMode01Observation(responder,data.drop(2),eligible,live.count { it.pid==id })) else emptyList()
             ObdMode01Read(id,raw(row).ifEmpty { row.optString("status") },observation)
