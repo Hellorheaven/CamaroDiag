@@ -33,6 +33,8 @@ internal static class ObdJ1979LegacyScan
         public J1979CampaignSemantics.Readiness? Readiness { get; init; }
         public IReadOnlyList<Identification> IdentificationRecords { get; init; }=[];
         public IReadOnlyList<MonitorRecord> MonitorRecords { get; init; }=[];
+        public IReadOnlyList<object> LegacyMonitorResults => ObdJ1979LegacyMonitorValues.Project(Steps,SelectedResponseSource)
+            .Select(ObdJ1979LegacyMonitorValues.Evidence).ToArray();
         public FreezeTrigger? FreezeFrameTrigger { get; init; }
     }
     internal sealed record InventorySummary(byte Mode,byte? SensorMask,string State,int VerifiedPages,
