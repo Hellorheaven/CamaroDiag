@@ -112,13 +112,13 @@ class LinuxIsoTp:
 
 
     def run_clear(self, expected_vin: str, *, warning_acknowledged: bool,
-                  confirmed_yes: bool, require_current=lambda: None) -> dict:
+                  confirmed_yes: bool, save_baseline, require_current=lambda: None) -> dict:
         from .j1979_clear import clear_recipe
         return clear_recipe(self.exchange,
                             lambda: self._exchange(b"\x04", 2.5, require_current),
                             expected_vin=expected_vin, primary=self._primary,
                             warning_acknowledged=warning_acknowledged,
-                            confirmed_yes=confirmed_yes, require_current=require_current)
+                            confirmed_yes=confirmed_yes, save_baseline=save_baseline, require_current=require_current)
 
     def run_evap(self, expected_vin: str, *, warning_acknowledged: bool,
                  confirmed_yes: bool, require_current=lambda: None) -> dict:
