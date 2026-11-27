@@ -70,6 +70,43 @@ public final class J1979LiveUsbTest {
         }
         @Override public void close(){closed=true;}
     }
+    private static void rejectPrefix(byte[] raw,String vin)throws IOException{
+        try{
+            J1979LiveNativeReplay.inspectPrefix(raw,vin);
+            throw new AssertionError("Invalid prefix accepted");
+        }catch(IOException expected){/* expected */}
+    }
+    private static void prefix(J1979LiveUsbAuth.Profile profile,byte[] full)throws IOException{
+        byte[][] rows=bodies(profile);
+        ByteArrayOutputStream out=new ByteArrayOutputStream();
+        for(int i=0;i<rows.length-1;i++)out.write(frame(i==0?1:2,i,rows[i]));
+        byte[] original=out.toByteArray(),terminal=frame(3,rows.length-1,rows[rows.length-1]);
+        byte[][] tails={new byte[0],Arrays.copyOf(terminal,5),Arrays.copyOf(terminal,terminal.length-1)};
+        String[] reasons={"MISSING_TERMINAL","TRUNCATED_HEADER","TRUNCATED_RECORD"};
+        for(int i=0;i<tails.length;i++){
+            java.util.Map<String,Object> result=J1979LiveNativeReplay.inspectPrefix(concat(original,tails[i]),VIN);
+            assert Boolean.TRUE.equals(result.get("prefix_integrity_verified"));
+            assert Boolean.FALSE.equals(result.get("capture_integrity_verified"));
+            assert Boolean.FALSE.equals(result.get("execution_completed"));
+            assert Boolean.FALSE.equals(result.get("terminal_present"));
+            assert Integer.valueOf(8).equals(result.get("complete_records"));
+            assert Integer.valueOf(7).equals(result.get("complete_observations"));
+            assert Integer.valueOf(4).equals(result.get("raw_samples_in_prefix"));
+            assert Integer.valueOf(original.length).equals(result.get("last_complete_offset"));
+            assert Integer.valueOf(tails[i].length).equals(result.get("discarded_tail_bytes"));
+            assert reasons[i].equals(result.get("interruption"));
+        }
+        byte[] corrupt=original.clone();corrupt[corrupt.length-1]^=1;
+        rejectPrefix(corrupt,VIN);rejectPrefix(full,VIN);
+        rejectPrefix(concat(full,new byte[]{0}),VIN);
+        rejectPrefix(concat(original,new byte[]{'X'}),VIN);
+        rejectPrefix(concat(original,new byte[]{'C','L',2}),VIN);
+        rejectPrefix(original,"1FA6P8TH0L5100000");
+        byte[] swap=rows[3];rows[3]=rows[4];rows[4]=swap;
+        out.reset();
+        for(int i=0;i<rows.length-1;i++)out.write(frame(i==0?1:2,i,rows[i]));
+        rejectPrefix(out.toByteArray(),VIN);
+    }
     public static void main(String[] args)throws Exception{
         J1979LiveUsbAuth.Profile profile=new J1979LiveUsbAuth.Profile(0x7e0,0x7e8,false,VIN,new int[]{5,12},2,100,1000);
         assert profile.encode().length==67;
@@ -84,6 +121,7 @@ public final class J1979LiveUsbTest {
         assert hello.length==107;
         assert Arrays.equals(J1979LiveUsbAuth.proof(hello,challenge,key),concat(new byte[]{'C','U',3,3},hmac(key,transcript)));
         byte[] raw=capture(bodies(profile));
+        prefix(profile,raw);
         J1979LiveNativeReplay.Result decoded=J1979LiveNativeReplay.decode(new ByteArrayInputStream(raw),profile);
         assert decoded.captureIntegrityVerified&&decoded.completed()&&decoded.observationsReceived==7;
         assert ((Number)decoded.summary.get("raw")).intValue()==4;
