@@ -308,3 +308,49 @@ Remplacer les paramètres entre chevrons par les valeurs réelles ; conserver le
 Android et Windows contrôlent la structure des preuves applicatives, la séquence VIN/inventaire/échantillons, les réponses brutes et les empreintes. Leurs exports locaux ne revendiquent pas un rejeu indépendant du transport : celui-ci relève du vérificateur Python sur le rapport original. Ni une empreinte correcte ni une projection exacte ne certifient l'authenticité de la référence, la conformité SAE ou une validation physique.
 
 **EN:** Use an original raw-only Mode 01 report, an authorized documented JSON catalogue, its local reference and an independently pinned SHA-256. Enter the expected VIN independently. Native Android and Windows outputs are local application-evidence projections; use the Python command above for independent verification against the original report. Unknown or unavailable values remain unknown, and neither integrity nor replay proves vehicle provenance or normative compliance. No transport, write, DTC clear or programming operation is performed by the offline projector. Tests have been added but not run; full J1979 acceptance and the release gate remain open.
+
+
+## SAE J1979 Mode 01 — enregistrement USB natif CU/3 / CL/1
+
+**Statut : développement, non validé par compilation ni recette réelle.** Une carte et un profil physique qualifiés et un credential local provisionné sont nécessaires ; le firmware de découverte ne peut pas effectuer cette recette. Le Mode 01 natif ne modifie pas le calculateur.
+
+### Parcours fonctionnels
+
+| Plateforme | Acquisition | Inspection et export |
+| --- | --- | --- |
+| Android | Tests fonctionnels J1979 → Connecteur USB natif → Enregistrement USB natif ; choisir périphérique, CAN TX/RX, VIN du véhicule, PID, cadence, nombre de cycles et budget ; sélectionner credential et confirmer. | Export JSON et capture CL/1, CSV des échantillons bruts ; projection documentée depuis le fichier CL/1. |
+| Windows | Tests fonctionnels privés → Enregistrement USB natif ; arrêter le pont et la console, sélectionner port COM, adresse physique, VIN, PID, cadence, credential, dossier et confirmer. | Inspecter CL/1, exporter CL/1 en CSV, projection catalogue hors ligne. |
+| Linux | `camarodiagconnectors-j1979-live-native capture` sur port série explicitement choisi. | `inspect`, `verify`, `export-csv`; projection catalogue `project-native-live` et `verify-native-projection`. |
+
+Le VIN attendu doit être obtenu indépendamment du fichier inspecté. Les chemins de sortie doivent être nouveaux. Une absence de réponse, un résultat partiel, une annulation ou un changement de contexte ne devient jamais une mesure numérique. Les données du VIN, de l'inventaire et des PID sont des réponses applicatives enregistrées, non une attestation du véhicule ni une trace CAN physique.
+
+### Exemples de commandes (adresses et fichiers illustratifs)
+
+```text
+camarodiagconnectors-j1979-live-native capture --port /dev/ttyACM0 --key-file host.key --tx 7E0 --rx 7E8 --vin DOCUMENTED_VIN --pid 05 --pid 0C --cycles 30 --interval-ms 1000 --budget-ms 180000 --confirm-physical-channel --capture live.cl --output live.json
+camarodiagconnectors-j1979-live-native inspect --capture live.cl --vin DOCUMENTED_VIN --output inspected.json
+camarodiagconnectors-j1979-live-native verify --capture live.cl --report live.json --vin DOCUMENTED_VIN --output verified.json
+camarodiagconnectors-j1979-live-native export-csv --capture live.cl --vin DOCUMENTED_VIN --output live.csv
+camarodiagconnectors-j1979-catalogue project-native-live --capture live.cl --vin DOCUMENTED_VIN --catalogue catalogue.json --reference reference.pdf --reference-sha256 PINNED_SHA256 --output projection.json
+camarodiagconnectors-j1979-catalogue verify-native-projection --capture live.cl --vin DOCUMENTED_VIN --catalogue catalogue.json --reference reference.pdf --reference-sha256 PINNED_SHA256 --projection projection.json
+CamaroDiag.J2534Bridge.exe --j1979-live-native --port COM5 --key-file host.key --tx 7E0 --rx 7E8 --vin DOCUMENTED_VIN --pid 05 --pid 0C --cycles 30 --interval-ms 1000 --confirm-physical-channel --capture live.cl --output live.json
+CamaroDiag.J2534Bridge.exe --inspect-j1979-live-native live.cl DOCUMENTED_VIN inspected.json
+CamaroDiag.J2534Bridge.exe --export-j1979-live-native-csv live.cl DOCUMENTED_VIN live.csv
+```
+
+Pour le catalogue Windows, la commande existante `--j1979-project-catalogue` accepte le fichier CL/1 via `--report`. Android accepte également l'original CL/1 dans le sélecteur de source du catalogue. Les projections natives utilisent le même schéma que Linux, avec empreinte SHA-256 de la capture et distinction entre rejeu applicatif et preuve des trames physiques.
+
+### Cas de recette à exécuter au gate et sur la Release autorisée
+
+| Cas | Résultat logiciel attendu |
+| --- | --- |
+| Profil exact, VIN correct, PID annoncés, cycles terminés, réponse brute pour chaque PID | Capture complète, terminal cohérent, CSV et JSON dérivés des mêmes octets. |
+| VIN incorrect, mauvais credential, PID non annoncé, canal différent | Refus avant échantillonnage ; aucun repli automatique. |
+| Réponse négative et silence sur un PID | Compteurs distincts ; pas de conversion arbitraire en valeur zéro. |
+| Réponse de longueur inconnue avec PID corrélé | Conservation brute ; projection uniquement si une définition documentée accepte la longueur. |
+| CRC invalide, troncature, ordre modifié avec CRC recalculé, terminal falsifié | Rejeu refusé ; pas de verdict complet. |
+| Annulation, déconnexion, changement de véhicule/compte, fichier remplacé | Arrêt de session et rejet de la publication qui ne correspond plus au contexte. |
+| Catalogue modifié ou empreinte de référence différente | Projection rejetée, capture originale inchangée. |
+
+**EN:** Native live capture is a read-only, explicitly approved physical CAN recording for qualified boards. The CU/3 credential exchange binds the selected scope, and the CL/1 stream preserves ordered application responses and a replayable terminal summary. Android, Windows and Linux can export raw CSV; catalogue projection reads the original binary stream. Neither replay nor HMAC establishes vehicle provenance or full normative compliance. Firmware, host and GUI regression cases have been written but have not been executed. The normative J1979DA catalogue and the closing software validation remain open; real-vehicle tests are separate.
+
