@@ -10,6 +10,7 @@
 #include "j1979_cu1.hpp"
 #include "j1979_discovery.hpp"
 #include "j1979_legacy_scan.hpp"
+#include "j1979_legacy_freeze_wire.hpp"
 #include <array>
 #include <string_view>
 #include <exception>
@@ -1367,6 +1368,152 @@ static int capture_cu45(int argc,char** argv,cd::cu45::Mode mode){
     }catch(const std::exception& e){return error(e.what());}
 }
 
+struct LegacyFreezeOptions{
+    cd::legacy::Protocol protocol{};
+    unsigned source{};
+    uint32_t baud{38400};
+    cd::legacy::FreezePlan plan;
+    const char* port{},*capture{},*output{};
+    bool protocol_set{},source_set{},baud_set{},budget_set{},approved{};
+};
+static bool parse_legacy_freeze(int argc,char** argv,LegacyFreezeOptions& o){
+    for(int i=2;i<argc;++i){
+        const std::string_view flag=argv[i];
+        if(flag=="--confirm-physical-channel"){
+            if(o.approved)return false;
+            o.approved=true;continue;
+        }
+        if(i+1>=argc||argv[i+1][0]=='-')return false;
+        const char* value=argv[++i];
+        if(!*value)return false;
+        if(flag=="--protocol"){
+            uint32_t n=0;
+            if(o.protocol_set||!decimal_uint32(value,&n))return false;
+            o.protocol=static_cast<cd::legacy::Protocol>(n);o.protocol_set=true;
+        }else if(flag=="--source"){
+            uint32_t n=0;
+            if(o.source_set||strlen(value)!=2||!hex_uint32(value,&n)||!cd::legacy::valid_source(n))return false;
+            o.source=n;o.source_set=true;
+        }else if(flag=="--baud"){
+            if(o.baud_set||!decimal_uint32(value,&o.baud))return false;
+            o.baud_set=true;
+        }else if(flag=="--budget-ms"){
+            uint32_t n=0;
+            if(o.budget_set||!decimal_uint32(value,&n))return false;
+            o.plan.budget_ms=n;o.budget_set=true;
+        }else if(flag=="--vin"){
+            if(!o.plan.vin.empty())return false;
+            o.plan.vin=value;
+        }else if(flag=="--frame"||flag=="--pid"){
+            uint32_t n=0;
+            if(strlen(value)!=2||!hex_uint32(value,&n)||n>255)return false;
+            auto& list=flag=="--frame"?o.plan.frames:o.plan.pids;
+            if(list.size()>=(flag=="--frame"?8u:64u))return false;
+            list.push_back(static_cast<uint8_t>(n));
+        }else{
+            const char** slot=nullptr;
+            if(flag=="--port")slot=&o.port;
+            else if(flag=="--capture")slot=&o.capture;
+            else if(flag=="--output")slot=&o.output;
+            if(!slot||*slot)return false;
+            *slot=value;
+        }
+    }
+    return o.approved&&o.protocol_set&&o.source_set&&o.port&&o.capture&&o.output&&
+        strcmp(o.capture,o.output)&&cd::legacy::valid_protocol(o.protocol)&&o.plan.valid();
+}
+static bool write_owned_file(int& fd,const void* bytes,std::size_t size){
+    const auto* data=static_cast<const unsigned char*>(bytes);
+    while(size){
+        const auto n=write(fd,data,size);
+        if(n<0&&errno==EINTR)continue;
+        if(n<=0)return false;
+        data+=n;size-=static_cast<std::size_t>(n);
+    }
+    const bool synced=fsync(fd)==0;
+    const bool closed=close(fd)==0;
+    fd=-1;return synced&&closed;
+}
+static int legacy_freeze_cli(int argc,char** argv){
+    LegacyFreezeOptions o;
+    if(!parse_legacy_freeze(argc,argv,o))return error("Explicit selected legacy ECU, VIN, frames, capture and report required");
+    if(!isatty(STDIN_FILENO))return error("Interactive confirmation required");
+    fputs("Legacy freeze: functional reads only, selected checksum-verified response source, stationary vehicle. Type yes: ",stderr);
+    char answer[16]{};
+    if(!fgets(answer,sizeof(answer),stdin)||strcmp(answer,"yes\n"))return error("Consent refused");
+    struct File{int fd;~File(){if(fd>=0)close(fd);}};
+    File capture{open(o.capture,O_WRONLY|O_CREAT|O_EXCL|O_NOFOLLOW|O_CLOEXEC,0600)};
+    if(capture.fd<0)return error("Capture destination unavailable");
+    File output{open(o.output,O_WRONLY|O_CREAT|O_EXCL|O_NOFOLLOW|O_CLOEXEC,0600)};
+    if(output.fd<0)return error("Report destination unavailable");
+    legacy_cancelled=0;
+    struct Signals{
+        struct sigaction oldint{},oldterm{};
+        bool intr{},term{};
+        Signals(){
+            struct sigaction act{};act.sa_handler=legacy_signal;sigemptyset(&act.sa_mask);
+            intr=sigaction(SIGINT,&act,&oldint)==0;
+            term=intr&&sigaction(SIGTERM,&act,&oldterm)==0;
+        }
+        ~Signals(){if(term)sigaction(SIGTERM,&oldterm,nullptr);if(intr)sigaction(SIGINT,&oldint,nullptr);}
+    } signals;
+    try{
+        if(!signals.term)return error("Cancellation handlers unavailable");
+        const auto current=[](){return legacy_cancelled==0;};
+        cd::legacy::FreezeResult result;
+        {
+            auto link=cd::legacy::serial_link(o.port,o.baud,current);
+            cd::legacy::Elm elm(*link,o.protocol,true,current);
+            elm.configure();
+            result=cd::legacy::acquire_freeze(elm,o.source,o.plan,cd::legacy::monotonic_ms,current);
+        }
+        const auto raw=cd::legacy::encode_freeze_capture({o.protocol,o.source,o.plan,result.trace});
+        if(!write_owned_file(capture.fd,raw.data(),raw.size()))return error("Freeze capture persistence failed");
+        input original{},again{};
+        if(!load_regular(o.capture,cd::legacy::freeze_max_capture,&original)||original.length!=raw.size()||
+           memcmp(original.bytes.get(),raw.data(),raw.size())||
+           !load_regular(o.capture,cd::legacy::freeze_max_capture,&again)||!same_input(&original,&again))
+            return error("Persisted legacy freeze capture changed");
+        const auto replay=cd::legacy::inspect_freeze_capture({original.bytes.get(),original.length},o.protocol,o.source,o.plan.vin);
+        const auto report=cd::legacy::freeze_report(replay);
+        if(report!=cd::legacy::freeze_report(result))return error("Live result differs from independent raw replay");
+        if(!write_owned_file(output.fd,report.data(),report.size()))return error("Freeze report persistence failed");
+        return replay.completed&&replay.all_frames_stable?0:2;
+    }catch(const std::exception& e){return error(e.what());}
+}
+static int legacy_freeze_replay(const char* protocol,const char* source,const char* vin,
+    const char* capture_path,const char* report_path,const char* proof_path){
+    uint32_t p=0,n=0;
+    if(!decimal_uint32(protocol,&p)||!cd::legacy::valid_protocol(static_cast<cd::legacy::Protocol>(p))||
+        strlen(source)!=2||!hex_uint32(source,&n)||!cd::legacy::valid_source(n)||!cf1_valid_vin(vin))
+        return error("Independent protocol, selected source and VIN required");
+    input original{},again{},stored{},stored_again{};
+    try{
+        if(!load_regular(capture_path,cd::legacy::freeze_max_capture,&original))
+            return error("Invalid bounded LFR/1 capture");
+        const auto replay=cd::legacy::inspect_freeze_capture({original.bytes.get(),original.length},
+            static_cast<cd::legacy::Protocol>(p),n,vin);
+        const auto canonical=cd::legacy::freeze_report(replay);
+        if(proof_path){
+            if(!load_regular(report_path,cd::legacy::freeze_max_capture*6,&stored)||!separate(&original,&stored)||
+                stored.length!=canonical.size()||memcmp(stored.bytes.get(),canonical.data(),canonical.size())||
+                !load_regular(report_path,cd::legacy::freeze_max_capture*6,&stored_again)||!same_input(&stored,&stored_again))
+                return error("Legacy freeze report differs from independent replay");
+        }
+        if(!load_regular(capture_path,cd::legacy::freeze_max_capture,&again)||!same_input(&original,&again))
+            return error("Legacy freeze capture changed during replay");
+        if(proof_path){
+            const auto proof=std::string("{\"schema\":\"camarodiag-j1979-legacy-freeze-verification-linux-v1\","
+                "\"consistent\":true,\"physical_vehicle_verified\":false,\"capture_sha256\":\"")+original.digest+
+                "\",\"report_sha256\":\""+stored.digest+"\",\"completed\":"+(replay.completed?"true":"false")+
+                ",\"all_frames_stable\":"+(replay.all_frames_stable?"true":"false")+
+                ",\"permits_programming\":false}\n";
+            if(!atomic_create(proof_path,proof.data(),proof.size()))return error("Legacy freeze proof destination unavailable");
+        }else if(!atomic_create(report_path,canonical.data(),canonical.size()))return error("Legacy freeze report destination unavailable");
+        return replay.completed&&replay.all_frames_stable?0:2;
+    }catch(const std::exception& e){return error(e.what());}
+}
+
 static void usage(FILE *stream) {
     fprintf(stream,
         "CamaroDiag Linux native C++20 — SAE J1979\n"
@@ -1394,6 +1541,9 @@ static void usage(FILE *stream) {
         "  camarodiag-native --verify-j1979-campaign CAPTURE.cj REPORT.json PROOF.json VIN\n"
         "  camarodiag-native --j1979-legacy-discover --port /dev/ttyUSB0 --protocol 2 --baud 38400 --output responders.json --confirm-physical-channel\n"
         "  camarodiag-native --j1979-legacy --port /dev/ttyUSB0 --protocol 2 --source 10 --vin VIN --output scan.json --confirm-physical-channel\n"
+        "  camarodiag-native --j1979-legacy-freeze --port /dev/ttyUSB0 --protocol 2 --source 10 --vin VIN --frame 00 --pid 0C --capture freeze.lfr --output freeze.json --confirm-physical-channel\n"
+        "  camarodiag-native --inspect-j1979-legacy-freeze PROTOCOL SOURCE VIN CAPTURE.lfr REPORT.json\n"
+        "  camarodiag-native --verify-j1979-legacy-freeze PROTOCOL SOURCE VIN CAPTURE.lfr REPORT.json PROOF.json\n"
         "  camarodiag-native --inspect-j1979-legacy-discovery PROTOCOL RAW_RESPONSE RAW_ATDPN REPORT.json\n"
         "  camarodiag-native --help\n"
         "Examples:\n"
@@ -1406,6 +1556,9 @@ int main(int argc, char **argv) {
     if (argc == 2 && (!strcmp(argv[1], "--help") || !strcmp(argv[1], "-h"))) {
         usage(stdout); return 0;
     }
+    if (argc>=3 && !strcmp(argv[1],"--j1979-legacy-freeze"))return legacy_freeze_cli(argc,argv);
+    if (argc==7 && !strcmp(argv[1],"--inspect-j1979-legacy-freeze"))return legacy_freeze_replay(argv[2],argv[3],argv[4],argv[5],argv[6],nullptr);
+    if (argc==8 && !strcmp(argv[1],"--verify-j1979-legacy-freeze"))return legacy_freeze_replay(argv[2],argv[3],argv[4],argv[5],argv[6],argv[7]);
     if (argc>=3 && !strcmp(argv[1],"--j1979-legacy"))return legacy_discovery_cli(argc,argv,true);
     if (argc>=3 && !strcmp(argv[1],"--j1979-legacy-discover"))return legacy_discovery_cli(argc,argv);
     if (argc==6 && !strcmp(argv[1],"--inspect-j1979-legacy-discovery"))return replay_legacy_discovery(argv[2],argv[3],argv[4],argv[5]);
