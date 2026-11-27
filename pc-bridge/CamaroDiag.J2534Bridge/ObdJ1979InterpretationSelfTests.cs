@@ -214,6 +214,16 @@ internal static class ObdJ1979InterpretationSelfTests
             StandardProtocolCli.ParseIsoTp(args.Concat(
                 new[] { "--mode", "receive" }).ToArray()),
             "J1979 correlation needs outgoing request.");
+        var fuel=ObdJ1979Status.DecodeResponse([1,3],[0x41,3,2,3]);
+        Check(fuel is {Count:2}&&fuel[0].State=="CLOSED_FEEDBACK"&&fuel[1].State=="UNKNOWN",
+            "fuel status retains unknown code");
+        var boost=new byte[12];boost[0]=0x41;boost[1]=0x70;boost[2]=4;boost[11]=14;
+        var states=ObdJ1979Status.DecodeResponse([1,0x70],boost);
+        Check(states is {Count:1}&&states[0].State=="CLOSED_LOOP","boost mask isolates status A");
+        Check(ObdJ1979Interpretation.Interpret([1,0x70],boost).Description.Contains("CLOSED_LOOP"),
+            "console includes categorical fields");
+        boost[11]=0xFE;
+        Check(ObdJ1979Status.DecodeResponse([1,0x70],boost) is null,"reserved boost bits rejected");
         return checks;
     }
 }
