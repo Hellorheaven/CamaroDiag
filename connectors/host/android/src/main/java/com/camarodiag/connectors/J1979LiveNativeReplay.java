@@ -256,6 +256,13 @@ public final class J1979LiveNativeReplay {
                 "raw_bytes",rawBytes,"advertised_pids",Collections.unmodifiableList(ids),
                 "raw_per_pid",Collections.unmodifiableList(counts));
         }
+        Map<String,Object> prefix(){
+            return map("initial_identity_verified_in_prefix",initial,"final_identity_observed_in_prefix",finalIdentity,
+                "complete_observations",steps,"last_elapsed_ms",duration,"raw_bytes",rawBytes,
+                "completed_cycles_in_prefix",cycles,"raw_samples_in_prefix",raw,"negative_samples_in_prefix",negative,
+                "timeout_samples_in_prefix",timeouts,"observations",Collections.unmodifiableList(new ArrayList<>(observations)),
+                "samples",Collections.unmodifiableList(new ArrayList<>(rows)));
+        }
         Map<String,Object> result(){
             return map("schema","camarodiag-j1979-live-inspection-v1","verified",true,"raw_only",true,
                 "declared_vin",profile.vin,"channel",map("kind","can","tx",profile.tx,"rx",profile.rx),
@@ -294,6 +301,56 @@ public final class J1979LiveNativeReplay {
             return Collections.unmodifiableMap(report);
         }
     }
+    /** Separate offline schema: complete records of an interrupted capture.
+     * No terminal, transport or physical provenance is asserted. */
+    public static Map<String,Object> inspectPrefix(byte[] bytes,String expectedVin)throws IOException{
+        require(expectedVin!=null&&expectedVin.matches("[A-HJ-NPR-Z0-9]{17}"),"Independently supplied VIN required");
+        require(bytes!=null&&bytes.length>0&&bytes.length<=MAX_CAPTURE,"Invalid CL/1 input size");
+        int position=0,sequence=0;
+        J1979LiveUsbAuth.Profile profile=null;Replay replay=null;
+        String interruption="MISSING_TERMINAL";
+        while(position<bytes.length){
+            require(sequence<MAX_STEPS+2,"CL/1 record count exceeded");
+            int remaining=bytes.length-position;
+            byte[] head=Arrays.copyOfRange(bytes,position,position+Math.min(8,remaining));
+            byte[] magic={'C','L',1};
+            for(int i=0;i<Math.min(3,head.length);i++)require(head[i]==magic[i],"Invalid partial CL/1 header");
+            if(head.length>=4)require(sequence==0?head[3]==1:head[3]==2||head[3]==3,"Invalid CL/1 record kind");
+            if(head.length>=5)require(u(head[4])==(sequence&255),"Invalid partial CL/1 sequence");
+            if(head.length>=6)require(u(head[5])==(sequence>>8),"Invalid partial CL/1 sequence");
+            if(remaining<8){interruption="TRUNCATED_HEADER";break;}
+            int len=header(head,sequence),kind=u(head[3]);
+            require((kind!=1||len==67)&&(kind!=2||len>=26)&&(kind!=3||len==FINAL_SIZE),"Invalid CL/1 body length");
+            int size=8+len+4;
+            if(remaining<size){interruption="TRUNCATED_RECORD";break;}
+            byte[] data=body(head,Arrays.copyOfRange(bytes,position+8,position+size),len);
+            if(kind==1){
+                profile=J1979LiveUsbAuth.Profile.decode(data);
+                require(profile.vin.equals(expectedVin),"CL/1 plan differs from independent VIN");
+                replay=new Replay(profile);
+            }else if(kind==2){
+                require(replay!=null,"Missing CL/1 plan");
+                replay.observe(new Event(data));
+            }else{
+                require(replay!=null,"Missing CL/1 plan");
+                replay.finish(data);
+                require(position+size==bytes.length,"Trailing CL/1 bytes");
+                throw new IOException("CL/1 contains a terminal record; use inspect");
+            }
+            position+=size;sequence++;
+        }
+        require(profile!=null&&replay!=null,"No complete CL/1 plan");
+        require(sequence<=MAX_STEPS+1,"CL/1 record count exceeded");
+        Map<String,Object> result=new LinkedHashMap<>(replay.prefix());
+        result.putAll(map("schema","camarodiag-j1979-native-live-prefix-v1","protocol","SAE-J1979",
+            "source","OFFLINE_CL1_PREFIX","profile",profileView(profile),"prefix_integrity_verified",true,
+            "capture_integrity_verified",false,"execution_completed",false,"terminal_present",false,
+            "expected_vin_independently_supplied",true,"complete_records",sequence,"last_complete_offset",position,
+            "discarded_tail_bytes",bytes.length-position,"interruption",interruption,"physical_vehicle_verified",false,
+            "hardware_provenance_verified",false,"evidence_authenticated",false,"permits_programming",false));
+        return Collections.unmodifiableMap(result);
+    }
+
     public static Result decode(InputStream stream,J1979LiveUsbAuth.Profile expected){
         J1979LiveUsbAuth.Profile profile=null;Replay replay=null;Map<String,Object> summary=null;
         int received=0,total=0;String error=null;
