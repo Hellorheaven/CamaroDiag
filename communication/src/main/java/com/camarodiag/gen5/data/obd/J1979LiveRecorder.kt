@@ -49,7 +49,8 @@ data class J1979LiveReport(val plan: J1979LivePlan,val observedVin: String?,val 
     val observations: List<J1979LiveObservation>,val summaries: List<J1979LiveSummary>,
     val completed: Boolean,val stopReason: String?,val durationMs: Long,
     val legacyExchanges: List<LegacyLiveExchange> = emptyList(),
-    val multiSignalSummary: List<J1979LiveChannelSummary> = emptyList()) {
+    val multiSignalSummary: List<J1979LiveChannelSummary> = emptyList(),
+    val scalingConfiguration: List<ObdJ1979ScalingContext.Configuration>? = null) {
     val physicallyAddressed get() = !plan.target.legacy
     val scope get() = if(physicallyAddressed)"PHYSICAL_SELECTED_ECU_LIVE" else "FUNCTIONAL_SELECTED_RESPONSE_LIVE"
     val physicalVehicleVerified get() = false
@@ -75,7 +76,7 @@ internal object J1979LiveRecorder {
     fun legacyNumericPid(pid:Int):Boolean=numericPid(pid)&&(ObdJ1979MultiSignal.width(pid)?:0)<=5
     fun allowed(request: ByteArray) = request.contentEquals(byteArrayOf(9,2)) ||
         request.size==2 && request[0]==1.toByte() &&
-        ((request[1].toInt() and 255)%32==0 || numericPid(request[1].toInt() and 255))
+        ((request[1].toInt() and 255)%32==0 || ObdJ1979ScalingContext.isConfiguration(request[1].toInt() and 255) || numericPid(request[1].toInt() and 255))
     private class ChannelAccumulator(private val first:ObdJ1979MultiSignal.Signal) {
         private var count=0
         private var minimum=0.0
@@ -142,6 +143,11 @@ internal object J1979LiveRecorder {
         var lastIdentity: Long?=null
         var stop: String?=null
         var completeInventory=false
+        val requiredConfigs=plan.pids.mapNotNull(ObdJ1979ScalingContext::dependency).distinct().sorted()
+        var scaling:ObdJ1979ScalingContext.Context?=null
+        fun buildScaling()=ObdJ1979ScalingContext.build(admission.map {
+            ObdJ1979ScalingContext.Observation(it.requestHex,it.responseHex,it.status)
+        })
         var cycles=0
         suspend fun active(): Boolean {
             if(stop!=null)return false
@@ -182,17 +188,31 @@ internal object J1979LiveRecorder {
                     }else {
                         status=evidence.status
                         if(status=="NEGATIVE")detail="NRC_"+hex(requireNotNull(evidence.negativeResponseCode()))
-                        if(phase=="SAMPLE"&&status in setOf("RAW","PASSED")&&
+                        if(phase=="SCALING"&&status in setOf("RAW","PASSED")&&
+                            !ObdJ1979ScalingContext.validConfiguration(request[1].toInt() and 255,
+                                requireNotNull(reply.payload).drop(2).map { it.toInt() and 255 })){
+                            status="FAILED";stop="INVALID_APPLICATION_RESPONSE";detail=stop;evidence=null
+                        }else if(phase=="SAMPLE"&&status in setOf("RAW","PASSED")&&
                             pid!=null&&ObdJ1979MultiSignal.width(pid)!=null){
                             multi=ObdJ1979MultiSignal.decodeResponse(command,raw)
                             if(multi==null){
                                 status="FAILED";stop="INVALID_MEASUREMENT";detail=stop;evidence=null
+                            }else if(scaling!=null&&ObdJ1979ScalingContext.dependency(pid)!=null){
+                                val contextual=scaling?.decode(command,raw)
+                                if(contextual==null||contextual.signals.size!=multi.size||contextual.signals.any { it.number==null }){
+                                    status="FAILED";stop="SCALING_UNVERIFIED";detail=stop;evidence=null;multi=null
+                                }else multi=multi.zip(contextual.signals).map { (signal,scaled)->signal.copy(number=requireNotNull(scaled.number)) }
                             }
                         }else if(phase=="SAMPLE"&&status=="PASSED"){
                             val m=evidence.measurement()
                             if(m==null||m.pid!=pid||m.mode!=1||!m.number.isFinite()){
                                 status="FAILED";stop="INVALID_MEASUREMENT";detail=stop;evidence=null
-                            }else value=J1979LiveValue(m.name,m.number,m.unit)
+                            }else {
+                                val number=if(scaling!=null&&ObdJ1979ScalingContext.dependency(m.pid)!=null)
+                                    scaling?.decode(command,raw)?.signals?.singleOrNull()?.number else m.number
+                                if(number==null){status="FAILED";stop="SCALING_UNVERIFIED";detail=stop;evidence=null}
+                                else value=J1979LiveValue(m.name,number,m.unit)
+                            }
                         }
                     }
                 }
@@ -250,7 +270,7 @@ internal object J1979LiveRecorder {
                 pages+=J1979LivePage(base,ids,page.hasNextPage)
                 advertised.addAll(ids)
                 if(!page.hasNextPage){completeInventory=true;break}
-                if(plan.pids.all { it in advertised })break
+                if(plan.pids.all { it in advertised }&&(requiredConfigs.isEmpty()||base>=0x40))break
             }
             if(stop==null&&!plan.pids.all { it in advertised })stop="SELECTED_PID_NOT_VERIFIED"
         }
@@ -266,6 +286,15 @@ internal object J1979LiveRecorder {
             // VIN establishes application response on the selected CAN
             // channel; ATDPN then confirms the fixed electrical profile.
             if(identity("INITIAL_VIN")&&protocol())inventory()
+            if(stop==null&&requiredConfigs.isNotEmpty()){
+                for(config in requiredConfigs){
+                    if(config in advertised)query(byteArrayOf(1,config.toByte()),"SCALING")
+                    if(stop!=null)break
+                }
+                scaling=buildScaling()
+                if(stop==null&&scaling!!.configurations.any { it.pid in requiredConfigs && it.state=="UNVERIFIED" })
+                    stop="SCALING_UNVERIFIED"
+            }
             if(stop==null){
                 var next=elapsed()
                 for(cycle in 1..plan.cycles){
@@ -291,6 +320,7 @@ internal object J1979LiveRecorder {
             completeInventory,cycles,admission.toList(),rows.toList(),plan.pids.map { stats.getValue(it).snapshot() },
             stop==null&&cycles==plan.cycles,stop,elapsed(),multiSignalSummary=channels.entries
                 .sortedWith(compareBy({it.key.first},{it.key.second}))
-                .map { (key,acc)->acc.snapshot(stats.getValue(key.first).snapshot().attempted) })
+                .map { (key,acc)->acc.snapshot(stats.getValue(key.first).snapshot().attempted) },
+            scalingConfiguration=if(requiredConfigs.isEmpty())null else (scaling?:buildScaling()).configurations)
     }
 }
