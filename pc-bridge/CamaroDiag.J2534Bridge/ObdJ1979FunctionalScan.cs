@@ -25,6 +25,8 @@ internal static class ObdJ1979FunctionalScan
         }).ToArray();
         // Keep the native CJ/1 evidence schema unchanged; this is a derived
         // engineering view of correlated physical CAN Mode 06 scan records.
+        public object OperatingContext => ObdJ1979OperatingContext.Evidence(ObdJ1979OperatingContext.Project(
+            Steps.Select(s=>new ObdJ1979OperatingContext.Observation(s.RequestHex,s.ResponseHex,s.Status))));
         public ObdJ1979ScalingContext.Projection ContextualMeasurements => ObdJ1979ScalingContext.Project(
             Steps.Select(s=>new ObdJ1979ScalingContext.Observation(s.RequestHex,s.ResponseHex,s.Status)));
         public IReadOnlyList<ObdJ1979Status.Record> StatusRecords => Steps
@@ -137,6 +139,9 @@ internal static class ObdJ1979FunctionalScan
                 if(request[0]==1 && request.Length==2 && ObdJ1979ScalingContext.IsConfiguration(request[1]) &&
                     !ObdJ1979ScalingContext.ValidConfiguration(request[1],response.AsSpan(2)))
                     throw new InvalidDataException("Invalid ECU measurement configuration.");
+                if(request.AsSpan().SequenceEqual(new byte[]{1,0x41}) &&
+                    ObdJ1979OperatingContext.DecodeCycle(response[2..],null) is null)
+                    throw new InvalidDataException("Invalid current-cycle monitor response.");
                 if(application.Shape=="RAW"){
                     string? rawDetail = null;
                     if(request[0]==1 && ObdJ1979MultiSignal.Width(request[1]) is not null){
