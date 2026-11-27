@@ -20,4 +20,6 @@
     <string name="j1979_freeze_unvisited">Frames not visited: %1$s</string>
     <string name="j1979_freeze_more">%1$d more records in JSON export</string>
     <string name="j1979_freeze_scope">Recorded data only. Additional OEM frames stay raw; no physical validation.</string>
+    <string name="j1979_freeze_native_title">Native USB freeze frames (CU/2)</string>
+    <string name="j1979_freeze_native_verified">Native capture verified by replay</string>
 </resources>
