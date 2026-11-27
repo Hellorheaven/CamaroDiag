@@ -22,4 +22,5 @@
     <string name="j1979_freeze_scope">Recorded data only. Additional OEM frames stay raw; no physical validation.</string>
     <string name="j1979_freeze_native_title">Native USB freeze frames (CU/2)</string>
     <string name="j1979_freeze_native_verified">Native capture verified by replay</string>
+    <string name="j1979_legacy_freeze_confirm">I confirm functional legacy requests may reach multiple ECUs; selected replies only, VIN %1$s.</string>
 </resources>
