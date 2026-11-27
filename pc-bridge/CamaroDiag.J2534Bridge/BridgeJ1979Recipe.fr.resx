@@ -161,4 +161,6 @@
   <data name="FreezeNativeSelected" xml:space="preserve"><value>Sélectionné</value></data>
   <data name="FreezeNativeOffline" xml:space="preserve"><value>Inspection hors ligne</value></data>
   <data name="FreezeNativeCaptureFilter" xml:space="preserve"><value>Capture native (*.cf)|*.cf</value></data>
+  <data name="FreezeLegacyRun" xml:space="preserve"><value>Trames figées legacy</value></data>
+  <data name="FreezeLegacyConfirm" xml:space="preserve"><value>Je confirme que les requêtes fonctionnelles peuvent atteindre plusieurs calculateurs ; seules les réponses de la source sélectionnée sont utilisées.</value></data>
 </root>
