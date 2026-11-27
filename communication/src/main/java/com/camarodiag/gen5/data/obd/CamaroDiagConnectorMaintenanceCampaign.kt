@@ -22,14 +22,14 @@ import java.util.UUID
  * pre-transmission marker survive a cancellation or process interruption.
  * No automatic retry and no generic write API. */
 object CamaroDiagConnectorMaintenanceCampaign {
-    data class Target(val channel: CamaroDiagConnectorNativeCampaign.Target,val operation: Int) {
+    data class Target(val channel: CamaroDiagConnectorNativeCampaign.Target,val operation: Int,val archive:Boolean=false) {
         val profile: J1979MaintenanceUsb.Profile get() = J1979MaintenanceUsb.Profile(
             operation,channel.tx,channel.rx,channel.extended,channel.vehicle,channel.budgetMs)
         val valid: Boolean get()=channel.valid&&runCatching { profile }.isSuccess
     }
     data class Evidence(val journal: File,val report: File,val sha256: String?,
                         val document: Map<String,Any?>,val target: Target) {
-        val verified: Boolean get()=document["journal_transfer_verified"]==true
+        val verified: Boolean get()=document[if(target.archive) "archive_transfer_verified" else "journal_transfer_verified"]==true
         val recoveryRequired: Boolean get()=document["recovery_required"]==true
         val terminal: Map<*,*>? get()=(document["inspection"] as? Map<*,*>)?.get("terminal") as? Map<*,*>
     }
@@ -82,7 +82,7 @@ object CamaroDiagConnectorMaintenanceCampaign {
             fun current()=job.isActive&&stillApproved(target.channel.connectionGeneration)&&
                 manager.hasPermission(device)&&manager.deviceList[device.deviceName]==device
             check(current())
-            val stem="j1979-maintenance-"+UUID.randomUUID()
+            val stem=(if(target.archive) "j1979-maintenance-archive-" else "j1979-maintenance-")+UUID.randomUUID()
             val marker=File(folder,stem+".pending.json")
             val journal=File(folder,stem+".cm")
             val report=File(folder,stem+".json")
@@ -90,7 +90,7 @@ object CamaroDiagConnectorMaintenanceCampaign {
             val profile=target.profile
             // Reserve the final report before USB and durably persist a
             // marker. A marker without a final report is never success.
-            writeNew(marker,linkedMapOf("schema" to "camarodiag-j1979-native-maintenance-pending-v1",
+            if(!target.archive)writeNew(marker,linkedMapOf("schema" to "camarodiag-j1979-native-maintenance-pending-v1",
                 "scope" to profile.view(),"started_at_utc" to started.toString(),
                 "raw_journal_name" to journal.name,"final_report_name" to report.name,
                 "command_outcome_unknown" to true,"permits_automatic_retry" to false))
@@ -104,13 +104,15 @@ object CamaroDiagConnectorMaintenanceCampaign {
                         FileChannel.open(journal.toPath(),StandardOpenOption.CREATE_NEW,StandardOpenOption.WRITE).use { raw ->
                             check(current())
                             enteredUsb=true
-                            document=UsbJ1979.captureMaintenance(manager,device,target.channel.controlId,target.channel.dataId,
-                                profile,key,Channels.newOutputStream(raw),::current).toMutableMap()
+                            document=(if(target.archive) UsbJ1979.captureMaintenanceArchive(manager,device,
+                                target.channel.controlId,target.channel.dataId,profile,key,Channels.newOutputStream(raw),::current)
+                            else UsbJ1979.captureMaintenance(manager,device,target.channel.controlId,target.channel.dataId,
+                                profile,key,Channels.newOutputStream(raw),::current)).toMutableMap()
                             raw.force(true)
                         }
                         sha=digest(journal)
                         val value=requireNotNull(document)
-                        if(value["journal_transfer_verified"]==true){
+                        if(value[if(target.archive) "archive_transfer_verified" else "journal_transfer_verified"]==true){
                             val saved=J1979MaintenanceJournal.inspect(readBounded(journal),profile.vin)
                             check(saved==value["inspection"]&&digest(journal)==sha) { "Persisted CM/1 differs from transfer" }
                         }
@@ -139,6 +141,23 @@ object CamaroDiagConnectorMaintenanceCampaign {
                         value["recovery_required"]=possible
                         value["command_outcome_unknown"]=possible
                         value["error"]="CU/4 context revoked"
+                    }
+                    if(target.archive){
+                        // Archive acquisition never sends a maintenance command. Keep
+                        // recovery required if its evidence could not be verified.
+                        value["schema"]="camarodiag-j1979-native-maintenance-archive-v1"
+                        value["source"]="READ_ONLY_USB_CU5"
+                        if(value["archive_transfer_verified"]!=true||!current()){
+                            value["archive_transfer_verified"]=false
+                            value["inspection"]=null
+                            value["recovery_required"]=true
+                        }
+                        value["maintenance_command_sent"]=false
+                        value["physical_stop_independently_verified"]=false
+                        value.remove("proof_transmission_attempted")
+                        value.remove("client_proof_sent")
+                        value.remove("command_outcome_unknown")
+                        value.remove("journal_transfer_verified")
                     }
                     value["cancelled"]=value["cancelled"]==true
                     value["physical_vehicle_verified"]=false
