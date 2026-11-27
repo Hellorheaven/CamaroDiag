@@ -6,7 +6,7 @@ for capture integrity, and all conclusions are recomputed from observations.
 from __future__ import annotations
 
 from dataclasses import dataclass
-import hashlib
+import io
 import hmac
 import os
 import struct
@@ -15,6 +15,7 @@ from pathlib import Path
 
 from .j1979_freeze import FreezePlan, Read, execute_plan, MAX_STEPS, MAX_RESPONSE
 from .j1979_usb_auth import validate_profile
+from .recovery_bundle import _regular
 
 HEADER = struct.Struct("<2sBBHH")
 PROFILE = struct.Struct("<IIBI")
@@ -204,6 +205,7 @@ def decode(stream, expected=None):
         result["duration_ms"] = summary["duration_ms"]
     except (ValueError, OSError, EOFError) as exc:
         error = str(exc)
+        result = None
     return {"schema": "camarodiag-functional-j1979-native-freeze-v1",
             "protocol": "SAE-J1979", "source": "OFFLINE_CF1",
             "profile": profile.report() if profile else None,
@@ -216,25 +218,11 @@ def decode(stream, expected=None):
 
 
 def inspect_file(path):
-    with Path(path).open("rb") as stream:
-        before = os.fstat(stream.fileno())
-        if before.st_size > MAX_CAPTURE:
-            raise ValueError("CF/1 capture exceeds size limit")
-        digest = hashlib.sha256()
-        remaining = MAX_CAPTURE
-        while True:
-            block = stream.read(min(65536, remaining + 1))
-            if not block:
-                break
-            remaining -= len(block)
-            if remaining < 0:
-                raise ValueError("CF/1 capture exceeds size limit")
-            digest.update(block)
-        stream.seek(0)
-        report = decode(stream)
-        after = os.fstat(stream.fileno())
-        if (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns) != (
-                after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns):
-            raise ValueError("CF/1 capture changed during inspection")
-        report["capture_sha256"] = digest.hexdigest()
+    source = Path(path)
+    raw, stamp = _regular(source, MAX_CAPTURE)
+    report = decode(io.BytesIO(raw))
+    again, final = _regular(source, MAX_CAPTURE)
+    if raw != again or stamp != final:
+        raise ValueError("CF/1 capture changed during inspection")
+    report["capture_sha256"] = stamp.digest
     return report
