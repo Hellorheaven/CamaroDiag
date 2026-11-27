@@ -32,10 +32,11 @@ def run(argv=None):
             with LegacyElmSerial(args.port, args.baud, args.protocol) as transport:
                 result = scan(transport.exchange, transport.observed_protocol,
                               args.protocol, budget=args.budget)
-        except (OSError, ValueError, ImportError) as exc:
+        except (OSError, ValueError, ImportError, KeyboardInterrupt) as exc:
             result = {"expected_protocol": args.protocol, "observed_protocol": None,
                       "observed_vin": None, "completed": False,
-                      "stop_reason": type(exc).__name__, "steps": [],
+                      "stop_reason": "CANCELLED" if isinstance(exc, KeyboardInterrupt) else type(exc).__name__,
+                      "cancelled": isinstance(exc, KeyboardInterrupt), "steps": [],
                       "not_executed": ["MODE_04_CLEAR", "MODE_08_CONTROL"]}
         report = {"schema": "camarodiag-functional-j1979-legacy-v1",
                   "protocol": "SAE-J1979", "version": __version__,
@@ -46,6 +47,8 @@ def run(argv=None):
                   **result}
         json.dump(report, output, indent=2, ensure_ascii=True)
         output.write("\n")
+        output.flush()
+        os.fsync(output.fileno())
     return report
 
 

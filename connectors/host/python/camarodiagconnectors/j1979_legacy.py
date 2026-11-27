@@ -166,6 +166,13 @@ def scan(exchange, protocol_check, expected_protocol: int, *, budget=180.0,
         status, detail = "NOT_TESTED", None
         try:
             raw = exchange(command, min(left, 4.0))
+            if clock() - start >= budget:
+                stop = "BUDGET_EXHAUSTED"
+                detail = "LATE_RESPONSE"
+                steps.append({"request_hex": command, "raw_response": raw, "status": status,
+                              "detail": detail, "records_hex": [],
+                              "duration_ms": round((clock() - begun) * 1000)})
+                return []
             parsed = records(command, raw)
             valid = [row for row in parsed if validate(row)]
             if len(valid) != len(parsed) or not valid:
@@ -174,6 +181,8 @@ def scan(exchange, protocol_check, expected_protocol: int, *, budget=180.0,
                 valid = []  # do not advance discovery on ambiguous data
             else:
                 status = "PASSED"
+        except KeyboardInterrupt:
+            stop = detail = "CANCELLED"
         except ValueError as exc:
             detail = str(exc)
         except OSError as exc:
@@ -206,11 +215,15 @@ def scan(exchange, protocol_check, expected_protocol: int, *, budget=180.0,
     if first:
         try:
             actual = protocol_check()
-            if actual != expected_protocol:
+            if clock() - start >= budget:
+                stop = "BUDGET_EXHAUSTED"
+            elif actual != expected_protocol:
                 stop = "PROTOCOL_MISMATCH"
             else:
                 observed_protocol = actual
-        except (OSError, ValueError):
+        except KeyboardInterrupt:
+            stop = "CANCELLED"
+        except (OSError, ValueError, RuntimeError):
             stop = "PROTOCOL_UNVERIFIED"
     elif stop is None:
         stop = "NO_POSITIVE_PID00"
@@ -274,5 +287,5 @@ def scan(exchange, protocol_check, expected_protocol: int, *, budget=180.0,
             "protocol_name": PROTOCOLS[expected_protocol], "responder_attribution": "ANONYMOUS",
             "observed_vin": None, "anonymous_vin_candidate": vin_candidate,
             "steps": steps, "advertised_control_tests": controls, "completed": stop is None,
-            "stop_reason": stop, "duration_ms": round((clock() - start) * 1000),
+            "stop_reason": stop, "cancelled": stop == "CANCELLED", "duration_ms": round((clock() - start) * 1000),
             "not_executed": ["MODE_04_CLEAR", "MODE_08_CONTROL"]}
