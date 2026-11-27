@@ -192,6 +192,15 @@ internal static class J1979LiveNative
             }
             return stage;
         }
+        private static int MaximumReply(int phase)=>phase switch {1 or 3 or 5=>20,2=>6,4=>4095,_=>0};
+        private bool CanRetain(int phase)=>MaximumReply(phase)>0&&MaximumReply(phase)<=MaximumRaw-rawBytes;
+        private bool CapacityStop(long now)
+        {
+            int phase=Phase(now);
+            if(phase==4&&index==0&&!earlyIdentity&&now-lastIdentity>=29000)phase=3;
+            if(stage==4&&index==0&&cycleStart is long start&&now-start<profile.IntervalMs+25L)return false;
+            return phase is >=1 and <=5&&!CanRetain(phase);
+        }
         private byte[] Request(int phase)=>phase switch {
             1 or 3 or 5=>[9,2],
             2=>[1,(byte)basePid],
@@ -204,6 +213,7 @@ internal static class J1979LiveNative
             int phase=Phase(e.Start);
             if(e.Phase==3&&phase==4&&index==0&&!earlyIdentity)phase=3;
             Require(phase==e.Phase&&phase is >=1 and <=5,"Unexpected CL/1 phase");
+            Require(CanRetain(phase),"CL/1 request exceeds remaining evidence capacity");
             var req=Request(phase);
             Require(e.Request.AsSpan().SequenceEqual(req)&&e.Timeout<=profile.BudgetMs-e.Start&&
                 e.Cycle==(phase==4?cycles+1:0)&&e.Pid==(phase==4?req[1]:0),"CL/1 request outside approved scope");
@@ -263,12 +273,13 @@ internal static class J1979LiveNative
         }
         internal Terminal Finish(byte[] data)
         {
-            Require(data.Length==FinalSize&&data[0]<Stops.Length&&data[0] is not (1 or 9 or 10 or 11)&&
+            Require(data.Length==FinalSize&&data[0]<Stops.Length&&data[0] is not (1 or 9 or 10)&&
                 (data[1]&~15)==0,"Malformed CL/1 terminal");
             long end=U32(data,24);Require(end>=duration&&end<=604000,"Invalid terminal duration");
             if(stage!=7)
             {
-                Require(data[0] is 2 or 3&&(data[0]!=2||profile.BudgetMs-end<=1),"Unsupported terminal state");
+                Require(data[0] is 2 or 3 or 11&&(data[0]!=2||profile.BudgetMs-end<=1)&&
+                    (data[0]!=11||CapacityStop(end)),"Unsupported terminal state");
                 Abort(data[0],end);
             }
             Require(data.AsSpan().SequenceEqual(EncodeSummary()),"CL/1 terminal counters differ from replay");
