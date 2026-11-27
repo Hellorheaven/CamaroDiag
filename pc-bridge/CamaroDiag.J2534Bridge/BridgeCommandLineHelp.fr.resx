@@ -19,6 +19,7 @@ Utilisation :
   CamaroDiag.J2534Bridge.exe --inspect-j1979-freeze-native freeze.cf inspected.json
   CamaroDiag.J2534Bridge.exe --j1979-live-native --port COM5 --key-file host.key --tx 7E0 --rx 7E8 --vin DOCUMENTED_VIN --pid 05 --pid 0C --cycles 30 --interval-ms 1000 --confirm-physical-channel --capture live.cl --output live.json
   CamaroDiag.J2534Bridge.exe --inspect-j1979-live-native live.cl DOCUMENTED_VIN inspected.json
+  CamaroDiag.J2534Bridge.exe --export-j1979-live-native-csv live.cl DOCUMENTED_VIN live.csv
   CamaroDiag.J2534Bridge.exe --j1979-freeze --adapter-index 0 --protocol 33 --tx 7E0 --rx 7E8 --vin DOCUMENTED_VIN --frame 00 --frame 01 --pid 0C --confirm-physical-channel --output freeze.json
   CamaroDiag.J2534Bridge.exe --j1979-live --adapter-index 0 --protocol 33 --tx 7E0 --rx 7E8 --vin DOCUMENTED_VIN --pid 05 --pid 0C --cycles 30 --interval-ms 1000 --confirm-physical-channel --output live.json --csv live.csv
   CamaroDiag.J2534Bridge.exe --j1979-legacy-live --adapter-index 0 --variant 2 --source 10 --vin DOCUMENTED_VIN --pid 05 --pid 0C --confirm-legacy-profile --confirm-functional-scope --output legacy-live.json --csv legacy-live.csv
