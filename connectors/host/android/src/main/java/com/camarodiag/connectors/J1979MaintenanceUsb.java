@@ -190,6 +190,11 @@ public final class J1979MaintenanceUsb {
             declared=map("bytes",(int)length,"records",(int)head[5],"terminal_present",terminal,
                 "damaged_tail",damaged,"recovery_required",recovery);
             read((int)length,start,budget,allowed,raw,copy);
+            byte[] trailer=read(12,start,budget,allowed,null,null);
+            java.util.zip.CRC32 crc=new java.util.zip.CRC32();crc.update(copy.toByteArray());
+            ByteBuffer receipt=ByteBuffer.wrap(trailer).order(ByteOrder.LITTLE_ENDIAN);
+            require(header(trailer,12,5,5)&&(receipt.getInt(4)&0xffffffffL)==length&&
+                (receipt.getInt(8)&0xffffffffL)==crc.getValue(),"CU/5 closing receipt missing or inconsistent");
             link.checkNoBufferedInput();remaining(start,budget,allowed);
             Map<String,Object> result=J1979MaintenanceJournal.inspect(copy.toByteArray(),profile.vin);
             require(profile.view().equals(result.get("scope"))&&Boolean.valueOf(terminal).equals(result.get("terminal_present"))&&
@@ -205,7 +210,8 @@ public final class J1979MaintenanceUsb {
         if(error!=null)inspection=null;
         return map("schema","camarodiag-j1979-native-maintenance-archive-v1","protocol","SAE-J1979",
             "source","READ_ONLY_USB_CU5","scope",profile.view(),"device_credential_authenticated",authenticated,
-            "archive_transfer_verified",inspection!=null,"journal_bytes_received",copy.size(),
+            "archive_transfer_verified",inspection!=null,"archive_close_receipt_verified",inspection!=null,
+            "journal_bytes_received",copy.size(),
             "declared_archive",declared,"inspection",inspection,"recovery_required",inspection==null||
                 Boolean.TRUE.equals(declared.get("recovery_required")),"maintenance_command_sent",false,
             "physical_vehicle_verified",false,"physical_stop_independently_verified",false,"evidence_authenticated",false,
