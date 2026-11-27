@@ -212,4 +212,6 @@
   <data name="NativeMaintenanceAccept" xml:space="preserve"><value>I acknowledge the consequences and prerequisites</value></data>
   <data name="NativeMaintenanceConfirm" xml:space="preserve"><value>I confirm one operation with independent local approval on the selected VIN.</value></data>
   <data name="NativeMaintenanceUnverified" xml:space="preserve"><value>Journal not verified; no successful operation claimed.</value></data>
+  <data name="NativeMaintenancePrefixInspect" xml:space="preserve"><value>Inspect interrupted maintenance journal</value></data>
+  <data name="NativeMaintenancePrefixConsistent" xml:space="preserve"><value>Complete prefix records checked; terminal absent. Recovery remains required.</value></data>
 </root>
