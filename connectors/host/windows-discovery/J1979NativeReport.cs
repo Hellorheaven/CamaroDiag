@@ -39,6 +39,8 @@ internal static class J1979NativeReport
                 measurement=s.PidMeasurement is { } value?new {
                     mode=value.Mode,pid=value.Pid,name=value.Name,number=value.Number,unit=value.Unit
                 }:null}),
+            multi_signal_records=result.Steps.Select(s=>ObdJ1979MultiSignal.TryRecord(s.RequestHex,s.ResponseHex,s.Status))
+                .OfType<ObdJ1979MultiSignal.Record>().Select(ObdJ1979MultiSignal.Evidence),
             extended_vehicle_info=result.Steps.Select(s=>ObdJ1979ExtendedVehicleInfo.TryRaw(s.RequestHex,s.ResponseHex,s.Status))
                 .OfType<ObdJ1979ExtendedVehicleInfo.Record>().Select(ObdJ1979ExtendedVehicleInfo.Evidence),
             service_observations=new[]{1,2,3,6,7,8,9,10}.Select(mode=>{
