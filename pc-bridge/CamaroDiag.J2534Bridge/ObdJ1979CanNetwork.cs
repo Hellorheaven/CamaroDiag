@@ -86,7 +86,7 @@ internal static class ObdJ1979CanNetwork
         if(data.Length!=8)return invalid;
         if(data[0]==6&&data[1]==0x41&&data[2]==0){
             var page=ObdJ1979PidSupport.Decode([1,0],data.AsSpan(1,6));
-            return invalid with {Status="PASSED",Detail=null,SupportedPids=page.SupportedPids,NextPage=page.HasNextPage};
+            return invalid with {Status="PASSED",Detail=null,SupportedPids=page.SupportedPids.Where(x=>x%32!=0).ToArray(),NextPage=page.HasNextPage};
         }
         if(data[0]==3&&data[1]==0x7F&&data[2]==1&&data[3]!=0){
             return invalid with {Status="NOT_TESTED",

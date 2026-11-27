@@ -297,3 +297,7 @@ camarodiag-offline inspect-checkpoint-history --input prepared.bin --input erase
 ```
 
 La suite est fournie dans l'ordre par l'opérateur. Un état terminal ne prouve pas une restauration physique, et un suffixe ne constitue pas un historique complet. CRC et SHA-256 ne prouvent ni authenticité ni fraîcheur. Aucun accès ECU et aucune autorisation de programmation. / Explicit ordered evidence only; no authenticated history or recovery authorization. Optional transaction and manifest identifiers must match exactly.
+
+### Relecture des campagnes CAN réseau / CAN network evidence replay
+
+`camarodiag-offline verify-network --report network.json --output inspected.json` relit hors ligne la découverte, les sélections de calculateurs et les recettes physiques des trois hôtes. `--vin` vérifie la contrainte déclarée. Une campagne interrompue peut être cohérente sans être complète. Les trames, mesures et listes de défauts sont revalidées ; aucune preuve de couverture complète ou de provenance matérielle. / Replay only, not a hardware qualification or an ECU authorization.

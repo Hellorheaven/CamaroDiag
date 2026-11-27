@@ -13,6 +13,7 @@ from .doip_archive import verify_archive
 from .memory import Geometry, Patch, Region, Technology, plan_patches
 from .recovery_bundle import AndroidIdentity,inspect_bundle,write_report
 from .j1979_live_inspection import inspect_file, compare_files
+from .j1979_network_inspection import inspect_network_file
 from .connector_checkpoint import inspect_file as inspect_checkpoint, inspect_history, verify_report as verify_checkpoint_report
 
 
@@ -94,6 +95,11 @@ def _parser() -> argparse.ArgumentParser:
     verify_checkpoint.add_argument("--report", type=Path, required=True)
     verify_checkpoint.add_argument("--output", type=Path, required=True)
 
+    network = commands.add_parser("verify-network", help="Replay CAN network discovery and selected ECU scans")
+    network.add_argument("--report", type=Path, required=True)
+    network.add_argument("--vin")
+    network.add_argument("--output", type=Path, required=True)
+
     plan = commands.add_parser("plan", help="Dry-run changes; no device programming")
     plan.add_argument("--target", required=True)
     plan.add_argument("--technology", required=True, choices=[t.value for t in Technology])
@@ -146,6 +152,9 @@ def run(argv: Sequence[str] | None = None) -> dict[str, object]:
         return write_report(args.output, inspect_history(args.input,args.transaction,args.manifest))
     if args.action == "verify-checkpoint-report":
         return write_report(args.output, verify_checkpoint_report(args.input,args.report))
+
+    if args.action == "verify-network":
+        return write_report(args.output, inspect_network_file(args.report,args.vin))
 
     original = args.input.read_bytes()
     geometry = Geometry(args.target, Technology(args.technology), len(original), args.page_size,
