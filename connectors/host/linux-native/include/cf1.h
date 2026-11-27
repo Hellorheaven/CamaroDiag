@@ -62,6 +62,9 @@ typedef struct {
     char recipe_stop_reason[32];
     /* Invariant: a prefix can NEVER assert completed physical execution. */
     bool execution_completed, capture_integrity_verified, physical_vehicle_verified;
+    bool terminal_present;
+    uint32_t terminal_duration_ms;
+    char terminal_stop_reason[32];
 } cf1_evidence;
 
 /* Returns 0 only for a valid, interrupted CF/1 prefix. Complete terminal is
@@ -71,6 +74,9 @@ typedef struct {
 int cf1_inspect_prefix(const uint8_t *raw, size_t length,
                        const char *independent_vin, cf1_evidence *out,
                        char *error, size_t error_size);
+int cf1_inspect_complete(const uint8_t *raw, size_t length,
+                         const char *independent_vin, cf1_evidence *out,
+                         char *error, size_t error_size);
 void cf1_evidence_free(cf1_evidence *evidence);
 uint32_t cf1_crc32(const uint8_t *data, size_t size);
 bool cf1_valid_vin(const char *vin);
