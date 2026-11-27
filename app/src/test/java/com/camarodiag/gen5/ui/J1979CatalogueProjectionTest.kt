@@ -179,6 +179,50 @@ class J1979CatalogueProjectionTest {
         reject { J1979CatalogueProjection.replay(bytes(source()), "1FA6P8TH0L5100000") }
     }
 
+    // Synthetic fixture with three selected PIDs across all eight support
+    // pages. The same wire bytes are used by the Windows projection test.
+    private fun nativeCapture(): ByteArray {
+        val wire = "434c010100004300e0070000e807000000314731464131525858523031323334353603f1f2f3000000000000000000000000" +
+            "000000000000000000000000000000000001006400e80300006f021499434c010201002e0001010100000000000000000005" +
+            "0000006400140005000000090249020131473146413152585852303132333435367d8eac1e434c0102020020000201010000" +
+            "000000050000000a00000064000600050000000100410000000001284d533a434c01020300200002010100000000000a0000" +
+            "000f00000064000600050000000120412000000001f354c069434c01020400200002010100000000000f0000001400000064" +
+            "0006000500000001404140000000011787631d434c0102050020000201010000000000140000001900000064000600050000" +
+            "0001604160000000011ca946c5434c0102060020000201010000000000190000001e00000064000600050000000180418000" +
+            "0000017fd2b851434c01020700200002010100000000001e00000023000000640006000500000001a041a00000000186dac7" +
+            "b7434c01020800200002010100000000002300000028000000640006000500000001c041c00000000190aeb200434c010209" +
+            "0020000201010000000000280000002d000000640006000500000001e041e00000e0006eea5e13434c01020a001f00040201" +
+            "000100f1002d00000032000000640005000500000001f141f181feff01c3c00d434c01020b001d00040201000100f2003200" +
+            "000037000000640003000500000001f241f20001dd414e434c01020c002400040201000100f300370000003c00000064000a" +
+            "000500000001f341f3fffffffffffffffff5ce1095434c01020d002e0005010100000000003c000000410000006400140005" +
+            "000000090249020131473146413152585852303132333435360667a450434c01030e008000000f01000d0000000300000003" +
+            "0000000000000000000000410000006a0000000000000000000000000000000000000000000000000000000000000000000e" +
+            "0001000100010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000" +
+            "0000000000000000000000000000009e60ab59"
+        return wire.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
+    }
+
+    @Test fun nativeCaptureProjectionAndCsvAreDerivedFromOriginalBytes() {
+        val raw=nativeCapture()
+        val report=J1979CatalogueProjection.build(catalogue(),pin,raw,vin)
+        assertEquals(J1979CatalogueProjection.NATIVE_SCHEMA,report.document["schema"])
+        assertEquals(true,report.document["source_replay_verified"])
+        assertEquals(false,report.document["transport_frames_replayed"])
+        assertEquals(J1979DocumentedCatalogue.sha(raw),report.document["source_capture_sha256"])
+        val projected=projected(report)
+        assertEquals(3,projected.size)
+        assertEquals(mapOf("numerator" to "-1","denominator" to "6"),signal(projected[0],0)["value"])
+        assertEquals("NO_DOCUMENTED_DEFINITION",J1979CatalogueJson.obj(projected[1])["projection_status"])
+        assertEquals(mapOf("numerator" to "18446744073709551615","denominator" to "1"),
+            signal(projected[2],0)["value"])
+        val replay=com.camarodiag.connectors.J1979LiveNativeReplay.decode(java.io.ByteArrayInputStream(raw),null)
+        val csv=J1979NativeLiveCsv.encode(replay).toString(Charsets.US_ASCII)
+        assertTrue(csv.contains("1,F1,50,RAW,41F181FEFF,7E0,7E8,$vin,true"))
+        assertEquals(4,csv.lineSequence().filter { it.isNotEmpty() }.count())
+        reject { J1979CatalogueProjection.build(catalogue(),pin,raw.copyOf(raw.size-1),vin) }
+        reject { J1979CatalogueProjection.build(catalogue(),pin,raw,"1FA6P8TH0L5100000") }
+    }
+
     @Test fun strictJsonAndCataloguePreventAmbiguousOrExecutableDefinitions() {
         val raw = catalogue().toString(Charsets.UTF_8)
         for (value in listOf(
