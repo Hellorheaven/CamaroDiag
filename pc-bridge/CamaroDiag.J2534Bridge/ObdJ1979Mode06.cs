@@ -96,7 +96,6 @@ internal static class ObdJ1979Mode06
             0x8E => ("A", 0.001d, true, 0d),
             0x90 => ("ms", 1d, true, 0d),
             0x96 => ("degC", 0.1d, true, 0d),
-            0x99 => ("kPa", 0.1d, true, 0d),
             0x9C => ("deg", 0.01d, true, 0d),
             0x9D => ("deg", 0.5d, true, 0d),
             0xA8 => ("g/s", 1d, true, 0d),
