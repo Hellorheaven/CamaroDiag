@@ -52,6 +52,12 @@ data class J1979NetworkEcu(
     val status: String,val stopReason: String?,val completed: Boolean,
     val steps: List<J1979NetworkStep>,val inventories: List<J1979NetworkInventory>
 ) {
+    val scaledMonitorRecords get()=steps.flatMap {
+        ObdCanMonitorRecords.project(it.requestHex,it.responseHex,it.status)
+    }
+    val statusRecords get()=steps.mapNotNull {
+        ObdJ1979Status.tryRecord(it.requestHex,it.responseHex,it.status)
+    }
     val contextualMeasurements get() = ObdJ1979ScalingContext.project(steps.map {
         ObdJ1979ScalingContext.Observation(it.requestHex,it.responseHex,it.status)
     })
@@ -223,6 +229,11 @@ internal object J1979NetworkCampaign {
                                 ObdJ1979ScalingContext.isConfiguration(u(request[1])) &&
                                 !ObdJ1979ScalingContext.validConfiguration(u(request[1]),requireNotNull(reply.payload).drop(2).map(::u))){
                                 status="FAILED";detail="INVALID_SCALING_CONFIGURATION";evidence=null
+                            }
+                            if(status in setOf("RAW","PASSED")&&request.size==2&&u(request[0])==1&&
+                                ObdJ1979Status.width(u(request[1]))!=null&&
+                                ObdJ1979Status.tryRecord(command,response,status)==null){
+                                status="FAILED";detail="INVALID_CATEGORICAL_RECORD";evidence=null
                             }
                             if(status in setOf("RAW","PASSED") && request.size==2 &&
                                 u(request[0])==1 && ObdJ1979MultiSignal.width(u(request[1]))!=null){
