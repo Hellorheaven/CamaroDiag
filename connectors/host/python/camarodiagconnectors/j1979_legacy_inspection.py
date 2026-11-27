@@ -18,6 +18,7 @@ from .j1979_status import decode_response as status_decode, width as status_widt
 from .j1979_scaling_context import project as contextual_project, config_data, CONFIG_PIDS
 from .j1979_vehicle_info import legacy_info
 from .j1979_legacy_monitor import project as monitor_projection
+from .j1979_drive_cycle import project as operating_context, cycle_data
 from .j1979_live_inspection import load, _get, _require, _hex, _array, _dict
 from .j1979_network_inspection import _normalize, _equal
 from .j1979_multi_signal import historical_projection
@@ -105,6 +106,8 @@ def _shape(req,payload):
             if multi_width(pid) is not None and multi_decode(req,payload) is None:
                 return False
             if status_width(pid) is not None and status_decode(req,payload) is None:
+                return False
+            if pid==0x41 and cycle_data(payload[2:],None) is None:
                 return False
             if pid in CONFIG_PIDS and config_data(pid,payload[2:]) is None:
                 return False
@@ -502,6 +505,11 @@ def inspect(root,*,expected_vin=None):
         _require(_equal(_normalize(claimed("legacy_monitor_results")),legacy_monitors),
                  "Legacy monitor results differ from original responses")
         checked.append("legacy_monitor_results")
+    operating=operating_context(normalized)
+    if claimed("operating_context") is not None:
+        _require(_equal(_normalize(claimed("operating_context")),operating),
+                 "Operating context differs from selected-source responses")
+        checked.append("operating_context")
     context=contextual_project(normalized)
     if claimed("contextual_measurements") is not None:
         _require(_equal(_normalize(claimed("contextual_measurements")),context),
@@ -523,7 +531,7 @@ def inspect(root,*,expected_vin=None):
             "inventory":inventories,"identification":identities,
             "dtc_modes":[{"mode":m,"codes":dtcs.get(m)} for m in (3,7,10)],
             "measurements":measurements,"multi_signal_records":multis,"status_records":states,
-            "contextual_measurements":context,"readiness":readiness,
+            "contextual_measurements":context,"operating_context":operating,"readiness":readiness,
             "freeze_trigger":freeze,"monitor_records":monitors,"legacy_monitor_results":legacy_monitors}
 
 
