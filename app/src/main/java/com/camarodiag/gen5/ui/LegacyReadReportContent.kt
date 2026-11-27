@@ -50,7 +50,9 @@ internal fun LegacyReadReportContent(report: LegacyReadReport) {
         Text("${hex(it.mode)}/${hex(it.pid)} · ${it.name}: ${it.number} ${it.unit}",fontSize=11.sp)
     }
     report.identification.forEach {
-        Text("09/${hex(it.infoType)}: ${it.values.joinToString(", ")}",fontSize=11.sp)
+        val extended=it.extended
+        if(extended==null) Text("09/${hex(it.infoType)}: ${it.values.joinToString(", ")}",fontSize=11.sp)
+        else J1979ExtendedVehicleInfoContent(extended)
     }
     report.freezeTrigger?.let {
         Text(stringResource(if(it.present) R.string.legacy_read_freeze_present else R.string.legacy_read_freeze_absent))
