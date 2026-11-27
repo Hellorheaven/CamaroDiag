@@ -170,3 +170,91 @@ def inspect_history(journals, platform, *, android_identity: AndroidIdentity | N
     except (OSError, ValueError, RuntimeError, TypeError, KeyError) as exc:
         result["problem"] = str(exc)
     return result
+
+
+MAX_HISTORY_REPORT = 2 * 1024 * 1024
+
+
+def _compare_history_value(declared, actual, field):
+    """Compare JSON evidence recursively without bool/int coercion."""
+    _require(type(declared) is type(actual), f"History report type differs: {field}")
+    if isinstance(actual, dict):
+        _require(declared.keys() == actual.keys(), f"History report fields differ: {field}")
+        for key in actual:
+            _compare_history_value(declared[key], actual[key], f"{field}.{key}")
+    elif isinstance(actual, list):
+        _require(len(declared) == len(actual), f"History report length differs: {field}")
+        for index, (left, right) in enumerate(zip(declared, actual)):
+            _compare_history_value(left, right, f"{field}[{index}]")
+    else:
+        _require(declared == actual, f"History report value differs: {field}")
+
+
+def _portable_history(report):
+    """Local filenames and independently supplied target checks are contextual.
+
+    All recorded target identifiers, journal and envelope fingerprints, state
+    transitions and safety flags remain mandatory. A comparison made using an
+    independently supplied VIN/OSID is recorded separately in the verification.
+    """
+    from copy import deepcopy
+    projected = deepcopy(report)
+    identities = [projected.get("identity")]
+    snapshots = projected.get("snapshots")
+    _require(isinstance(snapshots, list), "Missing history snapshots")
+    for snapshot in snapshots:
+        _require(isinstance(snapshot, dict), "Invalid history snapshot")
+        name = snapshot.pop("journal_name", None)
+        _require(isinstance(name, str) and bool(name), "Missing snapshot journal name")
+        identities.append(snapshot.get("identity"))
+    for identity in identities:
+        _require(isinstance(identity, dict), "Missing snapshot target identity")
+        if "declared_identity_matches" in identity:
+            state = identity.pop("declared_identity_matches")
+            _require(state is None or state is True, "Invalid declared target comparison")
+    return projected
+
+
+def verify_history_report(report_path, journals, platform, *,
+                          android_identity=None, expected_vin=None,
+                          expected_osid=None, require_current=lambda: None):
+    """Replay a previously exported history against all original bundles.
+
+    A positive report must be fully reproducible from the explicit ordered
+    inputs. Do not reconstruct missing evidence or infer ECU state from any
+    declared historical transition. Failed input is never upgraded to success.
+    """
+    from .recovery_bundle import _json
+
+    path = Path(report_path)
+    journals = [Path(journal) for journal in journals]
+    _require(path.resolve() not in {p.resolve() for p in journals},
+             "History report cannot also be a journal")
+    raw, stamp = _regular(path, MAX_HISTORY_REPORT, require_current)
+    declared = _json(raw)
+    _require(isinstance(declared, dict), "Expected recovery history object")
+    _require(declared.get("schema") == "camarodiag-offline-recovery-history-v1",
+             "Unsupported recovery history report schema")
+    _require(declared.get("verified") is True and
+             declared.get("ordered_prefix_verified") is True,
+             "Only verified history reports can be reproduced")
+    _require(declared.get("platform") == platform.upper(),
+             "History report platform differs from supplied platform")
+    fresh = inspect_history(journals, platform, android_identity=android_identity,
+                            expected_vin=expected_vin, expected_osid=expected_osid,
+                            require_current=require_current)
+    _require(fresh["verified"] and fresh["ordered_prefix_verified"],
+             "Independent history replay failed: " + str(fresh["problem"]))
+    _compare_history_value(_portable_history(declared), _portable_history(fresh), "history")
+    again, final_stamp = _regular(path, MAX_HISTORY_REPORT, require_current)
+    _require(stamp == final_stamp and raw == again, "History report changed during replay")
+    require_current()
+    return {
+        **fresh,
+        "schema": "camarodiag-offline-recovery-history-report-verification-v1",
+        "source_schema": declared["schema"],
+        "report_matches": True,
+        "report_sha256": stamp.digest,
+        "expected_vin_independently_supplied": expected_vin is not None,
+        "expected_osid_independently_supplied": expected_osid is not None,
+    }
