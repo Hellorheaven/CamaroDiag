@@ -45,15 +45,31 @@ def run(argv=None, *, prompt=input) -> dict:
     except (EOFError, KeyboardInterrupt):
         return {"outcome": "NOT_TESTED", "reason": "CANCELLED"}
 
+    baseline_path = Path(str(args.output) + ".baseline.json")
+    if baseline_path.exists():
+        raise FileExistsError(str(baseline_path))
     fd = os.open(args.output, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     with os.fdopen(fd, "w", encoding="utf-8") as output:
         started = datetime.now(timezone.utc).isoformat()
+        def save_baseline(result):
+            fd = os.open(baseline_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            with os.fdopen(fd, "w", encoding="utf-8") as baseline:
+                json.dump({"schema":"camarodiag-j1979-can-clear-baseline-v1",
+                           "protocol":"SAE-J1979","version":__version__,
+                           "transport":"LINUX_SOCKETCAN_ISOTP","interface":args.interface,
+                           "expected_vin":args.vin,"tx_can_id":f"{args.tx:X}","rx_can_id":f"{args.rx:X}",
+                           "started_at_utc":started,"finished_at_utc":datetime.now(timezone.utc).isoformat(),
+                           "physical_vehicle_verified":False,**result},baseline,indent=2)
+                baseline.write("\n")
+                baseline.flush()
+                os.fsync(baseline.fileno())
         try:
             with LinuxIsoTp(args.interface, args.tx, args.rx) as transport:
-                result = transport.run_clear(args.vin, warning_acknowledged=True, confirmed_yes=True)
+                result = transport.run_clear(args.vin, warning_acknowledged=True, confirmed_yes=True,
+                                             save_baseline=save_baseline)
         except (OSError, ValueError) as exc:
-            result = {"outcome": "NOT_TESTED", "reason": type(exc).__name__,
-                      "command_attempted": False, "acknowledged": False, "observed_vin": None, "observations": []}
+            result = {"outcome": "UNCERTAIN" if baseline_path.exists() else "NOT_TESTED", "reason": type(exc).__name__,
+                      "command_attempted": None if baseline_path.exists() else False, "acknowledged": False, "observed_vin": None, "observations": []}
         report = {"schema": "camarodiag-functional-j1979-clear-v1",
                   "protocol": "SAE-J1979", "version": __version__,
                   "transport": "LINUX_SOCKETCAN_ISOTP", "interface": args.interface,
@@ -64,6 +80,8 @@ def run(argv=None, *, prompt=input) -> dict:
                   **result}
         json.dump(report, output, indent=2, ensure_ascii=True)
         output.write("\n")
+        output.flush()
+        os.fsync(output.fileno())
     return report
 
 
