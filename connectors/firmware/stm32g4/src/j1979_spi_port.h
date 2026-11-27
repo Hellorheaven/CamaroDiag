@@ -4,6 +4,7 @@
 #include "../../shared/j1979_spi_transport.h"
 
 namespace cd {
+namespace maintenance_link { class SpiSlave; }
 // Board owns NSS/clock counting and interrupt routing. A HAL completion
 // alone does not prove that NSS framed exactly 256 clock edges.
 class StmJ1979SpiPort final:public readlink::SpiSlavePort {
@@ -17,10 +18,12 @@ class StmJ1979SpiPort final:public readlink::SpiSlavePort {
   uint32_t monotonicMs()override{return HAL_GetTick();}
   bool arm(const uint8_t* tx,uint8_t* rx,size_t length)override;
   void ready(bool value)override;
+  bool finishResponse()override;
   void fault()override;
   // Called from owner task after NSS rises; board's clock monitor supplies
   // the observed bit count and clean electrical framing, not host data.
   bool completed(readlink::SpiSlave& slave,uint32_t bits,bool clean);
+  bool completed(maintenance_link::SpiSlave& slave,uint32_t bits,bool clean);
  private:
   SPI_HandleTypeDef& spi_;Admission admission_;Ready ready_;Fault fault_;
   bool failed_=false,armed_=false;
