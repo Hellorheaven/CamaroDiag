@@ -82,8 +82,9 @@ internal static class ObdJ1979InterpretationSelfTests
             monitorTest.Description.Contains("TID=0x80") &&
             monitorTest.Description.Contains("UASID=0x24") &&
             monitorTest.Description.Contains("raw=100") &&
-            monitorTest.Description.Contains("no UASID conversion"),
-            "Mode 06 physical monitor test retains raw unit/scaling ID.");
+            monitorTest.Description.Contains("unit=count") &&
+            monitorTest.Description.Contains("no monitor pass verdict"),
+            "Mode 06 retains raw unit/scaling ID and exposes known engineering values.");
         var readiness = ObdJ1979Interpretation.Interpret(
             [0x01, 0x01], [0x41, 0x01, 0x83, 0x08, 0xA5, 0x5A]);
         Check(readiness.Positive &&
