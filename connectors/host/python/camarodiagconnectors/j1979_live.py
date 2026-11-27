@@ -14,6 +14,7 @@ import time
 from .j1979_campaign_evidence import decode_observation
 from .j1979_multi_signal import width as multi_width, decode_response as multi_decode
 from .j1979_status import width as status_width, decode_response as status_decode
+from .j1979_scaling_context import dependency, context_from_steps, config_data
 
 MAX_PIDS = 32
 MAX_CYCLES = 1000
@@ -147,6 +148,8 @@ def record(exchange, plan: Plan, *, clock=time.monotonic, sleep=time.sleep,
     stop=None
     completed_cycles=0
     inventory_complete=False
+    required_configs=sorted({dependency(pid) for pid in plan.pids if dependency(pid) is not None})
+    scaling=None
 
     def elapsed():
         return max(0,round((clock()-started)*1000))
@@ -197,13 +200,23 @@ def record(exchange, plan: Plan, *, clock=time.monotonic, sleep=time.sleep,
                     row["status"]=evidence["shape"]
                     if evidence["shape"]=="NEGATIVE":
                         row["detail"]=f'NRC_{evidence["negative_response_code"]:02X}'
-                    if phase=="SAMPLE" and evidence["shape"] in ("RAW","PASSED") and multi_width(pid) is not None:
+                    if phase=="SCALING" and evidence["shape"] in ("RAW","PASSED") and config_data(request[1],raw[2:]) is None:
+                        stop="INVALID_APPLICATION_RESPONSE"
+                        row.update(status="FAILED",detail=stop,application_evidence=None)
+                    elif phase=="SAMPLE" and evidence["shape"] in ("RAW","PASSED") and multi_width(pid) is not None:
                         signals=multi_decode(request,raw)
                         if signals is None or (status_width(pid) is not None and status_decode(request,raw) is None):
                             stop="INVALID_MEASUREMENT"
                             row.update(status="FAILED",detail=stop,application_evidence=None)
                         else:
                             row["multi_signals"]=signals
+                            if dependency(pid) is not None and scaling is not None:
+                                contextual=scaling.decode(request,raw)
+                                if contextual is None or any(s["number"] is None for s in contextual["signals"]):
+                                    stop="SCALING_UNVERIFIED"
+                                    row.update(status="FAILED",detail=stop,application_evidence=None,multi_signals=None)
+                                else:
+                                    row["multi_signals"]=[{**s,"number":c["number"]} for s,c in zip(signals,contextual["signals"])]
                     elif phase=="SAMPLE" and evidence["shape"]=="PASSED":
                         value=evidence.get("measurement")
                         if value is None or value["pid"]!=pid or value["mode"]!=1:
@@ -211,6 +224,13 @@ def record(exchange, plan: Plan, *, clock=time.monotonic, sleep=time.sleep,
                             row.update(status="FAILED",detail=stop,application_evidence=None)
                         else:
                             row["measurement"]=value
+                            if dependency(pid) is not None and scaling is not None:
+                                contextual=scaling.decode(request,raw)
+                                if contextual is None or contextual["signals"][0]["number"] is None:
+                                    stop="SCALING_UNVERIFIED"
+                                    row.update(status="FAILED",detail=stop,application_evidence=None,measurement=None)
+                                else:
+                                    row["measurement"]={**value,"number":contextual["signals"][0]["number"]}
         except KeyboardInterrupt:
             stop="CANCELLED"
             row["detail"]=stop
@@ -265,7 +285,7 @@ def record(exchange, plan: Plan, *, clock=time.monotonic, sleep=time.sleep,
                 break
             # No need to probe additional optional pages once all selected
             # PIDs are proven, but report that remaining inventory is partial.
-            if all(pid in advertised for pid in plan.pids):
+            if all(pid in advertised for pid in plan.pids) and (not required_configs or base>=0x40):
                 break
         if any(pid not in advertised for pid in plan.pids):
             stop="SELECTED_PID_NOT_VERIFIED"
@@ -282,6 +302,15 @@ def record(exchange, plan: Plan, *, clock=time.monotonic, sleep=time.sleep,
     try:
         if identity("INITIAL_VIN"):
             inventory()
+        if stop is None and required_configs:
+            for config in required_configs:
+                if config in advertised:
+                    query(bytes((1,config)),"SCALING")
+                    if stop is not None:
+                        break
+            scaling=context_from_steps(admission)
+            if stop is None and any(scaling.get(config).state=="UNVERIFIED" for config in required_configs):
+                stop="SCALING_UNVERIFIED"
         if stop is None:
             next_start=clock()
             for cycle in range(1,plan.cycles+1):
@@ -321,6 +350,7 @@ def record(exchange, plan: Plan, *, clock=time.monotonic, sleep=time.sleep,
             "requested_cycles":plan.cycles,"completed_cycles":completed_cycles,
             "interval_ms":round(plan.interval*1000),"budget_ms":round(plan.budget*1000),
             "duration_ms":elapsed(),"admission":admission,"observations":rows,
+            "scaling_configuration":(scaling or context_from_steps(admission)).report() if required_configs else None,
             "summary":[stats[pid].report() for pid in plan.pids],
             "multi_signal_summary":[channels[k].report(sum(stats[k[0]].counts.values())) for k in sorted(channels)],
             "completed":stop is None and completed_cycles==plan.cycles,
