@@ -439,6 +439,9 @@ def inspect_bundle(journal:Path,platform:str,*,android_identity:AndroidIdentity|
         result["journal_sha256"]=journal_state.digest
         metadata_path=None;metadata_state=None;image_state=None;image=None
         if platform=="android":
+            android_identity.validate()
+            if expected_vin is not None and expected_vin != android_identity.vin:
+                raise ValueError("Declared Android target does not match expected VIN")
             audit,expected=_android_journal(raw,android_identity)
             result["journal_audit"]=audit
             result["identity"]=asdict(android_identity)
