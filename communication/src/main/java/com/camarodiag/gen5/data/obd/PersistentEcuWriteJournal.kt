@@ -68,6 +68,13 @@ class PersistentEcuWriteJournal private constructor(
     private var appendFailed = false
     private var expectedLength = 0L
     private var expectedTailHash = ""
+    private var expectedFileKey:Any?=null
+    private fun requireJournalIdentity() {
+        val attributes=Files.readAttributes(file.toPath(),java.nio.file.attribute.BasicFileAttributes::class.java,
+            LinkOption.NOFOLLOW_LINKS)
+        check(attributes.isRegularFile && !attributes.isSymbolicLink &&
+            (expectedFileKey==null || attributes.fileKey()==expectedFileKey)) { "ECU journal identity changed." }
+    }
     private val shaPattern = Regex("[0-9a-fA-F]{64}")
     private val header = listOf(
         "CAMARODIAG-ECU-JOURNAL-V1",
@@ -91,8 +98,11 @@ class PersistentEcuWriteJournal private constructor(
             val bytes = (header + "\n").toByteArray(StandardCharsets.UTF_8)
             FileChannel.open(file.toPath(), StandardOpenOption.CREATE_NEW,
                 StandardOpenOption.WRITE, LinkOption.NOFOLLOW_LINKS).use { channel ->
+                expectedFileKey=Files.readAttributes(file.toPath(),java.nio.file.attribute.BasicFileAttributes::class.java,
+                    LinkOption.NOFOLLOW_LINKS).fileKey()
                 writeAndForce(channel, bytes)
             }
+            requireJournalIdentity()
             check(readBoundedSnapshot()?.contentEquals(bytes)==true) {
                 "New ECU journal could not be independently verified."
             }
@@ -111,7 +121,8 @@ class PersistentEcuWriteJournal private constructor(
         synchronized(guard) {
             check(!appendFailed) { "Earlier journal I/O failed; preserve the journal for assessment." }
             val raw = try {
-                readBoundedSnapshot()
+                requireJournalIdentity()
+                readBoundedSnapshot().also { requireJournalIdentity() }
             } catch (error: Exception) {
                 appendFailed = true
                 throw error
@@ -143,6 +154,7 @@ class PersistentEcuWriteJournal private constructor(
             try {
                 check(file.length() == expectedLength) { "Journal changed before append." }
                 durableAppend(checkNotNull(raw), bytes)
+                requireJournalIdentity()
                 expectedLength += bytes.size
                 expectedTailHash = checksum
             } catch (error: Exception) {
@@ -158,7 +170,9 @@ class PersistentEcuWriteJournal private constructor(
     internal fun requireAcceptedState() = synchronized(guard) {
         check(writable && !appendFailed) { "Active ECU journal is unavailable." }
         try {
+            requireJournalIdentity()
             val raw = checkNotNull(readBoundedSnapshot())
+            requireJournalIdentity()
             val audit = inspectLocked(raw = raw)
             val tail = if (audit.records == 0) sha256(header)
                 else raw.toString(StandardCharsets.UTF_8).dropLast(1).substringAfterLast('\t')

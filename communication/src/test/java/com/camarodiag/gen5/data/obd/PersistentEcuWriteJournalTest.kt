@@ -101,6 +101,22 @@ class PersistentEcuWriteJournalTest {
         assertTrue(accepted.contentEquals(file.readBytes()))
     }
 
+    @Test fun sameBytesReplacementDoesNotQualifyAsActiveJournal() = runBlocking {
+        val (file,journal)=newJournal()
+        journal.append(record)
+        org.junit.Assume.assumeNotNull(Files.readAttributes(file.toPath(),
+            java.nio.file.attribute.BasicFileAttributes::class.java).fileKey())
+        val saved=File(temporaryFolder.root,"original-journal")
+        Files.move(file.toPath(),saved.toPath())
+        file.writeBytes(saved.readBytes())
+        assertTrue(PersistentEcuWriteJournal.inspectExisting(file,target,vin).valid)
+        assertTrue(runCatching { journal.requireAcceptedState() }.isFailure)
+        file.delete()
+        Files.move(saved.toPath(),file.toPath())
+        assertTrue(runCatching { journal.requireAcceptedState() }.isFailure)
+        Unit
+    }
+
     @Test fun redirectedJournalCannotBeAcceptedOrReopenedForAppend() = runBlocking {
         val (file,journal)=newJournal()
         journal.append(record)
