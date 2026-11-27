@@ -27,6 +27,9 @@ internal static class ObdJ1979LegacyScan
         public IReadOnlyList<ObdJ1979PidValues.Value> Measurements { get; init; }=[];
         public IReadOnlyList<ObdJ1979MultiSignal.Record> MultiSignalRecords { get; init; }=[];
         public IReadOnlyList<ObdJ1979Status.Record> StatusRecords { get; init; }=[];
+        public ObdJ1979ScalingContext.Projection ContextualMeasurements => ObdJ1979ScalingContext.Project(
+            Steps.Select(s=>new ObdJ1979ScalingContext.Observation(s.RequestHex,
+                s.Responses.Count==1 && s.Responses[0].Source==SelectedResponseSource?s.Responses[0].PayloadHex:null,s.Status)));
         public J1979CampaignSemantics.Readiness? Readiness { get; init; }
         public IReadOnlyList<Identification> IdentificationRecords { get; init; }=[];
         public IReadOnlyList<MonitorRecord> MonitorRecords { get; init; }=[];
@@ -282,6 +285,8 @@ internal static class ObdJ1979LegacyScan
                 2 when mode == 2 => 2,
                 _ => ObdJ1979PidValues.DataLength(pid)
             };
+            if(mode==1 && ObdJ1979ScalingContext.IsConfiguration(pid) &&
+                !ObdJ1979ScalingContext.ValidConfiguration(pid,r.AsSpan(offset)))return false;
             if(mode==1 && ObdJ1979Status.Width(pid) is not null &&
                 ObdJ1979Status.DecodeData(pid,r.AsSpan(offset)) is null)return false;
             if(mode==1 && ObdJ1979MultiSignal.Width(pid) is not null)
