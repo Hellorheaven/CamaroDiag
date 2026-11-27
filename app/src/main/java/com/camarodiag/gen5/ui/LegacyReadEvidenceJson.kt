@@ -37,6 +37,7 @@ internal object LegacyReadEvidenceJson {
         }))
         .put("identification",JSONArray(report.identification.map {
             JSONObject().put("infoType",it.infoType).put("values",JSONArray(it.values))
+                .put("extended",it.extended?.let(J1979ExtendedVehicleInfoJson::encode) ?: JSONObject.NULL)
         }))
         .put("readiness",report.readiness?.let {
             JSONObject().put("milOn",it.milOn).put("confirmedDtcCount",it.confirmedDtcCount)
