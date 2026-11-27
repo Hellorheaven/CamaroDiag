@@ -722,6 +722,9 @@ fun CamaroDiagApp(
                         liveProtocol = viewModel.functionalLiveProtocol(),
                         onRunLive = { plan,epoch,profile -> viewModel.runFunctionalLive(plan,epoch,profile) },
                         onExportLiveCsv = { withExportFolder { viewModel.exportFunctionalLiveCsv() } },
+                        onProjectCatalogue = { catalogue,reference,report,pin,epoch,profile ->
+                            withExportFolder { viewModel.projectFunctionalCatalogue(catalogue,reference,report,pin,epoch,profile) }
+                        },
                         onRunFreeze = { plan,epoch,profile -> viewModel.runFunctionalFreeze(plan,epoch,profile) },
                         onRunNetwork = { plan,epoch,profile -> viewModel.runFunctionalNetwork(plan,epoch,profile) },
                         nativeUsbEnabled = adapter.tier == AdapterTier.DISCONNECTED && !calibrationWorkspace.isJ2534BridgeConnected,
