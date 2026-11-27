@@ -17,6 +17,7 @@
 #include "j1979_discovery.hpp"
 #include "j1979_legacy_scan.hpp"
 #include "j1979_legacy_scan_wire.hpp"
+#include "j1979_legacy_journal.hpp"
 #include "j1979_legacy_mutation.hpp"
 #include "j1979_legacy_freeze_wire.hpp"
 #include "j1979_legacy_live_wire.hpp"
@@ -1208,10 +1209,20 @@ static int legacy_discovery_cli(int argc,char** argv,bool scan=false){
     try{
         if(!signals.terminate)throw cd::legacy::TransportError("Signal handlers unavailable");
         const auto current=[](){return legacy_cancelled==0;};
+        std::unique_ptr<cd::legacy::CaptureJournal> journal;
+        if(scan){
+            const auto name=std::string(o.capture?o.capture:o.output)+".lj";
+            journal=std::make_unique<cd::legacy::CaptureJournal>(name.c_str(),
+                cd::legacy::ScanCapture{o.protocol,o.source,o.budget,o.vin,{}});
+        }
         auto link=cd::legacy::serial_link(o.port,o.baud,current);
         cd::legacy::Elm elm(*link,o.protocol,true,current);
         elm.configure();
-        if(scan)s=cd::legacy::scan_selected(elm,o.source,o.vin,o.budget,cd::legacy::monotonic_ms,current);
+        if(scan){
+            s=cd::legacy::scan_selected(elm,o.source,o.vin,o.budget,cd::legacy::monotonic_ms,current,
+                [&](const auto& row){journal->append(row);});
+            journal->finish();
+        }
         else d=cd::legacy::discover(elm,o.budget,cd::legacy::monotonic_ms,current);
     }catch(const cd::legacy::Cancelled&){d.error="CANCELLED";s.error=d.error;}
     catch(const std::exception&){d.error="ADAPTER_SETUP_FAILED";s.error=d.error;}
@@ -1493,13 +1504,16 @@ static int legacy_freeze_cli(int argc,char** argv){
     try{
         if(!signals.term)return error("Cancellation handlers unavailable");
         const auto current=[](){return legacy_cancelled==0;};
+        const auto journal_path=std::string(o.capture)+".lj";
+        cd::legacy::CaptureJournal journal(journal_path.c_str(),cd::legacy::FreezeCapture{o.protocol,o.source,o.plan,{}});
         cd::legacy::FreezeResult result;
         {
             auto link=cd::legacy::serial_link(o.port,o.baud,current);
             cd::legacy::Elm elm(*link,o.protocol,true,current);
             elm.configure();
-            result=cd::legacy::acquire_freeze(elm,o.source,o.plan,cd::legacy::monotonic_ms,current);
+            result=cd::legacy::acquire_freeze(elm,o.source,o.plan,cd::legacy::monotonic_ms,current,[&](const auto& row){journal.append(row);});
         }
+        journal.finish();
         const auto raw=cd::legacy::encode_freeze_capture({o.protocol,o.source,o.plan,result.trace});
         if(!write_owned_file(capture.fd,raw.data(),raw.size()))return error("Freeze capture persistence failed");
         input original{},again{};
@@ -1635,6 +1649,8 @@ static int legacy_live_cli(int argc,char** argv){
     try{
         if(!signals.term)return error("Cancellation handlers unavailable");
         const auto current=[](){return legacy_cancelled==0;};
+        const auto journal_path=std::string(o.capture)+".lj";
+        cd::legacy::CaptureJournal journal(journal_path.c_str(),cd::legacy::LiveCapture{o.protocol,o.source,o.plan,{}});
         cd::legacy::LiveResult result;
         {
             auto link=cd::legacy::serial_link(o.port,o.baud,current);
@@ -1643,8 +1659,9 @@ static int legacy_live_cli(int argc,char** argv){
             result=cd::legacy::acquire_live(elm,o.source,o.plan,cd::legacy::monotonic_ms,current,[](unsigned ms){
                 struct timespec delay{static_cast<time_t>(ms/1000),static_cast<long>((ms%1000)*1000000)};
                 nanosleep(&delay,nullptr);
-            });
+            },[&](const auto& row){journal.append(row);});
         }
+        journal.finish();
         const auto raw=cd::legacy::encode_live_capture({o.protocol,o.source,o.plan,result.trace});
         if(!write_owned_file(capture.fd,raw.data(),raw.size()))return error("Live capture persistence failed");
         input original{},again{};
@@ -2342,6 +2359,36 @@ static int socket_freeze_cli(int argc,char** argv){
     }catch(const std::exception& e){return error(e.what());}
 }
 
+static int legacy_journal_cli(const char* protocol,const char* source,const char* vin,const char* path,const char* output,bool recover){
+    uint32_t p=0,n=0;
+    if(!decimal_uint32(protocol,&p)||!cd::legacy::valid_protocol(static_cast<cd::legacy::Protocol>(p))||
+        strlen(source)!=2||!hex_uint32(source,&n)||!cd::legacy::valid_source(n)||!cf1_valid_vin(vin))
+        return error("Independent protocol, selected source and VIN required");
+    input original{},again{};
+    try{
+        if(!load_regular(path,cd::legacy::journal_max_bytes,&original))return error("Invalid bounded LJ/1 journal");
+        const auto evidence=cd::legacy::inspect_journal({original.bytes.get(),original.length},
+            static_cast<cd::legacy::Protocol>(p),n,vin);
+        if(!load_regular(path,cd::legacy::journal_max_bytes,&again)||!same_input(&original,&again))
+            return error("Legacy journal changed during inspection");
+        if(recover){
+            if(!evidence.terminal||evidence.capture.empty())return error("Interrupted journal cannot become a completed capture");
+            if(!atomic_create(output,reinterpret_cast<const char*>(evidence.capture.data()),evidence.capture.size()))
+                return error("Recovery output unavailable");
+        }else{
+            const std::string json=std::string("{\"schema\":\"camarodiag-j1979-legacy-journal-v1\",\"journal_sha256\":\"")+
+                original.digest+"\",\"kind\":"+std::to_string(static_cast<unsigned>(evidence.kind))+
+                ",\"observations\":"+std::to_string(evidence.observations)+
+                ",\"verified_bytes\":"+std::to_string(evidence.verified_bytes)+
+                ",\"unverified_tail_bytes\":"+std::to_string(evidence.torn_bytes)+
+                ",\"terminal_present\":"+(evidence.terminal?"true":"false")+
+                ",\"physical_vehicle_verified\":false,\"permits_programming\":false}\n";
+            if(!atomic_create(output,json.data(),json.size()))return error("Journal report unavailable");
+        }
+        return evidence.terminal?0:2;
+    }catch(const std::exception& e){return error(e.what());}
+}
+
 static void usage(FILE *stream) {
     fprintf(stream,
         "CamaroDiag Linux native C++20 — SAE J1979\n"
@@ -2381,6 +2428,8 @@ static void usage(FILE *stream) {
         "  camarodiag-native --j1979-legacy-live --port /dev/ttyUSB0 --protocol 2 --source 10 --vin VIN --pid 0C --cycles 30 --interval-ms 1000 --capture session.llr --output live.json --confirm-physical-channel [--raw-only]\n"
         "  camarodiag-native --inspect-j1979-legacy-live PROTOCOL SOURCE VIN CAPTURE.llr REPORT.json\n"
         "  camarodiag-native --verify-j1979-legacy-live PROTOCOL SOURCE VIN CAPTURE.llr REPORT.json PROOF.json\n"
+        "  camarodiag-native --inspect-j1979-legacy-journal PROTOCOL SOURCE VIN JOURNAL.lj REPORT.json\n"
+        "  camarodiag-native --recover-j1979-legacy-journal PROTOCOL SOURCE VIN JOURNAL.lj CAPTURE\n"
         "  camarodiag-native --inspect-j1979-legacy-scan PROTOCOL SOURCE VIN CAPTURE.lsr REPORT.json\n"
         "  camarodiag-native --verify-j1979-legacy-scan PROTOCOL SOURCE VIN CAPTURE.lsr REPORT.json PROOF.json\n"
         "  camarodiag-native --j1979-legacy-maintenance --operation clear --port /dev/ttyUSB0 --protocol 2 --engine-source 10 --source 10 --vin VIN --baseline baseline.json --intent intent.json --output result.json --confirm-functional-scope --acknowledge-maintenance-warning\n"
@@ -2408,6 +2457,8 @@ int main(int argc, char **argv) {
     if (argc>=3 && !strcmp(argv[1],"--j1979-legacy-freeze"))return legacy_freeze_cli(argc,argv);
     if (argc==7 && !strcmp(argv[1],"--inspect-j1979-legacy-freeze"))return legacy_freeze_replay(argv[2],argv[3],argv[4],argv[5],argv[6],nullptr);
     if (argc==8 && !strcmp(argv[1],"--verify-j1979-legacy-freeze"))return legacy_freeze_replay(argv[2],argv[3],argv[4],argv[5],argv[6],argv[7]);
+    if (argc==7 && !strcmp(argv[1],"--inspect-j1979-legacy-journal"))return legacy_journal_cli(argv[2],argv[3],argv[4],argv[5],argv[6],false);
+    if (argc==7 && !strcmp(argv[1],"--recover-j1979-legacy-journal"))return legacy_journal_cli(argv[2],argv[3],argv[4],argv[5],argv[6],true);
     if (argc==7 && !strcmp(argv[1],"--inspect-j1979-legacy-scan"))return legacy_scan_replay(argv[2],argv[3],argv[4],argv[5],argv[6],nullptr);
     if (argc==8 && !strcmp(argv[1],"--verify-j1979-legacy-scan"))return legacy_scan_replay(argv[2],argv[3],argv[4],argv[5],argv[6],argv[7]);
     if (argc>=3 && !strcmp(argv[1],"--j1979-legacy-maintenance"))return legacy_maintenance_cli(argc,argv);
