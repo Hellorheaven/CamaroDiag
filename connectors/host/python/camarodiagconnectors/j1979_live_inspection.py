@@ -18,6 +18,7 @@ from .j1979_campaign_evidence import decode_observation
 from .j1979_live import Plan, numeric_pid, legacy_numeric_pid
 from .j1979_multi_signal import width as multi_width, decode_response as multi_decode
 from .j1979_scaling_context import dependency, context_from_steps, config_data
+from .j1979_drive_cycle import TRIMS, trim_layout, live_signals as trim_signals
 from .j1979 import physical_pair
 from .j1979_legacy_discovery import valid_source
 from .j1979_legacy_frames import checksum
@@ -243,6 +244,12 @@ def inspect(root, *, expected_vin=None):
     claimed_scaling=_get(result,"scaling_configuration")
     scoped_scaling=claimed_scaling is not None
     _require(not scoped_scaling or bool(required_configs),"Unexpected scaling configuration")
+    claimed_layout=_get(result,"trim_layout")
+    contextual_trims=claimed_layout is not None
+    _require(not contextual_trims or any(pid in TRIMS for pid in pids),"Unexpected trim layout")
+    _require(contextual_trims or not any(0x55<=pid<=0x58 for pid in pids),"Missing secondary trim layout")
+    layout_rows=[]
+    layout_attempted=False
     scale_rows=[]
     config_requests=[]
     combined=[]
@@ -261,7 +268,7 @@ def inspect(root, *, expected_vin=None):
     # disambiguates initial/inventory versus first samples and final versus last.
     def order(item):
         phase=item[4].get("phase")
-        priority=0 if phase in ("INITIAL_VIN","INVENTORY","PERIODIC_VIN","SCALING") else 2 if phase=="FINAL_VIN" else 1
+        priority=0 if phase in ("INITIAL_VIN","INVENTORY","PERIODIC_VIN","SCALING","TRIM_LAYOUT") else 2 if phase=="FINAL_VIN" else 1
         return item[0],priority,item[1],item[3]
     combined.sort(key=order)
     advertised=set()
@@ -315,14 +322,16 @@ def inspect(root, *, expected_vin=None):
                          "Missing periodic identity check")
                 last_start=start
             context=context_from_steps(scale_rows) if scoped_scaling else None
+            if contextual_trims:
+                _require(0x1D not in advertised or layout_attempted,"Sampling before trim-layout admission")
             if scoped_scaling:
                 _require(all(context.get(c).state!="UNVERIFIED" for c in required_configs),
                          "Sampling before ECU scaling admission")
             counts[pid][status]+=1
             measured=ev.get("measurement") if status=="PASSED" else None
             signals=None
-            if multi_width(pid) is not None and status in ("RAW","PASSED"):
-                signals=multi_decode(req,res)
+            if (multi_width(pid) is not None or contextual_trims and pid in TRIMS) and status in ("RAW","PASSED"):
+                signals=trim_signals(req,res,trim_layout(scale_rows+layout_rows)) if contextual_trims and pid in TRIMS else multi_decode(req,res)
                 _require(signals is not None and value is None,"Invalid multi-signal response")
                 if context is not None and dependency(pid) is not None:
                     scaled=context.decode(req,res)
@@ -377,7 +386,7 @@ def inspect(root, *, expected_vin=None):
         elif phase=="INVENTORY":
             _require(identity==vin and not sample_index and not final and not inventory_complete and value is None
                      and req==bytes((1,next_page)),"Unexpected inventory page")
-            _require(not config_requests,"Inventory after scaling admission")
+            _require(not config_requests and not layout_attempted,"Inventory after contextual admission")
             scale_rows.append({"request_hex":req.hex(),"response_hex":res.hex() if res is not None else None,"status":status})
             if status=="PASSED":
                 page=ev.get("supported_page")
@@ -388,8 +397,14 @@ def inspect(root, *, expected_vin=None):
                 next_page+=32
             else:
                 terminal=True
+        elif phase=="TRIM_LAYOUT":
+            _require(contextual_trims and not layout_attempted and identity==vin and not sample_index and not final and
+                     set(pids)<=advertised and 0x1D in advertised and req==bytes((1,0x1D)) and value is None,
+                     "Unexpected trim-layout admission")
+            layout_attempted=True
+            layout_rows.append({"request_hex":"011D","response_hex":res.hex() if res is not None else None,"status":status})
         elif phase=="SCALING":
-            _require(scoped_scaling and identity==vin and not sample_index and not final and
+            _require(scoped_scaling and not layout_attempted and identity==vin and not sample_index and not final and
                      set(pids)<=advertised and value is None and len(req)==2 and req[0]==1 and
                      req[1] in required_configs and req[1] in advertised and req[1] not in config_requests,
                      "Unexpected ECU scaling request")
@@ -402,6 +417,13 @@ def inspect(root, *, expected_vin=None):
             raise ValueError("Unknown admission phase")
         if status in ("FAILED","NOT_TESTED"):
             terminal=True
+    derived_layout=trim_layout(scale_rows+layout_rows) if contextual_trims else None
+    if contextual_trims:
+        declared=_dict(claimed_layout,"trim layout")
+        _require(declared.get("state")==derived_layout["state"] and
+                 _get(declared,"raw_encoded")==derived_layout["raw_encoded"] and
+                 (derived_layout["raw_encoded"] is None or type(_get(declared,"raw_encoded")) is int),
+                 "Trim layout differs from admission bytes")
     derived_scaling=context_from_steps(scale_rows).report() if scoped_scaling else None
     if scoped_scaling:
         claimed=_array(claimed_scaling,2,"scaling configuration")
@@ -448,7 +470,7 @@ def inspect(root, *, expected_vin=None):
             "maximum":max(numbers),"mean":statistics.fmean(numbers),
             "last_verified_value":seq[-1][0],"last_verified_elapsed_ms":seq[-1][1]})
     declared_signals=_get(result,"multi_signal_summary")
-    if declared_signals is not None or any(multi_width(pid) is not None for pid in pids):
+    if declared_signals is not None or contextual_trims or any(multi_width(pid) is not None for pid in pids):
         declared_signals=_array(declared_signals,320,"multi-signal summary")
         _require(len(declared_signals)==len(signal_summaries),"Missing or excess channel summaries")
         for raw,wanted in zip(declared_signals,signal_summaries):
@@ -469,7 +491,7 @@ def inspect(root, *, expected_vin=None):
             "channel":channel,"requested_cycles":cycles,"completed_cycles":recorded_cycles,
             "selected_pids":pids,"advertised_pids":sorted(advertised),"inventory_complete":inventory_complete,
             "summary":summaries,"multi_signal_summary":signal_summaries,"samples":clean,
-            "scaling_configuration":derived_scaling,"scaling_context_verified":not required_configs or (scoped_scaling and all(context_from_steps(scale_rows).get(c).state!="UNVERIFIED" for c in required_configs)),"physical_vehicle_verified":False,
+            "trim_layout":derived_layout,"scaling_configuration":derived_scaling,"scaling_context_verified":not required_configs or (scoped_scaling and all(context_from_steps(scale_rows).get(c).state!="UNVERIFIED" for c in required_configs)),"physical_vehicle_verified":False,
             "authenticated":False,"whole_vehicle_coverage_verified":False,
             "stop_reason":_get(result,"stop_reason")}
 
