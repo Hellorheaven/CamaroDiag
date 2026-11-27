@@ -232,6 +232,57 @@ public final class J1979MaintenanceJournal {
         }
         return s;
     }
+    /** Verify complete records only, without repairing or trusting a torn tail. */
+    public static Map<String,Object> inspectPrefix(byte[] data,String expectedVin)throws IOException{
+        require(data!=null&&data.length>0&&data.length<=MAX_JOURNAL&&validVin(expectedVin),
+            "Invalid interrupted CM/1 input");
+        int pos=0,number=0,prior=0;
+        String declaredKind=null;
+        Scope firstScope=null;
+        byte[] magic={'C','M',1};
+        while(pos<data.length){
+            require(number<4&&prior!=4,"Trailing bytes after CM/1 terminal");
+            int available=Math.min(HEADER,data.length-pos);
+            for(int i=0;i<Math.min(3,available);i++)
+                require(data[pos+i]==magic[i],"Invalid CM/1 prefix magic/version");
+            if(available>=4){
+                int k=u(data[pos+3]);
+                require(k>=1&&k<=4&&(number==0?k==1:k==prior+1||k==4),"Unexpected prefix record");
+                declaredKind=KINDS[k];
+            }
+            if(available>=5)require(u(data[pos+4])==number,"Invalid prefix sequence");
+            if(available>=6)require(u(data[pos+5])<=MAX_ROWS&&(number!=0||data[pos+5]==0),"Invalid prefix count");
+            for(int i=6;i<Math.min(8,available);i++)require(data[pos+i]==0,"Invalid prefix reserved field");
+            if(available<HEADER)break;
+            int kind=u(data[pos+3]),count=u(data[pos+5]);long length=u32(data,pos+8);
+            require(length>=SCOPE&&length<=MAX_RECORD-HEADER-4&&
+                (kind==1?length==SCOPE&&count==0:length>=SCOPE+SUMMARY+count*ROW),"Invalid prefix body size");
+            int end=pos+HEADER+(int)length+4;
+            if(data.length-pos>=HEADER+SCOPE){
+                Scope scope=new Scope(Arrays.copyOfRange(data,pos+HEADER,pos+HEADER+SCOPE));
+                require(scope.vin.equals(expectedVin)&&(firstScope==null||Arrays.equals(firstScope.wire,scope.wire)),
+                    "CM/1 prefix scope changed");
+                if(firstScope==null)firstScope=scope;
+            }
+            if(end>data.length)break;
+            CRC32 crc=new CRC32();crc.update(data,pos,end-pos-4);
+            require(crc.getValue()==u32(data,end-4),"Complete prefix record has bad CRC");
+            pos=end;number++;prior=kind;declaredKind=null;
+        }
+        require(number>0&&prior!=4,"Interrupted CM/1 requires verified open and no terminal");
+        Map<String,Object> verified=inspect(Arrays.copyOf(data,pos),expectedVin);
+        require(Boolean.FALSE.equals(verified.get("terminal_present"))&&Boolean.TRUE.equals(verified.get("recovery_required")),
+            "Invalid prefix state");
+        return map("schema","camarodiag-j1979-native-maintenance-prefix-v1","protocol","SAE-J1979",
+            "scope",verified.get("scope"),"prefix_integrity_verified",true,"record_consistency_verified",false,
+            "terminal_present",false,"verified_prefix_bytes",pos,"unverified_trailing_bytes",data.length-pos,
+            "journal_bytes_received",data.length,"next_record_kind_declared",declaredKind,"verified_records",verified.get("records"),
+            "baseline_record_present",verified.get("baseline_record_present"),"intent_record_present",verified.get("intent_record_present"),
+            "observations",verified.get("observations"),"recovery_required",true,"command_outcome_unknown",true,
+            "physical_vehicle_verified",false,"physical_stop_independently_verified",false,"durable_before_tx_independently_verified",false,
+            "operator_consent_verified",false,"monitor_completion_verified",false,"evidence_authenticated",false,
+            "permits_automatic_retry",false,"permits_programming",false);
+    }
     public static Map<String,Object> inspect(byte[] raw,String expectedVin)throws IOException{
         require(validVin(expectedVin),"Independent VIN required");
         List<Entry> entries=parse(raw);Scope scope=entries.get(0).scope;
