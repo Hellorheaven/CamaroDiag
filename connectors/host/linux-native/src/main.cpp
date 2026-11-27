@@ -5,6 +5,7 @@
 #include "cl1_usb.h"
 #include "j1979_can_cli.h"
 #include "j1979_can_network.hpp"
+#include "j1979_catalogue_projection.hpp"
 #include "j1979_isotp.h"
 #include "j1979_cm1.hpp"
 #include "j1979_cu45_session.hpp"
@@ -1913,6 +1914,130 @@ static int network_cli(int argc,char** argv,bool scan){
     }catch(const std::exception& e){return error(e.what());}
 }
 
+struct ReferenceStamp{
+    dev_t device{};
+    ino_t inode{};
+    off_t size{};
+    timespec modified{},changed{};
+    std::string digest;
+    bool same(const ReferenceStamp& other)const{
+        return device==other.device&&inode==other.inode&&size==other.size&&digest==other.digest&&
+            modified.tv_sec==other.modified.tv_sec&&modified.tv_nsec==other.modified.tv_nsec&&
+            changed.tv_sec==other.changed.tv_sec&&changed.tv_nsec==other.changed.tv_nsec;
+    }
+    bool separate_from(const input& other)const{return device!=other.device||inode!=other.inode;}
+};
+static ReferenceStamp reference_stamp(const char* path){
+    struct File{int fd;~File(){if(fd>=0)close(fd);}} file{open(path,O_RDONLY|O_NOFOLLOW|O_CLOEXEC|O_NONBLOCK)};
+    struct stat first{},last{};
+    if(file.fd<0||fstat(file.fd,&first)!=0||!S_ISREG(first.st_mode)||first.st_size<=0||
+        static_cast<std::uint64_t>(first.st_size)>cd::catalogue::max_reference)
+        throw std::invalid_argument("Bounded regular reference file required");
+    std::unique_ptr<EVP_MD_CTX,decltype(&EVP_MD_CTX_free)> context(EVP_MD_CTX_new(),EVP_MD_CTX_free);
+    if(!context||EVP_DigestInit_ex(context.get(),EVP_sha256(),nullptr)!=1)
+        throw std::runtime_error("Reference digest unavailable");
+    std::array<unsigned char,65536> block{};
+    std::size_t total=0;
+    for(;;){
+        const auto n=read(file.fd,block.data(),block.size());
+        if(n<0&&errno==EINTR)continue;
+        if(n<0)throw std::runtime_error("Reference read failed");
+        if(!n)break;
+        const auto got=static_cast<std::size_t>(n);
+        if(got>static_cast<std::size_t>(first.st_size)-total||
+            EVP_DigestUpdate(context.get(),block.data(),got)!=1)throw std::runtime_error("Reference changed or digest failed");
+        total+=got;
+    }
+    if(total!=static_cast<std::size_t>(first.st_size)||fstat(file.fd,&last)||first.st_dev!=last.st_dev||
+        first.st_ino!=last.st_ino||first.st_size!=last.st_size||
+        first.st_mtim.tv_sec!=last.st_mtim.tv_sec||first.st_mtim.tv_nsec!=last.st_mtim.tv_nsec||
+        first.st_ctim.tv_sec!=last.st_ctim.tv_sec||first.st_ctim.tv_nsec!=last.st_ctim.tv_nsec)
+        throw std::runtime_error("Reference changed during digest");
+    std::array<unsigned char,EVP_MAX_MD_SIZE> digest{};
+    unsigned size=0;
+    if(EVP_DigestFinal_ex(context.get(),digest.data(),&size)!=1||size!=32)throw std::runtime_error("Reference digest failed");
+    constexpr char alphabet[]="0123456789abcdef";
+    std::string hex;hex.reserve(64);
+    for(unsigned i=0;i<size;++i){hex+=alphabet[digest[i]>>4];hex+=alphabet[digest[i]&15];}
+    return {first.st_dev,first.st_ino,first.st_size,first.st_mtim,first.st_ctim,std::move(hex)};
+}
+static bool recheck_input(const char* path,std::size_t max,const input& original){
+    input again{};return load_regular(path,max,&again)&&same_input(&original,&again);
+}
+static int catalogue_inventory_cli(const char* mode,const char* catalogue_path,const char* reference_path,const char* pin,const char* output){
+    const std::string_view kind=mode;
+    if(kind!="live"&&kind!="freeze")return error("Catalogue mode must be live or freeze");
+    try{
+        if(!cd::catalogue::valid_digest(pin))return error("Independent lowercase reference SHA-256 required");
+        input catalogue{};
+        if(!load_regular(catalogue_path,cd::catalogue::max_catalogue,&catalogue))return error("Invalid catalogue file");
+        const auto ref=reference_stamp(reference_path);
+        if(ref.digest!=pin||!ref.separate_from(catalogue))return error("Reference does not match pin or aliases catalogue");
+        const auto parsed=cd::catalogue::parse_catalogue(
+            {reinterpret_cast<const char*>(catalogue.bytes.get()),catalogue.length},
+            kind=="live"?cd::catalogue::Mode::live:cd::catalogue::Mode::freeze,pin);
+        const auto json=cd::catalogue::inventory(parsed,catalogue.digest);
+        if(!recheck_input(catalogue_path,cd::catalogue::max_catalogue,catalogue)||!ref.same(reference_stamp(reference_path)))
+            return error("Catalogue/reference changed");
+        if(!atomic_create(output,json.data(),json.size()))return error("Catalogue inventory destination unavailable");
+        return 0;
+    }catch(const std::exception& e){return error(e.what());}
+}
+static int catalogue_projection_cli(int argc,char** argv,bool verify){
+    const int required=verify?10:9;
+    if(argc!=required&&argc!=required+2)return error("Invalid catalogue projection arguments");
+    const std::string_view kind=argv[2];
+    const bool legacy=kind=="llr1";
+    if((kind!="cl1"&&kind!="cf1"&&!legacy)||legacy!=(argc==required+2))
+        return error("Explicit cl1, cf1 or llr1 source type required");
+    const char* catalogue_path=argv[3],*reference_path=argv[4],*pin=argv[5],*capture_path=argv[6],
+        *vin=argv[7],*output=argv[8],*proof=verify?argv[9]:nullptr;
+    unsigned protocol=0,source=0;
+    if(legacy){
+        if(!decimal_uint32(argv[required],&protocol)||protocol<1||protocol>5||
+            strlen(argv[required+1])!=2||!hex_uint32(argv[required+1],&source)||!cd::legacy::valid_source(source))
+            return error("Legacy protocol and response source required");
+    }
+    if(!cd::catalogue::valid_digest(pin)||!cf1_valid_vin(vin))return error("Independent reference pin and VIN required");
+    try{
+        input catalogue{},capture{},stored{};
+        const std::size_t capture_max=kind=="cf1"?static_cast<std::size_t>(CF1_MAX_BYTES):
+            kind=="cl1"?static_cast<std::size_t>(CL1_MAX_CAPTURE):cd::legacy::live_max_capture;
+        if(!load_regular(catalogue_path,cd::catalogue::max_catalogue,&catalogue)||
+            !load_regular(capture_path,capture_max,&capture)||!separate(&catalogue,&capture))
+            return error("Separate bounded catalogue and original capture required");
+        const auto ref=reference_stamp(reference_path);
+        if(ref.digest!=pin||!ref.separate_from(catalogue)||!ref.separate_from(capture))
+            return error("Reference digest mismatch or input alias");
+        const auto parsed=cd::catalogue::parse_catalogue(
+            {reinterpret_cast<const char*>(catalogue.bytes.get()),catalogue.length},
+            kind=="cf1"?cd::catalogue::Mode::freeze:cd::catalogue::Mode::live,pin);
+        const cd::catalogue::Bytes raw{capture.bytes.get(),capture.length};
+        const auto projected=kind=="cf1"?cd::catalogue::project_cf1(raw,vin,parsed,capture.digest,catalogue.digest):
+            legacy?cd::catalogue::project_llr1(raw,vin,protocol,source,parsed,capture.digest,catalogue.digest):
+            cd::catalogue::project_cl1(raw,vin,parsed,capture.digest,catalogue.digest);
+        const auto canonical=cd::catalogue::report(parsed,projected);
+        if(verify){
+            if(!load_regular(output,cd::catalogue::max_projection,&stored)||!separate(&stored,&capture)||
+                !separate(&stored,&catalogue)||!ref.separate_from(stored)||stored.length!=canonical.size()||
+                memcmp(stored.bytes.get(),canonical.data(),canonical.size())||
+                !recheck_input(output,cd::catalogue::max_projection,stored))
+                return error("Stored projection differs from independently replayed canonical native report");
+        }
+        if(!recheck_input(catalogue_path,cd::catalogue::max_catalogue,catalogue)||
+            !recheck_input(capture_path,capture_max,capture)||!ref.same(reference_stamp(reference_path)))
+            return error("Projection inputs changed");
+        if(verify){
+            const auto result=std::string("{\"schema\":\"camarodiag-j1979-catalogue-verification-linux-v1\","
+                "\"verified\":true,\"source_capture_sha256\":\"")+capture.digest+"\",\"catalogue_sha256\":\""+
+                catalogue.digest+"\",\"reference_sha256\":\""+ref.digest+"\",\"projection_sha256\":\""+stored.digest+
+                "\",\"normative_compliance_verified\":false,\"physical_vehicle_verified\":false}\n";
+            if(!atomic_create(proof,result.data(),result.size()))return error("Projection proof destination unavailable");
+        }else if(!atomic_create(output,canonical.data(),canonical.size()))return error("Projection destination unavailable");
+        return 0;
+    }catch(const std::exception& e){return error(e.what());}
+}
+
 static void usage(FILE *stream) {
     fprintf(stream,
         "CamaroDiag Linux native C++20 — SAE J1979\n"
@@ -1952,6 +2077,9 @@ static void usage(FILE *stream) {
         "  camarodiag-native --verify-j1979-legacy-scan PROTOCOL SOURCE VIN CAPTURE.lsr REPORT.json PROOF.json\n"
         "  camarodiag-native --j1979-legacy-maintenance --operation clear --port /dev/ttyUSB0 --protocol 2 --engine-source 10 --source 10 --vin VIN --baseline baseline.json --intent intent.json --output result.json --confirm-functional-scope --acknowledge-maintenance-warning\n"
         "  camarodiag-native --inspect-j1979-legacy-discovery PROTOCOL RAW_RESPONSE RAW_ATDPN REPORT.json\n"
+        "  camarodiag-native --inspect-j1979-catalogue live|freeze CATALOGUE REFERENCE SHA256 OUTPUT\n"
+        "  camarodiag-native --project-j1979-catalogue cl1|cf1|llr1 CATALOGUE REFERENCE SHA256 CAPTURE VIN OUTPUT [PROTOCOL SOURCE]\n"
+        "  camarodiag-native --verify-j1979-catalogue cl1|cf1|llr1 CATALOGUE REFERENCE SHA256 CAPTURE VIN PROJECTION PROOF [PROTOCOL SOURCE]\n"
         "  camarodiag-native --help\n"
         "Examples:\n"
         "  camarodiag-native --inspect-j1979-freeze-native-prefix incomplete.cf 2G1FA1E30D7654321 partial.json\n"
@@ -1963,6 +2091,9 @@ int main(int argc, char **argv) {
     if (argc == 2 && (!strcmp(argv[1], "--help") || !strcmp(argv[1], "-h"))) {
         usage(stdout); return 0;
     }
+    if (argc==7 && !strcmp(argv[1],"--inspect-j1979-catalogue"))return catalogue_inventory_cli(argv[2],argv[3],argv[4],argv[5],argv[6]);
+    if (argc>=3 && !strcmp(argv[1],"--project-j1979-catalogue"))return catalogue_projection_cli(argc,argv,false);
+    if (argc>=3 && !strcmp(argv[1],"--verify-j1979-catalogue"))return catalogue_projection_cli(argc,argv,true);
     if (argc>=3 && !strcmp(argv[1],"--j1979-legacy-live"))return legacy_live_cli(argc,argv);
     if (argc==7 && !strcmp(argv[1],"--inspect-j1979-legacy-live"))return legacy_live_replay(argv[2],argv[3],argv[4],argv[5],argv[6],nullptr);
     if (argc==8 && !strcmp(argv[1],"--verify-j1979-legacy-live"))return legacy_live_replay(argv[2],argv[3],argv[4],argv[5],argv[6],argv[7]);
