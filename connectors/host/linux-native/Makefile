@@ -8,9 +8,9 @@ CXXSTRICT = -std=c++20 -Wall -Wextra -Wpedantic -Werror -D_FILE_OFFSET_BITS=64
 INCLUDES = -Iinclude -I../../firmware/shared
 TARGET = camarodiag-native
 
-CXX_SOURCES = src/main.cpp src/j1979_cu1.cpp src/j1979_cj1.cpp src/j1979_cm1.cpp src/cf1_usb.cpp src/cf1.cpp src/cf1_complete.cpp src/cf1_crypto.cpp src/cl1.cpp src/cl1_crypto.cpp src/j1979_policy.cpp src/j1979_monitor_scaling.cpp src/j1979_vehicle_info.cpp src/j1979_measurement.cpp src/j1979_status.cpp src/j1979_multi.cpp src/j1979_context.cpp src/j1979_can.cpp src/j1979_live.cpp src/j1979_isotp.cpp src/j1979_can_cli.cpp
+CXX_SOURCES = src/main.cpp src/j1979_cu1.cpp src/j1979_cj1.cpp src/j1979_cm1.cpp src/cf1_usb.cpp src/cf1.cpp src/cf1_complete.cpp src/cf1_crypto.cpp src/cl1.cpp src/cl1_crypto.cpp src/j1979_policy.cpp src/j1979_monitor_scaling.cpp src/j1979_vehicle_info.cpp src/j1979_measurement.cpp src/j1979_projection.cpp src/j1979_status.cpp src/j1979_multi.cpp src/j1979_context.cpp src/j1979_can.cpp src/j1979_live.cpp src/j1979_isotp.cpp src/j1979_can_cli.cpp
 CXX_OBJECTS = $(patsubst src/%.cpp,build/%.o,$(CXX_SOURCES))
-DECODER_OBJECTS = build/j1979_status.o build/j1979_multi.o build/j1979_context.o build/j1979_monitor_scaling.o build/j1979_vehicle_info.o build/j1979_measurement.o
+DECODER_OBJECTS = build/j1979_projection.o build/j1979_status.o build/j1979_multi.o build/j1979_context.o build/j1979_monitor_scaling.o build/j1979_vehicle_info.o build/j1979_measurement.o
 
 .PHONY: all clean test install deb
 all: $(TARGET)

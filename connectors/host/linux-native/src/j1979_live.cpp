@@ -2,6 +2,7 @@
 #include "j1979_live.h"
 #include "j1979_measurement.h"
 #include "j1979_context.hpp"
+#include "j1979_projection.hpp"
 #include <limits.h>
 #include <stdlib.h>
 #include <string.h>
@@ -100,6 +101,10 @@ static j1979_live_step *query(const j1979_live_plan *p,j1979_live_result *r,
     if (length<3 || raw[0]!=(uint8_t)(mode+0x40u) || raw[1]!=pid) {
         snprintf(s->status,sizeof(s->status),"FAILED");
         halt(r,"WRONG_ECU_RESPONSE");return s;
+    }
+    if (mode==1&&!cd::j1979::known_shape({{s->request,2},{s->response,s->response_size},true,true})) {
+        snprintf(s->status,sizeof(s->status),"FAILED");
+        halt(r,"INVALID_KNOWN_PID_DEFINITION");return s;
     }
     snprintf(s->status,sizeof(s->status),"RAW");
     return s;
@@ -355,6 +360,7 @@ bool j1979_live_write_json(FILE *f,const j1979_live_plan *p,
     }
     const bool identity=r->initial_vin_valid&&r->final_vin_valid &&
         !strcmp(r->initial_vin,r->final_vin) && !strcmp(r->final_vin,p->channel.expected_vin);
-    if (!cd::j1979::write_context_json(f,observations,identity)) return false;
+    if (!cd::j1979::write_context_json(f,observations,identity) ||
+        !cd::j1979::write_projections(f,observations,identity)) return false;
     return fputs("}\n",f)!=EOF;
 }

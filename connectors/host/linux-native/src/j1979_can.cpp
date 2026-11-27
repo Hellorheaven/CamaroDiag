@@ -5,6 +5,7 @@
 #include "j1979_vehicle_info.h"
 #include "j1979_measurement.h"
 #include "j1979_context.hpp"
+#include "j1979_projection.hpp"
 #include <ctype.h>
 #include <errno.h>
 #include <limits.h>
@@ -115,6 +116,10 @@ static bool valid_response(const uint8_t *request, size_t count,
             snprintf(step->detail,sizeof(step->detail),"INVALID_MODE09_INFO");
             return false;
         }
+    }
+    if (request[0]==1 && count==2 && !cd::j1979::known_shape({{request,count},{response,n},true,true})) {
+        snprintf(step->detail,sizeof(step->detail),"INVALID_KNOWN_PID_DEFINITION");
+        return false;
     }
     if (request[0] == 9 && (request[1] == 4 || request[1] == 6 ||
                             request[1] == 10)) {
@@ -574,6 +579,7 @@ bool j1979_can_write_json(FILE *f, const j1979_can_plan *p,
     }
     const bool identity=r->vin_valid && r->final_vin_valid &&
         !strcmp(r->vin_match,"MATCH") && !strcmp(r->final_vin_match,"MATCH");
-    if (!cd::j1979::write_context_json(f,observations,identity)) return false;
+    if (!cd::j1979::write_context_json(f,observations,identity) ||
+        !cd::j1979::write_projections(f,observations,identity)) return false;
     return fputs("}\n",f)!=EOF;
 }
