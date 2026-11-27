@@ -21,5 +21,8 @@
     <Compile Include="../../connectors/host/windows-discovery/J1979FreezeNative.cs" Link="Connectors/J1979FreezeNative.cs" />
     <Compile Include="../../connectors/host/windows-discovery/J1979FreezeUsbCapture.cs" Link="Connectors/J1979FreezeUsbCapture.cs" />
     <Compile Include="../../connectors/host/windows-discovery/J1979FreezeNativeCli.cs" Link="Connectors/J1979FreezeNativeCli.cs" />
+    <Compile Include="../../connectors/host/windows-discovery/J1979LiveNative.cs" Link="Connectors/J1979LiveNative.cs" />
+    <Compile Include="../../connectors/host/windows-discovery/J1979LiveUsbCapture.cs" Link="Connectors/J1979LiveUsbCapture.cs" />
+    <Compile Include="../../connectors/host/windows-discovery/J1979LiveNativeCli.cs" Link="Connectors/J1979LiveNativeCli.cs" />
   </ItemGroup>
 </Project>
