@@ -14,7 +14,7 @@ import time
 from .j1979_legacy import PROTOCOLS
 from .j1979_legacy_discovery import valid_source
 from .j1979_legacy_frames import response_frames
-from .j1979_live import Plan, record, numeric_pid
+from .j1979_live import Plan, record, legacy_numeric_pid
 
 
 class LegacyLiveLink:
@@ -49,7 +49,7 @@ class LegacyLiveLink:
     def _read(self, command, deadline, logical):
         if not (command in ("0100","0900","0901","0902") or
             re.fullmatch(r"01[0-9A-F]{2}",command) and
-            (int(command[2:],16)%32==0 or numeric_pid(int(command[2:],16)))):
+            (int(command[2:],16)%32==0 or legacy_numeric_pid(int(command[2:],16)))):
             raise ValueError("Unsupported request in legacy live recording")
         row={"logical_query":logical,"request_hex":command,"raw_response":None,
              "frames":[],"selected_records_hex":[],"status":"NOT_TESTED","detail":None}
@@ -169,7 +169,7 @@ class LegacyLiveLink:
         deadline=self.clock()+timeout
         if request==b"\x09\x02":
             return self._vin(deadline,logical)
-        if len(request)!=2 or request[0]!=1 or not (request[1]%32==0 or numeric_pid(request[1])):
+        if len(request)!=2 or request[0]!=1 or not (request[1]%32==0 or legacy_numeric_pid(request[1])):
             raise ValueError("Only Mode 01 numeric values and support pages allowed")
         return self._single(request.hex().upper(),deadline,logical)
 
@@ -178,6 +178,8 @@ def record_legacy(exchange,protocol_check,protocol,source,plan:Plan,*,
                   clock=time.monotonic,sleep=time.sleep,require_current=lambda:None,
                   on_observation=lambda _:None):
     plan.validate()
+    if not all(legacy_numeric_pid(pid) for pid in plan.pids):
+        raise ValueError("Selected PID exceeds supported legacy application width")
     link=LegacyLiveLink(exchange,protocol_check,protocol,source,
                         clock=clock,require_current=require_current)
     report=record(link.query,plan,clock=clock,sleep=sleep,require_current=require_current,
