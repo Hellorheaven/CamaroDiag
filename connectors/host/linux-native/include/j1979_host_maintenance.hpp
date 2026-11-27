@@ -3,6 +3,8 @@
 #include "j1979_maintenance_journal.h"
 #include <functional>
 #include <string>
+#include <string_view>
+#include <signal.h>
 namespace cd::hostmaint {
 using Campaign=J1979MaintenanceCampaign;
 using Scope=Campaign::Scope;
@@ -13,6 +15,9 @@ struct Result{
     bool journal_created{},recovery_latched{};
     std::string error;
 };
+Result run_socket(const Scope&,const char* interface,const char* directory,const char* journal_name,
+    bool warning,bool approved,const volatile sig_atomic_t* cancel);
+std::string report(const Result&,std::string_view digest,std::string_view independent_journal_report);
 class FileStorage final:public Journal::Storage{
     int dir_{-1},fd_{-1};
     std::string journal_name_;
