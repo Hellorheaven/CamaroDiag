@@ -209,7 +209,7 @@ internal static class BridgeRecoveryHistory
         }
         // Existing junctions/symlinks could redirect an apparently separate
         // output into a protected inventory. Reject those parents explicitly.
-        var directory = new DirectoryInfo(Path.GetDirectoryName(destination)
+        DirectoryInfo? directory = new DirectoryInfo(Path.GetDirectoryName(destination)
             ?? throw new InvalidDataException("ProtectedDestination"));
         while (directory is not null)
         {
