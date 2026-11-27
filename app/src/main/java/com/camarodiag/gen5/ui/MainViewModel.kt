@@ -6077,7 +6077,31 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val uncertainMessage = if (clear) R.string.functional_clear_uncertain else R.string.functional_evap_uncertain
             try {
                 if (clear) {
-                    val result = obdManager.runElmClearRecipe(confirmedVehicle.vin, approval, ::current)
+                    val result = obdManager.runElmClearRecipe(confirmedVehicle.vin, approval, ::current) { baseline ->
+                        withContext(Dispatchers.IO) {
+                            check(current())
+                            val directory=File(getApplication<Application>().filesDir,"can-clear-evidence")
+                            check(directory.isDirectory || directory.mkdirs())
+                            val file=File(directory,"clear-"+java.util.UUID.randomUUID()+".baseline.json")
+                            val json=CanClearEvidenceJson.encode(baseline)
+                                .put("schema","camarodiag-j1979-can-clear-baseline-v1")
+                                .put("expectedVin",confirmedVehicle.vin)
+                                .put("appVersion",com.camarodiag.gen5.BuildConfig.VERSION_NAME)
+                                .put("createdAtMillis",System.currentTimeMillis())
+                            check(file.createNewFile())
+                            try {
+                                java.io.FileOutputStream(file).use {
+                                    it.write(json.toString(2).toByteArray(Charsets.UTF_8))
+                                    it.flush();it.fd.sync()
+                                }
+                                check(current())
+                            } catch(error:Exception) {
+                                file.delete();throw error
+                            }
+                        }
+                        check(current())
+                        _functionalTestState.update { it.copy(clearBaseline=baseline) }
+                    }
                     if (current()) _functionalTestState.value =
                         FunctionalTestPlanner.clearResults(_functionalTestState.value, result)
                 } else {
@@ -6219,22 +6243,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 } ?: JSONObject.NULL)
             }
             if (snapshot.clearCampaign) {
-                fun dtcMap(values: Map<String, List<String>?>) = JSONObject().apply {
-                    values.forEach { (mode, records) -> put(mode, records?.let { JSONArray(it) } ?: JSONObject.NULL) }
-                }
-                json.put("clear", snapshot.clearResult?.let { result ->
-                    JSONObject().put("outcome", result.outcome).put("commandAttempted", result.attempted)
-                        .put("acknowledged", result.acknowledged).put("reason", result.reason ?: JSONObject.NULL)
-                        .put("elmProtocol", result.protocol).put("requestCanId", result.requestCanId)
-                        .put("responseCanId", result.responseCanId)
-                        .put("beforeDtcs", dtcMap(result.beforeDtcs)).put("afterDtcs", dtcMap(result.afterDtcs))
-                        .put("observations", JSONArray(result.observations.map { observation ->
-                            JSONObject().put("stage", observation.stage).put("requestHex", observation.requestHex)
-                                .put("responseHex", observation.responseHex ?: JSONObject.NULL)
-                                .put("interpretation", observation.interpretation ?: JSONObject.NULL)
-                                .put("error", observation.error ?: JSONObject.NULL)
-                        }))
-                } ?: JSONObject.NULL)
+                json.put("clear",snapshot.clearResult?.let(CanClearEvidenceJson::encode)?:JSONObject.NULL)
+                    .put("clearBaseline",snapshot.clearBaseline?.let(CanClearEvidenceJson::encode)?:JSONObject.NULL)
             }
             snapshot.legacyTarget?.let { target ->
                 json.put("legacyMutation",snapshot.legacyResult?.let(LegacyMutationEvidenceJson::encode) ?: JSONObject.NULL)
