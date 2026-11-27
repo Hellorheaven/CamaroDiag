@@ -17,6 +17,9 @@ class J1979MaintenanceRemoteRunner final:public J1979MaintenanceUsb::Runner {
    public:
     virtual ~Waiter()=default;
     virtual bool current(const Scope& scope)=0;
+    // Same host/lease for offline transfer after physical stop, even if
+    // a recovery condition now prevents any diagnostic operation.
+    virtual bool present()=0;
     virtual bool waitMs(uint32_t duration)=0;
   };
   J1979MaintenanceRemoteRunner(maintenance_link::Transport& transport,Waiter& waiter,
@@ -46,15 +49,15 @@ class J1979MaintenanceRemoteRunner final:public J1979MaintenanceUsb::Runner {
     }
     class Sink final:public Client::Sink {
      public:
-      Sink(Buffer& buffer,size_t& offset,Waiter& waiter,const Scope& scope):
-        buffer_(buffer),offset_(offset),waiter_(waiter),scope_(scope){}
+      Sink(Buffer& buffer,size_t& offset,Waiter& waiter):
+        buffer_(buffer),offset_(offset),waiter_(waiter){}
       bool append(const uint8_t* bytes,size_t n)override{
         if(!bytes||!n||offset_>sizeof(buffer_.bytes)||n>sizeof(buffer_.bytes)-offset_||
-           !waiter_.current(scope_))return false;
+           !waiter_.present())return false;
         std::memcpy(buffer_.bytes+offset_,bytes,n);offset_+=n;return true;
       }
-     private:Buffer& buffer_;size_t& offset_;Waiter& waiter_;const Scope& scope_;
-    } sink(buffer_,size_,waiter_,scope_);
+     private:Buffer& buffer_;size_t& offset_;Waiter& waiter_;
+    } sink(buffer_,size_,waiter_);
     if(!client.fetch(sink)||size_!=progress.journalSize||!client.close()){
       client.abort();recovery_=true;return;
     }
