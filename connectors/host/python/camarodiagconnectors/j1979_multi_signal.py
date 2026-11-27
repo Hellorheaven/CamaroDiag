@@ -456,3 +456,13 @@ def from_steps(steps: list[dict]) -> list[dict]:
         if fields is not None:
             result.append({"request_hex": step["request_hex"], "signals": fields})
     return result
+
+
+# Exactly the previous published catalog; never permit arbitrary omission of
+# recognized fields in a claimed projection. Old reports remain verifiable.
+EXTENDED_PIDS = frozenset((0x6B,0x6F,0x81,0x82,0x83,0x84,0x85,0x87,
+                           0x89,0x8A,0x8B,0x8C,0x8D,0x8E,0x8F,0x93,0x94,0x9C))
+
+
+def historical_projection(records):
+    return [record for record in records if int(record["request_hex"][2:4],16) not in EXTENDED_PIDS]
