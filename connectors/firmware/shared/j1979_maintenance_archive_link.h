@@ -64,10 +64,10 @@ class Endpoint {
   }
   bool transact(const uint8_t* request,size_t n,uint8_t* response,size_t m){
     Packet p,q;
-    if(!response||m!=Size||!poll()||!decode(request,n,p)||p.sequence!=next_)return fail();
+    if(!response||m!=Size||!poll()||!archive_link::decode(request,n,p)||p.sequence!=next_)return fail();
     q.sequence=p.sequence;
     if(p.op==Op::Abort&&p.length==0){
-      q.op=Op::Closed;close();return encode(q,response,m);
+      q.op=Op::Closed;close();return archive_link::encode(q,response,m);
     }
     uint8_t wire[Scope::WireSize]{};
     if(!scope_.encode(wire,sizeof(wire)))return fail();
@@ -87,10 +87,11 @@ class Endpoint {
         if(!source_.read(offset_,q.body+4,count)||!source_.current())return fail();
         offset_+=uint32_t(count);
       }else if(p.op==Op::Close&&p.length==0&&offset_==info_.bytes){
+        if(!source_.finish())return fail();
         q.op=Op::Closed;close();
       }else return fail();
     }else return fail();
-    if(!connection_.present(scope_)||!encode(q,response,m)||next_==0xffffu)return fail();
+    if(!connection_.present(scope_)||!archive_link::encode(q,response,m)||next_==0xffffu)return fail();
     ++next_;return true;
   }
   void fault(){close();}
@@ -162,9 +163,9 @@ class Client {
        uint32_t(transport_.monotonicMs()-started_)>=20000u)return fail();
     p.sequence=next_;uint8_t tx[Size]{},rx[Size]{};
     const uint32_t start=transport_.monotonicMs();
-    if(!encode(p,tx,Size)||!transport_.exchange(tx,rx,1000)||!transport_.active()||
+    if(!archive_link::encode(p,tx,Size)||!transport_.exchange(tx,rx,1000)||!transport_.active()||
        uint32_t(transport_.monotonicMs()-start)>=1000u||
-       !decode(rx,Size,q)||q.op!=expected||q.sequence!=next_)return fail();
+       !archive_link::decode(rx,Size,q)||q.op!=expected||q.sequence!=next_)return fail();
     ++next_;return true;
   }
   Transport& transport_;const Scope scope_;Info info_{};
