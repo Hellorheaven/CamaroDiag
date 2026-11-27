@@ -132,7 +132,8 @@ class Endpoint {
       put16(r.body+1,uint16_t(scratchSize_));put32(r.body+3,scratch_.elapsedMs);
     }else if(p.op==Op::Fetch){
       if(p.length!=2||get16(p.body)!=offset_||offset_>=scratchSize_||
-         !beforeDeadline(bus_.monotonicMs(),exchangeStart_,exchangeBudget_))return fail();
+         !beforeDeadline(bus_.monotonicMs(),exchangeStart_,exchangeBudget_)||
+         (liveScoped_&&!liveSequence_.remaining(bus_.monotonicMs())))return fail();
       const size_t remaining=scratchSize_-offset_;
       const size_t count=remaining<BodySize-2?remaining:BodySize-2;
       r.op=Op::Chunk;r.length=uint8_t(count+2);
@@ -140,7 +141,8 @@ class Endpoint {
       std::memcpy(r.body+2,scratch_.response+offset_,count);offset_+=count;
     }else return fail();
     if(!admitted_()||!bus_.active()||
-       !beforeDeadline(bus_.monotonicMs(),exchangeStart_,exchangeBudget_)||!encode(r,out,m))return fail();
+       !beforeDeadline(bus_.monotonicMs(),exchangeStart_,exchangeBudget_)||
+       (liveScoped_&&!liveSequence_.remaining(bus_.monotonicMs()))||!encode(r,out,m))return fail();
     if(next_==sequenceLimit(version())||scratch_.state==State::Fault)closed_=true;
     else ++next_;
     return true;
