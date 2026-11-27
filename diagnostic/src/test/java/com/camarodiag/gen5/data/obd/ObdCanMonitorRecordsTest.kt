@@ -24,6 +24,25 @@ class ObdCanMonitorRecordsTest {
         assertFalse(report.contains("PARTIAL"))
     }
 
+    @Test fun knownMonitorScalingKeepsRawDataAndDecodesSignedLimits() {
+        val signed = requireNotNull(ObdCanMonitorRecords.results("46010190FFFF80000000", 1)).single()
+        val value = requireNotNull(signed.scaled())
+        assertEquals("ms", value.unit)
+        assertEquals(-1.0, value.value, 0.0)
+        assertEquals(-32768.0, value.minimum, 0.0)
+        assertEquals(0.0, value.maximum, 0.0)
+        assertEquals("WITHIN", value.numericRelation)
+        assertTrue(signed.rawText().contains("RAW=FFFF"))
+        assertTrue(signed.rawText().contains("UNIT=ms"))
+        val unknown = requireNotNull(ObdCanMonitorRecords.results("460101FF000100000002", 1)).single()
+        assertNull(unknown.scaled())
+        assertFalse(unknown.rawText().contains("UNIT="))
+        val inverted = ObdCanMonitorRecords.Result(1, 1, 0x24, 2, 3, 1)
+        assertEquals("INVERTED_LIMITS", inverted.scaled()?.numericRelation)
+        val voltage = ObdCanMonitorRecords.Result(1, 1, 0x0A, 1000, 0, 2000)
+        assertEquals(122.0, requireNotNull(voltage.scaled()).value, 1e-10)
+    }
+
     @Test fun malformedOrUnavailableResultsNeverBecomeMeasurements() {
         assertNull(ObdCanMonitorRecords.support("7F0611", 0))
         assertNull(ObdCanMonitorRecords.support("46008000", 0))
