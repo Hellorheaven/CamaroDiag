@@ -1,3 +1,15 @@
+# Reprise SAE J1979 — maintenance native CU/4, CI/4, CM/1 — 27/11/2026
+
+PR #117, branche `chore/unified-ci`, base du lot `fa6d365ac48286953ded269d0d63c3cde7133f9a`. Exclusivement SAE J1979. C6 et autres protocoles en pause.
+
+- Firmware : recette native Mode 04 et Mode 08 préparation EVAP, périmètre immuable ECM principal CAN classique, VIN, immobilité et régime, baseline puis intention persistante avant émission, tentative unique, état terminal après arrêt vérifié. CM/1 append-only avec CRC et relecture. CU/4 authentifié dédié, CI/4 distinct des mailboxes en lecture, tâches et composition ESP32/STM32 séparées, transfert ordonné des journaux. Les firmwares de découverte ne démarrent pas ces recettes.
+- Hôtes Android, Windows, Linux : clients CU/4, inspection/rejeu CM/1, export original et JSON, double consentement explicite, marqueurs de tentative et résultat incertain, intégration UI Android/Windows. Aucune relance automatique ni déclaration de validation physique.
+- Tests C++ recette/CI4 et Python inspection écrits ; intégration gate existant, aucun test ni compilation déclenché. Reste à compléter les régressions Java/C# CU4 et qualification des contrats de carte (stockage durable réel, bail, interverrouillages, ordonnancement et arrêt indépendant), puis revue globale. Ne pas activer les opérations sur la carte de découverte sans ces conditions.
+- Catalogue exhaustif J1979DA_202607 : source autorisée toujours absente. Ne pas inventer de définitions ni annoncer conformité complète. Après clôture logicielle et gate unique réussi, APK Release signé et vérifié selon procédure v2.0.46 sur SHA exact, sans fusion. Aucun APK ou Release généré dans ce lot.
+- Comparaison intermédiaire GitHub au SHA `03495cf8575b8241464855c5fc65710437b11275` : 67 commits, 49 fichiers, +4580/-26 lignes. Objectif 10000 lignes non atteint. Recalculer le diff final.
+
+---
+
 # Reprise SAE J1979 — CI/3 et captures interrompues — 27/11/2026
 
 PR #117, branche `chore/unified-ci`, base du lot `44712c16ad4998deb238e51759cb28aa68fc0d3e`. Exclusivement SAE J1979 ; C6 et autres protocoles en pause. Au SHA `4e9e94bf41c3bd2e359cdd41767063dc5c961c62`, comparaison GitHub : 48 commits, 38 fichiers, +1149/-62 lignes. Objectif des 10 000 lignes utiles non atteint.
