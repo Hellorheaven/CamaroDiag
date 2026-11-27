@@ -68,6 +68,19 @@ class OperatingContextTests(unittest.TestCase):
         for payload in ("01000000", "00800000", "00001000", "00080400", "00080014"):
             self.assertIsNone(cycle_data(bytes.fromhex(payload), None))
 
+    def test_invalid_baseline_and_ambiguous_context(self):
+        for encoded in ("00800100", "00001100", "00010110", "00080400", "00080004"):
+            compression=bool(bytes.fromhex(encoded)[1]&8)
+            cycle=cycle_data(bytes((0,8 if compression else 0,1,0)),bytes.fromhex(encoded))
+            self.assertFalse(cycle["support_verified"])
+            self.assertTrue(all(m["supported"] is None for m in cycle["monitors"]))
+        steps=[row("0101","410100010100"),row("0101","410100"),row("0141","414100010100"),
+               row("011D","411D30"),row("011D","411D3030"),row("0106","41068090")]
+        result=project(steps)
+        self.assertFalse(result["drive_cycle"]["support_verified"])
+        self.assertIsNone(result["fuel_trims"][0]["signals"][1]["number"])
+        self.assertEqual(project([row("01 06 ","410680")])["fuel_trims"],[])
+
     def test_projection_never_merges_legacy_sources(self):
         steps = [row("011D", "411DFF", source="10"), row("0106", "41068090", source="18")]
         self.assertEqual(legacy_project(steps, "10")["fuel_trims"], [])
