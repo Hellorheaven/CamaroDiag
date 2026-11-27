@@ -42,3 +42,13 @@ class LegacyBoundariesTests(unittest.TestCase):
         self.assertEqual([50.0, 40.0], [x["number"] for x in values if x["pid"] == 5])
         self.assertTrue(all(x["responder_attribution"] == "ANONYMOUS" for x in values))
         self.assertIsNone(report["observed_vin"])
+
+    def test_legacy_dtc_zero_padding_and_unknown_modes_stay_distinct(self):
+        replies = {"0100": "410000000000", "03": "43012300000000\n43000000000000",
+                   "07": "47000000000000"}
+        report = scan(lambda req, _: replies.get(req, "NO DATA"), lambda: 2, 2)
+        modes = {row["mode"]: row for row in report["dtc_modes"]}
+        self.assertEqual([["P0123"], []], modes[3]["anonymous_records"])
+        self.assertEqual([[]], modes[7]["anonymous_records"])
+        self.assertIsNone(modes[10]["anonymous_records"])
+        self.assertEqual("ANONYMOUS", modes[3]["responder_attribution"])

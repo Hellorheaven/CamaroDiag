@@ -231,9 +231,17 @@ def scan(exchange, protocol_check, expected_protocol: int, *, budget=180.0,
         stop = "NO_POSITIVE_PID00"
     pids = inventory(1, lambda _: True, 2, first=first) if stop is None else []
 
+    dtc_modes = []
+    def dtc(a, b):
+        return f"{'PCBU'[a >> 6]}{(a >> 4) & 3:X}{a & 15:X}{b:02X}"
     for mode in (3, 7, 10):
         # Legacy fixed three DTC pairs; zero pair is padding, no CAN count.
-        read(f"{mode:02X}", lambda r: len(r) == 7 and r[0] == mode + 0x40)
+        command = f"{mode:02X}"
+        rows = read(command, lambda r: len(r) == 7 and r[0] == mode + 0x40)
+        dtc_modes.append({"mode": mode,
+            "anonymous_records": [[dtc(a,b) for a,b in zip(row[1::2],row[2::2])
+                                   if a or b] for row in rows] if rows else None,
+            "responder_attribution": "ANONYMOUS"})
 
     measurements = []
     def read_pid(mode, pid):
@@ -295,7 +303,7 @@ def scan(exchange, protocol_check, expected_protocol: int, *, budget=180.0,
     return {"expected_protocol": expected_protocol, "observed_protocol": observed_protocol,
             "protocol_name": PROTOCOLS[expected_protocol], "responder_attribution": "ANONYMOUS",
             "observed_vin": None, "anonymous_vin_candidate": vin_candidate,
-            "steps": steps, "measurements": measurements,
+            "steps": steps, "measurements": measurements, "dtc_modes": dtc_modes,
             "advertised_control_tests": controls, "completed": stop is None,
             "stop_reason": stop, "cancelled": stop == "CANCELLED", "duration_ms": round((clock() - start) * 1000),
             "not_executed": ["MODE_04_CLEAR", "MODE_08_CONTROL"]}
