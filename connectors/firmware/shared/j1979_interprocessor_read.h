@@ -16,6 +16,10 @@ static constexpr size_t Size=32, BodySize=20;
 static constexpr uint8_t ClassicVersion=2, LiveVersion=3;
 inline uint32_t sequenceLimit(uint8_t version){return version==LiveVersion?0xffffffu:0xffffu;}
 inline bool supportedVersion(uint8_t version){return version==ClassicVersion||version==LiveVersion;}
+// Bound all fragments, including the final fetch, by the original request.
+// No refresh on a Fetch packet, even if it has the correct sequence.
+static constexpr uint32_t MaximumExchangeMs=4000;
+inline bool beforeDeadline(uint32_t now,uint32_t start,uint32_t budget){return uint32_t(now-start)<budget;}
 enum class Op:uint8_t { Read=1, Fetch=2, Result=0x81, Chunk=0x82 };
 struct Packet {
   Op op=Op::Read;
@@ -99,8 +103,12 @@ class Endpoint {
     r.seq=p.seq;r.version=version();
     if(p.op==Op::Read){
       if(offset_!=scratchSize_||p.length<12||p.length>18)return fail();
+      exchangeStart_=bus_.monotonicMs();
       const uint16_t timeout=get16(p.body);
       const size_t reqSize=p.length-11;
+      // The peer's vehicle timeout excludes the SPI reserve. The receiver
+      // still applies a hard maximum to the whole exchange, not per chunk.
+      exchangeBudget_=MaximumExchangeMs;
       if(timeout<1||timeout>4000||get32(p.body+2)!=tx_||
          get32(p.body+6)!=rx_||p.body[10]!=(ext_?1:0)||
          !(scoped_?sequence_.allows(p.body+11,reqSize):liveScoped_?liveScope_.allows(p.body+11,reqSize):
@@ -113,21 +121,26 @@ class Endpoint {
       }
       Exchange::run(bus_,tx_,rx_,ext_,p.body+11,reqSize,timeout,scratch_,scoped_?&scope_:nullptr,
         liveScoped_?&liveScope_:nullptr);
-      if(!validResult(p.body+11,reqSize,scratch_,scoped_?&scope_:nullptr,liveScoped_?&liveScope_:nullptr))return fail();
+      if(!admitted_()||!bus_.active()||
+         !beforeDeadline(bus_.monotonicMs(),exchangeStart_,exchangeBudget_)||
+         scratch_.elapsedMs>timeout||
+         !validResult(p.body+11,reqSize,scratch_,scoped_?&scope_:nullptr,liveScoped_?&liveScope_:nullptr))return fail();
       if(liveScoped_&&!liveSequence_.observe(p.body+11,reqSize,scratch_,bus_.monotonicMs()))return fail();
       if(scoped_&&!sequence_.observe(p.body+11,reqSize,scratch_))return fail();
       scratchSize_=scratch_.responseSize;offset_=0;
       r.op=Op::Result;r.length=7;r.body[0]=wireState(scratch_.state);
       put16(r.body+1,uint16_t(scratchSize_));put32(r.body+3,scratch_.elapsedMs);
     }else if(p.op==Op::Fetch){
-      if(p.length!=2||get16(p.body)!=offset_||offset_>=scratchSize_)return fail();
+      if(p.length!=2||get16(p.body)!=offset_||offset_>=scratchSize_||
+         !beforeDeadline(bus_.monotonicMs(),exchangeStart_,exchangeBudget_))return fail();
       const size_t remaining=scratchSize_-offset_;
       const size_t count=remaining<BodySize-2?remaining:BodySize-2;
       r.op=Op::Chunk;r.length=uint8_t(count+2);
       put16(r.body,uint16_t(offset_));
       std::memcpy(r.body+2,scratch_.response+offset_,count);offset_+=count;
     }else return fail();
-    if(!admitted_()||!encode(r,out,m))return fail();
+    if(!admitted_()||!bus_.active()||
+       !beforeDeadline(bus_.monotonicMs(),exchangeStart_,exchangeBudget_)||!encode(r,out,m))return fail();
     if(next_==sequenceLimit(version())||scratch_.state==State::Fault)closed_=true;
     else ++next_;
     return true;
@@ -142,6 +155,7 @@ class Endpoint {
   bool liveScoped_;const J1979LiveScope liveScope_;J1979LiveSequence liveSequence_;
   bool liveBegun_=false;
   size_t scratchSize_=0,offset_=0;
+  uint32_t exchangeStart_=0,exchangeBudget_=0;
   uint32_t next_=0;bool closed_=false;
 };
 // Actual SPI master must enforce a bounded request/response transaction,
@@ -201,6 +215,11 @@ class Client final:public J1979CanCampaign::ApplicationLink {
     const uint8_t state=r.body[0];const size_t total=get16(r.body+1);
     if(total>4095||(state<=3)!=(total>0))return fail();
     const uint32_t elapsed=get32(r.body+3);
+    if(elapsed>vehicleTimeout)return fail();
+    // A result claiming more fragments than the remaining sequence space
+    // cannot be partially consumed and must not be reused as evidence.
+    const uint32_t fragments=uint32_t((total+BodySize-3)/(BodySize-2));
+    if(fragments&& (closed_||fragments-1>sequenceLimit(version())-next_))return fail();
     size_t offset=0;
     while(offset<total){
       Packet fetch,chunk;fetch.op=Op::Fetch;fetch.length=2;put16(fetch.body,uint16_t(offset));
