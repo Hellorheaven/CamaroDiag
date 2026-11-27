@@ -169,7 +169,7 @@
   <data name="CatalogueFile" xml:space="preserve"><value>Catalogue JSON</value></data>
   <data name="CatalogueReference" xml:space="preserve"><value>Référence documentée</value></data>
   <data name="CataloguePin" xml:space="preserve"><value>SHA-256 de la référence</value></data>
-  <data name="CatalogueRawReport" xml:space="preserve"><value>Capture brute Mode 01</value></data>
+  <data name="CatalogueRawReport" xml:space="preserve"><value>Rapport brut JSON ou capture CL/1</value></data>
   <data name="CatalogueOutput" xml:space="preserve"><value>Nouveau rapport JSON</value></data>
   <data name="CatalogueBrowse" xml:space="preserve"><value>Choisir</value></data>
   <data name="CatalogueAnyFile" xml:space="preserve"><value>Tous les fichiers (*.*)|*.*</value></data>
