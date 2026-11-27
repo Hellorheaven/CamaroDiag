@@ -890,6 +890,12 @@ fun CamaroDiagApp(
                     onExportPhysicalRecovery = { identity, report ->
                         withExportFolder { viewModel.exportPhysicalRecoveryInspection(identity, report) }
                     },
+                    onInspectPhysicalRecoveryHistory = { identity, trees ->
+                        viewModel.inspectPhysicalRecoveryHistory(identity, trees)
+                    },
+                    onExportPhysicalRecoveryHistory = { report ->
+                        withExportFolder { viewModel.exportPhysicalRecoveryHistory(report) }
+                    },
                     onInspectPhysicalRecovery = { identity ->
                         viewModel.activeAccountUid.value?.let { owner ->
                             pendingPhysicalRecovery = (owner to viewModel.exportAccountGeneration()) to identity
