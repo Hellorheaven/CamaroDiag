@@ -32,3 +32,13 @@ Les nouveaux fichiers ISO-TP `connectors/firmware/shared/j1979_isotp_native_c.{c
 ## Lot 27/11/2026 — Android / Linux
 
 SHA code : `2f466499f6e0b3a2e9b506b4dd5675cc7291f77b`. Authentification et transports CU/1–CU/5, OTG et rejeu CL/1 portés en Kotlin ; le pont Linux C++20 couvre désormais une partie des échelles ECU et des moniteurs/corrections carburant Python, avec tests non exécutés. Les 128 fichiers Python recensés restent présents : parité du rejeu, CLI, rapports et fonctionnalités non achevée. Il reste également des sources et tests Java Android et les 19 fichiers C du noyau MPC5566. Aucun de ces composants ne doit être supprimé avant remplacement effectif et validation. Aucun gate ou APK dans ce lot.
+
+
+## Reprise PR117 — lot natif CJ/1 et CM/1 (27/11/2026)
+
+- Base du lot : `62c8ac6b6eb58b29e9eb80313e90ee4dca1e82ed`. Sept commits de code, 18 fichiers, +2086/-882 lignes, jusqu'à `ab25a62b0d2b318d3d62c54ab1fd10e10625341d`. Aucun build/test lancé et aucune validation revendiquée.
+- Android : rejeu CJ/1, journal CM/1, découverte binaire et adaptateur USB désormais en Kotlin. Il ne reste que cinq fichiers Java de tests, à migrer sans perdre les assertions.
+- Linux C++20 : inspection et vérification CM/1 (complet et préfixe déchiré), SHA-256, rapports et régressions synthétiques ; inspection CJ/1 et validation de l'ordre, CRC, compteurs, flags, services en lecture et rapports partiels. Les tests sont intégrés au Makefile, pas exécutés.
+- Reste : CU/1 et parité des données dérivées du rapport Python CJ/1, autres fonctions Python et migration des 19 fichiers C MPC5566 selon contraintes de cible. Le corpus Python reste présent (128 fichiers) comme référence jusqu'à parité démontrée. Ne pas le supprimer par simple renommage.
+- Protocole SAE J1979 toujours ouvert ; aucun passage à C6 ni aux autres protocoles. Référence normative J1979DA_202607 toujours non disponible, qualification physique encore à établir. Aucun checkpoint intermédiaire. APK v2.0.47 (versionCode 64) non produite : poursuivre jusqu'à clôture réelle, gate final unique, puis production et vérification de l'APK signée selon la procédure de v2.0.46. PR non fusionnée.
+
