@@ -11,6 +11,7 @@ internal sealed partial class BridgeDesktopForm
 {
     private readonly Button functionalRunNativeLive=Button(J1979RecipeText("LiveNativeRun"));
     private readonly Button functionalInspectNativeLive=Button(J1979RecipeText("LiveNativeInspect"));
+    private readonly Button functionalExportNativeLiveCsv=Button(J1979RecipeText("LiveNativeCsv"));
 
     private J1979LiveNativeCli.Options? ChooseNativeLiveOptions()
     {
@@ -141,16 +142,20 @@ internal sealed partial class BridgeDesktopForm
         }
     }
 
-    private async Task InspectWindowsNativeLiveAsync()
+    private Task InspectWindowsNativeLiveAsync()=>InspectWindowsNativeLiveAsync(false);
+    private Task ExportWindowsNativeLiveCsvAsync()=>InspectWindowsNativeLiveAsync(true);
+
+    private async Task InspectWindowsNativeLiveAsync(bool csv)
     {
         if(busy||functionalCancellation is not null||DateTimeOffset.UtcNow>=functionalAuthorizedUntil)return;
         string vin=functionalEvapVin.Text.Trim().ToUpperInvariant();
         if(!J1979LiveNative.ValidVin(vin)){ShowError(J1979RecipeText("LiveNativeVinRequired"));return;}
-        using var source=new OpenFileDialog{Title=J1979RecipeText("LiveNativeInspect"),CheckFileExists=true,
+        using var source=new OpenFileDialog{Title=J1979RecipeText(csv?"LiveNativeCsv":"LiveNativeInspect"),CheckFileExists=true,
             Multiselect=false,Filter=J1979RecipeText("LiveNativeCaptureFilter")};
         if(source.ShowDialog(this)!=DialogResult.OK)return;
-        using var destination=new SaveFileDialog{Filter=J1979RecipeText("JsonFilter"),DefaultExt="json",
-            AddExtension=true,OverwritePrompt=false,FileName="CamaroDiag_CL1_Inspection.json"};
+        using var destination=new SaveFileDialog{Filter=J1979RecipeText(csv?"LiveNativeCsvFilter":"JsonFilter"),
+            DefaultExt=csv?"csv":"json",AddExtension=true,OverwritePrompt=false,
+            FileName=csv?"CamaroDiag_CL1_Samples.csv":"CamaroDiag_CL1_Inspection.json"};
         if(destination.ShowDialog(this)!=DialogResult.OK||busy||DateTimeOffset.UtcNow>=functionalAuthorizedUntil)return;
         var expiry=functionalAuthorizedUntil;
         busy=true;completedFreeze=null;functionalExport.Enabled=false;
@@ -161,8 +166,10 @@ internal sealed partial class BridgeDesktopForm
         functionalResults.Text=J1979RecipeText("Running");
         try
         {
-            var report=await Task.Run(()=>J1979LiveNativeCli.Inspect(source.FileName,vin,destination.FileName,
-                ()=>DateTimeOffset.UtcNow<expiry&&functionalAuthorizedUntil==expiry));
+            bool Current()=>DateTimeOffset.UtcNow<expiry&&functionalAuthorizedUntil==expiry;
+            var report=await Task.Run(()=>csv?
+                J1979LiveNativeCli.ExportCsv(source.FileName,vin,destination.FileName,Current):
+                J1979LiveNativeCli.Inspect(source.FileName,vin,destination.FileName,Current));
             if(!IsDisposed&&!Disposing&&DateTimeOffset.UtcNow<expiry&&functionalAuthorizedUntil==expiry)
                 functionalResults.Text=FormatNativeLive(report,source.FileName,destination.FileName);
         }
