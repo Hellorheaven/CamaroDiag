@@ -168,8 +168,8 @@ internal sealed partial class BridgeDesktopForm
                 foreach(var item in result.IdentificationRecords)
                     output.AppendLine(item.Extended is { } extended ? ObdJ1979ExtendedVehicleInfo.Format(extended) :
                         $"09/{item.InfoType:X2}: {string.Join(", ",item.Values)}");
-                foreach(var monitor in result.MonitorRecords)
-                    output.AppendLine($"{monitor.Mode:X2}/{monitor.TestId:X2}: {monitor.EncodedDataHex}");
+                foreach(var monitor in ObdJ1979LegacyMonitorValues.Project(result.Steps,result.SelectedResponseSource))
+                    output.AppendLine(monitor.RequestHex+": "+ObdJ1979LegacyMonitorValues.Format(monitor.Record));
                 foreach (var step in result.Steps)
                 {
                     output.AppendLine($"{step.RequestHex} [{step.Status}] {step.Detail}");
