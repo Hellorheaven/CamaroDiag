@@ -39,7 +39,8 @@ data class LegacyReadReport(
     val dtcModes: List<LegacyReadDtc>, val measurements: List<LegacyReadMeasurement>,
     val readiness: LegacyReadReadiness?, val identification: List<LegacyReadIdentification>,
     val freezeTrigger: LegacyReadFreeze?, val monitors: List<LegacyReadMonitor>,
-    val otherSources: List<String>, val durationMs: Long
+    val otherSources: List<String>, val durationMs: Long,
+    val multiSignalRecords: List<ObdJ1979MultiSignal.Record> = emptyList()
 ) {
     val vinMatch: String get() = when {
         target.expectedVin == null -> "NOT_REQUESTED"
@@ -85,6 +86,7 @@ internal object ElmJ1979LegacyRead {
         val inventories = mutableListOf<LegacyReadInventory>()
         val dtcs = mutableMapOf<Int, List<String>>()
         val measurements = mutableListOf<LegacyReadMeasurement>()
+        val multiSignals = mutableListOf<ObdJ1979MultiSignal.Record>()
         val identification = mutableListOf<LegacyReadIdentification>()
         val monitors = mutableListOf<LegacyReadMonitor>()
         val otherSources = sortedSetOf<Int>()
@@ -103,7 +105,7 @@ internal object ElmJ1979LegacyRead {
             steps.toList(), inventories.toList(), listOf(3,7,10).map { mode ->
                 LegacyReadDtc(mode, dtcs[mode], steps.singleOrNull { it.requestHex == cmd(mode) }?.status)
             }, measurements.toList(), readiness, identification.toList(), freeze, monitors.toList(),
-            otherSources.map(ElmLegacyResponseFrames::hex), (clock()-start).coerceAtLeast(0))
+            otherSources.map(ElmLegacyResponseFrames::hex), (clock()-start).coerceAtLeast(0),multiSignals.toList())
 
         suspend fun read(command: String, single: Boolean = false,
             validate: (List<Int>) -> Boolean): List<List<Int>> {
@@ -271,7 +273,17 @@ internal object ElmJ1979LegacyRead {
             J1979CampaignSemantics.decodePositive(request,hex(row))
         suspend fun readPid(mode: Int,pid: Int): List<Int>? {
             val request = pidRequest(mode,pid)
-            val row = read(request,true) { pidEvidence(request,it) != null }.singleOrNull() ?: return null
+            val row = read(request,true) {
+                if(mode==1&&ObdJ1979MultiSignal.width(pid)!=null)
+                    ObdJ1979MultiSignal.decodeResponse(request,hex(it))!=null
+                else pidEvidence(request,it)!=null
+            }.singleOrNull() ?: return null
+            if(mode==1&&ObdJ1979MultiSignal.width(pid)!=null){
+                val decoded=ObdJ1979MultiSignal.decodeResponse(request,hex(row)) ?: return null
+                multiSignals+=ObdJ1979MultiSignal.Record(request,decoded)
+                steps[steps.lastIndex]=steps.last().copy(status="RAW",detail="MULTI_SIGNAL_DECODED")
+                return row
+            }
             val evidence = pidEvidence(request,row) ?: error("Accepted PID shape changed.")
             evidence.measurement()?.let { measurements += LegacyReadMeasurement(it.mode,it.pid,it.name,it.number,it.unit) }
             if (mode == 1 && pid == 1) evidence.readiness()?.let {
