@@ -14,7 +14,9 @@ public:
     virtual ~Link()=default;
     virtual std::string command(std::string_view,unsigned timeout_ms)=0;
 };
+class MutationSession;
 class Elm {
+    friend class MutationSession;
     Link& link_;
     Protocol protocol_;
     bool headered_,ready_{},used_{};

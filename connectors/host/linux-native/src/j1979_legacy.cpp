@@ -1,5 +1,6 @@
 #include "j1979_legacy.hpp"
 #include "j1979_legacy_freeze_plan.hpp"
+#include "j1979_legacy_mutation.hpp"
 #include <algorithm>
 #include <map>
 #include <stdexcept>
@@ -136,6 +137,12 @@ std::vector<Frame> frames(Protocol protocol,std::string_view command,std::string
 std::vector<Frame> freeze_frames(Protocol protocol,const FreezePlan& plan,Bytes request,std::string_view raw){
     if(!plan.allows(request))throw std::invalid_argument("Invalid legacy freeze frame scope");
     return parse_frames(protocol,hex(request),raw);
+}
+std::vector<Frame> mutation_response_frames(const MutationPlan& p,Bytes q,std::string_view raw){
+    if(!p.valid())throw std::invalid_argument("Invalid maintenance scope");
+    const Data expected=p.operation==MutationOperation::clear?Data{4}:Data{8,1,0,0,0,0,0};
+    if(!std::equal(q.begin(),q.end(),expected.begin(),expected.end()))throw std::invalid_argument("Mutation response scope mismatch");
+    return parse_frames(p.protocol,hex(q),raw);
 }
 std::vector<Data> anonymous_records(std::string_view command,std::string_view response){
     if(!read_allowed(unhex(command)))throw std::invalid_argument("Invalid anonymous scope");

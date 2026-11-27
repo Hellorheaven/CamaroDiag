@@ -1,4 +1,5 @@
 #include "j1979_legacy_identity.hpp"
+#include "j1979_legacy_mutation.hpp"
 #include <algorithm>
 namespace cd::legacy {
 bool valid_vin(std::string_view vin){
@@ -23,5 +24,10 @@ std::optional<std::string> normalized_vin(std::span<const Data> fragments){
     if(vin[0]||vin[1]||vin[2])return {};
     std::string result(vin.begin()+3,vin.end());
     return valid_vin(result)?std::optional<std::string>{std::move(result)}:std::nullopt;
+}
+bool MutationPlan::valid()const{
+    return valid_protocol(protocol)&&(operation==MutationOperation::clear||operation==MutationOperation::evap)&&
+        valid_vin(vin)&&budget_ms>=1000&&budget_ms<=60000&&sources.size()>=1&&sources.size()<=32&&
+        sources.contains(engine)&&std::all_of(sources.begin(),sources.end(),valid_source);
 }
 }
