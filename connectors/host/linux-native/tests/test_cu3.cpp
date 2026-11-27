@@ -8,7 +8,7 @@
 
 /* Synthetic CU/3 proof transcript only; no physical channel or ECU. */
 static cl1_plan scope(void) {
-    cl1_plan p={0};
+    cl1_plan p{};
     p.tx=0x7e0;p.rx=0x7e8;
     memcpy(p.vin,"1G1FA1RXXR0123456",18);
     p.pids[0]=0x0c;p.pid_count=1;p.cycles=2;
@@ -84,6 +84,6 @@ int main(void) {
     assert(!cl1_cu3_hello(&p,key,hello,err,sizeof(err)));
     OPENSSL_cleanse(key,sizeof(key));
     OPENSSL_cleanse(expected,sizeof(expected));
-    puts("CU/3 native C mutual credential and canonical scope: synthetic checks passed");
+    puts("CU/3 native C++ mutual credential and canonical scope: synthetic checks passed");
     return 0;
 }

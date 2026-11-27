@@ -12,7 +12,7 @@
  * These assertions must run only in the final protocol gate.
  */
 static cf1_plan known_plan(void) {
-    cf1_plan plan = {0};
+    cf1_plan plan{};
     plan.tx = 0x7e0; plan.rx = 0x7e8; plan.budget_ms = 60000;
     memcpy(plan.vin, "2G1FA1E30D7654321", 18);
     plan.frame_count = 1; plan.frames[0] = 0;
@@ -74,6 +74,6 @@ int main(void) {
     assert(!cf1_cu2_hello(&plan, key, hello, error, sizeof(error)));
     OPENSSL_cleanse(key, sizeof(key));
     OPENSSL_cleanse(expected, sizeof(expected));
-    puts("CU/2 native C authentication assertions passed (synthetic only)");
+    puts("CU/2 native C++ authentication assertions passed (synthetic only)");
     return 0;
 }

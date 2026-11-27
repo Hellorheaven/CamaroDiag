@@ -13,8 +13,8 @@ CXXSTRICT = -std=c++20 -Wall -Wextra -Wpedantic -Werror -D_FILE_OFFSET_BITS=64
 INCLUDES = -Iinclude -I../../firmware/shared
 TARGET = camarodiag-native
 
-LEGACY_C_SOURCES = src/cf1_usb.c src/main.c
-CXX_SOURCES = src/cf1.cpp src/cf1_complete.cpp src/cf1_crypto.cpp src/cl1.cpp src/cl1_crypto.cpp src/j1979_policy.cpp src/j1979_monitor_scaling.cpp src/j1979_vehicle_info.cpp src/j1979_measurement.cpp src/j1979_can.cpp src/j1979_live.cpp src/j1979_isotp.cpp src/j1979_can_cli.cpp
+LEGACY_C_SOURCES = src/main.c
+CXX_SOURCES = src/cf1_usb.cpp src/cf1.cpp src/cf1_complete.cpp src/cf1_crypto.cpp src/cl1.cpp src/cl1_crypto.cpp src/j1979_policy.cpp src/j1979_monitor_scaling.cpp src/j1979_vehicle_info.cpp src/j1979_measurement.cpp src/j1979_can.cpp src/j1979_live.cpp src/j1979_isotp.cpp src/j1979_can_cli.cpp
 LEGACY_C_OBJECTS = $(patsubst src/%.c,build/%.o,$(LEGACY_C_SOURCES))
 CXX_OBJECTS = $(patsubst src/%.cpp,build/%.o,$(CXX_SOURCES))
 DECODER_OBJECTS = build/j1979_monitor_scaling.o build/j1979_vehicle_info.o build/j1979_measurement.o

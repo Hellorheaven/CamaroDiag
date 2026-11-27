@@ -6,9 +6,9 @@ Directive utilisateur : **supprimer tout Python du projet livré**, sans réécr
 
 | Plateforme | Implémentation native à privilégier |
 |---|---|
-| Android | Kotlin, code métier et UI Compose existants |
-| Windows | C#/.NET, pont J2534 et interface existants |
-| Linux ARM/x64 | **C++20** pour le développement natif, avec migration progressive des anciens fichiers C, paquet .deb sans interpréteur |
+| Android | Kotlin exclusivement, code métier et UI Compose existants ; migrer les sources Java internes |
+| Windows | C# exclusivement (.NET), pont J2534 et interface existants |
+| Linux ARM/x64 | **C++20 exclusivement** pour le développement natif, avec migration progressive des anciens fichiers C, paquet .deb sans interpréteur |
 | Firmware ESP32-S3 | **C++ existant** (ESP-IDF/Arduino/PlatformIO) ; aucun nouveau moteur de protocole en C |
 | STM32G4 | C/C++ de son firmware et de ses pilotes, selon les modules existants |
 

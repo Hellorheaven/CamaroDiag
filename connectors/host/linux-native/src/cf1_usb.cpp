@@ -16,6 +16,8 @@
 #include <termios.h>
 #include <time.h>
 #include <unistd.h>
+#include <memory>
+#include <new>
 
 #ifndef O_NOFOLLOW
 #error "Native CU/2 capture refuses symlink serial and evidence outputs"
@@ -53,7 +55,7 @@ static int wait_ready(int fd, short events, uint64_t deadline) {
         if (!now || now >= deadline) return -1;
         uint64_t left = deadline - now;
         int timeout = (int)(left > 150 ? 150 : left);
-        struct pollfd p = { .fd = fd, .events = events };
+        struct pollfd p{fd, events, 0};
         int count = poll(&p, 1, timeout);
         if (count < 0 && errno == EINTR) continue;
         if (count < 0) return -1;
@@ -100,10 +102,12 @@ static bool configure_serial(int fd, struct termios *saved) {
     t.c_cflag = (t.c_cflag & ~(CSIZE | PARENB | CSTOPB | flow_mask)) |
                 CS8 | CREAD | CLOCAL;
     t.c_cc[VMIN] = 0; t.c_cc[VTIME] = 0;
-    return cfsetispeed(&t, B115200) == 0 &&
-           cfsetospeed(&t, B115200) == 0 &&
-           tcsetattr(fd, TCSANOW, &t) == 0 &&
-           tcflush(fd, TCIOFLUSH) == 0;
+    if (cfsetispeed(&t, B115200) != 0 ||
+        cfsetospeed(&t, B115200) != 0 ||
+        tcsetattr(fd, TCSANOW, &t) != 0) return false;
+    if (tcflush(fd, TCIOFLUSH) == 0) return true;
+    tcsetattr(fd, TCSANOW, saved);
+    return false;
 }
 static int write_capture(int fd, const uint8_t *bytes, size_t n) {
     size_t position = 0;
@@ -155,10 +159,11 @@ int cf1_usb_capture(const char *port_path, const cf1_plan *plan,
     uint8_t proof[CF1_CU2_PROOF_SIZE] = {0};
     uint8_t profile[CF1_PLAN_SIZE] = {0};
     int serial = -1, file = -1, result = -1;
-    struct termios old = {0};
+    struct termios old{};
     bool has_old = false;
-    uint8_t *raw = NULL;
+    std::unique_ptr<uint8_t[]> raw;
     const char *why = "Native CU/2 session interrupted";
+    {
     if (!cf1_cu2_random_nonce(nonce) ||
         !cf1_cu2_hello(plan, nonce, hello, err, cap) ||
         !cf1_encode_profile(plan, profile, err, cap)) {
@@ -177,9 +182,11 @@ int cf1_usb_capture(const char *port_path, const cf1_plan *plan,
         goto cleanup;
     }
     out->capture_file_created = true;
-    raw = malloc(CF1_MAX_BYTES);
+    raw.reset(new (std::nothrow) uint8_t[CF1_MAX_BYTES]);
     if (!raw) { why = "Insufficient bounded CF/1 capture memory"; goto cleanup; }
-    uint64_t auth_deadline = monotonic_ms() + 5000;
+    const uint64_t auth_started = monotonic_ms();
+    if (!auth_started) { why = "CU/2 monotonic clock unavailable"; goto cleanup; }
+    const uint64_t auth_deadline = auth_started + 5000;
     if (write_deadline(serial, hello, sizeof(hello), auth_deadline) ||
         read_deadline(serial, challenge, sizeof(challenge), auth_deadline)) {
         why = "CU/2 challenge timeout or interrupted transmission; no retry";
@@ -195,11 +202,16 @@ int cf1_usb_capture(const char *port_path, const cf1_plan *plan,
         goto cleanup;
     }
     out->client_proof_sent = true;
-    uint64_t deadline = monotonic_ms() + plan->budget_ms + 15000u;
+    const uint64_t capture_started = monotonic_ms();
+    if (!capture_started) { why = "CU/2 capture monotonic clock unavailable"; goto cleanup; }
+    const uint64_t deadline = capture_started + plan->budget_ms + 15000u;
     for (size_t seq = 0; seq < CF1_MAX_STEPS + 2 && !cancelled; ++seq) {
-        uint8_t *h = raw + out->raw_bytes_received;
-        if (out->raw_bytes_received + 8 > CF1_MAX_BYTES ||
-            receive_to_capture(serial, file, h, 8, deadline, out)) {
+        if (out->raw_bytes_received + 8 > CF1_MAX_BYTES) {
+            why = "CF/1 input exceeds the preapproved maximum";
+            goto cleanup;
+        }
+        uint8_t *h = raw.get() + out->raw_bytes_received;
+        if (receive_to_capture(serial, file, h, 8, deadline, out)) {
             why = "CF/1 header interrupted; any received bytes retained";
             goto cleanup;
         }
@@ -218,7 +230,7 @@ int cf1_usb_capture(const char *port_path, const cf1_plan *plan,
             why = "CF/1 capture exceeds maximum allocation";
             goto cleanup;
         }
-        uint8_t *tail = raw + out->raw_bytes_received;
+        uint8_t *tail = raw.get() + out->raw_bytes_received;
         if (receive_to_capture(serial, file, tail, length + 4, deadline, out)) {
             why = "CF/1 payload interrupted; any received bytes retained";
             goto cleanup;
@@ -233,10 +245,10 @@ int cf1_usb_capture(const char *port_path, const cf1_plan *plan,
         }
         if (h[3] == 3) {
             out->terminal_received = true;
-            struct pollfd p = { .fd = serial, .events = POLLIN };
+            struct pollfd p{serial, POLLIN, 0};
             int seen;
             do { seen = poll(&p, 1, 100); } while (seen < 0 && errno == EINTR && !cancelled);
-            if (seen < 0 || (seen > 0 && (p.revents & (POLLIN | POLLERR | POLLHUP | POLLNVAL)))) {
+            if (seen < 0 || cancelled || (seen > 0 && (p.revents & (POLLIN | POLLERR | POLLHUP | POLLNVAL)))) {
                 why = "Untrusted bytes or error after CF/1 terminal";
                 goto cleanup;
             }
@@ -254,6 +266,7 @@ int cf1_usb_capture(const char *port_path, const cf1_plan *plan,
     }
     if (result != 0) why = cancelled ? "Operator cancelled CU/2 capture" :
                                  "CF/1 record limit exceeded without terminal";
+    }
 cleanup:
     if (file >= 0) {
         if (result != 0) fsync(file); /* Preserve partial evidence if possible. */
@@ -263,7 +276,7 @@ cleanup:
         if (has_old) tcsetattr(serial, TCSANOW, &old);
         close(serial);
     }
-    if (raw) { OPENSSL_cleanse(raw, out->raw_bytes_received); free(raw); }
+    if (raw) { OPENSSL_cleanse(raw.get(), out->raw_bytes_received); }
     OPENSSL_cleanse(nonce, sizeof(nonce));
     OPENSSL_cleanse(hello, sizeof(hello));
     OPENSSL_cleanse(challenge, sizeof(challenge));
@@ -276,7 +289,7 @@ cleanup:
     return 0;
 }
 
-/* Native C CU/3 CL/1 capture, transport only. The same bound, locally
+/* Native C++20 CU/3 CL/1 capture, transport only. The same bound, locally
  * approved USB CDC port and existing fail-closed serial deadline primitives
  * are deliberately shared with the CU/2 implementation above. This
  * cannot silently fall back to CU/1, CU/2, Python, or another ECU.
@@ -295,10 +308,11 @@ int cl1_usb_capture(const char *port_path,const cl1_plan *plan,
     uint8_t proof[CL1_CU3_PROOF_SIZE]={0};
     uint8_t canonical[CL1_PLAN_SIZE]={0};
     int serial=-1,file=-1,result=-1;
-    struct termios previous={0};
+    struct termios previous{};
     bool has_previous=false;
-    uint8_t *raw=NULL;
+    std::unique_ptr<uint8_t[]> raw;
     const char *why="CU/3 CL/1 recording interrupted";
+    {
     if (!cl1_cu3_random_nonce(nonce) ||
         !cl1_cu3_hello(plan,nonce,hello,err,cap) ||
         !cl1_encode_plan(plan,canonical,err,cap)) {
@@ -317,7 +331,7 @@ int cl1_usb_capture(const char *port_path,const cl1_plan *plan,
         goto cleanup;
     }
     out->capture_file_created=true;
-    raw=malloc(CL1_MAX_CAPTURE);
+    raw.reset(new (std::nothrow) uint8_t[CL1_MAX_CAPTURE]);
     if (!raw) {
         why="CL/1 bounded capture allocation unavailable";
         goto cleanup;
@@ -354,7 +368,7 @@ int cl1_usb_capture(const char *port_path,const cl1_plan *plan,
             why="CL/1 input exceeds the preapproved maximum";
             goto cleanup;
         }
-        uint8_t *h=raw+out->raw_bytes_received;
+        uint8_t *h=raw.get() + out->raw_bytes_received;
         if (receive_to_capture(serial,file,h,8,deadline,out)) {
             why="CU/3 CL/1 header interrupted; received bytes preserved";
             goto cleanup;
@@ -374,7 +388,7 @@ int cl1_usb_capture(const char *port_path,const cl1_plan *plan,
             why="CL/1 evidence exceeds retained byte bound";
             goto cleanup;
         }
-        uint8_t *body=raw+out->raw_bytes_received;
+        uint8_t *body=raw.get() + out->raw_bytes_received;
         if (receive_to_capture(serial,file,body,(size_t)length+4u,
                                deadline,out)) {
             why="CU/3 CL/1 body interrupted; received bytes preserved";
@@ -390,7 +404,7 @@ int cl1_usb_capture(const char *port_path,const cl1_plan *plan,
         }
         if (h[3]==3) {
             out->terminal_received=true;
-            struct pollfd poller={.fd=serial,.events=POLLIN};
+            struct pollfd poller{serial, POLLIN, 0};
             int extra;
             do {extra=poll(&poller,1,100);}
             while (extra<0 && errno==EINTR && !cancelled);
@@ -413,6 +427,7 @@ int cl1_usb_capture(const char *port_path,const cl1_plan *plan,
     }
     if (result!=0)
         why=cancelled?"CU/3 operator cancelled":"CL/1 sequence bound reached without terminal";
+    }
 cleanup:
     if (file>=0) {
         if (result!=0) fsync(file); /* Persist partial evidence if possible. */
@@ -423,8 +438,7 @@ cleanup:
         close(serial);
     }
     if (raw) {
-        OPENSSL_cleanse(raw,out->raw_bytes_received);
-        free(raw);
+        OPENSSL_cleanse(raw.get(), out->raw_bytes_received);
     }
     OPENSSL_cleanse(nonce,sizeof(nonce));
     OPENSSL_cleanse(hello,sizeof(hello));
