@@ -1,4 +1,7 @@
+// CamaroDiag native C++20 cl1_crypto implementation.
 #include "cl1_transport.h"
+#include <array>
+#include <span>
 #include <openssl/crypto.h>
 #include <openssl/evp.h>
 #include <openssl/hmac.h>
@@ -68,7 +71,7 @@ bool cl1_cu3_hello(const cl1_plan *p,const uint8_t nonce[32],
 }
 static bool canonical_auth(const uint8_t wire[CL1_CU3_PROFILE_SIZE]) {
     if (wire[8]>1 || wire[30]<1 || wire[30]>CL1_MAX_PIDS) return false;
-    cl1_plan p={0};
+    cl1_plan p{};
     p.tx=read32(wire);p.rx=read32(wire+4);p.extended=wire[8]!=0;
     p.budget_ms=read32(wire+9);
     memcpy(p.vin,wire+13,17);
@@ -102,26 +105,26 @@ bool cl1_cu3_proof(const uint8_t hello[CL1_CU3_HELLO_SIZE],
      * 71 canonical scope bytes and both independently generated 32-byte
      * nonces. No downgrade to CU/1 or CU/2, no retry on uncertain proof.
      */
-    uint8_t transcript[1+CL1_CU3_PROFILE_SIZE+64]={0};
-    uint8_t tag[EVP_MAX_MD_SIZE]={0};
+    std::array<uint8_t,1+CL1_CU3_PROFILE_SIZE+64> transcript{};
+    std::array<uint8_t,EVP_MAX_MD_SIZE> tag{};
     unsigned tag_size=0;
     transcript[0]='L';
-    memcpy(transcript+1,hello+4,CL1_CU3_PROFILE_SIZE+32);
-    memcpy(transcript+1+CL1_CU3_PROFILE_SIZE+32,challenge+4,32);
-    bool valid=HMAC(EVP_sha256(),key,32,transcript,sizeof(transcript),
-                    tag,&tag_size)!=NULL &&
-               tag_size==32 && CRYPTO_memcmp(tag,challenge+36,32)==0;
-    OPENSSL_cleanse(tag,sizeof(tag));
+    memcpy(transcript.data()+1,hello+4,CL1_CU3_PROFILE_SIZE+32);
+    memcpy(transcript.data()+1+CL1_CU3_PROFILE_SIZE+32,challenge+4,32);
+    bool valid=HMAC(EVP_sha256(),key,32,transcript.data(),transcript.size(),
+                    tag.data(),&tag_size)!=NULL &&
+               tag_size==32 && CRYPTO_memcmp(tag.data(),challenge+36,32)==0;
+    OPENSSL_cleanse(tag.data(),tag.size());
     if (valid) {
         transcript[0]='l';
-        valid=HMAC(EVP_sha256(),key,32,transcript,sizeof(transcript),
-                   tag,&tag_size)!=NULL && tag_size==32;
+        valid=HMAC(EVP_sha256(),key,32,transcript.data(),transcript.size(),
+                   tag.data(),&tag_size)!=NULL && tag_size==32;
         if (valid) {
             memcpy(proof,"CU\x03\x03",4);
-            memcpy(proof+4,tag,32);
+            memcpy(proof+4,tag.data(),32);
         }
     }
-    OPENSSL_cleanse(tag,sizeof(tag));
-    OPENSSL_cleanse(transcript,sizeof(transcript));
+    OPENSSL_cleanse(tag.data(),tag.size());
+    OPENSSL_cleanse(transcript.data(),transcript.size());
     return valid?true:fail(err,n,"CU/3 device credential proof rejected");
 }

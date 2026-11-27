@@ -1,4 +1,7 @@
+// CamaroDiag native C++20 cf1_complete implementation.
 #include "cf1.h"
+#include <array>
+#include <span>
 
 #include <stdio.h>
 #include <string.h>
@@ -42,16 +45,17 @@ int cf1_inspect_complete(const uint8_t *raw, size_t length,
                          const char *vin, cf1_evidence *out,
                          char *error, size_t capacity) {
     if (!out) return denial(error, capacity, "Missing CF/1 result");
-    memset(out, 0, sizeof(*out));
+    *out = {};
     if (!raw || length < CF1_PLAN_SIZE + 12 + 32 ||
         length > CF1_MAX_BYTES || !cf1_valid_vin(vin))
         return denial(error, capacity, "Invalid full CF/1 scope or length");
+    const std::span<const uint8_t> stream{raw,length};
     size_t pos = 0, seq = 0;
     const uint8_t *terminal = NULL;
     while (pos < length) {
         if (length - pos < 8 || seq > CF1_MAX_STEPS + 1)
             return denial(error, capacity, "Truncated or excessive CF/1 full records");
-        const uint8_t *h = raw + pos;
+        const uint8_t *h = stream.data() + pos;
         if (h[0] != 'C' || h[1] != 'F' || h[2] != 1 ||
             le16(h + 4) != seq || (seq == 0 && h[3] != 1) ||
             (seq && h[3] != 2 && h[3] != 3))

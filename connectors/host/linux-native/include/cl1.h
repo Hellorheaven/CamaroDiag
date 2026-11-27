@@ -1,5 +1,8 @@
 #ifndef CAMARODIAG_LINUX_J1979_CL1_H
 #define CAMARODIAG_LINUX_J1979_CL1_H
+#ifdef __cplusplus
+extern "C" {
+#endif
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -44,4 +47,7 @@ int cl1_inspect_prefix(const uint8_t *data, size_t length, const char *vin,
                        cl1_result *out, char *error, size_t error_capacity);
 int cl1_inspect_complete(const uint8_t *data, size_t length, const char *vin,
                          cl1_result *out, char *error, size_t error_capacity);
+#ifdef __cplusplus
+}
+#endif
 #endif

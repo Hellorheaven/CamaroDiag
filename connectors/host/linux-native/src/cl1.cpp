@@ -1,4 +1,7 @@
+// CamaroDiag native C++20 cl1 implementation.
 #include "cl1.h"
+#include <array>
+#include <span>
 #include "cf1.h"
 
 #include <stdio.h>

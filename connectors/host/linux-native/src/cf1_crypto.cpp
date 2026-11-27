@@ -1,4 +1,7 @@
+// CamaroDiag native C++20 cf1_crypto implementation.
 #include "cf1_transport.h"
+#include <array>
+#include <span>
 
 #include <openssl/crypto.h>
 #include <openssl/evp.h>
@@ -52,7 +55,7 @@ static uint32_t le32(const uint8_t *p) {
 static bool valid_profile_wire(const uint8_t wire[CF1_PLAN_SIZE]) {
     if (wire[8] > 1 || wire[30] > CF1_MAX_FRAMES ||
         wire[39] > CF1_MAX_PIDS) return false;
-    cf1_plan plan = {0};
+    cf1_plan plan{};
     plan.tx = le32(wire);
     plan.rx = le32(wire + 4);
     plan.extended = wire[8] == 1;
@@ -85,27 +88,28 @@ bool cf1_cu2_proof(const uint8_t hello[CF1_CU2_HELLO_SIZE],
     /* Transcript: domain separator, 136 bytes of hello payload + 32 of
      * device nonce. Scope is bound to both HMACs; no pairing fallback.
      */
-    uint8_t transcript[169] = {0}, computed[EVP_MAX_MD_SIZE] = {0};
+    std::array<uint8_t,169> transcript{};
+    std::array<uint8_t,EVP_MAX_MD_SIZE> computed{};
     unsigned int computed_size = 0;
     transcript[0] = 'F';
-    memcpy(transcript + 1, hello + 4, 136);
-    memcpy(transcript + 137, challenge + 4, 32);
-    bool ok = HMAC(EVP_sha256(), key, 32, transcript, sizeof(transcript),
-                   computed, &computed_size) != NULL &&
+    memcpy(transcript.data() + 1, hello + 4, 136);
+    memcpy(transcript.data() + 137, challenge + 4, 32);
+    bool ok = HMAC(EVP_sha256(), key, 32, transcript.data(), transcript.size(),
+                   computed.data(), &computed_size) != NULL &&
               computed_size == 32 &&
-              CRYPTO_memcmp(computed, challenge + 36, 32) == 0;
-    OPENSSL_cleanse(computed, sizeof(computed));
+              CRYPTO_memcmp(computed.data(), challenge + 36, 32) == 0;
+    OPENSSL_cleanse(computed.data(), computed.size());
     if (ok) {
         transcript[0] = 'f';
-        ok = HMAC(EVP_sha256(), key, 32, transcript, sizeof(transcript),
-                  computed, &computed_size) != NULL && computed_size == 32;
+        ok = HMAC(EVP_sha256(), key, 32, transcript.data(), transcript.size(),
+                  computed.data(), &computed_size) != NULL && computed_size == 32;
         if (ok) {
             memcpy(proof, "CU\x02\x03", 4);
-            memcpy(proof + 4, computed, 32);
+            memcpy(proof + 4, computed.data(), 32);
         }
     }
-    OPENSSL_cleanse(computed, sizeof(computed));
-    OPENSSL_cleanse(transcript, sizeof(transcript));
+    OPENSSL_cleanse(computed.data(), computed.size());
+    OPENSSL_cleanse(transcript.data(), transcript.size());
     return ok ? true : deny(err, cap, "CU/2 device credential proof rejected");
 }
 bool cf1_cu2_random_nonce(uint8_t nonce[32]) {

@@ -1,5 +1,8 @@
 #ifndef CAMARODIAG_LINUX_J1979_CF1_H
 #define CAMARODIAG_LINUX_J1979_CF1_H
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -81,4 +84,7 @@ void cf1_evidence_free(cf1_evidence *evidence);
 uint32_t cf1_crc32(const uint8_t *data, size_t size);
 bool cf1_valid_vin(const char *vin);
 bool cf1_valid_plan(const cf1_plan *plan);
+#ifdef __cplusplus
+}
+#endif
 #endif

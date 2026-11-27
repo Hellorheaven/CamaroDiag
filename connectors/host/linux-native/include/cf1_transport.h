@@ -1,5 +1,8 @@
 #ifndef CAMARODIAG_LINUX_J1979_CF1_TRANSPORT_H
 #define CAMARODIAG_LINUX_J1979_CF1_TRANSPORT_H
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #include "cf1.h"
 #include <stdbool.h>
@@ -27,4 +30,7 @@ bool cf1_cu2_proof(const uint8_t hello[CF1_CU2_HELLO_SIZE],
                     const uint8_t key[32],
                     uint8_t proof[CF1_CU2_PROOF_SIZE],
                     char *error, size_t error_capacity);
+#ifdef __cplusplus
+}
+#endif
 #endif
