@@ -85,9 +85,18 @@ internal static class ObdJ1979CatalogueProjection
         Check(raw.Length is >0 and <=MaxReportBytes,"Report exceeds size limit");
         using var doc=JsonDocument.Parse(raw,new JsonDocumentOptions{MaxDepth=64});
         var root=doc.RootElement;Unique(root);
+        static bool LiveSchema(string? value)=>value is "camarodiag-j1979-live-v1" or "camarodiag-j1979-legacy-live-v1";
+        if(!LiveSchema(Text(Get(root,"schema"))))
+        {
+            // Android's functional-test export wraps the live evidence.
+            var candidates=new[]{"j1979Live","j1979_live","liveReport","live"}
+                .Where(x=>root.TryGetProperty(x,out var item)&&item.ValueKind==JsonValueKind.Object&&
+                    LiveSchema(Text(Get(item,"schema")))).ToArray();
+            Check(candidates.Length==1,"Exactly one original live report required");
+            root=root.GetProperty(candidates[0]);
+        }
         string schema=RequiredText(Get(root,"schema"));
-        Check(schema is "camarodiag-j1979-live-v1" or "camarodiag-j1979-legacy-live-v1",
-            "Original live report required");
+        Check(LiveSchema(schema),"Original live report required");
         bool legacy=schema=="camarodiag-j1979-legacy-live-v1";
         var inner=Get(root,"result");var result=inner.ValueKind==JsonValueKind.Undefined?root:inner;
         Check(Bool(Get(result,"raw_only"))&&RequiredText(Get(result,"declared_vin"))==expectedVin,
