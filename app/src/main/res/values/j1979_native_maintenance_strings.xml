@@ -19,4 +19,10 @@
     <string name="j1979_native_maintenance_unverified">Journal not verified; no successful operation claimed.</string>
     <string name="j1979_native_maintenance_prefix_title">Inspect interrupted maintenance journal</string>
     <string name="j1979_native_maintenance_prefix_scope">Only complete records are checked. A torn or missing terminal leaves the operation unresolved. Do not repeat automatically.</string>
+    <string name="j1979_native_maintenance_archive">Read existing maintenance archive (CU/5)</string>
+    <string name="j1979_native_maintenance_archive_budget">Original operation budget (ms)</string>
+    <string name="j1979_native_maintenance_archive_warning">Read-only retrieval of the selected existing journal; no maintenance operation is sent.</string>
+    <string name="j1979_native_maintenance_archive_accept">I authorize read-only journal retrieval</string>
+    <string name="j1979_native_maintenance_archive_confirm">Confirm archive retrieval for VIN %1$s</string>
+    <string name="j1979_native_maintenance_archive_run">Retrieve journal</string>
 </resources>
