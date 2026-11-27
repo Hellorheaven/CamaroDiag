@@ -131,20 +131,20 @@ internal static class ObdJ1979FunctionalScan
                     ObdJ1979Status.DecodeResponse(request,response) is null)
                     throw new InvalidDataException("Invalid categorical PID record.");
                 if(application.Shape=="RAW"){
-                    string? detail = null;
+                    string? rawDetail = null;
                     if(request[0]==1 && ObdJ1979MultiSignal.Width(request[1]) is not null){
                         var signals=ObdJ1979MultiSignal.DecodeResponse(request,response)
                             ?? throw new InvalidDataException("Invalid multi-signal record.");
-                        detail=ObdJ1979MultiSignal.Format(signals);
+                        rawDetail=ObdJ1979MultiSignal.Format(signals);
                     }
                     if(request[0]==1 && ObdJ1979Status.DecodeResponse(request,response) is { } states)
-                        detail=(detail is null?"":detail+"; ")+ObdJ1979Status.Format(states);
+                        rawDetail=(rawDetail is null?"":rawDetail+"; ")+ObdJ1979Status.Format(states);
                     if(request[0]==9 && ObdJ1979ExtendedVehicleInfo.IsExtended(request[1])){
                         _=ObdJ1979ExtendedVehicleInfo.Can(request[1],response);
-                        detail="EXTENDED_INFOTYPE_DECODED";
+                        rawDetail="EXTENDED_INFOTYPE_DECODED";
                     }
                     steps.Add(new(Convert.ToHexString(request),Convert.ToHexString(response),
-                        "RAW",detail,timer.ElapsedMilliseconds,application));
+                        "RAW",rawDetail,timer.ElapsedMilliseconds,application));
                     return null;
                 }
                 var detail = decode is null
