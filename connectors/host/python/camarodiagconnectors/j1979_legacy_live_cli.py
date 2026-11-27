@@ -26,6 +26,8 @@ def parse(argv=None):
     parser.add_argument("--source",required=True,help="Two-digit response source; not physical addressing")
     parser.add_argument("--vin",required=True)
     parser.add_argument("--pid",action="append",required=True)
+    parser.add_argument("--raw-only",action="store_true",
+                        help="Capture advertised raw values from the selected response source")
     parser.add_argument("--cycles",type=int,default=30)
     parser.add_argument("--interval",type=float,default=1.0)
     parser.add_argument("--budget",type=float,default=180.0)
@@ -42,8 +44,8 @@ def parse(argv=None):
         args.source=int(args.source,16)
         if any(not re.fullmatch(r"[0-9A-Fa-f]{2}",x) for x in args.pid):
             raise ValueError("Expected two-digit numeric PID")
-        plan=Plan(tuple(int(x,16) for x in args.pid),args.vin,args.cycles,args.interval,args.budget).validate()
-        if not all(legacy_numeric_pid(pid) for pid in plan.pids):
+        plan=Plan(tuple(int(x,16) for x in args.pid),args.vin,args.cycles,args.interval,args.budget,args.raw_only).validate()
+        if not plan.raw_only and not all(legacy_numeric_pid(pid) for pid in plan.pids):
             raise ValueError("Selected PID exceeds supported legacy application width")
         if args.csv is not None and args.csv.resolve()==args.output.resolve():
             raise ValueError("JSON and CSV paths must be distinct")
@@ -64,7 +66,7 @@ def run(argv=None):
                     value=row["measurement"]
                     signals=row.get("multi_signals")
                     text=("; ".join(f'{v["name"]}={v["number"]:.3f} {v["unit"]}' for v in signals)
-                          if signals else f'{value["number"]:.3f} {value["unit"]}' if value else row["status"])
+                          if signals else f'{value["number"]:.3f} {value["unit"]}' if value else (row["response_hex"] or row["status"]) if plan.raw_only else row["status"])
                     print(f'{row["elapsed_ms"]} ms {args.source:02X}/{row["pid"]:02X} {text}',flush=True)
             try:
                 with LegacyElmSerial(args.port,args.baud,args.protocol,headered=True) as link:
