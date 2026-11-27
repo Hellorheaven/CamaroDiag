@@ -102,6 +102,8 @@ data class FunctionalTestState(
     val freezeReport: com.camarodiag.gen5.data.obd.J1979FreezeReport? = null,
     val nativeFreezeTarget: com.camarodiag.gen5.data.obd.CamaroDiagConnectorFreezeCampaign.Target? = null,
     val nativeFreezeEvidence: com.camarodiag.gen5.data.obd.CamaroDiagConnectorFreezeCampaign.Evidence? = null,
+    val nativeLiveEvidence: com.camarodiag.gen5.data.obd.CamaroDiagConnectorLiveCampaign.Evidence? = null,
+    val nativeLiveTarget: com.camarodiag.gen5.data.obd.CamaroDiagConnectorLiveCampaign.Target? = null,
     val nativeUsbEvidence: String? = null
 ) {
     val canExport: Boolean get() = !running && finishedAtMillis != null && context != null && checks.isNotEmpty()
