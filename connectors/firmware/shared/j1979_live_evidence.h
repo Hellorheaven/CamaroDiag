@@ -70,7 +70,11 @@ class J1979LiveEvidence final:public J1979LiveCampaign::Sink {
       // can terminate the stream between observations; never invent a
       // terminal ECU response in those cases.
       if(summary.stop==Stop::Budget&&replay_.remaining(summary.durationMs)>1)return fail();
-      if(summary.stop!=Stop::Budget&&summary.stop!=Stop::Context)return fail();
+      if(summary.stop==Stop::EvidenceLimit){
+        const auto phase=replay_.recommendedPhase(summary.durationMs);
+        if(phase==Phase::Done||phase==Phase::Waiting||replay_.hostWaitRemaining(summary.durationMs)||
+           replay_.canRetain(phase))return fail();
+      }else if(summary.stop!=Stop::Budget&&summary.stop!=Stop::Context)return fail();
       replay_.abort(summary.stop,summary.durationMs);
     }
     const auto& checked=replay_.summary();
