@@ -12,12 +12,13 @@ from test_j1979 import REPLIES, VIN
 
 class MultiSignalTests(unittest.TestCase):
     def test_each_catalog_entry_exact_width_and_valid_masks(self):
-        self.assertEqual(49,len(DEFINITIONS))
-        self.assertEqual(144,sum(len(d.fields) for d in DEFINITIONS.values()))
+        self.assertEqual(67,len(DEFINITIONS))
+        self.assertEqual(230,sum(len(d.fields) for d in DEFINITIONS.values()))
         for pid,d in DEFINITIONS.items():
             with self.subTest(pid=pid):
                 self.assertEqual(d.width,width(pid))
-                data=bytes([d.support_mask])+bytes(d.width-1)
+                mask={0x6B:0x0F,0x6F:0x03}.get(pid,d.support_mask)
+                data=bytes([mask])+bytes(d.width-1)
                 signals=decode_data(pid,data)
                 self.assertIsNotNone(signals)
                 self.assertEqual(len(d.fields),len(signals))
@@ -135,3 +136,39 @@ class MultiSignalTests(unittest.TestCase):
             self.assertTrue(legacy_numeric_pid(pid))
         for pid in (0x68,0x6D,0x78,0x7F):
             self.assertFalse(legacy_numeric_pid(pid))
+
+    def test_aecd_unsigned_pairs_and_slot_isolation(self):
+        for pid, first in ((0x81,1),(0x82,6),(0x89,11),(0x8A,16)):
+            with self.subTest(pid=pid):
+                data=bytes([0x11])+bytes.fromhex("FFFFFFFF80000000")+bytes(24)+bytes.fromhex("0000000100000002")
+                records=decode_data(pid,data)
+                self.assertEqual([f"aecd-{first}-timer-1",f"aecd-{first}-timer-2",
+                                  f"aecd-{first+4}-timer-1",f"aecd-{first+4}-timer-2"],
+                                 [x["name"] for x in records])
+                self.assertEqual([4294967295,2147483648,1,2],[x["number"] for x in records])
+                self.assertIsNone(decode_data(pid,bytes([0x20])+data[1:]))
+                self.assertIsNone(decode_data(pid,data[:-1]))
+                self.assertFalse(legacy_numeric_pid(pid))
+
+    def test_alternate_range_without_duplicate_channels(self):
+        values=decode_data(0x6B,bytes.fromhex("2164640000"))
+        self.assertEqual([60,360],[x["number"] for x in values])
+        self.assertIsNone(decode_data(0x6B,bytes.fromhex("1164640000")))
+        values=decode_data(0x6F,bytes.fromhex("090A14"))
+        self.assertEqual([10,160],[x["number"] for x in values])
+        self.assertIsNone(decode_data(0x6F,bytes.fromhex("050A14")))
+
+    def test_scr_reagent_and_unsigned_warning_timer(self):
+        values=decode_data(0x85,bytes.fromhex("0F00C80190FFFFFFFFFF"))
+        self.assertEqual([1,2,100,4294967295],[x["number"] for x in values])
+        self.assertEqual(["L/h","L/h","%","s"],[x["unit"] for x in values])
+        self.assertIsNone(decode_data(0x85,bytes.fromhex("1000C80190FFFFFFFFFF")))
+
+    def test_oxygen_concentration_and_lambda_separate_masks(self):
+        for pid, sensor in ((0x8C,1),(0x9C,3)):
+            data=bytes([0x11])+bytes.fromhex("2710")+bytes(6)+bytes.fromhex("2000")+bytes(6)
+            values=decode_data(pid,data)
+            self.assertEqual([f"oxygen-concentration-bank-1-sensor-{sensor}",
+                              f"oxygen-lambda-bank-1-sensor-{sensor}"],[x["name"] for x in values])
+            self.assertAlmostEqual(15.26,values[0]["number"])
+            self.assertAlmostEqual(.999424,values[1]["number"])
