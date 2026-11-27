@@ -4,8 +4,8 @@ namespace CamaroDiag.J2534Bridge;
 /// The ECU's reported state is not evidence of a successful actuation.</summary>
 internal static class ObdJ1979Status
 {
-    internal sealed record State(int Pid,string Name,long RawEncoded,string Code);
-    internal sealed record Record(string RequestHex,IReadOnlyList<State> States);
+    internal sealed record StatusValue(int Pid,string Name,long RawEncoded,string State);
+    internal sealed record Record(string RequestHex,IReadOnlyList<StatusValue> States);
     private sealed record Field(string Name,int Offset,int Shift,int Mask,
         IReadOnlyDictionary<int,string> Codes,int Support=-1);
     private sealed record Definition(int Width,(int Offset,int Mask)[] Reserved,Field[] Fields);
@@ -75,12 +75,12 @@ internal static class ObdJ1979Status
     };
 
     internal static int? Width(int pid)=>Definitions.TryGetValue(pid,out var d)?d.Width:null;
-    internal static IReadOnlyList<State>? DecodeData(int pid,ReadOnlySpan<byte> data)
+    internal static IReadOnlyList<StatusValue>? DecodeData(int pid,ReadOnlySpan<byte> data)
     {
         if(!Definitions.TryGetValue(pid,out var definition)||data.Length!=definition.Width)return null;
         foreach(var (offset,mask) in definition.Reserved)
             if((data[offset]&mask)!=0)return null;
-        var states=new List<State>();
+        var states=new List<StatusValue>();
         foreach(var field in definition.Fields){
             if(field.Support>=0&&(data[0]&(1<<field.Support))==0)continue;
             int raw=(data[field.Offset]>>field.Shift)&field.Mask;
@@ -89,7 +89,7 @@ internal static class ObdJ1979Status
         return states.AsReadOnly();
     }
 
-    internal static IReadOnlyList<State>? DecodeResponse(ReadOnlySpan<byte> request,ReadOnlySpan<byte> response)
+    internal static IReadOnlyList<StatusValue>? DecodeResponse(ReadOnlySpan<byte> request,ReadOnlySpan<byte> response)
     {
         if(request.Length!=2||request[0]!=1||response.Length<2||
             response[0]!=0x41||response[1]!=request[1])return null;
@@ -106,6 +106,6 @@ internal static class ObdJ1979Status
         }catch(FormatException){return null;}
     }
 
-    internal static string Format(IReadOnlyList<State> states)=>states.Count==0?
-        "No supported status field":string.Join("; ",states.Select(s=>$"{s.Name}={s.Code} (0x{s.RawEncoded:X})"));
+    internal static string Format(IReadOnlyList<StatusValue> states)=>states.Count==0?
+        "No supported status field":string.Join("; ",states.Select(s=>$"{s.Name}={s.State} (0x{s.RawEncoded:X})"));
 }
