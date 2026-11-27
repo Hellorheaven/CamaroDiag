@@ -76,12 +76,12 @@ internal sealed class J1979FreezeUsbCapture(J1979UsbCapture.ILink link,Func<long
             if(!finished)throw new InvalidDataException("CF/1 record limit exceeded");
         }
         catch(OperationCanceledException e){cancelled=true;error=e.Message;}
-        catch(Exception e) when(e is IOException or TimeoutException or ArgumentException or InvalidOperationException or UnauthorizedAccessException)
+        catch(Exception e) when(e is InvalidDataException or IOException or TimeoutException or ArgumentException or InvalidOperationException or UnauthorizedAccessException)
         {error=e.Message;}
         finally
         {
             try{link.Dispose();}
-            catch(Exception e) when(e is IOException or TimeoutException or InvalidOperationException)
+            catch(Exception e) when(e is InvalidDataException or IOException or TimeoutException or InvalidOperationException)
             {error??=e.Message;}
             try{raw.Flush();}
             catch(IOException e){error??=e.Message;}
