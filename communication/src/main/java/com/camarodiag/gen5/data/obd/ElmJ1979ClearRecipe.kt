@@ -35,6 +35,7 @@ internal object ElmJ1979ClearRecipe {
     }
 
     suspend fun run(protocol: Int, expectedVin: String, requireCurrent: () -> Unit,
+        saveBaseline: suspend (ObdClearRecipeResult) -> Unit,
         exchange: suspend (ByteArray) -> ByteArray): ObdClearRecipeResult {
         require(expectedVin.matches(Regex("[A-HJ-NPR-Z0-9]{17}")))
         val (tx, rx) = ElmJ1979EvapTest.addresses(protocol)
@@ -104,6 +105,13 @@ internal object ElmJ1979ClearRecipe {
             if (!query("PRECONDITION", byteArrayOf(1, 0x0D)).contentEquals(byteArrayOf(0x41, 0x0D, 0)) ||
                 !query("PRECONDITION", byteArrayOf(1, 0x0C)).contentEquals(byteArrayOf(0x41, 0x0C, 0, 0)))
                 return finish("NOT_TESTED", "STATIONARY_EVIDENCE_REQUIRED")
+            saveBaseline(finish("BASELINE_SAVED"))
+            active()
+            if (!query("RECHECK",byteArrayOf(9,2)).contentEquals(identity))
+                return finish("NOT_TESTED","IDENTITY_CHANGED_AFTER_BASELINE")
+            if (!query("RECHECK",byteArrayOf(1,0x0D)).contentEquals(byteArrayOf(0x41,0x0D,0)) ||
+                !query("RECHECK",byteArrayOf(1,0x0C)).contentEquals(byteArrayOf(0x41,0x0C,0,0)))
+                return finish("NOT_TESTED","STATIONARY_EVIDENCE_CHANGED")
             active()
             attempted = true
             observations += ObdClearObservation("RESET", "04", null)
