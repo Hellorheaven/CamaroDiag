@@ -22,7 +22,7 @@ import java.util.Locale
 internal fun J1979LivePanel(protocol: Int?,state: FunctionalTestState,vehicle: VehicleProfile,
     epoch: Long,run: (J1979LivePlan,Long,VehicleProfile)->Unit,exportCsv: ()->Unit) {
     var source by remember(protocol,epoch,vehicle) {
-        mutableStateOf(if(protocol in setOf(7,9))"18DAF110" else "7E8")
+        mutableStateOf(if(protocol in 1..5)"" else if(protocol in setOf(7,9))"18DAF110" else "7E8")
     }
     var pids by remember { mutableStateOf("05,0C") }
     var cycles by remember { mutableStateOf("30") }
@@ -45,7 +45,8 @@ internal fun J1979LivePanel(protocol: Int?,state: FunctionalTestState,vehicle: V
             OutlinedTextField(value,{change(it.take(limit));confirmed=false},label={Text(stringResource(label))},
                 enabled=enabled,singleLine=true,modifier=Modifier.fillMaxWidth())
         }
-        Field(source,R.string.j1979_live_source,8){source=it.uppercase(Locale.ROOT)}
+        Field(source,if(protocol in 1..5)R.string.legacy_read_source else R.string.j1979_live_source,
+            if(protocol in 1..5)2 else 8){source=it.uppercase(Locale.ROOT)}
         target?.requestId?.let { Text("${target.idHex(it)} → ${target.idHex(target.responseId)}",fontFamily=FontFamily.Monospace) }
         Field(pids,R.string.j1979_live_pids,95){pids=it.uppercase(Locale.ROOT)}
         Field(cycles,R.string.j1979_live_cycles,4){cycles=it}
@@ -53,7 +54,7 @@ internal fun J1979LivePanel(protocol: Int?,state: FunctionalTestState,vehicle: V
         Field(budget,R.string.j1979_live_budget,3){budget=it}
         Row(verticalAlignment=Alignment.CenterVertically){
             Checkbox(confirmed,{confirmed=it},enabled=enabled)
-            Text(stringResource(R.string.j1979_live_confirm,vehicle.vin))
+            Text(stringResource(if(protocol in 1..5)R.string.j1979_live_legacy_confirm else R.string.j1979_live_confirm,vehicle.vin))
         }
         OutlinedButton(onClick={plan?.let { run(it,epoch,vehicle) };confirmed=false},
             enabled=enabled&&confirmed&&plan?.valid==true,modifier=Modifier.fillMaxWidth()){
@@ -80,6 +81,6 @@ internal fun J1979LivePanel(protocol: Int?,state: FunctionalTestState,vehicle: V
                 Text(stringResource(R.string.j1979_live_export_csv))
             }
         }
-        Text(stringResource(R.string.j1979_live_scope),fontSize=11.sp)
+        Text(stringResource(if(state.livePlan.target.legacy)R.string.j1979_live_legacy_scope else R.string.j1979_live_scope),fontSize=11.sp)
     }
 }

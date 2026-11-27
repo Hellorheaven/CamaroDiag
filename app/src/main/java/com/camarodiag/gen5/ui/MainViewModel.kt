@@ -5824,7 +5824,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         functionalTestJob=viewModelScope.launch {
             if(!confirmFunctionalTestOwner(account)||!current())return@launch
             _functionalTestState.value=FunctionalTestState(running=true,startedAtMillis=System.currentTimeMillis(),
-                protocol=FunctionalProtocol.J1979,livePlan=plan,checks=FunctionalTestPlanner.j1979Checks(),
+                protocol=if(plan.target.legacy)FunctionalProtocol.entries.single {
+                    it.expectedLegacyElmProtocol==plan.target.protocol
+                } else FunctionalProtocol.J1979,livePlan=plan,checks=FunctionalTestPlanner.j1979Checks(),
                 context=FunctionalTestContext(confirmedVehicle.vin,_adapter.value.deviceName,
                     obdManager.currentTransportKind,confirmedConnection))
             var report: com.camarodiag.gen5.data.obd.J1979LiveReport?=null
@@ -6076,6 +6078,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val evidenceContext = snapshot.context ?: return@launch
             val json = JSONObject()
                 .put("schema", when {
+                    snapshot.livePlan?.target?.legacy == true -> "camarodiag-j1979-legacy-live-v1"
                     snapshot.livePlan != null -> "camarodiag-j1979-live-v1"
                     snapshot.nativeUsbEvidence != null -> "camarodiag-functional-j1979-native-usb-v1"
                     snapshot.legacyRead != null -> "camarodiag-functional-j1979-legacy-source-v1"
@@ -6182,7 +6185,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     .put("legacyProtocol",target.protocol).put("wholeVehicleCoverageVerified",false)
             }
             val exportName = if (snapshot.livePlan != null)
-                "CamaroDiag_SAE-J1979_LIVE_${snapshot.startedAtMillis}.json"
+                "CamaroDiag_SAE-J1979_${if(snapshot.livePlan.target.legacy)"LEGACY_" else ""}LIVE_${snapshot.startedAtMillis}.json"
                 else if (snapshot.nativeUsbEvidence != null)
                 "CamaroDiag_SAE-J1979_NATIVE_USB_" + snapshot.startedAtMillis + ".json"
                 else if (snapshot.legacyRead != null)

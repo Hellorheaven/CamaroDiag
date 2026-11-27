@@ -1,3 +1,7 @@
+## SAE J1979 — enregistrement legacy Android ELM/STN (27/11/2026)
+
+- Extension du moteur d'enregistrement Android aux cinq variantes legacy négociées : source de réponse documentée, PID00/ATDPN et fragments VIN avant admission et aux contrôles périodiques/final, séparation des trames d'origine et du payload normalisé. Configuration et restauration ELM exclusives, interface et exports JSON/CSV existants, aucun adressage physique revendiqué. Tests écrits non exécutés, aucune qualification matérielle. C6/J1979 restent ouverts.
+
 ## SAE J1979 — enregistrement legacy J2534 Windows (27/11/2026)
 
 - Les cinq variantes J2534 legacy sont accessibles depuis le même enregistreur privé Windows, sélection de la variante/source/VIN, confirmations distinctes de la portée fonctionnelle. Réassemblage VIN 0900/0901/0902 sur la source filtrée, traces du pilote distinctes de la réponse normalisée, budget logique partagé, cycles et statistiques réutilisés, CLI --j1979-legacy-live et JSON/CSV. Pas de prétention d'adressage physique ou de contrôle du checksum par l'application J2534 ; aucun Mode 04/08. Régressions écrites non exécutées, C6/J1979 ouverts.

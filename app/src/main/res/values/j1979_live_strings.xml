@@ -15,4 +15,6 @@
     <string name="j1979_live_summary">min %1$s · max %2$s · mean %3$s %4$s</string>
     <string name="j1979_live_export_csv">Export CSV</string>
     <string name="j1979_live_scope">Individual timestamped read requests, no simultaneous samples or mutations.</string>
+    <string name="j1979_live_legacy_confirm">Confirm legacy response source and VIN %1$s; requests are functional.</string>
+    <string name="j1979_live_legacy_scope">Header-filtered responses to functional requests; no physical addressing or mutations.</string>
 </resources>

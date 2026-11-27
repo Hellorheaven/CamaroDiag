@@ -10,6 +10,7 @@ import java.util.Locale
 /** Selected physical classic CAN channel, not a functional broadcast.
  * The numeric PID catalog is derived from the shared application decoder. */
 data class J1979LiveTarget(val protocol: Int, val responseId: Int, val vin: String) {
+    val legacy: Boolean get() = protocol in 1..5
     val requestId: Int? get() = when {
         protocol in setOf(6,8) && responseId in 0x7E8..0x7EF -> responseId-8
         protocol in setOf(7,9) && responseId and 0x1FFFFF00 == 0x18DAF100 &&
@@ -18,8 +19,9 @@ data class J1979LiveTarget(val protocol: Int, val responseId: Int, val vin: Stri
         else -> null
     }
     val extended: Boolean get() = protocol in setOf(7,9)
-    val valid: Boolean get() = requestId != null && vin.matches(Regex("[A-HJ-NPR-Z0-9]{17}"))
-    fun idHex(id: Int) = id.toString(16).uppercase(Locale.ROOT).padStart(if(extended)8 else 3,'0')
+    val valid: Boolean get() = (if(legacy)responseId in 1..254&&responseId!=0xF1 else requestId!=null) &&
+        vin.matches(Regex("[A-HJ-NPR-Z0-9]{17}"))
+    fun idHex(id: Int) = id.toString(16).uppercase(Locale.ROOT).padStart(if(legacy)2 else if(extended)8 else 3,'0')
 }
 
 data class J1979LivePlan(val target: J1979LiveTarget, val pids: List<Int>,
@@ -41,7 +43,10 @@ data class J1979LiveReport(val plan: J1979LivePlan,val observedVin: String?,val 
     val protocolResponse: String?,val advertisedPids: List<Int>,val inventoryPages: List<J1979LivePage>,
     val inventoryComplete: Boolean,val completedCycles: Int,val admission: List<J1979LiveObservation>,
     val observations: List<J1979LiveObservation>,val summaries: List<J1979LiveSummary>,
-    val completed: Boolean,val stopReason: String?,val durationMs: Long) {
+    val completed: Boolean,val stopReason: String?,val durationMs: Long,
+    val legacyExchanges: List<LegacyLiveExchange> = emptyList()) {
+    val physicallyAddressed get() = !plan.target.legacy
+    val scope get() = if(physicallyAddressed)"PHYSICAL_SELECTED_ECU_LIVE" else "FUNCTIONAL_SELECTED_RESPONSE_LIVE"
     val physicalVehicleVerified get() = false
     val wholeVehicleCoverageVerified get() = false
     val vinMatch: String get() = when {
@@ -92,7 +97,8 @@ internal object J1979LiveRecorder {
         verifyProtocol: suspend (Long)->String,requireCurrent: ()->Unit,
         onSample: (J1979LiveObservation)->Unit={},
         clock: ()->Long={System.nanoTime()/1000000},
-        sleep: suspend (Long)->Unit={delay(it)}): J1979LiveReport {
+        sleep: suspend (Long)->Unit={delay(it)},
+        requestTimeout: (ByteArray)->Long={2500}): J1979LiveReport {
         val plan=requested.copy(pids=requested.pids.toList())
         require(plan.valid)
         val start=clock()
@@ -130,7 +136,9 @@ internal object J1979LiveRecorder {
             var status="NOT_TESTED"
             var detail: String?=null
             try {
-                reply=exchange(request,minOf(2500,remaining()))
+                val limit=requestTimeout(request)
+                require(limit in 1..30000)
+                reply=exchange(request,minOf(limit,remaining()))
                 response=reply.payload?.let(::hex)
                 currentCoroutineContext().ensureActive()
                 requireCurrent()
@@ -188,7 +196,8 @@ internal object J1979LiveRecorder {
             val values=protocolRaw.orEmpty().replace('>','\n').lineSequence()
                 .map { it.trim().uppercase(Locale.ROOT) }
                 .filter { it.isNotEmpty() && it!="ATDPN" }.toList()
-            observedProtocol=values.singleOrNull()?.takeIf { it.matches(Regex("[6-9]")) }?.toInt()
+            observedProtocol=values.singleOrNull()?.takeIf { it.matches(
+                if(plan.target.legacy)Regex("[1-5]") else Regex("[6-9]")) }?.toInt()
             if(observedProtocol!=plan.target.protocol){stop="PROTOCOL_UNVERIFIED";return false}
             return true
         }

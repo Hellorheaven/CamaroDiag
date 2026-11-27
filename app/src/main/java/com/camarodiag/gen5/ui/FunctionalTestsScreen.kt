@@ -226,7 +226,7 @@ fun FunctionalTestsScreen(
                     Text(stringResource(R.string.functional_protocol_run))
                 }
                 if (selected == FunctionalProtocol.J1979) {
-                    J1979LivePanel(liveProtocol,state,vehicle,connectionGeneration,onRunLive,onExportLiveCsv)
+                    J1979LivePanel(liveProtocol?.takeIf { it in 6..9 },state,vehicle,connectionGeneration,onRunLive,onExportLiveCsv)
                     NativeUsbFunctionalPanel(nativeUsbEnabled && !state.running, connectionGeneration, vehicle, onRunNativeUsb)
                     Text(stringResource(R.string.functional_evap_scope), style = MaterialTheme.typography.bodySmall)
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -254,6 +254,7 @@ fun FunctionalTestsScreen(
                     }
                 }
                 if (legacyProtocol != null) {
+                    J1979LivePanel(liveProtocol?.takeIf { it==legacyProtocol },state,vehicle,connectionGeneration,onRunLive,onExportLiveCsv)
                     val sourceTarget=parseSource(readSource)?.let {
                         com.camarodiag.gen5.data.obd.LegacyReadTarget(legacyProtocol,it,vehicle.vin)
                     }

@@ -15,4 +15,6 @@
     <string name="j1979_live_summary">min %1$s · max %2$s · moyenne %3$s %4$s</string>
     <string name="j1979_live_export_csv">Exporter CSV</string>
     <string name="j1979_live_scope">Lectures horodatées distinctes, ni mesures simultanées ni mutation.</string>
+    <string name="j1979_live_legacy_confirm">Confirmer la source legacy et le VIN %1$s ; les requêtes sont fonctionnelles.</string>
+    <string name="j1979_live_legacy_scope">Réponses filtrées par en-tête à des requêtes fonctionnelles ; ni adressage physique ni mutation.</string>
 </resources>

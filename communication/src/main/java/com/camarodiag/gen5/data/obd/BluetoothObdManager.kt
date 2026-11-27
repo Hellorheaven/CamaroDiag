@@ -1120,7 +1120,7 @@ class BluetoothObdManager(context: Context) {
         }
     }
 
-    val j1979LiveProtocol: Int? get() = standardElmProfile.protocol.takeIf { isElmEvapCandidate }
+    val j1979LiveProtocol: Int? get() = legacyMutationProtocol ?: standardElmProfile.protocol.takeIf { isElmEvapCandidate }
 
     /** Hold the same exclusive lock as the console and other ELM sessions.
      * Only the recorder's exact Mode 01/09 allowlist may cross this boundary. */
@@ -1130,7 +1130,7 @@ class BluetoothObdManager(context: Context) {
         val epoch=transportSessionEpoch.capture()
         val original=standardElmProfile
         val target=plan.target
-        val tx=target.idHex(requireNotNull(target.requestId))
+        val tx=target.requestId?.let(target::idHex)
         val rx=target.idHex(target.responseId)
         fun guard(){
             transportSessionEpoch.requireQueuedCurrent(epoch)
@@ -1140,13 +1140,27 @@ class BluetoothObdManager(context: Context) {
             guard()
             check(j1979LiveProtocol==target.protocol&&standardElmProfile==original)
             try {
-                for(command in listOf("ATSP${target.protocol}","ATE0","ATL0","ATH1","ATS1","ATD0",
-                    "ATCAF0","ATSH $tx","ATCRA $rx","ATFCSH $tx","ATFCSD 30 00 00","ATFCSM1","ATCFC1")){
+                val config=if(target.legacy){
+                    val header=when(target.protocol){1->"616AF1";4,5->"C033F1";else->"686AF1"}
+                    listOf("ATSP${target.protocol}","ATE0","ATL0","ATH1","ATS1","ATSH $header")
+                }else listOf("ATSP${target.protocol}","ATE0","ATL0","ATH1","ATS1","ATD0",
+                    "ATCAF0","ATSH $tx","ATCRA $rx","ATFCSH $tx","ATFCSD 30 00 00","ATFCSM1","ATCFC1")
+                for(command in config){
                     guard()
                     check(CanConsoleAdapterRestorationPolicy.accepted(sendAtCommandInternal(command,1500L,
                         expectedEpoch=epoch,preserveLines=true,beforeTransmit=::guard)))
                 }
-                J1979LiveRecorder.run(plan,exchange={ payload,timeout ->
+                if(target.legacy){
+                    val link=ElmLegacyLiveLink(target,exchange={command,timeout ->
+                        check(ElmJ1979LegacyRead.allowsRead(command))
+                        sendAtCommandInternal(command,timeout,expectedEpoch=epoch,preserveLines=true,beforeTransmit=::guard)
+                    },probe={timeout ->
+                        sendAtCommandInternal("ATDPN",timeout,expectedEpoch=epoch,preserveLines=true,beforeTransmit=::guard)
+                    },requireCurrent=::guard)
+                    J1979LiveRecorder.run(plan,link::query,link::protocolResponse,::guard,onSample,
+                        requestTimeout={if(it[0]==9.toByte())20000 else 4000})
+                        .copy(legacyExchanges=link.traces).also(retain)
+                }else J1979LiveRecorder.run(plan,exchange={ payload,timeout ->
                     check(J1979LiveRecorder.allowed(payload))
                     val frame=byteArrayOf(payload.size.toByte())+payload
                     val raw=sendAtCommandInternal(ElmJ1979EvapTest.hex(frame),timeout,
@@ -1163,7 +1177,9 @@ class BluetoothObdManager(context: Context) {
                 withContext(NonCancellable){
                     if(transportSessionEpoch.isCurrent(epoch)){
                         var restored=true
-                        for(command in ElmUdsPayloadTransport.restoreCommandsFor(original.protocol)){
+                        val restore=if(target.legacy)original.restoreCommands() else
+                            ElmUdsPayloadTransport.restoreCommandsFor(original.protocol)
+                        for(command in restore){
                             val response=runCatching {
                                 sendAtCommandInternal(command,1500L,expectedEpoch=epoch)
                             }.getOrNull()
