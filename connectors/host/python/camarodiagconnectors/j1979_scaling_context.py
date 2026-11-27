@@ -145,9 +145,13 @@ class Context:
             if voltage:
                 fields.append(field(prefix+"voltage","V",b,1,1/8192,lambda x:x/65535))
             else:
-                # Existing J1979 PID 34-3B representation uses offset binary
-                # for the signed current. Scale the centered signed value.
-                fields.append(field(prefix+"current","mA",b,2,1/256,lambda x:x/32768,32768))
+                # B.60 explicitly specifies signed two\'s complement when
+                # a nonzero custom current range is supplied; original PID
+                # encoding retains its historical offset-binary conversion.
+                current = field(prefix+"current","mA",b,2,1/256,lambda x:x/32768,32768)
+                if maxima[2] and config.state != "UNVERIFIED":
+                    current["number"] = (b-65536 if b>=32768 else b)*maxima[2]/32768
+                fields.append(current)
         return {"request_hex":request.hex().upper(),"configuration_pid":dep,"signals":fields}
 
 
