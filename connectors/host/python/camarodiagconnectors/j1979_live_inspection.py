@@ -469,7 +469,7 @@ def inspect(root, *, expected_vin=None):
             "channel":channel,"requested_cycles":cycles,"completed_cycles":recorded_cycles,
             "selected_pids":pids,"advertised_pids":sorted(advertised),"inventory_complete":inventory_complete,
             "summary":summaries,"multi_signal_summary":signal_summaries,"samples":clean,
-            "scaling_configuration":derived_scaling,"scaling_context_verified":scoped_scaling or not required_configs,"physical_vehicle_verified":False,
+            "scaling_configuration":derived_scaling,"scaling_context_verified":not required_configs or (scoped_scaling and all(context_from_steps(scale_rows).get(c).state!="UNVERIFIED" for c in required_configs)),"physical_vehicle_verified":False,
             "authenticated":False,"whole_vehicle_coverage_verified":False,
             "stop_reason":_get(result,"stop_reason")}
 
