@@ -5,6 +5,9 @@ using CamaroDiagConnectors.Windows;
 if (args is ["--self-test"])
     return SelfTests.Run();
 
+if (args.Length>0 && args[0] is J1979FreezeNativeCli.CaptureCommand or J1979FreezeNativeCli.InspectCommand)
+    return J1979FreezeNativeCli.Run(args);
+
 if (args.Length>0 && args[0]=="--j1979-usb")
     return J1979UsbCli.Run(args[1..]);
 
