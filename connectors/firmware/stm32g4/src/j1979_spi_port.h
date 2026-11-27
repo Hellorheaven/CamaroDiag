@@ -2,9 +2,9 @@
 #include <Arduino.h>
 #include <stm32g4xx_hal_spi.h>
 #include "../../shared/j1979_spi_transport.h"
+#include "../../shared/j1979_maintenance_spi.h"
 
 namespace cd {
-namespace maintenance_link { class SpiSlave; }
 // Board owns NSS/clock counting and interrupt routing. A HAL completion
 // alone does not prove that NSS framed exactly 256 clock edges.
 class StmJ1979SpiPort final:public readlink::SpiSlavePort {
@@ -24,6 +24,7 @@ class StmJ1979SpiPort final:public readlink::SpiSlavePort {
   // the observed bit count and clean electrical framing, not host data.
   bool completed(readlink::SpiSlave& slave,uint32_t bits,bool clean);
   bool completed(maintenance_link::SpiSlave& slave,uint32_t bits,bool clean);
+  bool completed(archive_link::SpiSlave& slave,uint32_t bits,bool clean);
  private:
   SPI_HandleTypeDef& spi_;Admission admission_;Ready ready_;Fault fault_;
   bool failed_=false,armed_=false;
