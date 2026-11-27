@@ -722,6 +722,9 @@ fun CamaroDiagApp(
                         liveProtocol = viewModel.functionalLiveProtocol(),
                         onRunLive = { plan,epoch,profile -> viewModel.runFunctionalLive(plan,epoch,profile) },
                         onExportLiveCsv = { withExportFolder { viewModel.exportFunctionalLiveCsv() } },
+                        onInspectNativeMaintenance = { source,epoch,profile ->
+                            withExportFolder { viewModel.inspectFunctionalNativeMaintenance(source,epoch,profile) }
+                        },
                         onInspectNativePrefix = { source,epoch,profile ->
                             withExportFolder { viewModel.inspectFunctionalNativeLivePrefix(source,epoch,profile) }
                         },
