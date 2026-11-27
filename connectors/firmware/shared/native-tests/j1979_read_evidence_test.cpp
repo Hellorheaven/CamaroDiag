@@ -58,6 +58,33 @@ int main(){
   assert(E::classify(V::ClassicCan,unknown,2,echoOnly,2)==R::Invalid);
   const uint8_t finalPage[]={1,0xe0},badNext[]={0x41,0xe0,0,0,0,1};
   assert(E::classify(V::ClassicCan,finalPage,2,badNext,6)==R::Invalid);
+  // Known multi-signal replies must be structurally sound even when the
+  // firmware deliberately leaves interpretation to the host.
+  const uint8_t aecdReq[]={1,0x81};
+  uint8_t aecd[43]={0x41,0x81,0x1f};
+  std::memset(aecd+3,0xff,40);
+  assert(E::classify(V::ClassicCan,aecdReq,2,aecd,sizeof(aecd))==R::Raw);
+  assert(E::classify(V::ClassicCan,aecdReq,2,aecd,sizeof(aecd)-1)==R::Invalid);
+  assert(E::classify(V::Legacy,aecdReq,2,aecd,sizeof(aecd))==R::Invalid);
+  aecd[2]=0x20;
+  assert(E::classify(V::ClassicCan,aecdReq,2,aecd,sizeof(aecd))==R::Invalid);
+  const uint8_t egrReq[]={1,0x6b};
+  uint8_t egr[]={0x41,0x6b,0x21,100,100,0,0};
+  assert(E::classify(V::ClassicCan,egrReq,2,egr,sizeof(egr))==R::Raw);
+  assert(E::classify(V::Legacy,egrReq,2,egr,sizeof(egr))==R::Raw);
+  egr[2]=0x11;
+  assert(E::classify(V::ClassicCan,egrReq,2,egr,sizeof(egr))==R::Invalid);
+  const uint8_t scrReq[]={1,0x85};
+  uint8_t scr[12]={0x41,0x85,0x0f};
+  assert(E::classify(V::ClassicCan,scrReq,2,scr,sizeof(scr))==R::Raw);
+  scr[2]=0x10;
+  assert(E::classify(V::ClassicCan,scrReq,2,scr,sizeof(scr))==R::Invalid);
+  const uint8_t sparkIpt[]={9,8};
+  uint8_t sparkReply[35]={0x49,8,1};
+  assert(E::classify(V::ClassicCan,sparkIpt,2,sparkReply,sizeof(sparkReply))==R::Raw);
+  assert(E::classify(V::ClassicCan,sparkIpt,2,sparkReply,sizeof(sparkReply)-1)==R::Invalid);
+  sparkReply[2]=2;
+  assert(E::classify(V::ClassicCan,sparkIpt,2,sparkReply,sizeof(sparkReply))==R::Invalid);
   // Feed only captured synthetic frames through the passive observer.
   const uint8_t vinReq[]={9,2};
   uint8_t vin[20]={0x49,2,1};
