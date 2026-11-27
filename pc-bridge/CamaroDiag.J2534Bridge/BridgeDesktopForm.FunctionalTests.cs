@@ -87,6 +87,7 @@ internal sealed partial class BridgeDesktopForm
         nativeFreezeActions.Controls.Add(functionalRunNativeLive);
         nativeFreezeActions.Controls.Add(functionalInspectNativeLive);
         nativeFreezeActions.Controls.Add(functionalExportNativeLiveCsv);
+        nativeFreezeActions.Controls.Add(functionalInspectNativePrefix);
         WideRow(fields,nativeFreezeActions,42);
         WideRow(fields, functionalProjectCatalogue, 42);
         WideRow(fields, functionalRunLegacyMutation, 42);
@@ -124,8 +125,9 @@ internal sealed partial class BridgeDesktopForm
         functionalRunNativeLive.Click += async (_, _) => await RunWindowsNativeLiveAsync();
         functionalInspectNativeLive.Click += async (_, _) => await InspectWindowsNativeLiveAsync();
         functionalExportNativeLiveCsv.Click += async (_, _) => await ExportWindowsNativeLiveCsvAsync();
-        functionalRunNativeUsb.EnabledChanged += (_, _) => functionalExportNativeLiveCsv.Enabled = functionalRunNativeLive.Enabled = functionalInspectNativeLive.Enabled = functionalRunNativeFreeze.Enabled = functionalInspectNativeFreeze.Enabled = functionalRunNativeUsb.Enabled;
-        functionalExportNativeLiveCsv.Enabled = functionalRunNativeLive.Enabled = functionalInspectNativeLive.Enabled = functionalRunNativeFreeze.Enabled = functionalInspectNativeFreeze.Enabled = functionalRunNativeUsb.Enabled;
+        functionalInspectNativePrefix.Click += async (_, _) => await InspectWindowsNativePrefixAsync();
+        functionalRunNativeUsb.EnabledChanged += (_, _) => functionalInspectNativePrefix.Enabled = functionalExportNativeLiveCsv.Enabled = functionalRunNativeLive.Enabled = functionalInspectNativeLive.Enabled = functionalRunNativeFreeze.Enabled = functionalInspectNativeFreeze.Enabled = functionalRunNativeUsb.Enabled;
+        functionalInspectNativePrefix.Enabled = functionalExportNativeLiveCsv.Enabled = functionalRunNativeLive.Enabled = functionalInspectNativeLive.Enabled = functionalRunNativeFreeze.Enabled = functionalInspectNativeFreeze.Enabled = functionalRunNativeUsb.Enabled;
         functionalRunLegacy.Click += async (_, _) => await RunWindowsLegacyAsync();
         functionalRunLegacyMutation.Click += async (_, _) => await RunWindowsLegacyMutationAsync();
         functionalRunEvap.Click += async (_, _) => await RunWindowsEvapAsync();
