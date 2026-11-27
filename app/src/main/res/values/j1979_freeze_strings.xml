@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="j1979_freeze_title">Freeze frames (Mode 02)</string>
+    <string name="j1979_freeze_frames">Frame numbers (hex, comma-separated)</string>
+    <string name="j1979_freeze_pids">PIDs (hex; empty = all advertised)</string>
+    <string name="j1979_freeze_confirm">I verified the physical ECU channel and selected frames for VIN %1$s.</string>
+    <string name="j1979_freeze_run">Read freeze frames</string>
+    <string name="j1979_freeze_complete">Selected freeze frames acquired</string>
+    <string name="j1979_freeze_incomplete">Freeze-frame campaign incomplete</string>
+    <string name="j1979_freeze_identity">VIN rechecked: %1$s</string>
+    <string name="j1979_freeze_verified">verified</string>
+    <string name="j1979_freeze_unavailable">Unavailable</string>
+    <string name="j1979_freeze_status_complete">Complete</string>
+    <string name="j1979_freeze_status_absent">No recorded trigger</string>
+    <string name="j1979_freeze_status_partial">Partial</string>
+    <string name="j1979_freeze_status_changed">Trigger changed</string>
+    <string name="j1979_freeze_summary">Frame %1$s — %2$s — DTC %3$s — %4$d/%5$d PIDs</string>
+    <string name="j1979_freeze_not_advertised">Not advertised: %1$s</string>
+    <string name="j1979_freeze_not_read">Not read: %1$s</string>
+    <string name="j1979_freeze_unvisited">Frames not visited: %1$s</string>
+    <string name="j1979_freeze_more">%1$d more records in JSON export</string>
+    <string name="j1979_freeze_scope">Recorded data only. Additional OEM frames stay raw; no physical validation.</string>
+</resources>
