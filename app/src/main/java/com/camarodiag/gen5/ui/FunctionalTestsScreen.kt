@@ -59,6 +59,7 @@ fun FunctionalTestsScreen(
     onProjectCatalogue: (android.net.Uri,android.net.Uri,android.net.Uri,String,Long,VehicleProfile)->Unit,
     onInspectNativePrefix: (android.net.Uri,Long,VehicleProfile)->Unit,
     onInspectNativeMaintenance: (android.net.Uri,Long,VehicleProfile)->Unit,
+    onInspectNativeMaintenancePrefix: (android.net.Uri,Long,VehicleProfile)->Unit,
     onRunFreeze: (com.camarodiag.gen5.data.obd.J1979FreezePlan,Long,VehicleProfile)->Unit,
     onRunNetwork: (com.camarodiag.gen5.data.obd.J1979NetworkPlan,Long,VehicleProfile)->Unit,
     onRunNativeFreeze: (android.hardware.usb.UsbDevice, com.camarodiag.gen5.data.obd.CamaroDiagConnectorFreezeCampaign.Target,
@@ -242,6 +243,7 @@ fun FunctionalTestsScreen(
                     J1979CataloguePanel(!state.running,vehicle,connectionGeneration,onProjectCatalogue)
                     J1979NativePrefixPanel(!state.running,vehicle,connectionGeneration,onInspectNativePrefix)
                     J1979NativePrefixPanel(!state.running,vehicle,connectionGeneration,onInspectNativeMaintenance,maintenance=true)
+                    J1979NativePrefixPanel(!state.running,vehicle,connectionGeneration,onInspectNativeMaintenancePrefix,maintenance=true,interrupted=true)
                     J1979FreezePanel(liveProtocol?.takeIf { it in 1..9 },state,vehicle,connectionGeneration,onRunFreeze)
                     NativeUsbFunctionalPanel(nativeUsbEnabled && !state.running, connectionGeneration, vehicle, onRunNativeUsb,onRunFreeze=onRunNativeFreeze,onRunLive=onRunNativeLive,onRunMaintenance=onRunNativeMaintenance)
                     Text(stringResource(R.string.functional_evap_scope), style = MaterialTheme.typography.bodySmall)
