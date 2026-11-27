@@ -291,35 +291,54 @@ internal object J1979FreezeCampaign {
             var raw: String? = null
             fun observed(outcome: String,response: ByteArray? = null) =
                 Read(outcome,response,(elapsed()-begin).coerceAtLeast(0),attempted,raw)
+            fun stillCurrent(): Boolean = try {
+                currentCoroutineContext().ensureActive()
+                guard()
+                true
+            } catch (_: Exception) { false }
             try {
                 currentCoroutineContext().ensureActive()
                 guard()
                 val left = plan.budgetMs - begin
                 if (left <= 0) observed("BUDGET") else {
-                    attempted = true
-                    val maximum=requestTimeout(request)
+                    // Resolve local timeout and preserve route ownership
+                    // before recording that any bus exchange was attempted.
+                    val maximum = requestTimeout(request)
                     require(maximum in 1..20000)
-                    val reply = exchange(request,minOf(maximum,left))
-                    raw = reply.raw?.take(MAX_RAW)
-                    guard()
                     currentCoroutineContext().ensureActive()
-                    val response = reply.payload
-                    when {
-                        (reply.raw?.length ?: 0) > MAX_RAW || (response?.size ?: 0) > MAX_RESPONSE || response?.isEmpty() == true ->
-                            observed("TRANSPORT_ERROR")
-                        response == null -> observed("TIMEOUT")
-                        elapsed() >= plan.budgetMs -> observed("LATE_RESPONSE",response)
-                        else -> observed("RECEIVED",response)
+                    guard()
+                    val remaining = plan.budgetMs - elapsed()
+                    if (remaining <= 0) observed("BUDGET") else {
+                        attempted = true
+                        val reply = exchange(request,minOf(maximum,remaining))
+                        // An adapter can complete after the selected ECU or
+                        // owner generation changed. Never accept those bytes.
+                        guard()
+                        currentCoroutineContext().ensureActive()
+                        raw = reply.raw?.take(MAX_RAW)
+                        val response = reply.payload
+                        when {
+                            (reply.raw?.length ?: 0) > MAX_RAW || (response?.size ?: 0) > MAX_RESPONSE ||
+                                response?.isEmpty() == true -> observed("TRANSPORT_ERROR")
+                            response == null -> observed("TIMEOUT")
+                            elapsed() >= plan.budgetMs -> observed("LATE_RESPONSE",response)
+                            else -> observed("RECEIVED",response)
+                        }
                     }
                 }
             } catch (error: AdapterReplyError) {
-                raw = error.raw.take(MAX_RAW)
-                observed("TRANSPORT_ERROR")
+                val active=stillCurrent()
+                raw=if(active)error.raw.take(MAX_RAW) else null
+                observed(if(attempted&&active) "TRANSPORT_ERROR" else "CONTEXT_CHANGED")
             } catch (_: CancellationException) { observed("CANCELLED") }
             catch (_: java.util.concurrent.TimeoutException) {
-                observed(if (attempted) "TIMEOUT" else "CONTEXT_CHANGED")
+                val active=stillCurrent()
+                if(!active)raw=null
+                observed(if(attempted&&active) "TIMEOUT" else "CONTEXT_CHANGED")
             } catch (_: Exception) {
-                observed(if (attempted) "TRANSPORT_ERROR" else "CONTEXT_CHANGED")
+                val active=stillCurrent()
+                if(!active)raw=null
+                observed(if(attempted&&active) "TRANSPORT_ERROR" else "CONTEXT_CHANGED")
             }
         },elapsed=::elapsed)
     }

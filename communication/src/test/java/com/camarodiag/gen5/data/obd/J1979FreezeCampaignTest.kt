@@ -78,6 +78,46 @@ class J1979FreezeCampaignTest {
         assertFalse(failure.allFramesStable)
     }
 
+    @Test fun preflightTimeoutDoesNotAdvertiseTransmittedMode02Request() = runBlocking {
+        var exchanges = 0
+        val rejected = J1979FreezeCampaign.run(plan,exchange={ _,_ ->
+            exchanges++
+            J1979LiveRecorder.Reply(vinReply(),null)
+        },guard={},requestTimeout={0})
+        assertEquals(0,exchanges)
+        assertEquals("CONTEXT_CHANGED",rejected.stopReason)
+        assertFalse(rejected.steps.single().transmissionAttempted)
+        assertNull(rejected.initialVin)
+    }
+
+    @Test fun releasedVehicleOrEcuDiscardsResponseAfterExchange() = runBlocking {
+        var active = true
+        val revoked = J1979FreezeCampaign.run(plan,exchange={ _,_ ->
+            active = false
+            J1979LiveRecorder.Reply(vinReply(),"old device response")
+        },guard={if(!active)error("Vehicle or ECU generation revoked")})
+        assertEquals("CONTEXT_CHANGED",revoked.stopReason)
+        assertTrue(revoked.steps.single().transmissionAttempted)
+        assertNull(revoked.steps.single().responseHex)
+        assertNull(revoked.initialVin)
+        assertFalse(revoked.completed)
+    }
+
+    @Test fun revokedTimeoutAndOrdinaryTimeoutRemainDistinct() = runBlocking {
+        var active = true
+        val revoked = J1979FreezeCampaign.run(plan,exchange={ _,_ ->
+            active = false
+            throw java.util.concurrent.TimeoutException("Old ECU response window elapsed")
+        },guard={if(!active)error("Connection ownership changed")})
+        assertEquals("CONTEXT_CHANGED",revoked.stopReason)
+        assertTrue(revoked.steps.single().transmissionAttempted)
+        val timeout = J1979FreezeCampaign.run(plan,exchange={ _,_ ->
+            throw java.util.concurrent.TimeoutException("ECU did not answer")
+        },guard={})
+        assertEquals("TIMEOUT",timeout.steps.single().transportOutcome)
+        assertTrue(timeout.steps.single().transmissionAttempted)
+    }
+
     @Test fun frameEchoAndProtocolEvidenceMustMatch() {
         val result=J1979FreezeCampaign.classify(bytes("020D01"),received(bytes("420D0050")))
         assertEquals("FAILED",result.status)
