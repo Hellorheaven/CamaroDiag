@@ -138,6 +138,24 @@ public final class J1979LiveNativeReplay {
             }
             return stage;
         }
+        int maximumReply(int phase){
+            switch(phase){
+                case 1:case 3:case 5:return 20;
+                case 2:return 6;
+                case 4:return 4095;
+                default:return 0;
+            }
+        }
+        boolean canRetain(int phase){
+            int maximum=maximumReply(phase);
+            return maximum>0&&maximum<=MAX_RAW-rawBytes;
+        }
+        boolean capacityStop(long now){
+            int p=phase(now);
+            if(p==4&&index==0&&!earlyIdentity&&now-lastIdentity>=29000)p=3;
+            if(stage==4&&index==0&&cycleStart>=0&&now-cycleStart<profile.intervalMs+25L)return false;
+            return p>=1&&p<=5&&!canRetain(p);
+        }
         byte[] request(int phase)throws IOException{
             switch(phase){
                 case 1:case 3:case 5:return new byte[]{9,2};
@@ -155,6 +173,7 @@ public final class J1979LiveNativeReplay {
             int phase=phase(e.start);
             if(e.phase==3&&phase==4&&index==0&&!earlyIdentity)phase=3;
             require(phase==e.phase&&phase>=1&&phase<=5,"Unexpected CL/1 phase");
+            require(canRetain(phase),"CL/1 request exceeds remaining evidence capacity");
             byte[] req=request(phase);
             require(Arrays.equals(req,e.request)&&e.timeout<=profile.budgetMs-e.start&&
                 e.cycle==(phase==4?cycles+1:0)&&e.pid==(phase==4?u(req[1]):0),
@@ -218,11 +237,12 @@ public final class J1979LiveNativeReplay {
             return wire;
         }
         Map<String,Object> finish(byte[] body)throws IOException{
-            require(body.length==FINAL_SIZE&&u(body[0])<STOPS.length&&body[0]!=1&&body[0]!=9&&body[0]!=10&&body[0]!=11&&
+            require(body.length==FINAL_SIZE&&u(body[0])<STOPS.length&&body[0]!=1&&body[0]!=9&&body[0]!=10&&
                 (body[1]&~15)==0,"Malformed CL/1 terminal");
             long end=u32(body,24);require(end>=duration&&end<=604000,"Invalid terminal duration");
             if(stage!=7){
-                require((body[0]==2||body[0]==3)&&(body[0]!=2||profile.budgetMs-end<=1),"Unsupported terminal state");
+                require((body[0]==2||body[0]==3||body[0]==11)&&(body[0]!=2||profile.budgetMs-end<=1)&&
+                    (body[0]!=11||capacityStop(end)),"Unsupported terminal state");
                 abort(body[0],end);
             }
             require(Arrays.equals(body,summaryWire()),"CL/1 terminal counters differ from replay");
