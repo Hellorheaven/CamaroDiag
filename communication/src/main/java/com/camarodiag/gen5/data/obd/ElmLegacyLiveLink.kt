@@ -15,9 +15,17 @@ internal class ElmLegacyLiveLink(
     private val exchange: suspend (String,Long)->String,
     private val probe: suspend (Long)->String,
     private val requireCurrent: ()->Unit,
-    private val clock: ()->Long={System.nanoTime()/1000000}
+    private val clock: ()->Long={System.nanoTime()/1000000},
+    freeze: J1979FreezePlan?=null
 ) {
-    init {require(target.legacy&&target.valid)}
+    private val freeze=freeze?.pinned()
+    init {require(target.legacy&&target.valid&&(this.freeze==null||this.freeze.target==target))}
+    private var rawBytes=0L
+    private fun bound(raw:String) {
+        require(raw.length<=32768)
+        rawBytes+=raw.length
+        require(rawBytes<=16L*1024*1024)
+    }
     private val trace=mutableListOf<LegacyLiveExchange>()
     val traces: List<LegacyLiveExchange> get()=trace.toList()
     private var logical=0
@@ -39,6 +47,10 @@ internal class ElmLegacyLiveLink(
     }
     private fun allows(command:String):Boolean =
         command in setOf("0100","0900","0901","0902") ||
+            (freeze?.let { plan -> command.matches(Regex("02[0-9A-F]{4}")) &&
+                command.takeLast(2).toInt(16) in plan.frames && command.substring(2,4).toInt(16).let {
+                    it%32==0||it==2||plan.selectedPids.isEmpty()||it in plan.selectedPids
+                } } ?: false) || freeze==null &&
             command.matches(Regex("01[0-9A-F]{2}"))&&command.takeLast(2).toInt(16).let {
                 it%32==0||it==0x1D||ObdJ1979ScalingContext.isConfiguration(it)||J1979LiveRecorder.legacyNumericPid(it)
             }
@@ -47,6 +59,7 @@ internal class ElmLegacyLiveLink(
         trace+=LegacyLiveExchange(index,command,null,emptyList(),emptyList(),"NOT_TESTED",null)
         try{
             val raw=exchange(command,remaining(deadline,4000))
+            if(freeze!=null)bound(raw)
             trace[trace.lastIndex]=trace.last().copy(rawResponse=raw)
             active()
             if(clock()>=deadline){mark("NOT_TESTED","LATE_RESPONSE");throw LogicalTimeout()}
@@ -78,6 +91,7 @@ internal class ElmLegacyLiveLink(
         trace+=LegacyLiveExchange(index,"ATDPN",null,emptyList(),emptyList(),"NOT_TESTED",null)
         try{
             val raw=probe(remaining(deadline,1500))
+            if(freeze!=null)bound(raw)
             trace[trace.lastIndex]=trace.last().copy(rawResponse=raw)
             active()
             if(clock()>=deadline){mark("NOT_TESTED","LATE_PROTOCOL");throw LogicalTimeout()}
@@ -125,7 +139,10 @@ internal class ElmLegacyLiveLink(
     }
     suspend fun query(request:ByteArray,timeout:Long):J1979LiveRecorder.Reply {
         require(timeout in 1..20000)
-        check(J1979LiveRecorder.allowed(request))
+        check(if(freeze==null)J1979LiveRecorder.allowed(request) else
+            request.contentEquals(byteArrayOf(9,2))||request.size==3&&request[0]==2.toByte()&&
+                allows(ElmJ1979EvapTest.hex(request)))
+        if(freeze!=null&&!request.contentEquals(byteArrayOf(9,2)))check(confirmed!=null)
         val index=logical++
         val deadline=clock()+timeout
         val start=trace.size
