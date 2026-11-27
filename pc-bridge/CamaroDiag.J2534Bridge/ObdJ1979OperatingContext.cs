@@ -11,7 +11,7 @@ internal static class ObdJ1979OperatingContext
     internal sealed record Observation(string RequestHex,string? ResponseHex,string Status);
     internal sealed record TrimSignal(int Bank,string Name,int RawEncoded,double? Number,string Unit,string Attribution);
     internal sealed record Trim(string RequestHex,int? Frame,int? Layout1d,IReadOnlyList<TrimSignal> Signals,
-        bool? UpperBankPresent);
+        bool? UpperBankVerified);
     internal sealed record Monitor(string Name,bool? Supported,bool? Enabled,bool? Complete,
         bool EnabledBit,bool IncompleteBit,bool Consistent);
     internal sealed record Cycle(string RequestHex,string RawHex,string? BaselineRawHex,bool SupportVerified,
@@ -151,6 +151,6 @@ internal static class ObdJ1979OperatingContext
         }:null,
         fuel_trims=p.FuelTrims.Select(t=>new {request_hex=t.RequestHex,frame=t.Frame,layout_1d=t.Layout1d,
             signals=t.Signals.Select(s=>new {bank=s.Bank,name=s.Name,raw_encoded=s.RawEncoded,
-                number=s.Number,unit=s.Unit,attribution=s.Attribution}),upper_bank_present=t.UpperBankPresent})
+                number=s.Number,unit=s.Unit,attribution=s.Attribution}),upper_bank_verified=t.UpperBankVerified})
     };
 }
