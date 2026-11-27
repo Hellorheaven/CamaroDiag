@@ -45,4 +45,7 @@ internal fun NativeUsbMonitorContent(monitor:NativeUsbFunctionalEvidence.Monitor
         "%04X".format(java.util.Locale.ROOT,monitor.value),
         "%04X".format(java.util.Locale.ROOT,monitor.minimum),
         "%04X".format(java.util.Locale.ROOT,monitor.maximum)))
+    monitor.scaled()?.let { scaled ->
+        Text("${scaled.value} ${scaled.unit} · [${scaled.minimum}–${scaled.maximum}]")
+    }
 }
