@@ -123,7 +123,12 @@ class J1979MaintenanceCampaign {
       }
       const auto request=sequence.next();
       const uint32_t remaining=sequence.remaining(now);
-      const uint32_t timeout=remaining<Sequence::MaxExchangeMs?remaining:Sequence::MaxExchangeMs;
+      uint32_t timeout=remaining<Sequence::MaxExchangeMs?remaining:Sequence::MaxExchangeMs;
+      if(request.stage==Stage::Command){
+        const auto window=sequence.commandWindow(now);
+        if(!window){sequence.abort(Reason::Stationary,now);break;}
+        if(timeout>window)timeout=window;
+      }
       if(!sequence.admit(request.bytes,request.size,now,timeout))break;
       scratch.state=J1979CanReadExchange::State::Fault;scratch.responseSize=0;scratch.elapsedMs=0;
       if(owner.approved(scope)&&link.active()&&link.matches(scope)){
