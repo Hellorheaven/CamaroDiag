@@ -58,6 +58,8 @@ internal object J1979FreezePrefixVerification {
             "report_sha256" to reportSha,
             "complete_records" to generated["complete_records"],
             "complete_observations" to generated["complete_observations"],
+            "last_complete_offset" to generated["last_complete_offset"],
+            "discarded_tail_bytes" to generated["discarded_tail_bytes"],
             "interruption" to generated["interruption"]
         )
         return Verified(verification,J1979CatalogueJson.encode(verification),originalSha,reportSha)

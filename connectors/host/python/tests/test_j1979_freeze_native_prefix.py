@@ -162,6 +162,8 @@ class FreezeNativePrefixTests(unittest.TestCase):
             verified = run(["verify-prefix", *args, "--report", str(output),
                             "--output", str(proof)])
             self.assertTrue(verified["consistent"])
+            self.assertEqual(verified["last_complete_offset"], len(data))
+            self.assertEqual(verified["discarded_tail_bytes"], 0)
             self.assertFalse(verified["capture_integrity_verified"])
             self.assertEqual(verified["capture_sha256"], hashlib.sha256(data).hexdigest())
             self.assertEqual(json.loads(proof.read_text()), verified)

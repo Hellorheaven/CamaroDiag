@@ -147,7 +147,9 @@ internal static class J1979FreezeNativeSelfTests
             Require(File.Exists(output)&&Equals(saved["prefix_integrity_verified"],true),
                 "Windows prefix CLI persists separate report");
             var verified=J1979FreezeNativeCli.VerifyPrefix(source,output,proof,Vin);
-            Require(Equals(verified["consistent"],true)&&Equals(verified["execution_completed"],false),
+            Require(Equals(verified["consistent"],true)&&Equals(verified["execution_completed"],false)&&
+                (int)verified["last_complete_offset"]! == interrupted.Length &&
+                (int)verified["discarded_tail_bytes"]! == 0,
                 "Windows prefix CLI verifies original CF/1 evidence");
             string originalReport=File.ReadAllText(output);
             string edited=originalReport.Replace("execution_completed","execution_COMPLETED",

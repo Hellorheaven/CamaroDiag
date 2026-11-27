@@ -310,6 +310,8 @@ class J1979CatalogueProjectionTest {
             val verified=J1979FreezePrefixVerification.verify(withoutTerminal,encodedPrefix,freezeVin)
             assertEquals(J1979FreezePrefixVerification.SCHEMA,verified.document["schema"])
             assertEquals(true,verified.document["consistent"])
+            assertEquals(withoutTerminal.size,verified.document["last_complete_offset"])
+            assertEquals(0,verified.document["discarded_tail_bytes"])
             assertEquals(false,verified.document["capture_integrity_verified"])
             assertEquals(false,verified.document["execution_completed"])
             assertEquals(false,verified.document["permits_programming"])

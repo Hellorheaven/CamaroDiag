@@ -137,6 +137,8 @@ def verify_prefix_files(capture, report, *, expected_vin):
             "report_sha256": stamp.digest,
             "complete_records": expected["complete_records"],
             "complete_observations": expected["complete_observations"],
+            "last_complete_offset": expected["last_complete_offset"],
+            "discarded_tail_bytes": expected["discarded_tail_bytes"],
             "interruption": expected["interruption"]}
 
 

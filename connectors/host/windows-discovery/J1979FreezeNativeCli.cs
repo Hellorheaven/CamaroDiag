@@ -103,6 +103,8 @@ internal static class J1979FreezeNativeCli
             ["capture_sha256"]=sha,["report_sha256"]=reportSha,
             ["complete_records"]=expected["complete_records"],
             ["complete_observations"]=expected["complete_observations"],
+            ["last_complete_offset"]=expected["last_complete_offset"],
+            ["discarded_tail_bytes"]=expected["discarded_tail_bytes"],
             ["interruption"]=expected["interruption"]
         };
         byte[] outputBytes=JsonSerializer.SerializeToUtf8Bytes(result,PrefixJsonOptions);

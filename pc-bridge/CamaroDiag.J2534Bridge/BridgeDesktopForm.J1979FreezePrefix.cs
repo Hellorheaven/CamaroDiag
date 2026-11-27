@@ -107,7 +107,7 @@ internal sealed partial class BridgeDesktopForm
             message.AppendLine(target.FileName);
             message.AppendLine(string.Format(CultureInfo.CurrentCulture,
                 J1979RecipeText("FreezePrefixSummary"),verified["complete_observations"],
-                0,verified["interruption"]));
+                verified["discarded_tail_bytes"],verified["interruption"]));
             functionalResults.Text=message.ToString();
         }
         catch(Exception e) when(e is IOException or InvalidDataException or ArgumentException or
