@@ -1,6 +1,7 @@
 #define _POSIX_C_SOURCE 200809L
 #include "j1979_can.h"
 #include "j1979_native_c.h"
+#include "j1979_monitor_scaling.h"
 #include <ctype.h>
 #include <errno.h>
 #include <limits.h>
@@ -421,6 +422,42 @@ bool j1979_can_write_json(FILE *f, const j1979_can_plan *p,
         if (fputs(",\"response_hex\":",f)==EOF) return false;
         if (s->response ? !hex(f,s->response,s->response_size) :
             fputs("null",f)==EOF) return false;
+        /* Mode 06: retain every complete MID/TID/UASID and 16-bit
+         * comparison; unknown UASIDs remain RAW, never a monitor verdict.
+         */
+        if (fputs(",\"monitor_records\":[",f)==EOF) return false;
+        if (s->request_size==2 && s->request[0]==6 &&
+            !strcmp(s->status,"RAW") && s->response) {
+            size_t record_count=j1979_monitor_count(s->request,s->response,
+                                                    s->response_size);
+            for (size_t j=0;j<record_count;++j) {
+                j1979_monitor_record monitor={0};
+                if (!j1979_monitor_decode(s->request,s->response,
+                                         s->response_size,j,&monitor)) return false;
+                if ((j&&fputc(',',f)==EOF) ||
+                    fprintf(f,"{\"record_index\":%zu,\"monitor_id\":%u,"
+                              "\"test_id\":%u,\"unit_scaling_id\":%u,"
+                              "\"value_encoded\":%u,\"minimum_encoded\":%u,"
+                              "\"maximum_encoded\":%u,\"scaled\":",
+                              j,monitor.monitor_id,monitor.test_id,
+                              monitor.scaling_id,monitor.encoded_value,
+                              monitor.encoded_minimum,monitor.encoded_maximum)<0)
+                    return false;
+                if (monitor.scaled) {
+                    if (fputs("{\"definition\":\"ISO15031-5:2006-ANNEX-E-SUBSET\","
+                              "\"unit\":",f)==EOF ||
+                        !quoted(f,monitor.unit) ||
+                        fprintf(f,",\"value\":%.12g,\"minimum\":%.12g,"
+                                  "\"maximum\":%.12g,\"numeric_relation\":",
+                                monitor.value,monitor.minimum,monitor.maximum)<0 ||
+                        !quoted(f,j1979_monitor_relation_name(monitor.relation)) ||
+                        fputs(",\"monitor_verdict\":null}",f)==EOF)
+                        return false;
+                } else if (fputs("null",f)==EOF) return false;
+                if (fputc('}',f)==EOF) return false;
+            }
+        }
+        if (fputc(']',f)==EOF) return false;
         /* SAE J1979 Mode 03/07/0A two-byte DTC encoding: retain raw
          * evidence and expose a textual code only on validated records.
          * A code string is not a diagnosis, an ECU attribution or a repair.

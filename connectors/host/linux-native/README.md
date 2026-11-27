@@ -207,3 +207,15 @@ Le secret est un fichier privé 32 octets, non écrit dans le JSON.
 Intégration ajoutée mais non encore compilée/testée, conformément à la
 consigne de gate unique. Le firmware connecté doit encore démontrer sa
 capacité CU/3 réelle avant une utilisation sur véhicule.
+
+## Moniteurs Mode 06 — mise à l'échelle native
+
+`j1979_monitor_scaling.c` reprend les 79 définitions UASID explicites du
+module Python `j1979_monitor_scaling.py`. Les rapports du scan `--j1979-can`
+conservent les octets d'origine et présentent, pour une réponse CAN Mode 06
+cohérente, chaque MONID/TID/UASID et ses valeurs encodées. Les définitions
+connues exposent unité, valeur, minimum et maximum et la comparaison
+`BELOW/WITHIN/ABOVE/INVERTED_LIMITS`; une définition inconnue reste
+`scaled: null`. L'absence d'interprétation ne signifie pas échec du moniteur.
+La comparaison numérique n'est **jamais** un verdict réglementaire ni
+une preuve qu'un moniteur a effectivement fonctionné.
