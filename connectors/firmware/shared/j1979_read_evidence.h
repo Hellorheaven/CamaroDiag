@@ -176,6 +176,11 @@ class J1979ReadEvidence {
       if(mode==2&&req[1]==2)return len==5?Result::Positive:Result::Invalid;
       if(legacy&&len>7)return Result::Invalid;
       if(mode==1){
+        if(req[1]==0x4f||req[1]==0x50){
+          if(len!=offset+4)return Result::Invalid;
+          if(req[1]==0x50&&(reply[offset+1]||reply[offset+2]||reply[offset+3]))return Result::Invalid;
+          return Result::Raw;
+        }
         if(statusWidth(req[1])&&!validStatus(req[1],reply+offset,len-offset))return Result::Invalid;
         const auto layout=multiLayout(req[1]);
         if(layout.width)return validMulti(layout,reply+offset,len-offset)?Result::Raw:Result::Invalid;
