@@ -35,7 +35,7 @@ Discovery replay_discovery(bool extended,bool sent,std::span<const Frame> frames
     if(frames.size()>max_frames||duration>3600000||(!sent&&!frames.empty())||
         (stop!=""&&stop!="CANCELLED"&&stop!="TRANSPORT_ERROR"&&stop!="FRAME_LIMIT"))
         throw std::invalid_argument("Invalid CAN discovery transcript");
-    if(stop=="FRAME_LIMIT"&&frames.size()!=max_frames)throw std::invalid_argument("Contradictory discovery frame limit");
+    if((stop=="FRAME_LIMIT"&&frames.size()!=max_frames)||(stop.empty()&&frames.size()==max_frames))throw std::invalid_argument("Contradictory discovery frame limit");
     Discovery d{};d.extended=extended;d.sent=sent;d.duration_ms=duration;d.stop=stop;
     std::map<std::uint32_t,std::vector<std::pair<Classification,Frame>>> groups;
     for(const auto& f:frames){
@@ -68,7 +68,9 @@ Discovery replay_discovery(bool extended,bool sent,std::span<const Frame> frames
 bool valid_targets(const Discovery& d,std::span<const std::uint32_t> ids){
     if(ids.empty()||ids.size()>max_targets||!d.completed||!d.sent||!d.stop.empty())return false;
     // Never admit a caller-supplied eligible list without rebuilding it from raw frames.
-    const auto replay=replay_discovery(d.extended,d.sent,d.frames,"",d.duration_ms);
+    Discovery replay{};
+    try{replay=replay_discovery(d.extended,d.sent,d.frames,"",d.duration_ms);}
+    catch(const std::invalid_argument&){return false;}
     if(!replay.completed)return false;
     std::set<std::uint32_t> seen;
     for(auto id:ids){

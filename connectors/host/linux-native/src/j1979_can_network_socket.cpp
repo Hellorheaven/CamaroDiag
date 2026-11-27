@@ -58,6 +58,7 @@ Discovery discover_socket(const char* interface,bool ext,unsigned window,std::fu
             if(n!=static_cast<ssize_t>(sizeof(stale)))throw std::runtime_error("CAN_STALE_FRAME");
         }
         if(!current())return replay_discovery(ext,false,{},"CANCELLED",static_cast<unsigned>(now()-start));
+        if(if_nametoindex(interface)!=index)throw std::runtime_error("CAN_INTERFACE_CHANGED");
         if(!drained||now()>=deadline)throw std::runtime_error("CAN_STALE_QUEUE");
         const auto request=functional_request(ext);
         can_frame wire{};wire.can_id=request.id|(ext?CAN_EFF_FLAG:0);wire.len=8;
@@ -67,6 +68,7 @@ Discovery discover_socket(const char* interface,bool ext,unsigned window,std::fu
         sent=true;
         while(frames.size()<max_frames){
             if(!current()){stop="CANCELLED";break;}
+            if(if_nametoindex(interface)!=index)throw std::runtime_error("CAN_INTERFACE_CHANGED");
             const auto t=now();if(t>=deadline)break;
             pollfd p{socket.fd,POLLIN,0};
             const auto rc=poll(&p,1,static_cast<int>(std::min<std::uint64_t>(deadline-t,100)));
@@ -80,6 +82,7 @@ Discovery discover_socket(const char* interface,bool ext,unsigned window,std::fu
             if(now()>=deadline)break;
             frames.push_back(convert(incoming));
         }
+        if(if_nametoindex(interface)!=index)throw std::runtime_error("CAN_INTERFACE_CHANGED");
         if(frames.size()==max_frames&&stop.empty())stop="FRAME_LIMIT";
     }catch(const std::exception&){stop=current()?"TRANSPORT_ERROR":"CANCELLED";}
     if(!current())stop="CANCELLED";

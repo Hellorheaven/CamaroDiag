@@ -97,6 +97,14 @@ std::string scan_report(const Scan& s){
         o<<",\"verified_pages\":"<<i.pages<<",\"complete\":";truth(o,i.complete);
         o<<",\"advertised_ids\":";array(o,i.advertised,[&](unsigned n){o<<n;});o<<'}';
     });
+    o<<",\"exchange_trace\":";
+    array(o,s.trace,[&](const ScanExchange& e){
+        o<<"{\"command\":";quote(o,e.command);
+        o<<",\"raw_response\":";quote(o,e.raw);
+        o<<",\"outcome\":"<<static_cast<unsigned>(e.outcome);
+        o<<",\"started_ms\":"<<e.started_ms<<",\"ended_ms\":"<<e.ended_ms;
+        o<<",\"attempted\":";truth(o,e.attempted);o<<'}';
+    });
     o<<",\"steps\":";
     array(o,s.steps,[&](const ScanStep& step){
         o<<"{\"request_hex\":";quote(o,hex(step.request));

@@ -52,6 +52,15 @@ void classification(){
     assert(!cancelled.completed&&cancelled.eligible.empty()&&!valid_targets(cancelled,good));
     auto limited=replay_discovery(false,true,std::vector<Frame>(max_frames,a),"FRAME_LIMIT",10);
     assert(!limited.completed&&limited.eligible.empty());
+    auto forged_limit=limited;forged_limit.completed=true;forged_limit.stop.clear();
+    forged_limit.eligible={0x7e8};
+    assert(!valid_targets(forged_limit,good));
+    auto malformed=d;malformed.frames.front().data.resize(9);
+    assert(!valid_targets(malformed,good));
+    bool rejected=false;
+    try{(void)replay_discovery(false,true,limited.frames,"",10);}
+    catch(const std::invalid_argument&){rejected=true;}
+    assert(rejected);
     auto negative_mixture=replay_discovery(false,true,std::array{a,negative(0x7e8,0x22)},"",10);
     assert(!negative_mixture.completed&&negative_mixture.responders[0].classification.state==State::conflicting);
 }

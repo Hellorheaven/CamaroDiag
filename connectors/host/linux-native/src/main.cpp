@@ -1798,8 +1798,19 @@ static int legacy_maintenance_cli(int argc,char** argv){
         int fd{-1};
         explicit File(const char* p):path(p),fd(open(p,O_WRONLY|O_CREAT|O_EXCL|O_NOFOLLOW|O_CLOEXEC,0600)){}
         ~File(){if(fd>=0)close(fd);}
+        input saved{};
+        bool unchanged() const {
+            input fresh{};
+            return saved.length&&load_regular(path,saved.length,&fresh)&&same_input(&saved,&fresh);
+        }
         bool persist(std::string_view text){
-            return fd>=0&&write_owned_file(fd,text.data(),text.size())&&sync_parent(path);
+            struct stat identity{};
+            if(fd<0||text.empty()||fstat(fd,&identity)||!S_ISREG(identity.st_mode)||
+                !write_owned_file(fd,text.data(),text.size())||!sync_parent(path))return false;
+            if(!load_regular(path,text.size(),&saved)||saved.length!=text.size()||
+                saved.device!=identity.st_dev||saved.inode!=identity.st_ino||
+                memcmp(saved.bytes.get(),text.data(),text.size()))return false;
+            return unchanged();
         }
     };
     // All three unique destinations must be reserved before adapter access.
@@ -1827,7 +1838,9 @@ static int legacy_maintenance_cli(int argc,char** argv){
             [&](std::string_view stage,const cd::legacy::MutationResult& observed){
                 auto snapshot=observed;snapshot.outcome=stage;
                 auto& file=stage=="BASELINE"?baseline:intent;
-                if(!file.persist(cd::legacy::mutation_report(snapshot)))
+                if((stage!="BASELINE"&&!baseline.unchanged())||
+                    !file.persist(cd::legacy::mutation_report(snapshot))||
+                    (stage!="BASELINE"&&!baseline.unchanged()))
                     throw cd::legacy::TransportError("DURABLE_JOURNAL_WRITE_FAILED");
             });
     }catch(const std::exception& e){r.reason=e.what();}
