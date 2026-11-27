@@ -76,9 +76,11 @@ internal static class J1979FreezeNativeCli
             using var output=new FileStream(options.OutputPath,FileMode.CreateNew,FileAccess.Write,FileShare.None);
             var report=new J1979FreezeNative.Report("camarodiag-functional-j1979-native-freeze-v1","SAE-J1979",
                 "LIVE_USB_CU2",false,false,false,false,0,"USB not started",profile,null,null);
+            bool created=false;
             try
             {
                 using var raw=new FileStream(options.CapturePath,FileMode.CreateNew,FileAccess.Write,FileShare.None);
+                created=true;
                 if(!current())throw new OperationCanceledException();
                 using var serial=new SerialPort(options.Port,115200,Parity.None,8,StopBits.One)
                 {
@@ -95,16 +97,43 @@ internal static class J1979FreezeNativeCli
                     Cancelled=e is OperationCanceledException||!current()};
             }
             if(!current())report=report with {CaptureIntegrityVerified=false,Cancelled=true};
-            Write(output,report);
+            string? digest=null;
+            if(created)
+            {
+                try
+                {
+                    using var saved=new FileStream(options.CapturePath,FileMode.Open,FileAccess.Read,FileShare.Read);
+                    var verified=ReplayPersisted(saved,profile);
+                    digest=verified.Digest;
+                    if(report.CaptureIntegrityVerified&&(!verified.Report.CaptureIntegrityVerified||
+                        J1979FreezeNative.EncodeReport(verified.Report with {Source=report.Source,
+                            DeviceCredentialAuthenticated=report.DeviceCredentialAuthenticated,
+                            ClientProofSent=report.ClientProofSent,Cancelled=report.Cancelled})!=J1979FreezeNative.EncodeReport(report)))
+                        report=report with {CaptureIntegrityVerified=false,Error="Persisted capture differs from live replay"};
+                }
+                catch(Exception e) when(e is IOException or InvalidDataException or UnauthorizedAccessException)
+                {report=report with {CaptureIntegrityVerified=false,Error=e.Message};}
+            }
+            Write(output,report,digest,created?Path.GetFileName(options.CapturePath):null);
             return report;
         }
         finally{CryptographicOperations.ZeroMemory(key);}
     }
 
-    private static void Write(FileStream output,J1979FreezeNative.Report report)
+    private static (J1979FreezeNative.Report Report,string Digest) ReplayPersisted(FileStream input,J1979FreezeNative.Profile? expected=null)
+    {
+        if(input.Length>J1979FreezeNative.MaximumCapture)throw new InvalidDataException("CF/1 capture exceeds bound");
+        var digest=Convert.ToHexString(SHA256.HashData(input)).ToLowerInvariant();input.Position=0;
+        var report=J1979FreezeNative.Decode(input,expected);input.Position=0;
+        if(digest!=Convert.ToHexString(SHA256.HashData(input)).ToLowerInvariant())
+            throw new InvalidDataException("CF/1 changed during replay");
+        return (report,digest);
+    }
+
+    private static void Write(FileStream output,J1979FreezeNative.Report report,string? digest=null,string? name=null)
     {
         using var writer=new StreamWriter(output,leaveOpen:true);
-        writer.WriteLine(J1979FreezeNative.EncodeReport(report));writer.Flush();output.Flush(true);
+        writer.WriteLine(J1979FreezeNative.EncodeReport(report,digest,name));writer.Flush();output.Flush(true);
     }
 
     internal static J1979FreezeNative.Report Inspect(string source,string destination,Func<bool>? current=null)
@@ -114,10 +143,10 @@ internal static class J1979FreezeNativeCli
         if(current is not null&&!current())throw new OperationCanceledException();
         using var input=new FileStream(source,FileMode.Open,FileAccess.Read,FileShare.Read);
         if(input.Length>J1979FreezeNative.MaximumCapture)throw new InvalidDataException("CF/1 capture exceeds bound");
-        var report=J1979FreezeNative.Decode(input);
+        var (report,digest)=ReplayPersisted(input);
         if(current is not null&&!current())throw new OperationCanceledException();
         using var output=new FileStream(destination,FileMode.CreateNew,FileAccess.Write,FileShare.None);
-        Write(output,report);return report;
+        Write(output,report,digest,Path.GetFileName(source));return report;
     }
 
     internal static int Run(string[] args)
