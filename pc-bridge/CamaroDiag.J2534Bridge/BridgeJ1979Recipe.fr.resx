@@ -203,4 +203,13 @@
   <data name="NativeMaintenanceAckEvap" xml:space="preserve"><value>Préparation EVAP acquittée ; aucun résultat de test de fuite</value></data>
   <data name="NativeMaintenanceNoTerminal" xml:space="preserve"><value>Enregistrement terminal absent</value></data>
   <data name="NativeMaintenanceNoRetry" xml:space="preserve"><value>Aucune relance automatique ni preuve physique.</value></data>
+  <data name="NativeMaintenanceRun" xml:space="preserve"><value>Exécuter une opération native unique</value></data>
+  <data name="NativeMaintenanceOperation" xml:space="preserve"><value>Opération</value></data>
+  <data name="NativeMaintenanceClear" xml:space="preserve"><value>Mode 04 — effacement des informations de diagnostic</value></data>
+  <data name="NativeMaintenanceEvap" xml:space="preserve"><value>Mode 08 — préparation EVAP</value></data>
+  <data name="NativeMaintenanceClearWarning" xml:space="preserve"><value>L’effacement réinitialise les données de diagnostic et les états de préparation. Véhicule immobilisé, moteur arrêté, local ventilé et carte qualifiée requis.</value></data>
+  <data name="NativeMaintenanceEvapWarning" xml:space="preserve"><value>Préparation uniquement, pas un test de fuite. Véhicule immobilisé, moteur arrêté, local ventilé et carte qualifiée requis.</value></data>
+  <data name="NativeMaintenanceAccept" xml:space="preserve"><value>Je reconnais les conséquences et les conditions requises</value></data>
+  <data name="NativeMaintenanceConfirm" xml:space="preserve"><value>Je confirme une opération unique avec autorisation locale indépendante sur le VIN sélectionné.</value></data>
+  <data name="NativeMaintenanceUnverified" xml:space="preserve"><value>Journal non vérifié ; aucun succès revendiqué.</value></data>
 </root>
