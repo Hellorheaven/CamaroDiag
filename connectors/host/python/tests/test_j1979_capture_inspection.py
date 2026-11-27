@@ -72,6 +72,7 @@ class CaptureInspectionTests(unittest.TestCase):
             lambda r: r["service_observations"][0].update(passed=999),
             lambda r: r.update(physical_vehicle_verified=True),
             lambda r: r.update(evidence_authenticated=True),
+            lambda r: r.update(extended_vehicle_info=[{"info_type": 13, "values": ["FORGED"]}]),
             lambda r: r.update(vin_match="MISMATCH"),
         )
         for mutate in mutations:
@@ -82,6 +83,11 @@ class CaptureInspectionTests(unittest.TestCase):
                 self.assertFalse(result["verified"])
                 self.assertFalse(result["report_consistent"])
                 self.assertTrue(result["differences"])
+
+    def test_previous_report_without_extended_view_is_compatible(self):
+        report = python_report()
+        report.pop("extended_vehicle_info", None)
+        self.assertTrue(verify(CAPTURE, report)["verified"])
 
     def test_truncated_capture_preserves_prefix_without_passing(self):
         truncated = CAPTURE[:-5]
