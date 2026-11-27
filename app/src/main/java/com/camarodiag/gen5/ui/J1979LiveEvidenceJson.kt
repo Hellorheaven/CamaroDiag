@@ -49,6 +49,9 @@ internal object J1979LiveEvidenceJson {
         .put("durationMs",r.durationMs).put("completed",r.completed).put("stopReason",n(r.stopReason))
         .put("notExecuted",JSONArray(listOf("MODE_04_CLEAR","MODE_08_CONTROL")))
         .put("admission",JSONArray(r.admission.map(::row))).put("observations",JSONArray(r.observations.map(::row)))
+        .put("scalingConfiguration",r.scalingConfiguration?.let { configs -> JSONArray(configs.map {
+            JSONObject().put("pid",it.pid).put("state",it.state).put("dataHex",n(it.dataHex))
+        }) }?:JSONObject.NULL)
         .put("multiSignalSummary",JSONArray(r.multiSignalSummary.map {
             JSONObject().put("pid",it.pid).put("name",it.name).put("unit",it.unit)
                 .put("count",it.count).put("attempted",it.attempted).put("missing",it.missing)
