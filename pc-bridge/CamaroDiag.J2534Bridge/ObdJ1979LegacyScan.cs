@@ -27,6 +27,9 @@ internal static class ObdJ1979LegacyScan
         public IReadOnlyList<ObdJ1979PidValues.Value> Measurements { get; init; }=[];
         public IReadOnlyList<ObdJ1979MultiSignal.Record> MultiSignalRecords { get; init; }=[];
         public IReadOnlyList<ObdJ1979Status.Record> StatusRecords { get; init; }=[];
+        public object OperatingContext => ObdJ1979OperatingContext.Evidence(ObdJ1979OperatingContext.Project(
+            Steps.Select(s=>new ObdJ1979OperatingContext.Observation(s.RequestHex,
+                s.Responses.Count==1 && s.Responses[0].Source==SelectedResponseSource?s.Responses[0].PayloadHex:null,s.Status))));
         public ObdJ1979ScalingContext.Projection ContextualMeasurements => ObdJ1979ScalingContext.Project(
             Steps.Select(s=>new ObdJ1979ScalingContext.Observation(s.RequestHex,
                 s.Responses.Count==1 && s.Responses[0].Source==SelectedResponseSource?s.Responses[0].PayloadHex:null,s.Status)));
@@ -287,6 +290,8 @@ internal static class ObdJ1979LegacyScan
                 2 when mode == 2 => 2,
                 _ => ObdJ1979PidValues.DataLength(pid)
             };
+            if(ObdJ1979OperatingContext.IsTrim(pid))return ObdJ1979OperatingContext.ValidTrim(pid,r.Length-offset);
+            if(mode==1&&pid==0x41)return ObdJ1979OperatingContext.DecodeCycle(r.AsSpan(offset).ToArray(),null) is not null;
             if(mode==1 && ObdJ1979ScalingContext.IsConfiguration(pid) &&
                 !ObdJ1979ScalingContext.ValidConfiguration(pid,r.AsSpan(offset)))return false;
             if(mode==1 && ObdJ1979Status.Width(pid) is not null &&
@@ -301,6 +306,14 @@ internal static class ObdJ1979LegacyScan
             byte[] request=mode==2?[mode,pid,0]:[mode,pid];
             var rows=Read(request,r=>PidRecord(r,mode,pid),single:true);
             if(rows.Length!=1)return rows;
+            if(ObdJ1979OperatingContext.IsTrim(pid)&&(pid>=0x55||rows[0].Length>(mode==2?4:3))){
+                steps[^1]=steps[^1] with {Status="RAW",Detail="CONTEXTUAL_FUEL_TRIM"};
+                return rows;
+            }
+            if(mode==1&&pid==0x41){
+                steps[^1]=steps[^1] with {Status="RAW",Detail="CURRENT_MONITORING_CYCLE"};
+                return rows;
+            }
             var states=ObdJ1979Status.DecodeResponse(request,rows[0]);
             if(states is not null)statusRecords.Add(new(Convert.ToHexString(request),states));
             var multi=ObdJ1979MultiSignal.DecodeResponse(request,rows[0]);
