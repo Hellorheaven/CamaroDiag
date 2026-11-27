@@ -29,6 +29,16 @@ class ObdJ1979ScalingContextTest {
         assertEquals(770.0,value("020B00","420B00FF"),1e-9)
     }
 
+    @Test fun customCurrentUsesTwosComplement() {
+        val context=ObdJ1979ScalingContext.build(inventory+row("014F","414F0400404D","RAW"))
+        for ((encoded, expected) in listOf("0000" to 0.0, "7FFF" to 63.998046875,
+            "8000" to -64.0, "9C40" to -49.875, "FFFF" to -0.001953125)) {
+            val signal=context.decode("0134","41347D00"+encoded)!!.signals[1]
+            assertEquals(expected,signal.number!!,1e-9)
+            assertEquals("ECU_CONFIGURATION",signal.scaleSource)
+        }
+    }
+
     @Test fun missingSupportIsNotUnsupported() {
         val context=ObdJ1979ScalingContext.build(inventory.take(1))
         assertEquals("UNVERIFIED",context.configuration(0x50).state)
