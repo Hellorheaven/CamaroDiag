@@ -6164,7 +6164,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 if(current()){
                     val retained=report?.let { if(failure!=null)it.copy(completed=false,stopReason=failure) else it }
                     val checks=retained?.summaries?.map { item ->
-                        val passed=item.statusCounts["PASSED"]?:0
+                        val passed=item.statusCounts[if(plan.rawOnly)"RAW" else "PASSED"]?:0
                         val failed=item.statusCounts["FAILED"]?:0
                         val name="%02X".format(java.util.Locale.ROOT,item.pid)
                         FunctionalTestCheck("live:$name","j1979_live",name,name,
