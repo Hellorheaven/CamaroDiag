@@ -49,6 +49,7 @@ internal object J1979LiveEvidenceJson {
         .put("durationMs",r.durationMs).put("completed",r.completed).put("stopReason",n(r.stopReason))
         .put("notExecuted",JSONArray(listOf("MODE_04_CLEAR","MODE_08_CONTROL")))
         .put("admission",JSONArray(r.admission.map(::row))).put("observations",JSONArray(r.observations.map(::row)))
+        .put("trimLayout",r.trimLayout?.let { JSONObject().put("state",it.state).put("rawEncoded",n(it.rawEncoded)) }?:JSONObject.NULL)
         .put("scalingConfiguration",r.scalingConfiguration?.let { configs -> JSONArray(configs.map {
             JSONObject().put("pid",it.pid).put("state",it.state).put("dataHex",n(it.dataHex))
         }) }?:JSONObject.NULL)
@@ -66,7 +67,7 @@ internal object J1979LiveEvidenceJson {
         }))
     fun csv(r: J1979LiveReport): String=buildString {
         fun escaped(value: String?)=value?.let { "\""+it.replace("\"","\"\"")+"\"" }?:""
-        val multi=r.plan.pids.any { com.camarodiag.gen5.data.obd.ObdJ1979MultiSignal.width(it)!=null }
+        val multi=r.plan.pids.any { com.camarodiag.gen5.data.obd.ObdJ1979MultiSignal.width(it)!=null || com.camarodiag.gen5.data.obd.ObdJ1979OperatingContext.isTrim(it) }
         val header="cycle,pid_hex,started_elapsed_ms,elapsed_ms,duration_ms,status,value,unit,request_hex,response_hex,detail"
         appendLine(if(multi)header+",signal_name,raw_encoded" else header)
         r.observations.forEach { row ->
