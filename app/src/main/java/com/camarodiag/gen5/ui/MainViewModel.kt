@@ -6606,6 +6606,52 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    private var functionalCatalogueJob: Job? = null
+
+    fun projectFunctionalCatalogue(catalogue: Uri, reference: Uri, report: Uri, referencePin: String,
+                                   confirmedConnection: Long, confirmedVehicle: VehicleProfile) {
+        val account = authenticatedAccountUid ?: return
+        val generation = accountSessionGeneration
+        if (functionalCatalogueJob?.isActive == true || _functionalTestState.value.running ||
+            confirmedConnection != connectionAttemptGeneration || confirmedVehicle != _vehicle.value) return
+        val input = J1979CatalogueFiles.Inputs(catalogue, reference, report, referencePin)
+        if (runCatching { input.validate() }.isFailure ||
+            !J1979CatalogueProjection.validVin(confirmedVehicle.vin)) return
+        fun current() = isCurrentAccountGeneration(generation) && authenticatedAccountUid == account &&
+            currentLicenseLevel == LicenseLevel.OWNER && confirmedConnection == connectionAttemptGeneration &&
+            confirmedVehicle == _vehicle.value && !_functionalTestState.value.running
+        functionalCatalogueJob = viewModelScope.launch {
+            if (!confirmFunctionalTestOwner(account) || !current()) return@launch
+            _connectionMessage.value = localizedContext.getString(R.string.j1979_catalogue_working)
+            try {
+                val path = withContext(Dispatchers.IO) {
+                    val context = getApplication<Application>()
+                    val resolver = context.contentResolver
+                    val job = currentCoroutineContext()[Job]
+                    fun requireCurrent() {
+                        check(job?.isActive == true && current())
+                    }
+                    val prepared = J1979CatalogueFiles.prepare(resolver, input, confirmedVehicle.vin, ::requireCurrent)
+                    requireCurrent()
+                    CamaroDiagExportStorage.write(context,
+                        "CamaroDiag_SAE-J1979_CATALOGUE_" + System.currentTimeMillis() + ".json",
+                        "application/json", category = CamaroDiagExportStorage.Category.TESTS,
+                        beforePublish = {
+                            requireCurrent()
+                            J1979CatalogueFiles.revalidate(resolver, input, prepared.result, ::requireCurrent)
+                        }) {
+                        it.write(prepared.bytes)
+                    }
+                }
+                if (current()) _connectionMessage.value = localizedContext.getString(R.string.export_folder_success) + "\n" + path
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                if (current()) _connectionMessage.value = localizedContext.getString(R.string.j1979_catalogue_rejected)
+            }
+        }
+    }
+
     fun exportFunctionalLiveCsv() {
         val account=authenticatedAccountUid?:return
         val generation=accountSessionGeneration
