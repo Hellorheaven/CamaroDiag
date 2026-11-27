@@ -86,6 +86,7 @@ internal sealed partial class BridgeDesktopForm
         nativeFreezeActions.Controls.Add(functionalInspectNativeFreeze);
         nativeFreezeActions.Controls.Add(functionalRunNativeLive);
         nativeFreezeActions.Controls.Add(functionalInspectNativeLive);
+        nativeFreezeActions.Controls.Add(functionalExportNativeLiveCsv);
         WideRow(fields,nativeFreezeActions,42);
         WideRow(fields, functionalProjectCatalogue, 42);
         WideRow(fields, functionalRunLegacyMutation, 42);
@@ -122,8 +123,9 @@ internal sealed partial class BridgeDesktopForm
         functionalInspectNativeFreeze.Click += async (_, _) => await InspectWindowsNativeFreezeAsync();
         functionalRunNativeLive.Click += async (_, _) => await RunWindowsNativeLiveAsync();
         functionalInspectNativeLive.Click += async (_, _) => await InspectWindowsNativeLiveAsync();
-        functionalRunNativeUsb.EnabledChanged += (_, _) => functionalRunNativeLive.Enabled = functionalInspectNativeLive.Enabled = functionalRunNativeFreeze.Enabled = functionalInspectNativeFreeze.Enabled = functionalRunNativeUsb.Enabled;
-        functionalRunNativeLive.Enabled = functionalInspectNativeLive.Enabled = functionalRunNativeFreeze.Enabled = functionalInspectNativeFreeze.Enabled = functionalRunNativeUsb.Enabled;
+        functionalExportNativeLiveCsv.Click += async (_, _) => await ExportWindowsNativeLiveCsvAsync();
+        functionalRunNativeUsb.EnabledChanged += (_, _) => functionalExportNativeLiveCsv.Enabled = functionalRunNativeLive.Enabled = functionalInspectNativeLive.Enabled = functionalRunNativeFreeze.Enabled = functionalInspectNativeFreeze.Enabled = functionalRunNativeUsb.Enabled;
+        functionalExportNativeLiveCsv.Enabled = functionalRunNativeLive.Enabled = functionalInspectNativeLive.Enabled = functionalRunNativeFreeze.Enabled = functionalInspectNativeFreeze.Enabled = functionalRunNativeUsb.Enabled;
         functionalRunLegacy.Click += async (_, _) => await RunWindowsLegacyAsync();
         functionalRunLegacyMutation.Click += async (_, _) => await RunWindowsLegacyMutationAsync();
         functionalRunEvap.Click += async (_, _) => await RunWindowsEvapAsync();
