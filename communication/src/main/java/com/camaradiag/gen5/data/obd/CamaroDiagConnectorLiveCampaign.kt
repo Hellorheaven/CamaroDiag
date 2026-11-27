@@ -54,6 +54,14 @@ object CamaroDiagConnectorLiveCampaign {
             base["cancelled"] = cancelled
             base["capture_sha256"] = sha256
             base["raw_capture_name"] = capture.name
+            base["declared_connector"] = target.channel.connector
+            base["declared_ecu"] = target.channel.ecu
+            base["connection_generation"] = target.channel.connectionGeneration
+            base["started_at_utc"] = java.time.Instant.ofEpochMilli(startedAtMillis).toString()
+            base["finished_at_utc"] = java.time.Instant.ofEpochMilli(maxOf(startedAtMillis,finishedAtMillis)).toString()
+            base["observed_vin"] = target.channel.vehicle.takeIf {
+                captureIntegrityVerified && replay?.summary?.get("initial_identity_verified")==true
+            }
             return base
         }
     }
