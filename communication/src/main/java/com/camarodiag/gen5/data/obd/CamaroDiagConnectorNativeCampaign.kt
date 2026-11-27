@@ -121,6 +121,24 @@ object CamaroDiagConnectorNativeCampaign {
             put("frame_integrity_verified", frames)
             put("capture_integrity_verified", semantic)
             put("cancelled", cancelled)
+            put("extended_vehicle_info", JSONArray(steps.mapNotNull { step ->
+                ObdJ1979ExtendedVehicleInfo.tryRaw(step.requestHex,step.responseHex,step.status)
+            }.map { record ->
+                JSONObject().put("info_type",record.infoType).apply {
+                    if(record.counterCount==null) put("values",JSONArray(record.values))
+                    else {
+                        put("general_denominator",record.generalDenominator)
+                        put("ignition_cycles",record.ignitionCycles)
+                        put("counter_count",record.counterCount)
+                        put("monitors",JSONArray(record.monitors.map { monitor ->
+                            JSONObject().put("monitor",monitor.monitor)
+                                .put("numerator",monitor.numerator).put("denominator",monitor.denominator)
+                                .put("ratio",monitor.ratio ?: JSONObject.NULL)
+                        }))
+                        put("regulatory_verdict",JSONObject.NULL)
+                    }
+                }
+            }))
             put("service_observations", JSONArray().apply {
                 for (mode in listOf(1, 2, 3, 6, 7, 8, 9, 10)) {
                     val rows = steps.filter { it.requestHex.take(2).toInt(16) == mode }
