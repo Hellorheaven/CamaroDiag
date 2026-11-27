@@ -102,6 +102,33 @@ internal static class ObdJ1979LiveRecorderSelfTests
             "AECD unsigned 32-bit maximum preserved");
         Check(diesel.Observations.All(x=>x.Measurement is null),"AECD does not masquerade as scalar");
         Check(ObdJ1979LiveRecorder.Csv(diesel).Count()==21,"all AECD channels in CSV");
+        now=0;sent.Clear();
+        byte[] Configured(byte[] request)=>Convert.ToHexString(request) switch {
+            "0100"=>Convert.FromHexString("410000210001"),
+            "0120"=>Convert.FromHexString("412000000001"),
+            "0140"=>Convert.FromHexString("414000030000"),
+            "014F"=>Convert.FromHexString("414F0410004D"),
+            "0150"=>Convert.FromHexString("415064000000"),
+            "010B"=>Convert.FromHexString("410BFF"),
+            "0110"=>Convert.FromHexString("4110FFFF"),
+            _=>Normal(request)
+        };
+        var configured=ObdJ1979LiveRecorder.Run((req,_)=>{
+            sent.Add(Convert.ToHexString(req));return Configured(req);
+        },plan with{Pids=[0x0B,0x10],Cycles=1},()=>{},clock:()=>now,delay:ms=>now+=ms);
+        Check(configured.Completed,"configured MAP and MAF acquisition");
+        Check(Math.Abs(configured.Summary[0].Mean!.Value-770d)<1e-8 &&
+              Math.Abs(configured.Summary[1].Mean!.Value-1000d)<1e-8,"ECU configured scales");
+        Check(sent.IndexOf("014F")<sent.IndexOf("010B")&&sent.IndexOf("0150")<sent.IndexOf("0110"),
+            "configuration precedes acquisition");
+        now=0;sent.Clear();
+        var noConfig=ObdJ1979LiveRecorder.Run((req,_)=>{
+            sent.Add(Convert.ToHexString(req));
+            if(req.SequenceEqual(new byte[]{1,0x50}))throw new TimeoutException();
+            return Configured(req);
+        },plan with{Pids=[0x10],Cycles=1},()=>{},clock:()=>now,delay:ms=>now+=ms);
+        Check(!noConfig.Completed&&noConfig.StopReason=="SCALING_UNVERIFIED"&&!sent.Contains("0110"),
+            "missing advertised configuration blocks acquisition");
         return count;
     }
 }
