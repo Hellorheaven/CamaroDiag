@@ -375,3 +375,15 @@ Les rapports `camarodiag-j1979-native-live-prefix-v1` distinguent nombre d'enreg
 
 Référence normative : le catalogue public de l'éditeur SAE identifie [J1979DA_202607](https://saemobilus.sae.org/standards/j1979da_202607-j1979-da-digital-annex-e-e-diagnostic-test-modes), révision du 16 juillet 2026. La fiche publique ne contient pas les tables détaillées sous accès réservé. Le moteur de catalogue accepte une référence autorisée locale ; aucune donnée normative exhaustive de cette édition n'est revendiquée sans son contenu.
 
+
+
+### SAE J1979 — maintenance native CU/4, CI/4, CM/1 (en développement)
+
+Périmètre limité aux recettes Mode 04 et Mode 08 préparation EVAP, ECM réglementaire principal CAN classique et VIN vérifié. Aucune commande arbitraire, programmation, effacement automatique ou activation dans le firmware de découverte. La préparation EVAP ne prouve pas le résultat du test EVAP ; effacer les DTC ne répare pas le véhicule et remet en cause les états de préparation.
+
+- Android : panneau USB propriétaire, choisir l'opération dédiée, vérifier le VIN et le contexte, accepter l'avertissement puis confirmer l'opération. Exporter le CM/1 original et le rapport JSON. Windows : panneau fonctionnel natif et inspecteur indépendant. Linux : outil `camarodiagconnectors-j1979-maintenance` (voir aide installée et sous-commandes capture/inspect/verify). Pas d'essai mutateur dans la recette de lecture habituelle.
+- CU/4 : authentification de périmètre exacte, nonce et preuve HMAC ; une seule tentative. CI/4 : enveloppes distinctes de CI/2 et CI/3, scope local identique, démarrage unique, consultation, transfert ordonné du journal et fermeture vérifiée. Tâche de maintenance STM32 séparée de la tâche SPI. Le propriétaire de carte fournit le bail, les interverrouillages électriques, le stockage durable et les callbacks de sécurité, indépendamment du demandeur USB.
+- CM/1 : journal append-only, baseline et intention relues avant émission mutatrice, terminal seulement après vérification physique de l'arrêt. Une intention sans terminal, une preuve perdue, une révocation ou un arrêt non vérifié interdisent toute relance automatique. Conserver les fichiers originaux, y compris incomplets, et les marqueurs hôtes en attente ; inspection hors ligne et vérification de cohérence ne prouvent pas l'exécution physique.
+- Cas d'acceptation synthétiques : refus avant action (VIN incorrect, véhicule en mouvement, périmètre incompatible, consentement révoqué), journal corrompu ou persistance en échec, réponse négative, réponse perdue après envoi, DTC restant, confirmation manquante, transfert CI/4 désordonné, expiration et accusé de démarrage perdu. Aucun de ces tests ne constitue un essai sur véhicule.
+
+Statut : code publié, gate non exécuté. Le stockage persistant et les interverrouillages propres à la carte doivent encore être raccordés/qualifiés ; la couverture exhaustive J1979DA exige la source autorisée. Ne pas annoncer la clôture ni générer l'APK de clôture avant le gate.
