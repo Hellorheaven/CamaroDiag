@@ -431,7 +431,27 @@ bool j1979_can_write_json(FILE *f, const j1979_can_plan *p,
         if (fputs(",\"response_hex\":",f)==EOF) return false;
         if (s->response ? !hex(f,s->response,s->response_size) :
             fputs("null",f)==EOF) return false;
-        if (fputs(",\"status\":",f)==EOF || !quoted(f,s->status)) return false;
+        /* SAE J1979 Mode 03/07/0A two-byte DTC encoding: retain raw
+         * evidence and expose a textual code only on validated records.
+         * A code string is not a diagnosis, an ECU attribution or a repair.
+         */
+        if (fputs(",\"dtc_codes\":[",f)==EOF) return false;
+        if (s->request_size==1 &&
+            (s->request[0]==3 || s->request[0]==7 || s->request[0]==10) &&
+            !strcmp(s->status,"PASSED") &&
+            s->response && valid_dtc(s->response,s->response_size)) {
+            static const char letters[]="PCBU";
+            static const char digits[]="0123456789ABCDEF";
+            for (size_t j=2;j<s->response_size;j+=2) {
+                uint8_t first=s->response[j],second=s->response[j+1];
+                char code[6]={letters[first>>6],
+                    digits[(first>>4)&3],digits[first&15],
+                    digits[second>>4],digits[second&15],0};
+                if ((j!=2 && fputc(',',f)==EOF) || !quoted(f,code))
+                    return false;
+            }
+        }
+        if (fputs("],\"status\":",f)==EOF || !quoted(f,s->status)) return false;
         if (fputs(",\"detail\":",f)==EOF) return false;
         if (s->detail[0] ? !quoted(f,s->detail) : fputs("null",f)==EOF) return false;
         if (fprintf(f,",\"duration_ms\":%u}",s->duration_ms)<0) return false;

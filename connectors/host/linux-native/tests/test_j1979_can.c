@@ -12,7 +12,7 @@ typedef struct {
     uint8_t emitted[24][3];
     size_t emitted_size[24];
     bool force_bad_vin, force_final_vin_mismatch, force_partial_mode06;
-    bool force_nrc, force_late, force_transport, refuse_mutation;
+    bool force_nrc, force_dtc, force_late, force_transport, refuse_mutation;
 } stub;
 static uint64_t clock_fake(void *ctx) { return ((stub *)ctx)->now; }
 static bool current_fake(void *ctx) { return ((stub *)ctx)->current; }
@@ -43,6 +43,9 @@ static int exchange_fake(void *ctx, const uint8_t *req, size_t n,
         if (s->force_nrc && req[0] == 7) {
             static const uint8_t negative[3] = {0x7f,7,0x11};
             bytes=negative;size=sizeof(negative);
+        } else if (s->force_dtc && req[0] == 3) {
+            static const uint8_t one_dtc[4]={0x43,1,0x03,0x01};
+            bytes=one_dtc;size=sizeof(one_dtc);
         } else {
             static uint8_t dtc[2];
             dtc[0]=(uint8_t)(req[0]+0x40); dtc[1]=0;
@@ -113,6 +116,15 @@ int main(void) {
     p=plan(&s);assert(j1979_can_scan(&p,&r)==0);
     assert(!r.completed && !strcmp(r.stop_reason,"VIN_MISMATCH"));
     assert(s.count==1);j1979_can_result_free(&r);
+    s=(stub){.current=true,.force_dtc=true};
+    p=plan(&s);assert(j1979_can_scan(&p,&r)==0);
+    assert(r.completed && r.step_count==11);
+    output=tmpfile();assert(output);
+    assert(j1979_can_write_json(output,&p,&r,"vcan0"));
+    rewind(output);memset(text,0,sizeof(text));
+    assert(fread(text,1,sizeof(text)-1,output)>0);
+    assert(strstr(text,"\"dtc_codes\":[\"P0301\"]"));
+    fclose(output);j1979_can_result_free(&r);
     s=(stub){.current=true,.force_final_vin_mismatch=true};
     p=plan(&s);assert(j1979_can_scan(&p,&r)==0);
     assert(!r.completed && !strcmp(r.stop_reason,"VIN_CHANGED"));
