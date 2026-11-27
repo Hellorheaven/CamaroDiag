@@ -42,6 +42,9 @@ data class LegacyReadReport(
     val otherSources: List<String>, val durationMs: Long,
     val multiSignalRecords: List<ObdJ1979MultiSignal.Record> = emptyList()
 ) {
+    val legacyMonitorResults get()=ObdLegacyMonitorValues.project(steps.map {
+        ObdLegacyMonitorValues.Observation(it.requestHex,it.status,it.acceptedRecords)
+    })
     val statusRecords get()=steps.mapNotNull {
         ObdJ1979Status.tryRecord(it.requestHex,it.acceptedRecords.singleOrNull(),it.status)
     }
