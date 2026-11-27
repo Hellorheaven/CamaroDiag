@@ -161,7 +161,11 @@ internal sealed partial class BridgeDesktopForm
                     output.AppendLine(string.Format(CultureInfo.CurrentUICulture,J1979RecipeText("ScanDtcMode"),
                         dtc.Mode.ToString("X2"),dtc.Codes is null?J1979RecipeText("Unavailable"):
                         dtc.Codes.Count==0?J1979RecipeText("NativeUsbZeroDtc"):string.Join(", ",dtc.Codes)));
-                foreach(var measurement in result.Measurements)
+                var operating=ObdJ1979OperatingContext.Project(result.Steps.Select(step=>new ObdJ1979OperatingContext.Observation(
+                    step.RequestHex,step.Responses.Count==1&&step.Responses[0].Source==result.SelectedResponseSource?
+                        step.Responses[0].PayloadHex:null,step.Status)));
+                foreach(var line in ObdJ1979OperatingContext.Display(operating))output.AppendLine(line);
+                foreach(var measurement in result.Measurements.Where(m=>!ObdJ1979OperatingContext.IsTrim(m.Pid)))
                     output.AppendLine($"{measurement.Mode:X2}/{measurement.Pid:X2}: {measurement.Number.ToString(CultureInfo.CurrentCulture)} {measurement.Unit}");
                 foreach(var record in result.MultiSignalRecords)
                     output.AppendLine(record.RequestHex+": "+ObdJ1979MultiSignal.Format(record.Signals));
