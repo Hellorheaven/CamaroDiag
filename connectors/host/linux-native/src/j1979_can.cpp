@@ -4,6 +4,7 @@
 #include "j1979_monitor_scaling.h"
 #include "j1979_vehicle_info.h"
 #include "j1979_measurement.h"
+#include "j1979_context.hpp"
 #include <ctype.h>
 #include <errno.h>
 #include <limits.h>
@@ -48,14 +49,17 @@ static int pid_width(unsigned service, uint8_t pid) {
     if (service == 2 && pid == 2) return 2;
     switch (pid) {
         case 0x01: case 0x24: case 0x25: case 0x28: case 0x29:
-        case 0x34: case 0x35: case 0x38: case 0x39: case 0xa6: return 4;
+        case 0x26: case 0x27: case 0x2a: case 0x2b:
+        case 0x34: case 0x35: case 0x36: case 0x37: case 0x38: case 0x39:
+        case 0x3a: case 0x3b: case 0x41: case 0x4f: case 0x50: case 0xa6: return 4;
         case 0x0c: case 0x10: case 0x14: case 0x15: case 0x16:
         case 0x17: case 0x1f: case 0x42: case 0x43: case 0x44: return 2;
         case 0x04: case 0x05: case 0x0a: case 0x0b: case 0x0d:
         case 0x0e: case 0x0f: case 0x11: case 0x13: case 0x1d:
         case 0x45: case 0x46: case 0x47: case 0x48: case 0x49:
         case 0x4a: case 0x4b: case 0x4c: case 0x52: case 0x5b: return 1;
-        case 0x06: case 0x07: case 0x08: case 0x09: return -2; /* one or two trims */
+        case 0x06: case 0x07: case 0x08: case 0x09:
+        case 0x55: case 0x56: case 0x57: case 0x58: return -2; /* one or two trims */
         default: return -1; /* undecoded RAW, never invented width */
     }
 }
@@ -557,5 +561,19 @@ bool j1979_can_write_json(FILE *f, const j1979_can_plan *p,
         if (s->detail[0] ? !quoted(f,s->detail) : fputs("null",f)==EOF) return false;
         if (fprintf(f,",\"duration_ms\":%u}",s->duration_ms)<0) return false;
     }
-    return fputs("]}\n",f)!=EOF;
+    if (fputs("],\"operating_context\":",f)==EOF) return false;
+    std::vector<cd::j1979::Observation> observations;
+    if (r->step_count>J1979_CAN_MAX_STEPS) return false;
+    observations.reserve(r->step_count);
+    for (size_t i=0;i<r->step_count;++i) {
+        const auto& step=r->steps[i];
+        if (step.request_size>sizeof(step.request) || step.response_size>J1979_CAN_MAX_PAYLOAD ||
+            (step.response_size && !step.response)) return false;
+        observations.push_back({{step.request,step.request_size},{step.response,step.response_size},
+            !strcmp(step.status,"RAW") || !strcmp(step.status,"PASSED"),true});
+    }
+    const bool identity=r->vin_valid && r->final_vin_valid &&
+        !strcmp(r->vin_match,"MATCH") && !strcmp(r->final_vin_match,"MATCH");
+    if (!cd::j1979::write_context_json(f,observations,identity)) return false;
+    return fputs("}\n",f)!=EOF;
 }
