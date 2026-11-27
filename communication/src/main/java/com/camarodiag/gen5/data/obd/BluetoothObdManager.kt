@@ -1264,6 +1264,84 @@ class BluetoothObdManager(context: Context) {
         }
     }
 
+    /** Physical Mode 02 read campaign; do not widen the ordinary live or
+     * network request allowlist. Retain the selected adapter's protocol
+     * response and restore its original profile before leaving the lock. */
+    suspend fun runJ1979Freeze(requested: J1979FreezePlan,isCurrent: () -> Boolean,
+        retain: (J1979FreezeReport) -> Unit): J1979FreezeReport {
+        val plan = requested.pinned()
+        val epoch = transportSessionEpoch.capture()
+        val original = standardElmProfile
+        val target = plan.target
+        val tx = target.idHex(requireNotNull(target.requestId))
+        val rx = target.idHex(target.responseId)
+        fun guard() {
+            transportSessionEpoch.requireQueuedCurrent(epoch)
+            check(isCurrent()) { "Freeze frame context changed." }
+        }
+        return commandSessionMutex.withLock {
+            guard()
+            check(j1979LiveProtocol == target.protocol && standardElmProfile == original)
+            val started = System.currentTimeMillis()
+            var rawProtocol: String? = null
+            var observedProtocol: Int? = null
+            var result: J1979FreezeResult? = null
+            var failure: String? = null
+            try {
+                for (command in listOf("ATSP${target.protocol}","ATE0","ATL0","ATH1","ATS1","ATD0",
+                    "ATCAF0","ATSH $tx","ATCRA $rx","ATFCSH $tx","ATFCSD 30 00 00","ATFCSM1","ATCFC1")) {
+                    guard()
+                    check(CanConsoleAdapterRestorationPolicy.accepted(sendAtCommandInternal(command,1500L,
+                        expectedEpoch=epoch,preserveLines=true,beforeTransmit=::guard)))
+                }
+                rawProtocol = sendAtCommandInternal("ATDPN",1500L,expectedEpoch=epoch,
+                    preserveLines=true,beforeTransmit=::guard).take(J1979FreezeCampaign.MAX_RAW)
+                observedProtocol = J1979FreezeCampaign.fixedProtocol(rawProtocol)
+                check(observedProtocol == target.protocol) { "ELM fixed CAN protocol unverified." }
+                var rawBudget = 16L * 1024 * 1024
+                result = J1979FreezeCampaign.run(plan,exchange={ payload,timeout ->
+                    check(J1979FreezeCampaign.allowed(payload,plan.frames))
+                    guard()
+                    val raw = sendAtCommandInternal(ElmJ1979EvapTest.hex(byteArrayOf(payload.size.toByte())+payload),
+                        timeout,expectedEpoch=epoch,preserveLines=true,beforeTransmit=::guard)
+                    rawBudget -= raw.length
+                    check(rawBudget >= 0 && raw.length <= J1979FreezeCampaign.MAX_RAW)
+                    val lines = raw.replace('>','\n').lineSequence()
+                        .map { it.trim().uppercase(java.util.Locale.ROOT) }.filter { it.isNotEmpty() }.toList()
+                    val response = if (lines == listOf("NO DATA")) null else try {
+                        ElmUdsPayloadTransport.decode(raw,target.responseId,target.extended)
+                    } catch (error: Exception) {
+                        throw J1979FreezeCampaign.AdapterReplyError(raw,error)
+                    }
+                    J1979LiveRecorder.Reply(response,raw)
+                },guard=::guard)
+            } catch (_: CancellationException) {
+                failure = "CANCELLED"
+            } catch (_: Exception) {
+                failure = "TRANSPORT_ERROR"
+            } finally {
+                withContext(NonCancellable) {
+                    if (transportSessionEpoch.isCurrent(epoch)) {
+                        var restored = true
+                        for (command in ElmUdsPayloadTransport.restoreCommandsFor(original.protocol)) {
+                            val response = runCatching { sendAtCommandInternal(command,1500L,expectedEpoch=epoch) }.getOrNull()
+                            if (response == null || !CanConsoleAdapterRestorationPolicy.accepted(response)) restored = false
+                        }
+                        if (!restored) {
+                            failure = "TRANSPORT_ERROR"
+                            disconnectIfCurrent(epoch)
+                        }
+                    }
+                }
+            }
+            val retained = result ?: J1979FreezeCampaign.execute(plan,observe={
+                J1979FreezeCampaign.Read(if (failure == "CANCELLED") "CANCELLED" else "CONTEXT_CHANGED",
+                    null,0,false)
+            })
+            J1979FreezeReport(retained,started,System.currentTimeMillis(),rawProtocol,observedProtocol,failure).also(retain)
+        }
+    }
+
     private suspend fun <T> withPrimaryObdMutationSession(expectedVin: String,
         approval: EcuWriteConsentFlow.Approval, isCurrent: () -> Boolean, mutation: String,
         recipe: suspend (Int, () -> Unit, suspend (ByteArray) -> ByteArray) -> T): T {
