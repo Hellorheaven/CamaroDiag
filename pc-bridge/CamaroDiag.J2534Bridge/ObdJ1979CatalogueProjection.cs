@@ -276,6 +276,8 @@ internal static class ObdJ1979CatalogueProjection
     internal static Dictionary<string,object?> Build(byte[] catalogueBytes,string referenceSha,
         byte[] sourceBytes,string expectedVin)
     {
+        if(sourceBytes.Length>=3&&sourceBytes[0]=='C'&&sourceBytes[1]=='F'&&sourceBytes[2]==1)
+            return ObdJ1979FreezeCatalogue.Build(catalogueBytes,referenceSha,sourceBytes,expectedVin);
         var catalogue=ObdJ1979DocumentedCatalogue.Parse(catalogueBytes,referenceSha);
         bool native=IsNative(sourceBytes);
         var source=native?ReplayNative(sourceBytes,expectedVin):ReplayApplication(sourceBytes,expectedVin);
