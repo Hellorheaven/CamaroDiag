@@ -86,6 +86,17 @@ object ObdJ1979Status {
         }
     }
 
+    data class Record(val requestHex:String,val states:List<State>)
+
+    fun tryRecord(requestHex:String,responseHex:String?,status:String):Record? {
+        if(status !in setOf("RAW","PASSED")||!requestHex.matches(Regex("01[0-9A-Fa-f]{2}"))||
+            responseHex==null||responseHex.length>28||responseHex.length%2!=0||
+            !responseHex.matches(Regex("[0-9A-Fa-f]+")))return null
+        val req=requestHex.chunked(2).map { it.toInt(16) }
+        val res=responseHex.chunked(2).map { it.toInt(16) }
+        return decodeResponse(req,res)?.let { Record(requestHex.uppercase(java.util.Locale.ROOT),it) }
+    }
+
     fun decodeResponse(request: List<Int>, response: List<Int>): List<State>? {
         if (request.size != 2 || request[0] != 1 || response.size < 2 ||
             response[0] != 0x41 || response[1] != request[1]) return null
