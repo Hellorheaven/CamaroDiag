@@ -105,3 +105,20 @@ Le nom de schéma commun ne doit **jamais** être conservé pour des objets dont
 les champs de preuve diffèrent. Les vérificateurs C n'acceptent que les
 rapports exacts de leur propre sortie canonique. Un import portable complet
 demande le rapprochement explicite des schémas et de leurs règles de contrôle.
+
+## Paquet Linux natif (.deb)
+
+Sur Debian, Ubuntu ou Raspberry Pi OS, installer la chaîne C et `dpkg-dev`,
+puis construire nativement sur l'architecture ciblée :
+
+```sh
+sudo apt install build-essential libssl-dev dpkg-dev
+make
+make deb
+# Fichier local : out/camarodiag-native-j1979_0.1.0_<arch>.deb
+```
+
+Le paquet ne comporte qu'un exécutable C natif et de la documentation. Les
+dépendances `libc` / `libcrypto` sont calculées sur le système cible par
+`dpkg-shlibdeps`. Il s'agit du **pont SAE J1979 partiel**, pas encore de
+l'interface graphique ni du paquet de livraison définitif.

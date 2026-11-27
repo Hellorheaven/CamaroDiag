@@ -8,7 +8,7 @@ INCLUDES = -Iinclude
 SOURCES = src/cf1.c src/cf1_complete.c src/cf1_crypto.c src/cf1_usb.c src/main.c
 TARGET = camarodiag-native
 
-.PHONY: all clean test
+.PHONY: all clean test install deb
 all: $(TARGET)
 
 $(TARGET): $(SOURCES) include/cf1.h
@@ -26,3 +26,13 @@ test-cu2: tests/test_cu2.c src/cf1.c src/cf1_crypto.c include/cf1.h include/cf1_
 
 clean:
 	rm -f $(TARGET) test-cf1 test-cu2
+
+PREFIX ?= /usr/local
+DESTDIR ?=
+
+install: $(TARGET)
+	install -d "$(DESTDIR)$(PREFIX)/bin"
+	install -m 0755 "$(TARGET)" "$(DESTDIR)$(PREFIX)/bin/$(TARGET)"
+
+deb: $(TARGET)
+	sh packaging/build-deb.sh "$(TARGET)"
