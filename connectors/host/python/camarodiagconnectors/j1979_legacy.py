@@ -343,7 +343,9 @@ def scan(exchange, protocol_check, expected_protocol: int, *, budget=180.0,
             "codes": sorted({code for group in codes for code in group}) if source is not None and codes is not None else None,
             "responder_attribution": attribution, "source": source_hex})
 
+    from .j1979_status import width as status_width, decode_response as status_decode
     measurements = []
+    status_records = []
     multi_signal_records = []
     readiness = None
     def read_pid(mode, pid):
@@ -352,7 +354,8 @@ def scan(exchange, protocol_check, expected_protocol: int, *, budget=180.0,
         def positive(row):
             evidence = decode_observation(request, row)
             return (evidence is not None and evidence["shape"] in ("PASSED", "RAW")
-                    and (mode != 1 or multi_width(pid) is None or multi_decode(request,row) is not None))
+                    and (mode != 1 or multi_width(pid) is None or multi_decode(request,row) is not None)
+                    and (mode != 1 or status_width(pid) is None or status_decode(request,row) is not None))
         rows = read(request.hex().upper(), positive, single=True)
         for index, row in enumerate(rows):
             evidence = decode_observation(request, row)
@@ -361,6 +364,10 @@ def scan(exchange, protocol_check, expected_protocol: int, *, budget=180.0,
             signals = multi_decode(request,row)
             if signals is not None:
                 multi_signal_records.append({"request_hex":request.hex().upper(),"signals":signals,
+                    "response_index":index,"source":source_hex,"responder_attribution":attribution})
+            states = status_decode(request,row)
+            if states is not None:
+                status_records.append({"request_hex":request.hex().upper(),"states":states,
                     "response_index":index,"source":source_hex,"responder_attribution":attribution})
             if evidence.get("measurement") is not None:
                 measurements.append({**evidence["measurement"], "response_index": index,
@@ -421,7 +428,8 @@ def scan(exchange, protocol_check, expected_protocol: int, *, budget=180.0,
             "observed_vin": vin_candidate if source is not None else None,
             "anonymous_vin_candidate": vin_candidate if source is None else None,
             "identification": identification, "extended_vehicle_info": extended_vehicle_info, "readiness": readiness, "inventory": inventories,
-            "steps": steps, "measurements": measurements, "multi_signal_records": multi_signal_records, "dtc_modes": dtc_modes,
+            "steps": steps, "measurements": measurements, "multi_signal_records": multi_signal_records,
+            "status_records": status_records, "dtc_modes": dtc_modes,
             "monitor_records": monitor_records, "freeze_triggers": freeze_triggers,
             "advertised_control_tests": controls, "completed": stop is None,
             "stop_reason": stop, "cancelled": stop == "CANCELLED", "duration_ms": round((clock() - start) * 1000),
