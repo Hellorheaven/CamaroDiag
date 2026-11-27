@@ -28,9 +28,10 @@ class J1979CanReadExchange {
     uint32_t elapsedMs=0;
   };
   static void run(J1979CanReadLink& link,uint32_t tx,uint32_t rx,bool extended,
-                  const uint8_t* request,size_t size,uint32_t timeout,Result& output){
+                  const uint8_t* request,size_t size,uint32_t timeout,Result& output,
+                  const J1979FreezeScope* freeze=nullptr){
     output.state=State::Fault;output.responseSize=0;output.elapsedMs=0;
-    Session session(tx,rx,extended);
+    Session session(tx,rx,extended,freeze);
     Session::Frame outgoing,received,flow;
     const uint32_t start=link.monotonicMs();
     if(!link.active()||!session.begin(request,size,start,timeout,outgoing))return;
