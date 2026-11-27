@@ -55,6 +55,12 @@ internal sealed partial class BridgeDesktopForm
             ShowError(J1979RecipeText("InvalidChannel"));
             return;
         }
+        var enteredVin=functionalEvapVin.Text.Trim();
+        if(enteredVin.Length>0 && !System.Text.RegularExpressions.Regex.IsMatch(enteredVin,@"\A[A-HJ-NPR-Z0-9]{17}\z")){
+            ShowError(J1979RecipeText("ScanVinInvalid"));
+            return;
+        }
+        string? expectedVin=enteredVin.Length==0?null:enteredVin;
         var expires = functionalAuthorizedUntil;
         using var cancellation = new CancellationTokenSource();
         functionalCancellation = cancellation;
@@ -65,7 +71,7 @@ internal sealed partial class BridgeDesktopForm
         completedLegacy = null;
         completedFunctionalChecks = [];
         functionalRunNativeUsb.Enabled = functionalRunAll.Enabled = functionalRunJ1979.Enabled = functionalRunEvap.Enabled = functionalRunClear.Enabled = functionalRunLegacy.Enabled = functionalRunLegacyMutation.Enabled =
-            functionalGoogleSignIn.Enabled = functionalExport.Enabled = false;
+            functionalGoogleSignIn.Enabled = functionalExport.Enabled = functionalEvapVin.Enabled = false;
         functionalCancel.Enabled = true;
         functionalResults.Text = J1979RecipeText("Running");
         void RequireActive()
@@ -85,7 +91,7 @@ internal sealed partial class BridgeDesktopForm
                     options.Can29Bit, options.ProtocolNumber);
                 RequireActive();
                 return ObdJ1979FunctionalScan.Run(device.Exchange, RequireActive,
-                    TimeSpan.FromMinutes(3),retainCancelledEvidence:true);
+                    TimeSpan.FromMinutes(3),retainCancelledEvidence:true,expectedVin:expectedVin);
             });
             // Do not publish a prefix after expiry or replacement of the
             // authorization. Explicit operator cancellation may retain it.
@@ -102,6 +108,9 @@ internal sealed partial class BridgeDesktopForm
             output.AppendLine(J1979RecipeText(result.Cancelled ? "ScanCancelledPartial" :
                 result.Completed ? "Completed" : "Partial"));
             output.AppendLine("VIN: " + (result.ObservedVin ?? J1979RecipeText("Unavailable")));
+            output.AppendLine(J1979RecipeText(result.VinMatch switch {
+                "MATCH"=>"ScanVinMatch","MISMATCH"=>"ScanVinMismatch",
+                "UNVERIFIED"=>"ScanVinUnverified",_=>"ScanVinNotRequested"}));
             output.AppendLine(J1979RecipeText("ScanInventory"));
             foreach(var item in result.Inventory)
                 output.AppendLine(string.Format(CultureInfo.CurrentUICulture,J1979RecipeText("ScanInventoryRow"),
@@ -133,7 +142,7 @@ internal sealed partial class BridgeDesktopForm
             functionalCancellation = null;
             busy = false;
             functionalCancel.Enabled = false;
-            functionalGoogleSignIn.Enabled = true;
+            functionalGoogleSignIn.Enabled = functionalEvapVin.Enabled = true;
             functionalRunNativeUsb.Enabled = functionalRunAll.Enabled = functionalRunJ1979.Enabled = functionalRunEvap.Enabled = functionalRunClear.Enabled = functionalRunLegacy.Enabled = functionalRunLegacyMutation.Enabled =
                 DateTimeOffset.UtcNow < functionalAuthorizedUntil;
         }

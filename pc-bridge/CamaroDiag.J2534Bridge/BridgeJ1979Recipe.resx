@@ -113,4 +113,9 @@
   <data name="ScanDtcMode" xml:space="preserve"><value>DTC mode {0}: {1}</value></data>
   <data name="ScanCancelledPartial" xml:space="preserve"><value>Campaign cancelled. Previously received results only.</value></data>
   <data name="ScanInventoryUnavailable" xml:space="preserve"><value>Inventory unavailable</value></data>
+  <data name="ScanVinInvalid" xml:space="preserve"><value>Leave VIN blank or enter the documented 17-character VIN.</value></data>
+  <data name="ScanVinMatch" xml:space="preserve"><value>VIN matches the selected vehicle.</value></data>
+  <data name="ScanVinMismatch" xml:space="preserve"><value>VIN mismatch — scan stopped.</value></data>
+  <data name="ScanVinUnverified" xml:space="preserve"><value>VIN unavailable — scan stopped.</value></data>
+  <data name="ScanVinNotRequested" xml:space="preserve"><value>VIN comparison not requested.</value></data>
 </root>

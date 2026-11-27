@@ -95,6 +95,16 @@ internal static class ObdJ1979FunctionalScanSelfTests
         }
         catch (OperationCanceledException) { Assert(tx == 1, "no late request after cancellation"); }
 
+        sent.Clear();
+        var wrongVin=ObdJ1979FunctionalScan.Run(Exchange,()=>{},TimeSpan.FromMinutes(1),
+            expectedVin:"1FA6P8TH0L5100000");
+        Assert(!wrongVin.Completed&&wrongVin.VinMatch=="MISMATCH"&&sent.SequenceEqual(new[]{"0902"}),
+            "expected VIN mismatch stops before subsequent requests");
+        sent.Clear();
+        var noVin=ObdJ1979FunctionalScan.Run((request,_)=>{
+            sent.Add(Convert.ToHexString(request));return [0x7F,9,0x11];
+        },()=>{},TimeSpan.FromMinutes(1),expectedVin:"1G1FA1RXXR0123456");
+        Assert(noVin.VinMatch=="UNVERIFIED"&&!noVin.Completed&&sent.Count==1,"missing VIN stops scoped campaign");
         int cancelCalls=0;
         var cancelled=ObdJ1979FunctionalScan.Run((request,timeout)=>{
             cancelCalls++;

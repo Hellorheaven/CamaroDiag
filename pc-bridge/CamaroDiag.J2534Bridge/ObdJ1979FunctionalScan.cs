@@ -12,8 +12,11 @@ internal static class ObdJ1979FunctionalScan
         string Status, string? Detail, long DurationMs,
         J1979CampaignSemantics.Observation? ApplicationEvidence = null);
     internal sealed record Result(string? ObservedVin, IReadOnlyList<Step> Steps,
-        bool Completed, string[] NotExecuted, string? StopReason)
+        bool Completed, string[] NotExecuted, string? StopReason, string? DeclaredVin=null)
     {
+        public string VinMatch => DeclaredVin is null ? "NOT_REQUESTED" :
+            ObservedVin is null ? "UNVERIFIED" :
+            ObservedVin==DeclaredVin ? "MATCH" : "MISMATCH";
         public bool Cancelled => StopReason=="CANCELLED";
         public IReadOnlyList<InventorySummary> Inventory => SummarizeInventory(Steps);
         public IReadOnlyList<DtcModeSummary> DtcModes => new[]{3,7,10}.Select(mode=>{
@@ -49,11 +52,13 @@ internal static class ObdJ1979FunctionalScan
     }
 
     internal static Result Run(Func<byte[], int, byte[]> exchange,
-        Action requireActive, TimeSpan budget, bool retainCancelledEvidence=false)
+        Action requireActive, TimeSpan budget, bool retainCancelledEvidence=false, string? expectedVin=null)
     {
         ArgumentNullException.ThrowIfNull(exchange);
         ArgumentNullException.ThrowIfNull(requireActive);
         if (budget <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(budget));
+        if(expectedVin is not null && !System.Text.RegularExpressions.Regex.IsMatch(expectedVin,@"\A[A-HJ-NPR-Z0-9]{17}\z"))
+            throw new ArgumentException("Invalid expected VIN.",nameof(expectedVin));
         var watch = Stopwatch.StartNew();
         var steps = new List<Step>();
         string? vin = null;
@@ -147,6 +152,10 @@ internal static class ObdJ1979FunctionalScan
         // Prioritize VIN and DTC evidence before the potentially large
         // supported-PID inventory consumes the campaign budget.
         Read([9, 2], data => vin = ObdJ1979Vin.DecodeIsoTp(data));
+        if(!expired && expectedVin is not null && vin!=expectedVin){
+            expired=true;
+            stopReason=vin is null?"VIN_UNVERIFIED":"VIN_MISMATCH";
+        }
         foreach (byte mode in new byte[] { 3, 7, 10 })
         {
             if (expired) break;
@@ -245,6 +254,6 @@ internal static class ObdJ1979FunctionalScan
             stopReason="CANCELLED";
         }
         return new(vin, steps.ToArray(), !expired,
-            ["MODE_04_CLEAR", "MODE_05_LEGACY", "MODE_08_CONTROL"], stopReason);
+            ["MODE_04_CLEAR", "MODE_05_LEGACY", "MODE_08_CONTROL"], stopReason,expectedVin);
     }
 }
