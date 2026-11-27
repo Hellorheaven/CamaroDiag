@@ -27,24 +27,29 @@ data class J1979LiveTarget(val protocol: Int, val responseId: Int, val vin: Stri
 data class J1979LivePlan(val target: J1979LiveTarget, val pids: List<Int>,
     val cycles: Int = 30, val intervalMs: Long = 1000, val budgetMs: Long = 180000) {
     val valid: Boolean get() = target.valid && pids.size in 1..32 && pids.distinct().size == pids.size &&
-        pids.all(J1979LiveRecorder::numericPid) && cycles in 1..1000 && cycles*pids.size <= 10000 &&
+        pids.all { if(target.legacy) J1979LiveRecorder.legacyNumericPid(it) else J1979LiveRecorder.numericPid(it) } && cycles in 1..1000 && cycles*pids.size <= 10000 &&
         intervalMs in 100..60000 && budgetMs in 1..600000
 }
 data class J1979LiveValue(val name: String,val number: Double,val unit: String)
 data class J1979LiveObservation(val phase: String,val cycle: Int?,val pid: Int?,
     val requestHex: String,val responseHex: String?,val rawAdapterResponse: String?,
     val startedElapsedMs: Long,val elapsedMs: Long,val durationMs: Long,
-    val status: String,val detail: String?,val value: J1979LiveValue?)
+    val status: String,val detail: String?,val value: J1979LiveValue?,
+    val multiSignals: List<ObdJ1979MultiSignal.Signal>? = null)
 data class J1979LivePage(val base: Int,val supportedIds: List<Int>,val hasNextPage: Boolean)
 data class J1979LiveSummary(val pid: Int,val name: String?,val unit: String?,val attempted: Int,
     val statusCounts: Map<String,Int>,val minimum: Double?,val maximum: Double?,val mean: Double?,
     val lastVerifiedValue: Double?,val lastVerifiedElapsedMs: Long?)
+data class J1979LiveChannelSummary(val pid:Int,val name:String,val unit:String,val count:Int,
+    val attempted:Int,val missing:Int,val minimum:Double,val maximum:Double,val mean:Double,
+    val lastVerifiedValue:Double,val lastVerifiedElapsedMs:Long)
 data class J1979LiveReport(val plan: J1979LivePlan,val observedVin: String?,val observedProtocol: Int?,
     val protocolResponse: String?,val advertisedPids: List<Int>,val inventoryPages: List<J1979LivePage>,
     val inventoryComplete: Boolean,val completedCycles: Int,val admission: List<J1979LiveObservation>,
     val observations: List<J1979LiveObservation>,val summaries: List<J1979LiveSummary>,
     val completed: Boolean,val stopReason: String?,val durationMs: Long,
-    val legacyExchanges: List<LegacyLiveExchange> = emptyList()) {
+    val legacyExchanges: List<LegacyLiveExchange> = emptyList(),
+    val multiSignalSummary: List<J1979LiveChannelSummary> = emptyList()) {
     val physicallyAddressed get() = !plan.target.legacy
     val scope get() = if(physicallyAddressed)"PHYSICAL_SELECTED_ECU_LIVE" else "FUNCTIONAL_SELECTED_RESPONSE_LIVE"
     val physicalVehicleVerified get() = false
@@ -61,14 +66,35 @@ internal object J1979LiveRecorder {
     private fun hex(n: Int) = ElmJ1979EvapTest.hex(n,2)
     fun numericPid(pid: Int): Boolean {
         if(pid !in 1..255 || pid%32==0)return false
+        if(ObdJ1979MultiSignal.width(pid)!=null)return true
         val request="01"+hex(pid)
         return listOf(1,2,4).any { width ->
             J1979CampaignSemantics.decodePositive(request,"41"+hex(pid)+"00".repeat(width))?.measurement()!=null
         }
     }
+    fun legacyNumericPid(pid:Int):Boolean=numericPid(pid)&&(ObdJ1979MultiSignal.width(pid)?:0)<=5
     fun allowed(request: ByteArray) = request.contentEquals(byteArrayOf(9,2)) ||
         request.size==2 && request[0]==1.toByte() &&
         ((request[1].toInt() and 255)%32==0 || numericPid(request[1].toInt() and 255))
+    private class ChannelAccumulator(private val first:ObdJ1979MultiSignal.Signal) {
+        private var count=0
+        private var minimum=0.0
+        private var maximum=0.0
+        private var mean=0.0
+        private var last=0.0
+        private var lastTime=0L
+        fun append(signal:ObdJ1979MultiSignal.Signal,elapsed:Long){
+            require(signal.unit==first.unit&&signal.number.isFinite())
+            val value=signal.number
+            count++
+            minimum=if(count==1)value else minOf(minimum,value)
+            maximum=if(count==1)value else maxOf(maximum,value)
+            mean=if(count==1)value else mean+(value-mean)/count
+            last=value;lastTime=elapsed
+        }
+        fun snapshot(attempts:Int)=J1979LiveChannelSummary(first.pid,first.name,first.unit,
+            count,attempts,attempts-count,minimum,maximum,mean,last,lastTime)
+    }
     private class Accumulator(private val pid: Int) {
         private val counts=linkedMapOf<String,Int>()
         private var name: String?=null
@@ -109,6 +135,7 @@ internal object J1979LiveRecorder {
         val pages=mutableListOf<J1979LivePage>()
         val advertised=sortedSetOf<Int>()
         val stats=plan.pids.associateWith { Accumulator(it) }
+        val channels=mutableMapOf<Pair<Int,String>,ChannelAccumulator>()
         var vin: String?=null
         var observedProtocol: Int?=null
         var protocolRaw: String?=null
@@ -133,6 +160,7 @@ internal object J1979LiveRecorder {
             var response: String?=null
             var evidence: J1979CampaignSemantics.Step?=null
             var value: J1979LiveValue?=null
+            var multi: List<ObdJ1979MultiSignal.Signal>?=null
             var status="NOT_TESTED"
             var detail: String?=null
             try {
@@ -147,13 +175,20 @@ internal object J1979LiveRecorder {
                 else {
                     val raw=response
                     evidence=J1979CampaignSemantics.decodePositive(command,raw)
+                        ?:J1979CampaignSemantics.decodeObservation(command,raw,"RAW")
                         ?:J1979CampaignSemantics.decodeObservation(command,raw,"NEGATIVE")
                     if(evidence==null){
                         status="FAILED";stop="INVALID_APPLICATION_RESPONSE";detail=stop
                     }else {
                         status=evidence.status
                         if(status=="NEGATIVE")detail="NRC_"+hex(requireNotNull(evidence.negativeResponseCode()))
-                        if(phase=="SAMPLE"&&status=="PASSED"){
+                        if(phase=="SAMPLE"&&status in setOf("RAW","PASSED")&&
+                            pid!=null&&ObdJ1979MultiSignal.width(pid)!=null){
+                            multi=ObdJ1979MultiSignal.decodeResponse(command,raw)
+                            if(multi==null){
+                                status="FAILED";stop="INVALID_MEASUREMENT";detail=stop;evidence=null
+                            }
+                        }else if(phase=="SAMPLE"&&status=="PASSED"){
                             val m=evidence.measurement()
                             if(m==null||m.pid!=pid||m.mode!=1||!m.number.isFinite()){
                                 status="FAILED";stop="INVALID_MEASUREMENT";detail=stop;evidence=null
@@ -162,17 +197,21 @@ internal object J1979LiveRecorder {
                     }
                 }
             }catch(_:CancellationException){
-                stop="CANCELLED";detail=stop;evidence=null;value=null;status="NOT_TESTED"
+                stop="CANCELLED";detail=stop;evidence=null;value=null;multi=null;status="NOT_TESTED"
             }catch(e:Exception){
                 stop="TRANSPORT_OR_CONTEXT_ERROR";detail=e.javaClass.simpleName
-                evidence=null;value=null;status="FAILED"
+                evidence=null;value=null;multi=null;status="FAILED"
             }
             val end=elapsed()
             val row=J1979LiveObservation(phase,cycle,pid,command,response,reply?.raw,begun,end,
-                end-begun,status,detail,value)
+                end-begun,status,detail,value,multi)
             if(phase=="SAMPLE"){
                 rows+=row
                 stats.getValue(requireNotNull(pid)).append(row)
+                for(signal in multi.orEmpty()){
+                    val key=signal.pid to signal.name
+                    channels.getOrPut(key){ChannelAccumulator(signal)}.append(signal,end)
+                }
                 onSample(row)
             }else admission+=row
             return row to evidence
@@ -245,11 +284,13 @@ internal object J1979LiveRecorder {
                 }
             }
             if(stop==null&&cycles==plan.cycles&&identity("FINAL_VIN"))protocol()
-            if(stop==null&&rows.none { it.status=="PASSED" })stop="NO_VERIFIED_MEASUREMENT"
+            if(stop==null&&rows.none { it.value!=null||!it.multiSignals.isNullOrEmpty() })stop="NO_VERIFIED_MEASUREMENT"
         }catch(_:CancellationException){stop="CANCELLED"}
         catch(_:Exception){stop="TRANSPORT_OR_CONTEXT_ERROR"}
         return J1979LiveReport(plan,vin,observedProtocol,protocolRaw,advertised.toList(),pages.toList(),
             completeInventory,cycles,admission.toList(),rows.toList(),plan.pids.map { stats.getValue(it).snapshot() },
-            stop==null&&cycles==plan.cycles,stop,elapsed())
+            stop==null&&cycles==plan.cycles,stop,elapsed(),multiSignalSummary=channels.entries
+                .sortedWith(compareBy({it.key.first},{it.key.second}))
+                .map { (key,acc)->acc.snapshot(stats.getValue(key.first).snapshot().attempted) })
     }
 }
