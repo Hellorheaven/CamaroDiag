@@ -185,4 +185,9 @@
   <data name="LiveNativeVinRequired" xml:space="preserve"><value>Enter the independently known VIN before inspection.</value></data>
   <data name="LiveNativeCsv" xml:space="preserve"><value>Export CL/1 CSV</value></data>
   <data name="LiveNativeCsvFilter" xml:space="preserve"><value>CSV samples (*.csv)|*.csv</value></data>
+  <data name="LiveNativePrefix" xml:space="preserve"><value>Inspect interrupted CL/1</value></data>
+  <data name="LiveNativePrefixScope" xml:space="preserve"><value>Complete records only; no verified completed recording.</value></data>
+  <data name="LiveNativePrefixRecords" xml:space="preserve"><value>Complete records: {0}</value></data>
+  <data name="LiveNativePrefixSamples" xml:space="preserve"><value>Correlated raw samples: {0}</value></data>
+  <data name="LiveNativePrefixTail" xml:space="preserve"><value>Unverified trailing bytes: {0}</value></data>
 </root>
