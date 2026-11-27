@@ -1179,6 +1179,15 @@ static bool parse_legacy(int argc,char** argv,LegacyOptions& o,bool scan){
     return o.port&&o.output&&o.confirmed&&o.protocol_set&&cd::legacy::valid_protocol(o.protocol)
         &&o.budget>0&&o.budget<=(scan?600000u:60000u)&&(!scan||(o.source_set&&o.vin&&(!o.capture||strcmp(o.capture,o.output))));
 }
+static bool journal_matches(const std::string& path,cd::legacy::Protocol protocol,unsigned source,
+    std::string_view vin,cd::legacy::Bytes raw){
+    input original{},again{};
+    if(!load_regular(path.c_str(),cd::legacy::journal_max_bytes,&original))return false;
+    const auto evidence=cd::legacy::inspect_journal({original.bytes.get(),original.length},protocol,source,vin);
+    return evidence.terminal&&evidence.capture.size()==raw.size()&&
+        std::equal(evidence.capture.begin(),evidence.capture.end(),raw.begin())&&
+        load_regular(path.c_str(),cd::legacy::journal_max_bytes,&again)&&same_input(&original,&again);
+}
 static int legacy_discovery_cli(int argc,char** argv,bool scan=false){
     LegacyOptions o;
     if(!parse_legacy(argc,argv,o,scan))return error("Legacy requires port, protocol 1..5, output, explicit confirmation and selected source plus VIN for scan");
@@ -1222,10 +1231,13 @@ static int legacy_discovery_cli(int argc,char** argv,bool scan=false){
             s=cd::legacy::scan_selected(elm,o.source,o.vin,o.budget,cd::legacy::monotonic_ms,current,
                 [&](const auto& row){journal->append(row);});
             journal->finish();
+            const auto raw=cd::legacy::encode_scan_capture({s.protocol,s.source,s.budget_ms,s.expected_vin,s.trace});
+            if(!journal_matches(std::string(o.capture?o.capture:o.output)+".lj",o.protocol,o.source,o.vin,raw))
+                throw std::runtime_error("Legacy scan journal differs from capture");
         }
         else d=cd::legacy::discover(elm,o.budget,cd::legacy::monotonic_ms,current);
     }catch(const cd::legacy::Cancelled&){d.error="CANCELLED";s.error=d.error;}
-    catch(const std::exception&){d.error="ADAPTER_SETUP_FAILED";s.error=d.error;}
+    catch(const std::exception& e){d.error=e.what();s.error=d.error;s.completed=false;s.trace.clear();}
     try{
         if(scan&&o.capture&&!s.trace.empty()){
             const auto raw=cd::legacy::encode_scan_capture({s.protocol,s.source,s.budget_ms,s.expected_vin,s.trace});
@@ -1515,6 +1527,7 @@ static int legacy_freeze_cli(int argc,char** argv){
         }
         journal.finish();
         const auto raw=cd::legacy::encode_freeze_capture({o.protocol,o.source,o.plan,result.trace});
+        if(!journal_matches(journal_path,o.protocol,o.source,o.plan.vin,raw))return error("Legacy journal differs from capture");
         if(!write_owned_file(capture.fd,raw.data(),raw.size()))return error("Freeze capture persistence failed");
         input original{},again{};
         if(!load_regular(o.capture,cd::legacy::freeze_max_capture,&original)||original.length!=raw.size()||
@@ -1663,6 +1676,7 @@ static int legacy_live_cli(int argc,char** argv){
         }
         journal.finish();
         const auto raw=cd::legacy::encode_live_capture({o.protocol,o.source,o.plan,result.trace});
+        if(!journal_matches(journal_path,o.protocol,o.source,o.plan.vin,raw))return error("Legacy journal differs from capture");
         if(!write_owned_file(capture.fd,raw.data(),raw.size()))return error("Live capture persistence failed");
         input original{},again{};
         if(!load_regular(o.capture,cd::legacy::live_max_capture,&original)||original.length!=raw.size()||
