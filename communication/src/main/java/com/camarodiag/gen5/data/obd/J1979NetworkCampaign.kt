@@ -51,7 +51,11 @@ data class J1979NetworkEcu(
     val requestId: Int,val responseId: Int,val observedVin: String?,
     val status: String,val stopReason: String?,val completed: Boolean,
     val steps: List<J1979NetworkStep>,val inventories: List<J1979NetworkInventory>
-)
+) {
+    val contextualMeasurements get() = ObdJ1979ScalingContext.project(steps.map {
+        ObdJ1979ScalingContext.Observation(it.requestHex,it.responseHex,it.status)
+    })
+}
 data class J1979NetworkReport(
     val plan: J1979NetworkPlan,val discovery: J1979NetworkDiscovery,
     val ecus: List<J1979NetworkEcu>,val completed: Boolean,val stopReason: String?,val durationMs: Long
@@ -215,6 +219,11 @@ internal object J1979NetworkCampaign {
                         else {
                             status=evidence.status
                             detail=evidence.negativeResponseCode()?.let { "NRC_"+ElmJ1979EvapTest.hex(it,2) }
+                            if(status in setOf("RAW","PASSED") && request.size==2 && u(request[0])==1 &&
+                                ObdJ1979ScalingContext.isConfiguration(u(request[1])) &&
+                                !ObdJ1979ScalingContext.validConfiguration(u(request[1]),requireNotNull(reply.payload).drop(2).map(::u))){
+                                status="FAILED";detail="INVALID_SCALING_CONFIGURATION";evidence=null
+                            }
                             if(status in setOf("RAW","PASSED") && request.size==2 &&
                                 u(request[0])==1 && ObdJ1979MultiSignal.width(u(request[1]))!=null){
                                 multi=ObdJ1979MultiSignal.tryRecord(command,response,status)
