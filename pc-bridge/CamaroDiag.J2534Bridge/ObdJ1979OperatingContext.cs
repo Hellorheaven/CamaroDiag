@@ -75,7 +75,8 @@ internal static class ObdJ1979OperatingContext
         bool compression=(b&8)!=0;
         int reserved=compression?0x14:0x10;
         if(((c|d)&reserved)!=0)return null;
-        bool valid=baseline is {Length:4}&&((baseline[1]&8)!=0)==compression;
+        bool valid=baseline is {Length:4}&&((baseline[1]&8)!=0)==compression&&
+            (baseline[1]&0x80)==0&&((baseline[2]|baseline[3])&reserved)==0;
         var monitors=new List<Monitor>();
         void Add(string?[] names,int? support,int enabled,int incomplete){
             for(int bit=0;bit<names.Length;bit++){
@@ -96,9 +97,9 @@ internal static class ObdJ1979OperatingContext
     internal static Projection Project(IEnumerable<Observation> observations)
     {
         var rows=Correlated(observations).ToArray();
-        var layouts=rows.Where(x=>x.Request.SequenceEqual(new byte[]{1,0x1D})&&x.Data.Length==1).ToArray();
-        int? layout=layouts.Length==1?layouts[0].Data[0]:null;
-        var baselines=rows.Where(x=>x.Request.SequenceEqual(new byte[]{1,1})&&x.Data.Length==4).ToArray();
+        var layouts=rows.Where(x=>x.Request.SequenceEqual(new byte[]{1,0x1D})).ToArray();
+        int? layout=layouts.Length==1&&layouts[0].Data.Length==1?layouts[0].Data[0]:null;
+        var baselines=rows.Where(x=>x.Request.SequenceEqual(new byte[]{1,1})).ToArray();
         var cycles=rows.Where(x=>x.Request.SequenceEqual(new byte[]{1,0x41})).ToArray();
         var cycle=cycles.Length==1?DecodeCycle(cycles[0].Data,baselines.Length==1?baselines[0].Data:null):null;
         var trims=rows.Where(x=>IsTrim(x.Request[1])).Select(x=>DecodeTrim(x.Request,x.Data,layout))
