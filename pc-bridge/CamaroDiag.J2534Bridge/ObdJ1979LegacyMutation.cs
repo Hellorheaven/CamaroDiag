@@ -155,7 +155,7 @@ internal static class ObdJ1979LegacyMutation
             // Persist the actual initial evidence before the write boundary.
             // Recheck authorization and fresh stationary state after disk I/O.
             saveBaseline(Finish("BASELINE_SAVED"));
-            if (!Zero(0x0D,[0x41,0x0D,0]) || !Zero(0x0C,[0x41,0x0C,0,0]))
+            if (!Scope() || !Zero(0x0D,[0x41,0x0D,0]) || !Zero(0x0C,[0x41,0x0C,0,0]))
                 return Finish("NOT_TESTED","STATIONARY_EVIDENCE_CHANGED");
             requireActive();
             attempted = true;
