@@ -79,11 +79,11 @@ class J1979MaintenanceJournal final:public J1979MaintenanceCampaign::Store {
   }
   static void p16(uint8_t* p,uint16_t v){p[0]=uint8_t(v);p[1]=uint8_t(v>>8);}
   static void p32(uint8_t* p,uint32_t v){for(unsigned i=0;i<4;++i)p[i]=uint8_t(v>>(8*i));}
-  static uint32_t crc(const uint8_t* p,size_t n){
-    uint32_t v=0xffffffffu;
+  static uint32_t crcUpdate(uint32_t v,const uint8_t* p,size_t n){
     for(size_t i=0;i<n;++i){v^=p[i];for(unsigned k=0;k<8;++k)v=(v>>1)^((v&1)?0xedb88320u:0u);}
-    return v^0xffffffffu;
+    return v;
   }
+  static uint32_t crc(const uint8_t* p,size_t n){return crcUpdate(0xffffffffu,p,n)^0xffffffffu;}
   bool fail(){if(!failed_){failed_=true;storage_.latchRecovery();}return false;}
   bool exact(size_t offset,const uint8_t* data,size_t count){
     uint8_t check[64];
@@ -96,8 +96,18 @@ class J1979MaintenanceJournal final:public J1979MaintenanceCampaign::Store {
   }
   bool verifyLast(){
     size_t total=0;
-    return lastSize_&&storage_.size(total)&&total==offset_&&
-      exact(lastOffset_,scratch_.bytes,lastSize_);
+    if(!lastSize_||!storage_.size(total)||total!=offset_||
+       !exact(lastOffset_,scratch_.bytes,lastSize_))return false;
+    uint32_t rolling=0xffffffffu;
+    uint8_t buffer[64];
+    for(size_t pos=0;pos<total;){
+      const size_t count=total-pos<sizeof(buffer)?total-pos:sizeof(buffer);
+      if(!storage_.read(pos,buffer,count))return false;
+      rolling=crcUpdate(rolling,buffer,count);pos+=count;
+    }
+    // CRC detects corruption, not deliberate replacement by an attacker.
+    // The board must protect the local storage from untrusted writes.
+    return rolling==rolling_;
   }
   bool write(Kind kind,const Evidence* evidence){
     if(failed_||!storage_.ready()||(phase_&&!verifyLast()))return fail();
@@ -136,11 +146,13 @@ class J1979MaintenanceJournal final:public J1979MaintenanceCampaign::Store {
     if(pos>MaximumRecord||offset_+pos>MaximumJournal||!storage_.size(actual)||actual!=offset_||
        !storage_.append(out,pos)||!storage_.flush()||!storage_.size(actual)||actual!=offset_+pos||
        !exact(offset_,out,pos))return fail();
+    rolling_=crcUpdate(rolling_,out,pos);
     lastOffset_=offset_;lastSize_=pos;offset_+=pos;phase_=uint8_t(kind);++records_;
     return true;
   }
   Storage& storage_;Scratch& scratch_;Scope scope_{};
   size_t offset_=0,lastOffset_=0,lastSize_=0;
+  uint32_t rolling_=0xffffffffu;
   uint8_t phase_=0,records_=0;
   bool failed_=false,consumed_=false;
 };
