@@ -5560,6 +5560,97 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         job.start()
     }
 
+    fun runNativeMaintenanceFunctionalTest(
+        device: android.hardware.usb.UsbDevice,
+        requested: com.camarodiag.gen5.data.obd.CamaroDiagConnectorMaintenanceCampaign.Target,
+        keyUri: Uri, confirmedConnection: Long, confirmedVehicle: VehicleProfile
+    ) {
+        if(!requested.valid||keyUri.scheme!="content")return
+        val channel=requested.channel
+        if(channel.connectionGeneration!=maxOf(1L,confirmedConnection) ||
+            confirmedConnection!=connectionAttemptGeneration||confirmedVehicle!=_vehicle.value||
+            channel.vehicle!=confirmedVehicle.vin||channel.connector!=device.deviceName)return
+        if(_adapter.value.tier!=AdapterTier.DISCONNECTED||_isBusy.value||_isObdScanning.value||
+            _calibrationWorkspace.value.isJ2534BridgeConnected||
+            functionalCatalogueJob?.isActive==true||functionalTestJob?.isCompleted==false||
+            nativeFunctionalCleanup?.isCompleted==false||connectionAttemptJob?.isCompleted==false||
+            enhancedUdsJob?.isCompleted==false||canMonitorJob?.isCompleted==false||canRequestJob?.isCompleted==false||
+            detachedCanMonitorJob?.isCompleted==false||detachedCanRequestJob?.isCompleted==false){
+            _connectionMessage.value=localizedContext.getString(R.string.functional_native_usb_disconnected)
+            return
+        }
+        val owner=authenticatedAccountUid?:return
+        val account=accountSessionGeneration
+        val connection=nextConnectionGeneration()
+        val approved=requested.copy(channel=channel.copy(connectionGeneration=connection))
+        val execution=++functionalTestGeneration
+        fun current()=isCurrentAccountGeneration(account)&&execution==functionalTestGeneration&&
+            connection==connectionAttemptGeneration&&confirmedVehicle==_vehicle.value&&
+            FirebaseAuth.getInstance().currentUser?.uid==owner&&currentLicenseLevel==LicenseLevel.OWNER
+        val job=viewModelScope.launch(start=CoroutineStart.LAZY){
+            if(!confirmFunctionalTestOwner(owner)||!current())return@launch
+            val context=getApplication<Application>()
+            val usb=context.getSystemService(android.hardware.usb.UsbManager::class.java)?:return@launch
+            val labelEn=if(approved.operation==1)"Native Mode 04" else "Native Mode 08 EVAP"
+            val labelFr=if(approved.operation==1)"Mode 04 natif" else "Mode 08 EVAP natif"
+            fun row(outcome:FunctionalTestOutcome,detail:String)=FunctionalTestCheck(
+                "j1979-native-maintenance","j1979",labelEn,labelFr,outcome,detail,detail)
+            _functionalTestState.value=FunctionalTestState(running=true,startedAtMillis=System.currentTimeMillis(),
+                protocol=FunctionalProtocol.J1979,checks=listOf(row(FunctionalTestOutcome.NOT_TESTED,"")),
+                context=FunctionalTestContext(confirmedVehicle.vin,device.deviceName,"NATIVE_USB_CU4",connection),
+                nativeMaintenanceTarget=approved)
+            beginBusyOperation()
+            try{
+                val evidence=withContext(Dispatchers.IO){
+                    check(current()&&usb.hasPermission(device))
+                    val key=ByteArray(32)
+                    try{
+                        val input=context.contentResolver.openInputStream(keyUri)?:error("Credential unavailable")
+                        java.io.DataInputStream(input).use { it.readFully(key);check(it.read()==-1) }
+                        check(current())
+                        val accountKey=MessageDigest.getInstance("SHA-256").digest(owner.toByteArray(Charsets.UTF_8))
+                            .joinToString(""){"%02x".format(it)}
+                        val folder=File(context.filesDir,"native-usb-evidence-"+accountKey)
+                        check(folder.isDirectory||folder.mkdirs())
+                        com.camarodiag.gen5.data.obd.CamaroDiagConnectorMaintenanceCampaign.run(
+                            usb,device,approved,key,folder,com.camarodiag.gen5.BuildConfig.VERSION_NAME
+                        ){generation -> generation==connection&&current()}
+                    }finally{key.fill(0)}
+                }
+                if(current()){
+                    val terminal=evidence.terminal
+                    // PASSED means the exact functional acknowledgment/readback
+                    // was recorded, not an actual leak test or repair.
+                    val outcome=when{
+                        !evidence.verified||evidence.recoveryRequired->FunctionalTestOutcome.NOT_TESTED
+                        terminal?.get("outcome")=="REFUSED"->FunctionalTestOutcome.FAILED
+                        terminal?.get("outcome") in setOf("ACKNOWLEDGED_READBACK","ACKNOWLEDGED_EVAP")->FunctionalTestOutcome.PASSED
+                        else->FunctionalTestOutcome.NOT_TESTED
+                    }
+                    val detail=localizedContext.getString(when{
+                        evidence.recoveryRequired->R.string.j1979_native_maintenance_recovery
+                        evidence.verified->R.string.j1979_native_maintenance_journal_checked
+                        else->R.string.j1979_native_maintenance_unverified
+                    })
+                    _functionalTestState.update { state -> state.copy(nativeMaintenanceEvidence=evidence,
+                        checks=listOf(row(outcome,detail)),
+                        context=state.context?.copy(observedVin=confirmedVehicle.vin.takeIf{terminal?.get("initial_vin")==true}),
+                        error=detail.takeIf{outcome!=FunctionalTestOutcome.PASSED}) }
+                }
+            }catch(cancelled:CancellationException){throw cancelled}
+            catch(_:Exception){
+                if(current())_functionalTestState.update{it.copy(error=localizedContext.getString(
+                    R.string.j1979_native_maintenance_recovery))}
+            }finally{
+                endBusyOperation()
+                if(execution==functionalTestGeneration&&isCurrentAccountGeneration(account))
+                    _functionalTestState.update{it.copy(running=false,finishedAtMillis=System.currentTimeMillis(),
+                        error=if(current())it.error else localizedContext.getString(R.string.j1979_native_maintenance_recovery))}
+            }
+        }
+        functionalTestJob=job;nativeFunctionalCleanup=job;job.start()
+    }
+
     fun runNativeLiveFunctionalTest(
         device: android.hardware.usb.UsbDevice,
         requested: com.camarodiag.gen5.data.obd.CamaroDiagConnectorLiveCampaign.Target,
@@ -6507,6 +6598,43 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val snapshot = _functionalTestState.value
             if (!snapshot.canExport) return@launch
             val evidenceContext = snapshot.context ?: return@launch
+            snapshot.nativeMaintenanceEvidence?.let { evidence ->
+                fun current()=isCurrentAccountGeneration(sessionGeneration)&&authenticatedAccountUid==accountUid&&
+                    currentLicenseLevel==LicenseLevel.OWNER&&_functionalTestState.value===snapshot
+                val context=getApplication<Application>()
+                try{
+                    val maximum=com.camarodiag.connectors.J1979MaintenanceJournal.MAX_JOURNAL.toLong()
+                    var journalPath:String?=null
+                    if(evidence.sha256!=null){
+                        val before=withContext(Dispatchers.IO){evidence.journal.inputStream().use{
+                            CamaroDiagExportStorage.fingerprint(it,maximum)
+                        }}
+                        check(before.sha256==evidence.sha256&&current())
+                        journalPath=CamaroDiagExportStorage.write(context,
+                            "CamaroDiag_SAE-J1979_NATIVE_MAINTENANCE_${snapshot.startedAtMillis}.cm",
+                            "application/octet-stream",category=CamaroDiagExportStorage.Category.TESTS,
+                            beforePublish={check(current())},verifyStaged={input->
+                                check(CamaroDiagExportStorage.fingerprint(input,maximum)==before)
+                            }){output->evidence.journal.inputStream().use{it.copyTo(output)}}
+                    }
+                    check(current())
+                    val json=JSONObject(evidence.document).apply{
+                        put("raw_journal_name",journalPath?.substringAfterLast('/')?:JSONObject.NULL)
+                    }
+                    val bytes=json.toString(2).toByteArray(Charsets.UTF_8)
+                    val reportPath=CamaroDiagExportStorage.write(context,
+                        "CamaroDiag_SAE-J1979_NATIVE_MAINTENANCE_${snapshot.startedAtMillis}.json",
+                        "application/json",category=CamaroDiagExportStorage.Category.TESTS,
+                        beforePublish={check(current())},verifyStaged={input->
+                            PhysicalRecoveryEvidenceJson.requireExactJson(input,bytes)
+                        }){it.write(bytes)}
+                    if(current())_connectionMessage.value=localizedContext.getString(R.string.export_folder_success)+
+                        "\n"+listOfNotNull(journalPath,reportPath).joinToString("\n")
+                }catch(cancelled:CancellationException){throw cancelled}
+                catch(_:Exception){if(current())_connectionMessage.value=localizedContext.getString(R.string.export_folder_failed)}
+                return@launch
+            }
+            if(snapshot.nativeMaintenanceTarget!=null)return@launch
             snapshot.nativeLiveEvidence?.let { evidence ->
                 fun current()=isCurrentAccountGeneration(sessionGeneration) &&
                     authenticatedAccountUid==accountUid && currentLicenseLevel==LicenseLevel.OWNER &&
