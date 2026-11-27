@@ -26,7 +26,7 @@ class LegacyLiveLink:
     back to another ECU, the adapter's automatic protocol or cached data.
     """
     def __init__(self, exchange, protocol_check, protocol, source, *,
-                 clock=time.monotonic, require_current=lambda:None):
+                 clock=time.monotonic, require_current=lambda:None, raw_plan=None):
         if protocol not in PROTOCOLS or not valid_source(source):
             raise ValueError("Explicit legacy protocol and response source required")
         self.exchange=exchange
@@ -39,6 +39,8 @@ class LegacyLiveLink:
         self.observed_protocol=None
         self.other_sources=set()
         self.logical_count=0
+        self.raw_plan=raw_plan.validate() if raw_plan is not None else None
+        self.raw_bytes=0
 
     def _remaining(self, deadline, maximum):
         self.require_current()
@@ -51,7 +53,8 @@ class LegacyLiveLink:
         return (command in ("0100","0900","0901","0902") or
                 re.fullmatch(r"01[0-9A-F]{2}",command) is not None and
                 (int(command[2:],16)%32==0 or int(command[2:],16) in CONFIG_PIDS or
-                 int(command[2:],16)==0x1D or legacy_numeric_pid(int(command[2:],16))))
+                 int(command[2:],16)==0x1D or legacy_numeric_pid(int(command[2:],16)) or
+                 self.raw_plan is not None and int(command[2:],16) in self.raw_plan.pids)))
 
     def _read(self, command, deadline, logical):
         if not self._allows_command(command):
@@ -61,6 +64,11 @@ class LegacyLiveLink:
         self.exchanges.append(row)
         try:
             raw=self.exchange(command,self._remaining(deadline,4.0))
+            if not isinstance(raw,str) or len(raw)>32768:
+                raise ValueError("Invalid legacy transcript")
+            self.raw_bytes+=len(raw)
+            if self.raw_bytes>16*1024*1024:
+                raise ValueError("Legacy transcript budget exceeded")
             row["raw_response"]=raw
             self.require_current()
             if self.clock()>=deadline:
@@ -174,7 +182,7 @@ class LegacyLiveLink:
         deadline=self.clock()+timeout
         if request==b"\x09\x02":
             return self._vin(deadline,logical)
-        if len(request)!=2 or request[0]!=1 or not (request[1]%32==0 or request[1] in CONFIG_PIDS or request[1]==0x1D or legacy_numeric_pid(request[1])):
+        if len(request)!=2 or request[0]!=1 or not (request[1]%32==0 or request[1] in CONFIG_PIDS or request[1]==0x1D or legacy_numeric_pid(request[1]) or self.raw_plan is not None and request[1] in self.raw_plan.pids):
             raise ValueError("Only Mode 01 numeric values, configuration and support pages allowed")
         return self._single(request.hex().upper(),deadline,logical)
 
@@ -183,13 +191,13 @@ def record_legacy(exchange,protocol_check,protocol,source,plan:Plan,*,
                   clock=time.monotonic,sleep=time.sleep,require_current=lambda:None,
                   on_observation=lambda _:None):
     plan.validate()
-    if not all(legacy_numeric_pid(pid) for pid in plan.pids):
+    if not plan.raw_only and not all(legacy_numeric_pid(pid) for pid in plan.pids):
         raise ValueError("Selected PID exceeds supported legacy application width")
     link=LegacyLiveLink(exchange,protocol_check,protocol,source,
-                        clock=clock,require_current=require_current)
+                        clock=clock,require_current=require_current,raw_plan=plan if plan.raw_only else None)
     report=record(link.query,plan,clock=clock,sleep=sleep,require_current=require_current,
                   on_observation=on_observation,
-                  request_timeout=lambda request:20.0 if request==b"\x09\x02" else 4.0)
+                  request_timeout=lambda request:20.0 if request==b"\x09\x02" else 4.0,legacy=True)
     # The scheduler has distinct admission and sample arrays. Sort their
     # actual acquisition order by the logical query number, not timestamps
     # (millisecond-rounded values can collide). Each logical query yields one
