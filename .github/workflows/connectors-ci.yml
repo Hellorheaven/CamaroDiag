@@ -121,6 +121,8 @@ jobs:
           java -ea -cp /tmp/android-protocol com.camarodiag.connectors.J1979UsbTest
           javac -Xlint:all -Werror -cp /tmp/android-protocol -d /tmp/android-protocol connectors/host/android/src/main/java/com/camarodiag/connectors/J1979FreezeUsbAuth.java connectors/host/android/src/main/java/com/camarodiag/connectors/J1979FreezeUsbCapture.java connectors/host/android/src/test/java/com/camarodiag/connectors/J1979FreezeUsbTest.java
           java -ea -cp /tmp/android-protocol com.camarodiag.connectors.J1979FreezeUsbTest
+          javac -Xlint:all -Werror -cp /tmp/android-protocol -d /tmp/android-protocol connectors/host/android/src/main/java/com/camarodiag/connectors/J1979LiveUsbAuth.java connectors/host/android/src/main/java/com/camarodiag/connectors/J1979LiveNativeReplay.java connectors/host/android/src/main/java/com/camarodiag/connectors/J1979LiveUsbCapture.java connectors/host/android/src/test/java/com/camarodiag/connectors/J1979LiveUsbTest.java
+          java -ea -cp /tmp/android-protocol com.camarodiag.connectors.J1979LiveUsbTest
       - name: Use runner Android SDK
         run: |
           test -n "$ANDROID_HOME"
