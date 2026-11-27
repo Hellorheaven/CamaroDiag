@@ -1,3 +1,16 @@
+# Reprise SAE J1979 — CI/3 et captures interrompues — 27/11/2026
+
+PR #117, branche `chore/unified-ci`, base du lot `44712c16ad4998deb238e51759cb28aa68fc0d3e`. Exclusivement SAE J1979 ; C6 et autres protocoles en pause. Au SHA `4e9e94bf41c3bd2e359cdd41767063dc5c961c62`, comparaison GitHub : 48 commits, 38 fichiers, +1149/-62 lignes. Objectif des 10 000 lignes utiles non atteint.
+
+- Firmware : CI/3 pour acquisition native Mode 01 avec séquence 24 bits ; CI/2 conservé pour scan et trames figées. Même taille de paquet ; version fixée par le scope local, rejet croisé et pas de repli. Contrôle du délai absolu et du budget du scope sur fragments ; vérifier ensemble les deux MCU. Régression de bout en bout simulant plus de 65535 paquets écrite, non exécutée.
+- Limite de preuves CL/1 : réserver avant requête la taille maximale de réponse ; terminal partiel EVIDENCE_LIMIT vérifiable par firmware et moteurs Android, Windows et Python, sans réponse tronquée ni faux succès.
+- Capture interrompue : nouveau schéma distinct native-live-prefix-v1, seules les trames complètes CRC/ordre/sémantique valides sont inspectées ; rejet de corruption complète, pas de terminal ni preuve physique, empreinte et positions exactes, octets de fin non vérifiés. UI propriétaire Android/Windows, CLI Windows/Linux, vérification indépendante Python des exports des trois hôtes. Pas de projection catalogue ni CSV normal depuis un préfixe. Tests écrits.
+- Correction statique des déclarations Java J1979 vers com.camarodiag.connectors et déplacement vérifié de CamaroDiagConnectorLiveCampaign.kt du chemin erroné vers le chemin Kotlin canonique, sans perte de contenu. Sélecteur de credential lié au contexte de véhicule, périphérique et génération.
+- L'éditeur SAE identifie J1979DA_202607, révision du 16/07/2026, accès réservé : https://saemobilus.sae.org/standards/j1979da_202607-j1979-da-digital-annex-e-e-diagnostic-test-modes. Il manque le contenu autorisé des définitions exhaustives ; ne pas inventer de tables ni déduire conformité de la fiche publique. Restent aussi les services mutateurs natifs applicables et la revue globale de cohérence, puis gate unique de clôture. Le firmware n'est pas qualifié matériellement ; aucune activation mutatrice ajoutée dans ce lot.
+- Aucun test, build ou checkpoint volontairement déclenché avant clôture ; aucun APK, Release ni merge. Après clôture logicielle réussie, APK Release signé et vérifié selon v2.0.46, SHA exact de la PR, prerelease sans fusion.
+
+---
+
 # Reprise SAE J1979 Mode 01 natif — intégration hôtes et exports — 27/11/2026
 
 PR #117, branche `chore/unified-ci`, base `1f1cfc1153911885331d4a4cae750e18e6f1d20f`. Exclusivement SAE J1979, C6 et autres protocoles en pause. Au SHA `b7bb19636099dd276e6f647f6327b6c49f3f15b3`, comparaison GitHub : 48 commits, 32 fichiers, +1149/-34 lignes. Le volume de 10 000 lignes utiles demandé n'est pas atteint ; ne pas l'annoncer atteint.
