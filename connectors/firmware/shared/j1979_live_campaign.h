@@ -89,16 +89,17 @@ class J1979LiveCampaign {
         }
         continue;
       }
+      if(!sequence.canRetain(phase)){sequence.abort(Stop::EvidenceLimit,now);break;}
       uint8_t req[2]{};
       const uint32_t timeout=sequence.remaining(now)<2500u?sequence.remaining(now):2500u;
       if(timeout<2u){sequence.abort(Stop::Budget,now);break;}
       bool next=false;
       if(phase==Phase::PeriodicVin){req[0]=9;req[1]=2;next=true;}
       else next=sequence.next(now,req);
-      if(sequence.summary().steps>=MaximumSteps||!next||
-          !sequence.admit(req,sizeof(req),now,timeout)){
+      if(sequence.summary().steps>=MaximumSteps||!next){
         sequence.abort(Stop::InvalidSequence,now);break;
       }
+      if(!sequence.admit(req,sizeof(req),now,timeout))break;
       Observation event{};
       event.phase=phase;
       event.cycle=phase==Phase::Sample?sequence.cycle():0;
