@@ -1,3 +1,12 @@
+## Reprise SAE J1979 — 27/11/2026 — cohérence hôtes et CF/1
+
+PR #117, branche `chore/unified-ci`. Base du lot 1bf6c9933f55c2c48173cfa7248ed7872dd64f73 ; avant cette note 93cda522bea945a2a2cde9e5423aeb326dcd6342 : 11 commits, 11 fichiers, +137/-17 selon comparaison GitHub. Objectif 10 000 lignes non atteint.
+
+- Contexte Mode 01 : Python, Kotlin et C# rejettent les bits réservés du baseline PID 01 et les réponses positives ambiguës PID 01/1D ; régressions ajoutées. Ne pas sélectionner arbitrairement une réponse valide parmi des doublons contradictoires.
+- Mode 02 : régressions Android et Windows avec même fixture CF/1 synthétique à deux frames, définitions distinctes du même PID, PID inconnu, contrôle VIN, empreinte, troncature et référence. Libellés Android FR/EN corrigés ; CLI Windows distingue le rejeu d'une capture native du rejeu d'un rapport applicatif. Ces tests sont écrits, pas exécutés.
+- Reste à couvrir les variantes CF/1 changement DTC/VIN sur les deux hôtes, vérifier compilation et intégration matérielle CU/5/CI/5, obtenir la référence normative autorisée J1979DA_202607 et compléter la couverture sans inventer de définitions.
+- C6 en pause, aucun autre protocole, aucun test/build/gate volontairement lancé ; aucune fusion ni APK. Gate final SAE J1979 puis APK Release signé/vérifié selon v2.0.46 sur SHA exact, prerelease sans fusion.
+
 ## Reprise SAE J1979 — 27/11/2026 — CU/5, CI/5 et projection CF/1
 
 Base du lot : 04124ea274245301bc0cafa028899fb679288eea. Avant cette note : e9b2a79688fbf1843f80d453dc46497a565b3459 ; comparaison GitHub 38 commits, 33 fichiers, +1392/-79. Aucun gate ni test lancé. C6 en pause, pas d'autre protocole ni C8, pas de fusion.
