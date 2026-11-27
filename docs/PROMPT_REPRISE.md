@@ -1,3 +1,9 @@
+## Reprise — SAE J1979 / demande de Release signée (27 novembre 2026)
+
+Lot Mode 06 CAN : 16 UASID historiques ISO 15031-5:2006, conversions Android/Windows/Linux, mots signés, limites et valeurs inconnues conservées, export structuré Windows/Linux. Tests de régression écrits, non exécutés (pas de checkpoint avant clôture). Les anciennes preuves natives CJ/1 restent inchangées. Le catalogue J1979DA complet, les InfoTypes et contrôles normalisés encore manquants et la couverture firmware restent à terminer avant le gate de clôture. Ne pas déclarer SAE J1979 terminé sur ce seul lot.
+
+Demande du propriétaire : clôturer SAE J1979 puis produire un APK Release signé comme v2.0.46, sans fusionner PR #117. Procédure précédente : workflow `.github/workflows/release-pr117-apk.yml` sur main, épinglé sur le SHA de la PR, compilation avec clé éphémère, signature et vérification séparées, publication prerelease. Référence historique : commit main `036249d7d2e5429495182a0840f3fb32e1a4ac30`, tag `v2.0.46-pr117-26009f1`. Réutiliser après succès du gate J1979, sans modifier la release précédente, ni supprimer la branche. Aucun workflow Release déclenché dans ce lot.
+
 ## J1979 et C6 — relecture croisée des preuves et historique (27/11/2026)
 
 - J1979 : `verify-j1979-capture` rapproche le binaire CJ/1 et le rapport natif Android/Windows ou Python, avec limites de taille, SHA-256, relecture indépendante, contrôle du profil, de chaque étape et des champs dérivés, du résumé et des compteurs. Comparaison VIN indépendante facultative. Un rapport négatif ou annulé ne devient pas positif ; aucune authentification de la capture ni qualification physique.
