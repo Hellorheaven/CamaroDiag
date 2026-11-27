@@ -24,6 +24,28 @@ MAX_BUDGET = 600.0
 
 # Reuse the canonical application decoder. Widths are not guessed from an
 # observed response and a bitmap identifier is never a numeric live value.
+def raw_pid(pid):
+    """A Mode 01 data identifier, not a support page or a mutation."""
+    return type(pid) is int and 1 <= pid <= 255 and pid % 32 != 0
+
+
+def raw_sample(request, response, *, legacy=False):
+    """Check service, identifier and envelope only; do not infer data width,
+    units, numeric values or a newer annex's layout from an observed reply.
+    """
+    if (not isinstance(request, bytes) or len(request) != 2 or request[0] != 1
+            or not raw_pid(request[1]) or not isinstance(response, bytes)
+            or not 3 <= len(response) <= (7 if legacy else 4095)):
+        return None
+    if response[0] == 0x7f:
+        if len(response) == 3 and response[1] == 1 and response[2] not in (0, 0x78):
+            return {"shape": "NEGATIVE", "negative_response_code": response[2]}
+        return None
+    if response[:2] != bytes((0x41, request[1])):
+        return None
+    return {"shape": "RAW"}
+
+
 def numeric_pid(pid):
     if not isinstance(pid, int) or isinstance(pid, bool) or not 1 <= pid <= 255 or pid % 32 == 0:
         return False
@@ -47,11 +69,13 @@ class Plan:
     cycles: int = 30
     interval: float = 1.0
     budget: float = 180.0
+    raw_only: bool = False
 
     def validate(self):
         if (not self.pids or len(self.pids)>MAX_PIDS or len(set(self.pids))!=len(self.pids)
-                or not all(numeric_pid(pid) for pid in self.pids)):
-            raise ValueError("Select unique supported numeric PID definitions")
+                or type(self.raw_only) is not bool
+                or not all((raw_pid if self.raw_only else numeric_pid)(pid) for pid in self.pids)):
+            raise ValueError("Select unique numeric PID definitions or explicitly select raw-only Mode 01")
         if not isinstance(self.expected_vin,str) or not re.fullmatch(r"[A-HJ-NPR-Z0-9]{17}",self.expected_vin):
             raise ValueError("Documented physical ECU VIN required")
         if (not isinstance(self.cycles,int) or isinstance(self.cycles,bool) or not 1<=self.cycles<=MAX_CYCLES
@@ -129,7 +153,7 @@ class _ChannelAccumulator:
 
 def record(exchange, plan: Plan, *, clock=time.monotonic, sleep=time.sleep,
            require_current=lambda:None, on_observation=lambda _:None,
-           request_timeout=lambda _:2.5):
+           request_timeout=lambda _:2.5, legacy=False):
     """Capture a private prefix even on cancellation or transport failure.
 
     A cycle is a sequence of individual requests, not simultaneous samples.
@@ -149,9 +173,10 @@ def record(exchange, plan: Plan, *, clock=time.monotonic, sleep=time.sleep,
     stop=None
     completed_cycles=0
     inventory_complete=False
-    required_configs=sorted({dependency(pid) for pid in plan.pids if dependency(pid) is not None})
+    required_configs=[] if plan.raw_only else sorted({dependency(pid) for pid in plan.pids if dependency(pid) is not None})
     scaling=None
-    needs_trim=any(pid in TRIMS for pid in plan.pids)
+    needs_trim=not plan.raw_only and any(pid in TRIMS for pid in plan.pids)
+    raw_bytes=0
     layout=None
 
     def elapsed():
@@ -171,7 +196,7 @@ def record(exchange, plan: Plan, *, clock=time.monotonic, sleep=time.sleep,
         return True
 
     def query(request,phase,cycle=None,pid=None):
-        nonlocal stop
+        nonlocal stop, raw_bytes
         if not active():
             return None
         began=clock()
@@ -184,15 +209,18 @@ def record(exchange, plan: Plan, *, clock=time.monotonic, sleep=time.sleep,
             if not math.isfinite(allowed_timeout) or not 0<allowed_timeout<=30:
                 raise ValueError("Invalid per-request time limit")
             raw=exchange(request,min(allowed_timeout,remaining()))
-            if not isinstance(raw,bytes) or len(raw)>4095:
+            if not isinstance(raw,bytes) or not raw or len(raw)>4095:
                 raise ValueError("Invalid response type or length")
+            raw_bytes += len(raw)
+            if raw_bytes > 16 * 1024 * 1024:
+                raise ValueError("Live payload evidence budget exceeded")
             row["response_hex"]=raw.hex().upper()
             require_current()
             if remaining()<=0:
                 stop="BUDGET_EXHAUSTED"
                 row["detail"]="LATE_RESPONSE"
             else:
-                evidence=decode_observation(request,raw)
+                evidence=raw_sample(request,raw,legacy=legacy) if plan.raw_only and phase=="SAMPLE" else decode_observation(request,raw)
                 if evidence is None:
                     row.update(status="FAILED",detail="INVALID_APPLICATION_RESPONSE")
                     # A malformed or unrelated response calls the correlation
@@ -203,7 +231,10 @@ def record(exchange, plan: Plan, *, clock=time.monotonic, sleep=time.sleep,
                     row["status"]=evidence["shape"]
                     if evidence["shape"]=="NEGATIVE":
                         row["detail"]=f'NRC_{evidence["negative_response_code"]:02X}'
-                    if phase=="SCALING" and evidence["shape"] in ("RAW","PASSED") and config_data(request[1],raw[2:]) is None:
+                    if plan.raw_only and phase=="SAMPLE":
+                        if evidence["shape"]=="RAW":
+                            row["detail"]="RAW_UNINTERPRETED"
+                    elif phase=="SCALING" and evidence["shape"] in ("RAW","PASSED") and config_data(request[1],raw[2:]) is None:
                         stop="INVALID_APPLICATION_RESPONSE"
                         row.update(status="FAILED",detail=stop,application_evidence=None)
                     elif phase=="SAMPLE" and evidence["shape"] in ("RAW","PASSED") and pid in TRIMS:
@@ -351,8 +382,12 @@ def record(exchange, plan: Plan, *, clock=time.monotonic, sleep=time.sleep,
                 next_start=max(actual_start+plan.interval,clock())
         if stop is None and completed_cycles==plan.cycles:
             identity("FINAL_VIN")
-        if stop is None and not any(row["measurement"] is not None or row["multi_signals"] for row in rows):
-            stop="NO_VERIFIED_MEASUREMENT"
+        if stop is None:
+            if plan.raw_only:
+                if any(stats[pid].counts.get("RAW",0)==0 for pid in plan.pids):
+                    stop="SELECTED_RAW_PID_NO_RESPONSE"
+            elif not any(row["measurement"] is not None or row["multi_signals"] for row in rows):
+                stop="NO_VERIFIED_MEASUREMENT"
     except KeyboardInterrupt:
         stop="CANCELLED"
     except (OSError,ValueError,RuntimeError) as error:
@@ -360,7 +395,7 @@ def record(exchange, plan: Plan, *, clock=time.monotonic, sleep=time.sleep,
     return {"scope":"PHYSICAL_SELECTED_ECU_LIVE","declared_vin":plan.expected_vin,
             "observed_vin":observed,"vin_match":"UNVERIFIED" if observed is None else
                 "MATCH" if observed==plan.expected_vin else "MISMATCH",
-            "selected_pids":list(plan.pids),"advertised_pids":sorted(advertised),
+            "raw_only":plan.raw_only,"selected_pids":list(plan.pids),"advertised_pids":sorted(advertised),
             "inventory_pages":pages,"inventory_complete":inventory_complete,
             "unverified_selected_pids":[pid for pid in plan.pids if pid not in advertised],
             "requested_cycles":plan.cycles,"completed_cycles":completed_cycles,
@@ -378,7 +413,7 @@ def record(exchange, plan: Plan, *, clock=time.monotonic, sleep=time.sleep,
 
 def csv_rows(report):
     """Stable long-form CSV; empty fields represent missing values, never zero."""
-    multi=any(pid in TRIMS or multi_width(pid) is not None for pid in report.get("selected_pids",()))
+    multi=not report.get("raw_only",False) and any(pid in TRIMS or multi_width(pid) is not None for pid in report.get("selected_pids",()))
     header=("cycle","pid_hex","started_elapsed_ms","elapsed_ms","duration_ms","status",
             "value","unit","request_hex","response_hex","detail")
     yield header+("signal_name","raw_encoded") if multi else header
