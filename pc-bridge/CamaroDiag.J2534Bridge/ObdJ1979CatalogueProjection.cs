@@ -253,11 +253,32 @@ internal static class ObdJ1979CatalogueProjection
         if(!Null(inner)&&!Null(Get(root,"completed"))&& !Bool(Get(root,"completed")))complete=false;
         return new(expectedVin,complete,legacy?"LEGACY":"CAN",channel,samples,final);
     }
+    internal const string NativeSchema="camarodiag-j1979-native-catalogue-projection-v1";
+    private static bool IsNative(byte[] bytes)=>bytes.Length>=3&&bytes[0]=='C'&&bytes[1]=='L'&&bytes[2]==1;
+    private static Source ReplayNative(byte[] raw,string expectedVin)
+    {
+        Check(ValidVin(expectedVin),"Expected independent VIN required");
+        Check(raw.Length<=CamaroDiagConnectors.Windows.J1979LiveNative.MaximumCapture,"Native capture exceeds byte limit");
+        using var stream=new MemoryStream(raw,writable:false);
+        var report=CamaroDiagConnectors.Windows.J1979LiveNative.Decode(stream);
+        Check(report.CaptureIntegrityVerified&&report.Profile is not null&&report.Summary is not null&&
+            report.Result is not null,"Invalid or incomplete CL/1 evidence");
+        var profile=report.Profile!;
+        var result=report.Result!;
+        var summary=report.Summary!;
+        Check(profile.ExpectedVin==expectedVin,"Native capture VIN differs from independently supplied VIN");
+        return new(expectedVin,summary.Completed,"CAN",
+            new(){["kind"]="can",["tx"]=Convert.ToInt32(profile.RequestCanId,16),["rx"]=Convert.ToInt32(profile.ResponseCanId,16)},
+            result.Samples.Select(row=>new Sample(row.Pid,row.Cycle,row.ElapsedMs,row.Status,row.ResponseHex)).ToArray(),
+            summary.FinalIdentityVerified);
+    }
+
     internal static Dictionary<string,object?> Build(byte[] catalogueBytes,string referenceSha,
         byte[] sourceBytes,string expectedVin)
     {
         var catalogue=ObdJ1979DocumentedCatalogue.Parse(catalogueBytes,referenceSha);
-        var source=ReplayApplication(sourceBytes,expectedVin);
+        bool native=IsNative(sourceBytes);
+        var source=native?ReplayNative(sourceBytes,expectedVin):ReplayApplication(sourceBytes,expectedVin);
         var rows=new List<Dictionary<string,object?>>();
         var counts=new SortedDictionary<string,int>(StringComparer.Ordinal);
         int signalRows=0;
@@ -268,15 +289,18 @@ internal static class ObdJ1979CatalogueProjection
             var status=(string)row["projection_status"]!;
             counts[status]=counts.GetValueOrDefault(status)+1;rows.Add(row);
         }
-        return new(){
-            ["schema"]=Schema,["reference_edition"]=catalogue.Edition,["reference_sha256"]=catalogue.ReferenceSha256,
-            ["catalogue_sha256"]=catalogue.CatalogueSha256,["source_report_sha256"]=Sha(sourceBytes),
+        var output=new Dictionary<string,object?>(){
+            ["schema"]=native?NativeSchema:Schema,["reference_edition"]=catalogue.Edition,["reference_sha256"]=catalogue.ReferenceSha256,
+            ["catalogue_sha256"]=catalogue.CatalogueSha256,[native?"source_capture_sha256":"source_report_sha256"]=Sha(sourceBytes),
             ["expected_vin_independently_supplied"]=true,["declared_vin"]=source.Vin,["channel"]=source.Channel,
             ["source_completed"]=source.Completed,["final_identity_verified"]=source.FinalIdentityVerified,
-            ["source_application_replay_verified"]=true,["source_replay_verified"]=false,
+            ["source_replay_verified"]=native,
             ["reference_authenticity_verified"]=false,["normative_compliance_verified"]=false,
             ["physical_vehicle_verified"]=false,["authenticated"]=false,["permits_programming"]=false,
             ["diagnostic_verdict"]=null,["counts"]=counts,["rows"]=rows};
+        if(native){output["native_capture_replayed"]=true;output["transport_frames_replayed"]=false;}
+        else output["source_application_replay_verified"]=true;
+        return output;
     }
     private static FileStream OpenInput(string path,int max)
     {
