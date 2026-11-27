@@ -26,12 +26,12 @@ internal static class ObdJ1979FreezeCatalogue
         Check(reference==Digest(pin),"Reference digest differs from pin");
         var seen=new HashSet<int>();
         var definitions=new Dictionary<(int,int),Definition>();
-        foreach(var entry in Array(root.GetProperty("frames"),1,8))
+        foreach(var entry in ObdJ1979DocumentedCatalogue.Array(root.GetProperty("frames"),1,8))
         {
             Fields(entry,["frame","definitions"]);
             int frame=Int(entry.GetProperty("frame"),0,255);
             Check(seen.Add(frame),"Duplicate frame definition");
-            foreach(var row in Array(entry.GetProperty("definitions"),1,247))
+            foreach(var row in ObdJ1979DocumentedCatalogue.Array(entry.GetProperty("definitions"),1,247))
             {
                 var definition=ParseDefinition(row);
                 Check(definition.Pid!=2&&definition.Width<=4092&&
@@ -48,6 +48,7 @@ internal static class ObdJ1979FreezeCatalogue
     {
         Check(Regex.IsMatch(expectedVin??"", @"\A[A-HJ-NPR-Z0-9]{17}\z"),"Independent VIN required");
         var catalogue=Parse(catalogueBytes,referenceSha);
+        Check(capture.LongLength<=J1979FreezeNative.MaximumCapture,"CF/1 capture exceeds limit");
         using var stream=new MemoryStream(capture,writable:false);
         var source=J1979FreezeNative.Decode(stream);
         Check(source.CaptureIntegrityVerified&&source.Profile is not null&&source.Result is not null,
