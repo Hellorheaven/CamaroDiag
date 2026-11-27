@@ -36,7 +36,8 @@ class SpiTransport final:public Transport {
       return fail();
     Packet result;
     const auto expected=packet.op==Op::Read?Op::Result:Op::Chunk;
-    if(!decode(reply,Size,result)||result.op!=expected||result.seq!=packet.seq)
+    if(!decode(reply,Size,result)||result.version!=packet.version||
+       result.op!=expected||result.seq!=packet.seq)
       return fail();
     std::memcpy(res,reply,Size);return true;
   }
