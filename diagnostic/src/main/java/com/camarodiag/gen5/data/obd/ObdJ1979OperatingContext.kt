@@ -78,7 +78,8 @@ object ObdJ1979OperatingContext {
         val reserved=if(compression)0x14 else 0x10
         if((c or d) and reserved!=0)return null
         val valid=baseline!=null&&baseline.size==4&&baseline.all { it in 0..255 }&&
-            (baseline[1] and 8!=0)==compression
+            (baseline[1] and 8!=0)==compression&&baseline[1] and 0x80==0&&
+            (baseline[2] or baseline[3]) and reserved==0
         val monitors=mutableListOf<Monitor>()
         fun add(names:List<String?>,support:Int?,enabled:Int,incomplete:Int){
             names.forEachIndexed { bit,name ->
@@ -122,9 +123,9 @@ object ObdJ1979OperatingContext {
 
     fun project(observations:List<Observation>):Projection {
         val rows=correlated(observations)
-        val layout=rows.filter { (req,data)->req==listOf(1,0x1D)&&data.size==1 }
-            .singleOrNull()?.second?.single()
-        val baseline=rows.filter { (req,data)->req==listOf(1,1)&&data.size==4 }.singleOrNull()?.second
+        val layout=rows.filter { it.first==listOf(1,0x1D) }
+            .singleOrNull()?.second?.singleOrNull()
+        val baseline=rows.filter { it.first==listOf(1,1) }.singleOrNull()?.second
         val cycle=rows.filter { it.first==listOf(1,0x41) }.singleOrNull()?.second?.let { decodeCycle(it,baseline) }
         val trims=rows.mapNotNull { (req,data)->decodeTrim(req,data,layout) }
         return Projection(cycle,trims)
