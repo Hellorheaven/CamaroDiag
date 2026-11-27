@@ -50,7 +50,8 @@ internal object NativeUsbFunctionalEvidence {
         val extendedVehicleInfo:List<ObdJ1979ExtendedVehicleInfo.Result> = emptyList(),
         val multiSignalRecords:List<ObdJ1979MultiSignal.Record> = emptyList(),
         val statusRecords:List<ObdJ1979Status.Record> = emptyList(),
-        val contextualMeasurements:ObdJ1979ScalingContext.Projection = ObdJ1979ScalingContext.project(emptyList()))
+        val contextualMeasurements:ObdJ1979ScalingContext.Projection = ObdJ1979ScalingContext.project(emptyList()),
+        val operatingContext:com.camarodiag.gen5.data.obd.ObdJ1979OperatingContext.Projection = com.camarodiag.gen5.data.obd.ObdJ1979OperatingContext.project(emptyList()))
 
     private fun inventoryValue(step:JSONObject):InventoryPage? {
         val request=step.optString("request_hex")
@@ -254,7 +255,10 @@ internal object NativeUsbFunctionalEvidence {
             measured[mode to pid] = Measurement(mode,pid,name,number,unit)
         }
         return DiagnosticValues(vin,dtcs,measured.values.sortedWith(compareBy({ it.mode },{ it.pid })),monitors.toList(),identity.toMap(),readiness,pages.values.sortedWith(compareBy({it.mode},{it.base})),freeze,extendedVehicleInfo.toList(),multiSignals.toList(),statusRecords.toList(),
-            ObdJ1979ScalingContext.project(observations))
+            ObdJ1979ScalingContext.project(observations),
+            com.camarodiag.gen5.data.obd.ObdJ1979OperatingContext.project(observations.map {
+                com.camarodiag.gen5.data.obd.ObdJ1979OperatingContext.Observation(it.requestHex,it.responseHex,it.status)
+            }))
     }
 
     /** Verified readings within the advertised inventory, for ordinary diagnostic
@@ -277,6 +281,9 @@ internal object NativeUsbFunctionalEvidence {
         }
         return values.copy(
             contextualMeasurements=ObdJ1979ScalingContext.project(observations),
+            operatingContext=com.camarodiag.gen5.data.obd.ObdJ1979OperatingContext.project(observations.map {
+                com.camarodiag.gen5.data.obd.ObdJ1979OperatingContext.Observation(it.requestHex,it.responseHex,it.status)
+            }),
             statusRecords=values.statusRecords.filter { supported(1,it.requestHex.takeLast(2).toInt(16)) },
             measurements=values.measurements.filter { supported(it.mode,it.pid) &&
                 (it.mode!=2||values.freeze?.present==true) },
