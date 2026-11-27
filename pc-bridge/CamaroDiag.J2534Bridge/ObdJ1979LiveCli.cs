@@ -29,12 +29,13 @@ internal static class ObdJ1979LiveCli
             !args[0].Equals(LegacyCommand,StringComparison.OrdinalIgnoreCase))throw new ArgumentException("Expected live recorder command.");
         bool legacy=args[0].Equals(LegacyCommand,StringComparison.OrdinalIgnoreCase);
         var values=new Dictionary<string,string>(StringComparer.Ordinal);
-        var pids=new List<byte>();bool confirm=false,quiet=false,functional=false;
+        var pids=new List<byte>();bool confirm=false,quiet=false,functional=false,rawOnly=false;
         for(int i=1;i<args.Length;i++){
             string key=args[i];
             if(key==(legacy?"--confirm-legacy-profile":"--confirm-physical-channel")&&!confirm){confirm=true;continue;}
             if(legacy&&key=="--confirm-functional-scope"&&!functional){functional=true;continue;}
             if(key=="--quiet"&&!quiet){quiet=true;continue;}
+            if(key=="--raw-only"&&!rawOnly){rawOnly=true;continue;}
             if(key is not ("--adapter-index" or "--protocol" or "--variant" or "--source" or "--tx" or "--rx" or "--vin" or "--pid" or
                 "--cycles" or "--interval-ms" or "--budget-seconds" or "--output" or "--csv")||
                 i+1>=args.Length||args[i+1].StartsWith("--",StringComparison.Ordinal))throw new ArgumentException("Unexpected option.");
@@ -78,8 +79,8 @@ internal static class ObdJ1979LiveCli
             csv is not null&&(string.IsNullOrWhiteSpace(csv)||Path.GetFullPath(output).Equals(Path.GetFullPath(csv),StringComparison.OrdinalIgnoreCase)))
             throw new ArgumentException("Explicit physical channel, VIN, confirmations and distinct new files required.");
         var plan=new ObdJ1979LiveRecorder.Plan(pids.ToArray(),values.GetValueOrDefault("--vin")??"",
-            Number("--cycles",30),Number("--interval-ms",1000),budget*1000).Validate();
-        if(legacy&&plan.Pids.Any(pid=>!ObdJ1979LiveRecorder.LegacyNumericPid(pid)))
+            Number("--cycles",30),Number("--interval-ms",1000),budget*1000,rawOnly).Validate();
+        if(legacy&&!plan.RawOnly&&plan.Pids.Any(pid=>!ObdJ1979LiveRecorder.LegacyNumericPid(pid)))
             throw new ArgumentException("Selected PID exceeds legacy application width.");
         return new(index,profile,tx,rx,plan,output,csv,quiet,variant,source);
     }
@@ -93,13 +94,14 @@ internal static class ObdJ1979LiveCli
         try{
             requireActive();
             if(options.LegacyVariant is {} variant&&options.LegacySource is byte source){
-                if(options.Plan.Pids.Any(pid=>!ObdJ1979LiveRecorder.LegacyNumericPid(pid)))
+                if(!options.Plan.RawOnly&&options.Plan.Pids.Any(pid=>!ObdJ1979LiveRecorder.LegacyNumericPid(pid)))
                     throw new ArgumentException("Selected PID exceeds legacy application width.");
                 using var session=ObdLegacyJ2534Transport.Open(adapter,variant,source,requireActive);
                 initialization=session.InitEvidence;
-                legacyLink=new ObdJ1979LegacyLiveLink(source,session.Read,requireActive);
+                legacyLink=new ObdJ1979LegacyLiveLink(source,session.Read,requireActive,
+                    rawPlan:options.Plan.RawOnly?options.Plan:null);
                 result=ObdJ1979LiveRecorder.Run(legacyLink.Query,options.Plan,requireActive,onSample,
-                    requestTimeout:req=>req[0]==9?20000:4000);
+                    requestTimeout:req=>req[0]==9?20000:4000,legacy:true);
             }else{
                 using var device=new J2534Device(adapter);
                 device.Open(options.Tx,options.Rx,ObdJ1979CanNetwork.Extended(options.Profile),options.Profile);
@@ -143,7 +145,7 @@ internal static class ObdJ1979LiveCli
                 var report=Execute(adapters[options.AdapterIndex],options,cancel.Token.ThrowIfCancellationRequested,
                     row=>{if(!options.Quiet)Console.WriteLine($"{row.ElapsedMs} ms {row.Pid:X2} "+
                         (row.MultiSignals is { } signals?ObdJ1979MultiSignal.Format(signals):
-                             row.Measurement is {} v?ObdJ1979PidValues.Format(v):row.Status));});
+                             row.Measurement is {} v?ObdJ1979PidValues.Format(v):options.Plan.RawOnly?row.ResponseHex??row.Status:row.Status));});
                 Write(output,[Encode(report)]);
                 if(csv is not null)Write(csv,report.Result is {} result?ObdJ1979LiveRecorder.Csv(result):
                     new[]{"cycle,pid_hex,started_elapsed_ms,elapsed_ms,duration_ms,status,value,unit,request_hex,response_hex,detail"});
