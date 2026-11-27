@@ -9,6 +9,8 @@ import re
 import struct
 import zlib
 
+from .j1979_vehicle_info import can_info
+
 _HEADER = struct.Struct("<2sBBHH")
 _STATES = {1: "PASSED", 2: "RAW", 3: "NEGATIVE", 4: "TIMEOUT", 5: "FAILED"}
 _END = {1: "COMPLETE", 2: "INITIAL_UNVERIFIED", 3: "BUDGET", 4: "LINK_FAULT", 5: "SINK_STOPPED"}
@@ -424,6 +426,21 @@ def service_observations(steps):
     return result
 
 
+def extended_vehicle_info(steps):
+    """Decode historical RAW records without rewriting recorded CJ/1 states."""
+    records = []
+    for step in steps:
+        request = step.get("request_hex")
+        if step.get("status") != "RAW" or request not in ("0908", "090B", "090D", "090F"):
+            continue
+        try:
+            records.append(can_info(int(request[2:],16), bytes.fromhex(step["response_hex"])))
+        except (ValueError, TypeError):
+            # A historically correlated raw response is not necessarily valid.
+            pass
+    return records
+
+
 def decode(stream):
     """Consume one capture, preserving verified prefix on corruption/truncation."""
     report = {"schema": "camarodiag-functional-j1979-embedded-evidence-v1",
@@ -516,3 +533,4 @@ def decode(stream):
         return report
     finally:
         report["service_observations"] = service_observations(report["steps"])
+        report["extended_vehicle_info"] = extended_vehicle_info(report["steps"])
