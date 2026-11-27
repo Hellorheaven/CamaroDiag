@@ -73,6 +73,9 @@ class SpiSlavePort {
   virtual uint32_t monotonicMs()=0;
   virtual bool arm(const uint8_t* tx,uint8_t* rx,size_t length)=0;
   virtual void ready(bool response)=0;
+  // A terminal response need not arm another request slot. Board adapters
+  // must lower READY only after verifying that the last slot completed.
+  virtual bool finishResponse(){ready(false);return admitted();}
   virtual void fault()=0;
 };
 class SpiSlave {
