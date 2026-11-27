@@ -137,3 +137,30 @@ def legacy_project(steps, source):
         rows.append({"request_hex":step.get("request_hex"),"response_hex":records[0],
                      "status":step.get("status")})
     return project(rows)
+
+
+def trim_layout(steps):
+    """Derive admission layout from the original selected ECU evidence."""
+    rows=list(_records(steps))
+    pages=[data for req,data in rows if req==b"\x01\x00"]
+    values=[data for req,data in rows if req==b"\x01\x1d"]
+    if len(pages)!=1 or len(pages[0])!=4:
+        return {"state":"UNVERIFIED","raw_encoded":None}
+    advertised=bool(pages[0][3]&0x08) # PID 1D, index 28
+    if not advertised:
+        return {"state":"NOT_ADVERTISED_BY_SELECTED_ECU" if not values else "UNVERIFIED",
+                "raw_encoded":None}
+    if len(values)!=1 or len(values[0])!=1:
+        return {"state":"UNVERIFIED","raw_encoded":None}
+    return {"state":"VERIFIED","raw_encoded":values[0][0]}
+
+
+def live_signals(request,response,layout):
+    """Finite, attributed values only; unverified upper bytes remain in raw."""
+    if len(request)!=2 or request[0]!=1 or response[:2]!=bytes((0x41,request[1])):
+        return None
+    record=decode_trim(request,response[2:],layout.get("raw_encoded"))
+    if record is None:
+        return None
+    return [{"pid":request[1],"name":s["name"],"number":s["number"],"unit":s["unit"],
+             "raw_encoded":s["raw_encoded"]} for s in record["signals"] if s["number"] is not None]
