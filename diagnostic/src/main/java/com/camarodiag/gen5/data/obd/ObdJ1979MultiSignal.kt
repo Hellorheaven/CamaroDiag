@@ -272,6 +272,11 @@ object ObdJ1979MultiSignal {
             }
         }
     }
+    data class Record(val requestHex:String,val signals:List<Signal>)
+    fun tryRecord(request:String,response:String?,status:String):Record? {
+        if(status !in setOf("RAW","PASSED"))return null
+        return decodeResponse(request,response)?.let { Record(request,it) }
+    }
     fun decodeResponse(request:String,response:String?):List<Signal>? {
         if(!request.matches(Regex("01[0-9A-F]{2}"))||response==null)return null
         val pid=request.takeLast(2).toInt(16)
