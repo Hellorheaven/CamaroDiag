@@ -87,6 +87,21 @@ internal static class ObdJ1979LiveRecorderSelfTests
         Check(channels.Observations.All(x=>x.Measurement is null),"no scalar projection of multi-channel PID");
         Check(ObdJ1979LiveRecorder.Csv(channels).First().EndsWith("signal_name,raw_encoded"),
             "multi-channel CSV header");
+        now=0;
+        var diesel=ObdJ1979LiveRecorder.Run((req,_)=>Convert.ToHexString(req) switch {
+            "0100"=>[0x41,0,0,0,0,1],
+            "0120"=>[0x41,0x20,0,0,0,1],
+            "0140"=>[0x41,0x40,0,0,0,1],
+            "0160"=>[0x41,0x60,0,0,0,1],
+            "0180"=>[0x41,0x80,0x80,0,0,0],
+            "0181"=>[0x41,0x81,0x1F,..Enumerable.Repeat((byte)0xFF,40)],
+            _=>Normal(req)
+        },plan with{Pids=[0x81],Cycles=2},()=>{},clock:()=>now,delay:ms=>now+=ms);
+        Check(diesel.Completed&&diesel.MultiSignalSummary.Count==10,"AECD timers isolated");
+        Check(diesel.MultiSignalSummary.All(x=>x.Count==2&&x.Mean==4294967295d),
+            "AECD unsigned 32-bit maximum preserved");
+        Check(diesel.Observations.All(x=>x.Measurement is null),"AECD does not masquerade as scalar");
+        Check(ObdJ1979LiveRecorder.Csv(diesel).Count()==21,"all AECD channels in CSV");
         return count;
     }
 }
