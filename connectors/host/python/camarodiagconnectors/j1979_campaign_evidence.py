@@ -11,6 +11,7 @@ import zlib
 
 from .j1979_vehicle_info import can_info
 from .j1979_multi_signal import from_steps as multi_records
+from .j1979_status import from_steps as status_records
 
 _HEADER = struct.Struct("<2sBBHH")
 _STATES = {1: "PASSED", 2: "RAW", 3: "NEGATIVE", 4: "TIMEOUT", 5: "FAILED"}
@@ -536,3 +537,4 @@ def decode(stream):
         report["service_observations"] = service_observations(report["steps"])
         report["extended_vehicle_info"] = extended_vehicle_info(report["steps"])
         report["multi_signal_records"] = multi_records(report["steps"])
+        report["status_records"] = status_records(report["steps"])
