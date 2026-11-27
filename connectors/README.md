@@ -287,3 +287,13 @@ camarodiag-offline compare-live --report before.json --report after.json --outpu
 ```
 
 Relecture hors ligne des réponses Mode 01 et Mode 09, des bitmaps, des cycles, de la source legacy et des statistiques. La comparaison impose un même VIN et canal, sans supposer une acquisition simultanée ou des conditions de conduite identiques. Une preuve cohérente n'est ni une authentification, ni une qualification physique. / Offline consistency replay and per-PID summaries, not hardware qualification or a synchronized diagnostic verdict. Output is exclusive; source files are never modified.
+
+### Checkpoints CDJ/1 hors ligne / Offline checkpoint inspection
+
+```sh
+camarodiag-offline inspect-checkpoint --input checkpoint.bin --output inspection.json
+camarodiag-offline verify-checkpoint-report --input checkpoint.bin --report android-or-windows.json --output matched.json
+camarodiag-offline inspect-checkpoint-history --input prepared.bin --input erase-intent.bin --output history.json
+```
+
+La suite est fournie dans l'ordre par l'opérateur. Un état terminal ne prouve pas une restauration physique, et un suffixe ne constitue pas un historique complet. CRC et SHA-256 ne prouvent ni authenticité ni fraîcheur. Aucun accès ECU et aucune autorisation de programmation. / Explicit ordered evidence only; no authenticated history or recovery authorization. Optional transaction and manifest identifiers must match exactly.

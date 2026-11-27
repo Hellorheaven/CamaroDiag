@@ -13,6 +13,7 @@ from .doip_archive import verify_archive
 from .memory import Geometry, Patch, Region, Technology, plan_patches
 from .recovery_bundle import AndroidIdentity,inspect_bundle,write_report
 from .j1979_live_inspection import inspect_file, compare_files
+from .connector_checkpoint import inspect_file as inspect_checkpoint, inspect_history, verify_report as verify_checkpoint_report
 
 
 def _number(text: str) -> int:
@@ -78,6 +79,21 @@ def _parser() -> argparse.ArgumentParser:
     compare.add_argument("--vin")
     compare.add_argument("--output", type=Path, required=True)
 
+    checkpoint = commands.add_parser("inspect-checkpoint", help="Inspect one imported CDJ/1 record")
+    checkpoint.add_argument("--input", type=Path, required=True)
+    checkpoint.add_argument("--transaction")
+    checkpoint.add_argument("--manifest")
+    checkpoint.add_argument("--output", type=Path, required=True)
+    history = commands.add_parser("inspect-checkpoint-history", help="Inspect explicitly ordered CDJ/1 records")
+    history.add_argument("--input", type=Path, action="append", required=True)
+    history.add_argument("--transaction")
+    history.add_argument("--manifest")
+    history.add_argument("--output", type=Path, required=True)
+    verify_checkpoint = commands.add_parser("verify-checkpoint-report", help="Recheck exported checkpoint JSON against its binary")
+    verify_checkpoint.add_argument("--input", type=Path, required=True)
+    verify_checkpoint.add_argument("--report", type=Path, required=True)
+    verify_checkpoint.add_argument("--output", type=Path, required=True)
+
     plan = commands.add_parser("plan", help="Dry-run changes; no device programming")
     plan.add_argument("--target", required=True)
     plan.add_argument("--technology", required=True, choices=[t.value for t in Technology])
@@ -124,6 +140,13 @@ def run(argv: Sequence[str] | None = None) -> dict[str, object]:
     if args.action == "compare-live":
         return write_report(args.output, compare_files(args.report, expected_vin=args.vin))
 
+    if args.action == "inspect-checkpoint":
+        return write_report(args.output, inspect_checkpoint(args.input,args.transaction,args.manifest))
+    if args.action == "inspect-checkpoint-history":
+        return write_report(args.output, inspect_history(args.input,args.transaction,args.manifest))
+    if args.action == "verify-checkpoint-report":
+        return write_report(args.output, verify_checkpoint_report(args.input,args.report))
+
     original = args.input.read_bytes()
     geometry = Geometry(args.target, Technology(args.technology), len(original), args.page_size,
                         args.erase_size, tuple(args.protected))
@@ -158,6 +181,11 @@ def main() -> None:
     print(json.dumps(result, indent=2, sort_keys=True))
     if result.get("schema")=="camarodiag-offline-recovery-bundle-v1" and not result["verified"]:
         raise SystemExit(2)
+    if result.get("schema")=="camarodiag-offline-connector-checkpoint-v1" and result["inspection"]["status"]!="SAFE_BUT_BLOCKED":
+        raise SystemExit(8)
+    if result.get("schema")=="camarodiag-offline-connector-checkpoint-history-v1" and (
+            not result["consistent"] or result["disposition"]!="SAFE_BUT_BLOCKED"):
+        raise SystemExit(8)
 
 
 if __name__ == "__main__":
