@@ -85,6 +85,7 @@ internal sealed partial class BridgeDesktopForm
         nativeFreezeActions.Controls.Add(functionalRunNativeFreeze);
         nativeFreezeActions.Controls.Add(functionalInspectNativeFreeze);
         WideRow(fields,nativeFreezeActions,42);
+        WideRow(fields, functionalProjectCatalogue, 42);
         WideRow(fields, functionalRunLegacyMutation, 42);
         WideRow(fields, extraRecipes, 42);
         WideRow(fields, new Label
@@ -101,6 +102,7 @@ internal sealed partial class BridgeDesktopForm
         functionalRunJ1979.Click += async (_, _) => await RunWindowsJ1979Async();
         functionalRunNetwork.Click += async (_, _) => await RunWindowsNetworkAsync();
         functionalRunLive.Click += async (_, _) => await RunWindowsLiveAsync();
+        functionalProjectCatalogue.Click += async (_, _) => await ProjectWindowsCatalogueAsync();
         functionalRunFreeze.Click += async (_, _) => await RunWindowsFreezeAsync();
         functionalRunLegacyFreeze.Click += async (_, _) => await RunWindowsLegacyFreezeAsync();
         functionalRunLegacy.EnabledChanged += (_, _) => functionalRunLegacyFreeze.Enabled=functionalRunLegacy.Enabled;
@@ -108,9 +110,11 @@ internal sealed partial class BridgeDesktopForm
         functionalRunLive.EnabledChanged += (_, _) =>
         {
             functionalRunFreeze.Enabled = functionalRunLive.Enabled;
+            functionalProjectCatalogue.Enabled = functionalRunLive.Enabled;
             if (!functionalRunLive.Enabled) { completedFreeze = null; completedLegacyFreeze=null; }
         };
         functionalRunFreeze.Enabled = functionalRunLive.Enabled;
+        functionalProjectCatalogue.Enabled = functionalRunLive.Enabled;
         functionalRunNativeUsb.Click += async (_, _) => await RunWindowsNativeUsbAsync();
         functionalRunNativeFreeze.Click += async (_, _) => await RunWindowsNativeFreezeAsync();
         functionalInspectNativeFreeze.Click += async (_, _) => await InspectWindowsNativeFreezeAsync();
