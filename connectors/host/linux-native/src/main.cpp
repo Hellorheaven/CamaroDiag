@@ -6,6 +6,9 @@
 #include "j1979_can_cli.h"
 #include "j1979_cm1.hpp"
 #include "j1979_cj1.hpp"
+#include "j1979_cu1.hpp"
+#include <array>
+#include <string_view>
 #include <exception>
 
 #include <errno.h>
@@ -1001,6 +1004,123 @@ static int cm1_cli(const char* journal_path,const char* report_path,const char* 
     }
 }
 
+struct Cu1Options {
+    cd::cj1::Profile profile{0,0,60000,false};
+    const char *port{},*credential{},*capture{},*output{},*vin{};
+    bool approved{},tx_set{},rx_set{},budget_set{},ext_set{};
+};
+static bool parse_cu1(int argc,char** argv,Cu1Options& o) {
+    for(int i=2;i<argc;++i){
+        const std::string_view flag=argv[i];
+        if(flag=="--extended"){if(o.ext_set)return false;o.ext_set=true;o.profile.extended=true;continue;}
+        if(flag=="--confirm-physical-channel"){if(o.approved)return false;o.approved=true;continue;}
+        if(i+1>=argc||argv[i+1][0]=='-')return false;
+        const char* value=argv[++i];
+        if(flag=="--tx"){if(o.tx_set||!hex_uint32(value,&o.profile.tx))return false;o.tx_set=true;}
+        else if(flag=="--rx"){if(o.rx_set||!hex_uint32(value,&o.profile.rx))return false;o.rx_set=true;}
+        else if(flag=="--budget-ms"){if(o.budget_set||!decimal_uint32(value,&o.profile.budget))return false;o.budget_set=true;}
+        else {
+            const char** target=nullptr;
+            if(flag=="--port")target=&o.port;
+            else if(flag=="--key-file")target=&o.credential;
+            else if(flag=="--capture")target=&o.capture;
+            else if(flag=="--output")target=&o.output;
+            else if(flag=="--vin")target=&o.vin;
+            if(!target||*target||!*value)return false;
+            *target=value;
+        }
+    }
+    return o.approved&&o.tx_set&&o.rx_set&&o.port&&o.credential&&o.capture&&o.output&&o.vin&&
+        cf1_valid_vin(o.vin)&&cd::cj1::valid_profile(o.profile)&&
+        strcmp(o.capture,o.output)&&strcmp(o.credential,o.capture)&&strcmp(o.credential,o.output);
+}
+static int capture_cu1(int argc,char** argv) {
+    Cu1Options options;
+    if(!parse_cu1(argc,argv,options))return error("CU/1 requires explicit physical profile, independent VIN, key, port and separate output paths");
+    if(!isatty(STDIN_FILENO))return error("Local interactive confirmation required");
+    fputs("Read-only CU/1 test: confirm the selected physical ECU and stationary vehicle. Type yes: ",stderr);
+    char answer[16]{};
+    if(!fgets(answer,sizeof(answer),stdin)||strcmp(answer,"yes\n"))return error("CU/1 consent refused");
+    struct Key {
+        std::array<uint8_t,32> data{};
+        ~Key(){OPENSSL_cleanse(data.data(),data.size());}
+    } key;
+    if(!read_key_file(options.credential,key.data.data()))return error("Private 32-byte CU/1 key required");
+    // Reserve the report before transmission, and never truncate an existing report.
+    const int fd=open(options.output,O_WRONLY|O_CREAT|O_EXCL|O_NOFOLLOW|O_CLOEXEC,0600);
+    if(fd<0)return error("CU/1 report destination unavailable");
+    struct ReportFile {int fd;~ReportFile(){if(fd>=0)close(fd);}} output{fd};
+    struct sigaction action{},oldint{},oldterm{};
+    action.sa_handler=cancel_handler;
+    sigemptyset(&action.sa_mask);
+    const bool interrupt=sigaction(SIGINT,&action,&oldint)==0;
+    const bool terminate=interrupt&&sigaction(SIGTERM,&action,&oldterm)==0;
+    cf1_usb_capture_result transport{};
+    char failure[256]{};
+    const int status=terminate?cd::cu1::capture(options.port,options.profile,key.data,
+        options.capture,transport,failure,sizeof(failure)):-1;
+    if(terminate)sigaction(SIGTERM,&oldterm,nullptr);
+    if(interrupt)sigaction(SIGINT,&oldint,nullptr);
+    OPENSSL_cleanse(key.data.data(),key.data.size());
+    try {
+        input raw{},again{};
+        cd::cj1::Evidence evidence{};
+        char digest[65]{};
+        const bool available=transport.capture_file_created&&load_regular(options.capture,cd::cj1::max_capture,&raw);
+        if(available){
+            evidence=cd::cj1::inspect({raw.bytes.get(),raw.length});
+            memcpy(digest,raw.digest,sizeof(digest));
+        } else {
+            sha256_hex(reinterpret_cast<const unsigned char*>(""),0,digest);
+        }
+        const bool stable=available&&load_regular(options.capture,cd::cj1::max_capture,&again)&&same_input(&raw,&again);
+        if(status!=0||!stable||!(evidence.profile==options.profile)){
+            evidence.integrity_verified=false;
+            evidence.error=!terminate?"Cannot register cancellation handlers":
+                status!=0?"CU/1 capture interrupted or refused":!stable?"CJ/1 original missing or changed":"CJ/1 scope mismatch";
+        }
+        auto report=cd::cj1::report(evidence,options.vin,digest,true,transport.authenticated,transport.client_proof_sent);
+        report.resize(report.size()-2);
+        report+=",\"capture_file_created\":";
+        report+=transport.capture_file_created?"true":"false";
+        report+=",\"retained_bytes\":"+std::to_string(transport.raw_bytes_received)+
+            ",\"raw_capture_digest_available\":"+(available?std::string("true"):std::string("false"))+"}\n";
+        std::size_t offset=0;
+        while(offset<report.size()){
+            const auto n=write(output.fd,report.data()+offset,report.size()-offset);
+            if(n<0&&errno==EINTR)continue;
+            if(n<=0)return error("CU/1 report write failed");
+            offset+=static_cast<std::size_t>(n);
+        }
+        if(fsync(output.fd)!=0)return error("CU/1 report sync failed");
+        const int close_status=close(output.fd);output.fd=-1;
+        if(close_status)return error("CU/1 report close failed");
+        return evidence.integrity_verified&&evidence.end==1&&evidence.vin==options.vin?0:2;
+    }catch(const std::exception& e){return error(e.what());}
+}
+static int verify_cj1_cli(const char* capture_path,const char* report_path,const char* proof_path,const char* vin){
+    input raw{},stored{},again{},stored_again{};
+    try{
+        if(!cf1_valid_vin(vin)||!load_regular(capture_path,cd::cj1::max_capture,&raw)||
+           !load_regular(report_path,cd::cj1::max_report,&stored)||!separate(&raw,&stored))
+            return error("CJ/1 verification requires independent VIN and distinct regular inputs");
+        const auto evidence=cd::cj1::inspect({raw.bytes.get(),raw.length});
+        if(!evidence.integrity_verified)return error("CJ/1 independent replay failed");
+        const auto canonical=cd::cj1::report(evidence,vin,raw.digest);
+        if(stored.length!=canonical.size()||memcmp(stored.bytes.get(),canonical.data(),canonical.size())||
+           !load_regular(capture_path,cd::cj1::max_capture,&again)||!same_input(&raw,&again)||
+           !load_regular(report_path,cd::cj1::max_report,&stored_again)||!same_input(&stored,&stored_again))
+            return error("CJ/1 canonical report mismatch or input changed");
+        const std::string proof=std::string("{\"schema\":\"camarodiag-j1979-campaign-verification-linux-v1\","
+            "\"verification_scope\":\"CANONICAL_OFFLINE_CJ1\",\"consistent\":true,"
+            "\"physical_vehicle_verified\":false,\"permits_programming\":false,\"capture_sha256\":\"")+
+            raw.digest+"\",\"report_sha256\":\""+stored.digest+"\",\"vin_match\":\""+
+            (evidence.vin.empty()?"UNVERIFIED":evidence.vin==vin?"MATCH":"MISMATCH")+"\"}\n";
+        if(!atomic_create(proof_path,proof.data(),proof.size()))return error("CJ/1 proof path unavailable");
+        return evidence.end==1&&evidence.vin==vin?0:2;
+    }catch(const std::exception& e){return error(e.what());}
+}
+
 static void usage(FILE *stream) {
     fprintf(stream,
         "CamaroDiag Linux native C++20 — SAE J1979\n"
@@ -1021,7 +1141,9 @@ static void usage(FILE *stream) {
         "  camarodiag-native --inspect-j1979-maintenance-prefix JOURNAL.cm VIN REPORT.json\n"
         "  camarodiag-native --verify-j1979-maintenance JOURNAL.cm REPORT.json PROOF.json VIN\n"
         "  camarodiag-native --verify-j1979-maintenance-prefix JOURNAL.cm REPORT.json PROOF.json VIN\n"
+        "  camarodiag-native --j1979-usb --port /dev/ttyACM0 --key-file key.bin --capture session.cj --output report.json --tx 7E0 --rx 7E8 --vin VIN --budget-ms 60000 --confirm-physical-channel\n"
         "  camarodiag-native --inspect-j1979-campaign CAPTURE.cj VIN REPORT.json\n"
+        "  camarodiag-native --verify-j1979-campaign CAPTURE.cj REPORT.json PROOF.json VIN\n"
         "  camarodiag-native --help\n"
         "Examples:\n"
         "  camarodiag-native --inspect-j1979-freeze-native-prefix incomplete.cf 2G1FA1E30D7654321 partial.json\n"
@@ -1033,6 +1155,8 @@ int main(int argc, char **argv) {
     if (argc == 2 && (!strcmp(argv[1], "--help") || !strcmp(argv[1], "-h"))) {
         usage(stdout); return 0;
     }
+    if (argc>=3 && !strcmp(argv[1],"--j1979-usb"))return capture_cu1(argc,argv);
+    if (argc==6 && !strcmp(argv[1],"--verify-j1979-campaign"))return verify_cj1_cli(argv[2],argv[3],argv[4],argv[5]);
     if (argc==5 && !strcmp(argv[1],"--inspect-j1979-campaign"))
         return cj1_inspect_cli(argv[2],argv[3],argv[4]);
     if (argc==5 && !strcmp(argv[1],"--inspect-j1979-maintenance"))
