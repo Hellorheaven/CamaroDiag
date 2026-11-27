@@ -7,6 +7,8 @@
 #include <array>
 #include <charconv>
 #include <iomanip>
+#include <initializer_list>
+#include <utility>
 #include <locale>
 #include <sstream>
 #include <stdexcept>
@@ -18,8 +20,8 @@ constexpr std::array<std::string_view,6> ends{"","COMPLETE","INITIAL_UNVERIFIED"
 constexpr std::array<std::string_view,8> flags{"transport_observed","pid_inventory_complete","freeze_trigger_observed",
     "freeze_frame_present","freeze_inventory_complete","monitor_inventory_complete","control_inventory_complete",
     "identity_inventory_complete"};
-constexpr std::array<unsigned,34> one{4,5,6,7,8,9,10,11,13,14,15,17,19,29,44,45,46,47,48,51,69,70,71,72,73,74,75,76,82,90,91,92,97,98};
-constexpr std::array<unsigned,23> two{12,16,31,33,34,35,49,50,60,61,62,63,66,67,68,77,78,83,84,89,93,94,99};
+constexpr auto one=std::to_array<unsigned>({4,5,6,7,8,9,10,11,13,14,15,17,19,29,44,45,46,47,48,51,69,70,71,72,73,74,75,76,82,90,91,92,97,98});
+constexpr auto two=std::to_array<unsigned>({12,16,31,33,34,35,49,50,60,61,62,63,66,67,68,77,78,83,84,89,93,94,99});
 void require(bool ok,const char* message){if(!ok)throw std::invalid_argument(message);}
 unsigned u16(Bytes b,std::size_t p){return unsigned(b[p])|unsigned(b[p+1])<<8;}
 std::uint32_t u32(Bytes b,std::size_t p){return std::uint32_t(b[p])|std::uint32_t(b[p+1])<<8|
@@ -296,7 +298,8 @@ std::string report(const Evidence& e,std::string_view expected,std::string_view 
     for(unsigned mode:{1u,2u,3u,6u,7u,8u,9u,10u}){
         std::array<unsigned,6> counts{};
         for(const auto& s:e.steps)if(s.request[0]==mode)++counts[s.state];
-        if(!first)out<<',';first=false;out<<"{\"mode\":";quote(out,hex(std::array<std::uint8_t,1>{std::uint8_t(mode)}));
+        if(!first)out<<',';
+        first=false;out<<"{\"mode\":";quote(out,hex(std::array<std::uint8_t,1>{std::uint8_t(mode)}));
         unsigned total=0;for(unsigned i=1;i<=5;++i)total+=counts[i];out<<",\"attempted\":"<<total;
         for(unsigned i=1;i<=5;++i){std::string key(states[i]);for(char& c:key)c=char(c-'A'+'a');out<<',';quote(out,key);out<<':'<<counts[i];}
         out<<'}';
