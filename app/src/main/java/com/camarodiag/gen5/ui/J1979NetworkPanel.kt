@@ -70,6 +70,13 @@ internal fun J1979NetworkPanel(protocol:Int?,state:FunctionalTestState,vehicle:V
                 val states=ecu.statusRecords.associateBy { it.requestHex }
                 val monitorResults=ecu.scaledMonitorRecords.groupBy { it.requestHex }
                 ecu.steps.forEach { step->
+                    val trim=trims[step.requestHex]
+                    trim?.signals?.forEach { signal ->
+                        Text("${signal.name}: ${signal.number ?: "—"} ${signal.unit}",fontSize=11.sp)
+                    }
+                    if(step.requestHex=="0141")operating.driveCycle?.monitors?.forEach { monitor ->
+                        Text("${monitor.name}: ${monitor.complete?.let { if(it) "✓" else "✗" } ?: "—"}",fontSize=11.sp)
+                    }
                     val scaled=contextual[step.requestHex]
                     scaled?.signals?.forEach { signal ->
                         Text("${signal.name}: ${signal.number ?: "—"} ${signal.unit}",fontSize=11.sp)
@@ -84,7 +91,7 @@ internal fun J1979NetworkPanel(protocol:Int?,state:FunctionalTestState,vehicle:V
                     monitorResults[step.requestHex].orEmpty().forEach { monitor ->
                         Text(monitor.result.rawText(),fontSize=11.sp)
                     }
-                    val value=if(scaled==null)step.application?.measurement()else null
+                    val value=if(scaled==null&&trim==null)step.application?.measurement()else null
                     val codes=step.application?.dtcCodes()
                     Text("${step.requestHex} · ${step.status}"+
                         (value?.let { " · ${it.number} ${it.unit}" }?:"")+
