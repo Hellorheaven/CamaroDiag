@@ -2,6 +2,7 @@
 #include <cstddef>
 #include <cstdint>
 #include "j1979_freeze_scope.h"
+#include "j1979_live_scope.h"
 
 namespace cd {
 // Passive application record classifier, after the caller has verified link
@@ -157,6 +158,21 @@ class J1979ReadEvidence {
       !(req[1]==0xe0&&(reply[6]&1u))?Result::Positive:Result::Invalid;
     if(req[1]==2)return len==5?Result::Positive:Result::Invalid;
     return Result::Raw;
+  }
+
+  // Explicit raw-only recording: preserve the exact application payload,
+  // even when a documented numeric width is unknown or differs. Admission
+  // VIN and bitmap requests retain the strict existing structural checks.
+  static Result classifyLive(const J1979LiveScope& scope,const uint8_t* req,
+      size_t n,const uint8_t* reply,size_t len){
+    if(!scope.allows(req,n)||!reply||!len||len>4095)return Result::Invalid;
+    if(req[0]==9||req[1]%32==0)
+      return classify(Variant::ClassicCan,req,n,reply,len);
+    if(reply[0]==0x7f){
+      if(len!=3||reply[1]!=1||!reply[2])return Result::Invalid;
+      return reply[2]==0x78?Result::Pending:Result::Negative;
+    }
+    return len>=3&&reply[0]==0x41&&reply[1]==req[1]?Result::Raw:Result::Invalid;
   }
 
   static Result classify(Variant variant,const uint8_t* req,size_t n,
