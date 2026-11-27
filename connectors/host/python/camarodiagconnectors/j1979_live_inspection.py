@@ -30,6 +30,8 @@ SCHEMAS = {"camarodiag-j1979-live-v1", "camarodiag-j1979-legacy-live-v1"}
 
 def _get(row, name, default=None):
     camel = re.sub(r"_([a-z])", lambda m: m[1].upper(), name)
+    _require(camel == name or name not in row or camel not in row,
+             "Ambiguous snake_case/camelCase report property: " + name)
     return row.get(name, row.get(camel, default))
 
 
@@ -92,18 +94,21 @@ def _unwrap(root):
     # Windows wraps Result; Android and Python export a direct result.
     if root.get("schema") in SCHEMAS:
         return root, root.get("result", root)
-    for key in ("j1979Live", "j1979_live", "liveReport", "live"):
-        candidate = root.get(key)
-        if isinstance(candidate, dict) and candidate.get("schema") in SCHEMAS:
-            return candidate, candidate.get("result", candidate)
-    raise ValueError("Unsupported live evidence schema")
+    candidates = [root.get(key) for key in ("j1979Live", "j1979_live", "liveReport", "live")
+                  if isinstance(root.get(key), dict) and root[key].get("schema") in SCHEMAS]
+    _require(len(candidates) == 1, "Expected exactly one original live evidence schema")
+    candidate = candidates[0]
+    return candidate, candidate.get("result", candidate)
 
 
 def _pids(value):
     # System.Text.Json serializes byte[] as base64, not as JSON numbers.
     if isinstance(value, str):
         try:
-            value = list(base64.b64decode(value, validate=True))
+            _require(1 <= len(value) <= 44, "Invalid Windows selected PIDs")
+            decoded = base64.b64decode(value, validate=True)
+            _require(base64.b64encode(decoded).decode("ascii") == value, "Noncanonical Windows selected PIDs")
+            value = list(decoded)
         except ValueError as exc:
             raise ValueError("Invalid Windows selected PIDs") from exc
     return _array(value, 32, "selected PIDs")
