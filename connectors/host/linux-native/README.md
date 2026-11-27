@@ -95,3 +95,13 @@ drapeaux d'authentification de session ; il ne se confond pas avec un rapport
 hors ligne**, et ne peut être accepté par le vérificateur hors ligne que si
 les champs et leur portée correspondent exactement. Ni rapport ni preuve ne
 sont une attestation d'identité matérielle.
+
+## Compatibilité et versionnement des preuves
+
+Les sorties C natives emploient intentionnellement les schémas
+`*-linux-c-v1` : elles exposent un sous-ensemble strict des champs du rejeu
+historique Python, C# et Kotlin, sans prétendre que le JSON est interchangeable.
+Le nom de schéma commun ne doit **jamais** être conservé pour des objets dont
+les champs de preuve diffèrent. Les vérificateurs C n'acceptent que les
+rapports exacts de leur propre sortie canonique. Un import portable complet
+demande le rapprochement explicite des schémas et de leurs règles de contrôle.

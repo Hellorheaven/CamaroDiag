@@ -134,7 +134,7 @@ static void write_array(json_writer *j, const uint8_t *values, size_t n) {
 }
 static void write_prefix(json_writer *j, const cf1_evidence *e, const char *capture_digest) {
     write_literal(j, "{\n"
-        "\"schema\":\"camarodiag-j1979-native-freeze-prefix-v1\","
+        "\"schema\":\"camarodiag-j1979-native-freeze-prefix-linux-c-v1\","
         "\"protocol\":\"SAE-J1979\","
         "\"source\":\"OFFLINE_CF1_PREFIX\","
         "\"profile\":{"
@@ -226,7 +226,7 @@ static void write_prefix(json_writer *j, const cf1_evidence *e, const char *capt
 static void write_complete(json_writer *j, const cf1_evidence *e, const char *digest,
                            bool live, bool authenticated, bool proof_sent) {
     write_literal(j, "{\n"
-        "\"schema\":\"camarodiag-functional-j1979-native-freeze-v1\","
+        "\"schema\":\"camarodiag-functional-j1979-native-freeze-linux-c-v1\","
         "\"protocol\":\"SAE-J1979\","
         "\"source\":");
     write_string(j, live ? "LIVE_USB_CU2" : "OFFLINE_CF1");
@@ -373,7 +373,7 @@ static int verify_complete(const char *capture_path, const char *report_path,
     if (valid) {
         char proof[1200];
         int n = snprintf(proof, sizeof(proof),
-            "{\"schema\":\"camarodiag-j1979-native-freeze-complete-verification-v1\","
+            "{\"schema\":\"camarodiag-j1979-native-freeze-complete-verification-linux-c-v1\","
             "\"consistent\":true,\"capture_integrity_verified\":true,"
             "\"execution_completed\":%s,"
             "\"physical_vehicle_verified\":false,"
@@ -413,7 +413,7 @@ static int verify(const char *capture_path, const char *report_path,
     if (ok) {
         char verification[1600] = {0};
         int n = snprintf(verification, sizeof(verification),
-            "{\"schema\":\"camarodiag-j1979-native-freeze-prefix-verification-v1\","
+            "{\"schema\":\"camarodiag-j1979-native-freeze-prefix-verification-linux-c-v1\","
             "\"consistent\":true,\"prefix_integrity_verified\":true,"
             "\"capture_integrity_verified\":false,\"execution_completed\":false,"
             "\"physical_vehicle_verified\":false,\"permits_programming\":false,"
@@ -588,7 +588,7 @@ static int capture_native(int argc, char **argv) {
                        usb.authenticated, usb.client_proof_sent);
     } else if (writer.bytes) {
         write_literal(&writer,
-            "{\"schema\":\"camarodiag-functional-j1979-native-freeze-v1\","
+            "{\"schema\":\"camarodiag-functional-j1979-native-freeze-linux-c-v1\","
             "\"protocol\":\"SAE-J1979\","
             "\"source\":\"LIVE_USB_CU2\","
             "\"capture_integrity_verified\":false,"
@@ -605,7 +605,12 @@ static int capture_native(int argc, char **argv) {
     }
     bool persisted = writer.bytes && !writer.failed &&
         atomic_create(o.report, writer.bytes, writer.used);
-    int status = valid && evidence.execution_completed && persisted ? 0 : 2;
+    bool all_frames_stable = valid && evidence.execution_completed;
+    for (size_t i = 0; i < evidence.visited_frames && all_frames_stable; ++i)
+        if (strcmp(evidence.progress[i].provisional_status, "COMPLETE") &&
+            strcmp(evidence.progress[i].provisional_status, "ABSENT"))
+            all_frames_stable = false;
+    int status = all_frames_stable && persisted ? 0 : 2;
     if (!persisted)
         fprintf(stderr, "Native CF/1 report could not be created; original capture is preserved\n");
     if (!valid)
