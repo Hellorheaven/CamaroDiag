@@ -14,5 +14,6 @@
     <Compile Include="../../../pc-bridge/CamaroDiag.J2534Bridge/ObdJ1979Status.cs" Link="ObdJ1979Status.cs" />
     <Compile Include="../../../pc-bridge/CamaroDiag.J2534Bridge/ObdJ1979MultiSignal.cs" Link="ObdJ1979MultiSignal.cs" />
     <Compile Include="../../../pc-bridge/CamaroDiag.J2534Bridge/ObdJ1979ExtendedVehicleInfo.cs" Link="ObdJ1979ExtendedVehicleInfo.cs" />
+    <Compile Include="../../../pc-bridge/CamaroDiag.J2534Bridge/ObdJ1979FreezeCampaign.cs" Link="ObdJ1979FreezeCampaign.cs" />
   </ItemGroup>
 </Project>
