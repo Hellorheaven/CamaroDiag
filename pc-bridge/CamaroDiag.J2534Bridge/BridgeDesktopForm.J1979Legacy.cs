@@ -163,6 +163,8 @@ internal sealed partial class BridgeDesktopForm
                         dtc.Codes.Count==0?J1979RecipeText("NativeUsbZeroDtc"):string.Join(", ",dtc.Codes)));
                 foreach(var measurement in result.Measurements)
                     output.AppendLine($"{measurement.Mode:X2}/{measurement.Pid:X2}: {measurement.Number.ToString(CultureInfo.CurrentCulture)} {measurement.Unit}");
+                foreach(var record in result.MultiSignalRecords)
+                    output.AppendLine(record.RequestHex+": "+ObdJ1979MultiSignal.Format(record.Signals));
                 foreach(var item in result.IdentificationRecords)
                     output.AppendLine(item.Extended is { } extended ? ObdJ1979ExtendedVehicleInfo.Format(extended) :
                         $"09/{item.InfoType:X2}: {string.Join(", ",item.Values)}");
