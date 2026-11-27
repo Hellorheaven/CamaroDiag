@@ -3,12 +3,13 @@ using System.IO.Ports;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Text.Json;
 
 namespace CamaroDiagConnectors.Windows;
 
 internal static class J1979LiveNativeCli
 {
-    internal const string CaptureCommand="--j1979-live-native",InspectCommand="--inspect-j1979-live-native",CsvCommand="--export-j1979-live-native-csv";
+    internal const string CaptureCommand="--j1979-live-native",InspectCommand="--inspect-j1979-live-native",CsvCommand="--export-j1979-live-native-csv",PrefixCommand="--inspect-j1979-live-prefix";
     internal sealed record Options(string Port,string KeyPath,string CapturePath,string OutputPath,J1979LiveNative.Profile Profile);
 
     internal static Options Parse(string[] args)
@@ -195,11 +196,45 @@ internal static class J1979LiveNativeCli
         output.Write(csv);output.Flush(true);return report;
     }
 
+    internal static Dictionary<string,object?> InspectPrefix(string source,string vin,string destination,Func<bool>? current=null)
+    {
+        if(!J1979LiveNative.ValidVin(vin)||Path.GetFullPath(source).Equals(Path.GetFullPath(destination),StringComparison.OrdinalIgnoreCase))
+            throw new ArgumentException("Independent VIN and distinct new output required");
+        if(current is not null&&!current())throw new OperationCanceledException("Owner revoked");
+        if((File.GetAttributes(source)&(FileAttributes.ReparsePoint|FileAttributes.Directory))!=0)
+            throw new InvalidDataException("Regular capture file required");
+        using var input=new FileStream(source,FileMode.Open,FileAccess.Read,FileShare.Read);
+        if(input.Length is <=0 or >J1979LiveNative.MaximumCapture)
+            throw new InvalidDataException("Invalid CL/1 input size");
+        byte[] raw=new byte[(int)input.Length];input.ReadExactly(raw);
+        if(input.ReadByte()!=-1)throw new InvalidDataException("CL/1 grew during read");
+        string digest=Convert.ToHexString(SHA256.HashData(raw)).ToLowerInvariant();
+        var report=J1979LiveNative.InspectPrefix(raw,vin);report["capture_sha256"]=digest;
+        input.Position=0;
+        if(digest!=Convert.ToHexString(SHA256.HashData(input)).ToLowerInvariant())
+            throw new InvalidDataException("CL/1 changed during prefix inspection");
+        byte[] data=JsonSerializer.SerializeToUtf8Bytes(report,new JsonSerializerOptions{
+            WriteIndented=true,PropertyNamingPolicy=JsonNamingPolicy.SnakeCaseLower});
+        if(data.Length>128*1024*1024)throw new InvalidDataException("Prefix report exceeds byte limit");
+        if(current is not null&&!current())throw new OperationCanceledException("Owner revoked");
+        using var output=new FileStream(destination,FileMode.CreateNew,FileAccess.Write,FileShare.None);
+        output.Write(data);output.Flush(true);return report;
+    }
+
     internal static int Run(string[] args)
     {
         try
         {
             if(args.Length==0)return 2;
+            if(args[0]==PrefixCommand)
+            {
+                if(args.Length!=4)throw new ArgumentException("Expected CL/1 source, independent VIN and new JSON output");
+                var prefix=InspectPrefix(args[1],args[2],args[3]);
+                Console.WriteLine(JsonSerializer.Serialize(new{
+                    prefix_integrity_verified=true,execution_completed=false,
+                    complete_records=prefix["complete_records"],discarded_tail_bytes=prefix["discarded_tail_bytes"]}));
+                return 7;
+            }
             J1979LiveNative.Report report;
             if(args[0]==CsvCommand)
             {
