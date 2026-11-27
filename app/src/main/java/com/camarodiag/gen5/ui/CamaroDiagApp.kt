@@ -734,6 +734,9 @@ fun CamaroDiagApp(
                         onInspectNativeFreezePrefix = { source,epoch,profile ->
                             withExportFolder { viewModel.inspectFunctionalNativeFreezePrefix(source,epoch,profile) }
                         },
+                        onVerifyNativeFreezePrefix = { capture,report,epoch,profile ->
+                            withExportFolder { viewModel.verifyFunctionalNativeFreezePrefix(capture,report,epoch,profile) }
+                        },
                         onProjectCatalogue = { catalogue,reference,report,pin,epoch,profile ->
                             withExportFolder { viewModel.projectFunctionalCatalogue(catalogue,reference,report,pin,epoch,profile) }
                         },
