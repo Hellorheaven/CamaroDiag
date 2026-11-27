@@ -72,7 +72,7 @@ class J1979MaintenanceArchiveUsb {
       if(!admitted()||!source.read(result.bytes,buffer,n)||!admitted()||!channel.writeExact(buffer,n,1000))return close();
       result.bytes+=n;
     }
-    result.complete=admitted();return close();
+    result.complete=admitted()&&source.finish();return close();
   }
  private:
   static bool header(const uint8_t* p,uint8_t op){return p[0]=='C'&&p[1]=='U'&&p[2]==5&&p[3]==op;}
