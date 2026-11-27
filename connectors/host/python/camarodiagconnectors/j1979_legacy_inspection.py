@@ -19,7 +19,10 @@ from .j1979_multi_signal import decode_response as multi_decode, width as multi_
 from .j1979_status import decode_response as status_decode, width as status_width
 from .j1979_scaling_context import project as contextual_project, config_data, CONFIG_PIDS
 from .j1979_vehicle_info import legacy_info
-from .j1979_live_inspection import load, _get, _require, _hex, _array, _dict, _id
+from .j1979_live_inspection import load, _get, _require, _hex, _array, _dict
+from .j1979_network_inspection import _normalize, _equal
+from .j1979_multi_signal import historical_projection
+import base64
 
 MAX_STEPS = 4096
 MAX_FRAMES = 128
@@ -241,7 +244,7 @@ def inspect(root,*,expected_vin=None):
     expected_vin=_vin(expected_vin)
     if expected_vin is not None:
         _require(declared is None or expected_vin==declared,"Requested VIN differs from report")
-    scope=declared or expected_vin
+    scope=declared
     source_hex=f"{source:02X}"
     rows=_array(body.get("steps"),MAX_STEPS,"legacy steps")
     completed=body.get("completed")
@@ -266,6 +269,8 @@ def inspect(root,*,expected_vin=None):
     sensor_masks=set()
     freeze=None
     elapsed=0
+    readiness=None
+    verified_responses=0
 
     for index,step in enumerate(rows):
         step=_dict(step,"legacy step")
@@ -314,6 +319,7 @@ def inspect(root,*,expected_vin=None):
         elif pid is not None and not (mode==2 and pid==2):
             _require(pid in chains.get(key,{}).get("ids",set()),
                      "Request absent from verified support inventory")
+        verified_responses+=len(accepted)
         if accepted:
             if mode==9 and pid%32:
                 if pid in COUNT_TYPES:
@@ -330,6 +336,8 @@ def inspect(root,*,expected_vin=None):
             elif mode in (1,2) and pid%32:
                 payload=accepted[0]
                 ev=decode_observation(req,payload)
+                if mode==1 and pid==1 and ev:
+                    readiness=ev.get("readiness")
                 if ev and ev.get("measurement") is not None:
                     measurements.append(ev["measurement"])
                 values=multi_decode(req,payload)
@@ -359,6 +367,8 @@ def inspect(root,*,expected_vin=None):
                            "duration_ms":elapsed_step})
     _require(elapsed<=duration+2*len(rows),"Step durations exceed campaign duration")
     _require(_get(body,"observed_vin")==observed_vin,"Reported VIN differs from reassembled response")
+    if expected_vin is not None:
+        _require(observed_vin==expected_vin,"Selected-source VIN differs from requested inspection VIN")
     match="NOT_REQUESTED" if declared is None else "UNVERIFIED" if observed_vin is None else \
         "MATCH" if observed_vin==declared else "MISMATCH"
     _require(_get(body,"vin_match",match)==match,"Reported VIN match differs from evidence")
@@ -386,6 +396,91 @@ def inspect(root,*,expected_vin=None):
                   else "PARTIAL" if c["pages"] else "UNAVAILABLE",
                   "verified_pages":c["pages"],"advertised_ids":sorted(c["ids"])}
                  for (mode,sensor),c in chains.items()]
+    # Rebuild all supported summary views independently, rather than trusting
+    # the host's display strings. Platform-specific provenance fields are
+    # checked before projecting them onto the common semantic model.
+    def claimed(name, fallback=None):
+        return _get(body,name,fallback)
+
+    def project_claims(name, expected, keys):
+        actual=claimed(name)
+        if actual is None:
+            return False
+        actual=_array(actual,MAX_STEPS*MAX_FRAMES,name)
+        reduced=[]
+        for item in actual:
+            item=_normalize(_dict(item,name))
+            if "source" in item:
+                _require(_source(item["source"])==source,"Summary claims another response source")
+            if "response_index" in item:
+                _require(type(item["response_index"]) is int and item["response_index"]>=0,"Invalid response index")
+            reduced.append({k:item.get(k) for k in keys})
+        wanted=[{k:item.get(k) for k in keys} for item in expected]
+        _require(_equal(reduced,wanted),"Derived summary differs: "+name)
+        return True
+
+    # A source report may omit optional summaries in an older version.
+    # An explicitly supplied summary must agree in its entirety.
+    checked=[]
+    actual_dtc=claimed("dtc_modes")
+    if actual_dtc is not None:
+        actual_dtc=_array(actual_dtc,3,"DTC modes")
+        _require(len(actual_dtc)==3,"Incomplete DTC summary")
+        for item,mode in zip(actual_dtc,(3,7,10)):
+            item=_normalize(_dict(item,"DTC mode"))
+            codes=item.get("codes")
+            if codes is not None:
+                codes=sorted(_array(codes,MAX_FRAMES*3,"DTC list"))
+            _require(item.get("mode")==mode and codes==dtcs.get(mode),"DTC summary differs from selected ECU")
+        checked.append("dtc_modes")
+
+    actual_inventory=claimed("inventory")
+    if actual_inventory is not None:
+        expected={(x["mode"],x["sensor_mask"]):x for x in inventories}
+        actual_keys=set()
+        for item in _array(actual_inventory,16,"inventory"):
+            item=_normalize(_dict(item,"inventory row"))
+            mode,sensor=item.get("mode"),item.get("sensor_mask")
+            key=(mode,sensor)
+            _require(key not in actual_keys,"Duplicate inventory summary")
+            actual_keys.add(key)
+            ids=item.get("advertised_ids")
+            if isinstance(ids,str):
+                try:
+                    ids=list(base64.b64decode(ids,validate=True))
+                except ValueError as exc:
+                    raise ValueError("Invalid driver inventory encoding") from exc
+            wanted=expected.get(key)
+            if wanted is None and mode==2 and sensor is None and (freeze is None or not freeze["present"]):
+                wanted={"state":"NOT_APPLICABLE" if freeze else "UNAVAILABLE","verified_pages":0,"advertised_ids":[]}
+            if wanted is None and not completed and item.get("state")=="UNAVAILABLE":
+                wanted={"state":"UNAVAILABLE","verified_pages":0,"advertised_ids":[]}
+            _require(wanted is not None and item.get("state")==wanted["state"] and
+                     item.get("verified_pages")==wanted["verified_pages"] and ids==wanted["advertised_ids"],
+                     "Inventory summary differs from verified pages")
+        # Early rejection during VIN admission may omit the initial cached page.
+        required=set(expected)-({(1,None)} if not completed and not any(r["request_hex"] in ("03","07","0A") for r in normalized) else set())
+        _require(required<=actual_keys,"Missing inventory summary")
+        checked.append("inventory")
+    if project_claims("measurements",measurements,("mode","pid","name","number","unit")):
+        checked.append("measurements")
+    actual_multi=claimed("multi_signal_records")
+    if actual_multi is not None:
+        actual_multi=_normalize(_array(actual_multi,MAX_STEPS,"multi-signal records"))
+        for item in actual_multi:
+            if "source" in item:
+                _require(_source(item["source"])==source,"Multi-signal source mismatch")
+        reduced=[{"request_hex":x.get("request_hex"),"signals":x.get("signals")} for x in actual_multi]
+        _require(_equal(reduced,multis) or _equal(reduced,historical_projection(multis)),
+                 "Multi-signal summary differs from original records")
+        checked.append("multi_signal_records")
+    if project_claims("status_records",states,("request_hex","states")):
+        checked.append("status_records")
+    context=contextual_project(normalized)
+    if claimed("contextual_measurements") is not None:
+        _require(_equal(_normalize(claimed("contextual_measurements")),context),
+                 "Contextual measurements differ from original responses")
+        checked.append("contextual_measurements")
     if not driver:
         claimed_other=_get(body,"other_response_sources",[])
         _require(sorted(_source(v) for v in _array(claimed_other,254,"other sources"))==sorted(other),
@@ -393,7 +488,8 @@ def inspect(root,*,expected_vin=None):
     return {"schema":"camarodiag-j1979-legacy-inspection-v1","verified":True,
             "completed":completed,"stop_reason":stop,"protocol":protocol,
             "protocol_name":PROTOCOLS[protocol],"selected_response_source":source_hex,
-            "link_checksum_verified":not driver,"physically_addressed":False,
+            "link_checksum_verified":not driver and verified_responses>0,"verified_response_count":verified_responses,
+            "physically_addressed":False,"checked_summary_fields":checked,
             "evidence_authenticated":False,"physical_vehicle_verified":False,
             "whole_vehicle_coverage_verified":False,"observed_vin":observed_vin,
             "declared_vin":declared,"vin_match":match,"steps":normalized,
@@ -401,7 +497,7 @@ def inspect(root,*,expected_vin=None):
             "inventory":inventories,"identification":identities,
             "dtc_modes":[{"mode":m,"codes":dtcs.get(m)} for m in (3,7,10)],
             "measurements":measurements,"multi_signal_records":multis,"status_records":states,
-            "contextual_measurements":contextual_project(normalized),
+            "contextual_measurements":context,"readiness":readiness,
             "freeze_trigger":freeze,"monitor_records":monitors}
 
 
