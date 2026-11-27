@@ -1049,13 +1049,20 @@ class Obd2FeatureEngine(
             )
         )
 
+        val categorical = if (ObdJ1979Status.width(pid) != null) {
+            val states = ObdJ1979Status.decodeData(pid, data) ?: return emptyList()
+            states.map { state -> ObdValue(pid, state.name, state.code, "", data) }
+        } else emptyList()
+
         if (ObdJ1979MultiSignal.width(pid) != null) {
             val decoded = ObdJ1979MultiSignal.decodeData(pid, data) ?: return emptyList()
-            return decoded.map { signal ->
+            return categorical + decoded.map { signal ->
                 ObdValue(pid,signal.name,String.format(Locale.US,"%.6f",signal.number)
                     .trimEnd('0').trimEnd('.'),signal.unit,data)
             }
         }
+
+        if (ObdJ1979Status.width(pid) != null) return categorical
 
         val decoded: Pair<String, Pair<Double, String>> = when (pid) {
             0x01 -> return emptyList() // Monitor status is displayed in the dedicated readiness card.
