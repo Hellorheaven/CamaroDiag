@@ -128,6 +128,61 @@ class PhysicalRecoveryFolderTest {
         }
     }
 
+    @Test fun cleanupDeletesOnlyRegisteredStagingEntries() {
+        val root=java.nio.file.Files.createTempDirectory("recovery-clean").toFile()
+        val blocks=java.io.File(root,"journal.blocks")
+        val journal=java.io.File(root,"journal")
+        val block=java.io.File(blocks,"original.ecu-block")
+        try {
+            val rootId=PhysicalRecoveryFolder.stagedIdentity(root,true)
+            assertTrue(blocks.mkdir())
+            journal.writeBytes(byteArrayOf(1))
+            block.writeBytes(byteArrayOf(2))
+            val created=linkedMapOf(
+                blocks to PhysicalRecoveryFolder.stagedIdentity(blocks,true),
+                journal to PhysicalRecoveryFolder.stagedIdentity(journal,false),
+                block to PhysicalRecoveryFolder.stagedIdentity(block,false))
+            val unexpected=java.io.File(blocks,"unknown")
+            assertTrue(unexpected.mkdir())
+            val preserved=java.io.File(unexpected,"preserve")
+            preserved.writeText("preserve")
+            assertThrows(IllegalStateException::class.java) {
+                PhysicalRecoveryFolder.cleanupStaging(root,rootId,created)
+            }
+            assertTrue(journal.exists())
+            assertTrue(block.exists())
+            assertEquals("preserve",preserved.readText())
+            assertTrue(preserved.delete())
+            assertTrue(unexpected.delete())
+            PhysicalRecoveryFolder.cleanupStaging(root,rootId,created)
+            assertFalse(root.exists())
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test fun cleanupRefusesReplacedBlockDirectoryEvenWithIdenticalContents() {
+        val root=java.nio.file.Files.createTempDirectory("recovery-clean-id").toFile()
+        val saved=java.nio.file.Files.createTempDirectory("recovery-clean-saved").toFile()
+        val blocks=java.io.File(root,"journal.blocks")
+        try {
+            val rootId=PhysicalRecoveryFolder.stagedIdentity(root,true)
+            assertTrue(blocks.mkdir())
+            val identity=PhysicalRecoveryFolder.stagedIdentity(blocks,true)
+            org.junit.Assume.assumeNotNull(identity.key)
+            java.nio.file.Files.move(blocks.toPath(),saved.toPath().resolve("original"))
+            assertTrue(blocks.mkdir())
+            assertThrows(IllegalStateException::class.java) {
+                PhysicalRecoveryFolder.cleanupStaging(root,rootId,mapOf(blocks to identity))
+            }
+            assertTrue(blocks.isDirectory)
+            assertTrue(java.io.File(saved,"original").isDirectory)
+        } finally {
+            root.deleteRecursively()
+            saved.deleteRecursively()
+        }
+    }
+
     @Test fun requiresIndependentCompleteIdentity() {
         val identity = PhysicalRecoveryIdentity("1G1FA1RXXR0123456", "E39", "ECM", "OS-A")
         assertTrue(identity.valid)

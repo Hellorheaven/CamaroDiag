@@ -100,6 +100,39 @@ internal object PhysicalRecoveryFolder {
         }
     }
 
+    /** Delete only entries created by this inspection, never recursively
+     * traverse an unexpected subtree. Private storage is still required:
+     * path-based checks cannot make directory replacement races atomic. */
+    internal fun cleanupStaging(root:File,rootIdentity:StagedIdentity,
+        created:Map<File,StagedIdentity>) {
+        requireStagedIdentity(root,rootIdentity)
+        fun children(directory:File):Set<File> =
+            Files.newDirectoryStream(directory.toPath()).use { rows ->
+                rows.map { it.toFile() }.toSet()
+            }
+        fun expected(directory:File)=created.keys.filter { it.parentFile==directory }.toSet()
+        val directories=created.filterValues { it.directory }
+        check(created.keys.all { it.parentFile==root || it.parentFile in directories.keys })
+        check(directories.keys.all { it.parentFile==root })
+        check(children(root)==expected(root)) { "Unexpected recovery staging inventory; refusing cleanup." }
+        for((directory,identity) in directories) {
+            requireStagedIdentity(directory,identity)
+            check(children(directory)==expected(directory)) { "Unexpected recovery staging inventory; refusing cleanup." }
+        }
+        check(uniqueStagedIdentities(listOf(rootIdentity)+created.values))
+        for((file,identity) in created) requireStagedIdentity(file,identity)
+        for((file,identity) in created.entries.sortedByDescending { it.key.toPath().nameCount }) {
+            requireStagedIdentity(root,rootIdentity)
+            if(file.parentFile!=root)
+                requireStagedIdentity(file.parentFile!!,directories.getValue(file.parentFile!!))
+            requireStagedIdentity(file,identity)
+            // Non-recursive delete fails if an unexpected directory entry appeared.
+            Files.delete(file.toPath())
+        }
+        requireStagedIdentity(root,rootIdentity)
+        Files.delete(root.toPath())
+    }
+
     suspend fun inspect(
         resolver: ContentResolver, tree: Uri, cacheDir: File, identity: PhysicalRecoveryIdentity,
         current: () -> Boolean
@@ -136,6 +169,8 @@ internal object PhysicalRecoveryFolder {
         val staging = Files.createTempDirectory(cacheDir.toPath(), "ecu-inspection-").toFile()
         val stagingIdentity=stagedIdentity(staging,true)
         var total = 0L
+        val created=linkedMapOf<File,StagedIdentity>()
+        var primaryFailure:Throwable?=null
         try {
             val digests = mutableMapOf<Entry, Pair<Long, ByteArray>>()
             val stagedIdentities=mutableMapOf<Entry,StagedIdentity>()
@@ -144,6 +179,7 @@ internal object PhysicalRecoveryFolder {
             requireStagedIdentity(staging,stagingIdentity)
             check(blockDir.mkdir())
             val blockIdentity=stagedIdentity(blockDir,true)
+            created[blockDir]=blockIdentity
             fun verifyDirectories() {
                 active()
                 requireStagedIdentity(staging,stagingIdentity)
@@ -159,6 +195,9 @@ internal object PhysicalRecoveryFolder {
                         java.nio.file.StandardOpenOption.CREATE_NEW,
                         java.nio.file.StandardOpenOption.WRITE,
                         java.nio.file.LinkOption.NOFOLLOW_LINKS).use { output ->
+                        // Register even a partially copied file for bounded cleanup.
+                        verifyDirectories()
+                        created[destination]=stagedIdentity(destination,false)
                         val buffer = ByteArray(8192)
                         while (true) {
                             active()
@@ -175,7 +214,9 @@ internal object PhysicalRecoveryFolder {
                 }
                 check(count > 0)
                 verifyDirectories()
-                stagedIdentities[entry]=stagedIdentity(destination,false)
+                val copiedIdentity=created.getValue(destination)
+                requireStagedIdentity(destination,copiedIdentity)
+                stagedIdentities[entry]=copiedIdentity
                 check(uniqueStagedIdentities(listOf(stagingIdentity,blockIdentity)+stagedIdentities.values)) {
                     "Aliased recovery staging entries."
                 }
@@ -231,27 +272,18 @@ internal object PhysicalRecoveryFolder {
             verifyStaging()
             active()
             return result
+        } catch(failure:Throwable) {
+            primaryFailure=failure
+            throw failure
         } finally {
-            // If the root was replaced, do not delete the substituted tree.
-            // A provider without stable file keys still relies on private storage.
-            if (!runCatching { requireStagedIdentity(staging,stagingIdentity) }.isSuccess) {
-                throw IllegalStateException("Recovery staging root was replaced; refusing cleanup.")
+            try {
+                cleanupStaging(staging,stagingIdentity,created)
+            } catch(cleanup:Exception) {
+                // Preserve the reason inspection failed, including cancellation.
+                // On success a cleanup failure still invalidates the result.
+                val original=primaryFailure
+                if(original!=null) original.addSuppressed(cleanup) else throw cleanup
             }
-            // Do not traverse an unexpected symbolic-link directory when
-            // cleaning private staged recovery evidence.
-            Files.walkFileTree(staging.toPath(), object : java.nio.file.SimpleFileVisitor<java.nio.file.Path>() {
-                override fun visitFile(file: java.nio.file.Path,
-                    attrs: java.nio.file.attribute.BasicFileAttributes): java.nio.file.FileVisitResult {
-                    Files.deleteIfExists(file)
-                    return java.nio.file.FileVisitResult.CONTINUE
-                }
-                override fun postVisitDirectory(dir: java.nio.file.Path,
-                    exc: java.io.IOException?): java.nio.file.FileVisitResult {
-                    if (exc != null) throw exc
-                    Files.deleteIfExists(dir)
-                    return java.nio.file.FileVisitResult.CONTINUE
-                }
-            })
         }
     }
 }
