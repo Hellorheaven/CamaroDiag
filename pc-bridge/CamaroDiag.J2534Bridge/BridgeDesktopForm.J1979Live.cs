@@ -97,7 +97,8 @@ internal sealed partial class BridgeDesktopForm
         var progress=new Progress<ObdJ1979LiveRecorder.Observation>(row=>{
             if(functionalCancellation!=cancel||functionalAuthorizedUntil!=expiry||DateTimeOffset.UtcNow>=expiry)return;
             var line=$"{row.ElapsedMs} ms · {row.Pid:X2} · "+
-                (row.Measurement is {} v?$"{v.Number.ToString(CultureInfo.CurrentCulture)} {v.Unit}":row.Status);
+                (row.MultiSignals is { } channels?ObdJ1979MultiSignal.Format(channels):
+                    row.Measurement is {} v?$"{v.Number.ToString(CultureInfo.CurrentCulture)} {v.Unit}":row.Status);
             var lines=functionalResults.Lines.TakeLast(39).Append(line).ToArray();
             functionalResults.Lines=lines;
         });
@@ -116,7 +117,12 @@ internal sealed partial class BridgeDesktopForm
                 output.AppendLine(string.Format(CultureInfo.CurrentUICulture,J1979RecipeText("LiveCycleCount"),result.CompletedCycles,result.RequestedCycles));
                 output.AppendLine("VIN: "+(result.ObservedVin??J1979RecipeText("Unavailable")));
                 if(result.StopReason is not null)output.AppendLine(result.StopReason);
-                foreach(var item in result.Summary)
+                foreach(var item in result.MultiSignalSummary)
+                    output.AppendLine($"{item.Pid:X2} {item.Name} · n={item.Count}/{item.Attempted} · "+
+                        string.Format(CultureInfo.CurrentUICulture,J1979RecipeText("LiveSummary"),
+                            item.Minimum.ToString("0.###"),item.Maximum.ToString("0.###"),
+                            item.Mean.ToString("0.###"),item.Unit));
+                foreach(var item in result.Summary.Where(x=>ObdJ1979MultiSignal.Width(x.Pid) is null))
                     output.AppendLine($"{item.Pid:X2} {item.Name} · n={item.StatusCounts.GetValueOrDefault("PASSED")} · "+
                         string.Format(CultureInfo.CurrentUICulture,J1979RecipeText("LiveSummary"),
                             item.Minimum?.ToString("0.###")??"—",item.Maximum?.ToString("0.###")??"—",
