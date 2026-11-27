@@ -177,4 +177,10 @@
   <data name="CatalogueConfirm" xml:space="preserve"><value>Je confirme le VIN et l’empreinte de la référence.</value></data>
   <data name="CatalogueSaved" xml:space="preserve"><value>Projection enregistrée.</value></data>
   <data name="CatalogueRejected" xml:space="preserve"><value>Projection refusée. Vérifiez le catalogue, la référence et la capture.</value></data>
+  <data name="LiveNativeRun" xml:space="preserve"><value>Enregistrement USB natif</value></data>
+  <data name="LiveNativeInspect" xml:space="preserve"><value>Inspecter la capture CL/1</value></data>
+  <data name="LiveNativeCaptureFilter" xml:space="preserve"><value>Capture native (*.cl)|*.cl</value></data>
+  <data name="LiveNativeConfirm" xml:space="preserve"><value>Je confirme le calculateur physique autorisé, le VIN, les PID et le véhicule à l’arrêt.</value></data>
+  <data name="LiveNativePids" xml:space="preserve"><value>PID bruts (hex., séparés par virgules)</value></data>
+  <data name="LiveNativeVinRequired" xml:space="preserve"><value>Saisir le VIN connu indépendamment avant inspection.</value></data>
 </root>
