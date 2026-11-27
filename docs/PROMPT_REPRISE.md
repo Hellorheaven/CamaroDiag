@@ -1,3 +1,12 @@
+## Reprise SAE J1979 — 27/11/2026 — CU/5, CI/5 et projection CF/1
+
+Base du lot : 04124ea274245301bc0cafa028899fb679288eea. Avant cette note : e9b2a79688fbf1843f80d453dc46497a565b3459 ; comparaison GitHub 38 commits, 33 fichiers, +1392/-79. Aucun gate ni test lancé. C6 en pause, pas d'autre protocole ni C8, pas de fusion.
+
+- CU/5 reçu terminal de fermeture (12 octets, CU 05 05, taille LE32 et CRC32 LE32) requis côté Python/Java/C#. Export incomplet si absent ou invalide. Écran Windows branché à acquisition archive avec consentement distinct. Stockage en lecture seule, vérification en fin de lecture et libération du bail avant reçu. Propriétaire indépendant de carte intégré aux compositions locales ESP32/STM32, exclusivité contre nouveaux écrivains jusqu'au reçu. Qualification carte physique et intégration du fournisseur réel de snapshots restent ouvertes.
+- Suites de régression archive C++ CI/5 et CU/5, Python, Java, C# ajoutées au code, non exécutées. Gate final unique selon AGENTS.md. Ne pas prétendre que les nouveaux tests passent.
+- Catalogue Mode 02 dédié par frame/PID, projection CF/1 indépendante Python, Windows et Android. Schéma camarodiag-j1979-freeze-catalogue-v1, 25000 signaux max, CAN, pas de réemploi des définitions live. CLI Python inspect-freeze-catalogue / project-native-freeze / verify-native-freeze-projection. Tests Python synthétiques ajoutés ; compléter les tests croisés C#/Kotlin, revoir signatures et compilation et les libellés de sélection du catalogue. Les valeurs ne sont admises qu'après relecture VIN finale et stabilité du déclencheur DTC. Référence J1979DA_202607 autorisée toujours manquante, ne pas inventer.
+- Avant clôture : audit de compilation complet et de couverture fonctionnelle, finaliser l'intégration carte réelle sans activer le firmware de découverte non qualifié, exécuter le gate protocol final. Une fois terminé, APK signé et vérifié selon la procédure v2.0.46 sur le SHA exact ; pas de fusion. Aucun APK produit pendant ce lot.
+
 # Reprise SAE J1979 — stockage, archives CU/5 et CI/5 — 27/11/2026
 
 PR #117, branche `chore/unified-ci`, base du lot `3ae7a3dcd2098ea634c58bf53540dd2e0adf62ea`. Exclusivement SAE J1979 ; C6 et autres protocoles en pause.
