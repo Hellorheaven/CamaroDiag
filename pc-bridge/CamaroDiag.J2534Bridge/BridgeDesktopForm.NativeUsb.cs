@@ -136,6 +136,8 @@ internal sealed partial class BridgeDesktopForm
                             text.AppendLine("  "+J1979RecipeText("NativeUsb_monitor_"+monitor.Key.Replace('-','_'))+": "+
                                 J1979RecipeText(monitor.Value?"NativeUsb_ready":"NativeUsb_incomplete"));
                     }
+                    if(ObdJ1979ExtendedVehicleInfo.TryRaw(step.RequestHex,step.ResponseHex,step.Status) is { } extendedInfo)
+                        text.AppendLine("  "+ObdJ1979ExtendedVehicleInfo.Format(extendedInfo));
                     if(step.Identification is { } info&&info.InfoType!=2)
                     {
                         string label=J1979RecipeText(info.InfoType switch {
