@@ -6,7 +6,8 @@ if (args is ["--self-test"])
     return SelfTests.Run();
 
 if (args.Contains(J1979LiveNativeCli.CaptureCommand,StringComparer.OrdinalIgnoreCase) ||
-    args.Contains(J1979LiveNativeCli.InspectCommand,StringComparer.OrdinalIgnoreCase))
+    args.Contains(J1979LiveNativeCli.InspectCommand,StringComparer.OrdinalIgnoreCase) ||
+    args.Contains(J1979LiveNativeCli.CsvCommand,StringComparer.OrdinalIgnoreCase))
     return J1979LiveNativeCli.Run(args);
 if (args.Length>0 && args[0] is J1979FreezeNativeCli.CaptureCommand or J1979FreezeNativeCli.InspectCommand)
     return J1979FreezeNativeCli.Run(args);
