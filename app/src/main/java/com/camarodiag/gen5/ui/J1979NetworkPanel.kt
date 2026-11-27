@@ -68,6 +68,9 @@ internal fun J1979NetworkPanel(protocol:Int?,state:FunctionalTestState,vehicle:V
                 Text(stringResource(R.string.j1979_network_steps,ecu.steps.size),fontSize=11.sp)
                 ecu.steps.forEach { step->
                     step.extendedVehicleInfo?.let { J1979ExtendedVehicleInfoContent(it) }
+                    step.multiSignalRecord?.signals?.forEach { signal ->
+                        Text("${signal.name}: ${signal.number} ${signal.unit}",fontSize=11.sp)
+                    }
                     val value=step.application?.measurement()
                     val codes=step.application?.dtcCodes()
                     Text("${step.requestHex} · ${step.status}"+
