@@ -8,6 +8,7 @@
 #include "j1979_cj1.hpp"
 #include "j1979_cu1.hpp"
 #include "j1979_discovery.hpp"
+#include "j1979_legacy_scan.hpp"
 #include <array>
 #include <string_view>
 #include <exception>
@@ -1128,10 +1129,12 @@ struct LegacyOptions {
     const char* port{};
     const char* output{};
     cd::legacy::Protocol protocol{};
-    uint32_t baud{38400},budget{8000};
+    uint32_t baud{38400},budget{8000},source{};
+    const char* vin{};bool source_set{};
     bool confirmed{},protocol_set{},baud_set{},budget_set{};
 };
-static bool parse_legacy(int argc,char** argv,LegacyOptions& o){
+static bool parse_legacy(int argc,char** argv,LegacyOptions& o,bool scan){
+    if(scan)o.budget=180000;
     for(int i=2;i<argc;++i){
         std::string_view flag=argv[i];
         if(flag=="--confirm-physical-channel"){
@@ -1145,6 +1148,12 @@ static bool parse_legacy(int argc,char** argv,LegacyOptions& o){
         else if(flag=="--protocol"){
             uint32_t n=0;if(o.protocol_set||!decimal_uint32(value,&n))return false;
             o.protocol=static_cast<cd::legacy::Protocol>(n);o.protocol_set=true;
+        }else if(flag=="--source"&&scan){
+            if(o.source_set||strlen(value)!=2||!hex_uint32(value,&o.source)||!cd::legacy::valid_source(o.source))return false;
+            o.source_set=true;
+        }else if(flag=="--vin"&&scan){
+            if(o.vin||!cf1_valid_vin(value))return false;
+            o.vin=value;
         }else if(flag=="--baud"){
             if(o.baud_set||!decimal_uint32(value,&o.baud))return false;
             o.baud_set=true;
@@ -1154,13 +1163,14 @@ static bool parse_legacy(int argc,char** argv,LegacyOptions& o){
         }else return false;
     }
     return o.port&&o.output&&o.confirmed&&o.protocol_set&&cd::legacy::valid_protocol(o.protocol)
-        &&o.budget>0&&o.budget<=60000;
+        &&o.budget>0&&o.budget<=(scan?600000u:60000u)&&(!scan||(o.source_set&&o.vin));
 }
-static int legacy_discovery_cli(int argc,char** argv){
+static int legacy_discovery_cli(int argc,char** argv,bool scan=false){
     LegacyOptions o;
-    if(!parse_legacy(argc,argv,o))return error("Legacy discovery requires port, protocol 1..5, output and explicit confirmation");
+    if(!parse_legacy(argc,argv,o,scan))return error("Legacy requires port, protocol 1..5, output, explicit confirmation and selected source plus VIN for scan");
     if(!isatty(STDIN_FILENO))return error("Local interactive consent required");
-    fputs("Confirm dedicated adapter and stationary vehicle, read-only PID00 discovery. Type yes: ",stderr);
+    fputs(scan?"Confirm selected legacy ECU, documented VIN and stationary vehicle. Type yes: ":
+        "Confirm dedicated adapter and stationary vehicle, read-only PID00 discovery. Type yes: ",stderr);
     char answer[16]{};
     if(!fgets(answer,sizeof(answer),stdin)||strcmp(answer,"yes\n"))return error("Consent refused");
     const int fd=open(o.output,O_WRONLY|O_CREAT|O_EXCL|O_NOFOLLOW|O_CLOEXEC,0600);
@@ -1178,17 +1188,20 @@ static int legacy_discovery_cli(int argc,char** argv){
         ~Signals(){if(terminate)sigaction(SIGTERM,&oldterm,nullptr);if(interrupt)sigaction(SIGINT,&oldint,nullptr);}
     } signals;
     cd::legacy::Discovery d{};d.protocol=o.protocol;
+    cd::legacy::Scan s{};s.protocol=o.protocol;s.source=o.source;
+    if(o.vin)s.expected_vin=o.vin;
     try{
         if(!signals.terminate)throw cd::legacy::TransportError("Signal handlers unavailable");
         const auto current=[](){return legacy_cancelled==0;};
         auto link=cd::legacy::serial_link(o.port,o.baud,current);
         cd::legacy::Elm elm(*link,o.protocol,true,current);
         elm.configure();
-        d=cd::legacy::discover(elm,o.budget,cd::legacy::monotonic_ms,current);
-    }catch(const cd::legacy::Cancelled&){d.error="CANCELLED";}
-    catch(const std::exception&){d.error="ADAPTER_SETUP_FAILED";}
+        if(scan)s=cd::legacy::scan_selected(elm,o.source,o.vin,o.budget,cd::legacy::monotonic_ms,current);
+        else d=cd::legacy::discover(elm,o.budget,cd::legacy::monotonic_ms,current);
+    }catch(const cd::legacy::Cancelled&){d.error="CANCELLED";s.error=d.error;}
+    catch(const std::exception&){d.error="ADAPTER_SETUP_FAILED";s.error=d.error;}
     try{
-        const auto report=cd::legacy::discovery_report(d);
+        const auto report=scan?cd::legacy::scan_report(s):cd::legacy::discovery_report(d);
         size_t written=0;
         while(written<report.size()){
             const auto n=write(output.fd,report.data()+written,report.size()-written);
@@ -1199,7 +1212,7 @@ static int legacy_discovery_cli(int argc,char** argv){
         if(fsync(output.fd))return error("Discovery report sync failed");
         const int result=close(output.fd);output.fd=-1;
         if(result)return error("Discovery report close failed");
-        return d.complete?0:2;
+        return (scan?s.completed:d.complete)?0:2;
     }catch(const std::exception& e){return error(e.what());}
 }
 static int replay_legacy_discovery(const char* protocol,const char* response,const char* probe,const char* output){
@@ -1247,6 +1260,7 @@ static void usage(FILE *stream) {
         "  camarodiag-native --inspect-j1979-campaign CAPTURE.cj VIN REPORT.json\n"
         "  camarodiag-native --verify-j1979-campaign CAPTURE.cj REPORT.json PROOF.json VIN\n"
         "  camarodiag-native --j1979-legacy-discover --port /dev/ttyUSB0 --protocol 2 --baud 38400 --output responders.json --confirm-physical-channel\n"
+        "  camarodiag-native --j1979-legacy --port /dev/ttyUSB0 --protocol 2 --source 10 --vin VIN --output scan.json --confirm-physical-channel\n"
         "  camarodiag-native --inspect-j1979-legacy-discovery PROTOCOL RAW_RESPONSE RAW_ATDPN REPORT.json\n"
         "  camarodiag-native --help\n"
         "Examples:\n"
@@ -1259,6 +1273,7 @@ int main(int argc, char **argv) {
     if (argc == 2 && (!strcmp(argv[1], "--help") || !strcmp(argv[1], "-h"))) {
         usage(stdout); return 0;
     }
+    if (argc>=3 && !strcmp(argv[1],"--j1979-legacy"))return legacy_discovery_cli(argc,argv,true);
     if (argc>=3 && !strcmp(argv[1],"--j1979-legacy-discover"))return legacy_discovery_cli(argc,argv);
     if (argc==6 && !strcmp(argv[1],"--inspect-j1979-legacy-discovery"))return replay_legacy_discovery(argv[2],argv[3],argv[4],argv[5]);
     if (argc>=3 && !strcmp(argv[1],"--j1979-usb"))return capture_cu1(argc,argv);
