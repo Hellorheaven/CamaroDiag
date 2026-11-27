@@ -521,9 +521,30 @@ def compare_files(paths, *, expected_vin=None):
         comparisons.append({"pid":pid,"unit":next((row["unit"] for row in reports if row["unit"]),None),
                             "recordings":reports,
                             "mean_range":max(means)-min(means) if len(means)>1 else None})
-    return {"schema":"camarodiag-j1979-live-comparison-v1","verified":True,
+    # Never collapse multiple signals of a PID into a single average. A
+    # channel must occur in all recordings with the same name and unit before
+    # its means are comparable. An absent channel is not a numeric zero.
+    channel_maps=[{(row["pid"],row["name"],row["unit"]):row
+                   for row in recording["multi_signal_summary"]}
+                  for recording in results]
+    channel_keys=sorted(set.union(*(set(m) for m in channel_maps)))
+    channel_comparisons=[]
+    for pid,name,unit in channel_keys:
+        values=[m.get((pid,name,unit)) for m in channel_maps]
+        means=[row["mean"] for row in values if row is not None]
+        present=sum(row is not None for row in values)
+        # Preserve absence and distinguish complete coverage of the inputs
+        # from a recording that contains only a subset of the samples.
+        channel_comparisons.append({
+            "pid":pid,"name":name,"unit":unit,
+            "recordings":values,"recordings_with_channel":present,
+            "all_recordings_have_channel":present==len(results),
+            "all_recordings_complete":all(x["completed"] for x in results),
+            "mean_range":max(means)-min(means) if present==len(results) else None,
+        })
+    return {"schema":"camaradiag-j1979-live-comparison-v1","verified":True,
             "declared_vin":first["declared_vin"],"channel":first["channel"],"shared_pids":shared,
             "recordings":[{"sha256":x["source_sha256"],"completed":x["completed"],
                            "completed_cycles":x["completed_cycles"]} for x in results],
-            "comparison":comparisons,"time_aligned":False,"diagnostic_verdict":None,
+            "comparison":comparisons,"channel_comparison":channel_comparisons,"time_aligned":False,"diagnostic_verdict":None,
             "physical_vehicle_verified":False,"authenticated":False}
