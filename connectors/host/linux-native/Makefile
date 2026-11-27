@@ -14,8 +14,8 @@ INCLUDES = -Iinclude -I../../firmware/shared
 TARGET = camarodiag-native
 
 LEGACY_C_SOURCES = src/cf1.c src/cf1_complete.c src/cf1_crypto.c src/cf1_usb.c src/cl1.c src/cl1_crypto.c src/main.c
-CXX_SOURCES = src/j1979_monitor_scaling.cpp src/j1979_vehicle_info.cpp src/j1979_measurement.cpp src/j1979_can.cpp src/j1979_live.cpp src/j1979_isotp.cpp src/j1979_can_cli.cpp
-LEGACY_C_OBJECTS = $(patsubst src/%.c,build/%.o,$(LEGACY_C_SOURCES)) build/j1979_native_c.o
+CXX_SOURCES = src/j1979_policy.cpp src/j1979_monitor_scaling.cpp src/j1979_vehicle_info.cpp src/j1979_measurement.cpp src/j1979_can.cpp src/j1979_live.cpp src/j1979_isotp.cpp src/j1979_can_cli.cpp
+LEGACY_C_OBJECTS = $(patsubst src/%.c,build/%.o,$(LEGACY_C_SOURCES))
 CXX_OBJECTS = $(patsubst src/%.cpp,build/%.o,$(CXX_SOURCES))
 DECODER_OBJECTS = build/j1979_monitor_scaling.o build/j1979_vehicle_info.o build/j1979_measurement.o
 
@@ -34,8 +34,8 @@ build/%.o: src/%.cpp | build
 build/test_%.o: tests/test_%.c | build
 	$(CC) $(CPPFLAGS) $(INCLUDES) $(CFLAGS) $(CSTRICT) -c $< -o $@
 
-build/j1979_native_c.o: ../../firmware/shared/j1979_native_c.c ../../firmware/shared/j1979_native_c.h | build
-	$(CC) $(CPPFLAGS) $(INCLUDES) $(CFLAGS) $(CSTRICT) -c $< -o $@
+build/test_%.o: tests/test_%.cpp | build
+	$(CXX) $(CPPFLAGS) $(INCLUDES) $(CXXFLAGS) $(CXXSTRICT) -c $< -o $@
 
 $(TARGET): $(LEGACY_C_OBJECTS) $(CXX_OBJECTS)
 	$(CXX) $(CXXFLAGS) $(CXXSTRICT) $^ $(LDFLAGS) $(LDLIBS) -o $@
@@ -62,8 +62,8 @@ test-j1979-vehicle-info: build/test_j1979_vehicle_info.o build/j1979_vehicle_inf
 test-j1979-monitor: build/test_j1979_monitor_scaling.o build/j1979_monitor_scaling.o
 	$(CXX) $(LDFLAGS) $^ -o $@
 
-test-j1979-native-c: tests/test_j1979_native_c.c ../../firmware/shared/j1979_native_c.c
-	$(CC) $(CPPFLAGS) $(INCLUDES) $(CFLAGS) $(CSTRICT) $^ $(LDFLAGS) -o $@
+test-j1979-native-c: build/test_j1979_native_c.o build/j1979_policy.o
+	$(CXX) $(LDFLAGS) $^ -o $@
 
 test-cf1: tests/test_cf1.c src/cf1.c src/cf1_complete.c include/cf1.h
 	$(CC) $(CPPFLAGS) $(INCLUDES) $(CFLAGS) $(CSTRICT) tests/test_cf1.c src/cf1.c src/cf1_complete.c $(LDFLAGS) -o $@
@@ -74,13 +74,13 @@ test-cu3: tests/test_cu3.c src/cl1_crypto.c src/cl1.c src/cf1.c include/cl1_tran
 test-cu2: tests/test_cu2.c src/cf1.c src/cf1_crypto.c include/cf1.h include/cf1_transport.h
 	$(CC) $(CPPFLAGS) $(INCLUDES) $(CFLAGS) $(CSTRICT) tests/test_cu2.c src/cf1.c src/cf1_crypto.c $(LDFLAGS) $(LDLIBS) -o $@
 
-test-j1979-can: build/test_j1979_can.o build/j1979_can.o $(DECODER_OBJECTS) build/j1979_native_c.o
+test-j1979-can: build/test_j1979_can.o build/j1979_can.o $(DECODER_OBJECTS) build/j1979_policy.o
 	$(CXX) $(LDFLAGS) $^ -o $@
 
-test-j1979-isotp: build/test_j1979_isotp.o build/j1979_isotp.o build/j1979_can.o $(DECODER_OBJECTS) build/j1979_native_c.o
+test-j1979-isotp: build/test_j1979_isotp.o build/j1979_isotp.o build/j1979_can.o $(DECODER_OBJECTS) build/j1979_policy.o
 	$(CXX) $(LDFLAGS) $^ -o $@
 
-test-j1979-live: build/test_j1979_live.o build/j1979_live.o build/j1979_can.o $(DECODER_OBJECTS) build/j1979_native_c.o
+test-j1979-live: build/test_j1979_live.o build/j1979_live.o build/j1979_can.o $(DECODER_OBJECTS) build/j1979_policy.o
 	$(CXX) $(LDFLAGS) $^ -o $@
 
 test-j1979-cl1: tests/test_j1979_cl1.c src/cl1.c src/cf1.c include/cl1.h include/cf1.h

@@ -1,4 +1,4 @@
-#include "j1979_native_c.h"
+#include "j1979_policy.h"
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
@@ -55,7 +55,7 @@ int main(void) {
            CD_J1979_NATIVE_DTC);
     assert(cd_j1979_native_classify(dtc_req,1,no_dtc,sizeof(no_dtc)) ==
            CD_J1979_NATIVE_DTC);
-    uint8_t dtc_code[2]={0x03,0x01};char code[6]={0};
+    uint8_t dtc_code[2]={0x03,0x01};char code[6]{};
     assert(cd_j1979_native_dtc_code(dtc_code,code));
     assert(!strcmp(code,"P0301"));
     dtc_code[0]=0x42;dtc_code[1]=0x07;
@@ -67,6 +67,6 @@ int main(void) {
     const uint8_t bad_count[4]={0x43,0,0x03,0x01};
     assert(cd_j1979_native_classify(dtc_req,1,bad_count,sizeof(bad_count)) ==
            CD_J1979_NATIVE_INVALID);
-    puts("Shared native C SAE J1979 physical, read-only and DTC shapes accepted");
+    puts("Native C++ SAE J1979 physical, read-only and DTC shapes accepted");
     return 0;
 }

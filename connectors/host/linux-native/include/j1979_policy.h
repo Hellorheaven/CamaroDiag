@@ -1,5 +1,5 @@
-#ifndef CAMARODIAG_SAE_J1979_NATIVE_C_H
-#define CAMARODIAG_SAE_J1979_NATIVE_C_H
+#ifndef CAMARODIAG_SAE_J1979_POLICY_H
+#define CAMARODIAG_SAE_J1979_POLICY_H
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -7,7 +7,7 @@
 extern "C" {
 #endif
 
-/* Hardware-independent C11 SAE J1979 admission and response envelope.
+/* Hardware-independent C++20 SAE J1979 admission and response envelope.
  * This component never probes or operates a vehicle, drives a pin, installs
  * a CAN driver, retries a request, or authorizes programming.
  */

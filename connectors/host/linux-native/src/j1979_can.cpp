@@ -1,6 +1,6 @@
 #define _POSIX_C_SOURCE 200809L
 #include "j1979_can.h"
-#include "j1979_native_c.h"
+#include "j1979_policy.h"
 #include "j1979_monitor_scaling.h"
 #include "j1979_vehicle_info.h"
 #include "j1979_measurement.h"
