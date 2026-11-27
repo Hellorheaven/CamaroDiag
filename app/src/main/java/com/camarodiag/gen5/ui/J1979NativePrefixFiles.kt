@@ -43,16 +43,19 @@ internal object J1979NativePrefixFiles {
         return J1979DocumentedCatalogue.digestText(sha.digest())
     }
 
-    fun prepareMaintenance(resolver: ContentResolver,uri: Uri,vin: String,current:()->Unit): Prepared {
+    fun prepareMaintenance(resolver: ContentResolver,uri: Uri,vin: String,current:()->Unit,prefix:Boolean=false): Prepared {
         require(J1979CatalogueProjection.validVin(vin))
         val raw=ByteArrayOutputStream()
         read(resolver,uri,current,J1979MaintenanceJournal.MAX_JOURNAL) { buffer,n -> raw.write(buffer,0,n) }
         val bytes=raw.toByteArray()
         val hash=J1979DocumentedCatalogue.sha(bytes)
         current()
-        val report=J1979MaintenanceJournal.inspect(bytes,vin).toMutableMap()
+        val report=(if(prefix) J1979MaintenanceJournal.inspectPrefix(bytes,vin)
+            else J1979MaintenanceJournal.inspect(bytes,vin)).toMutableMap()
         report["journal_sha256"]=hash
-        require(report["record_consistency_verified"]==true&&report["permits_automatic_retry"]==false&&
+        require((if(prefix) report["prefix_integrity_verified"]==true&&report["record_consistency_verified"]==false&&
+            report["terminal_present"]==false&&report["recovery_required"]==true else report["record_consistency_verified"]==true)&&
+            report["permits_automatic_retry"]==false&&
             report["physical_vehicle_verified"]==false&&report["permits_programming"]==false)
         val output=J1979CatalogueJson.encode(report)
         check(digest(resolver,uri,current,J1979MaintenanceJournal.MAX_JOURNAL)==hash) { "CM/1 changed during inspection" }
