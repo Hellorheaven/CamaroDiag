@@ -49,6 +49,11 @@ internal fun LegacyReadReportContent(report: LegacyReadReport) {
     report.measurements.forEach {
         Text("${hex(it.mode)}/${hex(it.pid)} · ${it.name}: ${it.number} ${it.unit}",fontSize=11.sp)
     }
+    report.multiSignalRecords.forEach { record ->
+        record.signals.forEach { signal ->
+            Text("${record.requestHex} · ${signal.name}: ${signal.number} ${signal.unit}",fontSize=11.sp)
+        }
+    }
     report.identification.forEach {
         val extended=it.extended
         if(extended==null) Text("09/${hex(it.infoType)}: ${it.values.joinToString(", ")}",fontSize=11.sp)
