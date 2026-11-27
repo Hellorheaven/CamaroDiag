@@ -40,7 +40,7 @@ internal class ElmLegacyLiveLink(
     private fun allows(command:String):Boolean =
         command in setOf("0100","0900","0901","0902") ||
             command.matches(Regex("01[0-9A-F]{2}"))&&command.takeLast(2).toInt(16).let {
-                it%32==0||J1979LiveRecorder.legacyNumericPid(it)
+                it%32==0||ObdJ1979ScalingContext.isConfiguration(it)||J1979LiveRecorder.legacyNumericPid(it)
             }
     private suspend fun read(command:String,deadline:Long,index:Int):List<List<Int>>{
         check(allows(command))
