@@ -21,7 +21,7 @@ object J1979OperatingContextJson {
         }?:JSONObject.NULL)
         .put("fuel_trims",JSONArray(p.fuelTrims.map { t ->
             JSONObject().put("request_hex",t.requestHex).put("frame",n(t.frame))
-                .put("layout_1d",n(t.layout1d)).put("upper_bank_present",n(t.upperBankPresent))
+                .put("layout_1d",n(t.layout1d)).put("upper_bank_verified",n(t.upperBankVerified))
                 .put("signals",JSONArray(t.signals.map { s ->
                     JSONObject().put("bank",s.bank).put("name",s.name).put("raw_encoded",s.rawEncoded)
                         .put("number",n(s.number)).put("unit",s.unit).put("attribution",s.attribution)
