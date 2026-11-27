@@ -37,7 +37,7 @@ class LegacyMutationTests(unittest.TestCase):
     def recipe(self, p=2, operation="clear", wrong_vin=False, moving=False,
                extra=False, fail_save=False, missing_ack=False, fail_after=False,
                second_evap_source=False, ok=True, yes=True,
-               missing_pending=False, residual_pending=False):
+               missing_pending=False, residual_pending=False, changed_scope_after_save=False):
         attempted = False
         saved = False
         sent = []
@@ -50,7 +50,7 @@ class LegacyMutationTests(unittest.TestCase):
                 raise OSError("Lost link after acknowledgment")
             replies = {
                 "0100": encode((0x10,"410080000000"),(0x11,"410080000000"),
-                              *(([(0x12,"410080000000")]) if extra else [])),
+                              *(([(0x12,"410080000000")]) if extra or (saved and changed_scope_after_save) else [])),
                 "0901": encode((0x10,"490105")),
                 "0902": encode(*[(0x10,bytes((0x49,2,i+1))+vin[i*4:i*4+4]) for i in range(5)]),
                 "03": encode((0x10,"43000000000000" if attempted else "43012300000000"),(0x11,"43000000000000")),
@@ -104,6 +104,13 @@ class LegacyMutationTests(unittest.TestCase):
         for kwargs in ({"ok":False},{"yes":False}):
             with self.assertRaises(ValueError):
                 self.recipe(**kwargs)
+
+    def test_scope_change_after_baseline_prevents_mutation(self):
+        result,sent=self.recipe(changed_scope_after_save=True)
+        self.assertEqual("NOT_TESTED",result["outcome"])
+        self.assertFalse(result["command_attempted"])
+        self.assertEqual(3,sent.count("0100"))
+        self.assertNotIn("04",sent)
 
     def test_missing_ack_and_transport_loss_are_not_retried(self):
         for kwargs,outcome in (({"missing_ack":True},"UNCERTAIN"),({"fail_after":True},"ACKNOWLEDGED_PARTIAL")):
