@@ -6922,8 +6922,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun inspectFunctionalNativeMaintenancePrefix(source: Uri,confirmedConnection: Long,confirmedVehicle: VehicleProfile) =
         inspectFunctionalNativeFile(source,confirmedConnection,confirmedVehicle,true,true)
 
+    fun inspectFunctionalNativeFreezePrefix(source: Uri,confirmedConnection: Long,
+                                            confirmedVehicle: VehicleProfile) =
+        inspectFunctionalNativeFile(source,confirmedConnection,confirmedVehicle,false,false,true)
+
     private fun inspectFunctionalNativeFile(source: Uri,confirmedConnection: Long,confirmedVehicle: VehicleProfile,
-                                            maintenance: Boolean,interrupted:Boolean=false) {
+                                            maintenance: Boolean,interrupted:Boolean=false,freeze:Boolean=false) {
         val account=authenticatedAccountUid ?: return
         val generation=accountSessionGeneration
         if(source.scheme!="content" || functionalCatalogueJob?.isActive==true || _functionalTestState.value.running ||
@@ -6941,15 +6945,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     val resolver=context.contentResolver
                     val job=currentCoroutineContext()[Job]
                     fun requireCurrent(){check(job?.isActive==true&&current())}
-                    val prepared=if(maintenance) J1979NativePrefixFiles.prepareMaintenance(resolver,source,confirmedVehicle.vin,::requireCurrent,interrupted)
-                        else J1979NativePrefixFiles.prepare(resolver,source,confirmedVehicle.vin,::requireCurrent)
+                    val prepared=when {
+                        freeze -> J1979NativePrefixFiles.prepareFreeze(resolver,source,confirmedVehicle.vin,::requireCurrent)
+                        maintenance -> J1979NativePrefixFiles.prepareMaintenance(resolver,source,confirmedVehicle.vin,::requireCurrent,interrupted)
+                        else -> J1979NativePrefixFiles.prepare(resolver,source,confirmedVehicle.vin,::requireCurrent)
+                    }
                     CamaroDiagExportStorage.write(context,
-                        "CamaroDiag_SAE-J1979_NATIVE_"+(if(interrupted) "MAINTENANCE_PREFIX_" else if(maintenance) "MAINTENANCE_" else "PREFIX_")+System.currentTimeMillis()+".json",
+                        "CamaroDiag_SAE-J1979_NATIVE_"+(if(freeze) "FREEZE_PREFIX_" else if(interrupted) "MAINTENANCE_PREFIX_" else if(maintenance) "MAINTENANCE_" else "PREFIX_")+System.currentTimeMillis()+".json",
                         "application/json",category=CamaroDiagExportStorage.Category.TESTS,
                         beforePublish={
                             requireCurrent()
                             check(J1979NativePrefixFiles.digest(resolver,source,::requireCurrent,
                                 if(maintenance) com.camarodiag.connectors.J1979MaintenanceJournal.MAX_JOURNAL
+                                else if(freeze) com.camarodiag.connectors.J1979FreezeUsbCapture.MAX_CAPTURE.toInt()
                                 else com.camarodiag.connectors.J1979LiveNativeReplay.MAX_CAPTURE)==prepared.sha256)
                         },verifyStaged={input -> PhysicalRecoveryEvidenceJson.requireExactJson(input,prepared.bytes)}) {
                         it.write(prepared.bytes)

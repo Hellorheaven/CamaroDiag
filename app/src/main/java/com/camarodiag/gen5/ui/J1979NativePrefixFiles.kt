@@ -4,6 +4,8 @@ import android.content.ContentResolver
 import android.net.Uri
 import com.camarodiag.connectors.J1979LiveNativeReplay
 import com.camarodiag.connectors.J1979MaintenanceJournal
+import com.camarodiag.connectors.J1979FreezeUsbCapture
+import com.camarodiag.gen5.data.obd.J1979FreezePrefix
 import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.security.MessageDigest
@@ -61,6 +63,27 @@ internal object J1979NativePrefixFiles {
         check(digest(resolver,uri,current,J1979MaintenanceJournal.MAX_JOURNAL)==hash) { "CM/1 changed during inspection" }
         current()
         return Prepared(report.toMap(),output,hash)
+    }
+
+    suspend fun prepareFreeze(resolver: ContentResolver,uri: Uri,vin: String,
+                              current:()->Unit): Prepared {
+        require(J1979CatalogueProjection.validVin(vin))
+        val max=J1979FreezeUsbCapture.MAX_CAPTURE.toInt()
+        val source=ByteArrayOutputStream()
+        read(resolver,uri,current,max) { bytes,n -> source.write(bytes,0,n) }
+        val raw=source.toByteArray()
+        val hash=J1979DocumentedCatalogue.sha(raw)
+        current()
+        val report=J1979FreezePrefix.inspect(raw,vin).toMutableMap()
+        report["capture_sha256"]=hash
+        require(report["prefix_integrity_verified"]==true&&
+            report["capture_integrity_verified"]==false&&
+            report["terminal_present"]==false&&report["execution_completed"]==false&&
+            report["physical_vehicle_verified"]==false&&report["permits_programming"]==false)
+        val bytes=J1979CatalogueJson.encode(report)
+        check(digest(resolver,uri,current,max)==hash) { "CF/1 source changed during inspection" }
+        current()
+        return Prepared(report.toMap(),bytes,hash)
     }
 
     fun prepare(resolver: ContentResolver,uri: Uri,vin: String,current:()->Unit): Prepared {

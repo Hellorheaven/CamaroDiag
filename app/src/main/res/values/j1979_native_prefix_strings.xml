@@ -7,4 +7,7 @@
     <string name="j1979_native_prefix_scope">Only complete records are checked. No completed recording or vehicle verification is claimed.</string>
     <string name="j1979_native_prefix_saved">Partial recording report exported</string>
     <string name="j1979_native_prefix_rejected">Interrupted capture inspection rejected</string>
+    <string name="j1979_freeze_prefix_title">Inspect interrupted CF/1 capture</string>
+    <string name="j1979_freeze_prefix_select">Select original CF/1 file</string>
+    <string name="j1979_freeze_prefix_scope">Only complete Mode 02 records are checked. No completed recording or vehicle verification is claimed.</string>
 </resources>
