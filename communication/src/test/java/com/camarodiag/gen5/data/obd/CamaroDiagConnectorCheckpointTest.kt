@@ -98,6 +98,54 @@ class CamaroDiagConnectorCheckpointTest {
         assertFalse(imported.authenticated)
         assertEquals(CamaroDiagConnectorCheckpoint.Disposition.RECOVERY_REQUIRED, imported.disposition)
     }
+    @Test fun snapshotBindsTwoReadsAndOptionalExpectedIdentity() {
+        val original=fixture(5,4)
+        var opens=0
+        val snapshot=CamaroDiagConnectorCheckpoint.capture(
+            { opens++; original.inputStream() },tx.uppercase(),digest)
+        assertEquals(2,opens)
+        assertEquals(64,snapshot.snapshotSha256?.length)
+        assertEquals(tx,snapshot.expectedTransaction)
+        assertTrue(snapshot.exportable)
+        assertFalse(snapshot.physicalVehicleVerified)
+        assertFalse(snapshot.inspection.authenticated)
+        CamaroDiagConnectorCheckpoint.requireSameEvidence(snapshot,
+            CamaroDiagConnectorCheckpoint.capture({original.inputStream()},tx,digest))
+        val mismatch=CamaroDiagConnectorCheckpoint.capture({original.inputStream()},"03".repeat(16),digest)
+        assertEquals(CamaroDiagConnectorCheckpoint.Disposition.IDENTITY_MISMATCH,mismatch.inspection.disposition)
+        assertThrows(IllegalStateException::class.java) {
+            CamaroDiagConnectorCheckpoint.requireSameEvidence(snapshot,mismatch)
+        }
+    }
+
+    @Test fun changingAndInvalidLengthEvidenceCannotBeExported() {
+        val original=fixture(2,1)
+        val changed=fixture(3,2)
+        var reads=0
+        val snapshot=CamaroDiagConnectorCheckpoint.capture(
+            { (if(reads++==0)original else changed).inputStream() })
+        assertEquals("CHANGED_DURING_INSPECTION",snapshot.problem)
+        assertFalse(snapshot.exportable)
+        for(size in listOf(0,63,65,1000)){
+            val bad=CamaroDiagConnectorCheckpoint.capture({ByteArray(size).inputStream()})
+            assertFalse(bad.exportable)
+            assertEquals("INVALID_SIZE",bad.problem)
+        }
+        assertThrows(IllegalArgumentException::class.java){
+            CamaroDiagConnectorCheckpoint.capture({fail("Must validate before opening");null},"00",digest)
+        }
+    }
+
+    @Test fun stableCorruptRecordCanBeExportedOnlyAsNegativeEvidence() {
+        val bytes=fixture(5,4).also { it[28]=3 }
+        val report=CamaroDiagConnectorCheckpoint.capture({bytes.inputStream()})
+        assertTrue(report.exportable)
+        assertNull(report.inspection.record)
+        assertEquals(CamaroDiagConnectorCheckpoint.Disposition.UNAVAILABLE_OR_CORRUPT,report.inspection.disposition)
+        assertFalse(report.inspection.permitsAutomaticRecovery)
+        assertFalse(report.inspection.permitsProgramming)
+    }
+
     @org.junit.Test fun streamInspectorRejectsTruncatedAndOverlongWithoutUnboundedRead() {
         val huge = object : java.io.InputStream() {
             var reads = 0

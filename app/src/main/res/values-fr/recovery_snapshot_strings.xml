@@ -1,4 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="cal_recovery_snapshot_sha256">SHA-256 des preuves inspectées</string>
+    <string name="cdj_expected_transaction">Transaction attendue (facultative, 32 caractères hex.)</string>
+    <string name="cdj_expected_manifest">SHA-256 du manifeste attendu (facultatif)</string>
+    <string name="cdj_open">Ouvrir un checkpoint CDJ/1</string>
+    <string name="cdj_reinspect">Analyser à nouveau</string>
+    <string name="cdj_inspecting">Analyse du checkpoint…</string>
+    <string name="cdj_corrupt">Checkpoint indisponible ou corrompu</string>
+    <string name="cdj_recovery">Évaluation de récupération requise</string>
+    <string name="cdj_blocked">Aucune action de récupération autorisée</string>
+    <string name="cdj_identity_mismatch">Identité du checkpoint discordante</string>
+    <string name="cdj_transaction">Transaction : %1$s</string>
+    <string name="cdj_manifest">SHA-256 du manifeste : %1$s</string>
+    <string name="cdj_changed">Les preuves ont changé. Analysez à nouveau.</string>
+    <string name="cdj_inspection_failed">Le checkpoint ne peut pas être analysé.</string>
+    <string name="cdj_unauthenticated">Preuves hors ligne non authentifiées.</string>
+    <string name="cdj_folder_authorized">Dossier CamaroDiag autorisé. Relancez l’export.</string>
+    <string name="cdj_folder_required">Sélectionnez le dossier de stockage CamaroDiag.</string>
+    <string name="cdj_export">Exporter le checkpoint JSON</string>
+    <string name="cdj_export_failed">Échec de l’export du rapport checkpoint.</string>
 </resources>

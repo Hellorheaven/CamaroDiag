@@ -1,3 +1,7 @@
+## C6 — parité CDJ/1 Android et Windows (27/11/2026)
+
+- Android : inspection CDJ/1 sur deux acquisitions bornées, empreinte SHA-256, transaction/manifeste facultatifs, rapport JSON sans autorisation de programmation ni restauration. Écran FR/EN avec nouvelle inspection, sélection du dossier CamaroDiag autorisé et export via le stockage vérifié existant, nouvelle acquisition avant publication. Régressions de capture et JSON écrites sans exécution. Windows : traitement explicite des erreurs de taille et de changement de checkpoint. Les deux plateformes ne prétendent pas authentifier les preuves ni qualifier la récupération physique. C6/J1979 ouverts, aucune CI intermédiaire, fusion ou Release.
+
 ## J1979 — recettes legacy Windows : résultat structuré et contrôle VIN (27/11/2026)
 
 - Recette J2534 legacy : inventaires par mode et sonde, DTC zéro distinct d'inconnu, mesures Mode 01/02, readiness, déclencheur freeze, CALID/CVN/VIN et résultats encodés Mode 05/06. Contrôle VIN facultatif dans la sélection GUI et CLI --vin ; arrêt avant les autres mesures si discordant ou indisponible, découverte sans VIN. Présentation structurée et ressources FR/EN, préservation du résultat lors d'une erreur de fermeture. Aucun changement mutateur ni preuve de couverture véhicule. Régressions écrites, non exécutées. C6/J1979 ouverts.

@@ -1,4 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="cal_recovery_snapshot_sha256">Inspected evidence SHA-256</string>
+    <string name="cdj_expected_transaction">Expected transaction (optional, 32 hex characters)</string>
+    <string name="cdj_expected_manifest">Expected manifest SHA-256 (optional)</string>
+    <string name="cdj_open">Open CDJ/1 checkpoint</string>
+    <string name="cdj_reinspect">Inspect again</string>
+    <string name="cdj_inspecting">Inspecting checkpoint…</string>
+    <string name="cdj_corrupt">Checkpoint unavailable or corrupt</string>
+    <string name="cdj_recovery">Recovery assessment required</string>
+    <string name="cdj_blocked">No recovery action authorized</string>
+    <string name="cdj_identity_mismatch">Checkpoint identity mismatch</string>
+    <string name="cdj_transaction">Transaction: %1$s</string>
+    <string name="cdj_manifest">Manifest SHA-256: %1$s</string>
+    <string name="cdj_changed">Evidence changed. Inspect again.</string>
+    <string name="cdj_inspection_failed">Checkpoint could not be inspected.</string>
+    <string name="cdj_unauthenticated">Unauthenticated offline evidence.</string>
+    <string name="cdj_folder_authorized">CamaroDiag folder authorized. Export again.</string>
+    <string name="cdj_folder_required">Select the CamaroDiag storage folder.</string>
+    <string name="cdj_export">Export checkpoint JSON</string>
+    <string name="cdj_export_failed">Checkpoint report export failed.</string>
 </resources>

@@ -103,7 +103,7 @@ internal static class ConnectorCheckpoint
                 throw new InvalidDataException("Checkpoint changed between reads.");
             return new(schema,version,name,utc,Convert.ToHexString(SHA256.HashData(bytes)),
                 inspection,expectedTransaction,expectedManifest,null);
-        }catch(Exception error) when(error is IOException or UnauthorizedAccessException or
+        }catch(Exception error) when(error is IOException or InvalidDataException or UnauthorizedAccessException or
             ArgumentException or NotSupportedException){
             return new(schema,version,name,utc,null,Inspect(ReadOnlySpan<byte>.Empty),
                 expectedTransaction,expectedManifest,error.Message);
@@ -162,7 +162,7 @@ internal static class ConnectorCheckpoint
             Console.WriteLine("Offline, unauthenticated evidence. No programming or automatic recovery authorized.");
             return report.Status == Disposition.SafeButBlocked ? 0 : 8;
         }
-        catch (Exception error) when (error is IOException or UnauthorizedAccessException or ArgumentException
+        catch (Exception error) when (error is IOException or InvalidDataException or UnauthorizedAccessException or ArgumentException
             or NotSupportedException)
         {
             Console.Error.WriteLine("Usage: --inspect-connector-checkpoint <checkpoint.bin> [--transaction HEX32] [--manifest HEX64] [--output new.json]");
