@@ -230,4 +230,8 @@
   <data name="FreezePrefixSaved" xml:space="preserve"><value>Inspection CF/1 partielle enregistrée (capture non terminée).</value></data>
   <data name="FreezePrefixConfirm" xml:space="preserve"><value>Confirmez le VIN indépendant attendu {0}. Seuls les enregistrements complets seront inspectés. Continuer ?</value></data>
   <data name="FreezePrefixSummary" xml:space="preserve"><value>Observations complètes : {0} ; octets finaux non vérifiés : {1} ; état : {2}</value></data>
+  <data name="FreezePrefixVerify" xml:space="preserve"><value>Vérifier le rapport CF/1 interrompu</value></data>
+  <data name="FreezePrefixReport" xml:space="preserve"><value>Sélectionner le rapport CF/1 JSON enregistré</value></data>
+  <data name="FreezePrefixVerified" xml:space="preserve"><value>La capture originale correspond au rapport partiel. La campagne reste incomplète.</value></data>
+  <data name="FreezePrefixRejected" xml:space="preserve"><value>Le rapport CF/1 ne correspond pas à la capture originale</value></data>
 </root>
