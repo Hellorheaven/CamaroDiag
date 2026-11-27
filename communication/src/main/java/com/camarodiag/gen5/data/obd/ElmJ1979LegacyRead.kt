@@ -42,6 +42,9 @@ data class LegacyReadReport(
     val otherSources: List<String>, val durationMs: Long,
     val multiSignalRecords: List<ObdJ1979MultiSignal.Record> = emptyList()
 ) {
+    val contextualMeasurements get() = ObdJ1979ScalingContext.project(steps.map {
+        ObdJ1979ScalingContext.Observation(it.requestHex,it.acceptedRecords.singleOrNull(),it.status)
+    })
     val vinMatch: String get() = when {
         target.expectedVin == null -> "NOT_REQUESTED"
         observedVin == null -> "UNVERIFIED"
@@ -271,13 +274,20 @@ internal object ElmJ1979LegacyRead {
         fun pidRequest(mode: Int,pid: Int) = if (mode == 2) cmd(2,pid,0) else cmd(1,pid)
         fun pidEvidence(request: String,row: List<Int>) =
             J1979CampaignSemantics.decodePositive(request,hex(row))
+                ?:J1979CampaignSemantics.decodeObservation(request,hex(row),"RAW")
         suspend fun readPid(mode: Int,pid: Int): List<Int>? {
             val request = pidRequest(mode,pid)
             val row = read(request,true) {
-                if(mode==1&&ObdJ1979MultiSignal.width(pid)!=null)
+                if(mode==1&&ObdJ1979ScalingContext.isConfiguration(pid))
+                    it.take(2)==listOf(0x41,pid)&&ObdJ1979ScalingContext.validConfiguration(pid,it.drop(2))
+                else if(mode==1&&ObdJ1979MultiSignal.width(pid)!=null)
                     ObdJ1979MultiSignal.decodeResponse(request,hex(it))!=null
                 else pidEvidence(request,it)!=null
             }.singleOrNull() ?: return null
+            if(mode==1&&ObdJ1979ScalingContext.isConfiguration(pid)){
+                steps[steps.lastIndex]=steps.last().copy(status="RAW",detail="SCALING_CONFIGURATION")
+                return row
+            }
             if(mode==1&&ObdJ1979MultiSignal.width(pid)!=null){
                 val decoded=ObdJ1979MultiSignal.decodeResponse(request,hex(row)) ?: return null
                 multiSignals+=ObdJ1979MultiSignal.Record(request,decoded)
