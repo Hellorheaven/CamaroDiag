@@ -206,6 +206,150 @@ void page_json(std::ostream& out,const Step& s){
     }
     out<<"],\"has_next_page\":";boolean(out,(s.response[off+3]&1)!=0);out<<'}';
 }
+std::string padded_ascii(Bytes bytes) {
+    while(!bytes.empty()&&bytes.back()==0)bytes=bytes.first(bytes.size()-1);
+    if(bytes.empty()||!std::all_of(bytes.begin(),bytes.end(),[](auto c){return c>=32&&c<=126;}))return {};
+    return {bytes.begin(),bytes.end()};
+}
+void vehicle_info(std::ostream& out,const Step& s) {
+    if(s.state!=1||s.request.size()!=2||s.request[0]!=9){out<<"null";return;}
+    const unsigned pid=s.request[1];
+    const Bytes r=s.response;
+    std::vector<std::string> values;
+    if(pid==2&&r.size()==20)values.emplace_back(r.begin()+3,r.end());
+    else if(pid==4||pid==6){
+        const unsigned width=pid==4?16:4;
+        if(r.size()<3||r.size()!=3u+r[2]*width){out<<"null";return;}
+        for(std::size_t i=3;i<r.size();i+=width){
+            auto value=pid==4?padded_ascii(r.subspan(i,width)):hex(r.subspan(i,width));
+            if(value.empty()){out<<"null";return;}
+            values.push_back(std::move(value));
+        }
+    }else if(pid==10&&r.size()==23&&r[2]==1&&r[7]=='-'){
+        auto first=padded_ascii(r.subspan(3,4)),second=padded_ascii(r.subspan(8,15));
+        if(!first.empty()&&!second.empty())values.push_back(first+"-"+second);
+    }
+    if(values.empty()){out<<"null";return;}
+    out<<"{\"info_type\":"<<pid<<",\"values\":[";
+    for(std::size_t i=0;i<values.size();++i){if(i)out<<',';quote(out,values[i]);}
+    out<<"]}";
+}
+void readiness(std::ostream& out,const Step& s) {
+    if(s.state!=1||s.request!=std::vector<std::uint8_t>{1,1}||s.response.size()!=6){out<<"null";return;}
+    const unsigned a=s.response[2],b=s.response[3],c=s.response[4],d=s.response[5];
+    const bool compression=(b&8)!=0;
+    out<<"{\"mil_on\":";boolean(out,(a&128)!=0);
+    out<<",\"confirmed_dtc_count\":"<<(a&127)<<",\"compression_ignition\":";boolean(out,compression);
+    out<<",\"byte_b\":"<<b<<",\"byte_c\":"<<c<<",\"byte_d\":"<<d<<",\"supported_monitors\":{";
+    constexpr std::array<std::string_view,3> continuous{"misfire","fuel-system","components"};
+    constexpr std::array<std::string_view,8> spark{"catalyst","heated-catalyst","evaporative-system","secondary-air","",
+        "oxygen-sensor","oxygen-sensor-heater","egr-vvt"};
+    constexpr std::array<std::string_view,8> diesel{"nmhc-catalyst","nox-aftertreatment","","boost-pressure","",
+        "exhaust-gas-sensor","particulate-filter","egr-vvt"};
+    bool first=true;
+    const auto add=[&](auto names,unsigned support,unsigned incomplete){
+        for(unsigned i=0;i<names.size();++i){
+            if(names[i].empty()||!(support&(1u<<i)))continue;
+            if(!first)out<<',';
+            first=false;quote(out,names[i]);out<<':';boolean(out,!(incomplete&(1u<<i)));
+        }
+    };
+    add(continuous,b,b>>4);add(compression?diesel:spark,c,d);
+    out<<"}}";
+}
+void freeze_trigger(std::ostream& out,const Step& s) {
+    if(s.state!=1||s.request!=std::vector<std::uint8_t>{2,2,0}||s.response.size()!=5){out<<"null";return;}
+    const bool present=s.response[3]||s.response[4];
+    out<<"{\"present\":";boolean(out,present);out<<",\"dtc\":";
+    if(present){
+        char code[6]{};require(cd_j1979_native_dtc_code(s.response.data()+3,code),"Invalid freeze trigger DTC");quote(out,code);
+    }else out<<"null";
+    out<<'}';
+}
+void extended_info(std::ostream& out,const std::vector<Step>& steps) {
+    out<<'[';
+    bool first=true;
+    for(const auto& s:steps){
+        if(s.state!=2||s.request.size()!=2||s.request[0]!=9)continue;
+        j1979_vehicle_info info{};
+        if(!j1979_vehicle_info_decode(s.request[1],s.response.data(),s.response.size(),&info))continue;
+        if(!first)out<<',';
+        first=false;
+        out<<"{\"info_type\":"<<unsigned(info.info_type)<<",\"regulatory_verdict\":null,\"physical_ecu_verified\":false";
+        if(info.counter_vector){
+            out<<",\"counter_count\":"<<info.counter_count<<",\"general_denominator\":"<<info.general_denominator
+                <<",\"ignition_cycles\":"<<info.ignition_cycles<<",\"monitors\":[";
+            for(unsigned i=0;i<info.monitor_count;++i){
+                if(i)out<<',';
+                const auto& m=info.monitors[i];
+                out<<"{\"name\":";quote(out,m.name);out<<",\"numerator\":"<<m.numerator
+                    <<",\"denominator\":"<<m.denominator<<",\"ratio\":";
+                if(m.ratio_valid)out<<std::setprecision(15)<<m.ratio;else out<<"null";
+                out<<'}';
+            }
+            out<<']';
+        }else if(info.printable_text){out<<",\"values\":[";quote(out,info.text);out<<']';}
+        out<<'}';
+    }
+    out<<']';
+}
+void inventory_summary(std::ostream& out,const std::vector<Step>& steps) {
+    out<<'[';
+    bool first=true;
+    for(const unsigned mode:{1u,2u,6u,8u,9u}){
+        if(!first)out<<',';
+        first=false;
+        std::array<bool,256> ids{};
+        unsigned pages=0;
+        bool complete=false,not_applicable=false;
+        if(mode==2){
+            const auto trigger=std::find_if(steps.begin(),steps.end(),[](const auto& s){
+                return s.state==1&&s.request==std::vector<std::uint8_t>{2,2,0};
+            });
+            not_applicable=trigger!=steps.end()&&trigger->response.size()==5&&!trigger->response[3]&&!trigger->response[4];
+        }
+        if(!not_applicable){
+            for(unsigned base=0;base<=224;base+=32){
+                const auto found=std::find_if(steps.begin(),steps.end(),[&](const auto& s){
+                    return s.state==1&&s.request.size()==(mode==2?3u:2u)&&s.request[0]==mode&&
+                        s.request[1]==base&&(mode!=2||s.request[2]==0);
+                });
+                const unsigned offset=mode==2?3:2;
+                if(found==steps.end()||found->response.size()!=offset+4)break;
+                ++pages;
+                for(unsigned bit=0;bit<31;++bit)
+                    if(found->response[offset+bit/8]&(0x80u>>(bit%8)))ids[base+bit+1]=true;
+                if(!(found->response[offset+3]&1)){complete=true;break;}
+            }
+        }
+        out<<"{\"mode\":"<<mode<<",\"state\":";
+        quote(out,not_applicable?"NOT_APPLICABLE":complete?"COMPLETE":pages?"PARTIAL":"UNAVAILABLE");
+        out<<",\"verified_pages\":"<<pages<<",\"advertised_ids\":[";
+        bool first_id=true;
+        for(unsigned id=1;id<256;++id)if(ids[id]){
+            if(!first_id)out<<',';
+            first_id=false;out<<id;
+        }
+        out<<"]}";
+    }
+    out<<']';
+}
+void dtc_summary(std::ostream& out,const std::vector<Step>& steps){
+    out<<'[';
+    bool first=true;
+    for(unsigned mode:{3u,7u,10u}){
+        if(!first)out<<',';
+        first=false;
+        const auto found=std::find_if(steps.begin(),steps.end(),[&](const auto& s){
+            return s.request.size()==1&&s.request[0]==mode;
+        });
+        out<<"{\"mode\":"<<mode<<",\"status\":";
+        if(found==steps.end())out<<"null,\"codes\":null";
+        else{quote(out,states[found->state]);out<<",\"codes\":";codes(out,*found);}
+        out<<'}';
+    }
+    out<<']';
+}
 }
 bool valid_profile(const Profile& p){
     return p.budget>=1&&p.budget<=600000&&cd_j1979_native_physical_pair(p.tx,p.rx,p.extended);
@@ -293,7 +437,9 @@ std::string report(const Evidence& e,std::string_view expected,std::string_view 
         out<<",\"duration_ms\":"<<s.duration<<",\"negative_response_code\":";
         if(s.state==3)out<<unsigned(s.response[2]);else out<<"null";
         out<<",\"dtc_codes\":";codes(out,s);out<<",\"measurement\":";measurement(out,s);
-        out<<",\"monitor_records\":";monitors(out,s);out<<",\"supported_page\":";page_json(out,s);out<<'}';
+        out<<",\"monitor_records\":";monitors(out,s);out<<",\"supported_page\":";page_json(out,s);
+        out<<",\"vehicle_info\":";vehicle_info(out,s);out<<",\"readiness\":";readiness(out,s);
+        out<<",\"freeze_trigger\":";freeze_trigger(out,s);out<<'}';
     }
     out<<"],\"service_observations\":[";
     first=true;
@@ -314,6 +460,9 @@ std::string report(const Evidence& e,std::string_view expected,std::string_view 
     cd::j1979::write_multi_json(out,observations);
     out<<",\"status_records\":";
     cd::j1979::write_status_json(out,observations);
+    out<<",\"extended_vehicle_info\":";extended_info(out,e.steps);
+    out<<",\"inventory\":";inventory_summary(out,e.steps);
+    out<<",\"dtc_modes\":";dtc_summary(out,e.steps);
     out<<",\"capture_sha256\":";quote(out,digest);out<<"}\n";
     auto result=out.str();require(result.size()<=max_report,"CJ/1 report byte limit");return result;
 }
