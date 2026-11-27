@@ -5,6 +5,7 @@
 #include "cl1_usb.h"
 #include "j1979_can_cli.h"
 #include "j1979_cm1.hpp"
+#include "j1979_cu45_session.hpp"
 #include "j1979_cj1.hpp"
 #include "j1979_cu1.hpp"
 #include "j1979_discovery.hpp"
@@ -1236,6 +1237,136 @@ static int replay_legacy_discovery(const char* protocol,const char* response,con
     }catch(const std::exception& e){return error(e.what());}
 }
 
+struct Cu45Options{
+    cd::cm1::Scope scope{};
+    const char* port{},*key{},*journal{},*report{};
+    bool operation{},tx{},rx{},budget{},extended{},confirmed{},warning{};
+};
+static bool parse_cu45(int argc,char** argv,Cu45Options& o,cd::cu45::Mode mode){
+    for(int i=2;i<argc;++i){
+        const std::string_view flag=argv[i];
+        if(flag=="--extended"){
+            if(o.extended)return false;
+            o.extended=true;o.scope.extended=true;continue;
+        }
+        if(flag=="--confirm-physical-channel"){
+            if(o.confirmed)return false;
+            o.confirmed=true;continue;
+        }
+        if(flag=="--acknowledge-maintenance-warning"){
+            if(o.warning||mode!=cd::cu45::Mode::maintenance)return false;
+            o.warning=true;continue;
+        }
+        if(i+1>=argc||argv[i+1][0]=='-')return false;
+        const char* value=argv[++i];
+        if(!*value)return false;
+        if(flag=="--operation"){
+            if(o.operation)return false;
+            o.operation=true;
+            if(!strcmp(value,"clear"))o.scope.operation=1;
+            else if(!strcmp(value,"evap"))o.scope.operation=2;
+            else return false;
+        }else if(flag=="--tx"){
+            if(o.tx||!hex_uint32(value,&o.scope.tx))return false;
+            o.tx=true;
+        }else if(flag=="--rx"){
+            if(o.rx||!hex_uint32(value,&o.scope.rx))return false;
+            o.rx=true;
+        }else if(flag=="--budget-ms"){
+            if(o.budget||!decimal_uint32(value,&o.scope.budget))return false;
+            o.budget=true;
+        }else if(flag=="--vin"){
+            if(!o.scope.vin.empty())return false;
+            o.scope.vin=value;
+        }else{
+            const char** slot=nullptr;
+            if(flag=="--port")slot=&o.port;
+            else if(flag=="--key-file")slot=&o.key;
+            else if(flag=="--journal")slot=&o.journal;
+            else if(flag=="--output")slot=&o.report;
+            if(!slot||*slot)return false;
+            *slot=value;
+        }
+    }
+    return o.operation&&o.tx&&o.rx&&o.budget&&o.confirmed&&o.port&&o.key&&o.journal&&o.report&&
+        (mode!=cd::cu45::Mode::maintenance||o.warning)&&cd::cu45::valid_scope(o.scope)&&
+        strcmp(o.key,o.journal)&&strcmp(o.key,o.report)&&strcmp(o.journal,o.report);
+}
+static int capture_cu45(int argc,char** argv,cd::cu45::Mode mode){
+    Cu45Options o;
+    if(!parse_cu45(argc,argv,o,mode))return error("Explicit primary ECM scope, journal, key, report, budget and confirmation required");
+    if(!isatty(STDIN_FILENO))return error("Interactive local approval required");
+    if(mode==cd::cu45::Mode::maintenance){
+        fputs("WARNING: clearing emissions DTCs can erase diagnostic and readiness data; EVAP is an active test. "
+              "Use only the stationary, authorized vehicle, with manufacturer safety conditions verified. "
+              "No automatic retry. Type AUTHORIZE MAINTENANCE: ",stderr);
+    }else fputs("Read-only recovery of an existing journal, no maintenance command. Type READ ARCHIVE: ",stderr);
+    char answer[64]{};
+    const char* expected=mode==cd::cu45::Mode::maintenance?"AUTHORIZE MAINTENANCE\n":"READ ARCHIVE\n";
+    if(!fgets(answer,sizeof(answer),stdin)||strcmp(answer,expected))return error("Explicit approval refused");
+    struct Key{
+        std::array<uint8_t,32> data{};
+        ~Key(){OPENSSL_cleanse(data.data(),data.size());}
+    } key;
+    if(!read_key_file(o.key,key.data.data()))return error("Private 32-byte device credential required");
+    // Reserve both destinations before the proof can reach the connector.
+    const int fd=open(o.report,O_WRONLY|O_CREAT|O_EXCL|O_NOFOLLOW|O_CLOEXEC,0600);
+    if(fd<0)return error("Report destination unavailable");
+    struct File{int fd;~File(){if(fd>=0)close(fd);}} out{fd};
+    legacy_cancelled=0;
+    struct Signals{
+        struct sigaction oldint{},oldterm{};
+        bool intr{},term{};
+        Signals(){
+            struct sigaction act{};act.sa_handler=legacy_signal;sigemptyset(&act.sa_mask);
+            intr=sigaction(SIGINT,&act,&oldint)==0;
+            term=intr&&sigaction(SIGTERM,&act,&oldterm)==0;
+        }
+        ~Signals(){if(term)sigaction(SIGTERM,&oldterm,nullptr);if(intr)sigaction(SIGINT,&oldint,nullptr);}
+    } signals;
+    try{
+        cd::cu45::Result r{};r.scope=o.scope;r.mode=mode;
+        if(signals.term)r=cd::cu45::capture_serial(mode,o.scope,key.data,o.port,o.journal,true,[]{return !legacy_cancelled;});
+        else r.error="SIGNAL_HANDLERS_UNAVAILABLE";
+        OPENSSL_cleanse(key.data.data(),key.data.size());
+        input first{},second{};
+        std::string digest;
+        if(r.file_created&&!r.journal.empty()){
+            const bool stable=load_regular(o.journal,cd::cm1::max_journal,&first)&&
+                first.length==r.journal.size()&&!memcmp(first.bytes.get(),r.journal.data(),first.length)&&
+                load_regular(o.journal,cd::cm1::max_journal,&second)&&same_input(&first,&second);
+            if(stable)digest=first.digest;
+            else{
+                r.inspection.reset();
+                if(r.error.empty())r.error="PERSISTED_JOURNAL_MISSING_OR_CHANGED";
+            }
+        }else if(r.verified()){
+            r.inspection.reset();r.error="NO_PERSISTED_JOURNAL";
+        }
+        if(legacy_cancelled){
+            r.cancelled=true;r.inspection.reset();
+            if(r.error.empty())r.error="CONTEXT_REVOKED";
+        }
+        auto report=cd::cu45::report(r,digest);
+        std::size_t offset=0;
+        while(offset<report.size()){
+            const auto n=write(out.fd,report.data()+offset,report.size()-offset);
+            if(n<0&&errno==EINTR)continue;
+            if(n<=0)return error("Report write failed; inspect retained journal, do not retry");
+            offset+=static_cast<std::size_t>(n);
+        }
+        if(fsync(out.fd))return error("Report persistence failed; do not retry");
+        const auto closed=close(out.fd);out.fd=-1;
+        if(closed)return error("Report close failed; do not retry");
+        if(!r.verified()||r.recovery_required())return 2;
+        if(mode==cd::cu45::Mode::maintenance){
+            const auto terminal=r.inspection->terminal;
+            return terminal&&(terminal->outcome==5||terminal->outcome==6)&&terminal->reason==0?0:2;
+        }
+        return 0;
+    }catch(const std::exception& e){return error(e.what());}
+}
+
 static void usage(FILE *stream) {
     fprintf(stream,
         "CamaroDiag Linux native C++20 — SAE J1979\n"
@@ -1252,6 +1383,8 @@ static void usage(FILE *stream) {
         "  camarodiag-native --inspect-j1979-freeze-native CAPTURE.cf VIN REPORT.json\n"
         "  camarodiag-native --verify-j1979-freeze-native-prefix CAPTURE.cf PREFIX.json PROOF.json VIN\n"
         "  camarodiag-native --verify-j1979-freeze-native CAPTURE.cf REPORT.json PROOF.json VIN\n"
+        "  camarodiag-native --j1979-maintenance-usb --operation clear --port /dev/ttyACM0 --key-file key.bin --journal session.cm --output report.json --tx 7E0 --rx 7E8 --vin VIN --budget-ms 60000 --confirm-physical-channel --acknowledge-maintenance-warning\n"
+        "  camarodiag-native --j1979-maintenance-archive --operation clear --port /dev/ttyACM0 --key-file key.bin --journal recovered.cm --output recovery.json --tx 7E0 --rx 7E8 --vin VIN --budget-ms 60000 --confirm-physical-channel\n"
         "  camarodiag-native --inspect-j1979-maintenance JOURNAL.cm VIN REPORT.json\n"
         "  camarodiag-native --inspect-j1979-maintenance-prefix JOURNAL.cm VIN REPORT.json\n"
         "  camarodiag-native --verify-j1979-maintenance JOURNAL.cm REPORT.json PROOF.json VIN\n"
@@ -1280,6 +1413,8 @@ int main(int argc, char **argv) {
     if (argc==6 && !strcmp(argv[1],"--verify-j1979-campaign"))return verify_cj1_cli(argv[2],argv[3],argv[4],argv[5]);
     if (argc==5 && !strcmp(argv[1],"--inspect-j1979-campaign"))
         return cj1_inspect_cli(argv[2],argv[3],argv[4]);
+    if (argc>=3 && !strcmp(argv[1],"--j1979-maintenance-usb"))return capture_cu45(argc,argv,cd::cu45::Mode::maintenance);
+    if (argc>=3 && !strcmp(argv[1],"--j1979-maintenance-archive"))return capture_cu45(argc,argv,cd::cu45::Mode::archive);
     if (argc==5 && !strcmp(argv[1],"--inspect-j1979-maintenance"))
         return cm1_cli(argv[2],argv[4],nullptr,argv[3],false);
     if (argc==5 && !strcmp(argv[1],"--inspect-j1979-maintenance-prefix"))
