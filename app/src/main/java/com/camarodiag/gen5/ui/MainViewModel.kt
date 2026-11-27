@@ -6919,8 +6919,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun inspectFunctionalNativeMaintenance(source: Uri,confirmedConnection: Long,confirmedVehicle: VehicleProfile) =
         inspectFunctionalNativeFile(source,confirmedConnection,confirmedVehicle,true)
 
+    fun inspectFunctionalNativeMaintenancePrefix(source: Uri,confirmedConnection: Long,confirmedVehicle: VehicleProfile) =
+        inspectFunctionalNativeFile(source,confirmedConnection,confirmedVehicle,true,true)
+
     private fun inspectFunctionalNativeFile(source: Uri,confirmedConnection: Long,confirmedVehicle: VehicleProfile,
-                                            maintenance: Boolean) {
+                                            maintenance: Boolean,interrupted:Boolean=false) {
         val account=authenticatedAccountUid ?: return
         val generation=accountSessionGeneration
         if(source.scheme!="content" || functionalCatalogueJob?.isActive==true || _functionalTestState.value.running ||
@@ -6938,10 +6941,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     val resolver=context.contentResolver
                     val job=currentCoroutineContext()[Job]
                     fun requireCurrent(){check(job?.isActive==true&&current())}
-                    val prepared=if(maintenance) J1979NativePrefixFiles.prepareMaintenance(resolver,source,confirmedVehicle.vin,::requireCurrent)
+                    val prepared=if(maintenance) J1979NativePrefixFiles.prepareMaintenance(resolver,source,confirmedVehicle.vin,::requireCurrent,interrupted)
                         else J1979NativePrefixFiles.prepare(resolver,source,confirmedVehicle.vin,::requireCurrent)
                     CamaroDiagExportStorage.write(context,
-                        "CamaroDiag_SAE-J1979_NATIVE_"+(if(maintenance) "MAINTENANCE_" else "PREFIX_")+System.currentTimeMillis()+".json",
+                        "CamaroDiag_SAE-J1979_NATIVE_"+(if(interrupted) "MAINTENANCE_PREFIX_" else if(maintenance) "MAINTENANCE_" else "PREFIX_")+System.currentTimeMillis()+".json",
                         "application/json",category=CamaroDiagExportStorage.Category.TESTS,
                         beforePublish={
                             requireCurrent()
