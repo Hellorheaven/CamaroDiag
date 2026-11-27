@@ -1,29 +1,33 @@
 #pragma once
 #include "j1979_maintenance_interprocessor.h"
 #include "j1979_spi_transport.h"
+#include "j1979_maintenance_archive_link.h"
 
 namespace cd { namespace maintenance_link {
 // Dedicated CI/4 SPI framing. Reuses only physical port contracts, not the
 // CI/2 or CI/3 packet parser. Every CS transaction remains exactly 32 bytes.
 class SpiTransport final:public Transport {
  public:
-  explicit SpiTransport(readlink::SpiMasterPort& port):port_(port){}
+  explicit SpiTransport(readlink::SpiMasterPort& port,bool archive=false):port_(port),archive_(archive){}
   bool active()override{return !closed_&&port_.admitted();}
   uint32_t monotonicMs()override{return port_.monotonicMs();}
   void fault()override{fail();}
   bool exchange(const uint8_t* request,uint8_t* response,uint32_t timeout)override{
     Packet p;
     if(!active()||!request||!response||!timeout||timeout>1000||
-       !decode(request,Size,p)||uint8_t(p.op)>=0x80||port_.responseReady())return fail();
+       !decodeSelected(request,p)||uint8_t(p.op)>=0x80||port_.responseReady())return fail();
     const auto start=monotonicMs();
     uint8_t ignored[Size]{},dummy[Size]{},reply[Size]{};
     if(!transfer(request,ignored,start,timeout)||!wait(true,start,timeout)||
        !transfer(dummy,reply,start,timeout)||!wait(false,start,timeout))return fail();
     Packet result;
-    if(!decode(reply,Size,result)||result.sequence!=p.sequence||result.op!=expected(p.op))return fail();
+    if(!decodeSelected(reply,result)||result.sequence!=p.sequence||result.op!=expected(p.op))return fail();
     std::memcpy(response,reply,Size);return true;
   }
  private:
+  bool decodeSelected(const uint8_t* bytes,Packet& p){
+    return archive_?archive_link::decode(bytes,Size,p):maintenance_link::decode(bytes,Size,p);
+  }
   static Op expected(Op op){
     switch(op){
       case Op::ScopeA:case Op::ScopeB:case Op::Start:return Op::Accepted;
@@ -47,16 +51,16 @@ class SpiTransport final:public Transport {
     }
     return false;
   }
-  readlink::SpiMasterPort& port_;bool closed_=false;
+  readlink::SpiMasterPort& port_;const bool archive_;bool closed_=false;
 };
 
 // Task-context slave. During execution the board must service poll()
 // independently of incoming packets. An IRQ may only signal slot completion.
-class SpiSlave {
+template<class EndpointType> class SpiSlaveT {
  public:
   enum class Phase { Idle,Request,Response,Finished,Fault };
-  SpiSlave(readlink::SpiSlavePort& port,Endpoint& endpoint):port_(port),endpoint_(endpoint){}
-  SpiSlave(const SpiSlave&)=delete;SpiSlave& operator=(const SpiSlave&)=delete;
+  SpiSlaveT(readlink::SpiSlavePort& port,EndpointType& endpoint):port_(port),endpoint_(endpoint){}
+  SpiSlaveT(const SpiSlaveT&)=delete;SpiSlaveT& operator=(const SpiSlaveT&)=delete;
   Phase phase()const{return phase_;}
   bool begin(){
     if(phase_!=Phase::Idle||!port_.admitted())return fail();
@@ -103,9 +107,12 @@ class SpiSlave {
     }
     return false;
   }
-  readlink::SpiSlavePort& port_;Endpoint& endpoint_;
+  readlink::SpiSlavePort& port_;EndpointType& endpoint_;
   uint8_t tx_[Size]{},rx_[Size]{};
   uint32_t sessionStart_=0,armedAt_=0;
   Phase phase_=Phase::Idle;
 };
+using SpiSlave=SpiSlaveT<Endpoint>;
+} namespace archive_link {
+using SpiSlave=maintenance_link::SpiSlaveT<Endpoint>;
 } }
