@@ -1,3 +1,9 @@
+## Reprise — SAE J1979 Mode 09 étendu (27 novembre 2026)
+
+- Décodage 08/0B IUPR essence/diesel, 0D/0F et 0A legacy, compteurs non signés, dénominateurs nuls, longueurs exactes et fragments corrélés. Compteur legacy 07 partagé par 08 et 0B ; correction firmware du classement des types 0B/0C/0D/0E/0F, sans revendiquer l'activation physique legacy.
+- Intégration Android (diagnostic, multi-ECU, legacy, projection USB), Windows (J2534 et USB), Linux/Python (CAN/legacy, capture et inspection). Export des valeurs étendues et affichage FR/EN Android. CJ/1 garde son statut RAW historique ; les nouvelles valeurs sont des vues dérivées, pas un changement rétroactif du format.
+- Régressions ajoutées, non exécutées. SAE J1979 et C6 restent ouverts. Catalogue J1979DA et fonctions Mode 08 encore à compléter ; aucune CI de clôture, Release ou fusion. Demande APK signé inchangée, après clôture validée.
+
 ## Reprise — SAE J1979 / demande de Release signée (27 novembre 2026)
 
 Lot Mode 06 CAN : 16 UASID historiques ISO 15031-5:2006, conversions Android/Windows/Linux, mots signés, limites et valeurs inconnues conservées, export structuré Windows/Linux. Tests de régression écrits, non exécutés (pas de checkpoint avant clôture). Les anciennes preuves natives CJ/1 restent inchangées. Le catalogue J1979DA complet, les InfoTypes et contrôles normalisés encore manquants et la couverture firmware restent à terminer avant le gate de clôture. Ne pas déclarer SAE J1979 terminé sur ce seul lot.
