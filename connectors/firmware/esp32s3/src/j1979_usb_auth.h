@@ -46,7 +46,7 @@ template<bool Freeze> class J1979UsbAuthSessionT {
     if(Freeze&&!J1979FreezeScope::decode(profile+13,J1979FreezeScope::WireSize,
         profile_.freezeScope))return close();
     if(profile[8]>1||!J1979CanReadSession::physicalPair(profile_.tx,profile_.rx,profile_.extended)||
-       profile_.budgetMs<1||profile_.budgetMs>600000u||
+       profile_.budgetMs<(Freeze?1000u:1u)||profile_.budgetMs>600000u||
        !security_.localApproval(profile_))return close();
     std::memcpy(transcript_+1,profile,ProfileSize+NonceSize);
     if(!nonzero(transcript_+1+ProfileSize,NonceSize)||
