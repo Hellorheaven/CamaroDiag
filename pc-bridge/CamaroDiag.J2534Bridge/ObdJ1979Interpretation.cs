@@ -130,6 +130,17 @@ internal static class ObdJ1979Interpretation
         if (request[0] is 0x01 or 0x02 &&
             request.Length == (request[0] == 0x02 ? 3 : 2))
         {
+            if (request[0] == 1 && ObdJ1979Status.Width(request[1]) is not null)
+            {
+                var states=ObdJ1979Status.DecodeResponse(request,response)
+                    ?? throw new InvalidDataException("Invalid categorical PID record.");
+                if(ObdJ1979MultiSignal.Width(request[1]) is not null){
+                    var values=ObdJ1979MultiSignal.DecodeResponse(request,response)
+                        ?? throw new InvalidDataException("Invalid multi-signal PID record.");
+                    return new Result(ObdJ1979Status.Format(states)+"; "+ObdJ1979MultiSignal.Format(values),true,reply.Service);
+                }
+                return new Result(ObdJ1979Status.Format(states),true,reply.Service);
+            }
             if (request[0] == 1 && ObdJ1979MultiSignal.Width(request[1]) is not null)
             {
                 var signals=ObdJ1979MultiSignal.DecodeResponse(request,response)
@@ -187,7 +198,7 @@ internal static class ObdJ1979Interpretation
                 throw new InvalidDataException("Unexpected PID, frame number or excess duplicate.");
             int? length = pid % 32 == 0 || (!freeze && pid == 0x01) ? 4 :
                 freeze && pid == 0x02 ? 2 : ObdJ1979PidValues.DataLength(pid) ??
-                    (freeze?null:ObdJ1979MultiSignal.Width(pid));
+                    (freeze?null:ObdJ1979MultiSignal.Width(pid) ?? ObdJ1979Status.Width(pid));
             if (length is null)
             {
                 // Without the data width there is no unambiguous next identifier.
