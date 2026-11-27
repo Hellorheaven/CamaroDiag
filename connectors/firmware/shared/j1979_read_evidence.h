@@ -175,6 +175,15 @@ class J1979ReadEvidence {
       size_t offset=mode==2?3u:2u;
       if(mode==2&&req[1]==2)return len==5?Result::Positive:Result::Invalid;
       if(legacy&&len>7)return Result::Invalid;
+      if((req[1]>=6&&req[1]<=9)||(req[1]>=0x55&&req[1]<=0x58)){
+        if(len==offset+1)return req[1]<0x55?Result::Positive:Result::Raw;
+        return len==offset+2?Result::Raw:Result::Invalid;
+      }
+      if(mode==1&&req[1]==0x41){
+        if(len!=offset+4||reply[offset]!=0||(reply[offset+1]&0x80u))return Result::Invalid;
+        const uint8_t reserved=(reply[offset+1]&8u)?0x14u:0x10u;
+        return ((reply[offset+2]|reply[offset+3])&reserved)?Result::Invalid:Result::Raw;
+      }
       if(mode==1){
         if(req[1]==0x4f||req[1]==0x50){
           if(len!=offset+4)return Result::Invalid;
