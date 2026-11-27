@@ -2,6 +2,7 @@
 #include "j1979_can.h"
 #include "j1979_native_c.h"
 #include "j1979_monitor_scaling.h"
+#include "j1979_vehicle_info.h"
 #include <ctype.h>
 #include <errno.h>
 #include <limits.h>
@@ -94,6 +95,15 @@ static bool valid_response(const uint8_t *request, size_t count,
         if ((width >= 0 && data != (size_t)width) ||
             (width == -2 && data != 1 && data != 2)) {
             snprintf(step->detail, sizeof(step->detail), "INVALID_PID_WIDTH");
+            return false;
+        }
+    }
+    if (request[0]==9 &&
+        (request[1]==8 || request[1]==11 ||
+         request[1]==13 || request[1]==15)) {
+        j1979_vehicle_info info={0};
+        if (!j1979_vehicle_info_decode(request[1],response,n,&info)) {
+            snprintf(step->detail,sizeof(step->detail),"INVALID_MODE09_INFO");
             return false;
         }
     }
@@ -458,6 +468,44 @@ bool j1979_can_write_json(FILE *f, const j1979_can_plan *p,
             }
         }
         if (fputc(']',f)==EOF) return false;
+        /* Mode 09 counters and identification text are exactly decoded
+         * from one correlated CAN reply. A VIN or printed ECU name is not
+         * a hardware provenance proof.
+         */
+        if (fputs(",\"vehicle_info\":",f)==EOF) return false;
+        j1979_vehicle_info info={0};
+        if (s->request_size==2 && s->request[0]==9 &&
+            !strcmp(s->status,"RAW") && s->response &&
+            j1979_vehicle_info_decode(s->request[1],s->response,
+                                      s->response_size,&info)) {
+            if (fprintf(f,"{\"info_type\":%u,\"regulatory_verdict\":null,"
+                          "\"physical_ecu_verified\":false",
+                        info.info_type)<0) return false;
+            if (info.counter_vector) {
+                if (fprintf(f,",\"counter_count\":%u,"
+                              "\"general_denominator\":%u,\"ignition_cycles\":%u,"
+                              "\"monitors\":[",
+                            info.counter_count,info.general_denominator,
+                            info.ignition_cycles)<0) return false;
+                for (unsigned j=0;j<info.monitor_count;++j) {
+                    const j1979_info_monitor *m=&info.monitors[j];
+                    if ((j&&fputc(',',f)==EOF) ||
+                        fputs("{\"name\":",f)==EOF || !quoted(f,m->name) ||
+                        fprintf(f,",\"numerator\":%u,\"denominator\":%u,"
+                                  "\"ratio\":",m->numerator,m->denominator)<0)
+                        return false;
+                    if (m->ratio_valid) {
+                        if (fprintf(f,"%.12g",m->ratio)<0) return false;
+                    } else if (fputs("null",f)==EOF) return false;
+                    if (fputc('}',f)==EOF) return false;
+                }
+                if (fputc(']',f)==EOF) return false;
+            } else if (info.printable_text) {
+                if (fputs(",\"values\":[",f)==EOF ||
+                    !quoted(f,info.text) || fputc(']',f)==EOF) return false;
+            }
+            if (fputc('}',f)==EOF) return false;
+        } else if (fputs("null",f)==EOF) return false;
         /* SAE J1979 Mode 03/07/0A two-byte DTC encoding: retain raw
          * evidence and expose a textual code only on validated records.
          * A code string is not a diagnosis, an ECU attribution or a repair.

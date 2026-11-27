@@ -219,3 +219,14 @@ connues exposent unité, valeur, minimum et maximum et la comparaison
 `scaled: null`. L'absence d'interprétation ne signifie pas échec du moniteur.
 La comparaison numérique n'est **jamais** un verdict réglementaire ni
 une preuve qu'un moniteur a effectivement fonctionné.
+
+## Informations véhicule Mode 09 — reprise native
+
+Le décodeur C `j1979_vehicle_info.c` reprend les règles du module Python
+`j1979_vehicle_info.py` pour les InfoTypes 08 et 0B (compteurs IPT
+essence/diesel) et 0D/0F (texte d'identification). Les rapports du scan
+contiennent le nombre de cycles, les compteurs et les ratios uniquement
+lorsque le format CAN complet est valide. Une division par zéro produit
+`null`, et les formats inconnus ou fragments d'autres ECU ne sont pas
+fusionnés. Les données restent des informations applicatives, pas une
+attestation de conformité ni d'identité matérielle.

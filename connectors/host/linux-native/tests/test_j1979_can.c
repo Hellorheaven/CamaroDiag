@@ -12,7 +12,7 @@ typedef struct {
     uint8_t emitted[24][3];
     size_t emitted_size[24];
     bool force_bad_vin, force_final_vin_mismatch, force_partial_mode06;
-    bool force_nrc, force_dtc, force_monitor, force_late, force_transport, refuse_mutation;
+    bool force_nrc, force_dtc, force_monitor, force_info, force_late, force_transport, refuse_mutation;
 } stub;
 static uint64_t clock_fake(void *ctx) { return ((stub *)ctx)->now; }
 static bool current_fake(void *ctx) { return ((stub *)ctx)->current; }
@@ -58,6 +58,10 @@ static int exchange_fake(void *ctx, const uint8_t *req, size_t n,
         bitmap[2]=req[0] == 1 ? 0x80 :
             (s->force_monitor && req[0] == 6 ? 0x00 : 0);
         if (s->force_monitor && req[0]==6) bitmap[5]=1;
+        if (s->force_info && req[0]==9) {
+            bitmap[2]=0x01; /* InfoType 08 */
+            bitmap[3]=0x08; /* InfoType 0D */
+        }
         bitmap[3]=bitmap[4]=bitmap[5]=0;
         bytes=bitmap;size=6;
     } else if (n == 2 && req[0] == 6 && req[1] == 0x20 &&
@@ -70,6 +74,19 @@ static int exchange_fake(void *ctx, const uint8_t *req, size_t n,
             0x46,0x21,0x01,0x07,0x03,0xE8,0x00,0x00,0x07,0xD0
         };
         bytes=test_record;size=sizeof(test_record);
+    } else if (s->force_info && n==2 && req[0]==9 && req[1]==8) {
+        static uint8_t counters[35]={0x49,8,16};
+        memset(counters+3,0,32);
+        counters[4]=10; /* general denominator */
+        counters[6]=20; /* ignition cycles */
+        counters[8]=3; counters[10]=6; /* catalyst bank 1 ratio=0.5 */
+        bytes=counters;size=sizeof(counters);
+    } else if (s->force_info && n==2 && req[0]==9 && req[1]==13) {
+        static const uint8_t info[20]={
+            0x49,13,1,0,0,'E','C','U','-','C','A','M','A','R',
+            'O','-','E','N','G','1'
+        };
+        bytes=info;size=sizeof(info);
     } else if (n == 2 && req[0] == 1 && req[1] == 1) {
         static const uint8_t status[6]={0x41,1,0,0,0,0};
         bytes=status;size=6;
@@ -156,6 +173,20 @@ int main(void) {
     assert(strstr(text,"\"unit_scaling_id\":7"));
     assert(strstr(text,"\"numeric_relation\":\"WITHIN\""));
     assert(strstr(text,"\"monitor_verdict\":null"));
+    fclose(output);j1979_can_result_free(&r);
+    s=(stub){.current=true,.force_info=true};
+    p=plan(&s);assert(j1979_can_scan(&p,&r)==0);
+    assert(r.completed && r.inventory_state[9]==1);
+    output=tmpfile();assert(output);
+    assert(j1979_can_write_json(output,&p,&r,"vcan0"));
+    rewind(output);memset(text,0,sizeof(text));
+    assert(fread(text,1,sizeof(text)-1,output)>0);
+    assert(strstr(text,"\"vehicle_info\":{\"info_type\":8"));
+    assert(strstr(text,"\"general_denominator\":10"));
+    assert(strstr(text,"\"ignition_cycles\":20"));
+    assert(strstr(text,"\"ratio\":0.5"));
+    assert(strstr(text,"\"vehicle_info\":{\"info_type\":13"));
+    assert(strstr(text,"ECU-CAMARO-ENG1"));
     fclose(output);j1979_can_result_free(&r);
     s=(stub){.current=true,.force_final_vin_mismatch=true};
     p=plan(&s);assert(j1979_can_scan(&p,&r)==0);
