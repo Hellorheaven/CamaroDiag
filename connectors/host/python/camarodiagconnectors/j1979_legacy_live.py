@@ -170,8 +170,8 @@ class LegacyLiveLink:
         deadline=self.clock()+timeout
         if request==b"\x09\x02":
             return self._vin(deadline,logical)
-        if len(request)!=2 or request[0]!=1 or not (request[1]%32==0 or legacy_numeric_pid(request[1])):
-            raise ValueError("Only Mode 01 numeric values and support pages allowed")
+        if len(request)!=2 or request[0]!=1 or not (request[1]%32==0 or request[1] in CONFIG_PIDS or legacy_numeric_pid(request[1])):
+            raise ValueError("Only Mode 01 numeric values, configuration and support pages allowed")
         return self._single(request.hex().upper(),deadline,logical)
 
 
