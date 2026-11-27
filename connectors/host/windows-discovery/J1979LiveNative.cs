@@ -313,7 +313,8 @@ internal static class J1979LiveNative
         return new("camarodiag-functional-j1979-native-live-v1","SAE-J1979","OFFLINE_CL1",profile?.View(),
             error is null,false,false,false,false,false,received,summary,error is null?replay!.Build():null,error);
     }
-    internal static string EncodeReport(Report report,string? digest=null,string? name=null)
+    internal static string EncodeReport(Report report,string? digest=null,string? name=null,
+        IReadOnlyDictionary<string,object?>? metadata=null)
     {
         var json=new Dictionary<string,object?>{
             ["schema"]=report.Schema,["protocol"]=report.Protocol,["source"]=report.Source,["profile"]=report.Profile,
@@ -327,6 +328,15 @@ internal static class J1979LiveNative
         if(report.HostElapsedMs.HasValue)json["host_elapsed_ms"]=report.HostElapsedMs.Value;
         if(digest is not null)json["capture_sha256"]=digest;
         if(name is not null)json["raw_capture_name"]=name;
+        if(metadata is not null)
+        {
+            foreach(var item in metadata)
+            {
+                Require(item.Key is "version" or "declared_connector" or "declared_ecu" or "connection_generation" or
+                    "started_at_utc" or "finished_at_utc" or "observed_vin","Unsupported native report metadata");
+                Require(json.TryAdd(item.Key,item.Value),"Duplicate native report metadata");
+            }
+        }
         return JsonSerializer.Serialize(json,new JsonSerializerOptions{WriteIndented=true,PropertyNamingPolicy=JsonNamingPolicy.SnakeCaseLower});
     }
 }
