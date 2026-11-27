@@ -87,6 +87,7 @@ data class FunctionalTestState(
     val evapResult: com.camarodiag.gen5.data.obd.ObdEvapResult? = null,
     val clearCampaign: Boolean = false,
     val clearResult: com.camarodiag.gen5.data.obd.ObdClearRecipeResult? = null,
+    val clearBaseline: com.camarodiag.gen5.data.obd.ObdClearRecipeResult? = null,
     val legacyTarget: com.camarodiag.gen5.data.obd.LegacyMutationTarget? = null,
     val legacyBaseline: com.camarodiag.gen5.data.obd.LegacyMutationResult? = null,
     val legacyResult: com.camarodiag.gen5.data.obd.LegacyMutationResult? = null,
