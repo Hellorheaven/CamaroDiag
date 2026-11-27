@@ -1,3 +1,9 @@
+## Reprise — C6 / historique multiplateforme et SAE J1979 Mode 02 explicite (27 novembre 2026)
+
+- PR #117 / chore/unified-ci. C6 : rejeu indépendant Python du format natif Windows (empreintes, secteurs, identité, compteurs, états et transitions) ; protection de la destination d'export Windows unitaire. Android : sélection/ordre de 2 à 8 dossiers SAF, comparaison de préfixes de journaux, empreintes et inventaires originaux, contrôle de contexte compte/véhicule, relecture avant export JSON portable, interface FR/EN. Régressions Kotlin et Python écrites.
+- SAE J1979 : correction de validation de largeur des PID de richesse multibancs côté Python ; campagne Linux Mode 02 explicite de 1 à 8 trames, support bitmap propre à chaque trame, déclencheur PID02, sélection de PID annoncés, contrôle VIN initial/final et déclencheur après mesures. Valeurs des trames optionnelles brutes, sans échelle OEM présumée. Le scan historique 00 et le firmware ne changent pas. Commandes `camarodiagconnectors-j1979-freeze` et `camarodiagconnectors-offline verify-freeze`. Rejeu de la campagne depuis les observations, régressions écrites. Windows/Android acquisition live multi-trames et firmware restent à raccorder.
+- Aucun test exécuté, aucun build ni checkpoint intermédiaire, aucune fusion, aucune Release. C6 et SAE J1979 restent ouverts ; C8 non démarré. Aucun essai matériel ou qualification physique revendiqué.
+
 ## Reprise — C6 / historique des preuves de récupération (27 novembre 2026)
 
 - PR #117 / chore/unified-ci : historique natif Windows de 2 à 8 journaux ordonnés explicitement, vérification de chaque inventaire, préfixe octet par octet, identité et enveloppes originales invariantes. Comparaison des états enregistrés, refus des divergences et des extensions après état terminal, relecture de toutes les sources avant export JSON exclusif.
