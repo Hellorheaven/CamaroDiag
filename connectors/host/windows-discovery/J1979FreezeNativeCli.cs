@@ -32,6 +32,34 @@ internal static class J1979FreezeNativeCli
         if(paths.Select(Path.GetFullPath).Distinct(StringComparer.OrdinalIgnoreCase).Count()!=paths.Length)
             throw new ArgumentException("Evidence paths must be distinct");
     }
+    private static byte[] ReadPrefixReport(string path)
+    {
+        using var file=new FileStream(path,FileMode.Open,FileAccess.Read,FileShare.Read);
+        if(file.Length is <1 or >67108864)
+            throw new InvalidDataException("CF/1 prefix report exceeds byte limit");
+        byte[] bytes=new byte[checked((int)file.Length)];
+        file.ReadExactly(bytes);
+        if(file.ReadByte()!=-1)throw new InvalidDataException("CF/1 report changed during read");
+        return bytes;
+    }
+    private static void RequireUnambiguousJson(JsonElement node)
+    {
+        switch(node.ValueKind)
+        {
+            case JsonValueKind.Object:
+                var keys=new HashSet<string>(StringComparer.Ordinal);
+                foreach(var item in node.EnumerateObject())
+                {
+                    if(!keys.Add(item.Name))
+                        throw new InvalidDataException("Duplicate key in CF/1 prefix report");
+                    RequireUnambiguousJson(item.Value);
+                }
+                break;
+            case JsonValueKind.Array:
+                foreach(var item in node.EnumerateArray())RequireUnambiguousJson(item);
+                break;
+        }
+    }
     internal static Dictionary<string,object?> InspectPrefix(string source,string output,string vin)
     {
         DistinctPaths(source,output);
@@ -53,21 +81,19 @@ internal static class J1979FreezeNativeCli
         var expected=J1979FreezeNative.InspectPrefix(raw,vin);
         expected["capture_sha256"]=sha;
         byte[] sourceJson=JsonSerializer.SerializeToUtf8Bytes(expected,PrefixJsonOptions);
-        using var saved=new FileStream(report,FileMode.Open,FileAccess.Read,FileShare.Read);
-        if(saved.Length is <1 or >67108864)throw new InvalidDataException("CF/1 report exceeds limit");
-        byte[] reportBytes=new byte[checked((int)saved.Length)];
-        saved.ReadExactly(reportBytes);
+        byte[] reportBytes=ReadPrefixReport(report);
         string reportSha=Convert.ToHexString(SHA256.HashData(reportBytes)).ToLowerInvariant();
         using(var original=JsonDocument.Parse(reportBytes,new JsonDocumentOptions{MaxDepth=64}))
         using(var recomputed=JsonDocument.Parse(sourceJson,new JsonDocumentOptions{MaxDepth=64}))
         {
+            RequireUnambiguousJson(original.RootElement);
             if(!JsonNode.DeepEquals(JsonNode.Parse(original.RootElement.GetRawText()),
                                     JsonNode.Parse(recomputed.RootElement.GetRawText())))
                 throw new InvalidDataException("CF/1 prefix report differs from independent replay");
         }
         var again=ReadPrefixSource(source);
         if(sha!=again.Hash||!raw.AsSpan().SequenceEqual(again.Raw)||
-           !reportBytes.AsSpan().SequenceEqual(File.ReadAllBytes(report)))
+           !reportBytes.AsSpan().SequenceEqual(ReadPrefixReport(report)))
             throw new InvalidDataException("CF/1 evidence changed during verification");
         var result=new Dictionary<string,object?>{
             ["schema"]="camarodiag-j1979-native-freeze-prefix-verification-v1",
