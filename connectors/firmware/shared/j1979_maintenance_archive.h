@@ -17,7 +17,7 @@ class J1979MaintenanceArchive {
     bool terminal=false,damagedTail=false,recoveryRequired=true;
     bool valid()const{
       return bytes>=47&&bytes<=J1979MaintenanceJournal::MaximumJournal&&records>=1&&records<=4&&
-        (!terminal||records>=2)&&(terminal&&!damagedTail||recoveryRequired);
+        (!terminal||records>=2)&&((terminal&&!damagedTail)||recoveryRequired);
     }
     bool same(const Info& b)const{
       return bytes==b.bytes&&records==b.records&&terminal==b.terminal&&
@@ -30,6 +30,7 @@ class J1979MaintenanceArchive {
     virtual bool open(const Scope& scope,Info& info)=0;
     virtual bool read(size_t offset,uint8_t* bytes,size_t n)=0;
     virtual bool current()=0;
+    virtual bool finish()=0;
     virtual void close()=0;
   };
   class Owner {
@@ -71,6 +72,7 @@ class J1979MaintenanceArchive {
       }
       offset_+=n;return true;
     }
+    bool finish()override{return current()&&offset_==snapshot_.size;}
     void close()override{
       if(!closed_){closed_=true;open_=false;if(attempted_)owner_.release();}
     }
