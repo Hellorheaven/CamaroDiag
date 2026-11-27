@@ -122,6 +122,8 @@ internal sealed partial class BridgeDesktopForm
                 output.AppendLine(string.Format(CultureInfo.CurrentUICulture,J1979RecipeText("ScanDtcMode"),
                     dtc.Mode.ToString("X2"),dtc.Codes is null?J1979RecipeText("Unavailable"):
                     dtc.Codes.Count==0?J1979RecipeText("NativeUsbZeroDtc"):string.Join(", ",dtc.Codes)));
+            foreach(var record in result.MultiSignalRecords)
+                output.AppendLine(record.RequestHex+": "+ObdJ1979MultiSignal.Format(record.Signals));
             foreach(var record in result.ExtendedVehicleInfo)
                 output.AppendLine(ObdJ1979ExtendedVehicleInfo.Format(record));
             foreach (var step in result.Steps)
