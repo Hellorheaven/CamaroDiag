@@ -38,7 +38,9 @@ class J1979LiveEvidence final:public J1979LiveCampaign::Sink {
        e.startedElapsed<lastEnd_||e.endedElapsed<e.startedElapsed||
        e.endedElapsed>J1979LiveScope::MaximumBudget+4000u||
        e.timeoutMs<1||e.timeoutMs>4000||r.responseSize>4095)return fail();
-    if(e.phase!=replay_.phase(e.startedElapsed)||
+    const auto expected=replay_.phase(e.startedElapsed);
+    if((e.phase!=expected&&!(e.phase==Phase::PeriodicVin&&expected==Phase::Sample&&
+       req[0]==9&&req[1]==2))||
        e.cycle!=(e.phase==Phase::Sample?replay_.cycle():0)||
        e.pid!=(e.phase==Phase::Sample?req[1]:0)||
        !replay_.admit(req,n,e.startedElapsed,e.timeoutMs))return fail();
