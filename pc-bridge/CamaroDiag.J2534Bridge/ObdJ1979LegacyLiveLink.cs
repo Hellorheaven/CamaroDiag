@@ -29,7 +29,7 @@ internal sealed class ObdJ1979LegacyLiveLink
 
     private static bool Allows(byte[] request)=>request.Length==2&&
         (request[0]==9&&request[1] is 0 or 1 or 2||
-         request[0]==1&&(request[1]%32==0||ObdJ1979PidValues.DataLength(request[1]) is not null));
+         request[0]==1&&(request[1]%32==0||ObdJ1979LiveRecorder.LegacyNumericPid(request[1])));
     private int Remaining(long deadline,int maximum){
         requireActive();
         var left=deadline-clock();
