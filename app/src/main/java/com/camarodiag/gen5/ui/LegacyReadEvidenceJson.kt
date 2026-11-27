@@ -35,6 +35,7 @@ internal object LegacyReadEvidenceJson {
             JSONObject().put("mode",it.mode).put("pid",it.pid).put("name",it.name)
                 .put("number",it.number).put("unit",it.unit)
         }))
+        .put("multiSignalRecords",JSONArray(report.multiSignalRecords.map(J1979MultiSignalJson::encode)))
         .put("identification",JSONArray(report.identification.map {
             JSONObject().put("infoType",it.infoType).put("values",JSONArray(it.values))
                 .put("extended",it.extended?.let(J1979ExtendedVehicleInfoJson::encode) ?: JSONObject.NULL)
