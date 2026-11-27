@@ -8,6 +8,7 @@ namespace CamaroDiag.J2534Bridge;
 internal sealed partial class BridgeDesktopForm
 {
     private readonly Button functionalInspectNativeMaintenance=Button(J1979RecipeText("NativeMaintenanceInspect"));
+    private readonly Button functionalInspectNativeMaintenancePrefix=Button(J1979RecipeText("NativeMaintenancePrefixInspect"));
     private readonly Button functionalRunNativeMaintenance=Button(J1979RecipeText("NativeMaintenanceRun"));
 
     private J1979MaintenanceUsbCli.Options? ChooseMaintenanceOptions()
@@ -141,17 +142,17 @@ internal sealed partial class BridgeDesktopForm
     }
 
 
-    private async Task InspectWindowsNativeMaintenanceAsync()
+    private async Task InspectWindowsNativeMaintenanceAsync(bool prefix=false)
     {
         if(busy||functionalCancellation is not null||DateTimeOffset.UtcNow>=functionalAuthorizedUntil)return;
         var expiry=functionalAuthorizedUntil;
         string vin=functionalEvapVin.Text.Trim().ToUpperInvariant();
         if(!J1979LiveNative.ValidVin(vin)){ShowError(J1979RecipeText("LiveNativeVinRequired"));return;}
-        using var source=new OpenFileDialog{Title=J1979RecipeText("NativeMaintenanceInspect"),
+        using var source=new OpenFileDialog{Title=J1979RecipeText(prefix?"NativeMaintenancePrefixInspect":"NativeMaintenanceInspect"),
             CheckFileExists=true,Multiselect=false,Filter=J1979RecipeText("NativeMaintenanceFilter")};
         if(source.ShowDialog(this)!=DialogResult.OK)return;
         using var destination=new SaveFileDialog{Filter=J1979RecipeText("JsonFilter"),DefaultExt="json",
-            AddExtension=true,OverwritePrompt=false,FileName="CamaroDiag_CM1_Inspection.json"};
+            AddExtension=true,OverwritePrompt=false,FileName=prefix?"CamaroDiag_CM1_Interrupted.json":"CamaroDiag_CM1_Inspection.json"};
         bool Current()=>!IsDisposed&&!Disposing&&DateTimeOffset.UtcNow<expiry&&
             functionalAuthorizedUntil==expiry&&functionalEvapVin.Text.Trim().ToUpperInvariant()==vin;
         if(destination.ShowDialog(this)!=DialogResult.OK||busy||functionalCancellation is not null||!Current())return;
@@ -166,7 +167,7 @@ internal sealed partial class BridgeDesktopForm
         try
         {
             var report=await Task.Run(()=>J1979MaintenanceJournal.InspectFile(source.FileName,vin,
-                destination.FileName,()=>DateTimeOffset.UtcNow<expiry&&functionalAuthorizedUntil==expiry));
+                destination.FileName,()=>DateTimeOffset.UtcNow<expiry&&functionalAuthorizedUntil==expiry,prefix));
             if(Current())functionalResults.Text=FormatNativeMaintenance(report,destination.FileName);
         }
         catch(Exception){if(Current())functionalResults.Text=J1979RecipeText("Failed");}
@@ -187,10 +188,11 @@ internal sealed partial class BridgeDesktopForm
     private static string FormatNativeMaintenance(Dictionary<string,object?> report,string output)
     {
         var text=new StringBuilder(J1979RecipeText("NativeMaintenanceOffline")).AppendLine();
-        text.AppendLine(J1979RecipeText("NativeMaintenanceConsistent"));
+        text.AppendLine(J1979RecipeText(Equals(report.GetValueOrDefault("prefix_integrity_verified"),true)?
+            "NativeMaintenancePrefixConsistent":"NativeMaintenanceConsistent"));
         if(Equals(report["recovery_required"],true))
             text.AppendLine(J1979RecipeText("NativeMaintenanceRecovery"));
-        if(report["terminal"] is Dictionary<string,object?> terminal)
+        if(report.GetValueOrDefault("terminal") is Dictionary<string,object?> terminal)
         {
             string outcome=Convert.ToString(terminal["outcome"],CultureInfo.InvariantCulture)??"";
             string key=outcome switch{
