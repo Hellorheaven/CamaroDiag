@@ -58,6 +58,9 @@ data class J1979NetworkEcu(
     val statusRecords get()=steps.mapNotNull {
         ObdJ1979Status.tryRecord(it.requestHex,it.responseHex,it.status)
     }
+    val operatingContext get()=ObdJ1979OperatingContext.project(steps.map {
+        ObdJ1979OperatingContext.Observation(it.requestHex,it.responseHex,it.status)
+    })
     val contextualMeasurements get() = ObdJ1979ScalingContext.project(steps.map {
         ObdJ1979ScalingContext.Observation(it.requestHex,it.responseHex,it.status)
     })
@@ -225,6 +228,10 @@ internal object J1979NetworkCampaign {
                         else {
                             status=evidence.status
                             detail=evidence.negativeResponseCode()?.let { "NRC_"+ElmJ1979EvapTest.hex(it,2) }
+                            if(status in setOf("RAW","PASSED")&&command=="0141"&&
+                                ObdJ1979OperatingContext.decodeCycle(requireNotNull(reply.payload).drop(2).map(::u),null)==null){
+                                status="FAILED";detail="INVALID_DRIVE_CYCLE";evidence=null
+                            }
                             if(status in setOf("RAW","PASSED") && request.size==2 && u(request[0])==1 &&
                                 ObdJ1979ScalingContext.isConfiguration(u(request[1])) &&
                                 !ObdJ1979ScalingContext.validConfiguration(u(request[1]),requireNotNull(reply.payload).drop(2).map(::u))){
