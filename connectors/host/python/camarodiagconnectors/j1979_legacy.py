@@ -268,13 +268,15 @@ def scan(exchange, protocol_check, expected_protocol: int, *, budget=180.0,
             stop = "PROTOCOL_UNVERIFIED"
     elif stop is None:
         stop = "NO_POSITIVE_PID00"
+    from .j1979_vehicle_info import legacy_info
     identification = []
+    extended_vehicle_info = []
     def read_identity():
         nonlocal vin_candidate
         info = inventory(9, lambda r: r[2] == 1, 3)
         counts = {}
         for kind in info:
-            if kind % 2:
+            if kind in (1, 3, 5, 7, 9, 12, 14):
                 rows = read(f"09{kind:02X}", lambda r: len(r) == 3 and
                             r[:2] == bytes((0x49, kind)) and r[2] > 0, single=True)
                 if len(rows) == 1:
@@ -282,7 +284,7 @@ def scan(exchange, protocol_check, expected_protocol: int, *, budget=180.0,
                 continue
             rows = read(f"09{kind:02X}", lambda r: len(r) == 7 and
                         r[:2] == bytes((0x49, kind)) and r[2] > 0)
-            count = counts.get(kind - 1)
+            count = counts.get(7 if kind == 11 else kind - 1)
             if not rows:
                 continue
             ordered = count is not None and len(rows) == count and [r[2] for r in rows] == list(range(1, count + 1))
@@ -308,6 +310,14 @@ def scan(exchange, protocol_check, expected_protocol: int, *, budget=180.0,
             elif source is not None and kind == 6:
                 identification.append({"info_type": 6, "values": [row[3:].hex().upper() for row in rows],
                                        "source": source_hex})
+            elif source is not None and kind in (8, 10, 11, 13, 15):
+                try:
+                    decoded = legacy_info(kind, count, rows)
+                    extended_vehicle_info.append({**decoded, "source": source_hex})
+                    if "values" in decoded:
+                        identification.append({**decoded, "source": source_hex})
+                except ValueError:
+                    steps[-1].update(status="FAILED", detail="INVALID_EXTENDED_INFOTYPE")
             elif source is not None:
                 steps[-1].update(status="RAW", detail="UNINTERPRETED_INFOTYPE")
     if source is not None and stop is None:
@@ -401,7 +411,7 @@ def scan(exchange, protocol_check, expected_protocol: int, *, budget=180.0,
             "whole_vehicle_coverage_verified": False, "declared_vin": expected_vin, "vin_match": vin_match,
             "observed_vin": vin_candidate if source is not None else None,
             "anonymous_vin_candidate": vin_candidate if source is None else None,
-            "identification": identification, "readiness": readiness, "inventory": inventories,
+            "identification": identification, "extended_vehicle_info": extended_vehicle_info, "readiness": readiness, "inventory": inventories,
             "steps": steps, "measurements": measurements, "dtc_modes": dtc_modes,
             "monitor_records": monitor_records, "freeze_triggers": freeze_triggers,
             "advertised_control_tests": controls, "completed": stop is None,
