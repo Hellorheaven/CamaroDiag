@@ -19,9 +19,13 @@ class J1979CanReadSession {
     uint8_t data[8]{};
   };
 
-  J1979CanReadSession(uint32_t requestId,uint32_t responseId,bool extended)
+  J1979CanReadSession(uint32_t requestId,uint32_t responseId,bool extended,
+      const J1979FreezeScope* freeze=nullptr)
     :tx_(requestId),rx_(responseId),extended_(extended),
-     observer_(responseId,extended),valid_(physicalPair(requestId,responseId,extended)){}
+     observer_(responseId,extended),valid_(physicalPair(requestId,responseId,extended)),
+     scoped_(freeze!=nullptr),scope_(freeze?*freeze:J1979FreezeScope{}){
+    if(scoped_&&!scope_.valid())valid_=false;
+  }
 
   static bool physicalPair(uint32_t tx,uint32_t rx,bool ext){
     if(!ext)return tx>=0x7e0u&&tx<=0x7e7u&&rx==tx+8u;
@@ -33,7 +37,8 @@ class J1979CanReadSession {
   // Each session represents one request. No automatic resend.
   bool begin(const uint8_t* request,size_t size,uint32_t now,uint32_t timeout,Frame& outgoing){
     if(state_!=State::Idle||!valid_||timeout<1||timeout>4000u||
-       !J1979ReadEvidence::readRequest(J1979ReadEvidence::Variant::ClassicCan,request,size)||
+       !(scoped_?scope_.allows(request,size):
+         J1979ReadEvidence::readRequest(J1979ReadEvidence::Variant::ClassicCan,request,size))||
        size>7)return false;
     std::memcpy(request_,request,size);
     requestSize_=size;started_=now;timeout_=timeout;
@@ -61,8 +66,10 @@ class J1979CanReadSession {
       flowRequired=true;
     }
     if(result!=IsoTpObserver::Result::Complete)return state_;
-    const auto evidence=J1979ReadEvidence::classify(J1979ReadEvidence::Variant::ClassicCan,
-      request_,requestSize_,observer_.message(),observer_.size());
+    const auto evidence=scoped_?J1979ReadEvidence::classifyFreeze(scope_,
+      request_,requestSize_,observer_.message(),observer_.size()):
+      J1979ReadEvidence::classify(J1979ReadEvidence::Variant::ClassicCan,
+        request_,requestSize_,observer_.message(),observer_.size());
     if(evidence==J1979ReadEvidence::Result::Pending){
       if(!observer_.consume())return fail();
       // NRC 78 does not restart the absolute deadline or trigger a resend.
@@ -92,6 +99,8 @@ class J1979CanReadSession {
   bool extended_;
   IsoTpObserver observer_;
   bool valid_;
+  bool scoped_;
+  const J1979FreezeScope scope_;
   State state_=State::Idle;
   uint32_t started_=0,timeout_=0;
   uint8_t request_[7]{};
