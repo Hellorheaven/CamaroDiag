@@ -185,3 +185,11 @@ FR : Les résultats CAN Mode 06 sur Android, le pont Windows et le scan Linux co
 EN: Android, the Windows bridge and Linux scan retain raw CAN Mode 06 words and decode 16 documented UASIDs from ISO 15031-5:2006 Annex E. Signed words use two's complement. Unknown units stay raw. Structured views distinguish inverted limits; numerical comparisons never establish a monitor verdict or emissions compliance. Historical CJ/1 evidence is unchanged. These scales do not apply to legacy Mode 05/06.
 
 Scope: historical subset, not the complete SAE J1979DA catalogue. Regression tests written; execution remains pending the protocol closure gate. Reference: ISO 15031-5:2006 Annex E.
+
+### J1979 — Mode 09 étendu / Extended vehicle information
+
+Périmètre logiciel : InfoTypes 08 (essence) et 0B (diesel), compteurs IUPR non signés, rapports numériques avec dénominateur non nul, identification moteur 0D, homologation 0F, nom ECU legacy 0A. Sur legacy, le compteur 07 est partagé par 08 et 0B ; 0C et 0E annoncent respectivement 0D et 0F. Vérifier les fragments numérotés, leur longueur, la source sélectionnée et les longueurs CAN exactes. Référence de définition : SAE J1979DA, octobre 2011, G8–G15 ; profils et variantes plus récents à confirmer. Ne pas déduire de verdict réglementaire des rapports numériques.
+
+Android : diagnostic OBD CAN, campagnes multi-ECU, recettes legacy et projection de capture native. Windows : console/scan J2534, recettes legacy et USB natif. Linux/Python : scans CAN/legacy, décodage CJ/1 et inspection indépendante. Le champ dérivé `extended_vehicle_info` est facultatif pour les anciens rapports CJ/1 ; si présent, l'inspection hôte le compare aux octets originaux. Une réponse historiquement RAW reste RAW. Les anciennes captures ne sont pas réécrites.
+
+Acceptance: use a confirmed responding ECU, read its Mode 09 inventory and request only advertised InfoTypes; distinguish spark and compression-ignition counter layouts, unavailable ratios, missing fragments and invalid padding. Check CAN/legacy reports against actual bytes and compare Android/Windows/Linux views. Reject forged decoded values in offline inspection. Tests added, not executed yet. No claim of physical legacy support in the connector firmware or regulatory compliance. SAE J1979 remains in progress.
