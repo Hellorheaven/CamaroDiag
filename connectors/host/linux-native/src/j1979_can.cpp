@@ -10,6 +10,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <array>
+#include <algorithm>
+#include <memory>
+#include <new>
 
 static uint64_t monotonic_ms(void) {
     struct timespec now = {0};
@@ -141,25 +145,27 @@ static j1979_can_step *read_one(const j1979_can_plan *p, j1979_can_result *r,
     step->request_size = (uint8_t)count;
     snprintf(step->status, sizeof(step->status), "NOT_TESTED");
     size_t capacity = J1979_CAN_MAX_PAYLOAD + 1;
-    uint8_t answer[J1979_CAN_MAX_PAYLOAD + 1] = {0};
+    std::array<uint8_t,J1979_CAN_MAX_PAYLOAD+1> answer{};
     uint64_t remaining = p->budget_ms - (now - start);
     unsigned timeout = remaining > 2500 ? 2500 : (unsigned)remaining;
     uint64_t begin = now_ms(p);
-    int rc = p->exchange(p->context, request, count, answer, &capacity, timeout);
+    int rc = p->exchange(p->context, request, count, answer.data(), &capacity, timeout);
     uint64_t end = now_ms(p);
     step->duration_ms = end >= begin && end - begin < UINT32_MAX
         ? (uint32_t)(end - begin) : UINT32_MAX;
-    if (capacity > sizeof(answer)) {
+    if (capacity > answer.size()) {
         snprintf(step->status, sizeof(step->status), "FAILED");
         snprintf(step->detail, sizeof(step->detail), "UNBOUNDED_TRANSPORT_REPLY");
         stop(r, "TRANSPORT_ERROR"); return step;
     }
     if (rc == 0) {
-        step->response = malloc(capacity ? capacity : 1u);
-        if (!step->response) {
+        std::unique_ptr<uint8_t[]> owned{
+            new (std::nothrow) uint8_t[capacity ? capacity : 1u]};
+        if (!owned) {
             stop(r, "MEMORY_EXHAUSTED"); return step;
         }
-        memcpy(step->response, answer, capacity);
+        std::copy_n(answer.begin(),capacity,owned.get());
+        step->response = owned.release(); /* Legacy ABI ownership -> result_free. */
         step->response_size = capacity;
     }
     /* A response obtained after expiration cannot be projected as a valid
@@ -235,7 +241,7 @@ static void measure_inventory(const j1979_can_plan *p, j1979_can_result *r,
 }
 int j1979_can_scan(const j1979_can_plan *p, j1979_can_result *r) {
     if (!r) return -1;
-    memset(r, 0, sizeof(*r));
+    *r = {};
     /* The pure campaign cannot be reused with an anonymous ECU or a
      * channel that cannot be requalified before every request. */
     if (!p || !p->exchange || !p->current ||
@@ -243,8 +249,10 @@ int j1979_can_scan(const j1979_can_plan *p, j1979_can_result *r) {
         p->budget_ms == 0 || p->budget_ms > 600000 ||
         !j1979_can_valid_vin(p->expected_vin))
         return -1;
-    r->steps = calloc(J1979_CAN_MAX_STEPS, sizeof(*r->steps));
-    if (!r->steps) return -1;
+    std::unique_ptr<j1979_can_step[]> owned{
+        new (std::nothrow) j1979_can_step[J1979_CAN_MAX_STEPS]{}};
+    if (!owned) return -1;
+    r->steps = owned.release(); /* C ABI requires final result_free. */
     snprintf(r->vin_match, sizeof(r->vin_match), "%s",
              p->expected_vin ? "UNVERIFIED" : "NOT_REQUESTED");
     snprintf(r->final_vin_match, sizeof(r->final_vin_match), "NOT_TESTED");
@@ -354,10 +362,11 @@ int j1979_can_scan(const j1979_can_plan *p, j1979_can_result *r) {
 void j1979_can_result_free(j1979_can_result *r) {
     if (!r) return;
     if (r->steps) {
-        for (size_t i = 0; i < r->step_count; ++i) free(r->steps[i].response);
-        free(r->steps);
+        for (size_t i = 0; i < r->step_count; ++i)
+            delete[] r->steps[i].response;
+        delete[] r->steps;
     }
-    memset(r, 0, sizeof(*r));
+    *r = {};
 }
 static bool quoted(FILE *f, const char *v) {
     if (fputc('"', f) == EOF) return false;

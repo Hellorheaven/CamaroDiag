@@ -6,8 +6,11 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-/* Native C replacement for read-only Python Mode 01 monitoring. All source,
+/* Native C++ replacement for read-only Python Mode 01 monitoring. All source,
  * identity and clock callbacks remain owned by the selected physical link.
  * Data is RAW; no unsupported J1979DA scaling is inferred from packet size.
  */
@@ -45,4 +48,7 @@ void j1979_live_free(j1979_live_result *result);
 bool j1979_live_write_json(FILE *stream, const j1979_live_plan *plan,
                            const j1979_live_result *result,
                            const char *interface_name);
+#ifdef __cplusplus
+}
+#endif
 #endif

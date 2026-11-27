@@ -5,6 +5,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <array>
+#include <algorithm>
+#include <memory>
+#include <new>
 
 static uint64_t uptime_ms(void) {
     struct timespec ts={0};
@@ -56,17 +60,19 @@ static j1979_live_step *query(const j1979_live_plan *p,j1979_live_result *r,
     s->started_ms=now-start;
     unsigned remaining=(unsigned)(p->channel.budget_ms-(now-start));
     unsigned timeout=remaining>2500?2500:remaining;
-    uint8_t raw[J1979_CAN_MAX_PAYLOAD+1]={0};
-    size_t length=sizeof(raw);
-    int rc=p->channel.exchange(p->channel.context,s->request,2,raw,&length,timeout);
+    std::array<uint8_t,J1979_CAN_MAX_PAYLOAD+1> raw{};
+    size_t length=raw.size();
+    int rc=p->channel.exchange(p->channel.context,s->request,2,raw.data(),&length,timeout);
     uint64_t end=tick(p);
     if (end>=now && end-now<=UINT_MAX) s->duration_ms=(unsigned)(end-now);
     s->elapsed_ms=end>=start?end-start:0;
-    if (length>sizeof(raw)) {halt(r,"UNBOUNDED_REPLY");return s;}
+    if (length>raw.size()) {halt(r,"UNBOUNDED_REPLY");return s;}
     if (rc==0 && length && r->raw_bytes+length<=J1979_LIVE_MAX_RAW) {
-        s->response=malloc(length);
-        if (!s->response) {halt(r,"MEMORY_EXHAUSTED");return s;}
-        memcpy(s->response,raw,length);s->response_size=length;
+        std::unique_ptr<uint8_t[]> owned{new (std::nothrow) uint8_t[length]};
+        if (!owned) {halt(r,"MEMORY_EXHAUSTED");return s;}
+        std::copy_n(raw.begin(),length,owned.get());
+        s->response=owned.release(); /* Legacy ABI: j1979_live_free owns it. */
+        s->response_size=length;
         r->raw_bytes+=length;
     } else if (rc==0) {halt(r,"INVALID_REPLY_SIZE");return s;}
     if (end<start || end-start>=p->channel.budget_ms) {
@@ -167,10 +173,12 @@ static bool delay_until(const j1979_live_plan *p,j1979_live_result *r,
 }
 int j1979_live_record(const j1979_live_plan *p,j1979_live_result *r) {
     if (!r) return -1;
-    memset(r,0,sizeof(*r));
+    *r={};
     if (!j1979_live_plan_valid(p)) return -1;
-    r->steps=calloc(J1979_LIVE_MAX_STEPS,sizeof(*r->steps));
-    if (!r->steps) return -1;
+    std::unique_ptr<j1979_live_step[]> owned{
+        new (std::nothrow) j1979_live_step[J1979_LIVE_MAX_STEPS]{}};
+    if (!owned) return -1;
+    r->steps=owned.release();
     uint64_t start=tick(p),last_identity=start,last_cycle_start=start;
     if (!start) {halt(r,"CLOCK_UNAVAILABLE");goto finish;}
     if (!identity(p,r,start,"INITIAL_VIN",false)) goto finish;
@@ -212,8 +220,9 @@ finish:
 }
 void j1979_live_free(j1979_live_result *r) {
     if (!r) return;
-    for (size_t i=0;i<r->step_count;++i) free(r->steps[i].response);
-    free(r->steps);memset(r,0,sizeof(*r));
+    for (size_t i=0;i<r->step_count;++i) delete[] r->steps[i].response;
+    delete[] r->steps;
+    *r={};
 }
 static bool string(FILE *f,const char *s) {
     if (fputc('"',f)==EOF) return false;

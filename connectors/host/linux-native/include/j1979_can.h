@@ -5,8 +5,11 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-/* Native C SAE J1979 classic service reader. The exchange implementation is
+/* Native C++ SAE J1979 classic service reader. The exchange implementation is
  * injected: this engine never opens an ECU, chooses a connector, or writes.
  * A session is pinned to one explicitly selected physical CAN pair.
  */
@@ -67,4 +70,7 @@ void j1979_can_result_free(j1979_can_result *result);
 bool j1979_can_write_json(FILE *output, const j1979_can_plan *plan,
                            const j1979_can_result *result,
                            const char *interface_name);
+#ifdef __cplusplus
+}
+#endif
 #endif
