@@ -60,6 +60,16 @@ object ObdJ1979ExtendedVehicleInfo {
             else -> null
         }
     }
+    /** Historical CJ/1 RAW status remains unchanged. Derive only from a
+     * correlated, bounded response, not from a producer's interpreted fields. */
+    fun tryRaw(requestHex:String,responseHex:String?,status:String):Result? {
+        if(status!="RAW" || !requestHex.matches(Regex("09[0-9A-F]{2}"))) return null
+        val type=requestHex.takeLast(2).toInt(16)
+        if(type !in extendedTypes || responseHex==null ||
+            responseHex.length !in 6..86 || responseHex.length%2!=0 ||
+            !responseHex.matches(Regex("[0-9A-F]+"))) return null
+        return can(type,responseHex.chunked(2).map { it.toInt(16) })
+    }
     fun legacy(type: Int, count: Int, rows: List<List<Int>>): Result? {
         if (count !in 1..10 || rows.size != count ||
             rows.withIndex().any { (index,row) ->
