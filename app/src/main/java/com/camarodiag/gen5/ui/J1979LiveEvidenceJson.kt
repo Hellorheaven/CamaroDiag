@@ -38,6 +38,7 @@ internal object J1979LiveEvidenceJson {
                 }))
         }))
         .put("physicalVehicleVerified",false).put("wholeVehicleCoverageVerified",false)
+        .put("rawOnly",r.plan.rawOnly)
         .put("selectedPids",JSONArray(r.plan.pids)).put("advertisedPids",JSONArray(r.advertisedPids))
         .put("inventoryComplete",r.inventoryComplete)
         .put("inventoryPages",JSONArray(r.inventoryPages.map {
@@ -67,7 +68,7 @@ internal object J1979LiveEvidenceJson {
         }))
     fun csv(r: J1979LiveReport): String=buildString {
         fun escaped(value: String?)=value?.let { "\""+it.replace("\"","\"\"")+"\"" }?:""
-        val multi=r.plan.pids.any { com.camarodiag.gen5.data.obd.ObdJ1979MultiSignal.width(it)!=null || com.camarodiag.gen5.data.obd.ObdJ1979OperatingContext.isTrim(it) }
+        val multi=!r.plan.rawOnly&&r.plan.pids.any { com.camarodiag.gen5.data.obd.ObdJ1979MultiSignal.width(it)!=null || com.camarodiag.gen5.data.obd.ObdJ1979OperatingContext.isTrim(it) }
         val header="cycle,pid_hex,started_elapsed_ms,elapsed_ms,duration_ms,status,value,unit,request_hex,response_hex,detail"
         appendLine(if(multi)header+",signal_name,raw_encoded" else header)
         r.observations.forEach { row ->
