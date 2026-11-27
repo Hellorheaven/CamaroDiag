@@ -35,6 +35,8 @@ typedef struct {
     char interruption[24];
 } cl1_result;
 
+bool cl1_valid_plan(const cl1_plan *plan);
+
 /* Both entrypoints require an independent VIN. The prefix variant rejects an
  * intact terminal, including a negative terminal, and cannot claim success.
  * Complete records with a bad CRC or invalid replay ALWAYS cause failure. */

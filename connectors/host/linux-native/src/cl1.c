@@ -38,7 +38,7 @@ static bool physical_pair(uint32_t tx, uint32_t rx, bool ext) {
            ((tx >> 8) & 0xffu) < 0xf0u &&
            rx == (0x18daf100u | ((tx >> 8) & 255u));
 }
-static bool plan_valid(const cl1_plan *p) {
+bool cl1_valid_plan(const cl1_plan *p) {
     if (!physical_pair(p->tx, p->rx, p->extended) || !cf1_valid_vin(p->vin) ||
         !p->pid_count || p->pid_count > CL1_MAX_PIDS ||
         !p->cycles || p->cycles > 1000 ||
@@ -68,7 +68,7 @@ static int parse_plan(const uint8_t *b, const char *vin, cl1_plan *p,
         if (b[27 + i]) return deny(err, capacity, "CL/1 noncanonical PID padding");
     p->cycles = u16(b + 59); p->interval_ms = u16(b + 61);
     p->budget_ms = u32(b + 63);
-    if (!plan_valid(p) || strcmp(p->vin, vin))
+    if (!cl1_valid_plan(p) || strcmp(p->vin, vin))
         return deny(err, capacity, "CL/1 plan violates independent physical scope or VIN");
     return 0;
 }
