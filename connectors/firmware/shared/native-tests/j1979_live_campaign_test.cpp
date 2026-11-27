@@ -111,4 +111,77 @@ static void testScope(){
   auto result=Campaign::runApplication(link,0x7e0,0x7e8,false,altered,link,evidence,scratch);
   assert(!result.completed&&result.stop==Stop::InvalidScope&&link.requests==0);
 }
-int main(){testSuccessful();testRejected();testScope();}
+class Large final:public Campaign::Link,public Campaign::Waiter {
+ public:
+  explicit Large(const J1979LiveScope& plan):plan_(plan){}
+  bool active()override{return true;}
+  bool matches(uint32_t tx,uint32_t rx,bool ext)const override{return tx==0x7e0&&rx==0x7e8&&!ext;}
+  bool matchesLive(const J1979LiveScope& s)const override{return plan_.same(s);}
+  uint32_t monotonicMs()override{return now;}
+  bool waitMs(uint32_t wait)override{now+=wait;return true;}
+  void exchange(const uint8_t* req,size_t n,uint32_t timeout,Campaign::Exchange::Result& r)override{
+    assert(n==2&&timeout>=5);
+    now+=5;r.elapsedMs=5;
+    if(req[0]==9){
+      ++identities;r.state=State::Positive;r.responseSize=20;
+      r.response[0]=0x49;r.response[1]=2;r.response[2]=1;
+      std::memcpy(r.response+3,plan_.vin,17);
+      return;
+    }
+    if(req[1]==0){
+      r.state=State::Positive;r.responseSize=6;
+      const uint8_t bytes[]={0x41,0,0xff,0xff,0xff,0xfe};
+      std::memcpy(r.response,bytes,6);return;
+    }
+    assert(plan_.includes(req[1]));
+    ++reads;r.state=State::Raw;r.responseSize=4095;
+    std::memset(r.response,0,r.responseSize);r.response[0]=0x41;r.response[1]=req[1];
+  }
+  uint32_t now=0,reads=0,identities=0;
+ private:
+  const J1979LiveScope plan_;
+};
+class CountingWriter final:public J1979LiveEvidence::Writer {
+ public:
+  bool write(const uint8_t*,size_t size)override{total+=size;return true;}
+  size_t total=0;
+};
+static void testCapacity(){
+  auto plan=scope();plan.count=31;plan.cycles=200;plan.budgetMs=600000;
+  for(unsigned i=0;i<31;++i)plan.pids[i]=uint8_t(i+1);
+  Large link(plan);CountingWriter writer;Campaign::Exchange::Result scratch{};
+  J1979LiveEvidence evidence(writer,plan);
+  assert(evidence.begin(0x7e0,0x7e8,false));
+  auto summary=Campaign::runApplication(link,0x7e0,0x7e8,false,plan,link,evidence,scratch);
+  assert(!summary.completed&&summary.stop==Stop::EvidenceLimit&&summary.initialIdentity);
+  assert(summary.raw==link.reads&&summary.samples==link.reads&&link.identities==1);
+  assert(summary.rawBytes<=J1979LiveSequence::MaximumRawBytes);
+  assert(J1979LiveSequence::MaximumRawBytes-summary.rawBytes<4095);
+  assert(summary.steps==summary.samples+2&&summary.completedCycles==summary.samples/31);
+  assert(evidence.finish(summary));
+  assert(writer.total>summary.rawBytes);
+  // A false capacity terminal at the beginning has no evidentiary basis.
+  CountingWriter other;J1979LiveEvidence invalid(other,plan);
+  assert(invalid.begin(0x7e0,0x7e8,false));
+  Campaign::Summary fake;fake.stop=Stop::EvidenceLimit;
+  assert(!invalid.finish(fake));
+}
+static void testSequenceBounds(){
+  auto plan=scope();J1979LiveSequence sequence(plan);
+  assert(sequence.begin(0xfffffff0u));
+  const uint8_t vin[]={9,2};Campaign::Exchange::Result reply{};
+  assert(sequence.admit(vin,2,0xfffffff0u,100));
+  reply.state=State::Positive;reply.responseSize=20;
+  reply.response[0]=0x49;reply.response[1]=2;reply.response[2]=1;
+  std::memcpy(reply.response+3,plan.vin,17);reply.elapsedMs=32;
+  assert(sequence.observe(vin,2,reply,0x10u)); // wrap-safe monotonic duration
+  const uint8_t page[]={1,0};
+  assert(sequence.admit(page,2,0x10u,100));
+  reply.state=State::Positive;reply.responseSize=6;
+  const uint8_t bits[]={0x41,0,8,0x10,0,0};std::memcpy(reply.response,bits,6);reply.elapsedMs=1;
+  assert(sequence.observe(page,2,reply,0x11u));
+  const uint8_t wrong[]={1,12};
+  assert(!sequence.admit(wrong,2,0x11u,100)&&sequence.finished());
+  assert(sequence.summary().stop==Stop::InvalidSequence);
+}
+int main(){testSuccessful();testRejected();testScope();testCapacity();testSequenceBounds();}
