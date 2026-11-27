@@ -13,6 +13,8 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <algorithm>
+#include <array>
 
 static volatile sig_atomic_t cancel_requested;
 static void cancel_handler(int signal_number) {
@@ -47,7 +49,7 @@ static bool parse_milliseconds(const char *s, unsigned *out) {
     *out=(unsigned)n;return true;
 }
 static bool parse(int argc, char **argv, options *o) {
-    memset(o,0,sizeof(*o));o->budget_ms=180000;
+    *o={};o->budget_ms=180000;
     o->live=!strcmp(argv[1],"--j1979-live");
     o->cycles=30;o->interval_ms=1000;
     bool has_budget=false;
@@ -103,7 +105,7 @@ static bool parse(int argc, char **argv, options *o) {
         j1979_can_physical_pair(o->tx,o->rx);
 }
 int j1979_can_cli(int argc, char **argv) {
-    options o={0};
+    options o{};
     if (!parse(argc,argv,&o)) {
         fprintf(stderr,"Native J1979: explicit --interface, --tx, --rx, "
             "--vin, --output and --confirm-physical-channel required; "
@@ -133,7 +135,7 @@ int j1979_can_cli(int argc, char **argv) {
     FILE *stream=fdopen(fd,"w");
     if (!stream) {close(fd);unlink(o.output);return 2;}
     cancel_requested=0;
-    struct sigaction handler={0},old_int={0},old_term={0};
+    struct sigaction handler{},old_int{},old_term{};
     handler.sa_handler=cancel_handler;
     sigemptyset(&handler.sa_mask);
     bool restored_handlers=false;
@@ -141,22 +143,26 @@ int j1979_can_cli(int argc, char **argv) {
         if (sigaction(SIGTERM,&handler,&old_term)==0) restored_handlers=true;
         else sigaction(SIGINT,&old_int,NULL);
     }
-    j1979_isotp_link link={.socket_fd=-1};
+    j1979_isotp_link link{};
+    link.socket_fd=-1;
     bool opened=restored_handlers &&
         j1979_isotp_open(&link,o.interface_name,o.tx,o.rx,&cancel_requested);
-    j1979_can_plan plan={0};
+    j1979_can_plan plan{};
     plan.exchange=j1979_isotp_exchange;
-    plan.clock=NULL; /* CLOCK_MONOTONIC in the pure C campaign engine */
+    plan.clock=nullptr; /* CLOCK_MONOTONIC in the native C++ campaign engine */
     plan.current=j1979_isotp_current;
     plan.context=&link;
     plan.tx=o.tx;plan.rx=o.rx;
     plan.budget_ms=o.budget_ms;
     plan.expected_vin=o.vin;
-    j1979_can_result result={0};
-    j1979_live_result live_result={0};
-    j1979_live_plan live_plan={.channel=plan,.pid_count=o.pid_count,
-                              .cycles=o.cycles,.interval_ms=o.interval_ms};
-    memcpy(live_plan.pids,o.pids,o.pid_count);
+    j1979_can_result result{};
+    j1979_live_result live_result{};
+    j1979_live_plan live_plan{};
+    live_plan.channel=plan;
+    live_plan.pid_count=o.pid_count;
+    live_plan.cycles=o.cycles;
+    live_plan.interval_ms=o.interval_ms;
+    std::copy_n(o.pids,o.pid_count,live_plan.pids);
     int scan_status=opened ?
         (o.live ? j1979_live_record(&live_plan,&live_result) :
                   j1979_can_scan(&plan,&result)) : -1;

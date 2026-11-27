@@ -1,5 +1,8 @@
 #ifndef CAMARODIAG_LINUX_NATIVE_J1979_ISOTP_H
 #define CAMARODIAG_LINUX_NATIVE_J1979_ISOTP_H
+#ifdef __cplusplus
+extern "C" {
+#endif
 #include <stdbool.h>
 #include <signal.h>
 #include <stddef.h>
@@ -22,4 +25,7 @@ int j1979_isotp_exchange(void *context, const uint8_t *request,
                          size_t request_size, uint8_t *response,
                          size_t *response_size, unsigned timeout_ms);
 void j1979_isotp_close(j1979_isotp_link *link);
+#ifdef __cplusplus
+}
+#endif
 #endif

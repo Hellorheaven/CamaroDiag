@@ -13,6 +13,25 @@
 #include <sys/socket.h>
 #include <time.h>
 #include <unistd.h>
+#include <array>
+#include <memory>
+#include <utility>
+
+namespace {
+// Own an opened socket until its descriptor is deliberately handed to the
+// selected link. Every bind failure closes the descriptor automatically.
+class UniqueSocket final {
+public:
+    explicit UniqueSocket(int fd) noexcept : fd_(fd) {}
+    ~UniqueSocket() noexcept { if (fd_ >= 0) close(fd_); }
+    UniqueSocket(const UniqueSocket &) = delete;
+    UniqueSocket &operator=(const UniqueSocket &) = delete;
+    int get() const noexcept { return fd_; }
+    int release() noexcept { return std::exchange(fd_,-1); }
+private:
+    int fd_;
+};
+} // namespace
 
 /* Linux ISO 15765-2 kernel socket: the only active transmitter is the
  * caller-selected CAN interface and physical ECU pair. No functional CAN
@@ -40,7 +59,7 @@ bool j1979_isotp_open(j1979_isotp_link *link, const char *name,
                       uint32_t tx, uint32_t rx,
                       const volatile sig_atomic_t *cancel_flag) {
     if (!link) return false;
-    memset(link, 0, sizeof(*link));
+    *link = {};
     link->socket_fd = -1;
     if (!j1979_isotp_valid_interface(name) ||
         !j1979_can_physical_pair(tx, rx) ||
@@ -48,21 +67,21 @@ bool j1979_isotp_open(j1979_isotp_link *link, const char *name,
         return false;
     unsigned index = if_nametoindex(name);
     if (!index) return false;
-    int fd = socket(PF_CAN, SOCK_DGRAM | SOCK_NONBLOCK | SOCK_CLOEXEC, CAN_ISOTP);
-    if (fd < 0) return false;
+    UniqueSocket socket_owner{socket(PF_CAN,
+        SOCK_DGRAM | SOCK_NONBLOCK | SOCK_CLOEXEC, CAN_ISOTP)};
+    if (socket_owner.get() < 0) return false;
     /* Explicit physical IDs only; 29-bit extended CAN identity must be
      * encoded with the Linux CAN_EFF_FLAG on both ends. */
     uint32_t ext = tx > CAN_SFF_MASK ? CAN_EFF_FLAG : 0;
-    struct sockaddr_can address = {0};
+    struct sockaddr_can address = {};
     address.can_family = AF_CAN;
     address.can_ifindex = (int)index;
     address.can_addr.tp.rx_id = rx | ext;
     address.can_addr.tp.tx_id = tx | ext;
-    if (bind(fd, (struct sockaddr *)&address, sizeof(address)) != 0) {
-        close(fd);
-        return false;
-    }
-    link->socket_fd = fd;
+    if (bind(socket_owner.get(),
+             reinterpret_cast<const sockaddr *>(&address),
+             sizeof(address)) != 0) return false;
+    link->socket_fd = socket_owner.release();
     link->interface_index = index;
     link->tx_can_id = tx;
     link->rx_can_id = rx;
@@ -71,7 +90,7 @@ bool j1979_isotp_open(j1979_isotp_link *link, const char *name,
     return true;
 }
 bool j1979_isotp_current(void *context) {
-    const j1979_isotp_link *link = context;
+    const auto *link = static_cast<const j1979_isotp_link *>(context);
     return link && link->socket_fd >= 0 && link->interface_index &&
         (!link->cancel_flag || !*link->cancel_flag) &&
         if_nametoindex(link->interface_name) == link->interface_index;
@@ -97,7 +116,7 @@ static int ready(const j1979_isotp_link *link, short events,
 int j1979_isotp_exchange(void *context, const uint8_t *request,
                          size_t n, uint8_t *response,
                          size_t *response_size, unsigned timeout_ms) {
-    j1979_isotp_link *link = context;
+    auto *link = static_cast<j1979_isotp_link *>(context);
     if (!j1979_isotp_current(link) ||
         !j1979_can_allowed_read(request, n) ||
         !response || !response_size || *response_size == 0 ||
@@ -110,8 +129,9 @@ int j1979_isotp_exchange(void *context, const uint8_t *request,
     /* A queued prior response cannot be attributed to the current request.
      * Fail on a continuously busy socket rather than silently mixing ECUs. */
     for (unsigned drained = 0; drained < 64; ++drained) {
-        uint8_t stale[J1979_CAN_MAX_PAYLOAD + 1] = {0};
-        ssize_t got = recv(link->socket_fd, stale, sizeof(stale), MSG_DONTWAIT);
+        std::array<uint8_t,J1979_CAN_MAX_PAYLOAD+1> stale{};
+        ssize_t got = recv(link->socket_fd, stale.data(), stale.size(),
+                           MSG_DONTWAIT);
         if (got < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) break;
         if (got < 0 && errno == EINTR) continue;
         if (got < 0 || !j1979_isotp_current(link) || monotonic_ms() >= deadline)
@@ -147,6 +167,6 @@ int j1979_isotp_exchange(void *context, const uint8_t *request,
 void j1979_isotp_close(j1979_isotp_link *link) {
     if (!link) return;
     if (link->socket_fd >= 0) close(link->socket_fd);
-    memset(link, 0, sizeof(*link));
+    *link = {};
     link->socket_fd = -1;
 }
