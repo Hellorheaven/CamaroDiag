@@ -223,6 +223,60 @@ class J1979CatalogueProjectionTest {
         reject { J1979CatalogueProjection.build(catalogue(),pin,raw,"1FA6P8TH0L5100000") }
     }
 
+    /** Rewrite a synthetic CF/1 exchange and its terminal verdict with
+     * valid CRCs: this proves the replay checks semantics, not only framing. */
+    private fun alteredFreezeCapture(original: ByteArray, changeTrigger: Boolean): ByteArray {
+        val bytes = original.copyOf()
+        var offset = 0
+        var changed = false
+        var terminal = false
+        fun writeCrc(start: Int, bodyLength: Int) {
+            val crc = java.util.zip.CRC32().apply { update(bytes, start, 8 + bodyLength) }.value
+            for (index in 0..3)
+                bytes[start + 8 + bodyLength + index] = ((crc ushr (8 * index)) and 255).toByte()
+        }
+        while (offset < bytes.size) {
+            require(offset + 12 <= bytes.size && bytes[offset] == 'C'.code.toByte() &&
+                bytes[offset+1] == 'F'.code.toByte() && bytes[offset+2] == 1.toByte())
+            val kind = bytes[offset + 3].toInt() and 255
+            val sequence = (bytes[offset + 4].toInt() and 255) +
+                ((bytes[offset + 5].toInt() and 255) shl 8)
+            val length = (bytes[offset + 6].toInt() and 255) +
+                ((bytes[offset + 7].toInt() and 255) shl 8)
+            val body = offset + 8
+            require(length > 0 && body + length + 4 <= bytes.size)
+            if (kind == 2 && sequence == if (changeTrigger) 6 else 12) {
+                val requestSize = bytes[body + 2].toInt() and 255
+                val response = body + 10 + requestSize
+                if (changeTrigger) {
+                    require(requestSize == 3 && bytes[response] == 0x42.toByte() &&
+                        bytes[response+1] == 2.toByte() && bytes[response+2] == 0.toByte())
+                    bytes[response + 4] = 2.toByte()
+                } else {
+                    require(requestSize == 2 && bytes[response] == 0x49.toByte() &&
+                        bytes[response+1] == 2.toByte())
+                    bytes[response + 3] = '2'.code.toByte()
+                }
+                writeCrc(offset, length)
+                changed = true
+            } else if (kind == 3) {
+                require(changed && length == 20)
+                if (changeTrigger) {
+                    bytes[body + 2] = 3.toByte()  // completed + identity, no stable-frame claim
+                    bytes[body + 12] = 4.toByte() // frame 00 changed trigger
+                } else {
+                    bytes[body] = 7.toByte()      // final VIN mismatch
+                    bytes[body + 2] = 0.toByte()  // cannot claim completion or identity
+                }
+                writeCrc(offset, length)
+                terminal = true
+            }
+            offset = body + length + 4
+        }
+        require(changed && terminal && offset == bytes.size)
+        return bytes
+    }
+
     @Test fun freezeCatalogueUsesFrameSpecificDefinitionsAndOriginalCapture() {
         kotlinx.coroutines.runBlocking {
             val freezeVin = "1G1FA1E30D1234567"
@@ -265,6 +319,28 @@ class J1979CatalogueProjectionTest {
             assertEquals(listOf(13),one["advertised_without_documentation"])
             assertEquals(listOf(12),one["projected_measurement_pids"])
             assertEquals(emptyList<Int>(),one["documented_without_advertisement"])
+            val triggerChanged = J1979FreezeCatalogue.build(definition.toByteArray(),pin,
+                alteredFreezeCapture(capture,true),freezeVin)
+            assertEquals(true,triggerChanged.document["final_identity_verified"])
+            val triggerFrames = J1979CatalogueJson.array(triggerChanged.document["frames"],2,2)
+            assertEquals(false,J1979CatalogueJson.obj(triggerFrames[0])["trigger_stable"])
+            assertEquals("CHANGED",J1979CatalogueJson.obj(triggerFrames[0])["source_status"])
+            val triggerRows = projected(triggerChanged)
+            assertTrue(triggerRows.filter { J1979CatalogueJson.obj(it)["frame"] == 0 }
+                .all { J1979CatalogueJson.obj(it)["projection_status"] == "TRIGGER_NOT_STABLE" })
+            assertTrue(triggerRows.filter { J1979CatalogueJson.obj(it)["frame"] == 1 }
+                .any { J1979CatalogueJson.obj(it)["projection_status"] == "PROJECTED" })
+
+            val identityChanged = J1979FreezeCatalogue.build(definition.toByteArray(),pin,
+                alteredFreezeCapture(capture,false),freezeVin)
+            assertEquals(false,identityChanged.document["final_identity_verified"])
+            assertEquals(false,identityChanged.document["source_completed"])
+            assertTrue(projected(identityChanged).all {
+                J1979CatalogueJson.obj(it)["projection_status"] == "IDENTITY_NOT_RECHECKED"
+            })
+            assertTrue(projected(identityChanged).all {
+                J1979CatalogueJson.array(J1979CatalogueJson.obj(it)["signals"],0,128).isEmpty()
+            })
             assertTrue(runCatching { J1979FreezeCatalogue.build(definition.toByteArray(),pin,capture.copyOf(capture.size-1),freezeVin) }.isFailure)
             assertTrue(runCatching { J1979FreezeCatalogue.build(definition.toByteArray(),pin,capture,vin) }.isFailure)
             assertTrue(runCatching { J1979FreezeCatalogue.parse(catalogue(),pin) }.isFailure)
