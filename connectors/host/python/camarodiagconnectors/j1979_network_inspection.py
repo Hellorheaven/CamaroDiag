@@ -14,6 +14,7 @@ from .j1979 import allowed_read
 from .j1979_vehicle_info import can_info
 from .j1979_multi_signal import from_steps as multi_records, historical_projection
 from .j1979_status import from_steps as status_records
+from .j1979_scaling_context import project as contextual_measurements
 from .j1979_campaign_evidence import decode_observation, summarize_observations
 from .j1979_live_inspection import load, _get, _require, _hex, _array, _dict, _id
 
@@ -369,9 +370,13 @@ def replay_ecu(row,android,vin):
     claimed_states=_get(body,"status_records")
     if claimed_states is not None:
         _require(_equal(_normalize(claimed_states),states),"Categorical states differ from physical responses")
+    context=contextual_measurements(steps)
+    claimed_context=_get(body,"contextual_measurements")
+    if claimed_context is not None:
+        _require(_equal(_normalize(claimed_context),context),"Contextual measurements differ from selected ECU responses")
     return {"completed":completed,"observed_vin":first,"final_vin":last,
             "steps":steps,"extended_vehicle_info":extended,"multi_signal_records":multi,
-            "multi_signal_report_catalog":catalog,"status_records":states,**summary}
+            "multi_signal_report_catalog":catalog,"status_records":states,"contextual_measurements":context,**summary}
 
 
 def inspect_network(root,expected_vin=None):
