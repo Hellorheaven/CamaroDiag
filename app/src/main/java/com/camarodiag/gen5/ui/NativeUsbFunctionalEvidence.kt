@@ -3,6 +3,9 @@ package com.camarodiag.gen5.ui
 import org.json.JSONObject
 import com.camarodiag.gen5.data.obd.ObdJ1979ExtendedVehicleInfo
 import com.camarodiag.gen5.data.obd.ObdJ1979MultiSignal
+import com.camarodiag.gen5.data.obd.ObdJ1979ScalingContext
+import com.camarodiag.gen5.data.obd.ObdJ1979Status
+import com.camarodiag.gen5.data.obd.ObdCanMonitorRecords
 import com.camarodiag.connectors.J1979CampaignSemantics
 
 /** Results reflect recorded replies, not a claim of physical provenance. */
@@ -25,7 +28,9 @@ internal object NativeUsbFunctionalEvidence {
         FunctionalTestOutcome.NOT_TESTED,"No verified evidence.","Aucune preuve vérifiée.") }
 
     data class Measurement(val mode: Int, val pid: Int, val name: String, val number: Double, val unit: String)
-    data class Monitor(val mid: Int, val tid: Int, val scaling: Int, val value: Int, val minimum: Int, val maximum: Int)
+    data class Monitor(val mid: Int, val tid: Int, val scaling: Int, val value: Int, val minimum: Int, val maximum: Int) {
+        fun scaled()=ObdCanMonitorRecords.Result(mid,tid,scaling,value,minimum,maximum).scaled()
+    }
     data class Readiness(val milOn:Boolean,val dtcCount:Int,val compression:Boolean,val monitors:Map<String,Boolean>)
     data class InventoryPage(val mode:Int,val base:Int,val ids:List<Int>,val next:Boolean)
     data class Inventory(val ids:Set<Int>,val complete:Boolean,val pages:List<InventoryPage>)
@@ -43,7 +48,9 @@ internal object NativeUsbFunctionalEvidence {
     data class DiagnosticValues(val observedVin: String?, val dtcs: Map<Int, List<String>?>,
         val measurements: List<Measurement>, val monitors: List<Monitor>, val identity: Map<Int,List<String>>, val readiness: Readiness?, val pages:List<InventoryPage>, val freeze:FreezeTrigger?,
         val extendedVehicleInfo:List<ObdJ1979ExtendedVehicleInfo.Result> = emptyList(),
-        val multiSignalRecords:List<ObdJ1979MultiSignal.Record> = emptyList())
+        val multiSignalRecords:List<ObdJ1979MultiSignal.Record> = emptyList(),
+        val statusRecords:List<ObdJ1979Status.Record> = emptyList(),
+        val contextualMeasurements:ObdJ1979ScalingContext.Projection = ObdJ1979ScalingContext.project(emptyList()))
 
     private fun inventoryValue(step:JSONObject):InventoryPage? {
         val request=step.optString("request_hex")
@@ -178,11 +185,18 @@ internal object NativeUsbFunctionalEvidence {
         val identity=linkedMapOf<Int,List<String>>()
         val extendedVehicleInfo=mutableListOf<ObdJ1979ExtendedVehicleInfo.Result>()
         val multiSignals=mutableListOf<ObdJ1979MultiSignal.Record>()
+        val statusRecords=mutableListOf<ObdJ1979Status.Record>()
+        val observations=mutableListOf<ObdJ1979ScalingContext.Observation>()
         var readiness:Readiness?=null
         var freeze:FreezeTrigger?=null
         val pages=linkedMapOf<Pair<Int,Int>,InventoryPage>()
         for (i in 0 until steps.length()) {
             val step = steps.optJSONObject(i) ?: continue
+            val requestHex=step.optString("request_hex")
+            val responseHex=if(step.isNull("response_hex"))null else step.optString("response_hex")
+            val status=step.optString("status")
+            observations+=ObdJ1979ScalingContext.Observation(requestHex,responseHex,status)
+            ObdJ1979Status.tryRecord(requestHex,responseHex,status)?.let(statusRecords::add)
             ObdJ1979MultiSignal.tryRecord(step.optString("request_hex"),step.optString("response_hex"),
                 step.optString("status"))?.let(multiSignals::add)
             ObdJ1979ExtendedVehicleInfo.tryRaw(step.optString("request_hex"),
@@ -239,7 +253,8 @@ internal object NativeUsbFunctionalEvidence {
                 decoded.unit!=unit||decoded.number!=number) continue
             measured[mode to pid] = Measurement(mode,pid,name,number,unit)
         }
-        return DiagnosticValues(vin,dtcs,measured.values.sortedWith(compareBy({ it.mode },{ it.pid })),monitors.toList(),identity.toMap(),readiness,pages.values.sortedWith(compareBy({it.mode},{it.base})),freeze,extendedVehicleInfo.toList(),multiSignals.toList())
+        return DiagnosticValues(vin,dtcs,measured.values.sortedWith(compareBy({ it.mode },{ it.pid })),monitors.toList(),identity.toMap(),readiness,pages.values.sortedWith(compareBy({it.mode},{it.base})),freeze,extendedVehicleInfo.toList(),multiSignals.toList(),statusRecords.toList(),
+            ObdJ1979ScalingContext.project(observations))
     }
 
     /** Verified readings within the advertised inventory, for ordinary diagnostic
@@ -249,7 +264,20 @@ internal object NativeUsbFunctionalEvidence {
         val chains=listOf(1,2,6,8,9).associateWith { inventory(values.pages,it) }
         if(chains.getValue(1).pages.isEmpty())return null
         fun supported(mode:Int,id:Int)=id in chains.getValue(mode).ids
+        val observations=(0 until report.getJSONArray("steps").length()).mapNotNull { index ->
+            val step=report.getJSONArray("steps").optJSONObject(index) ?: return@mapNotNull null
+            val req=step.optString("request_hex")
+            if(req.length !in setOf(4,6))return@mapNotNull null
+            val mode=req.take(2).toIntOrNull(16) ?: return@mapNotNull null
+            val pid=req.substring(2,4).toIntOrNull(16) ?: return@mapNotNull null
+            if(mode !in setOf(1,2) || mode==2&&values.freeze?.present!=true)return@mapNotNull null
+            val admitted=if(pid%32==0) chains.getValue(mode).pages.any { it.base==pid } else supported(mode,pid)
+            if(!admitted)return@mapNotNull null
+            ObdJ1979ScalingContext.Observation(req,if(step.isNull("response_hex"))null else step.optString("response_hex"),step.optString("status"))
+        }
         return values.copy(
+            contextualMeasurements=ObdJ1979ScalingContext.project(observations),
+            statusRecords=values.statusRecords.filter { supported(1,it.requestHex.takeLast(2).toInt(16)) },
             measurements=values.measurements.filter { supported(it.mode,it.pid) &&
                 (it.mode!=2||values.freeze?.present==true) },
             monitors=values.monitors.filter { supported(6,it.mid) },
