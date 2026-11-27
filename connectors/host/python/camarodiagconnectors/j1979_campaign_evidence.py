@@ -14,6 +14,7 @@ from .j1979_multi_signal import from_steps as multi_records
 from .j1979_status import from_steps as status_records
 from .j1979_scaling_context import project as contextual_measurements
 from .j1979_monitor_scaling import from_steps as scaled_monitor_records
+from .j1979_drive_cycle import project as operating_context, TRIMS, trim_width
 
 _HEADER = struct.Struct("<2sBBHH")
 _STATES = {1: "PASSED", 2: "RAW", 3: "NEGATIVE", 4: "TIMEOUT", 5: "FAILED"}
@@ -62,6 +63,10 @@ def _positive_state(req, res):
     if pid % 32 == 0:
         return 1 if len(res) == offset + 4 and not (pid == 0xE0 and res[-1] & 1) else None
     if mode in (1, 2):
+        # Preserve historical scalar classification for one-byte primary trims.
+        # Two-byte trims and secondary trims use separate derived evidence.
+        if pid in TRIMS:
+            return (1 if pid < 0x55 and len(res)==offset+1 else 2) if trim_width(pid,len(res)-offset) else None
         width = 2 if mode == 2 and pid == 2 else 4 if pid in (1, 0xA6) else 1 if pid in _ONE else 2 if pid in _TWO else 0
         return (1 if len(res) == offset + width else None) if width else (2 if len(res) > offset else None)
     if mode == 6:
@@ -542,3 +547,4 @@ def decode(stream):
         report["status_records"] = status_records(report["steps"])
         report["contextual_measurements"] = contextual_measurements(report["steps"])
         report["scaled_monitor_records"] = scaled_monitor_records(report["steps"])
+        report["operating_context"] = operating_context(report["steps"])
