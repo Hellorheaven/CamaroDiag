@@ -345,11 +345,17 @@ class Obd2FeatureEngine(
     private suspend fun collectMode01Reads(
         supportedPids: Set<Int>,
         byResponder: Map<String, Set<Int>>,
-        physicalCanResponder: String? = null
+        physicalCanResponder: String? = null,
+        inventoryVerified: Boolean = false
     ): Pair<List<ObdValue>, List<ObdMode01Read>> {
         val values = mutableListOf<ObdValue>()
         val reads = mutableListOf<ObdMode01Read>()
-        for (pid in supportedPids.filter { it in 1..255 && it % 32 != 0 }.sorted()) {
+        val configByAddress = mutableMapOf<String,MutableMap<Int,MutableList<List<Int>?>>>()
+        // Read equipment configuration before dependent values. Never query
+        // an unadvertised identifier and never share scales between ECUs.
+        val ordered = supportedPids.filter { it in 1..255 && it % 32 != 0 }
+            .sortedWith(compareBy<Int>({ if(ObdJ1979ScalingContext.isConfiguration(it))0 else 1 },{it}))
+        for (pid in ordered) {
             currentCoroutineContext().ensureActive()
             val response = ask("01%02X".format(Locale.US, pid), 1200L)
             val observations = CamaroUdsProtocol.parsePidObservations(response, "%02X".format(Locale.ROOT, pid))
@@ -365,8 +371,24 @@ class Obd2FeatureEngine(
                     !(responder != null && byResponder.isNotEmpty() && pid !in byResponder[responder].orEmpty()) &&
                     !(physicalCanResponder != null && responder != null && responder != physicalCanResponder)
                 for (data in dataRows) {
-                    val decoded = if (eligible) decode(pid, data).map { it.copy(responder = address) }
-                        else emptyList()
+                    if (ObdJ1979ScalingContext.isConfiguration(pid) && address != null) {
+                        val cfg = configByAddress.getOrPut(address){mutableMapOf()}
+                        cfg.getOrPut(pid){mutableListOf()}.add(
+                            if(eligible && ObdJ1979ScalingContext.validConfiguration(pid,data))listOf(0x41,pid)+data else null)
+                    }
+                    val decoded = if (!eligible || ObdJ1979ScalingContext.isConfiguration(pid))emptyList()
+                        else if (ObdJ1979ScalingContext.dependency(pid)!=null && address!=null) {
+                            val supported = byResponder[address] ?: if(physicalCanResponder==address)supportedPids else emptySet()
+                            val verified = inventoryVerified && (byResponder.containsKey(address)||physicalCanResponder==address)
+                            val context = ObdJ1979ScalingContext.fromSupport(supported,verified,configByAddress[address].orEmpty())
+                            val record = context.decode(listOf(1,pid),listOf(0x41,pid)+data)
+                            if(record==null)emptyList() else record.signals.map { signal ->
+                                ObdValue(pid,signal.name,signal.number?.let {
+                                    String.format(Locale.US,"%.6f",it).trimEnd('0').trimEnd('.')
+                                } ?: data.joinToString(" ") { "%02X".format(Locale.US,it) },
+                                    if(signal.number==null)"raw" else signal.unit,data,address)
+                            }
+                        } else decode(pid,data).map { it.copy(responder=address) }
                     values += decoded
                     evidence += ObdMode01Observation(address, data, eligible, decoded.size)
                 }
@@ -749,7 +771,8 @@ class Obd2FeatureEngine(
     ): ObdScanReport {
         val discovery = discoverPidAvailability()
         val supported = discovery.supported
-        val (live, mode01Reads) = collectMode01Reads(supported, discovery.byResponder, physicalCanResponder)
+        val (live, mode01Reads) = collectMode01Reads(supported, discovery.byResponder, physicalCanResponder,
+            discovery.firstUnresolvedPid==null && !discovery.attributionIncomplete)
         val dtcSnapshot = readDtcRecords()
         val freezeFrameDtc = readFreezeFrameDtc()
         val freezeFrameSupported = if (freezeFrameDtc != null) discoverFreezeFrameSupportedPids() else emptySet()
