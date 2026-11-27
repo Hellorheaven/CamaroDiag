@@ -1180,11 +1180,14 @@ fun AdapterScreen(
             Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
-                        if (isJ2534BridgeConnected) stringResource(R.string.adapter_j2534_bridge_connected)
-                        else adapter.deviceName,
+                        when {
+                            isJ2534BridgeConnected -> stringResource(R.string.adapter_j2534_bridge_connected)
+                            adapter.tier == AdapterTier.DISCONNECTED -> stringResource(R.string.adapter_tier_disconnected)
+                            else -> adapter.deviceName
+                        },
                         fontWeight = FontWeight.Bold, color = CamaroAmber, fontSize = 16.sp
                     )
-                    if (!isJ2534BridgeConnected) {
+                    if (!isJ2534BridgeConnected && adapter.tier != AdapterTier.DISCONNECTED) {
                         Text(localizedAdapterTierName(adapter.tier), fontSize = 13.sp)
                     }
                     if (isJ2534BridgeConnected || adapter.tier != AdapterTier.DISCONNECTED) {
@@ -1347,10 +1350,10 @@ fun AdapterScreen(
         }
         item {
             Text(stringResource(R.string.adapter_simulation_profiles), fontWeight = FontWeight.Bold)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = { onSelectSim("MX_PLUS") }, enabled = !isBusy) { Text("OBDLink MX+") }
-                OutlinedButton(onClick = { onSelectSim("ELM_15") }, enabled = !isBusy) { Text("ELM327 v1.5") }
-                OutlinedButton(onClick = { onSelectSim("CLONE") }, enabled = !isBusy) { Text(stringResource(R.string.adapter_tier_clone_elm)) }
+            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                OutlinedButton(onClick = { onSelectSim("MX_PLUS") }, enabled = !isBusy, modifier = Modifier.fillMaxWidth()) { Text("OBDLink MX+") }
+                OutlinedButton(onClick = { onSelectSim("ELM_15") }, enabled = !isBusy, modifier = Modifier.fillMaxWidth()) { Text("ELM327 v1.5") }
+                OutlinedButton(onClick = { onSelectSim("CLONE") }, enabled = !isBusy, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.adapter_tier_clone_elm)) }
             }
         }
     }
@@ -3245,8 +3248,11 @@ fun SectionTitle(text: String) {
 private fun AdapterCapabilityLine(label: String, active: Boolean) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically) {
-        Text(label, modifier = Modifier.weight(1f), fontSize = 13.sp)
-        BadgeChip(stringResource(if (active) R.string.adapter_capability_detected else R.string.adapter_capability_unverified), active)
+        Text(label, modifier = Modifier.weight(0.6f), fontSize = 13.sp)
+        // Constrain the chip too, so translated status text cannot starve the label.
+        Box(Modifier.weight(0.4f), contentAlignment = Alignment.CenterEnd) {
+            BadgeChip(stringResource(if (active) R.string.adapter_capability_detected else R.string.adapter_capability_unverified), active)
+        }
     }
 }
 
