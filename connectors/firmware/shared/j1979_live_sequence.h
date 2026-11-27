@@ -10,6 +10,7 @@ class J1979LiveSequence {
  public:
   using Exchange=J1979CanReadExchange;
   using State=Exchange::State;
+  static constexpr uint32_t MaximumRawBytes=16u*1024u*1024u;
   enum class Phase:uint8_t { InitialVin=1, Inventory=2, PeriodicVin=3,
     Sample=4, FinalVin=5, Waiting=6, Done=7 };
   enum class Stop:uint8_t { None=0, InvalidScope=1, Budget=2, Context=3,
@@ -98,12 +99,29 @@ class J1979LiveSequence {
       default:return false;
     }
   }
+  // Reserve the worst-case correlated application response before sending.
+  // This makes a capacity stop verifiable without recording a discarded
+  // or truncated response. VIN/inventory/negative responses are bounded.
+  static uint32_t maximumReply(Phase phase){
+    switch(phase){
+      case Phase::InitialVin:case Phase::PeriodicVin:case Phase::FinalVin:return 20;
+      case Phase::Inventory:return 6;
+      case Phase::Sample:return 4095;
+      default:return 0;
+    }
+  }
+  bool canRetain(Phase phase)const{
+    const uint32_t size=maximumReply(phase);
+    return size&&summary_.rawBytes<=MaximumRawBytes&&
+      size<=MaximumRawBytes-summary_.rawBytes;
+  }
   bool admit(const uint8_t* req,size_t n,uint32_t now,uint32_t timeout){
     if(!allows(req,n,now)||!timeout||timeout>4000||timeout>remaining(now)){
       abort(Stop::InvalidSequence,now);return false;
     }
     pendingPhase_=phase(now);
     if(pendingPhase_==Phase::Sample&&req[0]==9)pendingPhase_=Phase::PeriodicVin;
+    if(!canRetain(pendingPhase_)){abort(Stop::EvidenceLimit,now);return false;}
     pending_[0]=req[0];pending_[1]=req[1];pendingStart_=now;pendingTimeout_=timeout;
     if(pendingPhase_==Phase::Sample&&index_==0){cycleStart_=now;haveCycleStart_=true;}
     inFlight_=true;return true;
@@ -127,7 +145,7 @@ class J1979LiveSequence {
     const bool negative=reply.state==State::Negative&&shape==R::Negative;
     const bool timeout=reply.state==State::Timeout&&reply.responseSize==0;
     if(!positive&&!raw&&!negative&&!timeout){abort(Stop::Transport,now);return false;}
-    if(reply.responseSize>16u*1024u*1024u-summary_.rawBytes){
+    if(reply.responseSize>MaximumRawBytes-summary_.rawBytes){
       abort(Stop::EvidenceLimit,now);return false;
     }
     summary_.rawBytes+=uint32_t(reply.responseSize);
