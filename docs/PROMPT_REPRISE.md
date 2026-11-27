@@ -1,3 +1,15 @@
+# Reprise SAE J1979 Mode 01 natif — intégration hôtes et exports — 27/11/2026
+
+PR #117, branche `chore/unified-ci`, base `1f1cfc1153911885331d4a4cae750e18e6f1d20f`. Exclusivement SAE J1979, C6 et autres protocoles en pause. Au SHA `b7bb19636099dd276e6f647f6327b6c49f3f15b3`, comparaison GitHub : 48 commits, 32 fichiers, +1149/-34 lignes. Le volume de 10 000 lignes utiles demandé n'est pas atteint ; ne pas l'annoncer atteint.
+
+- Android : sélection explicite CU/3 dans le panneau USB (exclusif de CU/1 et CU/2), état fonctionnel et ViewModel sous contrôle propriétaire, génération de connexion et VIN, conservation privée, export CL/1 et JSON avec SHA-256 et contexte ; affichage des compteurs et export CSV après rejeu du fichier original ; ressources FR/EN. Le raccordement bloqué au lot précédent a été effectué.
+- Windows : GUI du pont avec capture, inspection et CSV CL/1, contrôle du VIN indépendant, consentement, port et session exclusive, CLI du connecteur et du pont, aide FR/EN, données de contexte de la recette. Linux : export CSV après rejeu, vérification des métadonnées déclarées de l'export.
+- Catalogue documenté : Android/Windows acceptent directement les octets CL/1 et produisent le schéma natif du moteur Python ; aucune promotion en preuve de transport physique. Même jeu de capture synthétique sur Android et Windows ; tests de falsification, profil, HMAC, annulation, CSV, projection rationnelle, refus de mauvais VIN et de fichier tronqué. Tests Java/C# raccordés à la CI, non exécutés. La documentation de recette comprend commandes et cas attendus.
+- Restant avant clôture logicielle : revue complète des nouveaux parcours, notamment séquences/limites de la liaison CI/2 et comportement des preuves partielles, périmètre natif des services mutateurs applicables sans activer matériel non qualifié, inventaire normatif par édition et catalogue J1979DA autorisé (non présent dans le dépôt), puis gate unique. Ne pas présenter le code committé comme compilé ou validé. Les essais matériels du propriétaire ne conditionnent pas la clôture logicielle.
+- Aucun test, build ni checkpoint volontairement déclenché pendant le développement ; aucun merge, APK ou Release. Après clôture logicielle réussie seulement, produire APK Release signé et vérifié depuis SHA exact de la PR selon v2.0.46, prerelease sans fusion.
+
+---
+
 # Reprise du lot J1979 natif Mode 01 — 27/11/2026
 
 PR #117, branche `chore/unified-ci`, base du lot `e9d143567078e99a021fe18cd53d190758d53a04`. Exclusivement SAE J1979 ; C6 et autres protocoles en pause.
