@@ -16,9 +16,12 @@ internal class ElmLegacyLiveLink(
     private val probe: suspend (Long)->String,
     private val requireCurrent: ()->Unit,
     private val clock: ()->Long={System.nanoTime()/1000000},
-    freeze: J1979FreezePlan?=null
+    freeze: J1979FreezePlan?=null,
+    rawPlan: J1979LivePlan?=null
 ) {
     private val freeze=freeze?.pinned()
+    private val rawPlan=rawPlan?.copy(pids=rawPlan.pids.toList())
+    init {require(this.rawPlan==null||(this.freeze==null&&this.rawPlan.valid&&this.rawPlan.rawOnly&&this.rawPlan.target==target))}
     init {require(target.legacy&&target.valid&&(this.freeze==null||this.freeze.target==target))}
     private var rawBytes=0L
     private fun bound(raw:String) {
@@ -52,14 +55,14 @@ internal class ElmLegacyLiveLink(
                     it%32==0||it==2||plan.selectedPids.isEmpty()||it in plan.selectedPids
                 } } ?: false) || freeze==null &&
             command.matches(Regex("01[0-9A-F]{2}"))&&command.takeLast(2).toInt(16).let {
-                it%32==0||it==0x1D||ObdJ1979ScalingContext.isConfiguration(it)||J1979LiveRecorder.legacyNumericPid(it)
+                it%32==0||it==0x1D||ObdJ1979ScalingContext.isConfiguration(it)||J1979LiveRecorder.legacyNumericPid(it)||rawPlan?.pids?.contains(it)==true
             }
     private suspend fun read(command:String,deadline:Long,index:Int):List<List<Int>>{
         check(allows(command))
         trace+=LegacyLiveExchange(index,command,null,emptyList(),emptyList(),"NOT_TESTED",null)
         try{
             val raw=exchange(command,remaining(deadline,4000))
-            if(freeze!=null)bound(raw)
+            if(freeze!=null||rawPlan!=null)bound(raw)
             trace[trace.lastIndex]=trace.last().copy(rawResponse=raw)
             active()
             if(clock()>=deadline){mark("NOT_TESTED","LATE_RESPONSE");throw LogicalTimeout()}
@@ -91,7 +94,7 @@ internal class ElmLegacyLiveLink(
         trace+=LegacyLiveExchange(index,"ATDPN",null,emptyList(),emptyList(),"NOT_TESTED",null)
         try{
             val raw=probe(remaining(deadline,1500))
-            if(freeze!=null)bound(raw)
+            if(freeze!=null||rawPlan!=null)bound(raw)
             trace[trace.lastIndex]=trace.last().copy(rawResponse=raw)
             active()
             if(clock()>=deadline){mark("NOT_TESTED","LATE_PROTOCOL");throw LogicalTimeout()}
@@ -139,7 +142,7 @@ internal class ElmLegacyLiveLink(
     }
     suspend fun query(request:ByteArray,timeout:Long):J1979LiveRecorder.Reply {
         require(timeout in 1..20000)
-        check(if(freeze==null)J1979LiveRecorder.allowed(request) else
+        check(if(freeze==null)J1979LiveRecorder.allowed(request,rawPlan) else
             request.contentEquals(byteArrayOf(9,2))||request.size==3&&request[0]==2.toByte()&&
                 allows(ElmJ1979EvapTest.hex(request)))
         if(freeze!=null&&!request.contentEquals(byteArrayOf(9,2)))check(confirmed!=null)
