@@ -186,6 +186,11 @@ std::string Elm::exchange(Bytes request,unsigned timeout){
         throw std::invalid_argument("Read request outside legacy scope");
     return command(hex(request),timeout);
 }
+std::string Elm::exchange_freeze(const FreezePlan& plan,Bytes request,unsigned timeout){
+    if(!ready_||!headered_||!plan.allows(request)||timeout<1||timeout>4000)
+        throw std::invalid_argument("Read outside approved legacy freeze plan");
+    return command(hex(request),timeout);
+}
 std::string Elm::probe(unsigned timeout){
     if(!ready_||timeout<1||timeout>2000)throw std::invalid_argument("Invalid fixed protocol probe");
     const auto response=command("ATDPN",timeout);

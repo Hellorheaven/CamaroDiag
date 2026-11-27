@@ -1,4 +1,5 @@
 #include "j1979_legacy.hpp"
+#include "j1979_legacy_freeze_plan.hpp"
 #include <algorithm>
 #include <map>
 #include <stdexcept>
@@ -105,8 +106,8 @@ std::optional<Protocol> fixed_protocol(std::string_view response){
     }catch(const std::invalid_argument&){}
     return {};
 }
-std::vector<Frame> frames(Protocol protocol,std::string_view command,std::string_view response){
-    if(!valid_protocol(protocol)||!read_allowed(unhex(command)))throw std::invalid_argument("Invalid legacy frame scope");
+static std::vector<Frame> parse_frames(Protocol protocol,std::string_view command,std::string_view response){
+    if(!valid_protocol(protocol))throw std::invalid_argument("Invalid legacy protocol");
     const auto tokens=lines(response,command);
     if(tokens.empty()||(tokens.size()==1&&tokens[0]=="NODATA"))return {};
     std::vector<Frame> result;result.reserve(tokens.size());
@@ -127,6 +128,14 @@ std::vector<Frame> frames(Protocol protocol,std::string_view command,std::string
         result.push_back({source,std::move(raw),std::move(payload)});
     }
     return result;
+}
+std::vector<Frame> frames(Protocol protocol,std::string_view command,std::string_view response){
+    if(!read_allowed(unhex(command)))throw std::invalid_argument("Invalid legacy frame scope");
+    return parse_frames(protocol,command,response);
+}
+std::vector<Frame> freeze_frames(Protocol protocol,const FreezePlan& plan,Bytes request,std::string_view raw){
+    if(!plan.allows(request))throw std::invalid_argument("Invalid legacy freeze frame scope");
+    return parse_frames(protocol,hex(request),raw);
 }
 std::vector<Data> anonymous_records(std::string_view command,std::string_view response){
     if(!read_allowed(unhex(command)))throw std::invalid_argument("Invalid anonymous scope");

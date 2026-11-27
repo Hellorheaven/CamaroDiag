@@ -1,5 +1,6 @@
 #pragma once
 #include "j1979_legacy.hpp"
+#include "j1979_legacy_freeze_plan.hpp"
 #include <functional>
 #include <memory>
 #include <stdexcept>
@@ -25,6 +26,7 @@ public:
     Elm& operator=(const Elm&)=delete;
     void configure();
     std::string exchange(Bytes request,unsigned timeout);
+    std::string exchange_freeze(const FreezePlan&,Bytes,unsigned timeout);
     std::string probe(unsigned timeout);
     bool headered()const{return headered_;}
     Protocol protocol()const{return protocol_;}
