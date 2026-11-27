@@ -1,3 +1,7 @@
+## SAE J1979 — recette legacy ELM attribuée au répondant (27/11/2026)
+
+- Nouvelle découverte PID 00 avec en-têtes et checksums, classification individuelle des répondants (support, conflit, refus), confirmation de la variante et aucun repli anonyme. Le CLI Python accepte --source discover ou un identifiant documenté et --vin facultatif ; la recette filtre les réponses du calculateur choisi, conserve toutes les trames en preuve et exporte les inventaires, VIN/CALID/CVN, DTC, mesures, readiness, freeze et moniteurs. Pas de requête mutatrice, pas d'adressage physique revendiqué, pas de couverture intégrale. Régressions sur les cinq variantes et CLI écrites, non exécutées. C6/J1979 restent ouverts ; aucune CI intermédiaire, fusion ou Release.
+
 ## Lots J1979 et C6 — reprise du 27/11/2026
 
 - Dix commits fonctionnels successifs sur PR #117 : échéances et annulation ELM legacy, contrôle du répondant et NRC terminal J2534 legacy, conservation du rapport CAN SocketCAN après échec de fermeture, mesures numériques legacy anonymes de largeur vérifiée, identité des enveloppes de sauvegarde Android, identité du journal actif Android, contrôle VIN optionnel intégré au scan CAN Windows (ressources FR/EN), lecture bornée des enveloppes Windows, DTC legacy structurés par réponse et résultats Mode 05/06 et déclencheurs de trame figée legacy structurés sans attribution inventée.

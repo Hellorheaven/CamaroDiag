@@ -143,16 +143,27 @@ class LegacyElmSerial:
 
 
 def scan(exchange, protocol_check, expected_protocol: int, *, budget=180.0,
-         clock=time.monotonic) -> dict:
+         clock=time.monotonic, source: int | None = None, expected_vin: str | None = None) -> dict:
     if expected_protocol not in PROTOCOLS or not 0 < budget <= 600:
         raise ValueError("Invalid legacy campaign")
+    from .j1979_legacy_discovery import valid_source
+    from .j1979_legacy_frames import response_frames
+    if source is not None and not valid_source(source):
+        raise ValueError("Invalid selected response source")
+    if expected_vin is not None and (source is None or
+            not re.fullmatch(r"[A-HJ-NPR-Z0-9]{17}", expected_vin)):
+        raise ValueError("A documented VIN requires a selected legacy response source")
+    attribution = "ANONYMOUS" if source is None else "SELECTED_RESPONSE_HEADER"
+    source_hex = None if source is None else f"{source:02X}"
     start = clock()
     steps = []
+    inventories = []
+    other_sources = set()
     stop = None
     observed_protocol = None
     vin_candidate = None
 
-    def read(command, validate):
+    def read(command, validate, *, single=False):
         nonlocal stop
         if stop is not None:
             return []
@@ -164,6 +175,7 @@ def scan(exchange, protocol_check, expected_protocol: int, *, budget=180.0,
             return []
         begun = clock()
         raw = None
+        frames = []
         valid = []
         status, detail = "NOT_TESTED", None
         try:
@@ -175,45 +187,70 @@ def scan(exchange, protocol_check, expected_protocol: int, *, budget=180.0,
                               "detail": detail, "records_hex": [],
                               "duration_ms": round((clock() - begun) * 1000)})
                 return []
-            parsed = records(command, raw)
-            valid = [row for row in parsed if validate(row)]
-            if len(valid) != len(parsed) or not valid:
-                detail = "MIXED_OR_UNMATCHED_RECORDS"
-                status = "FAILED" if valid else "NOT_TESTED"
-                valid = []  # do not advance discovery on ambiguous data
+            if source is None:
+                parsed = records(command, raw)
             else:
-                status = "PASSED"
+                frames = response_frames(expected_protocol, command, raw)
+                other_sources.update(frame.source for frame in frames if frame.source != source)
+                parsed = [frame.payload for frame in frames if frame.source == source]
+            mode = int(command[:2], 16)
+            if not parsed:
+                detail = "NO_SELECTED_RESPONSE"
+            elif source is not None and len(parsed) == 1 and len(parsed[0]) == 3 and (
+                    parsed[0][:2] == bytes((0x7F, mode)) and parsed[0][2] not in (0, 0x78)):
+                detail = f"NRC_{parsed[0][2]:02X}"
+            else:
+                valid = [row for row in parsed if validate(row)]
+                if len(valid) != len(parsed) or not valid or (
+                        source is not None and single and len(valid) != 1):
+                    detail = "MIXED_OR_UNMATCHED_RECORDS"
+                    status = "FAILED" if source is not None or valid else "NOT_TESTED"
+                    valid = []
+                else:
+                    status = "PASSED"
         except KeyboardInterrupt:
             stop = detail = "CANCELLED"
         except ValueError as exc:
             detail = str(exc)
+            if source is not None:
+                status = "FAILED"
         except OSError as exc:
             status, detail, stop = "FAILED", type(exc).__name__, "TRANSPORT_ERROR"
         steps.append({"request_hex": command, "raw_response": raw, "status": status,
                       "detail": detail, "records_hex": [r.hex().upper() for r in valid],
+                      "frames": [frame.evidence() for frame in frames],
+                      "selected_response_source": source_hex,
                       "duration_ms": round((clock() - begun) * 1000)})
         return valid
 
     def inventory(mode, prefix, offset, *, suffix="", first=None):
         found = set()
+        pages = 0
+        complete = False
         for base in range(0, 0x100, 32):
             def valid(row):
                 return (len(row) == offset + 4 and row[:2] == bytes((mode + 0x40, base))
                         and prefix(row) and not (base == 0xE0 and row[-1] & 1))
             page = first if base == 0 and first is not None else read(
-                f"{mode:02X}{base:02X}" + suffix, valid)
+                f"{mode:02X}{base:02X}" + suffix, valid, single=True)
             if not page:
                 break
+            pages += 1
             for row in page:
                 for bit in range(31):
                     if row[offset + bit // 8] & (0x80 >> (bit % 8)):
                         found.add(base + bit + 1)
             if not any(row[-1] & 1 for row in page):
+                complete = True
                 break
+        inventories.append({"mode": mode, "sensor_mask": int(suffix, 16) if mode == 5 else None,
+                            "state": "COMPLETE" if complete else "PARTIAL" if pages else "UNAVAILABLE",
+                            "verified_pages": pages, "advertised_ids": sorted(found),
+                            "responder_attribution": attribution, "source": source_hex})
         return sorted(found)
 
     # First verify actual OBD support and the negotiated legacy transport.
-    first = read("0100", lambda r: len(r) == 6 and r[:2] == b"\x41\x00")
+    first = read("0100", lambda r: len(r) == 6 and r[:2] == b"\x41\x00", single=True)
     if first:
         try:
             actual = protocol_check()
@@ -229,6 +266,54 @@ def scan(exchange, protocol_check, expected_protocol: int, *, budget=180.0,
             stop = "PROTOCOL_UNVERIFIED"
     elif stop is None:
         stop = "NO_POSITIVE_PID00"
+    identification = []
+    def read_identity():
+        nonlocal vin_candidate
+        info = inventory(9, lambda r: r[2] == 1, 3)
+        counts = {}
+        for kind in info:
+            if kind % 2:
+                rows = read(f"09{kind:02X}", lambda r: len(r) == 3 and
+                            r[:2] == bytes((0x49, kind)) and r[2] > 0, single=True)
+                if len(rows) == 1:
+                    counts[kind] = rows[0][2]
+                continue
+            rows = read(f"09{kind:02X}", lambda r: len(r) == 7 and
+                        r[:2] == bytes((0x49, kind)) and r[2] > 0)
+            count = counts.get(kind - 1)
+            if not rows:
+                continue
+            ordered = count is not None and len(rows) == count and [r[2] for r in rows] == list(range(1, count + 1))
+            if not ordered:
+                steps[-1].update(status="FAILED" if source is not None else "NOT_TESTED",
+                                 detail="INCOMPLETE_OR_AMBIGUOUS_SEQUENCE")
+                continue
+            data = b"".join(row[3:] for row in rows)
+            if kind == 2:
+                if count == 5 and data[:3] == bytes(3) and re.fullmatch(rb"[A-HJ-NPR-Z0-9]{17}", data[3:]):
+                    vin_candidate = data[3:].decode("ascii")
+                    if source is not None:
+                        identification.append({"info_type": 2, "values": [vin_candidate], "source": source_hex})
+                else:
+                    steps[-1].update(status="FAILED", detail="INVALID_VIN_RECORD")
+            elif source is not None and kind == 4:
+                fields = [data[i:i+16].rstrip(b" \x00") for i in range(0, len(data), 16)]
+                if count % 4 == 0 and all(field and all(32 <= ch <= 126 for ch in field) for field in fields):
+                    identification.append({"info_type": 4, "values": [x.decode("ascii") for x in fields],
+                                           "source": source_hex})
+                else:
+                    steps[-1].update(status="FAILED", detail="INVALID_CALID_RECORD")
+            elif source is not None and kind == 6:
+                identification.append({"info_type": 6, "values": [row[3:].hex().upper() for row in rows],
+                                       "source": source_hex})
+            elif source is not None:
+                steps[-1].update(status="RAW", detail="UNINTERPRETED_INFOTYPE")
+    if source is not None and stop is None:
+        read_identity()
+    vin_match = "NOT_REQUESTED" if expected_vin is None else (
+        "UNVERIFIED" if vin_candidate is None else "MATCH" if vin_candidate == expected_vin else "MISMATCH")
+    if stop is None and vin_match in ("UNVERIFIED", "MISMATCH"):
+        stop = "VIN_" + vin_match
     pids = inventory(1, lambda _: True, 2, first=first) if stop is None else []
 
     dtc_modes = []
@@ -238,23 +323,31 @@ def scan(exchange, protocol_check, expected_protocol: int, *, budget=180.0,
         # Legacy fixed three DTC pairs; zero pair is padding, no CAN count.
         command = f"{mode:02X}"
         rows = read(command, lambda r: len(r) == 7 and r[0] == mode + 0x40)
+        codes = [[dtc(a,b) for a,b in zip(row[1::2],row[2::2]) if a or b]
+                 for row in rows] if rows else None
         dtc_modes.append({"mode": mode,
-            "anonymous_records": [[dtc(a,b) for a,b in zip(row[1::2],row[2::2])
-                                   if a or b] for row in rows] if rows else None,
-            "responder_attribution": "ANONYMOUS"})
+            "anonymous_records": codes if source is None else None,
+            "codes": sorted({code for group in codes for code in group}) if source is not None and codes is not None else None,
+            "responder_attribution": attribution, "source": source_hex})
 
     measurements = []
+    readiness = None
     def read_pid(mode, pid):
+        nonlocal readiness
         request = bytes((mode, pid)) + (b"\x00" if mode == 2 else b"")
         def positive(row):
             evidence = decode_observation(request, row)
             return evidence is not None and evidence["shape"] in ("PASSED", "RAW")
-        rows = read(request.hex().upper(), positive)
+        rows = read(request.hex().upper(), positive, single=True)
         for index, row in enumerate(rows):
             evidence = decode_observation(request, row)
             if evidence.get("measurement") is not None:
                 measurements.append({**evidence["measurement"], "response_index": index,
-                                     "responder_attribution": "ANONYMOUS"})
+                                     "responder_attribution": attribution, "source": source_hex})
+            if source is not None and mode == 1 and pid == 1:
+                readiness = evidence.get("readiness")
+            if source is not None and evidence["shape"] == "RAW":
+                steps[-1].update(status="RAW", detail="UNINTERPRETED_PID")
         return rows
 
     sensors = set()
@@ -264,7 +357,7 @@ def scan(exchange, protocol_check, expected_protocol: int, *, budget=180.0,
             for row in rows:
                 sensors.update(1 << bit for bit in range(8) if row[2] & (1 << bit))
 
-    trigger = read("020200", lambda r: len(r) == 5 and r[:3] == b"\x42\x02\x00")
+    trigger = read("020200", lambda r: len(r) == 5 and r[:3] == b"\x42\x02\x00", single=True)
     if any(row[3:] != b"\x00\x00" for row in trigger):
         for pid in inventory(2, lambda r: r[2] == 0, 3, suffix="00"):
             if pid != 2:
@@ -281,7 +374,7 @@ def scan(exchange, protocol_check, expected_protocol: int, *, budget=180.0,
             for index, row in enumerate(rows):
                 monitor_records.append({"mode": 5, "test_id": tid, "sensor_mask": sensor,
                     "encoded_data_hex": row[3:].hex().upper(), "response_index": index,
-                    "responder_attribution": "ANONYMOUS"})
+                    "responder_attribution": attribution, "source": source_hex})
     for tid in inventory(6, lambda r: r[2] == 0xFF, 3):
         rows = read(f"06{tid:02X}", lambda r: len(r) == 7 and r[:2] == bytes((0x46, tid)))
         for index, row in enumerate(rows):
@@ -289,37 +382,24 @@ def scan(exchange, protocol_check, expected_protocol: int, *, budget=180.0,
                 "component_and_limit_encoded": row[2],
                 "value_encoded": int.from_bytes(row[3:5], "big"),
                 "limit_encoded": int.from_bytes(row[5:7], "big"),
-                "response_index": index, "responder_attribution": "ANONYMOUS"})
+                "response_index": index, "responder_attribution": attribution, "source": source_hex})
     freeze_triggers = [{"response_index": i, "present": bool(row[3] or row[4]),
                         "dtc": dtc(row[3], row[4]) if row[3] or row[4] else None,
-                        "responder_attribution": "ANONYMOUS"}
+                        "responder_attribution": attribution, "source": source_hex}
                        for i, row in enumerate(trigger)] if trigger else None
 
     controls = inventory(8, lambda r: r[2] == 0, 3, suffix="0000000000")
-    info = inventory(9, lambda r: r[2] == 1, 3)
-    counts = {}
-    for kind in info:
-        if kind % 2:
-            rows = read(f"09{kind:02X}", lambda r: len(r) == 3 and
-                        r[:2] == bytes((0x49, kind)) and r[2] > 0)
-            if len(rows) == 1:
-                counts[kind] = rows[0][2]
-        else:
-            rows = read(f"09{kind:02X}", lambda r: len(r) == 7 and
-                        r[:2] == bytes((0x49, kind)) and r[2] > 0)
-            count = counts.get(kind - 1)
-            ordered = count is not None and len(rows) == count and [r[2] for r in rows] == list(range(1, count + 1))
-            if rows and not ordered:
-                steps[-1]["status"] = "NOT_TESTED"
-                steps[-1]["detail"] = "ANONYMOUS_OR_INCOMPLETE_SEQUENCE"
-            if kind == 2 and ordered and count == 5:
-                data = b"".join(row[3:] for row in rows)
-                if data[:3] == bytes(3) and re.fullmatch(rb"[A-HJ-NPR-Z0-9]{17}", data[3:]):
-                    vin_candidate = data[3:].decode("ascii")
+    if source is None:
+        read_identity()
 
     return {"expected_protocol": expected_protocol, "observed_protocol": observed_protocol,
-            "protocol_name": PROTOCOLS[expected_protocol], "responder_attribution": "ANONYMOUS",
-            "observed_vin": None, "anonymous_vin_candidate": vin_candidate,
+            "protocol_name": PROTOCOLS[expected_protocol], "responder_attribution": attribution,
+            "scope": "FUNCTIONAL_SELECTED_RESPONSE" if source is not None else "FUNCTIONAL_ANONYMOUS",
+            "selected_response_source": source_hex, "other_response_sources": [f"{x:02X}" for x in sorted(other_sources)],
+            "whole_vehicle_coverage_verified": False, "declared_vin": expected_vin, "vin_match": vin_match,
+            "observed_vin": vin_candidate if source is not None else None,
+            "anonymous_vin_candidate": vin_candidate if source is None else None,
+            "identification": identification, "readiness": readiness, "inventory": inventories,
             "steps": steps, "measurements": measurements, "dtc_modes": dtc_modes,
             "monitor_records": monitor_records, "freeze_triggers": freeze_triggers,
             "advertised_control_tests": controls, "completed": stop is None,
