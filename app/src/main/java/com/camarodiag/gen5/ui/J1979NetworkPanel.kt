@@ -67,6 +67,8 @@ internal fun J1979NetworkPanel(protocol:Int?,state:FunctionalTestState,vehicle:V
                 Text("${id(ecu.responseId)} · ${ecu.status} · ${ecu.observedVin.orEmpty()}")
                 Text(stringResource(R.string.j1979_network_steps,ecu.steps.size),fontSize=11.sp)
                 val contextual=ecu.contextualMeasurements.records.associateBy { it.requestHex }
+                val states=ecu.statusRecords.associateBy { it.requestHex }
+                val monitorResults=ecu.scaledMonitorRecords.groupBy { it.requestHex }
                 ecu.steps.forEach { step->
                     val scaled=contextual[step.requestHex]
                     scaled?.signals?.forEach { signal ->
@@ -75,6 +77,12 @@ internal fun J1979NetworkPanel(protocol:Int?,state:FunctionalTestState,vehicle:V
                     step.extendedVehicleInfo?.let { J1979ExtendedVehicleInfoContent(it) }
                     if(scaled==null) step.multiSignalRecord?.signals?.forEach { signal ->
                         Text("${signal.name}: ${signal.number} ${signal.unit}",fontSize=11.sp)
+                    }
+                    states[step.requestHex]?.states?.forEach { state ->
+                        Text("${state.name}: ${state.code}",fontSize=11.sp)
+                    }
+                    monitorResults[step.requestHex].orEmpty().forEach { monitor ->
+                        Text(monitor.result.rawText(),fontSize=11.sp)
                     }
                     val value=if(scaled==null)step.application?.measurement()else null
                     val codes=step.application?.dtcCodes()
