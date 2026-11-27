@@ -345,6 +345,18 @@ fun FunctionalTestsScreen(
                     Text(evidence.adapterName + " • " + evidence.transport,
                         style = MaterialTheme.typography.bodySmall)
                 }
+                state.nativeLiveEvidence?.let { native ->
+                    val summary=native.replay?.summary
+                    if(native.captureIntegrityVerified && summary!=null) {
+                        Text(stringResource(R.string.j1979_live_cycle_count,
+                            (summary["completed_cycles"] as? Number)?.toInt() ?: 0,native.target.cycles))
+                        Text(stringResource(R.string.j1979_native_live_samples,
+                            (summary["raw"] as? Number)?.toInt() ?: 0))
+                        OutlinedButton(onClick=onExportLiveCsv,enabled=!state.running && state.canExport) {
+                            Text(stringResource(R.string.j1979_live_export_csv))
+                        }
+                    }
+                }
                 if (state.checks.isNotEmpty()) {
                     Text(stringResource(R.string.functional_tests_summary, passed, failed, untested))
                 }
