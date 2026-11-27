@@ -345,6 +345,7 @@ def scan(exchange, protocol_check, expected_protocol: int, *, budget=180.0,
 
     from .j1979_status import width as status_width, decode_response as status_decode
     from .j1979_scaling_context import project as contextual_measurements, config_data, CONFIG_PIDS
+    from .j1979_drive_cycle import legacy_project as operating_context, cycle_data
     measurements = []
     status_records = []
     multi_signal_records = []
@@ -357,7 +358,8 @@ def scan(exchange, protocol_check, expected_protocol: int, *, budget=180.0,
             return (evidence is not None and evidence["shape"] in ("PASSED", "RAW")
                     and (mode != 1 or multi_width(pid) is None or multi_decode(request,row) is not None)
                     and (mode != 1 or status_width(pid) is None or status_decode(request,row) is not None)
-                    and (mode != 1 or pid not in CONFIG_PIDS or config_data(pid,row[2:]) is not None))
+                    and (mode != 1 or pid not in CONFIG_PIDS or config_data(pid,row[2:]) is not None)
+                    and (mode != 1 or pid != 0x41 or cycle_data(row[2:],None) is not None))
         rows = read(request.hex().upper(), positive, single=True)
         for index, row in enumerate(rows):
             evidence = decode_observation(request, row)
@@ -434,6 +436,7 @@ def scan(exchange, protocol_check, expected_protocol: int, *, budget=180.0,
             "steps": steps, "measurements": measurements, "multi_signal_records": multi_signal_records,
             "status_records": status_records, "dtc_modes": dtc_modes,
             "contextual_measurements": contextual_measurements(steps, legacy_source=source_hex, legacy=True),
+             "operating_context": operating_context(steps,source_hex),
             "monitor_records": monitor_records, "legacy_monitor_results": monitor_projection(steps),
             "freeze_triggers": freeze_triggers,
             "advertised_control_tests": controls, "completed": stop is None,
