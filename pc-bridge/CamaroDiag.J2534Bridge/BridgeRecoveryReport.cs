@@ -103,9 +103,12 @@ internal static class BridgeRecoveryReport
     internal static Assessment ExportCurrent(string output, string journalPath, string? binPath,
         Assessment displayed)
     {
+        var protectedPaths = binPath is null ? new[] { journalPath } : new[] { journalPath, binPath };
+        BridgeRecoveryHistory.RequireSafeOutput(output, protectedPaths);
         var current = Inspect(journalPath, binPath);
         if (!SameEvidence(displayed, current))
             throw new InvalidDataException("Recovery evidence changed; inspect it again before exporting.");
+        BridgeRecoveryHistory.RequireSafeOutput(output, protectedPaths);
         // Refuse to overwrite any file, especially input recovery material.
         using var stream = new FileStream(output, FileMode.CreateNew, FileAccess.Write, FileShare.None);
         using var writer = new StreamWriter(stream);
