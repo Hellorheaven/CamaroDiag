@@ -269,3 +269,12 @@ camarodiagconnectors-j1979-legacy-live --port /dev/ttyUSB0 --protocol 2 --source
 ```
 
 Variantes 1 PWM, 2 VPW, 3 ISO 9141-2, 4 KWP slow init, 5 KWP fast init. Sélectionner la vraie source et le VIN documentés. Chaque contrôle VIN relit PID00, ATDPN, 0900/0901/0902 sur la source choisie ; trames numérotées et checksums obligatoires. Les demandes restent fonctionnelles, aucune preuve d’adressage physique. Le JSON distingue les données applicatives normalisées des trames réellement reçues. Seuls les PID numériques annoncés sont lus, avec horodatage et statistiques ; les absences de réponse ne deviennent jamais des valeurs. Aucun effacement/actionnement. / Dedicated ELM, explicit legacy variant and response source, shared time budget, original frame evidence and no physical addressing or coverage claim.
+
+### Récupération hors ligne — inspection de sauvegardes Android et Windows
+
+```sh
+camarodiagconnectors-offline verify-recovery --platform android --journal journal.tsv --family E39 --controller ECM --firmware OS-A --vin VIN_DOCUMENTE --output android-recovery.json
+camarodiagconnectors-offline verify-recovery --platform windows --journal journal.jsonl --vin VIN_DOCUMENTE --osid 123 --original-bin original.bin --output windows-recovery.json
+```
+
+Conserver le dossier `.blocks` associé au journal et, pour Windows, le manifeste `.meta.json`. Remplacer les identités d'exemple par celles documentées. La recette relit les originaux et les journaux, vérifie la séquence, les empreintes et l'inventaire exact, et calcule le même SHA-256 composite que les applications. `--expected-snapshot` compare une empreinte de rapport préexistante. Pour Windows E39/E39A, le BIN complet de 3 Mio peut être comparé aux originaux ; aucune adresse Android générique n'est supposée être un offset de BIN. Rapport JSON exclusif, aucune modification des preuves ou connexion véhicule, aucune autorisation de restauration. / Offline local evidence verification only; no physical provenance or programming authority.

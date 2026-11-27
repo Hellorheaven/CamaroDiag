@@ -1,3 +1,7 @@
+## C6 — inspection hôte multiplateforme des sauvegardes ECU (27/11/2026)
+
+- CLI offline verify-recovery pour journaux Android hash-chaînés et Windows E39/E39A JSONL, inventaire borné des secteurs originaux, vérification des enveloppes Java writeUTF et JSON, identité déclarée, séquences, empreintes de chaque fichier et SHA256 composite compatible applications, relecture indépendante des sources. Comparaison facultative de l'empreinte attendue et du BIN complet E39, rapport exclusif. Pas d'adressage générique des BIN Android ni écriture/restauration ECU. Régressions écrites non exécutées. C6/J1979 ouverts.
+
 ## SAE J1979 — enregistrement legacy Android ELM/STN (27/11/2026)
 
 - Extension du moteur d'enregistrement Android aux cinq variantes legacy négociées : source de réponse documentée, PID00/ATDPN et fragments VIN avant admission et aux contrôles périodiques/final, séparation des trames d'origine et du payload normalisé. Configuration et restauration ELM exclusives, interface et exports JSON/CSV existants, aucun adressage physique revendiqué. Tests écrits non exécutés, aucune qualification matérielle. C6/J1979 restent ouverts.

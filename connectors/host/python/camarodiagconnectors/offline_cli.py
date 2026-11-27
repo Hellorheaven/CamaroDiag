@@ -11,6 +11,7 @@ from typing import Sequence
 from .backup import backup_manifest, write_bundle, verify_bundle
 from .doip_archive import verify_archive
 from .memory import Geometry, Patch, Region, Technology, plan_patches
+from .recovery_bundle import AndroidIdentity,inspect_bundle,write_report
 
 
 def _number(text: str) -> int:
@@ -55,6 +56,18 @@ def _parser() -> argparse.ArgumentParser:
     doip.add_argument("--archive", type=Path, required=True)
     doip.add_argument("--profile", type=Path, required=True)
 
+    recovery = commands.add_parser("verify-recovery",help="Verify local Android or Windows recovery evidence without ECU I/O")
+    recovery.add_argument("--platform",choices=("android","windows"),required=True)
+    recovery.add_argument("--journal",type=Path,required=True)
+    recovery.add_argument("--family")
+    recovery.add_argument("--controller")
+    recovery.add_argument("--firmware")
+    recovery.add_argument("--vin")
+    recovery.add_argument("--osid",type=_number)
+    recovery.add_argument("--original-bin",type=Path)
+    recovery.add_argument("--expected-snapshot")
+    recovery.add_argument("--output",type=Path,required=True)
+
     plan = commands.add_parser("plan", help="Dry-run changes; no device programming")
     plan.add_argument("--target", required=True)
     plan.add_argument("--technology", required=True, choices=[t.value for t in Technology])
@@ -82,6 +95,19 @@ def run(argv: Sequence[str] | None = None) -> dict[str, object]:
 
     if args.action == "verify-doip":
         return verify_archive(args.archive, args.profile)
+
+    if args.action == "verify-recovery":
+        identity=None
+        if args.platform=="android":
+            if not all((args.family,args.controller,args.firmware,args.vin)) or args.osid is not None:
+                raise ValueError("Android requires --family --controller --firmware --vin")
+            identity=AndroidIdentity(args.family,args.controller,args.firmware,args.vin).validate()
+        elif any((args.family,args.controller,args.firmware)):
+            raise ValueError("Windows identity is read from E39 metadata; use --vin and --osid to compare")
+        report=inspect_bundle(args.journal,args.platform,android_identity=identity,
+                              expected_vin=args.vin,expected_osid=args.osid,
+                              original_bin=args.original_bin,expected_snapshot=args.expected_snapshot)
+        return write_report(args.output,report)
 
     original = args.input.read_bytes()
     geometry = Geometry(args.target, Technology(args.technology), len(original), args.page_size,
@@ -115,6 +141,8 @@ def main() -> None:
     except (OSError, ValueError) as exc:
         parser.exit(status=2, message=f"OFFLINE ERROR: {exc}\n")
     print(json.dumps(result, indent=2, sort_keys=True))
+    if result.get("schema")=="camarodiag-offline-recovery-bundle-v1" and not result["verified"]:
+        raise SystemExit(2)
 
 
 if __name__ == "__main__":
