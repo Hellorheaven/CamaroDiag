@@ -38,6 +38,15 @@ int main(){
   const uint8_t info[]={9,0},legacyInfo[]={0x49,0,1,0xc0,0,0,0};
   assert(E::classify(V::Legacy,info,2,legacyInfo,7)==R::Positive);
   assert(E::classify(V::ClassicCan,info,2,legacyInfo,7)==R::Invalid);
+  const uint8_t iptCount[]={9,7},iptCountReply[]={0x49,7,9};
+  const uint8_t dieselIpt[]={9,11},dieselFragment[]={0x49,11,1,0,1,0,2};
+  const uint8_t serialCount[]={9,12},serialCountReply[]={0x49,12,5};
+  const uint8_t serial[]={9,13},serialFragment[]={0x49,13,1,0,0,0,0};
+  assert(E::classify(V::Legacy,iptCount,2,iptCountReply,3)==R::Positive);
+  assert(E::classify(V::Legacy,dieselIpt,2,dieselFragment,7)==R::Positive);
+  assert(E::classify(V::Legacy,dieselIpt,2,dieselFragment,3)==R::Invalid);
+  assert(E::classify(V::Legacy,serialCount,2,serialCountReply,3)==R::Positive);
+  assert(E::classify(V::Legacy,serial,2,serialFragment,7)==R::Positive);
   const uint8_t coolant[]={1,5},goodCoolant[]={0x41,5,90},badCoolant[]={0x41,5,90,0};
   assert(E::classify(V::ClassicCan,coolant,2,goodCoolant,3)==R::Positive);
   assert(E::classify(V::ClassicCan,coolant,2,badCoolant,4)==R::Invalid);
