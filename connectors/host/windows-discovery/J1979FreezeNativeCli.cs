@@ -297,7 +297,7 @@ internal static class J1979FreezeNativeCli
             return report.CaptureIntegrityVerified&&!report.Cancelled&&report.Summary?.AllFramesStable==true?0:2;
         }
         catch(Exception e) when(e is InvalidDataException or ArgumentException or IOException or UnauthorizedAccessException or
-            TimeoutException or InvalidOperationException or OperationCanceledException)
+            TimeoutException or InvalidOperationException or OperationCanceledException or JsonException)
         {Console.Error.WriteLine(e.Message);return 2;}
     }
 }

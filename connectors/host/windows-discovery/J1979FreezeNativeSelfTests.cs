@@ -183,6 +183,14 @@ internal static class J1979FreezeNativeSelfTests
             try{J1979FreezeNativeCli.VerifyPrefix(source,output,Path.Combine(root,"duplicate.json"),Vin);}
             catch(InvalidDataException){denied=true;}
             Require(denied,"ambiguous duplicate JSON assertion must not be accepted");
+            File.WriteAllText(output,"{invalid json");
+            string badJsonPath=Path.Combine(root,"malformed.json");
+            int rejectedExit=J1979FreezeNativeCli.Run(new[]{
+                J1979FreezeNativeCli.VerifyPrefixCommand,source,output,badJsonPath,Vin
+            });
+            Require(rejectedExit==2&&!File.Exists(badJsonPath),
+                "malformed CF/1 prefix JSON fails cleanly without creating a verification");
+
 
         }
         finally{Directory.Delete(root,true);}
