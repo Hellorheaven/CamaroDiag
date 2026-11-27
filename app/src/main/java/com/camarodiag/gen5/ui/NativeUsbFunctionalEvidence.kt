@@ -1,6 +1,7 @@
 package com.camarodiag.gen5.ui
 
 import org.json.JSONObject
+import com.camarodiag.gen5.data.obd.ObdJ1979ExtendedVehicleInfo
 import com.camarodiag.connectors.J1979CampaignSemantics
 
 /** Results reflect recorded replies, not a claim of physical provenance. */
@@ -39,7 +40,8 @@ internal object NativeUsbFunctionalEvidence {
     }
     data class FreezeTrigger(val present:Boolean,val dtc:String?)
     data class DiagnosticValues(val observedVin: String?, val dtcs: Map<Int, List<String>?>,
-        val measurements: List<Measurement>, val monitors: List<Monitor>, val identity: Map<Int,List<String>>, val readiness: Readiness?, val pages:List<InventoryPage>, val freeze:FreezeTrigger?)
+        val measurements: List<Measurement>, val monitors: List<Monitor>, val identity: Map<Int,List<String>>, val readiness: Readiness?, val pages:List<InventoryPage>, val freeze:FreezeTrigger?,
+        val extendedVehicleInfo:List<ObdJ1979ExtendedVehicleInfo.Result> = emptyList())
 
     private fun inventoryValue(step:JSONObject):InventoryPage? {
         val request=step.optString("request_hex")
@@ -172,11 +174,14 @@ internal object NativeUsbFunctionalEvidence {
         val measured = linkedMapOf<Pair<Int, Int>, Measurement>()
         val monitors = mutableListOf<Monitor>()
         val identity=linkedMapOf<Int,List<String>>()
+        val extendedVehicleInfo=mutableListOf<ObdJ1979ExtendedVehicleInfo.Result>()
         var readiness:Readiness?=null
         var freeze:FreezeTrigger?=null
         val pages=linkedMapOf<Pair<Int,Int>,InventoryPage>()
         for (i in 0 until steps.length()) {
             val step = steps.optJSONObject(i) ?: continue
+            ObdJ1979ExtendedVehicleInfo.tryRaw(step.optString("request_hex"),
+                step.optString("response_hex"),step.optString("status"))?.let(extendedVehicleInfo::add)
             if (step.optString("status") != "PASSED") continue
             val request = step.optString("request_hex")
             inventoryValue(step)?.let { pages[it.mode to it.base]=it }
@@ -229,7 +234,7 @@ internal object NativeUsbFunctionalEvidence {
                 decoded.unit!=unit||decoded.number!=number) continue
             measured[mode to pid] = Measurement(mode,pid,name,number,unit)
         }
-        return DiagnosticValues(vin,dtcs,measured.values.sortedWith(compareBy({ it.mode },{ it.pid })),monitors.toList(),identity.toMap(),readiness,pages.values.sortedWith(compareBy({it.mode},{it.base})),freeze)
+        return DiagnosticValues(vin,dtcs,measured.values.sortedWith(compareBy({ it.mode },{ it.pid })),monitors.toList(),identity.toMap(),readiness,pages.values.sortedWith(compareBy({it.mode},{it.base})),freeze,extendedVehicleInfo.toList())
     }
 
     /** Verified readings within the advertised inventory, for ordinary diagnostic
@@ -244,6 +249,7 @@ internal object NativeUsbFunctionalEvidence {
                 (it.mode!=2||values.freeze?.present==true) },
             monitors=values.monitors.filter { supported(6,it.mid) },
             identity=values.identity.filterKeys { supported(9,it) },
+            extendedVehicleInfo=values.extendedVehicleInfo.filter { supported(9,it.infoType) },
             readiness=values.readiness.takeIf { supported(1,1) },
             pages=chains.values.flatMap { it.pages }.filter { it.mode!=2||values.freeze?.present==true })
     }
