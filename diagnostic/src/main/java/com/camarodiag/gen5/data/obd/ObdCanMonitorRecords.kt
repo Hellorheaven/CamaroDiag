@@ -5,11 +5,55 @@ import java.util.Locale
 /** SAE J1979 CAN Mode 06: support pages and complete 9-byte test records.
  * The functional ELM channel is anonymous, so never invent an ECU address. */
 internal object ObdCanMonitorRecords {
+    // ISO 15031-5:2006 Annex E, explicitly supported subset.
+    // No legacy or OEM-specific scaling; no monitor verdict inferred.
+    private data class Scale(val unit: String, val factor: Double, val signed: Boolean)
+    private val scales = mapOf(
+        0x0A to Scale("mV", 0.122, false),
+        0x0B to Scale("V", 0.001, false),
+        0x0D to Scale("mA", 0.00390625, false),
+        0x0E to Scale("A", 0.001, false),
+        0x0F to Scale("A", 0.01, false),
+        0x10 to Scale("ms", 1.0, false),
+        0x24 to Scale("count", 1.0, false),
+        0x25 to Scale("km", 1.0, false),
+        0x2F to Scale("%", 0.01, false),
+        0x31 to Scale("L", 0.001, false),
+        0x84 to Scale("1", 0.001, true),
+        0x85 to Scale("1", 0.0000305, true),
+        0x86 to Scale("1", 0.000305, true),
+        0x8E to Scale("A", 0.001, true),
+        0x90 to Scale("ms", 1.0, true),
+        0x96 to Scale("degC", 0.1, true),
+    )
+    data class Scaled(val unit: String, val value: Double, val minimum: Double,
+        val maximum: Double, val numericRelation: String)
     data class Support(val mids: Set<Int>, val more: Boolean)
     data class Result(val mid: Int, val tid: Int, val uasid: Int,
         val value: Int, val minimum: Int, val maximum: Int) {
-        fun rawText(): String = "MID=%02X TID=%02X UASID=%02X RAW=%04X MIN_RAW=%04X MAX_RAW=%04X"
-            .format(Locale.ROOT, mid, tid, uasid, value, minimum, maximum)
+        fun scaled(): Scaled? {
+            val scale = scales[uasid] ?: return null
+            if (listOf(value, minimum, maximum).any { it !in 0..65535 }) return null
+            fun decode(raw: Int): Double =
+                (if (scale.signed && raw >= 32768) raw - 65536 else raw) * scale.factor
+            val observed = decode(value)
+            val low = decode(minimum)
+            val high = decode(maximum)
+            val relation = when {
+                low > high -> "INVERTED_LIMITS"
+                observed < low -> "BELOW"
+                observed > high -> "ABOVE"
+                else -> "WITHIN"
+            }
+            return Scaled(scale.unit, observed, low, high, relation)
+        }
+        fun rawText(): String {
+            val encoded = "MID=%02X TID=%02X UASID=%02X RAW=%04X MIN_RAW=%04X MAX_RAW=%04X"
+                .format(Locale.ROOT, mid, tid, uasid, value, minimum, maximum)
+            val decoded = scaled() ?: return encoded
+            return encoded + " VALUE=%s MIN=%s MAX=%s UNIT=%s"
+                .format(Locale.ROOT, decoded.value, decoded.minimum, decoded.maximum, decoded.unit)
+        }
     }
 
     private fun messages(response: String, mid: Int): List<List<Int>>? {
