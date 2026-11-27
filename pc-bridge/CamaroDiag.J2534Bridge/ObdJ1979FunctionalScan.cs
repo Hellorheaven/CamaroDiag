@@ -25,6 +25,9 @@ internal static class ObdJ1979FunctionalScan
         }).ToArray();
         // Keep the native CJ/1 evidence schema unchanged; this is a derived
         // engineering view of correlated physical CAN Mode 06 scan records.
+        public IReadOnlyList<ObdJ1979Status.Record> StatusRecords => Steps
+            .Select(s=>ObdJ1979Status.TryRecord(s.RequestHex,s.ResponseHex,s.Status))
+            .OfType<ObdJ1979Status.Record>().ToArray();
         public IReadOnlyList<ObdJ1979MultiSignal.Record> MultiSignalRecords => Steps
             .Select(s=>ObdJ1979MultiSignal.TryRecord(s.RequestHex,s.ResponseHex,s.Status))
             .OfType<ObdJ1979MultiSignal.Record>().ToArray();
@@ -124,6 +127,9 @@ internal static class ObdJ1979FunctionalScan
                 if (request[0] is 1 or 2 or 9 &&
                     response.Length <= (request[0] == 2 ? 3 : 2))
                     throw new InvalidDataException("Missing diagnostic record data.");
+                if(request[0]==1 && request.Length==2 && ObdJ1979Status.Width(request[1]) is not null &&
+                    ObdJ1979Status.DecodeResponse(request,response) is null)
+                    throw new InvalidDataException("Invalid categorical PID record.");
                 if(application.Shape=="RAW"){
                     string? detail = null;
                     if(request[0]==1 && ObdJ1979MultiSignal.Width(request[1]) is not null){
@@ -131,6 +137,8 @@ internal static class ObdJ1979FunctionalScan
                             ?? throw new InvalidDataException("Invalid multi-signal record.");
                         detail=ObdJ1979MultiSignal.Format(signals);
                     }
+                    if(request[0]==1 && ObdJ1979Status.DecodeResponse(request,response) is { } states)
+                        detail=(detail is null?"":detail+"; ")+ObdJ1979Status.Format(states);
                     if(request[0]==9 && ObdJ1979ExtendedVehicleInfo.IsExtended(request[1])){
                         _=ObdJ1979ExtendedVehicleInfo.Can(request[1],response);
                         detail="EXTENDED_INFOTYPE_DECODED";
