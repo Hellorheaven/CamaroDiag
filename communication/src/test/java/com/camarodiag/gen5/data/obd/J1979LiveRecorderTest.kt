@@ -90,6 +90,28 @@ class J1979LiveRecorderTest {
         assertEquals(2,stopped.observations.size)
         assertEquals(0,stopped.completedCycles)
     }
+    @Test fun trimLayoutAdmissionAndIndependentBankStatistics()=runBlocking {
+        var now=0L
+        var reads=0
+        val sent=mutableListOf<String>()
+        val result=J1979LiveRecorder.run(plan.copy(pids=listOf(6),cycles=2),{req,_->
+            val command=ElmJ1979EvapTest.hex(req)
+            sent+=command
+            now+=10
+            when(command){
+                "0100"->J1979LiveRecorder.Reply(bytes("410004000008"),null)
+                "011D"->J1979LiveRecorder.Reply(bytes("411D30"),null)
+                "0106"->J1979LiveRecorder.Reply(bytes(if(++reads==1)"41068090" else "410690"),null)
+                else->normal(req)
+            }
+        },{"6"},{},clock={now},sleep={now+=it})
+        assertTrue(result.completed)
+        assertEquals(listOf("0902","0100","011D","0106","0106","0902"),sent)
+        assertEquals(2,result.multiSignalSummary.size)
+        assertEquals(6.25,result.multiSignalSummary[0].mean!!,0.0)
+        assertEquals(12.5,result.multiSignalSummary[1].mean!!,0.0)
+        assertEquals(1,result.multiSignalSummary[1].missing)
+    }
     @Test fun validatesPhysicalAddressAndNumericSelection() {
         assertEquals(0x18DA10F1,J1979LiveTarget(7,0x18DAF110,vin).requestId)
         assertNull(J1979LiveTarget(7,0x7E8,vin).requestId)
