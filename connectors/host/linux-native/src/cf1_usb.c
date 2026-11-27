@@ -90,7 +90,11 @@ static bool configure_serial(int fd, struct termios *saved) {
     t.c_iflag = IGNPAR;
     t.c_oflag = 0;
     t.c_lflag = 0;
-    t.c_cflag = (t.c_cflag & ~(CSIZE | PARENB | CSTOPB | CRTSCTS)) |
+    tcflag_t flow_mask = 0;
+#ifdef CRTSCTS
+    flow_mask = CRTSCTS;
+#endif
+    t.c_cflag = (t.c_cflag & ~(CSIZE | PARENB | CSTOPB | flow_mask)) |
                 CS8 | CREAD | CLOCAL;
     t.c_cc[VMIN] = 0; t.c_cc[VTIME] = 0;
     return cfsetispeed(&t, B115200) == 0 &&
@@ -107,6 +111,26 @@ static int write_capture(int fd, const uint8_t *bytes, size_t n) {
         position += (size_t)count;
     }
     return 0;
+}
+/* During a deadline or cable interruption, persist every received byte,
+ * not only the last fully assembled CF/1 record. Never replay uncommitted
+ * tails: they remain forensic evidence until an independent full parser.
+ */
+static int receive_to_capture(int serial, int output, uint8_t *destination,
+                              size_t requested, uint64_t deadline,
+                              cf1_usb_capture_result *result) {
+    size_t received = 0;
+    while (received < requested && !cancelled) {
+        if (wait_ready(serial, POLLIN, deadline)) return -1;
+        ssize_t n = read(serial, destination + received, requested - received);
+        if (n < 0 && (errno == EINTR || errno == EAGAIN)) continue;
+        if (n < 0) return -1;
+        if (n == 0) continue;
+        if (write_capture(output, destination + received, (size_t)n)) return -1;
+        received += (size_t)n;
+        result->raw_bytes_received += (size_t)n;
+    }
+    return cancelled ? -1 : 0;
 }
 static uint16_t little16(const uint8_t *p) {
     return (uint16_t)((uint16_t)p[0] | ((uint16_t)p[1] << 8));
@@ -172,18 +196,13 @@ int cf1_usb_capture(const char *port_path, const cf1_plan *plan,
     for (size_t seq = 0; seq < CF1_MAX_STEPS + 2 && !cancelled; ++seq) {
         uint8_t *h = raw + out->raw_bytes_received;
         if (out->raw_bytes_received + 8 > CF1_MAX_BYTES ||
-            read_deadline(serial, h, 8, deadline)) {
-            why = "CF/1 header deadline exceeded";
-            goto cleanup;
-        }
-        out->raw_bytes_received += 8;
-        if (write_capture(file, h, 8)) {
-            why = "Cannot persist exact CF/1 header";
+            receive_to_capture(serial, file, h, 8, deadline, out)) {
+            why = "CF/1 header interrupted; any received bytes retained";
             goto cleanup;
         }
         uint16_t length = little16(h + 6);
         if (h[0] != 'C' || h[1] != 'F' || h[2] != 1 ||
-            little16(h + 4) != seq || h[3] != (seq ? h[3] : 1) ||
+            little16(h + 4) != seq || (seq == 0 && h[3] != 1) ||
             (seq && h[3] != 2 && h[3] != 3) ||
             length < 1 || length > CF1_MAX_BODY ||
             (seq == 0 && length != CF1_PLAN_SIZE) ||
@@ -197,13 +216,8 @@ int cf1_usb_capture(const char *port_path, const cf1_plan *plan,
             goto cleanup;
         }
         uint8_t *tail = raw + out->raw_bytes_received;
-        if (read_deadline(serial, tail, length + 4, deadline)) {
-            why = "CF/1 record deadline exceeded; interrupted bytes retained";
-            goto cleanup;
-        }
-        out->raw_bytes_received += length + 4;
-        if (write_capture(file, tail, length + 4)) {
-            why = "Cannot persist exact CF/1 payload";
+        if (receive_to_capture(serial, file, tail, length + 4, deadline, out)) {
+            why = "CF/1 payload interrupted; any received bytes retained";
             goto cleanup;
         }
         if (cf1_crc32(h, (size_t)length + 8) != little32(tail + length)) {
