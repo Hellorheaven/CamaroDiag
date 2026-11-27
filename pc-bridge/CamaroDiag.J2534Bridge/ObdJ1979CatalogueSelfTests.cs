@@ -113,6 +113,42 @@ internal static class ObdJ1979CatalogueSelfTests
         Check(nativeCsv.Contains("1,F1,50,RAW,41F181FEFF,7E0,7E8,"+Vin+",true",StringComparison.Ordinal),"native raw CSV");
         Reject(()=>ObdJ1979CatalogueProjection.Build(cat,pin,native[..^1],Vin),"truncated native source");
         Reject(()=>ObdJ1979CatalogueProjection.Build(cat,pin,native,"1FA6P8TH0L5100000"),"native VIN mismatch");
+        // Same CF/1 wire fixture and synthetic frame definitions as Android.
+        byte[] freeze=Convert.FromHexString(
+            "4346010100006800e0070000e80700000060ea00003147314641314533304431323334353637020001000000000000020c0d" +
+            "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000" +
+            "0000000000000000000000001be52aa643460102010020000101020005000000140009024902013147314641314533304431" +
+            "3233343536370fee793343460102020014000101030005000000070002000042000040180000a518bfa24346010203001200" +
+            "0101030005000000050002020042020003014bdf4814434601020400120001010300050000000500020c00420c001f403ec1" +
+            "dd26434601020500110001010300050000000400020d00420d0050b116910c43460102060012000101030005000000050002" +
+            "020042020003018b28c15f43460102070014000101030005000000070002000142000140180000f3ca56bb43460102080012" +
+            "0001010300050000000500020201420201030199eded5e434601020900120001010300050000000500020c01420c011f406c" +
+            "a9891e434601020a00110001010300050000000400020d01420d01506e81ff64434601020b00120001010300050000000500" +
+            "0202014202010301d9409567434601020c002000010102000500000014000902490201314731464131453330443132333435" +
+            "363723d3f9ee434601030d001400000207000c0000003c0000000202000000000000937d821a");
+        byte[] freezeCat=Encoding.UTF8.GetBytes("""{"schema":"camarodiag-j1979-freeze-catalogue-v1","edition":"synthetic","reference_name":"synthetic","reference_sha256":"PIN","frames":[{"frame":0,"definitions":[{"pid":12,"payload_bytes":2,"protocols":["CAN"],"reference":"synthetic","signals":[{"name":"sample","unit":"fixture","bits":{"offset":0,"width":16,"order":"MSB0"},"signed":false,"scale":[1,2],"offset":[0,1],"reference":"test only"}]},{"pid":13,"payload_bytes":1,"protocols":["CAN"],"reference":"synthetic","signals":[{"name":"sample","unit":"fixture","bits":{"offset":0,"width":8,"order":"MSB0"},"signed":false,"scale":[1,2],"offset":[0,1],"reference":"test only"}]}]},{"frame":1,"definitions":[{"pid":12,"payload_bytes":2,"protocols":["CAN"],"reference":"synthetic","signals":[{"name":"sample","unit":"fixture","bits":{"offset":0,"width":16,"order":"MSB0"},"signed":false,"scale":[1,2],"offset":[100,1],"reference":"test only"}]}]}]}""".Replace("PIN",pin,StringComparison.Ordinal));
+        const string freezeVin="1G1FA1E30D1234567";
+        var freezeProjection=ObdJ1979CatalogueProjection.Build(freezeCat,pin,freeze,freezeVin);
+        Check(Equals(freezeProjection["schema"],ObdJ1979FreezeCatalogue.Projection)&&
+            Equals(freezeProjection["final_identity_verified"],true)&&
+            Equals(freezeProjection["permits_programming"],false)&&
+            Equals(freezeProjection["physical_vehicle_verified"],false),"CF/1 projection boundaries");
+        using(var freezeDoc=JsonDocument.Parse(JsonSerializer.SerializeToUtf8Bytes(freezeProjection)))
+        {
+            var entries=freezeDoc.RootElement.GetProperty("rows");
+            Check(entries.GetArrayLength()==4,"CF/1 measurement count");
+            Check(entries[0].GetProperty("signals")[0].GetProperty("value").GetProperty("numerator").GetString()=="4000",
+                "frame zero definition");
+            Check(entries[2].GetProperty("signals")[0].GetProperty("value").GetProperty("numerator").GetString()=="4100",
+                "frame one definition differs");
+            Check(entries[3].GetProperty("projection_status").GetString()=="NO_DOCUMENTED_DEFINITION","unknown frame PID");
+            Check(freezeDoc.RootElement.GetProperty("source_capture_sha256").GetString()==
+                ObdJ1979DocumentedCatalogue.Sha(freeze),"CF/1 original digest");
+        }
+        Reject(()=>ObdJ1979CatalogueProjection.Build(freezeCat,pin,freeze[..^1],freezeVin),"truncated CF/1");
+        Reject(()=>ObdJ1979CatalogueProjection.Build(freezeCat,pin,freeze,Vin),"wrong independent CF/1 VIN");
+        Reject(()=>ObdJ1979CatalogueProjection.Build(cat,pin,freeze,freezeVin),"live catalogue cannot decode freeze");
+        Reject(()=>ObdJ1979FreezeCatalogue.Parse(freezeCat,new string('b',64)),"wrong CF/1 reference pin");
         byte[] original=Original();
         var source=ObdJ1979CatalogueProjection.ReplayApplication(original,Vin);
         Check(source.Completed&&source.FinalIdentityVerified&&source.Samples.Count==12,"selected raw acquisition replay");
