@@ -59,7 +59,9 @@ class Recipe{
     }
     std::vector<Data> selected(const FreezeExchange& exchange,Bytes request){
         if(exchange.outcome!=FreezeOutcome::received)return {};
-        const auto parsed=freeze_frames(r_.protocol,r_.plan,request,exchange.raw);
+        std::vector<Frame> parsed;
+        try{parsed=freeze_frames(r_.protocol,r_.plan,request,exchange.raw);}
+        catch(const std::invalid_argument&){r_.error="MALFORMED_LEGACY_RESPONSE";return {};}
         std::vector<Data> result;
         for(const auto& frame:parsed){
             if(frame.source==r_.source)result.push_back(frame.payload);
@@ -135,14 +137,8 @@ class Recipe{
         require(r_.steps.size()<freeze_max_steps&&r_.plan.allows(q),"Freeze logical step limit or scope");
         FreezeStep step{};step.request=std::move(q);step.status="NOT_TESTED";
         step.first_exchange=static_cast<unsigned>(r_.trace.size());
-        try{
-            if(step.request==Data{9,2})identity(step);
-            else frame_data(step);
-        }catch(const std::invalid_argument&){
-            // Parser errors are not successful measurements. A structural
-            // replay exception still must propagate to reject forged traces.
-            throw;
-        }
+        if(step.request==Data{9,2})identity(step);
+        else frame_data(step);
         step.exchange_count=static_cast<unsigned>(r_.trace.size())-step.first_exchange;
         if(step.exchange_count)step.outcome=r_.trace.back().outcome;
         if(!r_.error.empty()){
