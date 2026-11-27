@@ -463,6 +463,27 @@ internal sealed partial class J2534Device : IDisposable
             throw new IOException("Standard OBD clear not confirmed by exact positive Mode 04 response.");
     }
 
+    /// <summary>Explicit local Mode 02 campaign on an already opened physical
+    /// standard OBD channel. The generic bridge and console policies remain
+    /// unchanged. Flush stale responses before each correlated exchange.</summary>
+    internal ObdJ1979FreezeCampaign.Result RunStandardFreezeCampaign(
+        ObdJ1979FreezeCampaign.Plan requested, Action requireCurrent)
+    {
+        EnsureOpen();
+        if (!IsStandardObdReadEnabled || _memoryReadScope is not null)
+            throw new InvalidOperationException("A dedicated physical OBD channel is required.");
+        var plan = requested.Validate();
+        return ObdJ1979FreezeCampaign.Run(plan, (request, timeout) =>
+        {
+            if (!ObdJ1979FreezeCampaign.Allows(request, plan.Frames))
+                throw new InvalidOperationException("Request outside selected freeze frames.");
+            requireCurrent();
+            ClearNativeReceiveQueue();
+            requireCurrent();
+            return ExchangeCore(request, timeout, nativeBenchReply: false);
+        }, requireCurrent);
+    }
+
     /// <summary>Local, separately authorized Mode 04 recipe, not the
     /// network bridge's ordinary reset endpoint.</summary>
     internal ObdJ1979ClearRecipe.Result RunStandardClearRecipe(string expectedVin,
