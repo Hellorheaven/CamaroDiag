@@ -16,6 +16,7 @@ from .j1979_multi_signal import from_steps as multi_records, historical_projecti
 from .j1979_status import from_steps as status_records
 from .j1979_scaling_context import project as contextual_measurements
 from .j1979_monitor_scaling import from_steps as scaled_monitor_records
+from .j1979_drive_cycle import project as operating_context
 from .j1979_campaign_evidence import decode_observation, summarize_observations
 from .j1979_live_inspection import load, _get, _require, _hex, _array, _dict, _id
 
@@ -379,9 +380,13 @@ def replay_ecu(row,android,vin):
     claimed_monitors=_get(body,"scaled_monitor_records")
     if claimed_monitors is not None:
         _require(_equal(_normalize(claimed_monitors),monitors),"Scaled monitor records differ from physical responses")
+    operating=operating_context(steps)
+    claimed_operating=_get(body,"operating_context")
+    if claimed_operating is not None:
+        _require(_equal(_normalize(claimed_operating),operating),"Operating context differs from selected ECU")
     return {"completed":completed,"observed_vin":first,"final_vin":last,
             "steps":steps,"extended_vehicle_info":extended,"multi_signal_records":multi,
-            "multi_signal_report_catalog":catalog,"status_records":states,"contextual_measurements":context,"scaled_monitor_records":monitors,**summary}
+            "multi_signal_report_catalog":catalog,"status_records":states,"contextual_measurements":context,"scaled_monitor_records":monitors,"operating_context":operating,**summary}
 
 
 def inspect_network(root,expected_vin=None):
