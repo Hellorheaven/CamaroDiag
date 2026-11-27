@@ -19,6 +19,9 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <memory>
+#include <new>
+#include <utility>
 
 #ifndef O_NOFOLLOW
 #error "Native evidence input requires O_NOFOLLOW (POSIX Linux)"
@@ -28,13 +31,19 @@
 #endif
 
 typedef struct {
-    unsigned char *bytes;
+    std::unique_ptr<unsigned char[]> bytes;
     size_t length;
     dev_t device;
     ino_t inode;
     char digest[65];
 } input;
-typedef struct { char *bytes; size_t used, capacity; bool failed; } json_writer;
+struct json_writer {
+    std::unique_ptr<char[]> bytes;
+    size_t used = 0;
+    size_t capacity;
+    bool failed = false;
+    explicit json_writer(size_t maximum) : capacity(maximum) {}
+};
 
 static int error(const char *message) {
     fprintf(stderr, "CamaroDiag native J1979: %s\n", message);
@@ -54,7 +63,7 @@ static void sha256_hex(const unsigned char *bytes, size_t n, char digest[65]) {
     digest[64] = '\0';
 }
 static bool load_regular(const char *path, size_t maximum, input *out) {
-    memset(out, 0, sizeof(*out));
+    *out = input{};
     int fd = open(path, O_RDONLY | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK);
     if (fd < 0) return false;
     struct stat st;
@@ -63,12 +72,12 @@ static bool load_regular(const char *path, size_t maximum, input *out) {
     if (ok) {
         out->length = (size_t)st.st_size;
         out->device = st.st_dev; out->inode = st.st_ino;
-        out->bytes = malloc(out->length);
-        ok = out->bytes != NULL;
+        out->bytes.reset(new (std::nothrow) unsigned char[out->length]);
+        ok = out->bytes.get() != NULL;
     }
     size_t n = 0;
     while (ok && n < out->length) {
-        ssize_t got = read(fd, out->bytes + n, out->length - n);
+        ssize_t got = read(fd, out->bytes.get() + n, out->length - n);
         if (got < 0 && errno == EINTR) continue;
         if (got <= 0) { ok = false; break; }
         n += (size_t)got;
@@ -81,24 +90,24 @@ static bool load_regular(const char *path, size_t maximum, input *out) {
     }
     close(fd);
     if (!ok) {
-        free(out->bytes); memset(out, 0, sizeof(*out));
+        *out = input{};
         return false;
     }
-    sha256_hex(out->bytes, out->length, out->digest);
+    sha256_hex(out->bytes.get(), out->length, out->digest);
     return true;
 }
-static void free_input(input *v) { free(v->bytes); memset(v, 0, sizeof(*v)); }
+static void free_input(input *v) { *v = input{}; }
 static bool same_input(const input *a, const input *b) {
     return a->length == b->length && a->device == b->device &&
-        a->inode == b->inode && !memcmp(a->bytes, b->bytes, a->length);
+        a->inode == b->inode && !memcmp(a->bytes.get(), b->bytes.get(), a->length);
 }
 static bool separate(const input *a, const input *b) {
     return a->device != b->device || a->inode != b->inode;
 }
 static void write_literal(json_writer *j, const char *text) {
     size_t length = strlen(text);
-    if (j->failed || j->used + length >= j->capacity) { j->failed = true; return; }
-    memcpy(j->bytes + j->used, text, length);
+    if (j->failed || j->used >= j->capacity || length >= j->capacity - j->used) { j->failed = true; return; }
+    memcpy(j->bytes.get() + j->used, text, length);
     j->used += length; j->bytes[j->used] = 0;
 }
 static void write_unsigned(json_writer *j, uint64_t n) {
@@ -291,55 +300,55 @@ static bool atomic_create(const char *path, const char *content, size_t n) {
     return ok;
 }
 static bool report_prefix(const input *capture, const char *vin,
-                          char **json_out, size_t *size_out) {
-    cf1_evidence e = {0};
+                          std::unique_ptr<char[]> *json_out, size_t *size_out) {
+    cf1_evidence e{};
     char err[256] = {0};
-    if (cf1_inspect_prefix(capture->bytes, capture->length, vin, &e, err, sizeof(err))) {
+    if (cf1_inspect_prefix(capture->bytes.get(), capture->length, vin, &e, err, sizeof(err))) {
         fprintf(stderr, "CF/1 rejected: %s\n", err);
         cf1_evidence_free(&e);
         return false;
     }
-    json_writer writer = { .capacity = 65536 };
-    writer.bytes = calloc(1, writer.capacity);
+    json_writer writer{65536};
+    writer.bytes.reset(new (std::nothrow) char[writer.capacity]{});
     if (writer.bytes) write_prefix(&writer, &e, capture->digest);
-    bool ok = writer.bytes && !writer.failed;
+    bool ok = writer.bytes.get() && !writer.failed;
     cf1_evidence_free(&e);
-    if (!ok) { free(writer.bytes); return false; }
-    *json_out = writer.bytes;
+    if (!ok) { writer.bytes.reset(); return false; }
+    *json_out = std::move(writer.bytes);
     *size_out = writer.used;
     return true;
 }
 static int inspect(const char *capture_path, const char *vin, const char *output) {
-    input original = {0}, again = {0};
-    char *report = NULL;
+    input original{}, again{};
+    std::unique_ptr<char[]> report;
     size_t report_size = 0;
     bool ok = load_regular(capture_path, CF1_MAX_BYTES, &original);
     if (ok) ok = report_prefix(&original, vin, &report, &report_size);
     if (ok) ok = load_regular(capture_path, CF1_MAX_BYTES, &again) &&
                  same_input(&original, &again);
-    if (ok) ok = atomic_create(output, report, report_size);
-    free(report); free_input(&again); free_input(&original);
+    if (ok) ok = atomic_create(output, report.get(), report_size);
+    report.reset(); free_input(&again); free_input(&original);
     return ok ? 0 : error("CF/1 inspection failed, source changed, or output exists");
 }
 static int inspect_complete(const char *capture_path, const char *vin, const char *output) {
-    input original = {0}, again = {0};
+    input original{}, again{};
     bool ok = load_regular(capture_path, CF1_MAX_BYTES, &original);
-    cf1_evidence evidence = {0};
+    cf1_evidence evidence{};
     char err[256] = {0};
-    if (ok) ok = cf1_inspect_complete(original.bytes, original.length, vin,
+    if (ok) ok = cf1_inspect_complete(original.bytes.get(), original.length, vin,
                                      &evidence, err, sizeof(err)) == 0;
     if (!ok && *err) fprintf(stderr, "CF/1 rejected: %s\n", err);
-    json_writer writer = { .capacity = 65536 };
+    json_writer writer{65536};
     if (ok) {
-        writer.bytes = calloc(1, writer.capacity);
-        ok = writer.bytes != NULL;
+        writer.bytes.reset(new (std::nothrow) char[writer.capacity]{});
+        ok = writer.bytes.get() != NULL;
         if (ok) write_complete(&writer, &evidence, original.digest, false, false, false);
         if (writer.failed) ok = false;
     }
     if (ok) ok = load_regular(capture_path, CF1_MAX_BYTES, &again) &&
                  same_input(&original, &again);
-    if (ok) ok = atomic_create(output, writer.bytes, writer.used);
-    free(writer.bytes);
+    if (ok) ok = atomic_create(output, writer.bytes.get(), writer.used);
+    writer.bytes.reset();
     cf1_evidence_free(&evidence);
     free_input(&again); free_input(&original);
     return ok ? 0 : error("Full CF/1 inspection failed or output exists");
@@ -350,25 +359,25 @@ static int inspect_complete(const char *capture_path, const char *vin, const cha
  */
 static int verify_complete(const char *capture_path, const char *report_path,
                            const char *output_path, const char *vin) {
-    input capture = {0}, saved = {0}, capture_again = {0}, report_again = {0};
-    cf1_evidence evidence = {0};
-    json_writer projection = { .capacity = 65536 };
+    input capture{}, saved{}, capture_again{}, report_again{};
+    cf1_evidence evidence{};
+    json_writer projection{65536};
     char failure[256] = {0};
     bool valid = load_regular(capture_path, CF1_MAX_BYTES, &capture) &&
                  load_regular(report_path, 67108864, &saved);
     if (valid) valid = separate(&capture, &saved);
-    if (valid) valid = cf1_inspect_complete(capture.bytes, capture.length,
+    if (valid) valid = cf1_inspect_complete(capture.bytes.get(), capture.length,
                                           vin, &evidence,
                                           failure, sizeof(failure)) == 0;
     if (valid) {
-        projection.bytes = calloc(1, projection.capacity);
-        valid = projection.bytes != NULL;
+        projection.bytes.reset(new (std::nothrow) char[projection.capacity]{});
+        valid = projection.bytes.get() != NULL;
     }
     if (valid) write_complete(&projection, &evidence, capture.digest,
                               false, false, false);
     if (valid) valid = !projection.failed &&
                        projection.used == saved.length &&
-                       !memcmp(projection.bytes, saved.bytes, projection.used);
+                       !memcmp(projection.bytes.get(), saved.bytes.get(), projection.used);
     if (valid) valid = load_regular(capture_path, CF1_MAX_BYTES, &capture_again) &&
                        load_regular(report_path, 67108864, &report_again) &&
                        same_input(&capture, &capture_again) &&
@@ -390,7 +399,7 @@ static int verify_complete(const char *capture_path, const char *report_path,
                 atomic_create(output_path, proof, (size_t)n);
     }
     if (!valid && failure[0]) fprintf(stderr, "CF/1 full verification rejected: %s\n", failure);
-    free(projection.bytes);
+    projection.bytes.reset();
     cf1_evidence_free(&evidence);
     free_input(&capture_again); free_input(&report_again);
     free_input(&capture); free_input(&saved);
@@ -398,8 +407,8 @@ static int verify_complete(const char *capture_path, const char *report_path,
 }
 static int verify(const char *capture_path, const char *report_path,
                   const char *output_path, const char *vin) {
-    input capture = {0}, stored = {0}, recheck_capture = {0}, recheck_report = {0};
-    char *replayed = NULL;
+    input capture{}, stored{}, recheck_capture{}, recheck_report{};
+    std::unique_ptr<char[]> replayed;
     size_t length = 0;
     bool ok = load_regular(capture_path, CF1_MAX_BYTES, &capture) &&
               load_regular(report_path, 67108864, &stored);
@@ -408,7 +417,7 @@ static int verify(const char *capture_path, const char *report_path,
     /* Native canonical verification deliberately compares the entire original
      * byte stream, not an untrusted subset of JSON fields. Alternative JSON
      * formatting/schema require an explicit, separately reviewed importer. */
-    if (ok) ok = stored.length == length && !memcmp(stored.bytes, replayed, length);
+    if (ok) ok = stored.length == length && !memcmp(stored.bytes.get(), replayed.get(), length);
     if (ok) ok = load_regular(capture_path, CF1_MAX_BYTES, &recheck_capture) &&
                  load_regular(report_path, 67108864, &recheck_report) &&
                  same_input(&capture, &recheck_capture) &&
@@ -426,7 +435,7 @@ static int verify(const char *capture_path, const char *report_path,
         ok = n > 0 && (size_t)n < sizeof(verification) &&
              atomic_create(output_path, verification, (size_t)n);
     }
-    free(replayed);
+    replayed.reset();
     free_input(&recheck_capture); free_input(&recheck_report);
     free_input(&capture); free_input(&stored);
     return ok ? 0 : error("CF/1 verification refused: wrong report, unstable inputs, or output exists");
@@ -547,7 +556,7 @@ static void cancel_handler(int signum) {
     cf1_usb_request_cancel();
 }
 static int capture_native(int argc, char **argv) {
-    capture_options o = {0};
+    capture_options o{};
     if (!parse_capture_options(argc, argv, &o))
         return error("Explicit physical scope, key, port, VIN, frame and --confirm-physical-channel required");
     if (!isatty(STDIN_FILENO))
@@ -560,33 +569,33 @@ static int capture_native(int argc, char **argv) {
     uint8_t key[32] = {0};
     if (!read_key_file(o.credential, key))
         return error("Invalid 32-byte credential file or unsafe file permissions");
-    struct sigaction action = {0}, oldint = {0}, oldterm = {0};
+    struct sigaction action{}, oldint{}, oldterm{};
     action.sa_handler = cancel_handler;
     sigemptyset(&action.sa_mask);
     sigaction(SIGINT, &action, &oldint);
     sigaction(SIGTERM, &action, &oldterm);
-    cf1_usb_capture_result usb = {0};
+    cf1_usb_capture_result usb{};
     char failure[256] = {0};
     int transport = cf1_usb_capture(o.port, &o.plan, key, o.capture,
                                      &usb, failure, sizeof(failure));
     sigaction(SIGINT, &oldint, NULL);
     sigaction(SIGTERM, &oldterm, NULL);
     OPENSSL_cleanse(key, sizeof(key));
-    input capture = {0}, again = {0};
-    cf1_evidence evidence = {0};
+    input capture{}, again{};
+    cf1_evidence evidence{};
     bool valid = transport == 0 &&
                  load_regular(o.capture, CF1_MAX_BYTES, &capture);
     if (valid) {
-        valid = cf1_inspect_complete(capture.bytes, capture.length,
+        valid = cf1_inspect_complete(capture.bytes.get(), capture.length,
                                     o.plan.vin, &evidence,
                                     failure, sizeof(failure)) == 0;
     }
     if (valid) valid = load_regular(o.capture, CF1_MAX_BYTES, &again) &&
                        same_input(&capture, &again);
-    json_writer writer = { .capacity = 65536 };
-    writer.bytes = calloc(1, writer.capacity);
+    json_writer writer{65536};
+    writer.bytes.reset(new (std::nothrow) char[writer.capacity]{});
     if (!writer.bytes) valid = false;
-    if (writer.bytes && valid) {
+    if (writer.bytes.get() && valid) {
         write_complete(&writer, &evidence, capture.digest, true,
                        usb.authenticated, usb.client_proof_sent);
     } else if (writer.bytes) {
@@ -606,8 +615,8 @@ static int capture_native(int argc, char **argv) {
         write_string(&writer, failure[0] ? failure : "Capture not fully validated");
         write_literal(&writer, "}\n");
     }
-    bool persisted = writer.bytes && !writer.failed &&
-        atomic_create(o.report, writer.bytes, writer.used);
+    bool persisted = writer.bytes.get() && !writer.failed &&
+        atomic_create(o.report, writer.bytes.get(), writer.used);
     bool all_frames_stable = valid && evidence.execution_completed;
     for (size_t i = 0; i < evidence.visited_frames && all_frames_stable; ++i)
         if (strcmp(evidence.progress[i].provisional_status, "COMPLETE") &&
@@ -618,7 +627,7 @@ static int capture_native(int argc, char **argv) {
         fprintf(stderr, "Native CF/1 report could not be created; original capture is preserved\n");
     if (!valid)
         fprintf(stderr, "Native CF/1 not validated: %s\n", failure[0] ? failure : "Unexpected failure");
-    free(writer.bytes); free_input(&capture); free_input(&again);
+    writer.bytes.reset(); free_input(&capture); free_input(&again);
     cf1_evidence_free(&evidence);
     return status;
 }
@@ -628,20 +637,20 @@ static int capture_native(int argc, char **argv) {
  * Prefix observations cannot be promoted to a complete terminal receipt.
  */
 static bool cl1_project(const input *capture, const char *vin, bool prefix,
-                        char **json_out, size_t *size_out, cl1_result *state) {
+                        std::unique_ptr<char[]> *json_out, size_t *size_out, cl1_result *state) {
     char reason[256] = {0};
     memset(state, 0, sizeof(*state));
     int replay = prefix ?
-        cl1_inspect_prefix(capture->bytes, capture->length, vin,
+        cl1_inspect_prefix(capture->bytes.get(), capture->length, vin,
                            state, reason, sizeof(reason)) :
-        cl1_inspect_complete(capture->bytes, capture->length, vin,
+        cl1_inspect_complete(capture->bytes.get(), capture->length, vin,
                              state, reason, sizeof(reason));
     if (replay != 0) {
         fprintf(stderr, "CL/1 replay rejected: %s\n", reason);
         return false;
     }
-    json_writer w = { .capacity = 65536 };
-    w.bytes = calloc(1, w.capacity);
+    json_writer w{65536};
+    w.bytes.reset(new (std::nothrow) char[w.capacity]{});
     if (!w.bytes) return false;
     write_literal(&w, "{\"schema\":");
     write_string(&w, prefix ? "camarodiag-j1979-live-prefix-linux-c-v1" :
@@ -718,30 +727,30 @@ static bool cl1_project(const input *capture, const char *vin, bool prefix,
     write_literal(&w,"],\"capture_sha256\":");
     write_string(&w,capture->digest);
     write_literal(&w,"}\n");
-    if (w.failed) {free(w.bytes);return false;}
-    *json_out=w.bytes;
+    if (w.failed) {w.bytes.reset();return false;}
+    *json_out = std::move(w.bytes);
     *size_out=w.used;
     return true;
 }
 static int cl1_inspect_cli(const char *capture_path, const char *vin,
                            const char *output, bool prefix) {
-    input capture={0}, again={0};
-    cl1_result state={0};
-    char *report=NULL;
+    input capture{}, again{};
+    cl1_result state{};
+    std::unique_ptr<char[]> report;
     size_t n=0;
     bool ok=load_regular(capture_path,CL1_MAX_CAPTURE,&capture);
     if (ok) ok=cl1_project(&capture,vin,prefix,&report,&n,&state);
     if (ok) ok=load_regular(capture_path,CL1_MAX_CAPTURE,&again) &&
                same_input(&capture,&again);
-    if (ok) ok=atomic_create(output,report,n);
-    free(report);free_input(&capture);free_input(&again);
+    if (ok) ok=atomic_create(output,report.get(),n);
+    report.reset();free_input(&capture);free_input(&again);
     return ok?0:error("CL/1 inspection refused: invalid capture, source changed or output exists");
 }
 static int cl1_verify_cli(const char *capture_path, const char *report_path,
                           const char *proof_path, const char *vin, bool prefix) {
-    input capture={0}, stored={0}, reread_capture={0}, reread_report={0};
-    cl1_result state={0};
-    char *canonical=NULL;
+    input capture{}, stored{}, reread_capture{}, reread_report{};
+    cl1_result state{};
+    std::unique_ptr<char[]> canonical;
     size_t size=0;
     bool ok=load_regular(capture_path,CL1_MAX_CAPTURE,&capture) &&
             load_regular(report_path,65536,&stored);
@@ -750,7 +759,7 @@ static int cl1_verify_cli(const char *capture_path, const char *report_path,
     /* No JSON field can be independently asserted by an untrusted saved
      * report: exact canonical equality is required after strict CL/1 replay.
      */
-    if (ok) ok=stored.length==size && !memcmp(stored.bytes,canonical,size);
+    if (ok) ok=stored.length==size && !memcmp(stored.bytes.get(),canonical.get(),size);
     if (ok) ok=load_regular(capture_path,CL1_MAX_CAPTURE,&reread_capture) &&
                load_regular(report_path,65536,&reread_report) &&
                same_input(&capture,&reread_capture) &&
@@ -774,7 +783,7 @@ static int cl1_verify_cli(const char *capture_path, const char *report_path,
         ok=n>0 && (size_t)n<sizeof(proof) &&
             atomic_create(proof_path,proof,(size_t)n);
     }
-    free(canonical);
+    canonical.reset();
     free_input(&capture);free_input(&stored);
     free_input(&reread_capture);free_input(&reread_report);
     return ok?0:error("CL/1 verification refused: altered report, unstable input or output exists");
@@ -858,7 +867,7 @@ static bool parse_cl1_capture(int argc,char **argv,cl1_capture_options *o) {
         cl1_valid_plan(&o->plan);
 }
 static int capture_cl1_native(int argc,char **argv) {
-    cl1_capture_options o={0};
+    cl1_capture_options o{};
     if (!parse_cl1_capture(argc,argv,&o))
         return error("CU/3 requires explicit approved physical pair, VIN, PID, key, port, capture, output, cycles and interval");
     if (!isatty(STDIN_FILENO))
@@ -872,7 +881,7 @@ static int capture_cl1_native(int argc,char **argv) {
     uint8_t key[32]={0};
     if (!read_key_file(o.credential,key))
         return error("CU/3 requires a private provisioned 32-byte key, no fallback");
-    struct sigaction action={0},oldint={0},oldterm={0};
+    struct sigaction action{},oldint{},oldterm{};
     action.sa_handler=cancel_handler;
     sigemptyset(&action.sa_mask);
     bool registered=sigaction(SIGINT,&action,&oldint)==0;
@@ -880,7 +889,7 @@ static int capture_cl1_native(int argc,char **argv) {
         sigaction(SIGINT,&oldint,NULL);
         registered=false;
     }
-    cf1_usb_capture_result transport={0};
+    cf1_usb_capture_result transport{};
     char failure[256]={0};
     int received=registered ?
         cl1_usb_capture(o.port,&o.plan,key,o.capture,
@@ -895,10 +904,10 @@ static int capture_cl1_native(int argc,char **argv) {
     /* Live credential proof is not an offline hardware attestation.
      * The published schema records only independently replayed CL/1 bytes.
      */
-    input capture={0},again={0};
-    char *report=NULL;
+    input capture{},again{};
+    std::unique_ptr<char[]> report;
     size_t size=0;
-    cl1_result replay={0};
+    cl1_result replay{};
     bool complete=received==0 &&
         load_regular(o.capture,CL1_MAX_CAPTURE,&capture);
     if (complete) complete=cl1_project(&capture,o.plan.vin,false,
@@ -907,7 +916,7 @@ static int capture_cl1_native(int argc,char **argv) {
                            replay.final_vin && replay.inventory_complete;
     if (complete) complete=load_regular(o.capture,CL1_MAX_CAPTURE,&again) &&
                            same_input(&capture,&again);
-    if (complete) complete=atomic_create(o.output,report,size);
+    if (complete) complete=atomic_create(o.output,report.get(),size);
     if (!complete) {
         /* A failed live capture is still a valuable forensic prefix.
          * Never turn its incomplete/unsafe status into a successful report.
@@ -936,7 +945,7 @@ static int capture_cl1_native(int argc,char **argv) {
         fprintf(stderr,"CU/3: no qualified complete report; raw capture retained when created (%s)\n",
                 failure[0]?failure:"independent replay failed or output unavailable");
     }
-    free(report);
+    report.reset();
     free_input(&capture);free_input(&again);
     return complete?0:2;
 }
