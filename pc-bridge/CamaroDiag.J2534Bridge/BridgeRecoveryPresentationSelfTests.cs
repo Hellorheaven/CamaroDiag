@@ -12,6 +12,7 @@ internal static class BridgeRecoveryPresentationSelfTests
             "VerifyOriginalButton", "ChooseOriginalTitle", "OriginalBinFilter",
             "OriginalBinName", "OriginalBinMatched", "OriginalBinRejected",
             "FailedSector", "OfflineNotice",
+            "RecoveryTab", "RecoveryInstructions", "OpenJournal", "OpenCheckpoint", "NoSelection", "JournalFilter", "CheckpointFilter", "InspectionFailed", "ExportFailed", "CheckpointState", "CheckpointStage", "CheckpointTransaction", "CheckpointManifest", "CheckpointUnauthenticated", "Checkpoint_UnavailableOrCorrupt", "Checkpoint_RecoveryRequired", "Checkpoint_SafeButBlocked", "Checkpoint_IdentityMismatch", "StateNoEvents", "StateCompleted", "StateRecoveryRequired", "StateInterrupted", "RecoveryEvidenceOnly",
             "ExportAssessment", "AssessmentJsonFilter", "Inspecting", "EvidenceChanged", "AssessmentExported", "JournalName", "JournalState", "JournalCounts", "JournalInvalid", "LastStage", "Unknown", "TargetIdentity", "TargetUnverified", "BackupStatus", "IntegrityVerified", "IntegrityUnverified", "Snapshot", "GeometryMatches", "GeometryUnqualified", "Sector"
         };
         foreach (var culture in new[] { CultureInfo.GetCultureInfo("fr"),

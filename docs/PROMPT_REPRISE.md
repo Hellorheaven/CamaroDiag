@@ -1,3 +1,7 @@
+## C6 — rapport CDJ/1 et export de preuves connecteur (27/11/2026)
+
+- Lecture bornée et double acquisition des 64 octets, SHA-256 de l'instantané, comparaison optionnelle transaction/manifeste via CLI, export JSON exclusif réévalué avant publication. Windows : sélection CDJ/1 distincte du journal E39, export du rapport correspondant, états localisés FR/EN et conservation des avertissements utiles ; aucune autorisation implicite. Rapports corrompus de taille exacte exportables comme preuves négatives, fichiers de taille incorrecte sans empreinte non exportables. Régressions CLI/JSON écrites non exécutées ; C6/J1979 ouverts, aucune CI intermédiaire.
+
 ## C6 — rapport de récupération Windows exportable (27/11/2026)
 
 - Rapport JSON hors ligne E39 : identité déclarée, état journal, secteurs, hash des enveloppes et preuves, nombre d'octets contrôlés, comparaison BIN optionnelle et absence explicite d'autorisation de restauration. Relecture complète avant export et création exclusive, rejet du rapport si les preuves affichées ont changé. L'écran remplace le résultat précédent au lieu d'ajouter une comparaison à un ancien journal. Ressources FR/EN, régressions écrites non exécutées. Aucun accès ECU ni qualification matérielle. C6/J1979 ouverts.

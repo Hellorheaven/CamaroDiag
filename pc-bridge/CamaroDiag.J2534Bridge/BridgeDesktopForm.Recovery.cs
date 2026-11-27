@@ -7,7 +7,8 @@ internal sealed partial class BridgeDesktopForm
 {
     private TabPage BuildRecoveryTab()
     {
-        var tab = new TabPage("Récupération ECU");
+        string T(string key)=>BridgeRecoveryPresentation.Text(key);
+        var tab = new TabPage(T("RecoveryTab"));
         var layout = new TableLayoutPanel
         {
             Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3
@@ -19,40 +20,41 @@ internal sealed partial class BridgeDesktopForm
         var instructions = new Label
         {
             AutoSize = true, Dock = DockStyle.Fill, Padding = new Padding(8),
-            Text = "Analyse hors ligne d'un ancien journal d'écriture ECU. " +
-                "Aucune connexion, aucun reset, aucune écriture ou reprise automatique. " +
-                "Conservez toujours le fichier original et le journal."
+            Text = T("RecoveryInstructions")
         };
-        var choose = Button("Ouvrir et analyser un journal");
-        var chooseConnector = Button("Ouvrir un checkpoint CDJ/1");
+        var choose = Button(T("OpenJournal"));
+        var chooseConnector = Button(T("OpenCheckpoint"));
         var verifyOriginal = Button(BridgeRecoveryPresentation.Text("VerifyOriginalButton"));
         verifyOriginal.Enabled = false;
         string? selectedJournal = null;
         string? selectedOriginal = null;
         BridgeRecoveryReport.Assessment? displayed = null;
+        string? selectedCheckpoint=null;
+        ConnectorCheckpoint.FileAssessment? displayedCheckpoint=null;
         var export = Button(BridgeRecoveryPresentation.Text("ExportAssessment"));
         export.Enabled = false;
         var results = new TextBox
         {
             Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Vertical,
             Dock = DockStyle.Fill, Font = new Font(FontFamily.GenericMonospace, 10),
-            Text = "Aucun journal sélectionné."
+            Text = T("NoSelection")
         };
         choose.Click += async (_, _) =>
         {
             if (busy) return;
             using var dialog = new OpenFileDialog
             {
-                Title = "Choisir un journal de programmation ECU existant",
-                Filter = "Journal ECU (*.jsonl)|*.jsonl|Tous les fichiers (*.*)|*.*",
+                Title = T("OpenJournal"),
+                Filter = T("JournalFilter"),
                 CheckFileExists = true, Multiselect = false
             };
             if (dialog.ShowDialog(this) != DialogResult.OK) return;
             selectedJournal = dialog.FileName;
+            selectedCheckpoint=null;displayedCheckpoint=null;
             selectedOriginal = null;
             displayed = null;
             verifyOriginal.Enabled = export.Enabled = false;
-            results.Text = "Analyse hors ligne…";
+            results.Text = T("Inspecting");
             choose.Enabled = false;
             try
             {
@@ -62,8 +64,8 @@ internal sealed partial class BridgeDesktopForm
                     displayed = assessment;
                     results.Lines = RecoveryAssessmentLines(assessment);
                 });
-                if (results.Text == "Analyse hors ligne…")
-                    results.Text = "Journal non analysable. Aucune conclusion sur l'état du calculateur.";
+                if (displayed is null)
+                    results.Text = T("InspectionFailed");
             }
             finally {
                 choose.Enabled = true;
@@ -112,33 +114,48 @@ internal sealed partial class BridgeDesktopForm
         };
         export.Click += async (_, _) =>
         {
-            if(busy || selectedJournal is null || displayed is null)return;
+            if(busy || (selectedJournal is null || displayed is null) &&
+                (selectedCheckpoint is null || displayedCheckpoint is null))return;
             using var save = new SaveFileDialog {
                 Title=BridgeRecoveryPresentation.Text("ExportAssessment"),
                 Filter=BridgeRecoveryPresentation.Text("AssessmentJsonFilter"),
-                FileName="CamaroDiag_E39_Recovery.json",AddExtension=true,DefaultExt="json",
+                FileName=displayedCheckpoint is null?"CamaroDiag_E39_Recovery.json":"CamaroDiag_CDJ_Checkpoint.json",
+                AddExtension=true,DefaultExt="json",
                 OverwritePrompt=true
             };
             if(save.ShowDialog(this)!=DialogResult.OK)return;
             var journal=selectedJournal;
             var bin=selectedOriginal;
             var previous=displayed;
+            var checkpoint=selectedCheckpoint;
+            var previousCheckpoint=displayedCheckpoint;
             export.Enabled=verifyOriginal.Enabled=false;
             try {
                 await RunBusyAsync(async ()=>{
                     try {
-                        var current=await Task.Run(()=>BridgeRecoveryReport.ExportCurrent(save.FileName,journal,bin,previous));
-                        displayed=current;
-                        results.Lines=RecoveryAssessmentLines(current);
+                        if(checkpoint is not null && previousCheckpoint is not null){
+                            var current=await Task.Run(()=>ConnectorCheckpoint.ExportCurrent(save.FileName,checkpoint,previousCheckpoint));
+                            displayedCheckpoint=current;
+                            results.Lines=CheckpointAssessmentLines(current);
+                        }else if(journal is not null && previous is not null){
+                            var current=await Task.Run(()=>BridgeRecoveryReport.ExportCurrent(save.FileName,journal,bin,previous));
+                            displayed=current;
+                            results.Lines=RecoveryAssessmentLines(current);
+                        }else return;
                         results.AppendText(Environment.NewLine+BridgeRecoveryPresentation.Text("AssessmentExported"));
                     } catch(InvalidDataException) {
                         displayed=null;selectedOriginal=null;
-                        results.Text=BridgeRecoveryPresentation.Text("EvidenceChanged");
+                        displayedCheckpoint=null;
+                        results.Text=T("EvidenceChanged");
+                    } catch(IOException) {
+                        ShowError(T("ExportFailed"));
+                    } catch(UnauthorizedAccessException) {
+                        ShowError(T("ExportFailed"));
                     }
                 });
             } finally {
                 verifyOriginal.Enabled=displayed?.Backup.Verified==true && displayed.Target.Verified;
-                export.Enabled=displayed?.Journal.Sha256 is not null;
+                export.Enabled=displayed?.Journal.Sha256 is not null || displayedCheckpoint?.SnapshotSha256 is not null;
             }
         };
         chooseConnector.Click += async (_, _) =>
@@ -146,44 +163,35 @@ internal sealed partial class BridgeDesktopForm
             if (busy) return;
             using var dialog = new OpenFileDialog
             {
-                Title = "Choisir un checkpoint CDJ/1 exporté (64 octets)",
-                Filter = "Checkpoint binaire (*.bin)|*.bin|Tous les fichiers (*.*)|*.*",
+                Title = T("OpenCheckpoint"),
+                Filter = T("CheckpointFilter"),
                 CheckFileExists = true, Multiselect = false
             };
             if (dialog.ShowDialog(this) != DialogResult.OK) return;
             // CDJ/1 is not an E39 write journal; do not retain the previous
             // E39 selection when showing unrelated connector evidence.
             selectedJournal = null;
+            selectedCheckpoint=dialog.FileName;
+            displayedCheckpoint=null;
             selectedOriginal = null;
             displayed = null;
             verifyOriginal.Enabled = export.Enabled = false;
-            results.Text = "Analyse CDJ/1 hors ligne…";
+            results.Text = T("Inspecting");
             chooseConnector.Enabled = choose.Enabled = false;
             try
             {
                 await RunBusyAsync(async () =>
                 {
-                    var report = await Task.Run(() => ConnectorCheckpoint.InspectFile(dialog.FileName));
-                    var lines = new List<string>
-                    {
-                        "Fichier : " + Path.GetFileName(dialog.FileName),
-                        "État CDJ/1 : " + report.Status,
-                        "Authentification : NON. Aucun accès physique autorisé."
-                    };
-                    if (report.Record is { } record)
-                    {
-                        lines.Add("Étape : " + record.Stage);
-                        lines.Add("Séquence : " + record.Sequence);
-                        lines.Add("Transaction : " + record.TransactionHex);
-                        lines.Add("SHA-256 du manifeste : " + record.ManifestSha256);
-                    }
-                    lines.Add("Reprise automatique et programmation interdites. Vérifier les preuves et l'état réel.");
-                    results.Lines = lines.ToArray();
+                    var report=await Task.Run(()=>ConnectorCheckpoint.AssessFile(dialog.FileName));
+                    displayedCheckpoint=report;
+                    results.Lines=CheckpointAssessmentLines(report);
                 });
-                if (results.Text == "Analyse CDJ/1 hors ligne…")
-                    results.Text = "Checkpoint non analysable. Aucune conclusion sur la cible.";
+                if(displayedCheckpoint is null)results.Text=T("InspectionFailed");
             }
-            finally { chooseConnector.Enabled = choose.Enabled = true; }
+            finally {
+                chooseConnector.Enabled=choose.Enabled=true;
+                export.Enabled=displayedCheckpoint?.SnapshotSha256 is not null;
+            }
         };
         layout.Controls.Add(instructions, 0, 0);
         var actions = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true };
@@ -195,6 +203,25 @@ internal sealed partial class BridgeDesktopForm
         layout.Controls.Add(results, 0, 2);
         tab.Controls.Add(layout);
         return tab;
+    }
+
+    private static string[] CheckpointAssessmentLines(ConnectorCheckpoint.FileAssessment report)
+    {
+        string T(string key)=>BridgeRecoveryPresentation.Text(key);
+        string F(string key,params object[] values)=>string.Format(
+            System.Globalization.CultureInfo.CurrentUICulture,T(key),values);
+        var lines=new List<string>{F("JournalName",report.FileName),
+            F("CheckpointState",T("Checkpoint_"+report.Inspection.Status))};
+        if(report.Inspection.Record is { } record){
+            lines.Add(F("CheckpointStage",record.Stage,record.Sequence));
+            lines.Add(F("CheckpointTransaction",record.TransactionHex));
+            lines.Add(F("CheckpointManifest",record.ManifestSha256));
+        }
+        if(report.SnapshotSha256 is not null)lines.Add(F("Snapshot",report.SnapshotSha256));
+        if(report.Problem is not null)lines.Add(report.Problem);
+        lines.Add(T("CheckpointUnauthenticated"));
+        lines.Add(T("OfflineNotice"));
+        return lines.ToArray();
     }
 
     private static string[] RecoveryAssessmentLines(BridgeRecoveryReport.Assessment report)
@@ -228,8 +255,20 @@ internal sealed partial class BridgeDesktopForm
                 F("OriginalBinRejected",comparison.Problem));
             if(comparison.FailedSectorAddress is uint failed)lines.Add(F("FailedSector",failed));
         }
-        // Previous extensive technical explanations remain in source history;
-        // only decision-relevant state and safety limitations are displayed.
+        // Former technical text is retained here, not displayed:
+        // lines.Add("Ce résultat décrit le journal, pas l'état physique actuel du calculateur.");
+        // lines.Add("La déclaration sauvegardée ne remplace pas une identification ECU en direct.");
+        // lines.Add("Aucun secteur ne sera restauré automatiquement.");
+        // lines.Add("Recette véhicule après écriture : identité ECU, checksum OEM, DTC avant/après, " +
+        //     "démarrage, ralenti, contrôles statiques, essai conduit par l'opérateur.");
+        // lines.Add("Avant restauration : confirmer l'état physique, les blocs, l'outil, " +
+        //     "le mode récupération et une NOUVELLE autorisation OK puis Oui/Non.");
+        // lines.Add(report.RequiresAssessment
+        //     ? "Évaluation manuelle nécessaire : conserver les preuves, vérifier l'alimentation, " +
+        //       "l'identité et le moyen de récupération documenté avant toute autre opération."
+        //     : "La fin de transaction est enregistrée. Cela ne certifie ni le fonctionnement du " +
+        //       "véhicule ni la possibilité de restaurer le calculateur.");
+        lines.Add(T("RecoveryEvidenceOnly"));
         lines.Add(T("OfflineNotice"));
         return lines.ToArray();
     }
@@ -237,9 +276,9 @@ internal sealed partial class BridgeDesktopForm
     private static string ExplainRecoveryState(NativeE39FileWriteJournal.CompletionState state) =>
         state switch
         {
-            NativeE39FileWriteJournal.CompletionState.NoEvents => "Aucune opération enregistrée",
-            NativeE39FileWriteJournal.CompletionState.Completed => "Fin de transaction enregistrée",
-            NativeE39FileWriteJournal.CompletionState.RecoveryRequired => "Récupération / évaluation requise",
-            _ => "Interrompu ou journal incomplet"
+            NativeE39FileWriteJournal.CompletionState.NoEvents => BridgeRecoveryPresentation.Text("StateNoEvents"),
+            NativeE39FileWriteJournal.CompletionState.Completed => BridgeRecoveryPresentation.Text("StateCompleted"),
+            NativeE39FileWriteJournal.CompletionState.RecoveryRequired => BridgeRecoveryPresentation.Text("StateRecoveryRequired"),
+            _ => BridgeRecoveryPresentation.Text("StateInterrupted")
         };
 }

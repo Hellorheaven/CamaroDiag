@@ -32,4 +32,27 @@
   <data name="GeometryMatches" xml:space="preserve"><value>Silicon erase geometry consistent; ECU board not qualified.</value></data>
   <data name="GeometryUnqualified" xml:space="preserve"><value>Erase geometry inconsistent or unqualified.</value></data>
   <data name="Sector" xml:space="preserve"><value>Original 0x{0:X8} · {1} bytes · SHA-256 {2}</value></data>
+  <data name="RecoveryTab" xml:space="preserve"><value>ECU recovery</value></data>
+  <data name="RecoveryInstructions" xml:space="preserve"><value>Offline analysis. Keep the original image and journal.</value></data>
+  <data name="OpenJournal" xml:space="preserve"><value>Open programming journal</value></data>
+  <data name="OpenCheckpoint" xml:space="preserve"><value>Open CDJ/1 checkpoint</value></data>
+  <data name="NoSelection" xml:space="preserve"><value>No evidence selected.</value></data>
+  <data name="JournalFilter" xml:space="preserve"><value>ECU journal (*.jsonl)|*.jsonl|All files (*.*)|*.*</value></data>
+  <data name="CheckpointFilter" xml:space="preserve"><value>Binary checkpoint (*.bin)|*.bin|All files (*.*)|*.*</value></data>
+  <data name="InspectionFailed" xml:space="preserve"><value>Evidence unavailable; no conclusion about physical ECU state.</value></data>
+  <data name="ExportFailed" xml:space="preserve"><value>Export failed. Select a new writable file.</value></data>
+  <data name="CheckpointState" xml:space="preserve"><value>CDJ/1 state: {0}</value></data>
+  <data name="CheckpointStage" xml:space="preserve"><value>Stage: {0} · sequence: {1}</value></data>
+  <data name="CheckpointTransaction" xml:space="preserve"><value>Transaction: {0}</value></data>
+  <data name="CheckpointManifest" xml:space="preserve"><value>Manifest SHA-256: {0}</value></data>
+  <data name="CheckpointUnauthenticated" xml:space="preserve"><value>Unauthenticated checkpoint.</value></data>
+  <data name="Checkpoint_UnavailableOrCorrupt" xml:space="preserve"><value>Unavailable or corrupt</value></data>
+  <data name="Checkpoint_RecoveryRequired" xml:space="preserve"><value>Recovery assessment required</value></data>
+  <data name="Checkpoint_SafeButBlocked" xml:space="preserve"><value>No recovery action authorized</value></data>
+  <data name="Checkpoint_IdentityMismatch" xml:space="preserve"><value>Identity mismatch</value></data>
+  <data name="StateNoEvents" xml:space="preserve"><value>No operation recorded</value></data>
+  <data name="StateCompleted" xml:space="preserve"><value>Transaction completion recorded</value></data>
+  <data name="StateRecoveryRequired" xml:space="preserve"><value>Recovery assessment required</value></data>
+  <data name="StateInterrupted" xml:space="preserve"><value>Interrupted or incomplete journal</value></data>
+  <data name="RecoveryEvidenceOnly" xml:space="preserve"><value>Evidence describes the recorded transaction, not the current physical ECU state.</value></data>
 </root>

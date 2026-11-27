@@ -32,4 +32,27 @@
   <data name="GeometryMatches" xml:space="preserve"><value>Géométrie silicium cohérente ; carte ECU non qualifiée.</value></data>
   <data name="GeometryUnqualified" xml:space="preserve"><value>Géométrie incohérente ou non qualifiée.</value></data>
   <data name="Sector" xml:space="preserve"><value>Original 0x{0:X8} · {1} octets · SHA-256 {2}</value></data>
+  <data name="RecoveryTab" xml:space="preserve"><value>Récupération ECU</value></data>
+  <data name="RecoveryInstructions" xml:space="preserve"><value>Analyse hors ligne. Conservez le BIN original et le journal.</value></data>
+  <data name="OpenJournal" xml:space="preserve"><value>Ouvrir un journal de programmation</value></data>
+  <data name="OpenCheckpoint" xml:space="preserve"><value>Ouvrir un checkpoint CDJ/1</value></data>
+  <data name="NoSelection" xml:space="preserve"><value>Aucune preuve sélectionnée.</value></data>
+  <data name="JournalFilter" xml:space="preserve"><value>Journal ECU (*.jsonl)|*.jsonl|Tous les fichiers (*.*)|*.*</value></data>
+  <data name="CheckpointFilter" xml:space="preserve"><value>Checkpoint binaire (*.bin)|*.bin|Tous les fichiers (*.*)|*.*</value></data>
+  <data name="InspectionFailed" xml:space="preserve"><value>Preuves indisponibles ; aucune conclusion sur l’état physique du calculateur.</value></data>
+  <data name="ExportFailed" xml:space="preserve"><value>Export impossible. Choisissez un nouveau fichier accessible.</value></data>
+  <data name="CheckpointState" xml:space="preserve"><value>État CDJ/1 : {0}</value></data>
+  <data name="CheckpointStage" xml:space="preserve"><value>Étape : {0} · séquence : {1}</value></data>
+  <data name="CheckpointTransaction" xml:space="preserve"><value>Transaction : {0}</value></data>
+  <data name="CheckpointManifest" xml:space="preserve"><value>SHA-256 du manifeste : {0}</value></data>
+  <data name="CheckpointUnauthenticated" xml:space="preserve"><value>Checkpoint non authentifié.</value></data>
+  <data name="Checkpoint_UnavailableOrCorrupt" xml:space="preserve"><value>Indisponible ou corrompu</value></data>
+  <data name="Checkpoint_RecoveryRequired" xml:space="preserve"><value>Évaluation de récupération requise</value></data>
+  <data name="Checkpoint_SafeButBlocked" xml:space="preserve"><value>Aucune action de récupération autorisée</value></data>
+  <data name="Checkpoint_IdentityMismatch" xml:space="preserve"><value>Identité discordante</value></data>
+  <data name="StateNoEvents" xml:space="preserve"><value>Aucune opération enregistrée</value></data>
+  <data name="StateCompleted" xml:space="preserve"><value>Fin de transaction enregistrée</value></data>
+  <data name="StateRecoveryRequired" xml:space="preserve"><value>Récupération / évaluation requise</value></data>
+  <data name="StateInterrupted" xml:space="preserve"><value>Interrompu ou journal incomplet</value></data>
+  <data name="RecoveryEvidenceOnly" xml:space="preserve"><value>Les preuves décrivent la transaction enregistrée, pas l’état physique actuel du calculateur.</value></data>
 </root>
