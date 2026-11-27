@@ -1315,4 +1315,6 @@
     <string name="functional_legacy_documented_sources">Sources documentées (hexadécimal, séparées par virgules)</string>
     <string name="functional_legacy_mutation_profile">Je confirme le protocole, le moteur et toutes les sources antipollution documentées pour le VIN %1$s.</string>
     <string name="functional_legacy_mutation_uncertain">Campagne legacy interrompue ou en échec. État de la demande potentiellement incertain. Ne relancez pas automatiquement.</string>
+    <string name="j1979_live_raw_only">Trames brutes uniquement (sans interprétation numérique)</string>
+    <string name="j1979_live_raw_count">PID %1$s : %2$d/%3$d réponses brutes corrélées</string>
 </resources>
