@@ -130,6 +130,12 @@ internal static class ObdJ1979Interpretation
         if (request[0] is 0x01 or 0x02 &&
             request.Length == (request[0] == 0x02 ? 3 : 2))
         {
+            if (request[0] == 1 && ObdJ1979MultiSignal.Width(request[1]) is not null)
+            {
+                var signals=ObdJ1979MultiSignal.DecodeResponse(request,response)
+                    ?? throw new InvalidDataException("Invalid multi-signal PID record.");
+                return new Result(ObdJ1979MultiSignal.Format(signals),true,reply.Service);
+            }
             var value = ObdJ1979PidValues.Decode(request, response);
             if (value is not null)
                 return new Result(ObdJ1979PidValues.Format(value),
@@ -180,7 +186,8 @@ internal static class ObdJ1979Interpretation
             if (!pending.Remove((pid, frame)))
                 throw new InvalidDataException("Unexpected PID, frame number or excess duplicate.");
             int? length = pid % 32 == 0 || (!freeze && pid == 0x01) ? 4 :
-                freeze && pid == 0x02 ? 2 : ObdJ1979PidValues.DataLength(pid);
+                freeze && pid == 0x02 ? 2 : ObdJ1979PidValues.DataLength(pid) ??
+                    (freeze?null:ObdJ1979MultiSignal.Width(pid));
             if (length is null)
             {
                 // Without the data width there is no unambiguous next identifier.
