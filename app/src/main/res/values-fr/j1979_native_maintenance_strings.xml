@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="j1979_native_maintenance_title">Inspecter le journal de maintenance natif</string>
+    <string name="j1979_native_maintenance_select">Sélectionner le journal CM/1 original</string>
+    <string name="j1979_native_maintenance_run">Inspecter et exporter le journal</string>
+    <string name="j1979_native_maintenance_scope">Preuve hors ligne uniquement. Un acquittement ne prouve pas la fin du test et ne permet pas une nouvelle commande.</string>
+    <string name="j1979_native_maintenance_saved">Rapport du journal de maintenance exporté</string>
+    <string name="j1979_native_maintenance_rejected">Inspection du journal de maintenance refusée</string>
+</resources>
