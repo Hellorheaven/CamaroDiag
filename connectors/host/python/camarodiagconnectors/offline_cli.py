@@ -18,6 +18,7 @@ from .j1979_live_inspection import inspect_file, compare_files
 from .j1979_network_inspection import inspect_network_file
 from .j1979_legacy_inspection import inspect_file as inspect_legacy_file
 from .j1979_mutation_inspection import inspect_files as inspect_legacy_mutation
+from .j1979_legacy_discovery_inspection import inspect_file as inspect_legacy_discovery, bind_files as bind_legacy_scan
 from .j1979_capture_inspection import verify_files as verify_j1979_capture
 from .connector_checkpoint import inspect_file as inspect_checkpoint, inspect_history, verify_report as verify_checkpoint_report
 
@@ -129,6 +130,14 @@ def _parser() -> argparse.ArgumentParser:
     legacy.add_argument("--vin")
     legacy.add_argument("--output", type=Path, required=True)
 
+    discovery = commands.add_parser("verify-legacy-discovery", help="Replay legacy PID00 discovery without connecting")
+    discovery.add_argument("--report", type=Path, required=True)
+    discovery.add_argument("--output", type=Path, required=True)
+    binding = commands.add_parser("compare-legacy-discovery-scan", help="Compare discovered and selected-source PID00 evidence")
+    binding.add_argument("--discovery", type=Path, required=True)
+    binding.add_argument("--scan", type=Path, required=True)
+    binding.add_argument("--output", type=Path, required=True)
+
     mutation = commands.add_parser("verify-legacy-mutation", help="Replay recorded legacy clear/EVAP evidence; never transmit")
     mutation.add_argument("--report", type=Path, required=True)
     mutation.add_argument("--baseline", type=Path)
@@ -219,6 +228,14 @@ def run(argv: Sequence[str] | None = None) -> dict[str, object]:
             raise ValueError("Inspection output must differ from the original report")
         return write_report(args.output, inspect_legacy_file(args.report, expected_vin=args.vin))
 
+    if args.action == "verify-legacy-discovery":
+        if args.report.resolve()==args.output.resolve():
+            raise ValueError("Output must differ from discovery input")
+        return write_report(args.output, inspect_legacy_discovery(args.report))
+    if args.action == "compare-legacy-discovery-scan":
+        if args.output.resolve() in (args.discovery.resolve(),args.scan.resolve()):
+            raise ValueError("Output must differ from original reports")
+        return write_report(args.output, bind_legacy_scan(args.discovery,args.scan))
     if args.action == "verify-legacy-mutation":
         inputs = {args.report.resolve()}
         if args.baseline is not None:
