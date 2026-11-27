@@ -10,4 +10,7 @@
     <string name="j1979_freeze_prefix_title">Inspect interrupted CF/1 capture</string>
     <string name="j1979_freeze_prefix_select">Select original CF/1 file</string>
     <string name="j1979_freeze_prefix_scope">Only complete Mode 02 records are checked. No completed recording or vehicle verification is claimed.</string>
+    <string name="j1979_freeze_prefix_saved">Interrupted Mode 02 report exported</string>
+    <string name="j1979_freeze_prefix_rejected">Interrupted CF/1 capture rejected</string>
+    <string name="j1979_freeze_prefix_summary">%1$d provisional frames, %2$d complete observations, %3$d unverified tail bytes</string>
 </resources>

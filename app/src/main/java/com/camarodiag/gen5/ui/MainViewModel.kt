@@ -6940,7 +6940,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             if(!confirmFunctionalTestOwner(account)||!current())return@launch
             _connectionMessage.value=localizedContext.getString(R.string.j1979_catalogue_working)
             try {
-                val path=withContext(Dispatchers.IO) {
+                val (path,progress)=withContext(Dispatchers.IO) {
                     val context=getApplication<Application>()
                     val resolver=context.contentResolver
                     val job=currentCoroutineContext()[Job]
@@ -6950,7 +6950,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         maintenance -> J1979NativePrefixFiles.prepareMaintenance(resolver,source,confirmedVehicle.vin,::requireCurrent,interrupted)
                         else -> J1979NativePrefixFiles.prepare(resolver,source,confirmedVehicle.vin,::requireCurrent)
                     }
-                    CamaroDiagExportStorage.write(context,
+                    val outputPath=CamaroDiagExportStorage.write(context,
                         "CamaroDiag_SAE-J1979_NATIVE_"+(if(freeze) "FREEZE_PREFIX_" else if(interrupted) "MAINTENANCE_PREFIX_" else if(maintenance) "MAINTENANCE_" else "PREFIX_")+System.currentTimeMillis()+".json",
                         "application/json",category=CamaroDiagExportStorage.Category.TESTS,
                         beforePublish={
@@ -6962,11 +6962,27 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         },verifyStaged={input -> PhysicalRecoveryEvidenceJson.requireExactJson(input,prepared.bytes)}) {
                         it.write(prepared.bytes)
                     }
+                    val summary=if(freeze) {
+                        val frames=J1979CatalogueJson.array(prepared.document["observed_frame_progress"],0,8)
+                        val observations=prepared.document["complete_observations"] as Int
+                        val ignored=prepared.document["discarded_tail_bytes"] as Int
+                        localizedContext.getString(R.string.j1979_freeze_prefix_summary,frames.size,observations,ignored)
+                    } else null
+                    outputPath to summary
                 }
-                if(current())_connectionMessage.value=localizedContext.getString(if(maintenance) R.string.j1979_native_maintenance_saved else R.string.j1979_native_prefix_saved)+"\n"+path
+                if(current()) {
+                    _connectionMessage.value=localizedContext.getString(
+                        if(freeze) R.string.j1979_freeze_prefix_saved
+                        else if(maintenance) R.string.j1979_native_maintenance_saved
+                        else R.string.j1979_native_prefix_saved)+"\n"+path+
+                        (progress?.let { "\n"+it } ?: "")
+                }
             }catch(cancelled:CancellationException){throw cancelled}
             catch(_:Exception){
-                if(current())_connectionMessage.value=localizedContext.getString(if(maintenance) R.string.j1979_native_maintenance_rejected else R.string.j1979_native_prefix_rejected)
+                if(current())_connectionMessage.value=localizedContext.getString(
+                    if(freeze) R.string.j1979_freeze_prefix_rejected
+                    else if(maintenance) R.string.j1979_native_maintenance_rejected
+                    else R.string.j1979_native_prefix_rejected)
             }
         }
     }

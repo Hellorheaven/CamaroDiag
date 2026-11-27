@@ -10,4 +10,7 @@
     <string name="j1979_freeze_prefix_title">Inspecter une capture CF/1 interrompue</string>
     <string name="j1979_freeze_prefix_select">Sélectionner le fichier CF/1 original</string>
     <string name="j1979_freeze_prefix_scope">Seuls les enregistrements Mode 02 complets sont contrôlés. Ni campagne terminée ni validation du véhicule.</string>
+    <string name="j1979_freeze_prefix_saved">Rapport Mode 02 interrompu exporté</string>
+    <string name="j1979_freeze_prefix_rejected">Capture CF/1 interrompue refusée</string>
+    <string name="j1979_freeze_prefix_summary">%1$d trames provisoires, %2$d observations complètes, %3$d octets de fin non vérifiés</string>
 </resources>
