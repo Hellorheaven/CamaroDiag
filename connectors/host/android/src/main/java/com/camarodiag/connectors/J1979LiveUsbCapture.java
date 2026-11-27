@@ -1,4 +1,4 @@
-package com.camaradiag.connectors;
+package com.camarodiag.connectors;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -10,7 +10,7 @@ import java.util.Objects;
 import java.util.function.BooleanSupplier;
 import java.util.function.LongSupplier;
 
-import static com.camaradiag.connectors.J1979LiveUsbAuth.require;
+import static com.camarodiag.connectors.J1979LiveUsbAuth.require;
 
 /** One approved CU/3 session. Record exactly the received CL/1 bytes and
  * independently replay them before returning any numeric or completion claim. */
