@@ -278,3 +278,12 @@ camarodiagconnectors-offline verify-recovery --platform windows --journal journa
 ```
 
 Conserver le dossier `.blocks` associé au journal et, pour Windows, le manifeste `.meta.json`. Remplacer les identités d'exemple par celles documentées. La recette relit les originaux et les journaux, vérifie la séquence, les empreintes et l'inventaire exact, et calcule le même SHA-256 composite que les applications. `--expected-snapshot` compare une empreinte de rapport préexistante. Pour Windows E39/E39A, le BIN complet de 3 Mio peut être comparé aux originaux ; aucune adresse Android générique n'est supposée être un offset de BIN. Rapport JSON exclusif, aucune modification des preuves ou connexion véhicule, aucune autorisation de restauration. / Offline local evidence verification only; no physical provenance or programming authority.
+
+### Relecture indépendante des enregistrements J1979 / Independent live replay
+
+```sh
+camarodiag-offline verify-live --report live.json --output verified.json
+camarodiag-offline compare-live --report before.json --report after.json --output comparison.json
+```
+
+Relecture hors ligne des réponses Mode 01 et Mode 09, des bitmaps, des cycles, de la source legacy et des statistiques. La comparaison impose un même VIN et canal, sans supposer une acquisition simultanée ou des conditions de conduite identiques. Une preuve cohérente n'est ni une authentification, ni une qualification physique. / Offline consistency replay and per-PID summaries, not hardware qualification or a synchronized diagnostic verdict. Output is exclusive; source files are never modified.

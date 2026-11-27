@@ -2479,3 +2479,5 @@ Rapport composite journal/secteurs/manifeste, avec empreinte de journal et contr
 
 ### SAE J1979 — Cohérence du décodage ELM/J2534
 Le PID 32 est signé sur 16 bits à 0,25 Pa/bit (SAE J1979 APR2002, tableau B23), sans biais de 32768. Contrôle exact des longueurs des PIDs connus côté J2534, rejet du bit de continuation à la page E0. Cas limites et réponses tronquées/surnuméraires ajoutés aux tests non exécutés.
+
+- J1979 : relecture hôte hors ligne des exports live Android, Windows et Python, recalcul des mesures, vérification des cycles, VIN, bitmaps, source et fragments legacy, comparaison de statistiques de même canal sans synchronisation ni verdict physique. `verify-live` / `compare-live`, tests ajoutés non exécutés. Correction statique du type nullable de la sélection Android. C6/J1979 restent ouverts.

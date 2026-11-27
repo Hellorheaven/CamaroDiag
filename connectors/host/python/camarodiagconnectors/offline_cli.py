@@ -12,6 +12,7 @@ from .backup import backup_manifest, write_bundle, verify_bundle
 from .doip_archive import verify_archive
 from .memory import Geometry, Patch, Region, Technology, plan_patches
 from .recovery_bundle import AndroidIdentity,inspect_bundle,write_report
+from .j1979_live_inspection import inspect_file, compare_files
 
 
 def _number(text: str) -> int:
@@ -68,6 +69,15 @@ def _parser() -> argparse.ArgumentParser:
     recovery.add_argument("--expected-snapshot")
     recovery.add_argument("--output",type=Path,required=True)
 
+    live = commands.add_parser("verify-live", help="Replay and verify a J1979 numeric live recording")
+    live.add_argument("--report", type=Path, required=True)
+    live.add_argument("--vin")
+    live.add_argument("--output", type=Path, required=True)
+    compare = commands.add_parser("compare-live", help="Compare independently verified recordings without time alignment")
+    compare.add_argument("--report", type=Path, action="append", required=True)
+    compare.add_argument("--vin")
+    compare.add_argument("--output", type=Path, required=True)
+
     plan = commands.add_parser("plan", help="Dry-run changes; no device programming")
     plan.add_argument("--target", required=True)
     plan.add_argument("--technology", required=True, choices=[t.value for t in Technology])
@@ -108,6 +118,11 @@ def run(argv: Sequence[str] | None = None) -> dict[str, object]:
                               expected_vin=args.vin,expected_osid=args.osid,
                               original_bin=args.original_bin,expected_snapshot=args.expected_snapshot)
         return write_report(args.output,report)
+
+    if args.action == "verify-live":
+        return write_report(args.output, inspect_file(args.report, expected_vin=args.vin))
+    if args.action == "compare-live":
+        return write_report(args.output, compare_files(args.report, expected_vin=args.vin))
 
     original = args.input.read_bytes()
     geometry = Geometry(args.target, Technology(args.technology), len(original), args.page_size,
