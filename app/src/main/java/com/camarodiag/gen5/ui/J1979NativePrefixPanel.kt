@@ -22,7 +22,7 @@ import com.camarodiag.gen5.domain.model.VehicleProfile
  * independent of whether a USB adapter is currently connected. */
 @Composable
 internal fun J1979NativePrefixPanel(enabled: Boolean,vehicle: VehicleProfile,generation: Long,
-                                    inspect:(Uri,Long,VehicleProfile)->Unit) {
+                                    inspect:(Uri,Long,VehicleProfile)->Unit,maintenance:Boolean=false) {
     var expanded by remember { mutableStateOf(false) }
     var selected by remember(vehicle,generation) { mutableStateOf<Uri?>(null) }
     var confirmed by remember(vehicle,generation) { mutableStateOf(false) }
@@ -36,7 +36,7 @@ internal fun J1979NativePrefixPanel(enabled: Boolean,vehicle: VehicleProfile,gen
         pending=null
     }
     OutlinedButton(onClick={expanded=!expanded},modifier=Modifier.fillMaxWidth()) {
-        Text(stringResource(R.string.j1979_native_prefix_title))
+        Text(stringResource(if(maintenance) R.string.j1979_native_maintenance_title else R.string.j1979_native_prefix_title))
     }
     if(!expanded)return
     Column(verticalArrangement=Arrangement.spacedBy(6.dp),modifier=Modifier.fillMaxWidth()) {
@@ -44,7 +44,7 @@ internal fun J1979NativePrefixPanel(enabled: Boolean,vehicle: VehicleProfile,gen
             pending=current
             picker.launch(arrayOf("*/*"))
         },enabled=enabled&&pending==null,modifier=Modifier.fillMaxWidth()) {
-            Text(stringResource(if(selected==null) R.string.j1979_native_prefix_select
+            Text(stringResource(if(selected==null) (if(maintenance) R.string.j1979_native_maintenance_select else R.string.j1979_native_prefix_select)
                 else R.string.j1979_catalogue_selected))
         }
         Row(verticalAlignment=Alignment.CenterVertically) {
@@ -59,8 +59,8 @@ internal fun J1979NativePrefixPanel(enabled: Boolean,vehicle: VehicleProfile,gen
             }
         },enabled=enabled&&pending==null&&selected!=null&&confirmed&&
             J1979CatalogueProjection.validVin(vehicle.vin),modifier=Modifier.fillMaxWidth()) {
-            Text(stringResource(R.string.j1979_native_prefix_run))
+            Text(stringResource(if(maintenance) R.string.j1979_native_maintenance_run else R.string.j1979_native_prefix_run))
         }
-        Text(stringResource(R.string.j1979_native_prefix_scope))
+        Text(stringResource(if(maintenance) R.string.j1979_native_maintenance_scope else R.string.j1979_native_prefix_scope))
     }
 }
