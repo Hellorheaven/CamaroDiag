@@ -1,5 +1,6 @@
 #define _POSIX_C_SOURCE 200809L
 #include "j1979_live.h"
+#include "j1979_measurement.h"
 #include <limits.h>
 #include <stdlib.h>
 #include <string.h>
@@ -273,6 +274,25 @@ bool j1979_live_write_json(FILE *f,const j1979_live_plan *p,
             !hex(f,s->request,2) || fputs(",\"response_hex\":",f)==EOF) return false;
         if (s->response ? !hex(f,s->response,s->response_size) :
             fputs("null",f)==EOF) return false;
+        if (fputs(",\"measurement\":",f)==EOF) return false;
+        j1979_measurement m={0};
+        if (!strcmp(s->status,"RAW") && s->response &&
+            j1979_measurement_decode(s->request,2,s->response,
+                                     s->response_size,&m)) {
+            if (fprintf(f,"{\"mode\":%u,\"pid\":%u,\"name\":",
+                        m.mode,m.pid)<0 ||
+                !string(f,m.name) ||
+                fputs(",\"unit\":",f)==EOF || !string(f,m.unit) ||
+                fprintf(f,",\"context_required\":%s,"
+                          "\"upper_trim_unverified\":%s,\"number\":",
+                          m.context_required?"true":"false",
+                          m.upper_trim_unverified?"true":"false")<0)
+                return false;
+            if (m.interpreted) {
+                if (fprintf(f,"%.12g",m.number)<0) return false;
+            } else if (fputs("null",f)==EOF) return false;
+            if (fputc('}',f)==EOF) return false;
+        } else if (fputs("null",f)==EOF) return false;
         if (fputs(",\"status\":",f)==EOF || !string(f,s->status) ||
             fputs(",\"detail\":",f)==EOF) return false;
         if (s->detail[0] ? !string(f,s->detail) :

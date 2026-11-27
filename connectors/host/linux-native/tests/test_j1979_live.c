@@ -111,6 +111,10 @@ int main(void) {
     assert(strstr(json,"\"completed_cycles\":2"));
     assert(strstr(json,"\"physical_vehicle_verified\":false"));
     assert(strstr(json,"\"response_hex\":\"410C1AF8\""));
+    assert(strstr(json,"\"name\":\"engine-rpm\""));
+    assert(strstr(json,"\"number\":1726"));
+    assert(strstr(json,"\"name\":\"vehicle-speed\""));
+    assert(strstr(json,"\"number\":42"));
     fclose(stream);
     j1979_live_free(&r);
     assert(!r.steps && !r.step_count);

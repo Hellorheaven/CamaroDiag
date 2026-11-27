@@ -230,3 +230,14 @@ lorsque le format CAN complet est valide. Une division par zéro produit
 `null`, et les formats inconnus ou fragments d'autres ECU ne sont pas
 fusionnés. Les données restent des informations applicatives, pas une
 attestation de conformité ni d'identité matérielle.
+
+## Mesures physiques et trames figées Mode 01/02 natives
+
+`j1979_measurement.c` transpose les 55 définitions numériques explicites
+du décodeur Python historique, et l'odomètre 0xA6. Les rapports du scan
+et de la surveillance live utilisent les mêmes valeurs strictement corrélées,
+sans interpréter les PID inconnus. Pour les paramètres sensibles à la
+configuration du calculateur (PID 4F/50), `context_required=true` et
+`number=null` préservent l'absence de preuve. Les trames figées sont
+attribuées uniquement à leur frame Mode 02; un deuxième octet de trim n'est
+pas attribué à une banque supérieure sans preuve d'implantation.

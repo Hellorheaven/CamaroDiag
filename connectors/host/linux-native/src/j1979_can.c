@@ -3,6 +3,7 @@
 #include "j1979_native_c.h"
 #include "j1979_monitor_scaling.h"
 #include "j1979_vehicle_info.h"
+#include "j1979_measurement.h"
 #include <ctype.h>
 #include <errno.h>
 #include <limits.h>
@@ -432,6 +433,26 @@ bool j1979_can_write_json(FILE *f, const j1979_can_plan *p,
         if (fputs(",\"response_hex\":",f)==EOF) return false;
         if (s->response ? !hex(f,s->response,s->response_size) :
             fputs("null",f)==EOF) return false;
+        if (fputs(",\"measurement\":",f)==EOF) return false;
+        j1979_measurement m={0};
+        if (s->response && (!strcmp(s->status,"RAW") ||
+                            !strcmp(s->status,"PASSED")) &&
+            j1979_measurement_decode(s->request,s->request_size,
+                                     s->response,s->response_size,&m)) {
+            if (fprintf(f,"{\"mode\":%u,\"pid\":%u,\"frame\":%u,"
+                          "\"name\":",m.mode,m.pid,m.frame)<0 ||
+                !quoted(f,m.name) ||
+                fputs(",\"unit\":",f)==EOF || !quoted(f,m.unit) ||
+                fprintf(f,",\"context_required\":%s,"
+                          "\"upper_trim_unverified\":%s,\"number\":",
+                          m.context_required?"true":"false",
+                          m.upper_trim_unverified?"true":"false")<0)
+                return false;
+            if (m.interpreted) {
+                if (fprintf(f,"%.12g",m.number)<0) return false;
+            } else if (fputs("null",f)==EOF) return false;
+            if (fputc('}',f)==EOF) return false;
+        } else if (fputs("null",f)==EOF) return false;
         /* Mode 06: retain every complete MID/TID/UASID and 16-bit
          * comparison; unknown UASIDs remain RAW, never a monitor verdict.
          */

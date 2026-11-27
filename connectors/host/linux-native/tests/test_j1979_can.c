@@ -12,7 +12,7 @@ typedef struct {
     uint8_t emitted[24][3];
     size_t emitted_size[24];
     bool force_bad_vin, force_final_vin_mismatch, force_partial_mode06;
-    bool force_nrc, force_dtc, force_monitor, force_info, force_late, force_transport, refuse_mutation;
+    bool force_nrc, force_dtc, force_monitor, force_info, force_measurement, force_late, force_transport, refuse_mutation;
 } stub;
 static uint64_t clock_fake(void *ctx) { return ((stub *)ctx)->now; }
 static bool current_fake(void *ctx) { return ((stub *)ctx)->current; }
@@ -58,6 +58,7 @@ static int exchange_fake(void *ctx, const uint8_t *req, size_t n,
         bitmap[2]=req[0] == 1 ? 0x80 :
             (s->force_monitor && req[0] == 6 ? 0x00 : 0);
         if (s->force_monitor && req[0]==6) bitmap[5]=1;
+        if (s->force_measurement && req[0]==1) bitmap[3]=0x10;
         if (s->force_info && req[0]==9) {
             bitmap[2]=0x01; /* InfoType 08 */
             bitmap[3]=0x08; /* InfoType 0D */
@@ -87,6 +88,10 @@ static int exchange_fake(void *ctx, const uint8_t *req, size_t n,
             'O','-','E','N','G','1'
         };
         bytes=info;size=sizeof(info);
+    } else if (n==2 && req[0]==1 && req[1]==0x0c &&
+               s->force_measurement) {
+        static const uint8_t rpm[4]={0x41,0x0c,0x1a,0xf8};
+        bytes=rpm;size=sizeof(rpm);
     } else if (n == 2 && req[0] == 1 && req[1] == 1) {
         static const uint8_t status[6]={0x41,1,0,0,0,0};
         bytes=status;size=6;
@@ -187,6 +192,17 @@ int main(void) {
     assert(strstr(text,"\"ratio\":0.5"));
     assert(strstr(text,"\"vehicle_info\":{\"info_type\":13"));
     assert(strstr(text,"ECU-CAMARO-ENG1"));
+    fclose(output);j1979_can_result_free(&r);
+    s=(stub){.current=true,.force_measurement=true};
+    p=plan(&s);assert(j1979_can_scan(&p,&r)==0);
+    assert(r.completed);
+    output=tmpfile();assert(output);
+    assert(j1979_can_write_json(output,&p,&r,"vcan0"));
+    rewind(output);memset(text,0,sizeof(text));
+    assert(fread(text,1,sizeof(text)-1,output)>0);
+    assert(strstr(text,"\"measurement\":{\"mode\":1,\"pid\":12"));
+    assert(strstr(text,"\"name\":\"engine-rpm\""));
+    assert(strstr(text,"\"number\":1726"));
     fclose(output);j1979_can_result_free(&r);
     s=(stub){.current=true,.force_final_vin_mismatch=true};
     p=plan(&s);assert(j1979_can_scan(&p,&r)==0);
