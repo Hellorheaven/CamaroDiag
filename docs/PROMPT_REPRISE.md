@@ -1,3 +1,15 @@
+## Reprise SAE J1979 — 27/11/2026 — Mode 02, audit CF/1 et cohérence des routes
+
+PR #117, branche `chore/unified-ci`, base avant le lot `45201077447c37622a1810e3cd2b2a72a8fb5345`. Au SHA `a394e65eea3f179c22503996ef199c5a1bdb01d5` : **10 commits, 15 fichiers, +623/-40 lignes** (comparaison GitHub). Volume souhaité de 10 000 lignes utiles non atteint, aucun remplissage artificiel.
+
+- Catalogue SAE J1979 Mode 02 / CF/1 : nouveau bloc `catalogue_coverage` identique Python/C#/Kotlin pour chaque frame explicitement demandée (PID documentés, annoncés, interrogés, effectivement répondus, projetés, non documentés et non demandés). Si l'inventaire est incomplet ou la frame non visitée, ne jamais déduire l'absence d'annonce de certains PID. Les valeurs restent rejetées si la comparaison VIN finale ou la stabilité du DTC déclencheur n'est pas établie. Pas de déclaration normative ou matérielle.
+- GUI Windows : affichage du résumé des PID inconnus et non interrogés par frame, ressources FR/EN. Tests CF/1 Kotlin/C# de changement DTC et VIN final sur capture synthétique avec CRC et terminal recalculés, non exécutés.
+- Acquisition Mode 02 Python, Windows J2534 et Android : préflight de délai et contexte ECU avant tout marquage de transmission, révocation contrôlée après réponse, pas de promotion d'un ancien contexte ni de relance automatique. En Python, les booléens ne sont plus des délais numériques acceptables. Nouvelles régressions Python/C#/Kotlin écrites, non exécutées.
+- **État** : commits publiés seulement. Aucun test, build, gate de clôture, fusion, APK ou Release pendant ce lot ; ne pas annoncer la compilation ni l'APK disponible.
+- **Blocages avant livraison** : exécuter le gate de clôture unique après finition du protocole, qualifier l'intégration matérielle CU/5/CI/5, vérifier l'intégralité du périmètre SAE avec une source autorisée J1979DA_202607 sans inventer le contenu. Lorsque le protocole et son gate sont terminés, reproduire sur le SHA exact le build APK Release signé et vérifié tel que pour v2.0.46, puis publier en prerelease sans fusion.
+
+---
+
 ## Reprise SAE J1979 — 27/11/2026 — cohérence hôtes et CF/1
 
 PR #117, branche `chore/unified-ci`. Base du lot 1bf6c9933f55c2c48173cfa7248ed7872dd64f73 ; avant cette note 93cda522bea945a2a2cde9e5423aeb326dcd6342 : 11 commits, 11 fichiers, +137/-17 selon comparaison GitHub. Objectif 10 000 lignes non atteint.
