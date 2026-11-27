@@ -85,6 +85,18 @@ int main(){
   assert(E::classify(V::ClassicCan,sparkIpt,2,sparkReply,sizeof(sparkReply)-1)==R::Invalid);
   sparkReply[2]=2;
   assert(E::classify(V::ClassicCan,sparkIpt,2,sparkReply,sizeof(sparkReply))==R::Invalid);
+  const uint8_t boostReq[]={1,0x70};
+  uint8_t boost[12]={0x41,0x70,4};
+  boost[11]=2;
+  assert(E::classify(V::ClassicCan,boostReq,2,boost,sizeof(boost))==R::Raw);
+  boost[11]=0xf2;
+  assert(E::classify(V::ClassicCan,boostReq,2,boost,sizeof(boost))==R::Invalid);
+  const uint8_t fuelReq[]={1,3},fuelStatus[]={0x41,3,2,8};
+  assert(E::classify(V::ClassicCan,fuelReq,2,fuelStatus,sizeof(fuelStatus))==R::Raw);
+  assert(E::classify(V::Legacy,fuelReq,2,fuelStatus,sizeof(fuelStatus))==R::Raw);
+  assert(E::classify(V::Legacy,fuelReq,2,fuelStatus,sizeof(fuelStatus)-1)==R::Invalid);
+  const uint8_t ptoReq[]={1,0x1e},ptoBad[]={0x41,0x1e,2};
+  assert(E::classify(V::ClassicCan,ptoReq,2,ptoBad,sizeof(ptoBad))==R::Invalid);
   // Feed only captured synthetic frames through the passive observer.
   const uint8_t vinReq[]={9,2};
   uint8_t vin[20]={0x49,2,1};
