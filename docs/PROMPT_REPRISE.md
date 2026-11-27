@@ -1,3 +1,15 @@
+## Reprise — SAE J1979 exclusivement, projection documentée multiplateforme (27 novembre 2026)
+
+PR #117 / chore/unified-ci. Demande propriétaire : grands lots de 10 000 lignes utiles et une dizaine de commits, exclusivement SAE J1979 ; C6 et les autres protocoles en pause. APK Release signé uniquement après clôture logicielle validée, selon le précédent v2.0.46, sans fusion.
+
+- Base de ce lot : 7fbf713fcb2ff4e5bebdd14c948cc0e66aa8a1f1. Au SHA fad8fcc7a28a8448c9a0f1146c11377b98eda9b5, comparaison GitHub : 37 commits, 27 fichiers, +2391/-11. Objectif de 10 000 lignes non atteint ; ne pas le revendiquer.
+- Windows : catalogue strict déclaratif et calcul rationnel exact, rejeu applicatif Mode 01 brut (VIN initial/périodique/final, inventaires, chronologie, corrélation des réponses, état terminal), empreintes, sortie exclusive ; commande --j1979-project-catalogue, GUI tests fonctionnels et ressources FR/EN.
+- Android : parseur JSON strict borné, même moteur de catalogue et rejeu applicatif, imports SAF avec empreintes et relecture des fichiers avant publication, contexte propriétaire/véhicule/session, export autorisé et panneau tests fonctionnels FR/EN.
+- Python : verify-local-projection pour vérifier les exports natifs contre le rapport original et le rejeu indépendant ; rejet des alias ambigus, PID base64 non canonique et incohérences. Les exports locaux Android/Windows ne revendiquent pas un rejeu indépendant du transport.
+- Régressions C#, Kotlin, Python ajoutées (valeurs 64 bits, rationnels, présence, sentinelles, entrées invalides, annulation, incohérences de VIN/bitmap). Aucun test, build ni CI lancé conformément au gate de fin de protocole. Ne pas présenter ces tests comme passés.
+- Prochain périmètre : obtenir la référence normative autorisée J1979DA et intégrer ses définitions vérifiables (pas de tables fictives), compléter acquisition Mode 01 raw-only continue côté firmware natif et clients CU/CI avec scope authentifié et séquence de preuves, vérifier la couverture et cohérence complète J1979, puis lancer le gate unique de clôture. Aucun essai physique revendiqué.
+- Après gate réussi seulement : reprendre le workflow Release APK de la v2.0.46 sur SHA exact de la PR, vérification de signature et publication prerelease sans fusion ; vérifier les limites d'une clé éphémère pour l'installation par-dessus un APK signé par une autre clé. Aucun APK généré durant ce lot.
+
 ## Reprise — correction Android et SAE J1979 exclusivement (27 novembre 2026)
 
 PR #117 / chore/unified-ci. Demande propriétaire : corriger l'affichage des capacités de l'interface OBD-II sur téléphone, poursuivre exclusivement SAE J1979 (mettre C6 en pause pour ce lot), puis APK Release signé selon v2.0.46 après clôture logicielle validée, sans fusion.
