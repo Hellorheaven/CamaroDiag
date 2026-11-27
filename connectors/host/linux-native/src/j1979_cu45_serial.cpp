@@ -98,7 +98,7 @@ public:
     void quiet(std::uint64_t end)override{
         check(end);
         const auto begin=now();
-        if(end-begin<=50)throw TransportError("NO_TRAILING_CHECK_BUDGET");
+        if(begin>=end||end-begin<=50)throw TransportError("NO_TRAILING_CHECK_BUDGET");
         while(now()-begin<50){
             check(end);
             const auto elapsed=now()-begin;

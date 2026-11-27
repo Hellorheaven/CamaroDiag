@@ -17,6 +17,25 @@ static constexpr unsigned known_width(uint8_t pid) {
         default:return 1;
     }
 }
+unsigned j1979_measurement_width(uint8_t pid){
+    switch(pid){
+
+        case 0x04: case 0x05: case 0x06: case 0x07: case 0x08:
+        case 0x09: case 0x0c: case 0x0d: case 0x0e: case 0x0f:
+        case 0x10: case 0x11: case 0x1f: case 0x2f: case 0x33:
+        case 0x42: case 0x46: case 0x52: case 0x5c: case 0x5e:
+        case 0x0a: case 0x0b: case 0x21: case 0x22: case 0x23:
+        case 0x2c: case 0x2d: case 0x2e: case 0x30: case 0x31:
+        case 0x32: case 0x3c: case 0x3d: case 0x3e: case 0x3f:
+        case 0x43: case 0x44: case 0x45: case 0x47: case 0x48:
+        case 0x49: case 0x4a: case 0x4b: case 0x4c: case 0x4d:
+        case 0x4e: case 0x53: case 0x54: case 0x59: case 0x5a:
+        case 0x5b: case 0x5d: case 0x61: case 0x62: case 0x63:
+        case 0xa6:
+            return known_width(pid);
+        default:return 0;
+    }
+}
 bool j1979_measurement_decode(const uint8_t *req,size_t qlen,
                               const uint8_t *res,size_t n,
                               j1979_measurement *out) {
@@ -31,7 +50,8 @@ bool j1979_measurement_decode(const uint8_t *req,size_t qlen,
     if (n<offset+1u || res[0]!=(uint8_t)(req[0]+0x40) ||
         res[1]!=req[1] || (req[0]==2 && res[2]!=0))
         return false;
-    unsigned width=known_width(req[1]);
+    unsigned width=j1979_measurement_width(req[1]);
+    if(!width)return false;
     bool trim=req[1]>=6 && req[1]<=9;
     if (n!=offset+width && !(trim && n==offset+2)) return false;
     const std::span<const uint8_t> bytes=response.subspan(offset);

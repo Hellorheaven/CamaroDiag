@@ -21,6 +21,8 @@ typedef struct {
  * application bytes. Context-dependent values retain name/unit but no
  * trusted number until the independent ECU configuration has been checked.
  */
+/* Zero means no scalar definition in this selected catalogue. */
+unsigned j1979_measurement_width(uint8_t pid);
 bool j1979_measurement_decode(const uint8_t *request,size_t request_size,
                               const uint8_t *response,size_t response_size,
                               j1979_measurement *out);

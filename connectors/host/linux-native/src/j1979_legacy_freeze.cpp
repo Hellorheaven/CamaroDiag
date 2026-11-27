@@ -122,10 +122,15 @@ class Recipe{
             else {step.status="FAILED";step.detail="INVALID_TRIGGER_DTC";}
         }else{
             if(q[2]==0){
+                const unsigned width=j1979_measurement_width(q[1]);
+                const bool trim=q[1]>=6&&q[1]<=9;
+                if(width&&r.size()!=3+width&&!(trim&&r.size()==5)){
+                    step.status="FAILED";step.detail="INVALID_PID_DATA_WIDTH";return;
+                }
                 j1979_measurement m{};
                 // A known scalar definition must have its exact width.
                 // No current Mode 01 context is applied to frozen measurements.
-                if(j1979_measurement_decode(q.data(),q.size(),r.data(),r.size(),&m)&&m.interpreted&&!m.context_required){
+                if(j1979_measurement_decode(q.data(),q.size(),r.data(),r.size(),&m)&&m.interpreted&&!m.context_required&&!trim){
                     step.status="PASSED";return;
                 }
             }
