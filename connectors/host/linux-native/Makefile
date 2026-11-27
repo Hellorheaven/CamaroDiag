@@ -8,7 +8,7 @@ CXXSTRICT = -std=c++20 -Wall -Wextra -Wpedantic -Werror -D_FILE_OFFSET_BITS=64
 INCLUDES = -Iinclude -I../../firmware/shared
 TARGET = camarodiag-native
 
-CXX_SOURCES = src/main.cpp src/j1979_legacy_report.cpp src/j1979_legacy_scan.cpp src/j1979_discovery.cpp src/j1979_elm.cpp src/j1979_legacy_freeze_report.cpp src/j1979_legacy_freeze_wire.cpp src/j1979_legacy_freeze_acquire.cpp src/j1979_legacy_freeze.cpp src/j1979_legacy_freeze_plan.cpp src/j1979_legacy.cpp src/j1979_cu1.cpp src/j1979_cj1.cpp src/j1979_cu45_report.cpp src/j1979_cu45_serial.cpp src/j1979_cu45_session.cpp src/j1979_cu45.cpp src/j1979_cm1.cpp src/cf1_usb.cpp src/cf1.cpp src/cf1_complete.cpp src/cf1_crypto.cpp src/cl1.cpp src/cl1_crypto.cpp src/j1979_policy.cpp src/j1979_monitor_scaling.cpp src/j1979_vehicle_info.cpp src/j1979_measurement.cpp src/j1979_projection.cpp src/j1979_status.cpp src/j1979_multi.cpp src/j1979_context.cpp src/j1979_can.cpp src/j1979_live.cpp src/j1979_isotp.cpp src/j1979_can_cli.cpp
+CXX_SOURCES = src/main.cpp src/j1979_legacy_report.cpp src/j1979_legacy_scan.cpp src/j1979_discovery.cpp src/j1979_elm.cpp src/j1979_legacy_freeze_report.cpp src/j1979_legacy_freeze_wire.cpp src/j1979_legacy_freeze_acquire.cpp src/j1979_legacy_freeze.cpp src/j1979_legacy_identity.cpp src/j1979_legacy_freeze_plan.cpp src/j1979_legacy.cpp src/j1979_cu1.cpp src/j1979_cj1.cpp src/j1979_cu45_report.cpp src/j1979_cu45_serial.cpp src/j1979_cu45_session.cpp src/j1979_cu45.cpp src/j1979_cm1.cpp src/cf1_usb.cpp src/cf1.cpp src/cf1_complete.cpp src/cf1_crypto.cpp src/cl1.cpp src/cl1_crypto.cpp src/j1979_policy.cpp src/j1979_monitor_scaling.cpp src/j1979_vehicle_info.cpp src/j1979_measurement.cpp src/j1979_projection.cpp src/j1979_status.cpp src/j1979_multi.cpp src/j1979_context.cpp src/j1979_can.cpp src/j1979_live.cpp src/j1979_isotp.cpp src/j1979_can_cli.cpp
 CXX_OBJECTS = $(patsubst src/%.cpp,build/%.o,$(CXX_SOURCES))
 DECODER_OBJECTS = build/j1979_projection.o build/j1979_status.o build/j1979_multi.o build/j1979_context.o build/j1979_monitor_scaling.o build/j1979_vehicle_info.o build/j1979_measurement.o
 
@@ -48,13 +48,13 @@ test: test-j1979-legacy-freeze test-j1979-legacy-scan test-j1979-legacy test-j19
 	./test-j1979-live
 	./test-j1979-cl1
 
-test-j1979-legacy-freeze: build/test_j1979_legacy_freeze.o build/j1979_legacy_freeze_plan.o build/j1979_legacy_freeze.o build/j1979_legacy_freeze_acquire.o build/j1979_legacy_freeze_wire.o build/j1979_legacy_freeze_report.o build/j1979_legacy.o build/j1979_elm.o build/j1979_measurement.o build/j1979_policy.o
+test-j1979-legacy-freeze: build/test_j1979_legacy_freeze.o build/j1979_legacy_identity.o build/j1979_legacy_freeze_plan.o build/j1979_legacy_freeze.o build/j1979_legacy_freeze_acquire.o build/j1979_legacy_freeze_wire.o build/j1979_legacy_freeze_report.o build/j1979_legacy.o build/j1979_elm.o build/j1979_measurement.o build/j1979_policy.o
 	$(CXX) $(LDFLAGS) $^ -o $@
 
-test-j1979-legacy-scan: build/test_j1979_legacy_scan.o build/j1979_legacy_scan.o build/j1979_legacy_report.o build/j1979_legacy.o build/j1979_legacy_freeze_plan.o build/j1979_elm.o build/j1979_policy.o $(DECODER_OBJECTS)
+test-j1979-legacy-scan: build/test_j1979_legacy_scan.o build/j1979_legacy_scan.o build/j1979_legacy_report.o build/j1979_legacy.o build/j1979_legacy_identity.o build/j1979_legacy_freeze_plan.o build/j1979_elm.o build/j1979_policy.o $(DECODER_OBJECTS)
 	$(CXX) $(LDFLAGS) $^ -o $@
 
-test-j1979-legacy: build/test_j1979_legacy.o build/j1979_legacy.o build/j1979_legacy_freeze_plan.o build/j1979_elm.o build/j1979_discovery.o
+test-j1979-legacy: build/test_j1979_legacy.o build/j1979_legacy.o build/j1979_legacy_identity.o build/j1979_legacy_freeze_plan.o build/j1979_elm.o build/j1979_discovery.o
 	$(CXX) $(LDFLAGS) $^ -o $@
 
 test-j1979-projection: build/test_j1979_projection.o build/j1979_multi.o build/j1979_status.o build/j1979_context.o

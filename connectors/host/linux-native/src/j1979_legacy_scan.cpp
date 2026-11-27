@@ -1,4 +1,5 @@
 #include "j1979_legacy_scan.hpp"
+#include "j1979_legacy_identity.hpp"
 #include "j1979_policy.h"
 #include "j1979_projection.hpp"
 #include <algorithm>
@@ -14,7 +15,6 @@ constexpr std::size_t max_raw=8*1024*1024;
 bool prefix(const Data& row,Bytes required){
     return row.size()>=required.size()&&std::equal(required.begin(),required.end(),row.begin());
 }
-bool vin_valid(std::string_view vin){return cd_j1979_native_vin(vin.data(),vin.size());}
 class Campaign {
     Elm& elm_;
     Clock clock_;
@@ -106,16 +106,9 @@ class Campaign {
         const auto count=read({9,1},[](const Data& r){return r.size()==3&&r[0]==0x49&&r[1]==1&&r[2]==5;},true);
         if(count.empty())return {};
         const auto rows=read({9,2},[](const Data& r){return r.size()==7&&r[0]==0x49&&r[1]==2&&r[2]>=1&&r[2]<=5;},false);
-        if(rows.size()!=5){mark_last("VIN_SEGMENTS_INCOMPLETE");return {};}
-        Data bytes;
-        for(unsigned n=0;n<5;++n){
-            if(rows[n][2]!=n+1){mark_last("VIN_SEGMENTS_UNORDERED");return {};}
-            bytes.insert(bytes.end(),rows[n].begin()+3,rows[n].end());
-        }
-        if(bytes.size()!=20||bytes[0]||bytes[1]||bytes[2]){mark_last("VIN_PADDING_INVALID");return {};}
-        const std::string vin(bytes.begin()+3,bytes.end());
-        if(!vin_valid(vin)){mark_last("VIN_FORMAT_INVALID");return {};}
-        return vin;
+        const auto vin=normalized_vin(rows);
+        if(!vin){mark_last("VIN_SEGMENTS_OR_FORMAT_INVALID");return {};}
+        return *vin;
     }
     void read_identification(const Inventory& info){
         std::map<unsigned,unsigned> counts;
@@ -209,7 +202,7 @@ public:
 };
 }
 Scan scan_selected(Elm& elm,unsigned source,std::string_view vin,unsigned budget,Clock clock,Current current){
-    if(!elm.headered()||!elm.ready()||!valid_source(source)||!vin_valid(vin)||
+    if(!elm.headered()||!elm.ready()||!valid_source(source)||!valid_vin(vin)||
         !clock||!current||!budget||budget>600000)
         throw std::invalid_argument("Explicit selected source, documented VIN and bounded headered session required");
     return Campaign(elm,source,vin,budget,std::move(clock),std::move(current)).run();

@@ -1,11 +1,10 @@
 #include "j1979_legacy_freeze_plan.hpp"
+#include "j1979_legacy_identity.hpp"
 #include <algorithm>
 #include <bitset>
 namespace cd::legacy {
 bool FreezePlan::valid()const{
-    if(vin.size()!=17||!std::all_of(vin.begin(),vin.end(),[](char c){
-        return (c>='0'&&c<='9')||(c>='A'&&c<='Z'&&c!='I'&&c!='O'&&c!='Q');
-    })||frames.empty()||frames.size()>8||pids.size()>64||budget_ms<1000||budget_ms>600000)return false;
+    if(!valid_vin(vin)||frames.empty()||frames.size()>8||pids.size()>64||budget_ms<1000||budget_ms>600000)return false;
     std::bitset<256> seen;
     for(auto frame:frames){if(seen.test(frame))return false;seen.set(frame);}
     seen.reset();

@@ -1,4 +1,5 @@
 #include "j1979_legacy_freeze.hpp"
+#include "j1979_legacy_identity.hpp"
 #include "j1979_measurement.h"
 #include <algorithm>
 #include <array>
@@ -12,11 +13,6 @@ bool starts(Bytes data,Bytes prefix){
 }
 bool negative(const Data& data,unsigned mode){
     return data.size()==3&&data[0]==0x7f&&data[1]==mode&&data[2]&&data[2]!=0x78;
-}
-bool valid_vin(std::string_view vin){
-    return vin.size()==17&&std::all_of(vin.begin(),vin.end(),[](char c){
-        return (c>='0'&&c<='9')||(c>='A'&&c<='Z'&&c!='I'&&c!='O'&&c!='Q');
-    });
 }
 std::string_view outcome_error(FreezeOutcome outcome){
     switch(outcome){
@@ -84,22 +80,17 @@ class Recipe{
         if(probe.outcome!=FreezeOutcome::received)return;
         if(fixed_protocol(probe.raw)!=r_.protocol){r_.error="PROTOCOL_MISMATCH";return;}
         const auto support=query({9,0},[](const Data& r){
-            return r.size()==7&&r[0]==0x49&&r[1]==0&&r[2]==1&&(r[3]&0xc0)==0xc0;
+            return vin_support_page(r);
         },true);
         if(support.empty()||!r_.error.empty())return;
-        const auto count=query({9,1},[](const Data& r){return r==Data{0x49,1,5};},true);
+        const auto count=query({9,1},[](const Data& r){return vin_fragment_count(r);},true);
         if(count.empty()||!r_.error.empty())return;
         const auto rows=query({9,2},[](const Data& r){return r.size()==7&&r[0]==0x49&&r[1]==2;},false);
-        if(rows.size()!=5||!r_.error.empty())return;
-        Data vin;
-        for(unsigned i=0;i<5;++i){
-            if(rows[i][2]!=i+1)return;
-            vin.insert(vin.end(),rows[i].begin()+3,rows[i].end());
-        }
-        if(vin.size()!=20||vin[0]||vin[1]||vin[2]||
-            !valid_vin(std::string_view(reinterpret_cast<const char*>(vin.data()+3),17)))return;
+        if(!r_.error.empty())return;
+        const auto vin=normalized_vin(rows);
+        if(!vin)return;
         step.response={0x49,2,1};
-        step.response.insert(step.response.end(),vin.begin()+3,vin.end());
+        step.response.insert(step.response.end(),vin->begin(),vin->end());
         step.status="PASSED";step.detail.clear();
     }
     void frame_data(FreezeStep& step){
