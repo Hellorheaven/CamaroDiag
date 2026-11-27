@@ -85,7 +85,7 @@ class SpiSlave {
     }
     for(uint8_t byte:rx_)if(byte)return fail();
     if(endpoint_.closed()){
-      phase_=Phase::Finished;port_.ready(false);return port_.admitted()||fail();
+      phase_=Phase::Finished;return port_.finishResponse()||fail();
     }
     return armRequest();
   }
