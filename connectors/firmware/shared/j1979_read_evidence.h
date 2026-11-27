@@ -92,8 +92,13 @@ class J1979ReadEvidence {
       return Result::Positive;
     }
     if(mode==9){
-      if(legacy)return len==(req[1]%2?3u:7u)&&reply[2]>0?
-        Result::Positive:Result::Invalid;
+      if(legacy){
+        const uint8_t type=req[1];
+        const bool count=type==1||type==3||type==5||type==7||
+          type==9||type==12||type==14;
+        return len==(count?3u:7u)&&reply[2]>0?
+          Result::Positive:Result::Invalid;
+      }
       if(req[1]==2){
         if(len!=20||reply[2]!=1)return Result::Invalid;
         for(size_t i=3;i<len;++i){
