@@ -15,6 +15,10 @@ import time
 import zlib
 import struct
 
+from .j1979_freeze_native_prefix import inspect_prefix_file
+from .j1979_freeze_inspection import MAX_REPORT
+from .recovery_bundle import _regular, _json
+from .recovery_history import _compare_history_value
 from .j1979_freeze import FreezePlan, MAX_STEPS
 from .j1979_freeze_native import NativeProfile, hello, proof, decode, inspect_file, HEADER, MAX_BODY
 
@@ -108,6 +112,34 @@ def capture_live(port, profile, key, capture, *, clock=time.monotonic, nonce=Non
     return report
 
 
+def verify_prefix_files(capture, report, *, expected_vin):
+    """Verify a portable CF/1 prefix report against the *original* raw file.
+
+    Recompute the complete report; never allow one host's optimistic prefix
+    counters to promote a partial capture into a trusted terminal campaign.
+    """
+    capture, report = Path(capture), Path(report)
+    if capture.resolve() == report.resolve():
+        raise ValueError("Capture and report paths must differ")
+    expected = inspect_prefix_file(capture, expected_vin=expected_vin)
+    raw, stamp = _regular(report, MAX_REPORT)
+    actual = _json(raw)
+    _compare_history_value(actual, expected, "native_freeze_prefix")
+    again = inspect_prefix_file(capture, expected_vin=expected_vin)
+    raw_again, checked = _regular(report, MAX_REPORT)
+    if expected != again or raw != raw_again or stamp != checked:
+        raise ValueError("CF/1 prefix inputs changed during verification")
+    return {"schema": "camarodiag-j1979-native-freeze-prefix-verification-v1",
+            "consistent": True, "prefix_integrity_verified": True,
+            "capture_integrity_verified": False, "execution_completed": False,
+            "physical_vehicle_verified": False, "permits_programming": False,
+            "capture_sha256": expected["capture_sha256"],
+            "report_sha256": stamp.digest,
+            "complete_records": expected["complete_records"],
+            "complete_observations": expected["complete_observations"],
+            "interruption": expected["interruption"]}
+
+
 def _exclusive(path, binary=False):
     fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     return os.fdopen(fd, "wb") if binary else os.fdopen(fd, "w", encoding="utf-8")
@@ -136,6 +168,17 @@ def run(argv=None):
     offline = commands.add_parser("inspect", allow_abbrev=False)
     offline.add_argument("--capture", type=Path, required=True)
     offline.add_argument("--output", type=Path, required=True)
+    partial = commands.add_parser("inspect-prefix", allow_abbrev=False,
+                                  help="Inspect an interrupted CF/1 (never a completed capture)")
+    partial.add_argument("--capture", type=Path, required=True)
+    partial.add_argument("--output", type=Path, required=True)
+    partial.add_argument("--vin", required=True)
+    check_partial = commands.add_parser("verify-prefix", allow_abbrev=False,
+                                        help="Independently verify a saved CF/1 prefix report")
+    check_partial.add_argument("--capture", type=Path, required=True)
+    check_partial.add_argument("--report", type=Path, required=True)
+    check_partial.add_argument("--output", type=Path, required=True)
+    check_partial.add_argument("--vin", required=True)
     live = commands.add_parser("capture", allow_abbrev=False)
     live.add_argument("--port", required=True)
     live.add_argument("--key-file", type=Path, required=True)
@@ -152,6 +195,18 @@ def run(argv=None):
     args = parser.parse_args(argv)
     if args.capture.resolve() == args.output.resolve():
         parser.error("Capture and report must be different files")
+    if args.command == "inspect-prefix":
+        report = inspect_prefix_file(args.capture, expected_vin=args.vin)
+        with _exclusive(args.output) as output:
+            _write_report(output, report)
+        return report
+    if args.command == "verify-prefix":
+        if args.report.resolve() in (args.capture.resolve(), args.output.resolve()):
+            parser.error("Prefix inputs and output must be distinct")
+        report = verify_prefix_files(args.capture, args.report, expected_vin=args.vin)
+        with _exclusive(args.output) as output:
+            _write_report(output, report)
+        return report
     if args.command == "inspect":
         report = inspect_file(args.capture)
         with _exclusive(args.output) as output:
@@ -212,6 +267,13 @@ def main():
     except (OSError, ValueError) as exc:
         print(str(exc), file=sys.stderr)
         raise SystemExit(2) from exc
+    if report["schema"] in ("camarodiag-j1979-native-freeze-prefix-v1",
+                             "camarodiag-j1979-native-freeze-prefix-verification-v1"):
+        print(json.dumps({key: report.get(key) for key in
+                          ("prefix_integrity_verified", "complete_records",
+                           "complete_observations", "interruption",
+                           "capture_integrity_verified", "execution_completed")}))
+        return
     print(json.dumps({key: report.get(key) for key in
                       ("capture_integrity_verified", "observations_received", "error")}))
     if not report["capture_integrity_verified"] or not (report.get("summary") or {}).get("all_frames_stable"):
