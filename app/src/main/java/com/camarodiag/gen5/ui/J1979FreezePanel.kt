@@ -30,17 +30,17 @@ internal fun parseFreezeIds(value: String, maximum: Int, emptyAllowed: Boolean):
 internal fun J1979FreezePanel(protocol: Int?,state: FunctionalTestState,vehicle: VehicleProfile,
     epoch: Long,run: (J1979FreezePlan,Long,VehicleProfile) -> Unit) {
     var source by remember(protocol,epoch,vehicle) {
-        mutableStateOf(if (protocol in setOf(7,9)) "18DAF110" else "7E8")
+        mutableStateOf(if(protocol!=null&&protocol in 1..5) "10" else if (protocol in setOf(7,9)) "18DAF110" else "7E8")
     }
     var frames by remember(epoch,vehicle) { mutableStateOf("00") }
     var pids by remember(epoch,vehicle) { mutableStateOf("") }
     var budget by remember(epoch,vehicle) { mutableStateOf("180") }
     var confirmed by remember(protocol,epoch,vehicle) { mutableStateOf(false) }
     var expanded by remember { mutableStateOf(false) }
-    val enabled = !state.running && protocol != null && protocol in 6..9
+    val enabled = !state.running && protocol != null && protocol in 1..9
     val selectedFrames = parseFreezeIds(frames,8,false)
     val selectedPids = parseFreezeIds(pids,64,true)
-    val target = source.trim().takeIf { it.matches(Regex("[0-9A-Fa-f]{3,8}")) }
+    val target = source.trim().takeIf { it.matches(Regex(if(protocol!=null&&protocol in 1..5) "[0-9A-Fa-f]{2}" else "[0-9A-Fa-f]{3,8}")) }
         ?.toIntOrNull(16)?.let { J1979LiveTarget(protocol ?: 0,it,vehicle.vin) }
     val plan = if (target != null && selectedFrames != null && selectedPids != null)
         J1979FreezePlan(target,selectedFrames,selectedPids,(budget.toLongOrNull() ?: 0) * 1000) else null
@@ -62,7 +62,7 @@ internal fun J1979FreezePanel(protocol: Int?,state: FunctionalTestState,vehicle:
         field(budget,R.string.j1979_live_budget,3) { budget=it }
         Row(verticalAlignment=Alignment.CenterVertically) {
             Checkbox(confirmed,{confirmed=it},enabled=enabled)
-            Text(stringResource(R.string.j1979_freeze_confirm,vehicle.vin))
+            Text(stringResource(if(target?.legacy==true) R.string.j1979_legacy_freeze_confirm else R.string.j1979_freeze_confirm,vehicle.vin))
         }
         OutlinedButton(onClick={ plan?.let { run(it,epoch,vehicle) }; confirmed=false },
             enabled=enabled && confirmed && plan?.valid==true,modifier=Modifier.fillMaxWidth()) {
