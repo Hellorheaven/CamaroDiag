@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="j1979_native_live_title">Enregistrement USB natif (PID bruts)</string>
+    <string name="j1979_native_live_pids">PID (hex., séparés par virgules)</string>
+    <string name="j1979_native_live_cycles">Nombre de cycles</string>
+    <string name="j1979_native_live_interval">Intervalle des cycles (ms)</string>
+    <string name="j1979_native_live_confirm">Confirmer le véhicule à l’arrêt, le calculateur physique autorisé et le VIN %1$s</string>
+    <string name="j1979_native_live_run">Démarrer l’enregistrement natif</string>
+    <string name="j1979_native_live_incomplete">Enregistrement natif incomplet</string>
+    <string name="j1979_native_live_samples">Échantillons bruts corrélés : %1$d</string>
+</resources>
