@@ -41,7 +41,7 @@ internal static class ObdJ1979CatalogueCli
             }));
             return 0;
         }
-        catch(Exception e) when(e is ArgumentException or IOException or UnauthorizedAccessException or JsonException or
+        catch(Exception e) when(e is ArgumentException or IOException or InvalidDataException or UnauthorizedAccessException or JsonException or
             FormatException or KeyNotFoundException or InvalidOperationException or OverflowException)
         {
             Console.Error.WriteLine("J1979 catalogue: "+e.Message);return 6;
