@@ -62,7 +62,7 @@ class Read:
     transmission_attempted: bool
 
     def validate(self):
-        if self.outcome not in _OUTCOMES or type(self.transmission_attempted) is not bool:
+        if type(self.outcome) is not str or self.outcome not in _OUTCOMES or type(self.transmission_attempted) is not bool:
             raise ValueError("Invalid read transport outcome")
         if type(self.duration_ms) is not int or not 0 <= self.duration_ms <= 3600000:
             raise ValueError("Invalid read duration")
@@ -173,6 +173,11 @@ def classify(request, read):
         # The established CJ/1 decoder is restricted to frame zero. Normalize
         # only for shared classical width/measurement checks after correlating
         # the actual frame, and never export a substituted request or response.
+        if frame != 0:
+            # Additional frame semantics can be manufacturer-defined. Do not
+            # assume the frame-zero measurement catalogue applies to them.
+            row.update(status="RAW", evidence=evidence, detail="STORED_RAW_VALUE")
+            return row
         normalized = decode_observation(bytes((2, pid, 0)), bytes((0x42, pid, 0)) + data)
         if normalized is None or pid in TRIMS and not trim_width(pid, len(data)):
             row.update(status="FAILED", detail="INVALID_PID_DATA_WIDTH")
@@ -275,9 +280,11 @@ def execute_plan(plan: FreezePlan, observe: Callable[[bytes], Read]):
             row = read(bytes((2, pid, frame)))
             if row is None:
                 break
-            result["read_pids"].append(pid)
+            if row["transmission_attempted"]:
+                result["read_pids"].append(pid)
             result["measurement_steps"].append(len(steps) - 1)
             failures += row["status"] not in ("PASSED", "RAW")
+        result["not_read_selected_pids"] = sorted(set(result["not_read_selected_pids"]) | (selected & ids) - set(result["read_pids"]))
         if stop is not None:
             result.update(status="PARTIAL", detail=stop)
             return result
