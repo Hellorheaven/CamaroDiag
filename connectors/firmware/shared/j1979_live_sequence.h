@@ -14,10 +14,10 @@ class J1979LiveSequence {
     Sample=4, FinalVin=5, Waiting=6, Done=7 };
   enum class Stop:uint8_t { None=0, InvalidScope=1, Budget=2, Context=3,
     Transport=4, VinUnverified=5, VinMismatch=6, PidUnverified=7,
-    NoRawResponse=8, SinkStopped=9, InvalidSequence=10 };
+    NoRawResponse=8, SinkStopped=9, InvalidSequence=10, EvidenceLimit=11 };
   struct Summary {
     Stop stop=Stop::InvalidScope;
-    uint32_t steps=0,samples=0,raw=0,negative=0,timeout=0,durationMs=0;
+    uint32_t steps=0,samples=0,raw=0,negative=0,timeout=0,durationMs=0,rawBytes=0;
     uint16_t completedCycles=0;
     bool initialIdentity=false,finalIdentity=false,inventoryComplete=false;
     bool completed=false;
@@ -111,6 +111,10 @@ class J1979LiveSequence {
     const bool negative=reply.state==State::Negative&&shape==R::Negative;
     const bool timeout=reply.state==State::Timeout&&reply.responseSize==0;
     if(!positive&&!raw&&!negative&&!timeout){abort(Stop::Transport,now);return false;}
+    if(reply.responseSize>16u*1024u*1024u-summary_.rawBytes){
+      abort(Stop::EvidenceLimit,now);return false;
+    }
+    summary_.rawBytes+=uint32_t(reply.responseSize);
     if(observedPhase==Phase::InitialVin||observedPhase==Phase::PeriodicVin||observedPhase==Phase::FinalVin){
       if(!positive){abort(Stop::VinUnverified,now);return true;}
       if(!scope_.vinMatches(reply.response,reply.responseSize)){abort(Stop::VinMismatch,now);return true;}
