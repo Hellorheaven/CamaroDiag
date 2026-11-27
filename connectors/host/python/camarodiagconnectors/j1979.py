@@ -11,6 +11,7 @@ import time
 from collections.abc import Callable
 from .j1979_campaign_evidence import decode_observation, summarize_observations
 from .j1979_monitor_scaling import scale_record
+from .j1979_vehicle_info import can_info
 
 _MAX_PAYLOAD = 4095
 Exchange = Callable[[bytes, float], bytes]
@@ -262,6 +263,10 @@ def scan(exchange: Exchange, *, budget: float = 180.0,
             if application is None:
                 raise ValueError("Invalid application record")
             if application["shape"] == "RAW":
+                # CJ/1 v1 records preserve their historical shape. Extended
+                # Mode 09 has a separately validated typed view.
+                if request[0] == 9 and request[1] in (8, 11, 13, 15):
+                    result = can_info(request[1], response)
                 status = "RAW"
             elif detail is None:
                 result = decode(response) if decode else response.hex().upper()
@@ -360,4 +365,7 @@ def scan(exchange: Exchange, *, budget: float = 180.0,
             **summarize_observations(steps),
             "completed": stop is None, "stop_reason": stop,
             "duration_ms": round((clock() - started) * 1000),
+            "extended_vehicle_info": [s["decoded"] for s in steps
+                                      if s["status"] == "RAW" and s["decoded"] is not None
+                                      and s["request_hex"] in ("0908", "090B", "090D", "090F")],
             "not_executed": ["MODE_04_CLEAR", "MODE_05_LEGACY", "MODE_08_CONTROL"]}
