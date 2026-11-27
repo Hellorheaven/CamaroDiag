@@ -1,3 +1,12 @@
+## Reprise PR117 — maintenance CU/4–CU/5, Mode 02 et Mode 01 legacy (27/11/2026)
+
+- Base `e881d4b155e55312be6913f371917e28202280a0`, dernier SHA de code `f52c360ab516c96f19363e58ccac9b9b70ee8090` ; comparaison GitHub avant documentation : **21 commits, 33 fichiers, +2762/-38 lignes**. Objectif 10 000 lignes non atteint. Aucun build, test ou APK exécuté.
+- Maintenance Linux C++20 : authentification HMAC CU/4 et CU/5 sur périmètre CM/1 canonique, moteur de session à usage unique, transport série exclusif, conservation journal, reçu d'archive et rapprochement CM/1, états d'incertitude et de récupération, rapports, CLI et scénarios synthétiques. Aucun rejeu automatique d'une mutation.
+- Legacy ELM, cinq variantes : Mode 02 sur frames explicites avec inventaire, DTC initial/final, provenance ECU, VIN et protocole recontrôlés ; LFR/1, replay, rapport, preuve SHA-256 et tests synthétiques.
+- Mode 01 legacy : plans PID explicites, inventaire, cadence, VIN périodique/final, contexte d'échelle, samples bruts ou numériques, statistiques, LLR/1 et replay indépendant, CLI et scénarios synthétiques. Les formats LFR/LLR sont natifs distincts ; les fichiers sont persistés après la recette et non en flux au fil des observations. Ne pas déclarer une parité totale avec Python.
+- Arbre Git vérifié : 128 fichiers Python, 19 fichiers C (MPC5566), aucun Java. Ne pas supprimer les implémentations historiques avant preuve de parité fonctionnelle et validation. Aucun passage à C6/C8 ni clôture J1979. Restent notamment mutation legacy, parité des rapports et des interfaces, rejeu complet scan, référence normative J1979DA_202607 non fournie, qualification logicielle et matérielle séparées.
+- PR #117 ouverte ; APK 2.0.47 non construite, signée ni publiée. Respecter le gate unique de fin de protocole, valider le SHA exact, puis produire et publier l'APK comme v46 sans fusion non autorisée. Les nouveaux tests ne sont pas encore exécutés.
+
 ## Reprise PR117 — CU/1, projections et SAE J1979 legacy Linux ; Android sans Java (27/11/2026)
 
 - Base `e0073b48b888e28a495783254acb0fb4db2b6e4f`, dernier SHA de code `96ff7fbd2660d45feb17db87a7960f6895ad2ab6` ; comparaison GitHub avant documentation : **20 commits, 39 fichiers, +3454/-754 lignes**. Cible de 10 000 lignes non atteinte. Aucune compilation/test de clôture lancée, aucun APK publié.

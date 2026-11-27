@@ -285,3 +285,18 @@ Les commandes ci-dessous sont raccordées au code C++20 et au Makefile, sans ex�
 ```
 
 Codes ELM fixes : 1 PWM, 2 VPW, 3 ISO 9141-2, 4 ISO 14230-4 lente, 5 ISO 14230-4 rapide. Le scan exige la source documentée et le VIN ; la découverte ne choisit jamais automatiquement un ECU. Les mesures dérivées et les preuves d'identité sont séparées de la capture brute. Une réponse valide n'atteste pas l'identité physique de l'ECU. Les opérations mutatrices, le rejeu indépendant complet du scan, les formats historiques et les autres fonctions Python restent à rapprocher avant suppression des outils existants.
+
+## CU/4–CU/5, Mode 02 et Mode 01 legacy natifs (non validés)
+
+Le transport de maintenance authentifié et la récupération d'archives sont des chemins distincts. Les journaux CM/1 originaux et la preuve hors ligne restent requis ; un reçu ou un CRC ne certifie pas une opération ECU. Aucun retry mutateur automatique.
+
+Les captures legacy LFR/1 (freeze) et LLR/1 (live) conservent les réponses brutes, le périmètre sélectionné et les informations de recette. Elles sont relues et rejouées avant génération du rapport. Pour le live, la cadence et les contrôles périodiques du VIN sont inclus dans le rejeu. Les exports numériques nécessitent le contexte approprié ; un PID inconnu doit rester brut. Les preuves comparent les octets canoniques et les SHA-256. Ces schémas ne remplacent pas encore à l'identique les schémas Python historiques. Les captures legacy sont persistées en fin de recette (y compris arrêt contrôlé), pas en streaming ; une interruption brutale du processus peut perdre des observations non persistées.
+
+```sh
+camarodiag-native --inspect-j1979-legacy-freeze 2 10 VIN capture.lfr report.json
+camarodiag-native --verify-j1979-legacy-freeze 2 10 VIN capture.lfr report.json proof.json
+camarodiag-native --inspect-j1979-legacy-live 2 10 VIN capture.llr report.json
+camarodiag-native --verify-j1979-legacy-live 2 10 VIN capture.llr report.json proof.json
+```
+
+Les tests sont raccordés au Makefile et réservés au gate de clôture. Aucune validation matérielle, compilation ou livraison APK ne résulte de ce portage.
