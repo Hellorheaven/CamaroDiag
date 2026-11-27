@@ -11,6 +11,7 @@ import re
 
 from .j1979_can_network import CanFrame, decode_frame, response_pair, validate_targets
 from .j1979 import allowed_read
+from .j1979_vehicle_info import can_info
 from .j1979_campaign_evidence import decode_observation, summarize_observations
 from .j1979_live_inspection import load, _get, _require, _hex, _array, _dict, _id
 
@@ -311,8 +312,48 @@ def replay_ecu(row,android,vin):
             declared=_get(body,name)
             if declared is not None:
                 _require(_equal(_normalize(declared),summary[name]),"Physical summary differs: "+name)
+    extended=[]
+    for step in steps:
+        req=step["request_hex"]
+        if req not in ("0908","090B","090D","090F") or step["status"]!="RAW":
+            continue
+        try:
+            extended.append(can_info(int(req[2:],16),bytes.fromhex(step["response_hex"])))
+        except ValueError:
+            # A historical RAW row may be malformed under the newer decoder.
+            # It remains raw, but no decoded projection is accepted.
+            pass
+    declared=_get(body,"extended_vehicle_info")
+    if declared is not None:
+        def canonical(record):
+            record=_normalize(_dict(record,"extended Mode 09 record"))
+            allowed={"info_type","values","general_denominator","ignition_cycles",
+                     "counter_count","monitors","regulatory_verdict"}
+            _require(set(record)<=allowed and record.get("regulatory_verdict") is None,
+                     "Unsupported extended Mode 09 claim")
+            kind=record.get("info_type")
+            if kind in (8,11):
+                _require(record.get("values",[])==[],"Counter record has unexpected identity values")
+                monitors=[]
+                for raw in _array(record.get("monitors"),9,"IPT monitor records"):
+                    monitor=_dict(raw,"IPT monitor")
+                    _require(set(monitor)<= {"monitor","name","numerator","denominator","ratio"} and
+                             not ("name" in monitor and "monitor" in monitor),
+                             "Unsupported IPT monitor fields")
+                    monitors.append({"monitor":monitor.get("monitor",monitor.get("name")),
+                                     "numerator":monitor.get("numerator"),
+                                     "denominator":monitor.get("denominator"),"ratio":monitor.get("ratio")})
+                return {"info_type":kind,"general_denominator":record.get("general_denominator"),
+                        "ignition_cycles":record.get("ignition_cycles"),"counter_count":record.get("counter_count"),
+                        "monitors":monitors,"regulatory_verdict":None}
+            _require(kind in (13,15) and record.get("general_denominator") is None and
+                     record.get("ignition_cycles") is None and record.get("counter_count") is None and
+                     record.get("monitors") in (None,[]),"Unexpected identification fields")
+            return {"info_type":kind,"values":record.get("values")}
+        _require(_equal([canonical(x) for x in _array(declared,4,"extended Mode 09 records")],extended),
+                 "Extended Mode 09 data differs from physical response")
     return {"completed":completed,"observed_vin":first,"final_vin":last,
-            "steps":steps,**summary}
+            "steps":steps,"extended_vehicle_info":extended,**summary}
 
 
 def inspect_network(root,expected_vin=None):
