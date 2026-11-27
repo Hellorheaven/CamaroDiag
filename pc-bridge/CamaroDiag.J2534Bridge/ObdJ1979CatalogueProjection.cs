@@ -49,9 +49,16 @@ internal static class ObdJ1979CatalogueProjection
     }
     private static int[] Selected(JsonElement value)
     {
-        var pids=value.ValueKind==JsonValueKind.String?
-            Convert.FromBase64String(value.GetString()!).Select(x=>(int)x).ToArray():
-            Array(value,1,32).Select(x=>Int(x,1,255)).ToArray();
+        int[] pids;
+        if(value.ValueKind==JsonValueKind.String)
+        {
+            var encoded=value.GetString()!;
+            Check(encoded.Length<=44&&Regex.IsMatch(encoded,@"\A[A-Za-z0-9+/]+={0,2}\z"),"Invalid base64 PID list");
+            var decoded=Convert.FromBase64String(encoded);
+            Check(Convert.ToBase64String(decoded)==encoded,"Noncanonical PID list");
+            pids=decoded.Select(x=>(int)x).ToArray();
+        }
+        else pids=Array(value,1,32).Select(x=>Int(x,1,255)).ToArray();
         Check(pids.Length is >=1 and <=32&&pids.Distinct().Count()==pids.Length&&
             pids.All(x=>x is >=1 and <=255&&x%32!=0),"Invalid selected PIDs");
         return pids;
@@ -114,14 +121,24 @@ internal static class ObdJ1979CatalogueProjection
         Check(cycles*selected.Length<=10000,"Too many requested observations");
         var admission=Array(Get(result,"admission"),1,256);
         var observations=Array(Get(result,"observations"),0,10000);
+        foreach(var group in new[]{admission,observations})
+        {
+            int previous=0;
+            foreach(var row in group)
+            {
+                int start=Int(Get(row,"started_elapsed_ms"),0,int.MaxValue);
+                Check(start>=previous,"Reordered observations in source array");
+                previous=Int(Get(row,"elapsed_ms"),start,int.MaxValue);
+            }
+        }
+        // Admission comes before samples sharing the same start timestamp;
+        // the final VIN must instead come after the last sample.
         var combined=admission.Select((row,i)=>(Row:row,Sample:false,Index:i))
             .Concat(observations.Select((row,i)=>(Row:row,Sample:true,Index:i)))
             .OrderBy(x=>Int(Get(x.Row,"started_elapsed_ms"),0,int.MaxValue))
+            .ThenBy(x=>x.Sample?1:RequiredText(Get(x.Row,"phase"))=="FINAL_VIN"?2:0)
             .ThenBy(x=>Int(Get(x.Row,"elapsed_ms"),0,int.MaxValue))
-            .ThenBy(x=>x.Sample?1:0).ThenBy(x=>x.Index).ToArray();
-        // Zero-duration exchanges from coarse host clocks can have equal
-        // timestamps. The independent verifier is required for ambiguous
-        // ordering; do not silently reorder successful records.
+            .ThenBy(x=>x.Index).ToArray();
         var advertised=new SortedSet<int>();
         var samples=new List<Sample>();
         var rawSeen=new HashSet<int>();
@@ -201,7 +218,8 @@ internal static class ObdJ1979CatalogueProjection
                     // Continuation PID is not a measurement, but the native
                     // inventories may list it as a supported identifier.
                     bool hasNext=(response![5]&1)!=0;
-                    if(hasNext&&nextPage+32<=255)advertised.Add(nextPage+32);
+                    Check(!hasNext||nextPage<224,"Support bitmap exceeds PID FF");
+                    if(hasNext)advertised.Add(nextPage+32);
                     inventoryComplete=!hasNext;nextPage+=32;
                 }
                 else terminal=true;
