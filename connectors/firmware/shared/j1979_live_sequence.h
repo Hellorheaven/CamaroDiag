@@ -60,6 +60,22 @@ class J1979LiveSequence {
     }
     return stage_;
   }
+  // Host scheduling margin: separate MCU clocks and SPI mailbox latency
+  // can place the receiver's first sample later than the host's. Never
+  // relax the receiver's actual minimum cadence or identity deadline.
+  uint32_t hostWaitRemaining(uint32_t now)const{
+    if(stage_!=Phase::Sample||index_!=0||!haveCycleStart_)return 0;
+    const uint32_t desired=uint32_t(scope_.intervalMs)+25u;
+    const uint32_t spent=uint32_t(now-cycleStart_);
+    return spent<desired?desired-spent:0;
+  }
+  Phase recommendedPhase(uint32_t now){
+    const auto current=phase(now);
+    if(current==Phase::Sample&&index_==0&&!earlyIdentity_&&
+       uint32_t(now-lastIdentity_)>=J1979LiveScope::IdentityInterval-1000u)
+      return Phase::PeriodicVin;
+    return current;
+  }
   // At a cycle boundary an earlier VIN recheck is also allowed. This
   // accommodates bounded independent host/receiver clock differences without
   // ever permitting a sample once the receiver's identity deadline expired.
