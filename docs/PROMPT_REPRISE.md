@@ -1,3 +1,9 @@
+## J1979 et C6 — relecture croisée des preuves et historique (27/11/2026)
+
+- J1979 : `verify-j1979-capture` rapproche le binaire CJ/1 et le rapport natif Android/Windows ou Python, avec limites de taille, SHA-256, relecture indépendante, contrôle du profil, de chaque étape et des champs dérivés, du résumé et des compteurs. Comparaison VIN indépendante facultative. Un rapport négatif ou annulé ne devient pas positif ; aucune authentification de la capture ni qualification physique.
+- C6 : `verify-recovery-history` inspecte deux à huit instantanés Android ou Windows explicitement ordonnés, compare les journaux octet pour octet (extension stricte), cible/métadonnées et empreintes des enveloppes originales ; refuse doublons, forks, rollback et changements de preuves. Dernier état enregistré distinct de l'état ECU réel. Aucune autorisation de restauration.
+- Les deux commandes exportent un JSON exclusif, les régressions sont écrites mais non exécutées ; documentation FR/EN dans `docs/PROTOCOL_FUNCTIONAL_RECIPES.md`. C6 et SAE J1979 restent actifs. Aucun gate intermédiaire, merge, Release ou essai matériel. Ce lot n'atteint pas l'objectif de 10 000 lignes utiles ; ne pas prétendre à une clôture.
+
 ## C6 — inspection hôte multiplateforme des sauvegardes ECU (27/11/2026)
 
 - CLI offline verify-recovery pour journaux Android hash-chaînés et Windows E39/E39A JSONL, inventaire borné des secteurs originaux, vérification des enveloppes Java writeUTF et JSON, identité déclarée, séquences, empreintes de chaque fichier et SHA256 composite compatible applications, relecture indépendante des sources. Comparaison facultative de l'empreinte attendue et du BIN complet E39, rapport exclusif. Pas d'adressage générique des BIN Android ni écriture/restauration ECU. Régressions écrites non exécutées. C6/J1979 ouverts.
