@@ -1,13 +1,14 @@
 using System.Globalization;
 using System.IO.Ports;
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.RegularExpressions;
 
 namespace CamaroDiagConnectors.Windows;
 
 internal static class J1979LiveNativeCli
 {
-    internal const string CaptureCommand="--j1979-live-native",InspectCommand="--inspect-j1979-live-native";
+    internal const string CaptureCommand="--j1979-live-native",InspectCommand="--inspect-j1979-live-native",CsvCommand="--export-j1979-live-native-csv";
     internal sealed record Options(string Port,string KeyPath,string CapturePath,string OutputPath,J1979LiveNative.Profile Profile);
 
     internal static Options Parse(string[] args)
@@ -149,13 +150,52 @@ internal static class J1979LiveNativeCli
         Write(output,report,digest,Path.GetFileName(source));return report;
     }
 
+    internal static byte[] Csv(J1979LiveNative.Report report)
+    {
+        if(!report.CaptureIntegrityVerified||report.Profile is null||report.Summary is null||report.Result is null)
+            throw new InvalidDataException("Verified CL/1 required");
+        var p=report.Profile;var result=report.Result;
+        var builder=new StringBuilder("cycle,pid_hex,elapsed_ms,status,response_hex,request_can_id,response_can_id,vin,source_completed\r\n");
+        foreach(var row in result.Samples)
+        {
+            builder.Append(row.Cycle.ToString(CultureInfo.InvariantCulture)).Append(',')
+                .Append(row.Pid.ToString("X2",CultureInfo.InvariantCulture)).Append(',')
+                .Append(row.ElapsedMs.ToString(CultureInfo.InvariantCulture)).Append(',')
+                .Append(row.Status).Append(',').Append(row.ResponseHex??"").Append(',')
+                .Append(p.RequestCanId).Append(',').Append(p.ResponseCanId).Append(',')
+                .Append(p.ExpectedVin).Append(',').Append(result.Completed?"true":"false").Append("\r\n");
+            if(builder.Length>40*1024*1024)throw new InvalidDataException("Native CSV size limit exceeded");
+        }
+        return Encoding.ASCII.GetBytes(builder.ToString());
+    }
+    internal static J1979LiveNative.Report ExportCsv(string source,string vin,string destination,Func<bool>? current=null)
+    {
+        if(!J1979LiveNative.ValidVin(vin)||Path.GetFullPath(source).Equals(Path.GetFullPath(destination),StringComparison.OrdinalIgnoreCase))
+            throw new ArgumentException("Independent VIN and distinct new output required");
+        if(current is not null&&!current())throw new OperationCanceledException("Owner revoked");
+        using var input=new FileStream(source,FileMode.Open,FileAccess.Read,FileShare.Read);
+        var (report,digest)=ReplayPersisted(input);
+        if(report.Profile?.ExpectedVin!=vin)throw new InvalidDataException("CL/1 plan differs from independently supplied VIN");
+        byte[] csv=Csv(report);input.Position=0;
+        if(digest!=Convert.ToHexString(SHA256.HashData(input)).ToLowerInvariant())
+            throw new InvalidDataException("CL/1 changed during export");
+        if(current is not null&&!current())throw new OperationCanceledException("Owner revoked");
+        using var output=new FileStream(destination,FileMode.CreateNew,FileAccess.Write,FileShare.None);
+        output.Write(csv);output.Flush(true);return report;
+    }
+
     internal static int Run(string[] args)
     {
         try
         {
             if(args.Length==0)return 2;
             J1979LiveNative.Report report;
-            if(args[0]==InspectCommand)
+            if(args[0]==CsvCommand)
+            {
+                if(args.Length!=4)throw new ArgumentException("Expected CL/1 source, independently supplied VIN and new CSV output");
+                report=ExportCsv(args[1],args[2],args[3]);
+            }
+            else if(args[0]==InspectCommand)
             {
                 if(args.Length!=4)throw new ArgumentException("Expected CL/1 source, independently supplied VIN and new JSON output");
                 report=Inspect(args[1],args[2],args[3]);
