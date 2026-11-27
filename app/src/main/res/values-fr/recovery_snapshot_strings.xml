@@ -19,4 +19,8 @@
     <string name="cdj_folder_required">Sélectionnez le dossier de stockage CamaroDiag.</string>
     <string name="cdj_export">Exporter le checkpoint JSON</string>
     <string name="cdj_export_failed">Échec de l’export du rapport checkpoint.</string>
+    <string name="recovery_journal_counts">Journal : %1$d entrées · %2$d originaux · %3$d écrits vérifiés · %4$d relus</string>
+    <string name="recovery_journal_sha256">SHA-256 du journal</string>
+    <string name="recovery_envelope_sha256">SHA-256 de l’enveloppe</string>
+    <string name="recovery_source_changed">Les preuves ont changé. Sélectionnez et analysez de nouveau le dossier.</string>
 </resources>

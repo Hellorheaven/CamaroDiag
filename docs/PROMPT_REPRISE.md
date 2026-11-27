@@ -1,3 +1,7 @@
+## C6 — rapport Android de récupération et revalidation à l’export (27/11/2026)
+
+- Inspection : empreintes individuelles des enveloppes, journal et audit complet. Affichage FR/EN des compteurs d’audit. Export JSON lié à l’URI et au rapport vérifié affiché, nouvelle inspection avant écriture et avant publication du fichier SAF, relecture exacte du JSON. Une modification du dossier invalide le résultat affiché, les preuves incomplètes restent visibles mais ne sont pas exportées comme vérifiées. Régressions écrites non exécutées. C6/J1979 ouverts, aucune CI intermédiaire.
+
 ## SAE J1979 — découverte et campagnes CAN multi-ECU Windows (27/11/2026)
 
 - Découverte classique J2534 11/29 bits à profil explicite 33–36, PID00 seul, filtre RAW et purge, classification des sources et conflits, campagnes physiques distinctes sur les seules sources confirmées, budget partagé et VIN facultatif. Nouvelle CLI --j1979-network et écran privé FR/EN, JSON exclusif, export lié à l'autorisation originale. Régressions écrites, non exécutées. Aucun merge, Release, CI intermédiaire ni qualification réelle. C6 et J1979 restent ouverts. Le compteur précédent affichant plus de 10 000 additions incluait quatre fichiers Android préexistants comptés intégralement comme ajoutés ; ne pas le présenter comme développement net.
