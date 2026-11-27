@@ -6,6 +6,7 @@
 #include <optional>
 #include <span>
 #include <string>
+#include <string_view>
 #include <vector>
 namespace cd::network {
 constexpr unsigned max_frames=512,max_targets=32;

@@ -55,7 +55,7 @@ Discovery discover_socket(const char* interface,bool ext,unsigned window,std::fu
             const auto n=recv(socket.fd,&stale,sizeof(stale),MSG_DONTWAIT);
             if(n<0&&(errno==EAGAIN||errno==EWOULDBLOCK)){drained=true;break;}
             if(n<0&&errno==EINTR)continue;
-            if(n!=sizeof(stale))throw std::runtime_error("CAN_STALE_FRAME");
+            if(n!=static_cast<ssize_t>(sizeof(stale)))throw std::runtime_error("CAN_STALE_FRAME");
         }
         if(!current())return replay_discovery(ext,false,{},"CANCELLED",static_cast<unsigned>(now()-start));
         if(!drained||now()>=deadline)throw std::runtime_error("CAN_STALE_QUEUE");
@@ -63,7 +63,7 @@ Discovery discover_socket(const char* interface,bool ext,unsigned window,std::fu
         can_frame wire{};wire.can_id=request.id|(ext?CAN_EFF_FLAG:0);wire.len=8;
         std::copy(request.data.begin(),request.data.end(),wire.data);
         // No retry: the one functional discovery request is the only write.
-        if(send(socket.fd,&wire,sizeof(wire),MSG_DONTWAIT)!=sizeof(wire))throw std::runtime_error("CAN_DISCOVERY_SEND");
+        if(send(socket.fd,&wire,sizeof(wire),MSG_DONTWAIT)!=static_cast<ssize_t>(sizeof(wire)))throw std::runtime_error("CAN_DISCOVERY_SEND");
         sent=true;
         while(frames.size()<max_frames){
             if(!current()){stop="CANCELLED";break;}
@@ -76,7 +76,7 @@ Discovery discover_socket(const char* interface,bool ext,unsigned window,std::fu
             can_frame incoming{};
             const auto n=recv(socket.fd,&incoming,sizeof(incoming),MSG_DONTWAIT|MSG_TRUNC);
             if(n<0&&(errno==EAGAIN||errno==EINTR))continue;
-            if(n!=sizeof(incoming))throw std::runtime_error("CAN_FRAME_SIZE");
+            if(n!=static_cast<ssize_t>(sizeof(incoming)))throw std::runtime_error("CAN_FRAME_SIZE");
             if(now()>=deadline)break;
             frames.push_back(convert(incoming));
         }

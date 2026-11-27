@@ -4,6 +4,8 @@
 #include "cl1.h"
 #include "cl1_usb.h"
 #include "j1979_can_cli.h"
+#include "j1979_can_network.hpp"
+#include "j1979_isotp.h"
 #include "j1979_cm1.hpp"
 #include "j1979_cu45_session.hpp"
 #include "j1979_cj1.hpp"
@@ -16,6 +18,7 @@
 #include "j1979_legacy_live_wire.hpp"
 #include <time.h>
 #include <array>
+#include <algorithm>
 #include <string_view>
 #include <exception>
 
@@ -1834,10 +1837,88 @@ static int legacy_maintenance_cli(int argc,char** argv){
     }catch(const std::exception& e){return error(e.what());}
 }
 
+struct NetworkOptions{
+    const char* interface{},*output{},*vin{};
+    unsigned window_ms{1500},budget_ms{180000};
+    bool extended{},confirmed{},window_set{},budget_set{};
+    std::vector<std::uint32_t> ids;
+};
+static bool parse_network(int argc,char** argv,NetworkOptions& o,bool scan){
+    for(int i=2;i<argc;++i){
+        const std::string_view flag=argv[i];
+        if(flag=="--extended"||flag=="--confirm-functional-scope"){
+            auto& seen=flag=="--extended"?o.extended:o.confirmed;
+            if(seen)return false;
+            seen=true;continue;
+        }
+        if(i+1>=argc||argv[i+1][0]=='-'||!*argv[i+1])return false;
+        const char* value=argv[++i];
+        if(flag=="--interface"){if(o.interface)return false;o.interface=value;}
+        else if(flag=="--output"){if(o.output)return false;o.output=value;}
+        else if(flag=="--vin"&&scan){if(o.vin||!cf1_valid_vin(value))return false;o.vin=value;}
+        else if(flag=="--window-ms"){
+            uint32_t n=0;if(o.window_set||!decimal_uint32(value,&n)||n<1||n>30000)return false;
+            o.window_set=true;o.window_ms=n;
+        }else if(flag=="--budget-ms"&&scan){
+            uint32_t n=0;if(o.budget_set||!decimal_uint32(value,&n)||n<1||n>600000)return false;
+            o.budget_set=true;o.budget_ms=n;
+        }else if(flag=="--rx"&&scan){
+            uint32_t n=0;
+            if(o.ids.size()>=cd::network::max_targets||!hex_uint32(value,&n)||
+               std::find(o.ids.begin(),o.ids.end(),n)!=o.ids.end())return false;
+            o.ids.push_back(n);
+        }else return false;
+    }
+    return o.interface&&j1979_isotp_valid_interface(o.interface)&&o.output&&o.confirmed&&
+        (!scan||(o.vin&&!o.ids.empty()&&std::all_of(o.ids.begin(),o.ids.end(),[&](auto id){
+            return cd::network::response_pair(id,o.extended).has_value();
+        })));
+}
+static int network_cli(int argc,char** argv,bool scan){
+    NetworkOptions o;
+    if(!parse_network(argc,argv,o,scan))return error("Explicit CAN interface, addressing, scope, output and selected responders required");
+    if(!isatty(STDIN_FILENO))return error("Interactive local consent required");
+    fputs(scan?"Confirm stationary authorized vehicle, one functional PID00 discovery and subsequent selected physical read-only scans. Type yes: ":
+        "Confirm stationary authorized vehicle and a single functional PID00 read on selected classic CAN interface. Type yes: ",stderr);
+    char answer[16]{};
+    if(!fgets(answer,sizeof(answer),stdin)||strcmp(answer,"yes\n"))return error("Consent refused");
+    struct File{int fd;~File(){if(fd>=0)close(fd);}} output{
+        open(o.output,O_WRONLY|O_CREAT|O_EXCL|O_NOFOLLOW|O_CLOEXEC,0600)};
+    if(output.fd<0)return error("Network evidence destination unavailable");
+    legacy_cancelled=0;
+    struct Signals{
+        struct sigaction oldint{},oldterm{};
+        bool intr{},term{};
+        Signals(){
+            struct sigaction act{};act.sa_handler=legacy_signal;sigemptyset(&act.sa_mask);
+            intr=sigaction(SIGINT,&act,&oldint)==0;
+            term=intr&&sigaction(SIGTERM,&act,&oldterm)==0;
+        }
+        ~Signals(){if(term)sigaction(SIGTERM,&oldterm,nullptr);if(intr)sigaction(SIGINT,&oldint,nullptr);}
+    } signals;
+    try{
+        if(!signals.term)return error("Cancellation handlers unavailable");
+        const auto current=[](){return legacy_cancelled==0;};
+        const auto discovery=cd::network::discover_socket(o.interface,o.extended,o.window_ms,current);
+        std::string json;bool completed=false;
+        if(scan){
+            const auto result=cd::network::scan_selected(discovery,o.ids,o.vin,o.budget_ms,cd::legacy::monotonic_ms,
+                current,[&](cd::network::Pair pair,unsigned budget){
+                    return cd::network::scan_socket(pair,budget,o.interface,o.vin,&legacy_cancelled);
+                });
+            json=cd::network::report(result);completed=result.completed;
+        }else{json=cd::network::report(discovery);completed=discovery.completed;}
+        if(!write_owned_file(output.fd,json.data(),json.size()))return error("Network evidence persistence failed");
+        return completed?0:2;
+    }catch(const std::exception& e){return error(e.what());}
+}
+
 static void usage(FILE *stream) {
     fprintf(stream,
         "CamaroDiag Linux native C++20 — SAE J1979\n"
         "Usage:\n"
+        "  camarodiag-native --j1979-can-discover --interface can0 --window-ms 1500 --output responders.json --confirm-functional-scope [--extended]\n"
+        "  camarodiag-native --j1979-can-network --interface can0 --rx 7E8 --rx 7E9 --vin VIN --output network.json --confirm-functional-scope [--extended]\n"
         "  camarodiag-native --j1979-can --interface can0 --tx 7E0 --rx 7E8 --output evidence.json --vin VIN --budget-ms 180000 --confirm-physical-channel\n"
         "  camarodiag-native --j1979-live-usb-native --port /dev/ttyACM0 --key-file key.bin --capture session.cl --output report.json --tx 7E0 --rx 7E8 --vin VIN --pid 0C --cycles 30 --interval-ms 1000 --budget-ms 180000 --confirm-physical-channel\n"
         "  camarodiag-native --j1979-live --interface can0 --tx 7E0 --rx 7E8 --vin VIN --pid 0C --cycles 30 --interval-ms 1000 --budget-ms 180000 --output live.json --confirm-physical-channel\n"
@@ -1910,6 +1991,8 @@ int main(int argc, char **argv) {
         return cm1_cli(argv[2],argv[3],argv[4],argv[5],true);
     if (argc >= 3 && !strcmp(argv[1], "--j1979-live-usb-native"))
         return capture_cl1_native(argc,argv);
+    if (argc>=3 && !strcmp(argv[1],"--j1979-can-discover"))return network_cli(argc,argv,false);
+    if (argc>=3 && !strcmp(argv[1],"--j1979-can-network"))return network_cli(argc,argv,true);
     if (argc >= 3 && (!strcmp(argv[1], "--j1979-can") ||
                       !strcmp(argv[1], "--j1979-live")))
         return j1979_can_cli(argc, argv);
