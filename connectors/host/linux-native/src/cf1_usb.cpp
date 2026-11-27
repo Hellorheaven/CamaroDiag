@@ -1,6 +1,10 @@
 #define _POSIX_C_SOURCE 200809L
 #include "cf1_usb.h"
 #include "cl1_usb.h"
+#include "j1979_cu1.hpp"
+#include <algorithm>
+#include <array>
+#include <sys/ioctl.h>
 
 #include <errno.h>
 #include <fcntl.h>
@@ -450,4 +454,93 @@ cleanup:
         return -1;
     }
     return 0;
+}
+
+namespace cd::cu1 {
+namespace {
+struct Serial {
+    int fd{-1};
+    termios previous{};
+    bool configured{};
+    ~Serial(){if(fd>=0){if(configured)tcsetattr(fd,TCSANOW,&previous);close(fd);}}
+};
+struct Output {
+    int fd{-1};
+    ~Output(){if(fd>=0){fsync(fd);close(fd);}}
+};
+template<class T> struct Secret {
+    T value{};
+    ~Secret(){OPENSSL_cleanse(value.data(),value.size());}
+};
+bool quiet(int fd,int ms,std::uint64_t deadline) {
+    const auto now=monotonic_ms();
+    if(cancelled||!now||now>=deadline)return false;
+    pollfd p{fd,POLLIN,0};
+    int result;
+    do {result=poll(&p,1,static_cast<int>(std::min<std::uint64_t>(ms,deadline-now)));}
+    while(result<0&&errno==EINTR&&!cancelled);
+    const auto after=monotonic_ms();
+    return result==0&&!cancelled&&after&&after<deadline;
+}
+}
+int capture(const char* port,const cj1::Profile& profile,std::span<const std::uint8_t,32> key,
+            const char* path,cf1_usb_capture_result& out,char* err,std::size_t cap) {
+    out={};
+    cancelled=0;
+    auto fail=[&](const char* why){if(err&&cap)snprintf(err,cap,"%s",why);return -1;};
+    if(!tty_name(port)||!cj1::valid_profile(profile)||!path)return fail("Invalid CU/1 physical scope");
+    Secret<Nonce> nonce;
+    Secret<Hello> request;
+    Secret<Challenge> challenge;
+    Secret<Proof> answer;
+    if(!cf1_cu2_random_nonce(nonce.value.data())||!hello(profile,nonce.value,request.value))
+        return fail("Cannot initialize CU/1 transcript");
+    Output output;
+    output.fd=open(path,O_WRONLY|O_CREAT|O_EXCL|O_NOFOLLOW|O_CLOEXEC,0600);
+    if(output.fd<0)return fail("CU/1 capture destination already exists or is unsafe");
+    out.capture_file_created=true;
+    Serial serial;
+    serial.fd=open(port,O_RDWR|O_NOCTTY|O_NONBLOCK|O_NOFOLLOW|O_CLOEXEC);
+    if(serial.fd<0||ioctl(serial.fd,TIOCEXCL)<0||!configure_serial(serial.fd,&serial.previous))
+        return fail("Cannot claim selected CU/1 serial device");
+    serial.configured=true;
+    const auto started=monotonic_ms();
+    if(!started)return fail("Monotonic clock unavailable");
+    const auto authentication_deadline=started+5000;
+    if(write_deadline(serial.fd,request.value.data(),request.value.size(),authentication_deadline)||
+       read_deadline(serial.fd,challenge.value.data(),challenge.value.size(),authentication_deadline))
+        return fail("CU/1 hello or challenge interrupted");
+    if(!proof(request.value,challenge.value,key,answer.value))return fail("CU/1 credential rejected");
+    out.authenticated=true;
+    if(!quiet(serial.fd,50,authentication_deadline))return fail("Unexpected bytes before CU/1 proof");
+    if(write_deadline(serial.fd,answer.value.data(),answer.value.size(),authentication_deadline))
+        return fail("CU/1 proof transmission uncertain; no retry");
+    out.client_proof_sent=true;
+    const auto capture_started=monotonic_ms();
+    if(!capture_started)return fail("Monotonic clock unavailable");
+    const auto deadline=capture_started+profile.budget+15000;
+    const auto canonical=cj1::encode_profile(profile);
+    std::array<std::uint8_t,cj1::max_body+12> record{};
+    for(unsigned seq=0;seq<cj1::max_records;++seq) {
+        if(receive_to_capture(serial.fd,output.fd,record.data(),8,deadline,&out))
+            return fail("Interrupted CJ/1 header; partial capture retained");
+        const unsigned kind=record[3], length=little16(record.data()+6);
+        if(record[0]!='C'||record[1]!='J'||record[2]!=1||little16(record.data()+4)!=seq||
+           length>cj1::max_body||(seq==0?(kind!=1||length!=13):
+           !((kind==2&&length>=9)||(kind==3&&length==22))))return fail("Invalid CJ/1 frame");
+        if(receive_to_capture(serial.fd,output.fd,record.data()+8,length+4,deadline,&out))
+            return fail("Interrupted CJ/1 payload; partial capture retained");
+        if(cf1_crc32(record.data(),length+8)!=little32(record.data()+8+length))
+            return fail("CJ/1 CRC mismatch");
+        if(seq==0&&!std::equal(canonical.begin(),canonical.end(),record.begin()+8))
+            return fail("CJ/1 profile differs from approved CU/1 scope");
+        if(kind==3){
+            out.terminal_received=true;
+            if(!quiet(serial.fd,100,deadline)||fsync(output.fd)!=0)
+                return fail("CJ/1 trailing bytes, deadline or persistence failure");
+            return 0;
+        }
+    }
+    return fail("CJ/1 record limit exceeded");
+}
 }
