@@ -8,10 +8,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from .j1979_catalogue import (
     Definition, require, object_fields, integer, label, digest,
-    MAX_CATALOGUE, MAX_REFERENCE, MAX_PROJECTION_ROWS,
+    MAX_CATALOGUE, MAX_REFERENCE,
 )
 from .j1979_freeze_native import inspect_file
 from .recovery_bundle import _regular, _json
+
+MAX_PROJECTION_ROWS = 25000
 
 SCHEMA = "camarodiag-j1979-freeze-catalogue-v1"
 PROJECTION = "camarodiag-j1979-native-freeze-catalogue-projection-v1"
