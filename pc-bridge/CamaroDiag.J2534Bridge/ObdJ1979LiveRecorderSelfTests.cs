@@ -138,6 +138,34 @@ internal static class ObdJ1979LiveRecorderSelfTests
             Check(current.Number is double number&&Math.Abs(number-expected)<1e-9&&
                 current.ScaleSource=="ECU_CONFIGURATION","Custom current uses signed binary encoding");
         }
+        now=0;reads=0;sent.Clear();
+        var trim=ObdJ1979LiveRecorder.Run((req,_)=>{
+            var hex=Convert.ToHexString(req);sent.Add(hex);now+=10;
+            return hex switch {
+                "0100"=>Convert.FromHexString("410004000008"),
+                "011D"=>Convert.FromHexString("411D30"),
+                "0106"=>Convert.FromHexString(++reads==1?"41068090":"410690"),
+                _=>Normal(req)
+            };
+        },plan with{Pids=[6],Cycles=2},()=>{},clock:()=>now,delay:ms=>now+=ms);
+        Check(trim.Completed&&trim.MultiSignalSummary.Count==2,"two-bank trim recording");
+        Check(sent.SequenceEqual(new[]{"0902","0100","011D","0106","0106","0902"}),"layout admission before acquisition");
+        Check(trim.MultiSignalSummary[0].Mean==6.25&&trim.MultiSignalSummary[1].Mean==12.5&&
+            trim.MultiSignalSummary[1].Missing==1,"independent bank statistics");
+        foreach(int pid in new[]{6,7,8,9,0x55,0x56,0x57,0x58}){
+            var decoded=ObdJ1979OperatingContext.DecodeTrim([1,(byte)pid],[0,255],255)!;
+            Check(decoded.Signals[0].Number==-100&&decoded.Signals[1].Number==99.21875,
+                "trim endpoint scaling");
+            Check(ObdJ1979OperatingContext.DecodeTrim([1,(byte)pid],[128,144],null)!
+                .Signals[1].Number is null,"unverified upper bank is not a value");
+        }
+        var cycle=ObdJ1979OperatingContext.DecodeCycle([0,17,1,1],[128,7,1,0])!;
+        Check(cycle.Consistent&&cycle.SupportVerified&&cycle.Monitors[0].Enabled==true&&
+            cycle.Monitors[0].Complete==false&&cycle.Monitors[1].Enabled==false&&
+            cycle.Monitors[1].Complete==true,"cycle support, enable and completion are independent");
+        Check(ObdJ1979OperatingContext.DecodeCycle([0,1,1,0],null)!.Monitors.All(m=>m.Complete is null),
+            "missing baseline does not prove completion");
+        Check(ObdJ1979OperatingContext.DecodeCycle([0,128,0,0],null) is null,"reserved cycle field rejected");
         return count;
     }
 }
