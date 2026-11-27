@@ -214,4 +214,10 @@
   <data name="NativeMaintenanceUnverified" xml:space="preserve"><value>Journal non vérifié ; aucun succès revendiqué.</value></data>
   <data name="NativeMaintenancePrefixInspect" xml:space="preserve"><value>Inspecter un journal de maintenance interrompu</value></data>
   <data name="NativeMaintenancePrefixConsistent" xml:space="preserve"><value>Enregistrements complets du préfixe contrôlés ; terminal absent. Récupération toujours requise.</value></data>
+  <data name="NativeArchiveRun" xml:space="preserve"><value>Récupérer une archive de maintenance</value></data>
+  <data name="NativeArchiveBudget" xml:space="preserve"><value>Budget de l’opération d’origine (ms)</value></data>
+  <data name="NativeArchiveWarning" xml:space="preserve"><value>Export en lecture seule ; aucune commande de maintenance envoyée. Sélectionner le périmètre d’origine.</value></data>
+  <data name="NativeArchiveAccept" xml:space="preserve"><value>J’autorise l’export en lecture seule</value></data>
+  <data name="NativeArchiveConfirm" xml:space="preserve"><value>Confirmer la récupération du journal existant</value></data>
+  <data name="NativeArchiveReadOnly" xml:space="preserve"><value>Archive en lecture seule (aucun nouveau test véhicule)</value></data>
 </root>
