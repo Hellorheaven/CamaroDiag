@@ -397,11 +397,12 @@ static bool hex(FILE *f, const uint8_t *data, size_t n) {
     }
     return fputc('"', f) != EOF;
 }
-bool j1979_can_write_json(FILE *f, const j1979_can_plan *p,
-                           const j1979_can_result *r, const char *interface_name) {
-    if (!f || !p || !r || !interface_name || !r->steps) return false;
+bool j1979_can_write_json_transport(FILE *f,const j1979_can_plan *p,
+    const j1979_can_result *r,const char *interface_name,const char *transport) {
+    if (!f || !p || !r || !interface_name || !transport || !r->steps) return false;
     if (fprintf(f, "{\"schema\":\"camarodiag-functional-j1979-can-linux-c-v1\","
-      "\"protocol\":\"SAE-J1979\",\"transport\":\"LINUX_SOCKETCAN_ISOTP\","
+      "\"protocol\":\"SAE-J1979\",\"transport\":") < 0 || !quoted(f,transport) ||
+        fprintf(f,","
       "\"physical_vehicle_verified\":false,\"permits_programming\":false,"
       "\"tx_can_id\":\"%X\",\"rx_can_id\":\"%X\",\"interface\":",p->tx,p->rx) < 0 ||
         !quoted(f, interface_name)) return false;
@@ -582,4 +583,8 @@ bool j1979_can_write_json(FILE *f, const j1979_can_plan *p,
     if (!cd::j1979::write_context_json(f,observations,identity) ||
         !cd::j1979::write_projections(f,observations,identity)) return false;
     return fputs("}\n",f)!=EOF;
+}
+
+bool j1979_can_write_json(FILE *f,const j1979_can_plan *p,const j1979_can_result *r,const char *iface){
+    return j1979_can_write_json_transport(f,p,r,iface,"LINUX_SOCKETCAN_ISOTP");
 }

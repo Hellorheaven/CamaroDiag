@@ -70,6 +70,8 @@ void j1979_can_result_free(j1979_can_result *result);
 bool j1979_can_write_json(FILE *output, const j1979_can_plan *plan,
                            const j1979_can_result *result,
                            const char *interface_name);
+bool j1979_can_write_json_transport(FILE *output,const j1979_can_plan *plan,
+    const j1979_can_result *result,const char *interface_name,const char *transport);
 #ifdef __cplusplus
 }
 #endif

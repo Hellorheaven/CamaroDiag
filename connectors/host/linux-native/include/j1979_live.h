@@ -48,6 +48,8 @@ void j1979_live_free(j1979_live_result *result);
 bool j1979_live_write_json(FILE *stream, const j1979_live_plan *plan,
                            const j1979_live_result *result,
                            const char *interface_name);
+bool j1979_live_write_json_transport(FILE *stream,const j1979_live_plan *plan,
+    const j1979_live_result *result,const char *interface_name,const char *transport);
 #ifdef __cplusplus
 }
 #endif

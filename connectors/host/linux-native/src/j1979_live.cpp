@@ -278,11 +278,11 @@ static bool hex(FILE *f,const uint8_t *b,size_t n) {
     }
     return fputc('"',f)!=EOF;
 }
-bool j1979_live_write_json(FILE *f,const j1979_live_plan *p,
-                            const j1979_live_result *r,const char *iface) {
-    if (!f||!p||!r||!r->steps||!iface) return false;
+bool j1979_live_write_json_transport(FILE *f,const j1979_live_plan *p,
+    const j1979_live_result *r,const char *iface,const char *transport) {
+    if (!f||!p||!r||!r->steps||!iface||!transport) return false;
     if (fputs("{\"schema\":\"camarodiag-j1979-live-linux-c-v1\","
-      "\"protocol\":\"SAE-J1979\",\"transport\":\"LINUX_SOCKETCAN_ISOTP\","
+      "\"protocol\":\"SAE-J1979\",\"transport\":",f)==EOF||!string(f,transport)||fputs(","
       "\"source\":\"LIVE_PHYSICAL_PAIR\",\"raw_only\":true,"
       "\"physical_vehicle_verified\":false,\"permits_programming\":false,"
       "\"interface\":",f)==EOF||!string(f,iface)) return false;
@@ -363,4 +363,8 @@ bool j1979_live_write_json(FILE *f,const j1979_live_plan *p,
     if (!cd::j1979::write_context_json(f,observations,identity) ||
         !cd::j1979::write_projections(f,observations,identity)) return false;
     return fputs("}\n",f)!=EOF;
+}
+
+bool j1979_live_write_json(FILE *f,const j1979_live_plan *p,const j1979_live_result *r,const char *iface){
+    return j1979_live_write_json_transport(f,p,r,iface,"LINUX_SOCKETCAN_ISOTP");
 }
