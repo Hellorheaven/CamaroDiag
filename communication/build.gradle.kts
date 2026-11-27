@@ -2,7 +2,7 @@ plugins { id("com.android.library"); id("org.jetbrains.kotlin.android") }
 android {
     namespace = "com.camarodiag.communication"
     compileSdk = 36
-    // Compile the portable Connectors USB clients from their single source.
+    // Compile portable Connectors USB clients (Kotlin and transitional Java) from one source tree.
     sourceSets.getByName("main").java.srcDir(rootProject.file("connectors/host/android/src/main/java"))
 
     defaultConfig {

@@ -124,19 +124,21 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - name: Test portable Java protocol
+      - name: Compile Kotlin CU authentication and test portable protocol
         run: |
           mkdir -p /tmp/android-protocol
+          command -v kotlinc
+          kotlinc -Werror -jvm-target 17 -include-runtime -d /tmp/android-cu-auth.jar connectors/host/android/src/main/java/com/camarodiag/connectors/CuWire.kt connectors/host/android/src/main/java/com/camarodiag/connectors/J1979UsbAuth.kt connectors/host/android/src/main/java/com/camarodiag/connectors/J1979FreezeUsbAuth.kt connectors/host/android/src/main/java/com/camarodiag/connectors/J1979LiveUsbAuth.kt
           javac -Xlint:all -Werror -d /tmp/android-protocol connectors/host/android/src/main/java/com/camarodiag/connectors/BinaryDiscovery.java connectors/host/android/src/test/java/com/camarodiag/connectors/BinaryDiscoveryTest.java
-          java -ea -cp /tmp/android-protocol com.camarodiag.connectors.BinaryDiscoveryTest
-          javac -Xlint:all -Werror -d /tmp/android-protocol connectors/host/android/src/main/java/com/camarodiag/connectors/J1979UsbAuth.java connectors/host/android/src/main/java/com/camarodiag/connectors/J1979CampaignSemantics.java connectors/host/android/src/main/java/com/camarodiag/connectors/J1979UsbCapture.java connectors/host/android/src/test/java/com/camarodiag/connectors/J1979UsbTest.java
-          java -ea -cp /tmp/android-protocol com.camarodiag.connectors.J1979UsbTest
-          javac -Xlint:all -Werror -cp /tmp/android-protocol -d /tmp/android-protocol connectors/host/android/src/main/java/com/camarodiag/connectors/J1979FreezeUsbAuth.java connectors/host/android/src/main/java/com/camarodiag/connectors/J1979FreezeUsbCapture.java connectors/host/android/src/test/java/com/camarodiag/connectors/J1979FreezeUsbTest.java
-          java -ea -cp /tmp/android-protocol com.camarodiag.connectors.J1979FreezeUsbTest
-          javac -Xlint:all -Werror -cp /tmp/android-protocol -d /tmp/android-protocol connectors/host/android/src/main/java/com/camarodiag/connectors/J1979LiveUsbAuth.java connectors/host/android/src/main/java/com/camarodiag/connectors/J1979LiveNativeReplay.java connectors/host/android/src/main/java/com/camarodiag/connectors/J1979LiveUsbCapture.java connectors/host/android/src/test/java/com/camarodiag/connectors/J1979LiveUsbTest.java
-          java -ea -cp /tmp/android-protocol com.camarodiag.connectors.J1979LiveUsbTest
-          javac -Xlint:all -Werror -cp /tmp/android-protocol -d /tmp/android-protocol connectors/host/android/src/main/java/com/camarodiag/connectors/J1979MaintenanceJournal.java connectors/host/android/src/main/java/com/camarodiag/connectors/J1979MaintenanceUsb.java connectors/host/android/src/test/java/com/camarodiag/connectors/J1979MaintenanceUsbTest.java
-          java -ea -cp /tmp/android-protocol com.camarodiag.connectors.J1979MaintenanceUsbTest
+          java -ea -cp /tmp/android-protocol:/tmp/android-cu-auth.jar com.camarodiag.connectors.BinaryDiscoveryTest
+          javac -Xlint:all -Werror -cp /tmp/android-cu-auth.jar -d /tmp/android-protocol connectors/host/android/src/main/java/com/camarodiag/connectors/J1979CampaignSemantics.java connectors/host/android/src/main/java/com/camarodiag/connectors/J1979UsbCapture.java connectors/host/android/src/test/java/com/camarodiag/connectors/J1979UsbTest.java
+          java -ea -cp /tmp/android-protocol:/tmp/android-cu-auth.jar com.camarodiag.connectors.J1979UsbTest
+          javac -Xlint:all -Werror -cp /tmp/android-protocol:/tmp/android-cu-auth.jar -d /tmp/android-protocol connectors/host/android/src/main/java/com/camarodiag/connectors/J1979FreezeUsbCapture.java connectors/host/android/src/test/java/com/camarodiag/connectors/J1979FreezeUsbTest.java
+          java -ea -cp /tmp/android-protocol:/tmp/android-cu-auth.jar com.camarodiag.connectors.J1979FreezeUsbTest
+          javac -Xlint:all -Werror -cp /tmp/android-protocol:/tmp/android-cu-auth.jar -d /tmp/android-protocol connectors/host/android/src/main/java/com/camarodiag/connectors/J1979LiveNativeReplay.java connectors/host/android/src/main/java/com/camarodiag/connectors/J1979LiveUsbCapture.java connectors/host/android/src/test/java/com/camarodiag/connectors/J1979LiveUsbTest.java
+          java -ea -cp /tmp/android-protocol:/tmp/android-cu-auth.jar com.camarodiag.connectors.J1979LiveUsbTest
+          javac -Xlint:all -Werror -cp /tmp/android-protocol:/tmp/android-cu-auth.jar -d /tmp/android-protocol connectors/host/android/src/main/java/com/camarodiag/connectors/J1979MaintenanceJournal.java connectors/host/android/src/main/java/com/camarodiag/connectors/J1979MaintenanceUsb.java connectors/host/android/src/test/java/com/camarodiag/connectors/J1979MaintenanceUsbTest.java
+          java -ea -cp /tmp/android-protocol:/tmp/android-cu-auth.jar com.camarodiag.connectors.J1979MaintenanceUsbTest
       - name: Use runner Android SDK
         run: |
           test -n "$ANDROID_HOME"
@@ -146,7 +148,7 @@ jobs:
           test -f "$ANDROID_HOME/platforms/android-35/android.jar"
       - name: Compile native USB Host adapter
         run: |
-          javac -Xlint:all -Werror -cp "$ANDROID_HOME/platforms/android-35/android.jar" -d /tmp/android-protocol connectors/host/android/src/main/java/com/camarodiag/connectors/*.java
+          javac -Xlint:all -Werror -cp "$ANDROID_HOME/platforms/android-35/android.jar:/tmp/android-cu-auth.jar" -d /tmp/android-protocol connectors/host/android/src/main/java/com/camarodiag/connectors/*.java
   python-host-tests:
     runs-on: ubuntu-latest
     strategy:
