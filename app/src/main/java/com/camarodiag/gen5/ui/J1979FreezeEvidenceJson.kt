@@ -49,12 +49,11 @@ internal object J1979FreezeEvidenceJson {
         .put("detail",nullable(value.detail))
         .put("evidence",value.evidence?.let(::evidence) ?: JSONObject.NULL)
 
-    fun encode(report: J1979FreezeReport,adapter: String,version: String): JSONObject {
-        val result = report.result
+    private fun body(result: J1979FreezeResult): JSONObject {
         val plan = result.plan
-        require(plan.valid && adapter.isNotBlank() && version.isNotBlank())
+        require(plan.valid)
         val target = plan.target
-        val body = JSONObject()
+        return JSONObject()
             .put("plan",JSONObject()
                 .put("expected_vin",target.vin)
                 .put("frames",JSONArray(plan.frames))
@@ -88,6 +87,12 @@ internal object J1979FreezeEvidenceJson {
             .put("authenticated",false)
             .put("whole_vehicle_coverage_verified",false)
             .put("permits_programming",false)
+    }
+
+    fun encode(report: J1979FreezeReport,adapter: String,version: String): JSONObject {
+        require(adapter.isNotBlank() && version.isNotBlank())
+        val result = report.result
+        val target = result.plan.target
         return JSONObject()
             .put("schema","camarodiag-functional-j1979-freeze-v1")
             .put("protocol","SAE-J1979")
@@ -109,6 +114,51 @@ internal object J1979FreezeEvidenceJson {
                     .put("request_hex",row.requestHex)
                     .put("raw_response",nullable(row.rawAdapterResponse))
             }))
-            .put("result",body)
+            .put("result",body(result))
+    }
+    fun encodeNative(evidence: CamaroDiagConnectorFreezeCampaign.Evidence,version:String,
+        exportedCaptureName:String?):JSONObject {
+        val profile=evidence.target.profile
+        val channel=evidence.target.channel
+        val result=evidence.report
+        return JSONObject()
+            .put("schema","camarodiag-functional-j1979-native-freeze-v1")
+            .put("protocol","SAE-J1979")
+            .put("source","LIVE_USB_CU2")
+            .put("version",version)
+            .put("declared_connector",channel.connector)
+            .put("declared_ecu",channel.ecu)
+            .put("connection_generation",channel.connectionGeneration)
+            .put("started_at_utc",Instant.ofEpochMilli(evidence.startedAtMillis).toString())
+            .put("finished_at_utc",Instant.ofEpochMilli(evidence.finishedAtMillis).toString())
+            .put("profile",JSONObject()
+                .put("request_can_id",profile.tx.toString(16).uppercase(java.util.Locale.ROOT))
+                .put("response_can_id",profile.rx.toString(16).uppercase(java.util.Locale.ROOT))
+                .put("extended",profile.extended)
+                .put("plan",JSONObject().put("expected_vin",profile.vin)
+                    .put("frames",JSONArray(profile.frames().toList()))
+                    .put("selected_pids",JSONArray(profile.pids().toList()))
+                    .put("budget_ms",profile.budgetMs)))
+            .put("device_credential_authenticated",evidence.credentialAuthenticated)
+            .put("client_proof_sent",evidence.proofSent)
+            .put("frame_integrity_verified",evidence.framed)
+            .put("capture_integrity_verified",evidence.captureIntegrityVerified)
+            .put("execution_completed",evidence.executionCompleted)
+            .put("cancelled",evidence.cancelled)
+            .put("observations_received",evidence.observationCount)
+            .put("capture_sha256",nullable(evidence.sha256))
+            .put("raw_capture_name",nullable(exportedCaptureName))
+            .put("error",nullable(evidence.error))
+            .put("hardware_provenance_verified",false)
+            .put("evidence_authenticated",false)
+            .put("physical_vehicle_verified",false)
+            .put("permits_programming",false)
+            .put("summary",result?.let { r -> JSONObject()
+                .put("stop_reason",nullable(r.stopReason)).put("visited_frames",r.frames.size)
+                .put("completed",r.completed).put("identity_rechecked",r.identityRechecked)
+                .put("all_frames_stable",r.allFramesStable).put("steps",r.steps.size)
+                .put("duration_ms",r.durationMs).put("frame_states",JSONArray(r.frames.map { it.status }))
+            } ?: JSONObject.NULL)
+            .put("result",result?.let(::body) ?: JSONObject.NULL)
     }
 }
