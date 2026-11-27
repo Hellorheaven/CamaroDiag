@@ -1,6 +1,7 @@
 #define _POSIX_C_SOURCE 200809L
 #include "j1979_isotp.h"
 #include "j1979_can.h"
+#include "j1979_freeze_scope.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -115,14 +116,16 @@ static int ready(const j1979_isotp_link *link, short events,
     }
     return -1;
 }
-int j1979_isotp_exchange(void *context, const uint8_t *request,
+static int exchange_scoped(void *context, const uint8_t *request,
                          size_t n, uint8_t *response,
-                         size_t *response_size, unsigned timeout_ms) {
+                         size_t *response_size, unsigned timeout_ms,const cd::J1979FreezeScope* scope) {
     auto *link = static_cast<j1979_isotp_link *>(context);
+    if(!response_size)return -1;
+    const auto capacity=*response_size;*response_size=0;
     if (!j1979_isotp_current(link) ||
-        !j1979_can_allowed_read(request, n) ||
-        !response || !response_size || *response_size == 0 ||
-        *response_size > J1979_CAN_MAX_PAYLOAD + 1u ||
+        !(scope?scope->allows(request,n):j1979_can_allowed_read(request,n)) ||
+        !response || capacity == 0 ||
+        capacity > J1979_CAN_MAX_PAYLOAD + 1u ||
         timeout_ms == 0 || timeout_ms > 2500)
         return -1;
     const uint64_t start = monotonic_ms();
@@ -130,17 +133,18 @@ int j1979_isotp_exchange(void *context, const uint8_t *request,
     const uint64_t deadline = start + timeout_ms;
     /* A queued prior response cannot be attributed to the current request.
      * Fail on a continuously busy socket rather than silently mixing ECUs. */
+    bool queue_empty=false;
     for (unsigned drained = 0; drained < 64; ++drained) {
         std::array<uint8_t,J1979_CAN_MAX_PAYLOAD+1> stale{};
         ssize_t got = recv(link->socket_fd, stale.data(), stale.size(),
                            MSG_DONTWAIT);
-        if (got < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) break;
+        if (got < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) {queue_empty=true;break;}
         if (got < 0 && errno == EINTR) continue;
         if (got < 0 || !j1979_isotp_current(link) || monotonic_ms() >= deadline)
             return -1;
         if (drained == 63) return -1;
     }
-    if (ready(link, POLLOUT, deadline) != 0 || !j1979_isotp_current(link))
+    if (!queue_empty || ready(link, POLLOUT, deadline) != 0 || !j1979_isotp_current(link))
         return -1;
     ssize_t sent = send(link->socket_fd, request, n, MSG_DONTWAIT);
     if (sent < 0 || (size_t)sent != n) return -1; /* No retry after uncertain TX */
@@ -149,10 +153,10 @@ int j1979_isotp_exchange(void *context, const uint8_t *request,
         int state = ready(link, POLLIN, deadline);
         if (state == 1) return pending ? -1 : 1;
         if (state != 0) return -1;
-        ssize_t received = recv(link->socket_fd, response, *response_size, MSG_DONTWAIT);
+        ssize_t received = recv(link->socket_fd, response, capacity, MSG_DONTWAIT|MSG_TRUNC);
         if (received < 0 && errno == EINTR) continue;
         if (received < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) continue;
-        if (received <= 0 || (size_t)received > J1979_CAN_MAX_PAYLOAD)
+        if (received <= 0 || (size_t)received > J1979_CAN_MAX_PAYLOAD || (size_t)received > capacity)
             return -1;
         if (!j1979_isotp_current(link) || monotonic_ms() >= deadline)
             return -1;
@@ -166,6 +170,16 @@ int j1979_isotp_exchange(void *context, const uint8_t *request,
     }
     return -1;
 }
+int j1979_isotp_exchange(void *context,const uint8_t *request,size_t n,uint8_t *response,size_t *size,unsigned timeout){
+    return exchange_scoped(context,request,n,response,size,timeout,nullptr);
+}
+namespace cd::hostfreeze {
+int exchange(j1979_isotp_link& link,const J1979FreezeScope& scope,const uint8_t* request,size_t n,
+    uint8_t* response,size_t* size,unsigned timeout){
+    return exchange_scoped(&link,request,n,response,size,timeout,&scope);
+}
+}
+
 void j1979_isotp_close(j1979_isotp_link *link) {
     if (!link) return;
     if (link->socket_fd >= 0) close(link->socket_fd);
