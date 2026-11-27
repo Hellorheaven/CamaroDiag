@@ -212,4 +212,6 @@
   <data name="NativeMaintenanceAccept" xml:space="preserve"><value>Je reconnais les conséquences et les conditions requises</value></data>
   <data name="NativeMaintenanceConfirm" xml:space="preserve"><value>Je confirme une opération unique avec autorisation locale indépendante sur le VIN sélectionné.</value></data>
   <data name="NativeMaintenanceUnverified" xml:space="preserve"><value>Journal non vérifié ; aucun succès revendiqué.</value></data>
+  <data name="NativeMaintenancePrefixInspect" xml:space="preserve"><value>Inspecter un journal de maintenance interrompu</value></data>
+  <data name="NativeMaintenancePrefixConsistent" xml:space="preserve"><value>Enregistrements complets du préfixe contrôlés ; terminal absent. Récupération toujours requise.</value></data>
 </root>
