@@ -79,6 +79,7 @@ internal sealed class NativeE39FileWriteJournal :
                 Directory.CreateDirectory(backupDirectory);
                 backupDirectoryCreated = true;
             }
+            RequireBackupDirectory();
             var name = Path.Combine(backupDirectory,
                 address.ToString("X8") + "-" + frozen.Length + ".ecu-block");
             var header = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new {
@@ -94,7 +95,9 @@ internal sealed class NativeE39FileWriteJournal :
                 output.Flush(flushToDisk: true);
             }
             // Require a newly read, byte-identical persistent capture.
-            var check = File.ReadAllBytes(name);
+            RequireBackupDirectory();
+            var check = ReadCreatedEnvelope(name,header.Length+frozen.Length);
+            RequireBackupDirectory();
             if (check.Length != header.Length + frozen.Length ||
                 !check.AsSpan(0, header.Length).SequenceEqual(header) ||
                 !check.AsSpan(header.Length).SequenceEqual(frozen) ||
@@ -109,6 +112,27 @@ internal sealed class NativeE39FileWriteJournal :
         finally { gate.Release(); }
     }
 
+    private void RequireBackupDirectory()
+    {
+        var attrs=File.GetAttributes(backupDirectory);
+        if((attrs & FileAttributes.Directory)==0 || (attrs & FileAttributes.ReparsePoint)!=0)
+            throw new InvalidDataException("Original ECU backup directory is missing or redirected.");
+    }
+
+    internal static byte[] ReadCreatedEnvelope(string path,int expectedLength)
+    {
+        if(expectedLength<=0||expectedLength>1024*1024+4096 ||
+            (File.GetAttributes(path)&(FileAttributes.Directory|FileAttributes.ReparsePoint))!=0)
+            throw new InvalidDataException("Invalid saved ECU envelope.");
+        using var source=new FileStream(path,FileMode.Open,FileAccess.Read,FileShare.Read);
+        if(source.Length!=expectedLength)throw new InvalidDataException("Saved ECU envelope length changed.");
+        var data=new byte[expectedLength];
+        source.ReadExactly(data);
+        if(source.ReadByte()!=-1||source.Length!=expectedLength)
+            throw new InvalidDataException("Saved ECU envelope changed while reading.");
+        return data;
+    }
+
     public async Task RequireOriginalBlocksIntactAsync(CancellationToken token)
     {
         await gate.WaitAsync(token);
@@ -120,7 +144,8 @@ internal sealed class NativeE39FileWriteJournal :
                 throw new InvalidDataException("Original sector backup is unavailable.");
             void RequireInventory()
             {
-                if (!Directory.EnumerateFileSystemEntries(backupDirectory)
+                RequireBackupDirectory();
+                if (!Directory.EnumerateFileSystemEntries(backupDirectory).Take(savedEnvelopes.Count+1)
                     .ToHashSet(StringComparer.Ordinal).SetEquals(savedEnvelopes.Keys))
                     throw new InvalidDataException("Original sector backup inventory changed.");
             }

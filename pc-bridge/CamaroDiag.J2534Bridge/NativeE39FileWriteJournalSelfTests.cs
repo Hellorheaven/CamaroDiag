@@ -232,6 +232,14 @@ internal static class NativeE39FileWriteJournalSelfTests
                 0x20000u, physicalBytes, originalSha, CancellationToken.None)
                 .GetAwaiter().GetResult();
             var physicalFile = Path.Combine(path + ".blocks", "00020000-16.ecu-block");
+            AssertThrows<InvalidDataException>(()=>
+                NativeE39FileWriteJournal.ReadCreatedEnvelope(physicalFile,1));
+            tests++;
+            AssertThrows<InvalidDataException>(()=>
+                NativeE39FileWriteJournal.ReadCreatedEnvelope(physicalFile,2*1024*1024));
+            tests++;
+            Assert(NativeE39FileWriteJournal.ReadCreatedEnvelope(physicalFile,(int)new FileInfo(physicalFile).Length)
+                .AsSpan()[^16..].SequenceEqual(physicalBytes),"Bounded exact envelope readback");
             Assert(File.Exists(physicalFile) &&
                 File.ReadAllBytes(physicalFile).AsSpan()[^16..].SequenceEqual(physicalBytes),
                 "Physical ECU sector backup is durably persisted with exact bytes");
