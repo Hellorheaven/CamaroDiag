@@ -119,6 +119,31 @@ internal static class ObdJ1979Mode06
             actual < low ? "BELOW" : actual > high ? "ABOVE" : "WITHIN");
     }
 
+    internal sealed record EngineeringRecord(string RequestHex,int RecordIndex,byte MonitorId,byte TestId,
+        byte UnitScalingId,ushort ValueEncoded,ushort MinimumEncoded,ushort MaximumEncoded,ScaledValue? Scaled);
+
+    internal static IReadOnlyList<EngineeringRecord> Project(string requestHex,string? responseHex,string status)
+    {
+        if(status!="PASSED"||requestHex.Length!=4||responseHex is null||responseHex.Length>8190)return [];
+        try {
+            byte[] req=Convert.FromHexString(requestHex);
+            if(req[0]!=6||req[1]%32==0)return [];
+            return DecodeTests(req,Convert.FromHexString(responseHex)).Select((test,index)=>
+                new EngineeringRecord(requestHex.ToUpperInvariant(),index,test.MonitorId,test.TestId,
+                    test.UnitScalingId,test.Value,test.Minimum,test.Maximum,test.Scaled)).ToArray();
+        } catch(FormatException){return [];}
+          catch(InvalidDataException){return [];}
+    }
+
+    internal static object Evidence(EngineeringRecord record)=>new {
+        request_hex=record.RequestHex,record_index=record.RecordIndex,monitor_id=record.MonitorId,
+        test_id=record.TestId,unit_scaling_id=record.UnitScalingId,value_encoded=record.ValueEncoded,
+        minimum_encoded=record.MinimumEncoded,maximum_encoded=record.MaximumEncoded,
+        scaled=record.Scaled is { } scaled?new {definition=scaled.Definition,unit=scaled.Unit,
+            value=scaled.Value,minimum=scaled.Minimum,maximum=scaled.Maximum,
+            numeric_relation=scaled.NumericRelation,monitor_verdict=(string?)null}:null
+    };
+
     internal static Availability DecodeAvailability(ReadOnlySpan<byte> request,
         ReadOnlySpan<byte> response)
     {
