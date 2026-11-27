@@ -291,7 +291,7 @@ internal object J1979FreezeCampaign {
             var raw: String? = null
             fun observed(outcome: String,response: ByteArray? = null) =
                 Read(outcome,response,(elapsed()-begin).coerceAtLeast(0),attempted,raw)
-            fun stillCurrent(): Boolean = try {
+            suspend fun stillCurrent(): Boolean = try {
                 currentCoroutineContext().ensureActive()
                 guard()
                 true

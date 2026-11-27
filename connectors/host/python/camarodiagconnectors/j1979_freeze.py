@@ -366,7 +366,7 @@ def scan_freeze(exchange, plan: FreezePlan, *, clock=time.monotonic, require_cur
             return result("CANCELLED")
         except (OSError, ValueError, RuntimeError):
             return result("CONTEXT_CHANGED")
-        if (not isinstance(maximum, (int, float)) or
+        if (type(maximum) not in (int, float) or
                 not math.isfinite(maximum) or not 0 < maximum <= 20):
             # Local admission failed before the actual exchange. Do not
             # incorrectly record a transmitted request.

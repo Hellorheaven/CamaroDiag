@@ -165,7 +165,7 @@ class FreezeTests(unittest.TestCase):
     def test_freeze_route_is_admitted_before_transmission(self):
         ecu = FakeECU()
         plan = FreezePlan(VIN)
-        for invalid in (0, -1, 21, float("inf"), float("nan"), "2.5"):
+        for invalid in (0, -1, 21, float("inf"), float("nan"), "2.5", True, False):
             with self.subTest(timeout=invalid):
                 result = scan_freeze(ecu.exchange, plan, request_timeout=lambda request: invalid)
                 self.assertEqual(result["stop_reason"], "CONTEXT_CHANGED")
@@ -189,7 +189,7 @@ class FreezeTests(unittest.TestCase):
             state["active"] = False
             return value
         report = scan_freeze(exchange, FreezePlan(VIN), require_current=require_current)
-        self.assertEqual(ecu.requests, [b"\\x09\\x02"])
+        self.assertEqual(ecu.requests, [bytes.fromhex("0902")])
         self.assertEqual(report["stop_reason"], "CONTEXT_CHANGED")
         self.assertIsNone(report["initial_vin"])
         self.assertTrue(report["steps"][0]["transmission_attempted"])
