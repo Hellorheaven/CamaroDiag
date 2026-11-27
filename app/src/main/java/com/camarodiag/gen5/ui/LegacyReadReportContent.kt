@@ -47,7 +47,18 @@ internal fun LegacyReadReportContent(report: LegacyReadReport) {
             Text(name+": "+stringResource(if(ready)R.string.legacy_read_monitor_ready else R.string.legacy_read_monitor_incomplete),fontSize=11.sp)
         }
     }
-    report.measurements.forEach {
+    val trims=report.operatingContext.fuelTrims
+    trims.forEach { trim ->
+        trim.signals.forEach { signal ->
+            Text("${trim.requestHex} · ${signal.name}: ${signal.number ?: "—"} ${signal.unit}",fontSize=11.sp)
+        }
+    }
+    report.operatingContext.driveCycle?.let { cycle ->
+        cycle.monitors.forEach { monitor ->
+            Text("0141 · ${monitor.name}: ${monitor.complete?.let { if(it) "✓" else "✗" } ?: "—"}",fontSize=11.sp)
+        }
+    }
+    report.measurements.filterNot { m -> trims.any { it.requestHex.take(4)=="%02X%02X".format(Locale.ROOT,m.mode,m.pid) } }.forEach {
         Text("${hex(it.mode)}/${hex(it.pid)} · ${it.name}: ${it.number} ${it.unit}",fontSize=11.sp)
     }
     report.multiSignalRecords.forEach { record ->
