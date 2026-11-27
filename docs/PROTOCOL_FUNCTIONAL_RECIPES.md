@@ -239,3 +239,30 @@ La commande hors ligne `verify-legacy --report source.json --vin VIN --output ve
 The historical ISO 15031-5:2006 Annex E table now contains 79 supported CAN Mode 06 scaling identifiers. Mode 05 uses the ten historical standard oxygen test definitions from Annex C, with constant versus bounded results kept distinct. Legacy Mode 06 is a separate record layout: component ID, single encoded limit and limit direction; no OEM engineering units are guessed. Numerical relations do not establish monitor completion or emissions compliance. Custom wideband oxygen current uses signed two's-complement when PID 4F specifies a nonzero current range; the default encoding remains offset binary. Source reference: ISO 15031-5:2006 sections 6.5/6.6, B.60 and Annexes C/E (https://studylib.net/doc/25827573/iso-15031-5-2006).
 
 Android, Windows and Linux host reports preserve original raw values and expose derived projections. Native USB scan and network display consume independently decoded contextual values. Regression vectors cover reserved IDs, signed extrema, unknown OEM tests, source substitution, corrupted checksum, unadvertised requests and incomplete VIN. Written, not executed; J1979DA newer-revision coverage, remaining firmware transport/action paths and closing validation remain open. No physical qualification or closure claimed.
+
+
+## SAE J1979 — acquisition explicite des trames figées / explicit freeze-frame acquisition
+
+Le scan standard conserve sa lecture historique de la trame 00. La recette Linux dédiée sélectionne de 1 à 8 numéros explicites ; elle ne balaie pas les 256 numéros. Utiliser exclusivement le calculateur et la paire CAN physique documentés. La trame 00 utilise les définitions historiques de PID applicables ; les données des trames supplémentaires restent brutes, car leurs définitions peuvent être propres au constructeur (ISO 15031-5:2006, sections 6.2 et 7.2). Aucun nouveau droit dans le pont réseau ou le firmware.
+
+Exemple de syntaxe, avec VIN et adresses fictifs à remplacer par les valeurs vérifiées du véhicule :
+
+```sh
+camarodiagconnectors-j1979-freeze --interface can0 --tx 7E0 --rx 7E8 \
+  --vin 1G1FA1E30D1234567 --frame 00 --frame 01 --pid 0C --pid 0D \
+  --confirm-physical-channel --output freeze.json
+camarodiagconnectors-offline verify-freeze --report freeze.json \
+  --vin 1G1FA1E30D1234567 --output freeze-verification.json
+```
+
+La disponibilité est propre à chaque numéro de trame : PID00, éventuelles pages suivantes, PID02 déclencheur annoncé, puis uniquement les PID de données annoncés. Une valeur de déclenchement nulle empêche la lecture des valeurs. Le déclencheur est revérifié après les mesures et le VIN avant/après la campagne ; cela ne garantit pas une capture atomique de l'ECU. Les erreurs, les limites de temps, les numéros indisponibles, les lectures non envoyées et les réponses brutes restent visibles. L'export n'écrase aucun fichier. Le vérificateur reconstruit la campagne à partir des observations et rejette toute divergence ; l'intégrité logique du rapport ne prouve pas l'identité physique, l'authenticité du matériel ou le minutage réel.
+
+The dedicated Linux recipe selects one to eight explicit frame numbers, uses an independently documented physical CAN channel and an expected VIN. It never guesses additional frame numbers or OEM-specific measurement scales. Each frame has its own support map and trigger. Only advertised measurement PIDs are requested. A zero trigger prevents value reads; a changed trigger or unavailable final VIN prevents a positive overall stable result. The independent offline command checks the exact request order, response echoes, summaries and safety flags. No programming authority is granted. Windows and Android live acquisition for additional frames and firmware coverage remain open. Regression tests written, not executed before the closing protocol gate.
+
+## C6 — historique de récupération multiplateforme / cross-platform recovery history
+
+Android permet de sélectionner et d'ordonner plusieurs dossiers de preuves de récupération via SAF, de comparer leurs journaux exacts et leurs inventaires de secteurs originaux, puis d'exporter un rapport JSON après relecture des sources. Le contrôle exige une identité attendue et un contexte de compte/véhicule inchangé. Les exports restent des constats hors ligne ; ni restauration, ni écriture sur le calculateur.
+
+Le vérificateur Python `verify-recovery-history-report` prend désormais en charge le rapport d'historique natif Windows en plus du format portable utilisé par Python et Android. Les journaux originaux doivent être fournis dans l'ordre déclaré ; les empreintes, secteurs, états, transitions et résultats sont recalculés indépendamment. Les exports unitaires Windows sont aussi interdits dans les répertoires de preuves d'origine.
+
+Android supports explicit ordered selection of recovery evidence folders, byte-prefix and invariant original-sector comparison, source reinspection and portable JSON export. Python independently replays native Windows history reports and the portable Android/Python shape from the actual source journals. These checks are offline, not hardware attestation or permission to recover an ECU. Regression cases are written, not executed. C6 remains open.
