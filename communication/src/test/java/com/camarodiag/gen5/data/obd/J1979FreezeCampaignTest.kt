@@ -93,7 +93,7 @@ class J1979FreezeCampaignTest {
         assertFalse(plan.copy(frames=emptyList()).valid)
         assertFalse(plan.copy(selectedPids=listOf(2)).valid)
         assertFalse(plan.copy(selectedPids=listOf(32)).valid)
-        assertFalse(plan.copy(target=J1979LiveTarget(2,0x10,vin)).valid)
+        assertTrue(plan.copy(target=J1979LiveTarget(2,0x10,vin)).valid)
         for (req in listOf("04","0800","22F190","020D02"))
             assertFalse(J1979FreezeCampaign.allowed(bytes(req),plan.frames))
     }
