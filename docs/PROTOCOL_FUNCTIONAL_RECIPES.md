@@ -230,3 +230,12 @@ L'enregistrement continu ne calcule pas de statistiques sur une échelle suppos�
 Les scénarios de régression couvrent les plages spécifiques, l'absence vérifiée,
 les réponses tronquées, les doublons et l'isolation des sources. Leur exécution
 reste réservée à la validation de clôture du protocole.
+
+
+### J1979 — vérification legacy et moniteurs / Legacy replay and monitors
+
+La commande hors ligne `verify-legacy --report source.json --vin VIN --output verification.json` relit un rapport de diagnostic à source sélectionnée (ELM Android/Linux ou J2534 Windows). Elle reconstitue les réponses à partir des trames enregistrées, vérifie les requêtes et les chaînes d'inventaire, le VIN fragmenté, l'attribution des réponses, les défauts et les projections numériques/moniteurs prises en charge. Les champs historiques non vérifiés ne sont pas assimilés à des preuves. Le résultat indique précisément les champs de synthèse contrôlés. Le fichier d'entrée n'est pas modifié. Le CRC ou checksum ELM est revérifié ; un pilote J2534 ne fournit pas nécessairement ce byte, donc son rapport ne peut pas attester ce contrôle. Pas de preuve physique ni d'autorisation d'actionnement.
+
+The historical ISO 15031-5:2006 Annex E table now contains 79 supported CAN Mode 06 scaling identifiers. Mode 05 uses the ten historical standard oxygen test definitions from Annex C, with constant versus bounded results kept distinct. Legacy Mode 06 is a separate record layout: component ID, single encoded limit and limit direction; no OEM engineering units are guessed. Numerical relations do not establish monitor completion or emissions compliance. Custom wideband oxygen current uses signed two's-complement when PID 4F specifies a nonzero current range; the default encoding remains offset binary. Source reference: ISO 15031-5:2006 sections 6.5/6.6, B.60 and Annexes C/E (https://studylib.net/doc/25827573/iso-15031-5-2006).
+
+Android, Windows and Linux host reports preserve original raw values and expose derived projections. Native USB scan and network display consume independently decoded contextual values. Regression vectors cover reserved IDs, signed extrema, unknown OEM tests, source substitution, corrupted checksum, unadvertised requests and incomplete VIN. Written, not executed; J1979DA newer-revision coverage, remaining firmware transport/action paths and closing validation remain open. No physical qualification or closure claimed.
