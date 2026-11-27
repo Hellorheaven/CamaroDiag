@@ -29,13 +29,14 @@ internal fun J1979LivePanel(protocol: Int?,state: FunctionalTestState,vehicle: V
     var interval by remember { mutableStateOf("1000") }
     var budget by remember { mutableStateOf("180") }
     var confirmed by remember(protocol,epoch,vehicle) { mutableStateOf(false) }
+    var rawOnly by remember(protocol,epoch,vehicle) { mutableStateOf(false) }
     var expanded by remember { mutableStateOf(false) }
     val enabled=!state.running&&protocol!=null
     val ids=pids.split(",").map { it.trim().takeIf { raw->raw.matches(Regex("[0-9A-Fa-f]{2}")) }?.toIntOrNull(16) }
     val target=source.toIntOrNull(16)?.let { J1979LiveTarget(protocol?:0,it,vehicle.vin) }
     val plan=target?.takeIf { ids.all { id->id!=null } }?.let {
         J1979LivePlan(it,ids.filterNotNull(),cycles.toIntOrNull()?:0,interval.toLongOrNull()?:0,
-            (budget.toLongOrNull()?:0)*1000)
+            (budget.toLongOrNull()?:0)*1000,rawOnly)
     }
     OutlinedButton(onClick={expanded=!expanded},modifier=Modifier.fillMaxWidth()){
         Text(stringResource(R.string.j1979_live_title))
@@ -49,6 +50,10 @@ internal fun J1979LivePanel(protocol: Int?,state: FunctionalTestState,vehicle: V
             if((protocol != null && protocol in 1..5))2 else 8){source=it.uppercase(Locale.ROOT)}
         target?.requestId?.let { Text("${target.idHex(it)} → ${target.idHex(target.responseId)}",fontFamily=FontFamily.Monospace) }
         Field(pids,R.string.j1979_live_pids,95){pids=it.uppercase(Locale.ROOT)}
+        Row(verticalAlignment=Alignment.CenterVertically){
+            Checkbox(rawOnly,{rawOnly=it;confirmed=false},enabled=enabled)
+            Text(stringResource(R.string.j1979_live_raw_only))
+        }
         Field(cycles,R.string.j1979_live_cycles,4){cycles=it}
         Field(interval,R.string.j1979_live_interval,5){interval=it}
         Field(budget,R.string.j1979_live_budget,3){budget=it}
@@ -65,7 +70,7 @@ internal fun J1979LivePanel(protocol: Int?,state: FunctionalTestState,vehicle: V
     if(state.livePlan!=null){
         state.liveRecent.takeLast(12).forEach {
             val value=it.multiSignals?.takeIf { v->v.isNotEmpty() }?.joinToString(" · ") { v->"${v.name}: ${v.number} ${v.unit}" }
-                ?:it.value?.let { v->"${v.number} ${v.unit}" }?:it.status
+                ?:it.value?.let { v->"${v.number} ${v.unit}" }?:if(state.livePlan.rawOnly&&it.status=="RAW")it.responseHex.orEmpty().take(128) else it.status
             Text("${it.elapsedMs} ms · ${it.requestHex} · $value",fontFamily=FontFamily.Monospace,fontSize=11.sp)
         }
         state.liveReport?.let { r ->
@@ -77,7 +82,10 @@ internal fun J1979LivePanel(protocol: Int?,state: FunctionalTestState,vehicle: V
                 Text("${"%02X".format(Locale.ROOT,it.pid)} · ${it.name} · ${it.count}/${it.attempted}")
                 Text(stringResource(R.string.j1979_live_summary,display(it.minimum),display(it.maximum),display(it.mean),it.unit),fontSize=11.sp)
             }
-            r.summaries.filter { scalar->r.multiSignalSummary.none { it.pid==scalar.pid } }.forEach {
+            if(r.plan.rawOnly)r.summaries.forEach {
+                Text(stringResource(R.string.j1979_live_raw_count,"%02X".format(Locale.ROOT,it.pid),it.statusCounts["RAW"]?:0,it.attempted))
+            }
+            else r.summaries.filter { scalar->r.multiSignalSummary.none { it.pid==scalar.pid } }.forEach {
                 fun display(x:Double?)=x?.let { n->"%.3f".format(Locale.getDefault(),n) }?:"—"
                 Text("${"%02X".format(Locale.ROOT,it.pid)} · ${it.name.orEmpty()} · ${it.statusCounts["PASSED"]?:0}/${it.attempted}")
                 Text(stringResource(R.string.j1979_live_summary,display(it.minimum),display(it.maximum),display(it.mean),it.unit.orEmpty()),
