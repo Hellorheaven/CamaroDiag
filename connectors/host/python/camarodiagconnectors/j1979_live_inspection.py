@@ -17,6 +17,7 @@ import statistics
 from .j1979_campaign_evidence import decode_observation
 from .j1979_live import Plan, numeric_pid, legacy_numeric_pid
 from .j1979_multi_signal import width as multi_width, decode_response as multi_decode
+from .j1979_scaling_context import dependency, context_from_steps, config_data
 from .j1979 import physical_pair
 from .j1979_legacy_discovery import valid_source
 from .j1979_legacy_frames import checksum
@@ -238,6 +239,12 @@ def inspect(root, *, expected_vin=None):
         channel={"kind":"can","tx":tx,"rx":rx}
     rows=_array(result.get("observations"),MAX_ROWS,"observations")
     admissions=_array(result.get("admission"),256,"admission")
+    required_configs=sorted({dependency(pid) for pid in pids if dependency(pid) is not None})
+    claimed_scaling=_get(result,"scaling_configuration")
+    scoped_scaling=claimed_scaling is not None
+    _require(not scoped_scaling or bool(required_configs),"Unexpected scaling configuration")
+    scale_rows=[]
+    config_requests=[]
     combined=[]
     for group,phase_name in ((admissions,"admission"),(rows,"sample")):
         previous=-1
@@ -254,7 +261,7 @@ def inspect(root, *, expected_vin=None):
     # disambiguates initial/inventory versus first samples and final versus last.
     def order(item):
         phase=item[4].get("phase")
-        priority=0 if phase in ("INITIAL_VIN","INVENTORY","PERIODIC_VIN") else 2 if phase=="FINAL_VIN" else 1
+        priority=0 if phase in ("INITIAL_VIN","INVENTORY","PERIODIC_VIN","SCALING") else 2 if phase=="FINAL_VIN" else 1
         return item[0],priority,item[1],item[3]
     combined.sort(key=order)
     advertised=set()
@@ -290,7 +297,7 @@ def inspect(root, *, expected_vin=None):
         value=row.get("measurement")
         declared_multi=_get(row,"multi_signals")
         if group!="sample":
-            _require(status!="RAW" and declared_multi in (None,[]),"Admission cannot carry multi-channel samples")
+            _require((status!="RAW" or phase=="SCALING" and scoped_scaling) and declared_multi in (None,[]),"Admission cannot carry multi-channel samples")
         if legacy:
             _match_legacy(groups.get(index),req,res,status,protocol,driver)
         _require(not terminal,"Observation after terminal condition")
@@ -307,12 +314,20 @@ def inspect(root, *, expected_vin=None):
                 _require(last_identity is not None and start-last_identity<=30000+2,
                          "Missing periodic identity check")
                 last_start=start
+            context=context_from_steps(scale_rows) if scoped_scaling else None
+            if scoped_scaling:
+                _require(all(context.get(c).state!="UNVERIFIED" for c in required_configs),
+                         "Sampling before ECU scaling admission")
             counts[pid][status]+=1
             measured=ev.get("measurement") if status=="PASSED" else None
             signals=None
             if multi_width(pid) is not None and status in ("RAW","PASSED"):
                 signals=multi_decode(req,res)
                 _require(signals is not None and value is None,"Invalid multi-signal response")
+                if context is not None and dependency(pid) is not None:
+                    scaled=context.decode(req,res)
+                    _require(scaled is not None and len(scaled["signals"])==len(signals), "Invalid contextual signal response")
+                    signals=[{**s,"number":c["number"]} for s,c in zip(signals,scaled["signals"])]
                 claimed=_array(declared_multi,10,"multi-signal values")
                 _require(len(claimed)==len(signals),"Missing or extra signal values")
                 for raw,signal in zip(claimed,signals):
@@ -327,6 +342,10 @@ def inspect(root, *, expected_vin=None):
             elif status=="PASSED":
                 _require(declared_multi in (None,[]),"Single measurement carries unexpected signal vector")
                 _require(measured is not None and isinstance(value,dict),"Missing numeric measurement")
+                if context is not None and dependency(pid) is not None:
+                    scaled=context.decode(req,res)
+                    _require(scaled is not None,"Invalid contextual scalar response")
+                    measured={**measured,"number":scaled["signals"][0]["number"]}
                 _require(value.get("name")==measured["name"] and value.get("unit")==measured["unit"]
                          and _same_number(value.get("number"),measured["number"]),"Measurement differs from raw response")
                 samples[pid].append((measured["number"],end,measured["name"],measured["unit"]))
@@ -358,6 +377,8 @@ def inspect(root, *, expected_vin=None):
         elif phase=="INVENTORY":
             _require(identity==vin and not sample_index and not final and not inventory_complete and value is None
                      and req==bytes((1,next_page)),"Unexpected inventory page")
+            _require(not config_requests,"Inventory after scaling admission")
+            scale_rows.append({"request_hex":req.hex(),"response_hex":res.hex() if res is not None else None,"status":status})
             if status=="PASSED":
                 page=ev.get("supported_page")
                 _require(page is not None,"Missing support bitmap")
@@ -367,10 +388,28 @@ def inspect(root, *, expected_vin=None):
                 next_page+=32
             else:
                 terminal=True
+        elif phase=="SCALING":
+            _require(scoped_scaling and identity==vin and not sample_index and not final and
+                     set(pids)<=advertised and value is None and len(req)==2 and req[0]==1 and
+                     req[1] in required_configs and req[1] in advertised and req[1] not in config_requests,
+                     "Unexpected ECU scaling request")
+            _require(not config_requests or config_requests[-1]<req[1],"Reordered scaling configuration")
+            config_requests.append(req[1])
+            if status in ("RAW","PASSED"):
+                _require(config_data(req[1],res[2:]) is not None,"Malformed ECU scaling record")
+            scale_rows.append({"request_hex":req.hex(),"response_hex":res.hex() if res is not None else None,"status":status})
         else:
             raise ValueError("Unknown admission phase")
         if status in ("FAILED","NOT_TESTED"):
             terminal=True
+    derived_scaling=context_from_steps(scale_rows).report() if scoped_scaling else None
+    if scoped_scaling:
+        claimed=_array(claimed_scaling,2,"scaling configuration")
+        _require(len(claimed)==2,"Missing scaling configuration")
+        for actual,wanted in zip(claimed,derived_scaling):
+            _require(isinstance(actual,dict) and actual.get("pid")==wanted["pid"] and
+                     actual.get("state")==wanted["state"] and _get(actual,"data_hex")==wanted["data_hex"],
+                     "Scaling configuration differs from raw admission")
     _require(not legacy or len(groups)==len(combined),"Extra legacy logical exchanges")
     _require(_get(result,"observed_vin")==initial,"Reported initial VIN differs from evidence")
     _require(sorted(_get(result,"advertised_pids",[]))==sorted(advertised),"Advertised PIDs differ from bitmaps")
@@ -429,7 +468,8 @@ def inspect(root, *, expected_vin=None):
             "completed":completed,"declared_vin":vin,"initial_vin":initial,"final_identity_verified":final and identity==vin,
             "channel":channel,"requested_cycles":cycles,"completed_cycles":recorded_cycles,
             "selected_pids":pids,"advertised_pids":sorted(advertised),"inventory_complete":inventory_complete,
-            "summary":summaries,"multi_signal_summary":signal_summaries,"samples":clean,"physical_vehicle_verified":False,
+            "summary":summaries,"multi_signal_summary":signal_summaries,"samples":clean,
+            "scaling_configuration":derived_scaling,"scaling_context_verified":scoped_scaling or not required_configs,"physical_vehicle_verified":False,
             "authenticated":False,"whole_vehicle_coverage_verified":False,
             "stop_reason":_get(result,"stop_reason")}
 
