@@ -11,7 +11,8 @@ typedef struct {
     unsigned count;
     uint8_t emitted[24][3];
     size_t emitted_size[24];
-    bool force_bad_vin, force_late, force_transport, refuse_mutation;
+    bool force_bad_vin, force_final_vin_mismatch, force_partial_mode06;
+    bool force_nrc, force_late, force_transport, refuse_mutation;
 } stub;
 static uint64_t clock_fake(void *ctx) { return ((stub *)ctx)->now; }
 static bool current_fake(void *ctx) { return ((stub *)ctx)->current; }
@@ -26,18 +27,27 @@ static int exchange_fake(void *ctx, const uint8_t *req, size_t n,
     }
     ++s->count;
     if (s->force_transport && s->count == 2) return -1;
+    if (s->force_partial_mode06 && n == 2 && req[0] == 6 && req[1] == 0)
+        return 1;
     if (s->force_late) s->now += timeout + 1;
     const uint8_t *bytes = NULL;
     size_t size = 0;
     static uint8_t v[20];
     if (req[0] == 9 && req[1] == 2) {
         v[0]=0x49;v[1]=2;v[2]=1;
-        memcpy(v+3,s->force_bad_vin?"1FA6P8TH0L5100000":vin,17);
+        memcpy(v+3,s->force_bad_vin?"1FA6P8TH0L5100000":
+            s->force_final_vin_mismatch && s->count > 1 ?
+            "2G1FA1RXXR0123456" : vin,17);
         bytes=v;size=20;
     } else if (n == 1 && (req[0] == 3 || req[0] == 7 || req[0] == 10)) {
-        static uint8_t dtc[2];
-        dtc[0]=(uint8_t)(req[0]+0x40); dtc[1]=0;
-        bytes=dtc;size=2;
+        if (s->force_nrc && req[0] == 7) {
+            static const uint8_t negative[3] = {0x7f,7,0x11};
+            bytes=negative;size=sizeof(negative);
+        } else {
+            static uint8_t dtc[2];
+            dtc[0]=(uint8_t)(req[0]+0x40); dtc[1]=0;
+            bytes=dtc;size=2;
+        }
     } else if (n == 2 && (req[0] == 1 || req[0] == 6 ||
                           req[0] == 8 || req[0] == 9) && req[1] == 0) {
         static uint8_t bitmap[6];
@@ -79,8 +89,10 @@ int main(void) {
     assert(j1979_can_scan(&p,&r)==0);
     assert(r.completed && r.vin_valid && !strcmp(r.observed_vin,vin));
     assert(!strcmp(r.vin_match,"MATCH"));
-    assert(r.step_count==10);
-    assert(s.count==10);
+    assert(r.step_count==11);
+    assert(s.count==11);
+    assert(r.final_vin_valid && r.final_vin_checked);
+    assert(!strcmp(r.final_vin,vin) && !strcmp(r.final_vin_match,"MATCH"));
     assert(r.advertised_count[1]==1);
     assert(r.inventory_state[1]==1 && r.inventory_state[2]==0);
     assert(!r.freeze_present && r.freeze_trigger_verified);
@@ -92,6 +104,8 @@ int main(void) {
     size_t read_size=fread(text,1,sizeof(text)-1,output);
     assert(read_size>0 && strstr(text,"\"vin_match\":\"MATCH\""));
     assert(strstr(text,"\"MODE_04_CLEAR\""));
+    assert(strstr(text,"\"final_vin_match\":\"MATCH\""));
+    assert(strstr(text,"\"final_vin_checked\":true"));
     fclose(output);
     j1979_can_result_free(&r);
 
@@ -99,6 +113,19 @@ int main(void) {
     p=plan(&s);assert(j1979_can_scan(&p,&r)==0);
     assert(!r.completed && !strcmp(r.stop_reason,"VIN_MISMATCH"));
     assert(s.count==1);j1979_can_result_free(&r);
+    s=(stub){.current=true,.force_final_vin_mismatch=true};
+    p=plan(&s);assert(j1979_can_scan(&p,&r)==0);
+    assert(!r.completed && !strcmp(r.stop_reason,"VIN_CHANGED"));
+    assert(!strcmp(r.final_vin_match,"MISMATCH"));
+    assert(s.count==11);j1979_can_result_free(&r);
+    s=(stub){.current=true,.force_partial_mode06=true};
+    p=plan(&s);assert(j1979_can_scan(&p,&r)==0);
+    assert(!r.completed && !strcmp(r.stop_reason,"INVENTORY_INCOMPLETE"));
+    assert(r.timeout_responses==1);j1979_can_result_free(&r);
+    s=(stub){.current=true,.force_nrc=true};
+    p=plan(&s);assert(j1979_can_scan(&p,&r)==0);
+    assert(!r.completed && !strcmp(r.stop_reason,"OBSERVATION_INCOMPLETE"));
+    assert(r.negative_responses==1);j1979_can_result_free(&r);
     s=(stub){.current=true,.force_transport=true};
     p=plan(&s);assert(j1979_can_scan(&p,&r)==0);
     assert(!r.completed && !strcmp(r.stop_reason,"TRANSPORT_ERROR"));

@@ -245,6 +245,7 @@ int j1979_can_scan(const j1979_can_plan *p, j1979_can_result *r) {
     if (!r->steps) return -1;
     snprintf(r->vin_match, sizeof(r->vin_match), "%s",
              p->expected_vin ? "UNVERIFIED" : "NOT_REQUESTED");
+    snprintf(r->final_vin_match, sizeof(r->final_vin_match), "NOT_TESTED");
     uint64_t start = now_ms(p);
     const uint8_t req_vin[2] = {9, 2};
     j1979_can_step *s = read_one(p, r, start, req_vin, 2);
@@ -293,10 +294,59 @@ int j1979_can_scan(const j1979_can_plan *p, j1979_can_result *r) {
     if (!r->stop_reason[0]) measure_inventory(p, r, start, 6, false);
     if (!r->stop_reason[0]) inventory(p, r, start, 8, false);
     if (!r->stop_reason[0]) measure_inventory(p, r, start, 9, false);
+    /* Re-read Mode 09 PID 02 on the very same selected physical channel.
+     * Software continuity only: this does NOT prove physical ECU provenance.
+     * Never emit new requests after transport/context retirement.
+     */
+    if (!r->stop_reason[0] && r->vin_valid) {
+        const uint8_t final_request[2] = {9, 2};
+        s = read_one(p, r, start, final_request, sizeof(final_request));
+        r->final_vin_checked = s != NULL;
+        if (positive(s) && s->response_size == 20 && s->response[2] == 1) {
+            memcpy(r->final_vin, s->response + 3, 17);
+            r->final_vin[17] = '\0';
+            if (j1979_can_valid_vin(r->final_vin)) {
+                r->final_vin_valid = true;
+                snprintf(s->status, sizeof(s->status), "PASSED");
+            }
+        }
+        if (!r->final_vin_valid) {
+            snprintf(r->final_vin_match, sizeof(r->final_vin_match),
+                     "UNVERIFIED");
+            stop(r, "FINAL_VIN_UNVERIFIED");
+        } else if (strcmp(r->final_vin, r->observed_vin) ||
+                   (p->expected_vin && strcmp(r->final_vin, p->expected_vin))) {
+            snprintf(r->final_vin_match, sizeof(r->final_vin_match), "MISMATCH");
+            stop(r, "VIN_CHANGED");
+        } else {
+            snprintf(r->final_vin_match, sizeof(r->final_vin_match), "MATCH");
+        }
+    }
+    for (size_t i = 0; i < r->step_count; ++i) {
+        const char *status = r->steps[i].status;
+        if (!strcmp(status, "FAILED")) ++r->failed_responses;
+        else if (!strcmp(status, "NOT_TESTED")) {
+            if (!strncmp(r->steps[i].detail, "NRC_", 4))
+                ++r->negative_responses;
+            else ++r->timeout_responses;
+        }
+    }
+    if (!r->stop_reason[0] &&
+        (r->inventory_state[1] != 1 ||
+         (r->freeze_present && r->inventory_state[2] != 1) ||
+         r->inventory_state[6] != 1 ||
+         r->inventory_state[8] != 1 ||
+         r->inventory_state[9] != 1))
+        stop(r, "INVENTORY_INCOMPLETE");
+    if (!r->stop_reason[0] && !r->freeze_trigger_verified)
+        stop(r, "FREEZE_TRIGGER_UNVERIFIED");
+    if (!r->stop_reason[0] &&
+        (r->failed_responses || r->negative_responses || r->timeout_responses))
+        stop(r, "OBSERVATION_INCOMPLETE");
     uint64_t end = now_ms(p);
     r->duration_ms = end >= start ? end - start : 0;
     r->cancelled = !strcmp(r->stop_reason, "CANCELLED");
-    r->completed = !r->stop_reason[0];
+    r->completed = !r->stop_reason[0] && r->final_vin_valid;
     return 0;
 }
 void j1979_can_result_free(j1979_can_result *r) {
@@ -340,6 +390,14 @@ bool j1979_can_write_json(FILE *f, const j1979_can_plan *p,
     if (fputs(",\"observed_vin\":",f) == EOF) return false;
     if (r->vin_valid ? !quoted(f,r->observed_vin) : fputs("null",f) == EOF) return false;
     if (fputs(",\"vin_match\":",f) == EOF || !quoted(f,r->vin_match)) return false;
+    if (fputs(",\"final_vin\":",f) == EOF) return false;
+    if (r->final_vin_valid ? !quoted(f,r->final_vin) : fputs("null",f) == EOF) return false;
+    if (fputs(",\"final_vin_match\":",f) == EOF || !quoted(f,r->final_vin_match)) return false;
+    if (fprintf(f,",\"final_vin_checked\":%s,\"final_vin_valid\":%s,"
+        "\"negative_responses\":%u,\"timeout_responses\":%u,\"failed_responses\":%u",
+        r->final_vin_checked ? "true" : "false",
+        r->final_vin_valid ? "true" : "false",r->negative_responses,
+        r->timeout_responses,r->failed_responses) < 0) return false;
     if (fprintf(f, ",\"completed\":%s,\"duration_ms\":%llu,\"cancelled\":%s,"
         "\"stop_reason\":", r->completed ? "true":"false",
         (unsigned long long)r->duration_ms, r->cancelled ? "true":"false") < 0) return false;

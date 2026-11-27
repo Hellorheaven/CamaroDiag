@@ -52,6 +52,10 @@ typedef struct {
     uint16_t advertised_count[10];
     bool freeze_present;
     bool freeze_trigger_verified;
+    /* Initial identity cannot authorize the entire changing session. */
+    bool final_vin_checked, final_vin_valid;
+    char final_vin[18], final_vin_match[16];
+    unsigned negative_responses, timeout_responses, failed_responses;
 } j1979_can_result;
 
 bool j1979_can_physical_pair(uint32_t tx, uint32_t rx);
