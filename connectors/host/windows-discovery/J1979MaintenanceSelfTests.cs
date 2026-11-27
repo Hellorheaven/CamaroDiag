@@ -140,6 +140,65 @@ internal static class J1979MaintenanceSelfTests
             Check(blocked,"session cannot be reused");
         }
     }
+    private static byte[] ArchiveEnvelope(byte[] raw,int records,int flags)
+    {
+        var header=new byte[12];header[0]=(byte)'C';header[1]=(byte)'U';header[2]=5;header[3]=4;
+        header[4]=(byte)flags;header[5]=(byte)records;P32(header,8,raw.Length);
+        var tail=new byte[12];tail[0]=(byte)'C';tail[1]=(byte)'U';tail[2]=5;tail[3]=5;
+        P32(tail,4,raw.Length);
+        BinaryPrimitives.WriteUInt32LittleEndian(tail.AsSpan(8),BinaryDiscovery.Crc32(raw));
+        return [..header,..raw,..tail];
+    }
+    private static void Archive(J1979MaintenanceUsb.Profile profile,byte[][] records,bool recovery)
+    {
+        byte[] hello=[(byte)'C',(byte)'U',5,1,..profile.Encode(),..Nonce];
+        byte[] transcript=[(byte)'R',..hello[4..],..Device];
+        byte[] challenge=[(byte)'C',(byte)'U',5,2,..Device,..HMACSHA256.HashData(Key,transcript)];
+        transcript[0]=(byte)'r';
+        byte[] proof=[(byte)'C',(byte)'U',5,3,..HMACSHA256.HashData(Key,transcript)];
+        for(int count=1;count<=records.Length;count++)
+        {
+            byte[] raw=records.Take(count).SelectMany(x=>x).ToArray();
+            bool terminal=count==4,required=!terminal||recovery;
+            int flags=(terminal?1:0)|(required?4:0);
+            for(int scenario=0;scenario<12;scenario++)
+            {
+                byte[] ch=challenge.ToArray(),response=ArchiveEnvelope(raw,count,flags);
+                switch(scenario){
+                    case 1:ch[36]^=1;break;
+                    case 2:response=response[..^12];break;
+                    case 3:response[^1]^=1;break;
+                    case 4:response=[..response,0];break;
+                    case 5:response[5]=(byte)(count==4?3:4);break;
+                    case 6:response[2]=4;break;
+                    case 7:response[4]=(byte)(flags^1);break;
+                    case 8:response[22]^=1;break;
+                    case 9:response=response[..(12+raw.Length/2)];break;
+                }
+                var sim=new Sim(ch,response,hello,proof){FailProof=scenario==10};
+                using var output=new MemoryStream();
+                var capture=new J1979MaintenanceUsb(sim,()=>0);
+                bool Current()=>scenario!=11||sim.Writes<2;
+                var report=capture.RunArchive(profile,Key,output,Current,Nonce);
+                Check(sim.Closed&&Equals(report["maintenance_command_sent"],false)&&
+                    Equals(report["physical_vehicle_verified"],false)&&Equals(report["permits_automatic_retry"],false),
+                    "archive is read-only and closed");
+                Check(Equals(report["archive_transfer_verified"],scenario==0)&&
+                    Equals(report["archive_close_receipt_verified"],scenario==0)&&
+                    Equals(report["recovery_required"],scenario!=0||required),"archive closure and recovery");
+                if(scenario==0){
+                    Check(output.ToArray().SequenceEqual(raw),"preserve original CM/1 bytes");
+                    Check(System.Text.Json.JsonSerializer.Serialize(report["inspection"])==
+                        System.Text.Json.JsonSerializer.Serialize(J1979MaintenanceJournal.Inspect(raw,Vin)),"independent replay");
+                }else Check(report["inspection"] is null,"no false successful inspection");
+                Check(sim.Writes==(scenario==1?1:2),"no retries or other command");
+                bool reused=false;
+                try{capture.RunArchive(profile,Key,output,()=>true,Nonce);}
+                catch(InvalidOperationException){reused=true;}
+                Check(reused,"CU/5 cannot be reused");
+            }
+        }
+    }
     internal static void Run()
     {
         foreach(int operation in new[]{1,2})
@@ -166,6 +225,7 @@ internal static class J1979MaintenanceSelfTests
                 Reject(full,true);Reject(prefix,true,"1FA6P8TH0L5100000");
                 byte[] corrupt=prefix.ToArray();corrupt[^1]^=1;Reject(corrupt,true);Reject([..prefix,(byte)'X'],true);
                 Capture(profile,full,failure==2);
+                Archive(profile,records,failure==2);
             }
         }
     }
