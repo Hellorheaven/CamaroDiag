@@ -71,6 +71,7 @@ internal object ObdScanJsonExport {
             put("vehicleInfoReads", JSONArray(report.vehicleInfoReads.map { read ->
                 JSONObject().put("infoType", read.infoType).put("rawResponse", read.rawResponse)
                     .put("positiveRecords", JSONArray(read.positiveRecords.map { JSONArray(it) }))
+                     .put("extendedRecords",JSONArray(read.extendedRecords.map(J1979ExtendedVehicleInfoJson::encode)))
             }))
             put("mode05", report.mode05?.let { mode ->
                 JSONObject().put("protocolNumber", mode.protocolNumber)
