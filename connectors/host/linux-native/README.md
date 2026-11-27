@@ -247,3 +247,26 @@ pas attribué à une banque supérieure sans preuve d'implantation.
 Les nouveaux décodeurs, les campagnes CAN, la surveillance Mode 01 et le transport ISO-TP Linux sont maintenant en C++20. Les buffers sont bornés et les allocations temporaires protégées par RAII. La frontière ABI historique conserve encore des destructeurs explicites.
 
 Les anciens parseurs CF/1/CL/1, le transport USB et le point d'entrée C restent à migrer ; la suppression finale des modules Python dépend aussi de leur remplacement fonctionnel. Aucun build/test intermédiaire ni APK v2.0.47 n'a été lancé à cette étape.
+
+## Offline maintenance journal / Journal de maintenance hors ligne
+
+The C++20 bridge can replay CM/1 journals with an independently supplied VIN.
+The following commands never contact a vehicle or authorize a retry:
+
+```sh
+camarodiag-native --inspect-j1979-maintenance session.cm VIN report.json
+camarodiag-native --verify-j1979-maintenance session.cm report.json proof.json VIN
+camarodiag-native --inspect-j1979-maintenance-prefix interrupted.cm VIN prefix.json
+camarodiag-native --verify-j1979-maintenance-prefix interrupted.cm prefix.json proof.json VIN
+```
+
+Exit codes: 0 = consistent evidence without a declared recovery requirement;
+7 = recovery required, including missing terminal; 2 = rejected input or output.
+Reports preserve CRC-checked original observations and SHA-256. Verification
+requires exact canonical native report bytes; it does not yet accept differently
+formatted Python reports. No physical provenance, monitor completion or ECU
+programming permission is inferred. Linux CU/4 and CU/5 acquisition remain separate.
+
+FR : ces commandes n'envoient aucune requête au véhicule. Le code 7 indique
+une récupération nécessaire, pas une autorisation de réessayer. Conserver le
+journal original ; ne jamais déduire une opération réussie d'un préfixe tronqué.
