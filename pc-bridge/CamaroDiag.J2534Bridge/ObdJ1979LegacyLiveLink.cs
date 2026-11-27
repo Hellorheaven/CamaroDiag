@@ -16,18 +16,24 @@ internal sealed class ObdJ1979LegacyLiveLink
     private readonly Action requireActive;
     private readonly Func<long> clock;
     private int logical;
+    private readonly ObdJ1979FreezeCampaign.Plan? freeze;
     private readonly List<Trace> traces=[];
     internal IReadOnlyList<Trace> Traces=>traces.ToArray();
 
     internal ObdJ1979LegacyLiveLink(byte source,Func<byte[],int,ObdLegacyJ2534Transport.Exchange> exchange,
-        Action requireActive,Func<long>? clock=null)
+        Action requireActive,Func<long>? clock=null,ObdJ1979FreezeCampaign.Plan? freeze=null)
     {
         if(source is 0 or 0xF1 or 0xFF)throw new ArgumentException("Invalid selected legacy source.");
         this.source=source;this.exchange=exchange;this.requireActive=requireActive;
+        this.freeze=freeze?.Validate();
         this.clock=clock??(()=>Stopwatch.GetTimestamp()*1000/Stopwatch.Frequency);
     }
 
-    private static bool Allows(byte[] request)=>request.Length==2&&
+    private bool Allows(byte[] request)=>freeze is not null ?
+        request.SequenceEqual(new byte[]{1,0}) || request.Length==2&&request[0]==9&&request[1] is 0 or 1 or 2 ||
+        request.Length==3&&request[0]==2&&freeze.Frames.Contains((int)request[2])&&
+            (request[1]%32==0||request[1]==2||freeze.SelectedPids.Length==0||freeze.SelectedPids.Contains((int)request[1])) :
+        request.Length==2&&
         (request[0]==9&&request[1] is 0 or 1 or 2||
          request[0]==1&&(request[1]%32==0||request[1]==0x1D||ObdJ1979ScalingContext.IsConfiguration(request[1])||ObdJ1979LiveRecorder.LegacyNumericPid(request[1])));
     private int Remaining(long deadline,int maximum){
@@ -114,8 +120,8 @@ internal sealed class ObdJ1979LegacyLiveLink
         int index=logical++;
         long deadline=clock()+timeoutMs;
         if(request.SequenceEqual(new byte[]{9,2}))return Identity(deadline,index);
-        if(request.Length!=2||request[0]!=1||!Allows(request))
-            throw new ArgumentException("Only numeric Mode 01 and bitmap requests allowed.");
+        if(!Allows(request)||(freeze is null ? request.Length!=2||request[0]!=1 : request.Length!=3||request[0]!=2))
+            throw new ArgumentException("Request outside selected legacy recipe.");
         return Single(request,deadline,index);
     }
 }
