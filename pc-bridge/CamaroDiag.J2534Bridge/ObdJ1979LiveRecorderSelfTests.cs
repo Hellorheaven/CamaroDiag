@@ -129,6 +129,15 @@ internal static class ObdJ1979LiveRecorderSelfTests
         },plan with{Pids=[0x10],Cycles=1},()=>{},clock:()=>now,delay:ms=>now+=ms);
         Check(!noConfig.Completed&&noConfig.StopReason=="SCALING_UNVERIFIED"&&!sent.Contains("0110"),
             "missing advertised configuration blocks acquisition");
+        var customCurrent=ObdJ1979ScalingContext.Context.Build([
+            new("0100","410000210001","PASSED"),new("0120","412010001001","PASSED"),
+            new("0140","414010030000","PASSED"),new("014F","414F0400404D","RAW")]);
+        foreach(var (encoded,expected) in new[]{("0000",0d),("7FFF",63.998046875d),
+            ("8000",-64d),("9C40",-49.875d),("FFFF",-0.001953125d)}){
+            var current=customCurrent.Decode([1,0x34],Convert.FromHexString("41347D00"+encoded))!.Signals[1];
+            Check(current.Number is double number&&Math.Abs(number-expected)<1e-9&&
+                current.ScaleSource=="ECU_CONFIGURATION","Custom current uses signed binary encoding");
+        }
         return count;
     }
 }
