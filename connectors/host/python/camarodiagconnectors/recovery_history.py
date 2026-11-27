@@ -56,7 +56,8 @@ def _summary(report, ordinal):
 
 
 def inspect_history(journals, platform, *, android_identity: AndroidIdentity | None = None,
-                    expected_vin=None, expected_osid=None, require_current=lambda: None):
+                    expected_vin=None, expected_osid=None, require_current=lambda: None,
+                    _details=None):
     """Inspect 2–8 local snapshots in explicit oldest-to-newest order.
 
     Require each complete original-sector inventory to be verified separately.
@@ -160,6 +161,8 @@ def inspect_history(journals, platform, *, android_identity: AndroidIdentity | N
             _require(_regular(journal, MAX_JOURNAL, require_current)[1] == stamp,
                      f"Snapshot {index} journal changed before history publication")
         require_current()
+        if _details is not None:
+            _details.extend((report, len(raw)) for report, raw in zip(reports, raw_snapshots))
         latest = reports[-1]["journal_audit"]
         result.update(verified=True, ordered_prefix_verified=True, identity=reports[0]["identity"],
                       latest_recorded_disposition=latest["recovery_disposition"],
@@ -172,7 +175,7 @@ def inspect_history(journals, platform, *, android_identity: AndroidIdentity | N
     return result
 
 
-MAX_HISTORY_REPORT = 2 * 1024 * 1024
+MAX_HISTORY_REPORT = 16 * 1024 * 1024
 
 
 def _compare_history_value(declared, actual, field):
@@ -233,19 +236,29 @@ def verify_history_report(report_path, journals, platform, *,
     raw, stamp = _regular(path, MAX_HISTORY_REPORT, require_current)
     declared = _json(raw)
     _require(isinstance(declared, dict), "Expected recovery history object")
-    _require(declared.get("schema") == "camarodiag-offline-recovery-history-v1",
+    schema = declared.get("schema")
+    native = schema == "camarodiag-windows-recovery-history-v1"
+    _require(native or schema == "camarodiag-offline-recovery-history-v1",
              "Unsupported recovery history report schema")
-    _require(declared.get("verified") is True and
-             declared.get("ordered_prefix_verified") is True,
-             "Only verified history reports can be reproduced")
-    _require(declared.get("platform") == platform.upper(),
-             "History report platform differs from supplied platform")
+    if native:
+        _require(platform == "windows", "Windows history requires Windows original journals")
+    else:
+        _require(declared.get("verified") is True and
+                 declared.get("ordered_prefix_verified") is True,
+                 "Only verified history reports can be reproduced")
+        _require(declared.get("platform") == platform.upper(),
+                 "History report platform differs from supplied platform")
+    details = []
     fresh = inspect_history(journals, platform, android_identity=android_identity,
                             expected_vin=expected_vin, expected_osid=expected_osid,
-                            require_current=require_current)
+                            require_current=require_current, _details=details if native else None)
     _require(fresh["verified"] and fresh["ordered_prefix_verified"],
              "Independent history replay failed: " + str(fresh["problem"]))
-    _compare_history_value(_portable_history(declared), _portable_history(fresh), "history")
+    if native:
+        from .recovery_windows_history import compare_native_history
+        compare_native_history(declared, fresh, details)
+    else:
+        _compare_history_value(_portable_history(declared), _portable_history(fresh), "history")
     again, final_stamp = _regular(path, MAX_HISTORY_REPORT, require_current)
     _require(stamp == final_stamp and raw == again, "History report changed during replay")
     require_current()
