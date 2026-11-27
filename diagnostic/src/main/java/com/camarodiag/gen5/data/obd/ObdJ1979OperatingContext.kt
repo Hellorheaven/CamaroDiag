@@ -13,7 +13,7 @@ object ObdJ1979OperatingContext {
     data class TrimSignal(val bank:Int,val name:String,val rawEncoded:Int,val number:Double?,
         val unit:String,val attribution:String)
     data class Trim(val requestHex:String,val frame:Int?,val layout1d:Int?,
-        val signals:List<TrimSignal>,val upperBankPresent:Boolean?)
+        val signals:List<TrimSignal>,val upperBankVerified:Boolean?)
     data class Monitor(val name:String,val supported:Boolean?,val enabled:Boolean?,val complete:Boolean?,
         val enabledBit:Boolean,val incompleteBit:Boolean,val consistent:Boolean)
     data class Cycle(val requestHex:String,val rawHex:String,val baselineRawHex:String?,
