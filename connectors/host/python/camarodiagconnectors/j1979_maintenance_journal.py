@@ -215,7 +215,7 @@ def replay(scope, rows, *, baseline, intent):
             state["baseline_persisted"] = True
         if i == scope.command_boundary:
             require(intent and baseline and set(recheck_times) == {"0902", "010D", "010C"}
-                    and all(event.start-t <= 5000 for t in recheck_times.values()),
+                    and all(event.start-t+event.timeout <= 5000 for t in recheck_times.values()),
                     "Command without fresh recheck and durable intent")
             state["intent_persisted"] = state["attempted"] = True
         now = event.end
