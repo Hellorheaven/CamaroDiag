@@ -1,5 +1,6 @@
 #pragma once
 #include <array>
+#include <signal.h>
 #include <cstdint>
 #include <functional>
 #include <optional>
@@ -45,4 +46,21 @@ Discovery replay_discovery(bool extended,bool sent,std::span<const Frame>,std::s
 bool valid_targets(const Discovery&,std::span<const std::uint32_t>);
 Discovery discover_socket(const char* interface,bool extended,unsigned window_ms,std::function<bool()> current);
 std::string report(const Discovery&);
+struct EcuReport{
+    Pair pair;
+    std::string status{"NOT_TESTED"},error,json;
+};
+struct Scan{
+    Discovery discovery;
+    std::string vin,stop;
+    std::vector<std::uint32_t> selected;
+    std::vector<EcuReport> ecus;
+    unsigned duration_ms{};
+    bool completed{};
+};
+using PhysicalScan=std::function<EcuReport(Pair,unsigned)>;
+Scan scan_selected(const Discovery&,std::span<const std::uint32_t>,std::string_view vin,unsigned budget_ms,
+    std::function<std::uint64_t()> clock,std::function<bool()> current,PhysicalScan);
+EcuReport scan_socket(Pair,unsigned,const char* interface,const char* vin,const volatile sig_atomic_t* cancel);
+std::string report(const Scan&);
 }

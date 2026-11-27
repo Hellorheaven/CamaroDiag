@@ -63,4 +63,30 @@ std::string report(const Discovery& d){
     o<<",\"raw_frames\":";array(o,d.frames,[&](const Frame& f){frame(o,f);});
     o<<"}\n";return o.str();
 }
+std::string report(const Scan& s){
+    std::ostringstream o;o.imbue(std::locale::classic());
+    auto quoted=[&](std::string_view value){
+        o<<'"';for(unsigned char c:value){
+            if(c=='"'||c=='\\')o<<'\\'<<char(c);
+            else if(c>=32&&c<=126)o<<char(c);
+            else o<<"?";
+        }o<<'"';
+    };
+    o<<"{\"schema\":\"camarodiag-j1979-can-network-linux-v1\",\"protocol\":\"SAE-J1979\","
+       "\"scope\":\"EXPLICIT_PHYSICAL_RESPONDER_SET\",\"declared_vin\":";
+    quoted(s.vin);o<<",\"completed\":"<<tf(s.completed)<<",\"duration_ms\":"<<s.duration_ms<<",\"stop_reason\":";
+    if(s.stop.empty())o<<"null";else quoted(s.stop);
+    o<<",\"physical_vehicle_verified\":false,\"whole_vehicle_coverage_verified\":false,"
+        "\"permits_programming\":false,\"selected_response_ids\":";
+    array(o,s.selected,[&](auto id){quoted(hex(id));});
+    o<<",\"discovery\":"<<report(s.discovery)<<",\"ecu_reports\":";
+    array(o,s.ecus,[&](const EcuReport& row){
+        o<<"{\"tx_can_id\":";quoted(hex(row.pair.tx));o<<",\"rx_can_id\":";quoted(hex(row.pair.rx));
+        o<<",\"status\":";quoted(row.status);o<<",\"error\":";
+        if(row.error.empty())o<<"null";else quoted(row.error);
+        o<<",\"report\":";if(row.json.empty())o<<"null";else o<<row.json;
+        o<<'}';
+    });
+    o<<"}\n";return o.str();
+}
 }
