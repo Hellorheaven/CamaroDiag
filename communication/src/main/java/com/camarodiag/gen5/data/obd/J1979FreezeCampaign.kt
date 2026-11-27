@@ -14,7 +14,7 @@ data class J1979FreezePlan(
     val selectedPids: List<Int> = emptyList(),
     val budgetMs: Long = 180000
 ) {
-    val valid: Boolean get() = target.valid && !target.legacy &&
+    val valid: Boolean get() = target.valid &&
         frames.size in 1..8 && frames.distinct().size == frames.size &&
         frames.all { it in 0..255 } && selectedPids.size <= 64 &&
         selectedPids.distinct().size == selectedPids.size &&
@@ -72,7 +72,8 @@ data class J1979FreezeReport(
     val finishedAtMillis: Long,
     val rawProtocolResponse: String?,
     val observedProtocol: Int?,
-    val transportProblem: String? = null
+    val transportProblem: String? = null,
+    val legacyExchanges: List<LegacyLiveExchange> = emptyList()
 ) {
     val executionCompleted: Boolean get() = result.completed && transportProblem == null &&
         observedProtocol == result.plan.target.protocol
@@ -278,7 +279,8 @@ internal object J1979FreezeCampaign {
 
     suspend fun run(requested: J1979FreezePlan,
         exchange: suspend (ByteArray,Long) -> J1979LiveRecorder.Reply,
-        guard: () -> Unit, clock: () -> Long = { System.nanoTime()/1000000 }): J1979FreezeResult {
+        guard: () -> Unit, clock: () -> Long = { System.nanoTime()/1000000 },
+        requestTimeout: (ByteArray)->Long = { 2500L }): J1979FreezeResult {
         val plan = requested.pinned()
         val started = clock()
         fun elapsed() = (clock()-started).coerceAtLeast(0)
@@ -294,7 +296,9 @@ internal object J1979FreezeCampaign {
                 val left = plan.budgetMs - begin
                 if (left <= 0) observed("BUDGET") else {
                     attempted = true
-                    val reply = exchange(request,minOf(2500L,left))
+                    val maximum=requestTimeout(request)
+                    require(maximum in 1..20000)
+                    val reply = exchange(request,minOf(maximum,left))
                     raw = reply.raw?.take(MAX_RAW)
                     guard()
                     currentCoroutineContext().ensureActive()
