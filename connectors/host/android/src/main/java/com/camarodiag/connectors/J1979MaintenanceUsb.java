@@ -168,6 +168,11 @@ public final class J1979MaintenanceUsb {
                                                        BooleanSupplier allowed)throws IOException{
         require(!used&&profile!=null&&key!=null&&key.length==32&&raw!=null&&allowed!=null,"Fresh CU/5 session required");
         byte[] nonce=new byte[32];new SecureRandom().nextBytes(nonce);
+        return runArchive(profile,key,raw,allowed,nonce);
+    }
+    synchronized Map<String,Object> runArchive(Profile profile,byte[] key,OutputStream raw,
+                                               BooleanSupplier allowed,byte[] nonce)throws IOException{
+        require(!used&&profile!=null&&key!=null&&key.length==32&&raw!=null&&allowed!=null,"Fresh CU/5 session required");
         byte[] request=hello(profile,nonce,true);used=true;
         long began=clock.getAsLong();boolean authenticated=false;
         Map<String,Object> declared=null,inspection=null;
