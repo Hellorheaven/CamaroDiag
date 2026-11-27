@@ -1049,25 +1049,12 @@ class Obd2FeatureEngine(
             )
         )
 
-        if (pid in 0x24..0x2B || pid in 0x34..0x3B) {
-            if (data.size != 4) return emptyList()
-            // Camaro uses a two-bank layout; the 3/4-bank PID-to-sensor
-            // arrangement is a different SAE table and needs explicit detection.
-            val currentFamily = pid in 0x34..0x3B
-            val index = pid - (if (currentFamily) 0x34 else 0x24)
-            val bank = if (index < 4) 1 else 2
-            val sensor = index % 4 + 1
-            val sensorLabel = "Bank $bank sensor $sensor"
-            val four = data.toIntArray()
-            val ratio = CamaroUdsProtocol.decodeWidebandLambda(four) ?: return emptyList()
-            val secondary = if (currentFamily)
-                CamaroUdsProtocol.decodeWidebandCurrent(four)
-            else CamaroUdsProtocol.decodeWidebandVoltage(four)
-            val reading = secondary ?: return emptyList()
-            val secondaryName = if (currentFamily) "current" else "voltage"
-            return value("O2 $sensorLabel equivalence ratio", ratio, "lambda") +
-                value("O2 $sensorLabel $secondaryName",
-                    reading, if (currentFamily) "mA" else "V")
+        if (ObdJ1979MultiSignal.width(pid) != null) {
+            val decoded = ObdJ1979MultiSignal.decodeData(pid, data) ?: return emptyList()
+            return decoded.map { signal ->
+                ObdValue(pid,signal.name,String.format(Locale.US,"%.6f",signal.number)
+                    .trimEnd('0').trimEnd('.'),signal.unit,data)
+            }
         }
 
         val decoded: Pair<String, Pair<Double, String>> = when (pid) {
