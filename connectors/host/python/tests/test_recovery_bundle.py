@@ -255,3 +255,74 @@ class TestExportedRecoveryReports(unittest.TestCase):
             self.assertTrue(run(args)["report_matches"])
             self.assertFalse(json.loads(out.read_text())["expected_vin_independently_supplied"])
             with self.assertRaises(FileExistsError):run(args)
+
+
+class RecoveryEvidenceBoundaryTests(unittest.TestCase):
+    def test_android_independent_vin_must_match(self):
+        with tempfile.TemporaryDirectory() as folder:
+            journal, _ = android_fixture(Path(folder))
+            different = "1G1FA1RXXR0123457"
+            report = inspect_bundle(journal, "android", android_identity=IDENTITY,
+                                    expected_vin=different)
+            self.assertFalse(report["verified"])
+            self.assertIn("expected VIN", report["problem"])
+            self.assertFalse(report["restore_authorized"])
+
+    def test_cli_cannot_add_files_to_original_sector_inventory(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            journal, envelope = android_fixture(root)
+            before = journal.read_bytes(), envelope.read_bytes()
+            report = envelope.parent / "inspection.json"
+            args = ["verify-recovery", "--platform", "android", "--journal", str(journal),
+                    "--family", "E39", "--controller", "ECM", "--firmware", "OS-A",
+                    "--vin", VIN, "--output", str(report)]
+            with self.assertRaisesRegex(ValueError, "outside original-sector"):
+                run(args)
+            self.assertFalse(report.exists())
+            self.assertEqual(before, (journal.read_bytes(), envelope.read_bytes()))
+            self.assertTrue(inspect_bundle(journal, "android", android_identity=IDENTITY)["verified"])
+
+    def test_cli_cannot_create_absent_metadata_beside_android_journal(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            journal, _ = android_fixture(root)
+            meta = Path(str(journal) + ".meta.json")
+            args = ["verify-recovery", "--platform", "android", "--journal", str(journal),
+                    "--family", "E39", "--controller", "ECM", "--firmware", "OS-A",
+                    "--vin", VIN, "--output", str(meta)]
+            with self.assertRaisesRegex(ValueError, "differ from original evidence"):
+                run(args)
+            self.assertFalse(meta.exists())
+
+    def test_history_export_cannot_invalidate_either_snapshot(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            a, b = root / "a", root / "b"
+            a.mkdir()
+            b.mkdir()
+            first, envelope_a, _ = windows_fixture(a)
+            second, envelope_b, _ = windows_fixture(b, (("TestWriteAccepted", "ok"),))
+            args = ["verify-recovery-history", "--platform", "windows",
+                    "--journal", str(first), "--journal", str(second), "--output"]
+            for envelope in (envelope_a, envelope_b):
+                output = envelope.parent / "history.json"
+                with self.assertRaisesRegex(ValueError, "outside original-sector"):
+                    run(args + [str(output)])
+                self.assertFalse(output.exists())
+            output = root / "history.json"
+            self.assertTrue(run(args + [str(output)])["verified"])
+
+    def test_report_verifier_output_guard_covers_source_report_and_sector_folder(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            journal, envelope, image = windows_fixture(root)
+            source = root / "source.json"
+            source.write_text("{}", encoding="utf-8")
+            args = ["verify-recovery-report", "--report", str(source),
+                    "--journal", str(journal), "--original-bin", str(image), "--output"]
+            for output in (source, journal, image, envelope.parent / "extra.json"):
+                with self.assertRaisesRegex(ValueError, "Recovery output"):
+                    run(args + [str(output)])
+            self.assertEqual("{}", source.read_text(encoding="utf-8"))
+            self.assertTrue(inspect_bundle(journal, "windows", original_bin=image)["verified"])
