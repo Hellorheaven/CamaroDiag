@@ -40,7 +40,9 @@ class LegacyLiveLink:
         self.other_sources=set()
         self.logical_count=0
         self.raw_plan=raw_plan.validate() if raw_plan is not None else None
-        self.raw_bytes=0
+        self.live_trace_bytes=0
+        if self.raw_plan is not None and not self.raw_plan.raw_only:
+            raise ValueError("Raw legacy selection requires raw-only plan")
 
     def _remaining(self, deadline, maximum):
         self.require_current()
@@ -66,8 +68,8 @@ class LegacyLiveLink:
             raw=self.exchange(command,self._remaining(deadline,4.0))
             if not isinstance(raw,str) or len(raw)>32768:
                 raise ValueError("Invalid legacy transcript")
-            self.raw_bytes+=len(raw)
-            if self.raw_bytes>16*1024*1024:
+            self.live_trace_bytes+=len(raw)
+            if self.live_trace_bytes>16*1024*1024:
                 raise ValueError("Legacy transcript budget exceeded")
             row["raw_response"]=raw
             self.require_current()
