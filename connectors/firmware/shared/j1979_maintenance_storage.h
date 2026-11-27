@@ -151,7 +151,9 @@ class J1979MaintenanceStorage final:public J1979MaintenanceJournal::Storage {
   // hold a read-only storage lease and independently verify CAN quiescence.
   bool archive(Archive& out){
     out=Archive{};
-    if(!inspected_)(void)inspect();
+    // Boot admission must have run before taking the read-only lease.
+    // In particular, archive access never writes a persistent guard.
+    if(!inspected_)return false;
     if(pendingSize_||(!locked_&&!sealed_&&state_.guard==Guard::Active))return false;
     Archive found;
     unsigned prior=0;
@@ -176,34 +178,36 @@ class J1979MaintenanceStorage final:public J1979MaintenanceJournal::Storage {
     }
     if(!found.records||!found.scope.valid()||found.size>Journal::MaximumJournal)return false;
     found.recoveryRequired=locked_||!sealed_||!found.terminal||found.damagedTail;
-    if(found.damagedTail||!found.terminal)(void)fail();
+    if(found.damagedTail||!found.terminal){locked_=true;medium_.inhibit();}
     out=found;return true;
   }
   bool readArchive(const Archive& pinned,size_t offset,uint8_t* out,size_t n){
-    if(!out||!n||offset>pinned.size||n>pinned.size-offset||!pinned.records||pinned.records>Slots)return false;
-    // Revalidate every complete record before publishing a chunk. This
-    // access path never opens an active writer and does not clear recovery.
-    if(pendingSize_||(!locked_&&!sealed_&&state_.guard==Guard::Active))return false;
-    size_t total=0;unsigned prior=0;
-    for(unsigned i=0;i<pinned.records;++i){
-      size_t length=0;
-      if(medium_.slotSize(i,length)!=Lookup::Present||length!=pinned.lengths[i]||!length||length>Journal::MaximumRecord||
-         !medium_.readSlot(i,0,scratch_.pending,length)||
-         !recordHeader(scratch_.pending,length,i,prior)||
-         u32(scratch_.pending+length-4)!=pinned.checksums[i])return false;
-      J1979MaintenanceScope scope;
-      if(!J1979MaintenanceScope::decode(scratch_.pending+Journal::Header,J1979MaintenanceScope::WireSize,scope)||
-         !scope.same(pinned.scope))return false;
-      prior=scratch_.pending[3];total+=length;
-      if(n){
-        if(offset>=length)offset-=length;
-        else{
-          const size_t take=n<length-offset?n:length-offset;
-          std::memcpy(out,scratch_.pending+offset,take);out+=take;n-=take;offset=0;
-        }
-      }
+    if(!out||!n||offset>pinned.size||n>pinned.size-offset||!pinned.records||pinned.records>Slots||
+       pendingSize_||(!locked_&&!sealed_&&state_.guard==Guard::Active))return false;
+    // Opening validates every record. Under the exclusive read-only lease,
+    // read only the addressed slot here; the full archive is revalidated
+    // at finish. This avoids rereading the entire journal per 16-byte SPI
+    // chunk (quadratic work on large replies).
+    for(unsigned i=0;i<pinned.records&&n;++i){
+      const size_t length=pinned.lengths[i];
+      if(!length||length>Journal::MaximumRecord)return false;
+      if(offset>=length){offset-=length;continue;}
+      size_t actual=0;
+      if(medium_.slotSize(i,actual)!=Lookup::Present||actual!=length)return false;
+      const size_t take=n<length-offset?n:length-offset;
+      if(!medium_.readSlot(i,offset,out,take))return false;
+      out+=take;n-=take;offset=0;
     }
-    return total==pinned.size&&!n&&(prior==4)==pinned.terminal;
+    return n==0;
+  }
+  bool verifyArchive(const Archive& pinned){
+    Archive actual;
+    if(!archive(actual)||!actual.scope.same(pinned.scope)||actual.size!=pinned.size||
+       actual.records!=pinned.records||actual.terminal!=pinned.terminal||
+       actual.damagedTail!=pinned.damagedTail||actual.recoveryRequired!=pinned.recoveryRequired)return false;
+    for(unsigned i=0;i<actual.records;++i)
+      if(actual.lengths[i]!=pinned.lengths[i]||actual.checksums[i]!=pinned.checksums[i])return false;
+    return true;
   }
   bool recoveryRequired()const{return locked_;}
   bool sealed()const{return sealed_;}
