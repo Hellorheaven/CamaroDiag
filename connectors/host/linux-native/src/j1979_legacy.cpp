@@ -88,7 +88,18 @@ bool read_allowed(Bytes q){
 std::optional<Protocol> fixed_protocol(std::string_view response){
     if(response.size()>4096)return {};
     try{
-        const auto tokens=lines(response,"ATDPN");
+        std::vector<std::string> tokens;
+        std::size_t start=0;
+        for(std::size_t i=0;i<=response.size();++i){
+            if(i<response.size()&&response[i]!='\r'&&response[i]!='\n'&&response[i]!='>')continue;
+            auto line=response.substr(start,i-start);start=i+1;
+            while(!line.empty()&&whitespace(line.front()))line.remove_prefix(1);
+            while(!line.empty()&&whitespace(line.back()))line.remove_suffix(1);
+            if(line.empty()||line=="ATDPN")continue;
+            if(line.size()!=1||line[0]<'1'||line[0]>'5')return {};
+            tokens.emplace_back(line);
+            if(tokens.size()>1)return {};
+        }
         if(tokens.size()==1&&tokens[0].size()==1&&tokens[0][0]>='1'&&tokens[0][0]<='5')
             return static_cast<Protocol>(tokens[0][0]-'0');
     }catch(const std::invalid_argument&){}
