@@ -172,3 +172,86 @@ class TestRecoveryBundle(unittest.TestCase):
             self.assertTrue(report["verified"])
             with self.assertRaises(FileExistsError):run(args)
             self.assertEqual(initial,(journal.read_bytes(),envelope.read_bytes()))
+
+
+class TestExportedRecoveryReports(unittest.TestCase):
+    def android_export(self, result):
+        audit=result["journal_audit"]
+        return {
+            "schema":"camarodiag-ecu-recovery-inspection-v1","identity":result["identity"],
+            "verified":True,"expectedSectors":result["expected_sectors"],
+            "verifiedBytes":result["verified_bytes"],"snapshotSha256":result["snapshot_sha256"],
+            "snapshotAlgorithm":result["snapshot_algorithm"],"journalSha256":result["journal_sha256"],
+            "journalAudit":{"valid":audit["sequence_valid"],"records":audit["records"],
+                "lastStage":audit["last_stage"],"baselineSectors":audit["baseline_sectors"],
+                "verifiedSectors":audit["verified_sectors"],"finalReadbackSectors":audit["final_readback_sectors"],
+                "completionRecorded":audit["completion_recorded"],"recoveryDisposition":audit["recovery_disposition"]},
+            "uncertainAddress":audit["uncertain_address"],"uncertainRegion":audit["uncertain_region"],
+            "journalDisposition":audit["recovery_disposition"],"sourceRevalidatedBeforePublication":True,
+            "sectors":[{"region":x["region"],"address":x["address"],"length":x["length"],
+                "sha256":x["original_sha256"],"envelopeSha256":x["envelope_sha256"]} for x in result["sectors"]],
+            "physicalVehicleVerified":False,"restoreAuthorized":False,"authenticated":False}
+
+    def windows_export(self, result):
+        audit=result["journal_audit"]; identity=result["identity"]
+        return {"schema":"camarodiag-offline-e39-recovery-assessment-v1",
+            "journal":{"state":"Completed" if audit["completion_recorded"] else "Interrupted",
+                "sequenceValid":audit["sequence_valid"],"preparedSectors":audit["baseline_sectors"],
+                "writtenSectors":audit["verified_sectors"],"finalReadbackSectors":audit["final_readback_sectors"],
+                "possiblyIncompleteAddress":audit["uncertain_address"],"lastPhase":audit["last_stage"],
+                "sha256":result["journal_sha256"]},
+            "target":{"verified":True,"family":identity["family"],"vin":identity["vin"],"osId":identity["osid"],
+                "originalImageSha256":identity["original_image_sha256"],
+                "metadataSnapshotSha256":identity["metadata_sha256"]},
+            "backup":{"verified":True,"expectedSectors":result["expected_sectors"],
+                "verifiedBytes":result["verified_bytes"],"snapshotSha256":result["snapshot_sha256"],
+                "sectors":[{"address":x["address"],"length":x["length"],"originalSha256":x["original_sha256"],
+                    "envelopeSha256":x["envelope_sha256"]} for x in result["sectors"]]},
+            "physicalVehicleVerified":False,"restoreAuthorized":False}
+
+    def test_android_export_reproduced_from_files(self):
+        from camarodiagconnectors.recovery_report_inspection import verify_recovery_report
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder);journal,envelope=android_fixture(root,phases=("BEFORE_ERASE",))
+            fresh=inspect_bundle(journal,"android",android_identity=IDENTITY)
+            export=self.android_export(fresh);path=root/"export.json"
+            path.write_text(json.dumps(export),encoding="utf-8")
+            verified=verify_recovery_report(path,journal,expected_vin=VIN)
+            self.assertTrue(verified["report_matches"])
+            self.assertEqual(verified["report_sha256"],sha(path.read_bytes()))
+            self.assertFalse(verified["restore_authorized"])
+            self.assertTrue(verified["expected_vin_independently_supplied"])
+            for field,value in (("verifiedBytes",0),("uncertainAddress",None),("restoreAuthorized",True),
+                                ("journalSha256","a"*64)):
+                changed=dict(export,**{field:value});path.write_text(json.dumps(changed),encoding="utf-8")
+                with self.assertRaises(ValueError):verify_recovery_report(path,journal)
+            path.write_text(json.dumps(export),encoding="utf-8")
+            envelope.write_bytes(envelope.read_bytes()+b"x")
+            with self.assertRaises(ValueError):verify_recovery_report(path,journal)
+
+    def test_windows_export_with_original_bin(self):
+        from camarodiagconnectors.recovery_report_inspection import verify_recovery_report
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder);journal,_,image=windows_fixture(root)
+            fresh=inspect_bundle(journal,"windows",original_bin=image)
+            export=self.windows_export(fresh)
+            export["originalBinName"]=image.name
+            export["originalBin"]={"verified":True,"verifiedSectors":1,"verifiedBytes":8,
+                "snapshotSha256":fresh["snapshot_sha256"],"metadataSnapshotSha256":fresh["identity"]["metadata_sha256"],
+                "originalImageSha256":fresh["original_bin"]["sha256"],"failedSectorAddress":None}
+            path=root/"export.json";path.write_text(json.dumps(export),encoding="utf-8")
+            with self.assertRaises(ValueError):verify_recovery_report(path,journal)
+            self.assertTrue(verify_recovery_report(path,journal,original_bin=image)["report_matches"])
+            export["originalBin"]["verifiedSectors"]=2
+            path.write_text(json.dumps(export),encoding="utf-8")
+            with self.assertRaises(ValueError):verify_recovery_report(path,journal,original_bin=image)
+
+    def test_cli_report_reverification_exclusive(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder);journal,_,_=windows_fixture(root)
+            path=root/"export.json";out=root/"verified.json"
+            path.write_text(json.dumps(self.windows_export(inspect_bundle(journal,"windows"))),encoding="utf-8")
+            args=["verify-recovery-report","--report",str(path),"--journal",str(journal),"--output",str(out)]
+            self.assertTrue(run(args)["report_matches"])
+            self.assertFalse(json.loads(out.read_text())["expected_vin_independently_supplied"])
+            with self.assertRaises(FileExistsError):run(args)

@@ -153,7 +153,7 @@ class AndroidIdentity:
 
     def validate(self):
         if any(not isinstance(x,str) or not x.strip() or len(x.encode("utf-8"))>65535
-               for x in (self.family,self.controller,self.firmware)) or not _VIN.fullmatch(self.vin):
+               for x in (self.family,self.controller,self.firmware)) or not isinstance(self.vin,str) or not _VIN.fullmatch(self.vin):
             raise ValueError("Explicit Android family/controller/firmware/VIN required")
         return self
 
@@ -383,6 +383,7 @@ def _windows_metadata(raw,expected_vin=None,expected_osid=None):
     osid=_int(data["ExpectedOsId"],1,0xFFFFFFFF)
     if expected_vin is not None and expected_vin!=data["ExpectedVin"] or expected_osid is not None and expected_osid!=osid:
         raise ValueError("Declared Windows target does not match expected identity")
+    if not isinstance(data["Utc"],str):raise ValueError("Invalid target metadata timestamp")
     datetime.fromisoformat(data["Utc"].replace("Z","+00:00"))
     for key in ("ProfileSha256","DriverSha256","OriginalSha256","TargetSha256","KernelSha256"):
         _digest(data[key])
@@ -439,11 +440,13 @@ def inspect_bundle(journal:Path,platform:str,*,android_identity:AndroidIdentity|
         metadata_path=None;metadata_state=None;image_state=None;image=None
         if platform=="android":
             audit,expected=_android_journal(raw,android_identity)
+            result["journal_audit"]=audit
             result["identity"]=asdict(android_identity)
             maximum=MAX_ANDROID_BLOCK+65536
             parse=lambda name,data:_android_envelope(name,data,android_identity,expected)
         else:
             audit,expected=_windows_journal(raw)
+            result["journal_audit"]=audit
             metadata_path=Path(str(journal)+".meta.json")
             metadata,metadata_state=_regular(metadata_path,16384,require_current)
             identity=_windows_metadata(metadata,expected_vin,expected_osid)

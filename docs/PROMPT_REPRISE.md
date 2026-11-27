@@ -2487,3 +2487,7 @@ Le PID 32 est signé sur 16 bits à 0,25 Pa/bit (SAE J1979 APR2002, tableau B23)
 - C6 : parité hôte CDJ/1, contrôle CRC/états accessibles/identité, lecture stable à deux acquisitions, rapprochement des rapports Android/Windows avec le binaire, inspection de suites explicitement ordonnées sans reconstruction des états manquants ni authentification. Aucun accès matériel, aucun droit de programmation ou reprise, régressions écrites non exécutées.
 
 - J1979 : vérification hors ligne des campagnes CAN réseau Android/Windows/Linux, relecture des trames PID00, classification et sélection explicite, rejeu des plans de lecture par ECU et recalcul des observations, inventaires, DTC et mesures. Continuité bitmap Windows distincte d'un PID de mesure. CLI verify-network, régressions écrites non exécutées.
+
+### Relecture indépendante des rapports de récupération Android / Windows
+
+La CLI hôte `verify-recovery-report --report assessment.json --journal transaction.journal --output verification.json` relit les secteurs originaux et le journal, compare les empreintes du rapport exporté, l'identité déclarée, l'état et les compteurs d'audit, et la couverture des secteurs. Pour un rapport Windows incluant une comparaison positive du BIN E39/E39A, fournir `--original-bin`. `--vin` impose une identité attendue indépendamment du rapport. Un rapport négatif ou incohérent ne devient jamais une validation positive ; aucun accès ECU ni autorisation de restauration. Les régressions ont été écrites, pas exécutées avant le gate C6.

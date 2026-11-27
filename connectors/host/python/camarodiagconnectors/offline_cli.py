@@ -12,6 +12,7 @@ from .backup import backup_manifest, write_bundle, verify_bundle
 from .doip_archive import verify_archive
 from .memory import Geometry, Patch, Region, Technology, plan_patches
 from .recovery_bundle import AndroidIdentity,inspect_bundle,write_report
+from .recovery_report_inspection import verify_recovery_report
 from .j1979_live_inspection import inspect_file, compare_files
 from .j1979_network_inspection import inspect_network_file
 from .connector_checkpoint import inspect_file as inspect_checkpoint, inspect_history, verify_report as verify_checkpoint_report
@@ -70,6 +71,14 @@ def _parser() -> argparse.ArgumentParser:
     recovery.add_argument("--original-bin",type=Path)
     recovery.add_argument("--expected-snapshot")
     recovery.add_argument("--output",type=Path,required=True)
+
+    recovery_report = commands.add_parser("verify-recovery-report",
+        help="Reproduce an Android or Windows recovery assessment from the original files")
+    recovery_report.add_argument("--report", type=Path, required=True)
+    recovery_report.add_argument("--journal", type=Path, required=True)
+    recovery_report.add_argument("--original-bin", type=Path)
+    recovery_report.add_argument("--vin")
+    recovery_report.add_argument("--output", type=Path, required=True)
 
     live = commands.add_parser("verify-live", help="Replay and verify a J1979 numeric live recording")
     live.add_argument("--report", type=Path, required=True)
@@ -140,6 +149,10 @@ def run(argv: Sequence[str] | None = None) -> dict[str, object]:
                               expected_vin=args.vin,expected_osid=args.osid,
                               original_bin=args.original_bin,expected_snapshot=args.expected_snapshot)
         return write_report(args.output,report)
+
+    if args.action == "verify-recovery-report":
+        return write_report(args.output, verify_recovery_report(
+            args.report, args.journal, original_bin=args.original_bin, expected_vin=args.vin))
 
     if args.action == "verify-live":
         return write_report(args.output, inspect_file(args.report, expected_vin=args.vin))
