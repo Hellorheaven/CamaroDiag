@@ -38,6 +38,15 @@ class ScalingContextTest(unittest.TestCase):
                 result = ctx.decode(bytes.fromhex(req), bytes.fromhex(res))
                 self.assertAlmostEqual(result["signals"][index]["number"], expected)
 
+    def test_custom_current_is_twos_complement(self):
+        ctx = context_from_steps(INVENTORY + [row("014F", "414F0400404D", "RAW")])
+        for encoded, expected in [("0000", 0), ("7FFF", 63.998046875),
+                                  ("8000", -64), ("9C40", -49.875), ("FFFF", -0.001953125)]:
+            with self.subTest(encoded=encoded):
+                result = ctx.decode(bytes.fromhex("0134"), bytes.fromhex("41347D00" + encoded))
+                self.assertAlmostEqual(result["signals"][1]["number"], expected)
+                self.assertEqual(result["signals"][1]["scale_source"], "ECU_CONFIGURATION")
+
     def test_unverified_is_not_default(self):
         for steps in ([], INVENTORY[:1], INVENTORY, INVENTORY + [
                 row("0150", "415064010000", "RAW")]):
