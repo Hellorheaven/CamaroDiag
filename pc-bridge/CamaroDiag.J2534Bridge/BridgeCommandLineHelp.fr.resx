@@ -14,6 +14,7 @@ Utilisation :
   CamaroDiag.J2534Bridge.exe --probe-drivers
   CamaroDiag.J2534Bridge.exe --j1979-legacy --adapter-index 0 --variant 2 --source 10 --confirm-legacy-profile --output legacy-vpw.json
   CamaroDiag.J2534Bridge.exe --j1979-network --adapter-index 0 --protocol 33 --discover-only --confirm-functional-pid00 --output can-sources.json
+  CamaroDiag.J2534Bridge.exe --j1979-freeze --adapter-index 0 --protocol 33 --tx 7E0 --rx 7E8 --vin DOCUMENTED_VIN --frame 00 --frame 01 --pid 0C --confirm-physical-channel --output freeze.json
   CamaroDiag.J2534Bridge.exe --j1979-live --adapter-index 0 --protocol 33 --tx 7E0 --rx 7E8 --vin DOCUMENTED_VIN --pid 05 --pid 0C --cycles 30 --interval-ms 1000 --confirm-physical-channel --output live.json --csv live.csv
   CamaroDiag.J2534Bridge.exe --j1979-legacy-live --adapter-index 0 --variant 2 --source 10 --vin DOCUMENTED_VIN --pid 05 --pid 0C --confirm-legacy-profile --confirm-functional-scope --output legacy-live.json --csv legacy-live.csv
   CamaroDiag.J2534Bridge.exe --j1979-network --adapter-index 0 --protocol 33 --source 7E8 --source 7E9 --confirm-functional-pid00 --confirm-physical-channels --output can-network.json
