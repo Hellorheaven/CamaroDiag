@@ -1,9 +1,18 @@
 import copy
+import contextlib
+import hashlib
+import io
+import json
+from pathlib import Path
+import tempfile
 import unittest
 from fractions import Fraction
 
 from camarodiagconnectors.j1979_catalogue import Catalogue, project
-from camarodiagconnectors.j1979_live import raw_sample, Plan
+from camarodiagconnectors.j1979_live import raw_sample, Plan, record
+from camarodiagconnectors.j1979_catalogue_cli import main, build_projection
+from camarodiagconnectors.j1979_live_inspection import inspect
+from types import SimpleNamespace
 
 
 def fixture():
@@ -108,6 +117,120 @@ class CatalogueTests(unittest.TestCase):
         Plan((0xF1,), "1G1YY22G965100001", raw_only=True).validate()
         with self.assertRaises(ValueError):
             Plan((0x20,), "1G1YY22G965100001", raw_only=True).validate()
+
+class CrossHostCatalogueTests(unittest.TestCase):
+    """Synthetic fixtures exercise the independent verifier, not vehicle conformance."""
+
+    VIN = "1G1YY22G965100001"
+
+    def original(self):
+        now = 0.0
+        reads = 0
+
+        def sleep(seconds):
+            nonlocal now
+            now += seconds
+
+        def exchange(request, timeout):
+            nonlocal now, reads
+            now += 0.01
+            if request == b"\x09\x02":
+                return b"\x49\x02\x01" + self.VIN.encode("ascii")
+            if request[0] == 1 and request[1] % 32 == 0:
+                return bytes((0x41, request[1])) + (
+                    bytes.fromhex("0000C000") if request[1] == 0xE0 else bytes.fromhex("00000001"))
+            if request == b"\x01\xf1":
+                data = ("41F181FEFF", "41F1010000", "41F180FFFF", "41F18000")[reads]
+                reads += 1
+                return bytes.fromhex(data)
+            if request == b"\x01\xf2":
+                return bytes.fromhex("41F200")
+            raise AssertionError("Unexpected synthetic request")
+
+        result = record(exchange, Plan((0xF1, 0xF2), self.VIN, 4, .1, 30, True),
+                        clock=lambda: now, sleep=sleep)
+        self.assertTrue(result["completed"])
+        return {"schema": "camarodiag-j1979-live-v1", "tx_can_id": "7E0",
+                "rx_can_id": "7E8", **result}
+
+    def test_local_report_replayed_and_every_field_verified(self):
+        with tempfile.TemporaryDirectory() as directory:
+            folder = Path(directory)
+            reference = folder / "reference.txt"
+            reference.write_bytes(b"synthetic regression reference; not SAE data")
+            pin = hashlib.sha256(reference.read_bytes()).hexdigest()
+            definition = fixture()
+            definition["reference_sha256"] = pin
+            catalogue = folder / "catalogue.json"
+            catalogue.write_text(json.dumps(definition), encoding="utf-8")
+            report = folder / "raw.json"
+            report.write_text(json.dumps(self.original()), encoding="utf-8")
+            output = folder / "projection.json"
+            args = SimpleNamespace(catalogue=catalogue, reference=reference, reference_sha256=pin,
+                                   report=report, vin=self.VIN)
+            projection = build_projection(args, local=True)
+            self.assertEqual(projection["schema"], "camarodiag-j1979-catalogue-local-projection-v1")
+            self.assertFalse(projection["source_replay_verified"])
+            self.assertTrue(projection["source_application_replay_verified"])
+            self.assertTrue(projection["final_identity_verified"])
+            self.assertEqual(projection["rows"][0]["signals"][0]["value"],
+                             {"numerator": "-1", "denominator": "6"})
+            self.assertEqual(projection["counts"], {
+                "PROJECTED": 3, "NO_DOCUMENTED_DEFINITION": 4,
+                "DOCUMENTED_WIDTH_MISMATCH": 1})
+            command = ["verify-local-projection", "--catalogue", str(catalogue),
+                       "--reference", str(reference), "--reference-sha256", pin,
+                       "--report", str(report), "--vin", self.VIN, "--projection", str(output)]
+            output.write_text(json.dumps(projection), encoding="utf-8")
+            with contextlib.redirect_stdout(io.StringIO()) as stream:
+                self.assertEqual(main(command), 0)
+            self.assertTrue(json.loads(stream.getvalue())["independent_source_replay_performed"])
+            for change in (
+                lambda x: x.update(source_replay_verified=True),
+                lambda x: x.update(physical_vehicle_verified=True),
+                lambda x: x.update(final_identity_verified=False),
+                lambda x: x["rows"][0]["signals"][0]["value"].update(numerator="0"),
+                lambda x: x["channel"].update(rx=2025),
+                lambda x: x["counts"].update(PROJECTED=4),
+                lambda x: x.update(source_report_sha256="f"*64),
+            ):
+                altered = copy.deepcopy(projection)
+                change(altered)
+                output.write_text(json.dumps(altered), encoding="utf-8")
+                with contextlib.redirect_stderr(io.StringIO()):
+                    self.assertEqual(main(command), 2)
+            output.write_text(json.dumps(projection), encoding="utf-8")
+            reference.write_bytes(b"changed")
+            with contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(main(command), 2)
+
+    def test_source_replay_rejects_ambiguous_report_wrappers_and_aliases(self):
+        original = self.original()
+        self.assertTrue(inspect(original, expected_vin=self.VIN)["completed"])
+        wrapped = {"schema": "functional-test", "live": original}
+        self.assertTrue(inspect(wrapped, expected_vin=self.VIN)["completed"])
+        with self.assertRaises(ValueError):
+            inspect({**wrapped, "liveReport": original}, expected_vin=self.VIN)
+        with self.assertRaises(ValueError):
+            inspect({**original, "rawOnly": True}, expected_vin=self.VIN)
+        modified = copy.deepcopy(original)
+        modified["observations"][0]["responseHex"] = modified["observations"][0]["response_hex"]
+        with self.assertRaises(ValueError):
+            inspect(modified, expected_vin=self.VIN)
+
+    def test_wrapper_cancellation_not_promoted_to_completed(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "record.json"
+            original = self.original()
+            wrapper = {"schema": original["schema"], "tx_can_id": "7E0", "rx_can_id": "7E8",
+                       "completed": False, "result": original}
+            path.write_text(json.dumps(wrapper), encoding="utf-8")
+            from camarodiagconnectors.j1979_catalogue_cli import replay_file
+            replay, sha = replay_file(path, self.VIN)
+            self.assertFalse(replay["completed"])
+            self.assertTrue(replay["final_identity_verified"])
+            self.assertEqual(sha, hashlib.sha256(path.read_bytes()).hexdigest())
+
 
 if __name__ == "__main__":
     unittest.main()
