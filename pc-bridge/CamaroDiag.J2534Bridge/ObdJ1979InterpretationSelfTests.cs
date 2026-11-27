@@ -85,6 +85,21 @@ internal static class ObdJ1979InterpretationSelfTests
             monitorTest.Description.Contains("unit=count") &&
             monitorTest.Description.Contains("no monitor pass verdict"),
             "Mode 06 retains raw unit/scaling ID and exposes known engineering values.");
+        foreach (var encoded in new[]{"00800100","00001100","00010110","00080400","00080004"})
+        {
+            var baseline=Convert.FromHexString(encoded);
+            var cycle=ObdJ1979OperatingContext.DecodeCycle([0,(byte)(baseline[1]&8),1,0],baseline);
+            Check(cycle is {SupportVerified:false} && cycle.Monitors.All(x=>x.Supported is null),
+                "Malformed PID01 cannot establish monitor support.");
+        }
+        var ambiguous=ObdJ1979OperatingContext.Project(new ObdJ1979OperatingContext.Observation[]{
+            new("0101","410100010100","PASSED"),new("0101","410100","RAW"),
+            new("0141","414100010100","PASSED"),new("011D","411D30","PASSED"),
+            new("011D","411D3030","RAW"),new("0106","41068090","PASSED")});
+        Check(ambiguous.DriveCycle is {SupportVerified:false} &&
+            ambiguous.FuelTrims.Single().Signals[1].Number is null,
+            "Ambiguous operating context never establishes monitor or upper-bank support.");
+
         var readiness = ObdJ1979Interpretation.Interpret(
             [0x01, 0x01], [0x41, 0x01, 0x83, 0x08, 0xA5, 0x5A]);
         Check(readiness.Positive &&
