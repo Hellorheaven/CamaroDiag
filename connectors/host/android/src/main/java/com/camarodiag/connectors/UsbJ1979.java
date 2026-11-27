@@ -1,4 +1,4 @@
-package com.camaradiag.connectors;
+package com.camarodiag.connectors;
 
 import android.hardware.usb.UsbConstants;
 import android.hardware.usb.UsbDevice;
