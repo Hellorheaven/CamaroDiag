@@ -129,6 +129,18 @@ internal static class ObdJ1979OperatingContext
             new ObdJ1979MultiSignal.Signal(request[1],x.Name,x.Unit,x.Number!.Value,x.RawEncoded)).ToArray();
     }
 
+    internal static IEnumerable<string> Display(Projection projection)
+    {
+        foreach(var trim in projection.FuelTrims)
+            foreach(var signal in trim.Signals)
+                yield return trim.RequestHex+" "+signal.Name+"="+(signal.Number is double number?
+                    number.ToString("0.###",CultureInfo.CurrentCulture)+" %":
+                    "RAW="+signal.RawEncoded.ToString("X2",CultureInfo.InvariantCulture));
+        if(projection.DriveCycle is {} cycle)
+            foreach(var monitor in cycle.Monitors.Where(m=>m.Supported==true))
+                yield return "0141 "+monitor.Name+" "+(monitor.Enabled==true?"●":"○")+" "+(monitor.Complete==true?"✓":"✗");
+    }
+
     internal static object Evidence(Projection p)=>new {
         drive_cycle=p.DriveCycle is {} c?new {
             request_hex=c.RequestHex,raw_hex=c.RawHex,baseline_raw_hex=c.BaselineRawHex,
