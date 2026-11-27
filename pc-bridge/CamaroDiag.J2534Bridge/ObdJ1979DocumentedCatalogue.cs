@@ -127,7 +127,7 @@ internal sealed class ObdJ1979DocumentedCatalogue
         else if(node.ValueKind==JsonValueKind.Array)
             foreach(var item in node.EnumerateArray())Unique(item);
     }
-    private static void Fields(JsonElement node,string[] required,params string[] optional)
+    internal static void Fields(JsonElement node,string[] required,params string[] optional)
     {
         Check(node.ValueKind==JsonValueKind.Object,"Expected object");
         var keys=node.EnumerateObject().Select(x=>x.Name).ToHashSet(StringComparer.Ordinal);
@@ -219,7 +219,7 @@ internal sealed class ObdJ1979DocumentedCatalogue
             unavailable,node.TryGetProperty("presence",out var presence)?ParsePresence(presence,width):null,
             min,max,enums,Label(node.GetProperty("reference")));
     }
-    private static Definition ParseDefinition(JsonElement node)
+    internal static Definition ParseDefinition(JsonElement node)
     {
         Fields(node,["pid","payload_bytes","protocols","reference","signals"]);
         int pid=Int(node.GetProperty("pid"),1,255),width=Int(node.GetProperty("payload_bytes"),1,4093);
