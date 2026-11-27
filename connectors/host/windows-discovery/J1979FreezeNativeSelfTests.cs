@@ -89,6 +89,65 @@ internal static class J1979FreezeNativeSelfTests
         foreach(byte[] bad in new[]{capture[..^1],capture.Concat(new byte[]{0}).ToArray(),
                 Capture(profile,true),Capture(profile,false,true)})
             Require(!J1979FreezeNative.Decode(new MemoryStream(bad),profile).CaptureIntegrityVerified,"reject malformed recipe");
+        var interrupted=capture[..^32]; // terminal is 8 + 20 + 4 bytes
+        var partial=J1979FreezeNative.InspectPrefix(interrupted,Vin);
+        Require(Equals(partial["prefix_integrity_verified"],true)&&
+            Equals(partial["capture_integrity_verified"],false)&&
+            Equals(partial["terminal_present"],false)&&
+            Equals(partial["execution_completed"],false)&&
+            Equals(partial["permits_programming"],false),"CF/1 prefix cannot claim terminal success");
+        Require((int)partial["complete_observations"]! == 6&&
+            (int)partial["complete_records"]! == 7&&
+            (string)partial["interruption"]! == "MISSING_TERMINAL","CF/1 prefix preserves complete reads");
+        Require((string)partial["observed_final_vin_in_prefix"]! == Vin&&
+            !(bool)partial["replay_terminated_by_missing_observation"]!,"full observation set without terminal");
+        var planOnly=J1979FreezeNative.InspectPrefix(capture[..(12+J1979FreezeNative.PlanSize)],Vin);
+        Require((int)planOnly["complete_observations"]! == 0&&
+            (bool)planOnly["replay_terminated_by_missing_observation"]!,
+            "plan-only prefix cannot invent VIN observation");
+        var shortHeader=J1979FreezeNative.InspectPrefix(interrupted.Concat(new byte[]{(byte)'C',(byte)'F',1,3,7}).ToArray(),Vin);
+        Require((string)shortHeader["interruption"]! == "TRUNCATED_HEADER"&&
+            (int)shortHeader["discarded_tail_bytes"]! == 5,"bounded truncated terminal header");
+        var shortBody=J1979FreezeNative.InspectPrefix(capture[..^1],Vin);
+        Require((string)shortBody["interruption"]! == "TRUNCATED_RECORD"&&
+            (int)shortBody["complete_observations"]! == 6,"missing terminal CRC cannot count as complete");
+        foreach(byte[] invalid in new[]{capture,Capture(profile,true)[..^32],
+            interrupted.Concat(new byte[]{(byte)'X'}).ToArray(),
+            interrupted.Concat(new byte[]{(byte)'C',(byte)'F',1,3,8}).ToArray()})
+        {
+            bool rejected=false;
+            try{J1979FreezeNative.InspectPrefix(invalid,Vin);}
+            catch(InvalidDataException){rejected=true;}
+            Require(rejected,"corrupted, forged or complete CF/1 cannot be accepted as interrupted");
+        }
+        {
+            bool denied=false;
+            try{J1979FreezeNative.InspectPrefix(interrupted,"1G1FA1E30D7654321");}
+            catch(InvalidDataException){denied=true;}
+            Require(denied,"independent VIN binds CF/1 prefix");
+        }
+        string root=Path.Combine(Path.GetTempPath(),"camarodiag-cf1-prefix-"+Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            string source=Path.Combine(root,"capture.cf"),output=Path.Combine(root,"prefix.json"),
+                proof=Path.Combine(root,"verification.json");
+            File.WriteAllBytes(source,interrupted);
+            var saved=J1979FreezeNativeCli.InspectPrefix(source,output,Vin);
+            Require(File.Exists(output)&&Equals(saved["prefix_integrity_verified"],true),
+                "Windows prefix CLI persists separate report");
+            var verified=J1979FreezeNativeCli.VerifyPrefix(source,output,proof,Vin);
+            Require(Equals(verified["consistent"],true)&&Equals(verified["execution_completed"],false),
+                "Windows prefix CLI verifies original CF/1 evidence");
+            string edited=File.ReadAllText(output).Replace(
+                "\\"execution_completed\\": false","\\"execution_completed\\": true",StringComparison.Ordinal);
+            File.WriteAllText(output,edited);
+            bool denied=false;
+            try{J1979FreezeNativeCli.VerifyPrefix(source,output,Path.Combine(root,"bad.json"),Vin);}
+            catch(InvalidDataException){denied=true;}
+            Require(denied,"forged Windows CF/1 JSON result is rejected");
+        }
+        finally{Directory.Delete(root,true);}
         var sim=new Sim(challenge.Concat(capture).ToArray());
         using var raw=new MemoryStream();
         var live=new J1979FreezeUsbCapture(sim).Run(profile,key,raw,()=>true,nonce);
