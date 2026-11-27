@@ -268,6 +268,28 @@ Le vérificateur Python `verify-recovery-history-report` prend désormais en cha
 Android supports explicit ordered selection of recovery evidence folders, byte-prefix and invariant original-sector comparison, source reinspection and portable JSON export. Python independently replays native Windows history reports and the portable Android/Python shape from the actual source journals. These checks are offline, not hardware attestation or permission to recover an ECU. Regression cases are written, not executed. C6 remains open.
 
 
+### SAE J1979 Mode 02 — inspection d'une capture CF/1 interrompue
+
+Cette opération est strictement **hors ligne**, sur une capture CF/1 fournie explicitement. Le VIN doit être connu et fourni indépendamment de la capture. Les implémentations Python, Android et Windows inspectent les enregistrements complets (CRC, taille, séquence, requêtes et réponses corrélées au plan Mode 02). Le dernier enregistrement tronqué n'est jamais interprété. Un enregistrement complet mais corrompu, un VIN erroné, une requête inattendue ou une capture possédant un terminal complet sont rejetés.
+
+Le rapport `camarodiag-j1979-native-freeze-prefix-v1` comporte l'empreinte du fichier original, l'offset du dernier enregistrement complet, le nombre d'octets finaux non vérifiés, les étapes relues et une indication explicite que l'état de la campagne n'est **pas validé**. Il ne peut servir de capture complète pour une projection Mode 02, un verdict de véhicule, une commande d'écriture ou une reprise automatique. Les imports Android utilisent SAF et recontrôlent les octets avant la publication de l'export.
+
+Exemples Linux / Python (sans bus, sortie nouvelle uniquement) :
+
+```sh
+camarodiagconnectors-j1979-freeze-native inspect-prefix --capture interrupted.cf --vin 1G1FA1E30D1234567 --output partial.json
+camarodiagconnectors-j1979-freeze-native verify-prefix --capture interrupted.cf --vin 1G1FA1E30D1234567 --report partial.json --output verification.json
+```
+
+Exemples Windows (pont J2534, sans adaptateur) :
+
+```powershell
+CamaroDiag.J2534Bridge.exe --inspect-j1979-freeze-native-prefix interrupted.cf 1G1FA1E30D1234567 partial.json
+CamaroDiag.J2534Bridge.exe --verify-j1979-freeze-native-prefix interrupted.cf partial.json verification.json 1G1FA1E30D1234567
+```
+
+Les chemins des sorties ne peuvent remplacer les sources. Les contrôles sont des tests de cohérence logicielle, non une preuve de transport physique. Le contenu normatif autorisé J1979DA_202607 et la qualification des cartes CU/5–CI/5 restent des points distincts à finaliser avant la clôture complète du protocole.
+
 ### SAE J1979 Mode 02 — parcours multi-trames natif et legacy (développement)
 
 | Parcours | Acquisition | Vérification |
