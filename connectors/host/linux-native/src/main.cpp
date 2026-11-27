@@ -4,6 +4,8 @@
 #include "cl1.h"
 #include "cl1_usb.h"
 #include "j1979_can_cli.h"
+#include "j1979_cm1.hpp"
+#include <exception>
 
 #include <errno.h>
 #include <fcntl.h>
@@ -950,9 +952,44 @@ static int capture_cl1_native(int argc,char **argv) {
     return complete?0:2;
 }
 
+static int cm1_cli(const char* journal_path,const char* report_path,const char* proof_path,
+                   const char* vin,bool prefix) {
+    input original{},again{},stored{},stored_again{};
+    try {
+        if (!load_regular(journal_path,cd::cm1::max_journal,&original))
+            return error("CM/1 input is not a bounded regular file");
+        const auto evidence=cd::cm1::inspect({original.bytes.get(),original.length},vin,prefix);
+        const auto canonical=cd::cm1::report(evidence,original.digest);
+        if (proof_path) {
+            if (!load_regular(report_path,cd::cm1::max_report,&stored)||!separate(&original,&stored)||
+                stored.length!=canonical.size()||memcmp(stored.bytes.get(),canonical.data(),canonical.size()))
+                return error("CM/1 report differs from canonical independent replay");
+        }
+        if (!load_regular(journal_path,cd::cm1::max_journal,&again)||!same_input(&original,&again))
+            return error("CM/1 original changed");
+        if (proof_path) {
+            if (!load_regular(report_path,cd::cm1::max_report,&stored_again)||!same_input(&stored,&stored_again))
+                return error("CM/1 report changed");
+            const std::string proof=std::string("{\"schema\":\"camarodiag-j1979-native-maintenance-verification-linux-v1\","
+                "\"consistent\":true,\"verification_scope\":\"CANONICAL_OFFLINE_CM1\",\"journal_sha256\":\"")+
+                original.digest+"\",\"report_sha256\":\""+stored.digest+"\",\"recovery_required\":"+
+                (evidence.recovery_required()?"true":"false")+
+                ",\"physical_vehicle_verified\":false,\"permits_automatic_retry\":false,\"replayed\":"+
+                canonical.substr(0,canonical.size()-1)+"}\n";
+            if (proof.size()>cd::cm1::max_report||!atomic_create(proof_path,proof.data(),proof.size()))
+                return error("CM/1 proof path unavailable");
+        } else if (!atomic_create(report_path,canonical.data(),canonical.size())) {
+            return error("CM/1 report path unavailable");
+        }
+        return evidence.recovery_required()?7:0;
+    } catch(const std::exception& e) {
+        return error(e.what());
+    }
+}
+
 static void usage(FILE *stream) {
     fprintf(stream,
-        "CamaroDiag Linux native C — SAE J1979 Mode 02 CF/1\n"
+        "CamaroDiag Linux native C++20 — SAE J1979\n"
         "Usage:\n"
         "  camarodiag-native --j1979-can --interface can0 --tx 7E0 --rx 7E8 --output evidence.json --vin VIN --budget-ms 180000 --confirm-physical-channel\n"
         "  camarodiag-native --j1979-live-usb-native --port /dev/ttyACM0 --key-file key.bin --capture session.cl --output report.json --tx 7E0 --rx 7E8 --vin VIN --pid 0C --cycles 30 --interval-ms 1000 --budget-ms 180000 --confirm-physical-channel\n"
@@ -966,6 +1003,10 @@ static void usage(FILE *stream) {
         "  camarodiag-native --inspect-j1979-freeze-native CAPTURE.cf VIN REPORT.json\n"
         "  camarodiag-native --verify-j1979-freeze-native-prefix CAPTURE.cf PREFIX.json PROOF.json VIN\n"
         "  camarodiag-native --verify-j1979-freeze-native CAPTURE.cf REPORT.json PROOF.json VIN\n"
+        "  camarodiag-native --inspect-j1979-maintenance JOURNAL.cm VIN REPORT.json\n"
+        "  camarodiag-native --inspect-j1979-maintenance-prefix JOURNAL.cm VIN REPORT.json\n"
+        "  camarodiag-native --verify-j1979-maintenance JOURNAL.cm REPORT.json PROOF.json VIN\n"
+        "  camarodiag-native --verify-j1979-maintenance-prefix JOURNAL.cm REPORT.json PROOF.json VIN\n"
         "  camarodiag-native --help\n"
         "Examples:\n"
         "  camarodiag-native --inspect-j1979-freeze-native-prefix incomplete.cf 2G1FA1E30D7654321 partial.json\n"
@@ -977,6 +1018,14 @@ int main(int argc, char **argv) {
     if (argc == 2 && (!strcmp(argv[1], "--help") || !strcmp(argv[1], "-h"))) {
         usage(stdout); return 0;
     }
+    if (argc==5 && !strcmp(argv[1],"--inspect-j1979-maintenance"))
+        return cm1_cli(argv[2],argv[4],nullptr,argv[3],false);
+    if (argc==5 && !strcmp(argv[1],"--inspect-j1979-maintenance-prefix"))
+        return cm1_cli(argv[2],argv[4],nullptr,argv[3],true);
+    if (argc==6 && !strcmp(argv[1],"--verify-j1979-maintenance"))
+        return cm1_cli(argv[2],argv[3],argv[4],argv[5],false);
+    if (argc==6 && !strcmp(argv[1],"--verify-j1979-maintenance-prefix"))
+        return cm1_cli(argv[2],argv[3],argv[4],argv[5],true);
     if (argc >= 3 && !strcmp(argv[1], "--j1979-live-usb-native"))
         return capture_cl1_native(argc,argv);
     if (argc >= 3 && (!strcmp(argv[1], "--j1979-can") ||
