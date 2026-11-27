@@ -64,14 +64,20 @@ internal fun J1979LivePanel(protocol: Int?,state: FunctionalTestState,vehicle: V
     }
     if(state.livePlan!=null){
         state.liveRecent.takeLast(12).forEach {
-            val value=it.value?.let { v->"${v.number} ${v.unit}" }?:it.status
+            val value=it.multiSignals?.takeIf { v->v.isNotEmpty() }?.joinToString(" · ") { v->"${v.name}: ${v.number} ${v.unit}" }
+                ?:it.value?.let { v->"${v.number} ${v.unit}" }?:it.status
             Text("${it.elapsedMs} ms · ${it.requestHex} · $value",fontFamily=FontFamily.Monospace,fontSize=11.sp)
         }
         state.liveReport?.let { r ->
             Text(stringResource(if(r.completed)R.string.j1979_live_completed else R.string.j1979_live_incomplete))
             Text(stringResource(R.string.j1979_live_cycle_count,r.completedCycles,r.plan.cycles))
             r.stopReason?.let { Text(it,fontSize=11.sp) }
-            r.summaries.forEach {
+            r.multiSignalSummary.forEach {
+                fun display(x:Double)="%.3f".format(Locale.getDefault(),x)
+                Text("${"%02X".format(Locale.ROOT,it.pid)} · ${it.name} · ${it.count}/${it.attempted}")
+                Text(stringResource(R.string.j1979_live_summary,display(it.minimum),display(it.maximum),display(it.mean),it.unit),fontSize=11.sp)
+            }
+            r.summaries.filter { scalar->r.multiSignalSummary.none { it.pid==scalar.pid } }.forEach {
                 fun display(x:Double?)=x?.let { n->"%.3f".format(Locale.getDefault(),n) }?:"—"
                 Text("${"%02X".format(Locale.ROOT,it.pid)} · ${it.name.orEmpty()} · ${it.statusCounts["PASSED"]?:0}/${it.attempted}")
                 Text(stringResource(R.string.j1979_live_summary,display(it.minimum),display(it.maximum),display(it.mean),it.unit.orEmpty()),
