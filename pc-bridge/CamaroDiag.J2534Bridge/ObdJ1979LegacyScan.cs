@@ -33,7 +33,8 @@ internal static class ObdJ1979LegacyScan
     internal sealed record InventorySummary(byte Mode,byte? SensorMask,string State,int VerifiedPages,
         IReadOnlyList<byte> AdvertisedIds);
     internal sealed record DtcSummary(byte Mode,IReadOnlyList<string>? Codes,string? Status);
-    internal sealed record Identification(byte InfoType,IReadOnlyList<string> Values);
+    internal sealed record Identification(byte InfoType,IReadOnlyList<string> Values,
+        ObdJ1979ExtendedVehicleInfo.Record? Extended=null);
     internal sealed record MonitorRecord(byte Mode,byte TestId,byte? SensorMask,string EncodedDataHex,
         byte? ComponentAndLimitEncoded=null,ushort? ValueEncoded=null,ushort? LimitEncoded=null);
     internal sealed record FreezeTrigger(bool Present,string? Dtc);
@@ -182,7 +183,7 @@ internal static class ObdJ1979LegacyScan
         foreach (byte type in info)
         {
             if (stop is not null) break;
-            if (type % 2 == 1)
+            if (ObdJ1979ExtendedVehicleInfo.IsLegacyCount(type))
             {
                 var rows = Read([9, type], r => r.Length == 3 && r[0] == 0x49 &&
                     r[1] == type && r[2] > 0, single: true);
@@ -192,7 +193,7 @@ internal static class ObdJ1979LegacyScan
             var fragments = Read([9, type], r => r.Length == 7 && r[0] == 0x49 &&
                 r[1] == type && r[2] > 0);
             if (fragments.Length == 0) continue;
-            if (!counts.TryGetValue((byte)(type - 1), out byte count) ||
+            if (!counts.TryGetValue(ObdJ1979ExtendedVehicleInfo.CountType(type), out byte count) ||
                 fragments.Length != count ||
                 !fragments.Select(x => (int)x[2]).SequenceEqual(Enumerable.Range(1, count)))
             {
@@ -237,7 +238,15 @@ internal static class ObdJ1979LegacyScan
                 identification.Add(new(6,cvns));
                 steps[^1]=steps[^1] with {Detail=string.Join(",",cvns)};
             }
-            if(type is not (2 or 4 or 6))
+            if(type==10||ObdJ1979ExtendedVehicleInfo.IsExtended(type)){
+                try{
+                    var extended=ObdJ1979ExtendedVehicleInfo.Legacy(type,count,fragments);
+                    identification.Add(new(type,extended.Values,extended));
+                    steps[^1]=steps[^1] with {Detail=ObdJ1979ExtendedVehicleInfo.Format(extended)};
+                }catch(InvalidDataException){
+                    steps[^1]=steps[^1] with {Status="FAILED",Detail="INVALID_EXTENDED_INFOTYPE"};
+                }
+            }else if(type is not (2 or 4 or 6))
                 steps[^1]=steps[^1] with {Status="RAW",Detail="UNINTERPRETED_INFOTYPE"};
         }
         if(stop is null && expectedVin is not null && vin!=expectedVin){
