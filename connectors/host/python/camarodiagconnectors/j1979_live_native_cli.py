@@ -7,6 +7,8 @@ from __future__ import annotations
 
 import argparse
 import csv
+from datetime import datetime, timezone
+from importlib.metadata import version, PackageNotFoundError
 import io
 import json
 import os
@@ -130,7 +132,10 @@ def verify_files(capture, report, *, expected_vin):
     actual = _json(report_raw)
     replay = decode(io.BytesIO(raw))
     core = set(replay)
-    extra = {"client_proof_sent", "cancelled", "host_elapsed_ms", "capture_sha256", "raw_capture_name"}
+    extra = {"client_proof_sent", "cancelled", "host_elapsed_ms", "capture_sha256", "raw_capture_name",
+             "version", "declared_connector", "declared_ecu", "connection_generation",
+             "started_at_utc", "finished_at_utc", "observed_vin"}
+
     require(isinstance(actual, dict) and core <= actual.keys() <= core | extra,
             "Unexpected native live report fields")
     require(actual["source"] in ("LIVE_USB_CU3", "OFFLINE_CL1"), "Unexpected CL/1 source")
@@ -152,6 +157,33 @@ def verify_files(capture, report, *, expected_vin):
                 "Missing or contradictory live credential declaration")
     else:
         require(not authenticated and not sent and not cancelled, "Offline report claims live authentication")
+    for field in ("version", "declared_connector", "declared_ecu"):
+        if field in actual:
+            value = actual[field]
+            require(isinstance(value, str) and 0 < len(value) <= 1024 and
+                    all(ord(ch) >= 32 and ord(ch) != 127 for ch in value), "Invalid declared metadata: " + field)
+    if "connection_generation" in actual:
+        require(type(actual["connection_generation"]) is int and 1 <= actual["connection_generation"] < 2**63,
+                "Invalid connection generation")
+    instants = {}
+    for field in ("started_at_utc", "finished_at_utc"):
+        if field in actual:
+            value = actual[field]
+            require(isinstance(value, str) and 0 < len(value) <= 64 and value.endswith("Z"),
+                    "Expected UTC timestamp: " + field)
+            try:
+                instants[field] = datetime.fromisoformat(value[:-1] + "+00:00")
+            except ValueError as exc:
+                raise ValueError("Invalid native UTC timestamp: " + field) from exc
+    if len(instants) == 2:
+        require(instants["finished_at_utc"] >= instants["started_at_utc"], "Native capture timestamps reversed")
+    if "observed_vin" in actual:
+        summary = replay.get("summary") or {}
+        expected_observed = expected_vin if summary.get("initial_identity_verified") else None
+        require(actual["observed_vin"] is None or actual["observed_vin"] == expected_observed,
+                "Observed VIN not established by the native capture")
+        if actual["capture_integrity_verified"]:
+            require(actual["observed_vin"] == expected_observed, "Verified report omitted observed identity")
     if "host_elapsed_ms" in actual:
         require(type(actual["host_elapsed_ms"]) is int and 0 <= actual["host_elapsed_ms"] < 2**63,
                 "Invalid host duration")
@@ -320,6 +352,7 @@ def run(argv=None):
     again, final = _regular(args.key_file, 32)
     require(again == key and final == key_stamp, "Credential changed before acquisition")
     report = None
+    started_at = datetime.now(timezone.utc)
     fd = os.open(args.capture, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     try:
         with os.fdopen(fd, "wb") as capture:
@@ -349,6 +382,16 @@ def run(argv=None):
         except (OSError, ValueError):
             report["capture_integrity_verified"] = False
     report["raw_capture_name"] = args.capture.name
+    try:
+        report["version"] = version("camarodiagconnectors")
+    except PackageNotFoundError:
+        report["version"] = "source"
+    report["declared_connector"] = args.port
+    report["declared_ecu"] = f"CAN {profile.tx:X}/{profile.rx:X}"
+    report["started_at_utc"] = started_at.isoformat().replace("+00:00", "Z")
+    report["finished_at_utc"] = max(started_at, datetime.now(timezone.utc)).isoformat().replace("+00:00", "Z")
+    report["observed_vin"] = (profile.vin if report["capture_integrity_verified"] and
+                              (report["summary"] or {}).get("initial_identity_verified") else None)
     write_new(args.output, report)
     return report
 
