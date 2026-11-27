@@ -139,7 +139,8 @@ class J1979MaintenanceStorage final:public J1979MaintenanceJournal::Storage {
   }
   void latchRecovery()override{fail();}
   struct Archive {
-    size_t size=0;
+    size_t size=0,lengths[Slots]{};
+    uint32_t checksums[Slots]{};
     unsigned records=0;
     bool terminal=false,damagedTail=false,recoveryRequired=true;
     J1979MaintenanceScope scope{};
@@ -169,6 +170,7 @@ class J1979MaintenanceStorage final:public J1979MaintenanceJournal::Storage {
         found.damagedTail=true;stopped=true;continue;
       }
       if(!i)found.scope=scope;
+      found.lengths[i]=n;found.checksums[i]=u32(scratch_.pending+n-4);
       found.size+=n;++found.records;prior=scratch_.pending[3];
       if(prior==4){found.terminal=true;stopped=true;}
     }
@@ -185,9 +187,10 @@ class J1979MaintenanceStorage final:public J1979MaintenanceJournal::Storage {
     size_t total=0;unsigned prior=0;
     for(unsigned i=0;i<pinned.records;++i){
       size_t length=0;
-      if(medium_.slotSize(i,length)!=Lookup::Present||!length||length>Journal::MaximumRecord||
+      if(medium_.slotSize(i,length)!=Lookup::Present||length!=pinned.lengths[i]||!length||length>Journal::MaximumRecord||
          !medium_.readSlot(i,0,scratch_.pending,length)||
-         !recordHeader(scratch_.pending,length,i,prior))return false;
+         !recordHeader(scratch_.pending,length,i,prior)||
+         u32(scratch_.pending+length-4)!=pinned.checksums[i])return false;
       J1979MaintenanceScope scope;
       if(!J1979MaintenanceScope::decode(scratch_.pending+Journal::Header,J1979MaintenanceScope::WireSize,scope)||
          !scope.same(pinned.scope))return false;
