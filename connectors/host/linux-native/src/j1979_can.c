@@ -1,0 +1,382 @@
+#define _POSIX_C_SOURCE 200809L
+#include "j1979_can.h"
+#include <ctype.h>
+#include <errno.h>
+#include <limits.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+
+static uint64_t monotonic_ms(void) {
+    struct timespec now = {0};
+    if (clock_gettime(CLOCK_MONOTONIC, &now)) return 0;
+    return (uint64_t)now.tv_sec * 1000u + (uint64_t)now.tv_nsec / 1000000u;
+}
+static uint64_t now_ms(const j1979_can_plan *p) {
+    return p->clock ? p->clock(p->context) : monotonic_ms();
+}
+bool j1979_can_physical_pair(uint32_t tx, uint32_t rx) {
+    if (tx >= 0x7e0u && tx <= 0x7e7u) return rx == tx + 8u;
+    if (tx > 0x1fffffffu || (tx & ~0xff00u) != 0x18da00f1u) return false;
+    unsigned ecu = (tx >> 8) & 255u;
+    return ecu != 0xf1u && ecu != 0xfeu && ecu != 0xffu &&
+        rx == (0x18daf100u | ecu);
+}
+bool j1979_can_valid_vin(const char *vin) {
+    if (!vin || strlen(vin) != 17) return false;
+    for (size_t i = 0; i < 17; ++i) {
+        char c = vin[i];
+        if (!((c >= 'A' && c <= 'Z' && c != 'I' && c != 'O' && c != 'Q') ||
+            (c >= '0' && c <= '9'))) return false;
+    }
+    return true;
+}
+bool j1979_can_allowed_read(const uint8_t *r, size_t n) {
+    if (!r) return false;
+    if (n == 2 && (r[0] == 1 || r[0] == 6 || r[0] == 9)) return true;
+    if (n == 3 && r[0] == 2 && r[2] == 0) return true;
+    if (n == 2 && r[0] == 8 && r[1] % 32 == 0) return true;
+    return n == 1 && (r[0] == 3 || r[0] == 7 || r[0] == 10);
+}
+static void stop(j1979_can_result *r, const char *reason) {
+    if (!r->stop_reason[0]) {
+        snprintf(r->stop_reason, sizeof(r->stop_reason), "%s", reason);
+    }
+}
+static bool valid_dtc(const uint8_t *reply, size_t n) {
+    if (n < 2 || n != 2u + 2u * reply[1]) return false;
+    for (size_t i = 2; i < n; i += 2)
+        if (reply[i] == 0 && reply[i+1] == 0) return false;
+    return true;
+}
+static int pid_width(unsigned service, uint8_t pid) {
+    if (pid % 32u == 0) return 4;
+    if (service == 2 && pid == 2) return 2;
+    switch (pid) {
+        case 0x01: case 0x24: case 0x25: case 0x28: case 0x29:
+        case 0x34: case 0x35: case 0x38: case 0x39: case 0xa6: return 4;
+        case 0x0c: case 0x10: case 0x14: case 0x15: case 0x16:
+        case 0x17: case 0x1f: case 0x42: case 0x43: case 0x44: return 2;
+        case 0x04: case 0x05: case 0x0a: case 0x0b: case 0x0d:
+        case 0x0e: case 0x0f: case 0x11: case 0x13: case 0x1d:
+        case 0x45: case 0x46: case 0x47: case 0x48: case 0x49:
+        case 0x4a: case 0x4b: case 0x4c: case 0x52: case 0x5b: return 1;
+        case 0x06: case 0x07: case 0x08: case 0x09: return -2; /* one or two trims */
+        default: return -1; /* undecoded RAW, never invented width */
+    }
+}
+static bool valid_response(const uint8_t *request, size_t count,
+                           const uint8_t *response, size_t n,
+                           j1979_can_step *step) {
+    if (n == 0 || n > J1979_CAN_MAX_PAYLOAD) {
+        snprintf(step->detail, sizeof(step->detail), "INVALID_LENGTH");
+        return false;
+    }
+    if (response[0] == 0x7f) {
+        if (n != 3 || response[1] != request[0] ||
+            response[2] == 0 || response[2] == 0x78) {
+            snprintf(step->detail, sizeof(step->detail), "INVALID_NEGATIVE_RESPONSE");
+            return false;
+        }
+        snprintf(step->status, sizeof(step->status), "NOT_TESTED");
+        snprintf(step->detail, sizeof(step->detail), "NRC_%02X", response[2]);
+        return true;
+    }
+    if (response[0] != (uint8_t)(request[0] + 0x40u) ||
+        (count > 1 && (n < count ||
+            memcmp(response + 1, request + 1, count - 1)))) {
+        snprintf(step->detail, sizeof(step->detail), "WRONG_ECU_SERVICE_OR_PID");
+        return false;
+    }
+    if (request[0] == 3 || request[0] == 7 || request[0] == 10) {
+        if (!valid_dtc(response, n)) {
+            snprintf(step->detail, sizeof(step->detail), "INVALID_DTC_RECORDS");
+            return false;
+        }
+        snprintf(step->status, sizeof(step->status), "PASSED");
+        return true;
+    }
+    if (n <= count) {
+        snprintf(step->detail, sizeof(step->detail), "MISSING_RESPONSE_DATA");
+        return false;
+    }
+    if (request[0] == 1 || request[0] == 2) {
+        int width = pid_width(request[0], request[1]);
+        size_t data = n - count;
+        if ((width >= 0 && data != (size_t)width) ||
+            (width == -2 && data != 1 && data != 2)) {
+            snprintf(step->detail, sizeof(step->detail), "INVALID_PID_WIDTH");
+            return false;
+        }
+    }
+    if (request[0] == 9 && (request[1] == 4 || request[1] == 6 ||
+                            request[1] == 10)) {
+        size_t width = request[1] == 4 ? 16u : request[1] == 6 ? 4u : 20u;
+        if (n < 3 || response[2] == 0 || n != 3u + (size_t)response[2] * width) {
+            snprintf(step->detail, sizeof(step->detail), "INVALID_INFO_COUNT");
+            return false;
+        }
+    }
+    snprintf(step->status, sizeof(step->status), "RAW");
+    return true;
+}
+static j1979_can_step *read_one(const j1979_can_plan *p, j1979_can_result *r,
+        uint64_t start, const uint8_t *request, size_t count) {
+    if (r->stop_reason[0]) return NULL;
+    if (!j1979_can_allowed_read(request, count)) {
+        stop(r, "UNSAFE_SERVICE_REJECTED");
+        return NULL;
+    }
+    if (p->current && !p->current(p->context)) {
+        stop(r, "CONTEXT_CHANGED"); return NULL;
+    }
+    uint64_t now = now_ms(p);
+    if (now < start || now - start >= p->budget_ms) {
+        stop(r, "BUDGET_EXHAUSTED"); return NULL;
+    }
+    if (r->step_count >= J1979_CAN_MAX_STEPS) {
+        stop(r, "RECORD_LIMIT"); return NULL;
+    }
+    j1979_can_step *step = &r->steps[r->step_count++];
+    memcpy(step->request, request, count);
+    step->request_size = (uint8_t)count;
+    snprintf(step->status, sizeof(step->status), "NOT_TESTED");
+    size_t capacity = J1979_CAN_MAX_PAYLOAD + 1;
+    uint8_t answer[J1979_CAN_MAX_PAYLOAD + 1] = {0};
+    uint64_t remaining = p->budget_ms - (now - start);
+    unsigned timeout = remaining > 2500 ? 2500 : (unsigned)remaining;
+    uint64_t begin = now_ms(p);
+    int rc = p->exchange(p->context, request, count, answer, &capacity, timeout);
+    uint64_t end = now_ms(p);
+    step->duration_ms = end >= begin && end - begin < UINT32_MAX
+        ? (uint32_t)(end - begin) : UINT32_MAX;
+    if (capacity > sizeof(answer)) {
+        snprintf(step->status, sizeof(step->status), "FAILED");
+        snprintf(step->detail, sizeof(step->detail), "UNBOUNDED_TRANSPORT_REPLY");
+        stop(r, "TRANSPORT_ERROR"); return step;
+    }
+    if (rc == 0) {
+        step->response = malloc(capacity ? capacity : 1u);
+        if (!step->response) {
+            stop(r, "MEMORY_EXHAUSTED"); return step;
+        }
+        memcpy(step->response, answer, capacity);
+        step->response_size = capacity;
+    }
+    /* A response obtained after expiration cannot be projected as a valid
+     * current observation, even if its content looks syntactically correct. */
+    if (end < start || end - start >= p->budget_ms) {
+        snprintf(step->detail, sizeof(step->detail), "LATE_RESPONSE");
+        stop(r, "BUDGET_EXHAUSTED"); return step;
+    }
+    if (p->current && !p->current(p->context)) {
+        snprintf(step->detail, sizeof(step->detail), "CONTEXT_CHANGED");
+        stop(r, "CONTEXT_CHANGED"); return step;
+    }
+    if (rc == 1) {
+        snprintf(step->detail, sizeof(step->detail), "TIMEOUT");
+        return step;
+    }
+    if (rc != 0) {
+        snprintf(step->status, sizeof(step->status), "FAILED");
+        snprintf(step->detail, sizeof(step->detail), "TRANSPORT_ERROR");
+        stop(r, "TRANSPORT_ERROR"); return step;
+    }
+    if (!valid_response(request, count, answer, capacity, step)) {
+        snprintf(step->status, sizeof(step->status), "FAILED");
+    }
+    return step;
+}
+static bool positive(const j1979_can_step *s) {
+    return s && !strcmp(s->status, "RAW");
+}
+static int inventory(const j1979_can_plan *p, j1979_can_result *r,
+                     uint64_t start, unsigned mode, bool freeze) {
+    /* Support pages remain separate per service (01/02/06/08/09). */
+    if (mode >= 10) return -1;
+    bool complete = false;
+    for (unsigned base = 0; base <= 0xe0 && !r->stop_reason[0]; base += 0x20) {
+        uint8_t req[] = {(uint8_t)mode, (uint8_t)base, 0};
+        size_t request_size = freeze ? 3u : 2u;
+        j1979_can_step *s = read_one(p, r, start, req, request_size);
+        if (!positive(s) || s->response_size != request_size + 4u ||
+            (base == 0xe0 && (s->response[s->response_size-1] & 1))) {
+            if (s && !strcmp(s->status, "RAW")) {
+                snprintf(s->status, sizeof(s->status), "FAILED");
+                snprintf(s->detail, sizeof(s->detail), "INVALID_SUPPORT_BITMAP");
+            }
+            break;
+        }
+        const uint8_t *bits = s->response + request_size;
+        for (unsigned i = 0; i < 31; ++i) {
+            if (bits[i / 8] & (uint8_t)(0x80u >> (i % 8))) {
+                r->advertised[mode][base+i+1] = 1;
+                ++r->advertised_count[mode];
+            }
+        }
+        bool next = (bits[3] & 1u) != 0;
+        snprintf(s->status, sizeof(s->status), "PASSED");
+        if (!next) {complete = true; break;}
+    }
+    r->inventory_state[mode] = complete ? 1 : 2;
+    return complete ? 0 : 1;
+}
+static void measure_inventory(const j1979_can_plan *p, j1979_can_result *r,
+                    uint64_t start, unsigned mode, bool freeze) {
+    inventory(p, r, start, mode, freeze);
+    if (r->inventory_state[mode] != 1) return;
+    for (unsigned id = 1; id <= 255 && !r->stop_reason[0]; ++id) {
+        if (!r->advertised[mode][id] || id % 32 == 0) continue;
+        uint8_t req[] = {(uint8_t)mode, (uint8_t)id, 0};
+        if (mode == 9 && id == 2) continue; /* VIN read independently at start */
+        if (mode == 8) continue; /* inventory only; 08xx can actuate hardware */
+        j1979_can_step *s = read_one(p, r, start, req, freeze ? 3u : 2u);
+        (void)s;
+    }
+}
+int j1979_can_scan(const j1979_can_plan *p, j1979_can_result *r) {
+    if (!r) return -1;
+    memset(r, 0, sizeof(*r));
+    if (!p || !p->exchange || !j1979_can_physical_pair(p->tx, p->rx) ||
+        p->budget_ms == 0 || p->budget_ms > 600000 ||
+        (p->expected_vin && !j1979_can_valid_vin(p->expected_vin)))
+        return -1;
+    r->steps = calloc(J1979_CAN_MAX_STEPS, sizeof(*r->steps));
+    if (!r->steps) return -1;
+    snprintf(r->vin_match, sizeof(r->vin_match), "%s",
+             p->expected_vin ? "UNVERIFIED" : "NOT_REQUESTED");
+    uint64_t start = now_ms(p);
+    const uint8_t req_vin[2] = {9, 2};
+    j1979_can_step *s = read_one(p, r, start, req_vin, 2);
+    if (positive(s)) {
+        if (s->response_size == 20 && s->response[2] == 1) {
+            memcpy(r->observed_vin, s->response + 3, 17);
+            r->observed_vin[17] = '\0';
+            if (j1979_can_valid_vin(r->observed_vin)) {
+                r->vin_valid = true;
+                snprintf(s->status, sizeof(s->status), "PASSED");
+            }
+        }
+        if (!r->vin_valid) {
+            memset(r->observed_vin, 0, sizeof(r->observed_vin));
+            snprintf(s->status, sizeof(s->status), "FAILED");
+            snprintf(s->detail, sizeof(s->detail), "INVALID_VIN_RECORD");
+        }
+    }
+    if (p->expected_vin) {
+        if (r->vin_valid && !strcmp(r->observed_vin, p->expected_vin))
+            snprintf(r->vin_match, sizeof(r->vin_match), "MATCH");
+        else {
+            snprintf(r->vin_match, sizeof(r->vin_match), "%s",
+                     r->vin_valid ? "MISMATCH" : "UNVERIFIED");
+            stop(r, r->vin_valid ? "VIN_MISMATCH" : "VIN_UNVERIFIED");
+        }
+    }
+    for (size_t i = 0; i < 3 && !r->stop_reason[0]; ++i) {
+        static const uint8_t services[3] = {3, 7, 10};
+        read_one(p, r, start, &services[i], 1);
+    }
+    if (!r->stop_reason[0]) measure_inventory(p, r, start, 1, false);
+    if (!r->stop_reason[0]) {
+        const uint8_t freeze_dtc[3] = {2, 2, 0};
+        s = read_one(p, r, start, freeze_dtc, 3);
+        if (positive(s) && s->response_size == 5) {
+            r->freeze_trigger_verified = true;
+            r->freeze_present = s->response[3] != 0 || s->response[4] != 0;
+            snprintf(s->status, sizeof(s->status), "PASSED");
+            if (r->freeze_present) measure_inventory(p, r, start, 2, true);
+        } else if (positive(s)) {
+            snprintf(s->status, sizeof(s->status), "FAILED");
+            snprintf(s->detail, sizeof(s->detail), "INVALID_FREEZE_TRIGGER");
+        }
+    }
+    if (!r->stop_reason[0]) measure_inventory(p, r, start, 6, false);
+    if (!r->stop_reason[0]) inventory(p, r, start, 8, false);
+    if (!r->stop_reason[0]) measure_inventory(p, r, start, 9, false);
+    uint64_t end = now_ms(p);
+    r->duration_ms = end >= start ? end - start : 0;
+    r->cancelled = !strcmp(r->stop_reason, "CANCELLED");
+    r->completed = !r->stop_reason[0];
+    return 0;
+}
+void j1979_can_result_free(j1979_can_result *r) {
+    if (!r) return;
+    if (r->steps) {
+        for (size_t i = 0; i < r->step_count; ++i) free(r->steps[i].response);
+        free(r->steps);
+    }
+    memset(r, 0, sizeof(*r));
+}
+static bool quoted(FILE *f, const char *v) {
+    if (fputc('"', f) == EOF) return false;
+    if (v) for (const unsigned char *p = (const unsigned char *)v; *p; ++p) {
+        if (*p < 0x20 || *p == 0x7f) return false;
+        if (*p == '"' || *p == '\\') {
+            if (fputc('\\', f) == EOF) return false;
+        }
+        if (fputc(*p, f) == EOF) return false;
+    }
+    return fputc('"', f) != EOF;
+}
+static bool hex(FILE *f, const uint8_t *data, size_t n) {
+    static const char map[] = "0123456789ABCDEF";
+    if (fputc('"', f) == EOF) return false;
+    for (size_t i = 0; i < n; ++i) {
+        if (fputc(map[data[i] >> 4], f) == EOF ||
+            fputc(map[data[i] & 15], f) == EOF) return false;
+    }
+    return fputc('"', f) != EOF;
+}
+bool j1979_can_write_json(FILE *f, const j1979_can_plan *p,
+                           const j1979_can_result *r, const char *interface_name) {
+    if (!f || !p || !r || !interface_name || !r->steps) return false;
+    if (fprintf(f, "{\"schema\":\"camarodiag-functional-j1979-can-linux-c-v1\","
+      "\"protocol\":\"SAE-J1979\",\"transport\":\"LINUX_SOCKETCAN_ISOTP\","
+      "\"physical_vehicle_verified\":false,\"permits_programming\":false,"
+      "\"tx_can_id\":\"%X\",\"rx_can_id\":\"%X\",\"interface\":",p->tx,p->rx) < 0 ||
+        !quoted(f, interface_name)) return false;
+    if (fprintf(f, ",\"declared_vin\":") < 0) return false;
+    if (p->expected_vin ? !quoted(f,p->expected_vin) : fputs("null",f) == EOF) return false;
+    if (fputs(",\"observed_vin\":",f) == EOF) return false;
+    if (r->vin_valid ? !quoted(f,r->observed_vin) : fputs("null",f) == EOF) return false;
+    if (fputs(",\"vin_match\":",f) == EOF || !quoted(f,r->vin_match)) return false;
+    if (fprintf(f, ",\"completed\":%s,\"duration_ms\":%llu,\"cancelled\":%s,"
+        "\"stop_reason\":", r->completed ? "true":"false",
+        (unsigned long long)r->duration_ms, r->cancelled ? "true":"false") < 0) return false;
+    if (r->stop_reason[0] ? !quoted(f,r->stop_reason) : fputs("null",f) == EOF) return false;
+    if (fprintf(f, ",\"freeze_trigger_verified\":%s,\"freeze_present\":%s,"
+        "\"not_executed\":[\"MODE_04_CLEAR\",\"MODE_05_LEGACY\",\"MODE_08_CONTROL\"],"
+        "\"inventory\":[",r->freeze_trigger_verified ? "true":"false",
+        r->freeze_present ? "true":"false") < 0) return false;
+    const unsigned modes[] = {1,2,6,8,9};
+    for (size_t i = 0; i < sizeof(modes)/sizeof(modes[0]); ++i) {
+        unsigned mode = modes[i];
+        if (i && fputc(',',f) == EOF) return false;
+        if (fprintf(f, "{\"mode\":%u,\"state\":",mode) < 0) return false;
+        if (!quoted(f, r->inventory_state[mode] == 1 ? "COMPLETE" :
+                         r->inventory_state[mode] == 2 ? "PARTIAL" : "NOT_TESTED"))
+            return false;
+        if (fputs(",\"advertised_ids\":[",f) == EOF) return false;
+        bool first = true;
+        for (unsigned id=1;id<256;++id) if (r->advertised[mode][id]) {
+            if ((!first && fputc(',',f)==EOF) || fprintf(f,"%u",id)<0) return false;
+            first=false;
+        }
+        if (fputs("]}",f)==EOF) return false;
+    }
+    if (fputs("],\"steps\":[",f)==EOF) return false;
+    for (size_t i=0;i<r->step_count;++i) {
+        const j1979_can_step *s=&r->steps[i];
+        if (i && fputc(',',f)==EOF) return false;
+        if (fputs("{\"request_hex\":",f)==EOF || !hex(f,s->request,s->request_size))
+            return false;
+        if (fputs(",\"response_hex\":",f)==EOF) return false;
+        if (s->response ? !hex(f,s->response,s->response_size) :
+            fputs("null",f)==EOF) return false;
+        if (fputs(",\"status\":",f)==EOF || !quoted(f,s->status)) return false;
+        if (fputs(",\"detail\":",f)==EOF) return false;
+        if (s->detail[0] ? !quoted(f,s->detail) : fputs("null",f)==EOF) return false;
+        if (fprintf(f,",\"duration_ms\":%u}",s->duration_ms)<0) return false;
+    }
+    return fputs("]}\n",f)!=EOF;
+}
