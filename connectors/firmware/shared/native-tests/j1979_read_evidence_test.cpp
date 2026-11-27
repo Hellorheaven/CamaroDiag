@@ -2,6 +2,7 @@
 #include "../isotp_observer.h"
 #include <cassert>
 #include <cstring>
+#include <initializer_list>
 using E=cd::J1979ReadEvidence;
 using V=E::Variant;
 using R=E::Result;
@@ -97,6 +98,15 @@ int main(){
   assert(E::classify(V::Legacy,fuelReq,2,fuelStatus,sizeof(fuelStatus)-1)==R::Invalid);
   const uint8_t ptoReq[]={1,0x1e},ptoBad[]={0x41,0x1e,2};
   assert(E::classify(V::ClassicCan,ptoReq,2,ptoBad,sizeof(ptoBad))==R::Invalid);
+  const uint8_t maxReq[]={1,0x4f},maxReply[]={0x41,0x4f,4,16,0,77};
+  const uint8_t mafReq[]={1,0x50},mafReply[]={0x41,0x50,100,0,0,0};
+  const uint8_t mafReserved[]={0x41,0x50,100,0,1,0};
+  for(auto variant:{V::ClassicCan,V::Legacy}){
+    assert(E::classify(variant,maxReq,2,maxReply,sizeof(maxReply))==R::Raw);
+    assert(E::classify(variant,mafReq,2,mafReply,sizeof(mafReply))==R::Raw);
+    assert(E::classify(variant,maxReq,2,maxReply,sizeof(maxReply)-1)==R::Invalid);
+    assert(E::classify(variant,mafReq,2,mafReserved,sizeof(mafReserved))==R::Invalid);
+  }
   // Feed only captured synthetic frames through the passive observer.
   const uint8_t vinReq[]={9,2};
   uint8_t vin[20]={0x49,2,1};
