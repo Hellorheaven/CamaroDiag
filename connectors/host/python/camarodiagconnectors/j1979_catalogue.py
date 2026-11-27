@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from fractions import Fraction
-import hashlib
 import re
 from pathlib import Path
 from .recovery_bundle import _regular, _json
@@ -258,12 +257,13 @@ def project(replayed, catalogue):
             replayed.get("verified") is True and replayed.get("raw_only") is True,
             "An independently replayed raw-only live report is required")
     channel = replayed["channel"]
-    protocol = "LEGACY" if channel["kind"] == "LEGACY" else "CAN"
-    require(channel["kind"] in ("LEGACY", "CAN"), "Unsupported replay channel")
+    protocol = "LEGACY" if channel["kind"] == "legacy" else "CAN"
+    require(channel["kind"] in ("legacy", "can"), "Unsupported replay channel")
     index = catalogue.index()
     samples = replayed["samples"]
     result = []
     counts = {}
+    signal_rows = 0
     for sample in samples:
         pid = sample["pid"]
         row = {"cycle": sample["cycle"], "pid": pid, "elapsed_ms": sample["elapsed_ms"],
@@ -280,6 +280,8 @@ def project(replayed, catalogue):
             if len(response) != 2 + definition.width:
                 row["projection_status"] = "DOCUMENTED_WIDTH_MISMATCH"
             else:
+                signal_rows += len(definition.signals)
+                require(signal_rows <= MAX_PROJECTION_ROWS, "Projection signal limit exceeded")
                 row["signals"] = [s.project(response[2:]) for s in definition.signals]
                 row["projection_status"] = "PROJECTED"
                 row["reference"] = definition.reference
