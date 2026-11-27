@@ -17,4 +17,6 @@
     <string name="j1979_native_maintenance_recovery">Outcome uncertain or recovery required. Do not repeat automatically.</string>
     <string name="j1979_native_maintenance_journal_checked">Journal consistency checked; no physical validation claimed.</string>
     <string name="j1979_native_maintenance_unverified">Journal not verified; no successful operation claimed.</string>
+    <string name="j1979_native_maintenance_prefix_title">Inspect interrupted maintenance journal</string>
+    <string name="j1979_native_maintenance_prefix_scope">Only complete records are checked. A torn or missing terminal leaves the operation unresolved. Do not repeat automatically.</string>
 </resources>
