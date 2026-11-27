@@ -165,4 +165,16 @@
   <data name="FreezeLegacyConfirm" xml:space="preserve"><value>I confirm these functional requests may reach multiple ECUs; only replies from the selected source are used.</value></data>
   <data name="LiveRawOnly" xml:space="preserve"><value>Raw payload only (no numeric interpretation)</value></data>
   <data name="LiveRawCount" xml:space="preserve"><value>PID {0}: {1}/{2} correlated raw replies</value></data>
+  <data name="CatalogueProject" xml:space="preserve"><value>Project PID catalogue</value></data>
+  <data name="CatalogueFile" xml:space="preserve"><value>JSON catalogue</value></data>
+  <data name="CatalogueReference" xml:space="preserve"><value>Documented reference</value></data>
+  <data name="CataloguePin" xml:space="preserve"><value>Reference SHA-256</value></data>
+  <data name="CatalogueRawReport" xml:space="preserve"><value>Raw Mode 01 recording</value></data>
+  <data name="CatalogueOutput" xml:space="preserve"><value>New JSON report</value></data>
+  <data name="CatalogueBrowse" xml:space="preserve"><value>Browse</value></data>
+  <data name="CatalogueAnyFile" xml:space="preserve"><value>All files (*.*)|*.*</value></data>
+  <data name="CatalogueScope" xml:space="preserve"><value>Offline byte projection. Transport replay, normative compliance and physical provenance are not verified.</value></data>
+  <data name="CatalogueConfirm" xml:space="preserve"><value>I confirm the VIN and reference digest.</value></data>
+  <data name="CatalogueSaved" xml:space="preserve"><value>Projection saved.</value></data>
+  <data name="CatalogueRejected" xml:space="preserve"><value>Projection rejected. Check the catalogue, reference and recording.</value></data>
 </root>
