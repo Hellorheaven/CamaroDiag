@@ -121,6 +121,12 @@ object CamaroDiagConnectorNativeCampaign {
             put("frame_integrity_verified", frames)
             put("capture_integrity_verified", semantic)
             put("cancelled", cancelled)
+            put("scaled_monitor_records",J1979DerivedEvidenceJson.monitors(steps.flatMap {
+                ObdCanMonitorRecords.project(it.requestHex,it.responseHex,it.status)
+            }))
+            put("status_records",J1979DerivedEvidenceJson.states(steps.mapNotNull {
+                ObdJ1979Status.tryRecord(it.requestHex,it.responseHex,it.status)
+            }))
             put("contextual_measurements",J1979ScalingJson.encode(ObdJ1979ScalingContext.project(steps.map {
                 ObdJ1979ScalingContext.Observation(it.requestHex,it.responseHex,it.status)
             })))
