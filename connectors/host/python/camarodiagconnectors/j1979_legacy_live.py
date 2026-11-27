@@ -15,6 +15,7 @@ from .j1979_legacy import PROTOCOLS
 from .j1979_legacy_discovery import valid_source
 from .j1979_legacy_frames import response_frames
 from .j1979_live import Plan, record, legacy_numeric_pid
+from .j1979_scaling_context import CONFIG_PIDS
 
 
 class LegacyLiveLink:
@@ -49,7 +50,7 @@ class LegacyLiveLink:
     def _read(self, command, deadline, logical):
         if not (command in ("0100","0900","0901","0902") or
             re.fullmatch(r"01[0-9A-F]{2}",command) and
-            (int(command[2:],16)%32==0 or legacy_numeric_pid(int(command[2:],16)))):
+            (int(command[2:],16)%32==0 or int(command[2:],16) in CONFIG_PIDS or legacy_numeric_pid(int(command[2:],16)))):
             raise ValueError("Unsupported request in legacy live recording")
         row={"logical_query":logical,"request_hex":command,"raw_response":None,
              "frames":[],"selected_records_hex":[],"status":"NOT_TESTED","detail":None}
