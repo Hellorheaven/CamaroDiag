@@ -169,7 +169,7 @@
   <data name="CatalogueFile" xml:space="preserve"><value>JSON catalogue</value></data>
   <data name="CatalogueReference" xml:space="preserve"><value>Documented reference</value></data>
   <data name="CataloguePin" xml:space="preserve"><value>Reference SHA-256</value></data>
-  <data name="CatalogueRawReport" xml:space="preserve"><value>Raw Mode 01 recording</value></data>
+  <data name="CatalogueRawReport" xml:space="preserve"><value>Raw JSON report or CL/1 capture</value></data>
   <data name="CatalogueOutput" xml:space="preserve"><value>New JSON report</value></data>
   <data name="CatalogueBrowse" xml:space="preserve"><value>Browse</value></data>
   <data name="CatalogueAnyFile" xml:space="preserve"><value>All files (*.*)|*.*</value></data>
