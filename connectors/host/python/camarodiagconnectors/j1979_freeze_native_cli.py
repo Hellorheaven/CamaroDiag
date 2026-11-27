@@ -174,12 +174,21 @@ def run(argv=None):
         raise SystemExit("Cancelled before USB transmission")
     with _exclusive(args.output) as output:
         report = None
+        created = False
         try:
             with _exclusive(args.capture, True) as raw:
+                created = True
                 with serial.Serial(args.port, baudrate=115200, timeout=0.1, write_timeout=1) as port:
                     report = capture_live(port, profile, key, raw)
                 raw.flush()
                 os.fsync(raw.fileno())
+            persisted = inspect_file(args.capture)
+            report["capture_sha256"] = persisted["capture_sha256"]
+            for field in ("profile", "observations_received", "summary", "result"):
+                if report[field] != persisted[field]:
+                    raise ValueError("Persisted CF/1 differs from live replay: " + field)
+            if report["capture_integrity_verified"] and not persisted["capture_integrity_verified"]:
+                raise ValueError("Persisted CF/1 failed independent replay")
         except (OSError, ValueError, KeyboardInterrupt) as exc:
             if report is None:
                 report = decode(io.BytesIO(b""), expected=profile)
@@ -187,6 +196,12 @@ def run(argv=None):
             report.update(capture_integrity_verified=False,
                           cancelled=isinstance(exc, KeyboardInterrupt),
                           error="Cancelled" if isinstance(exc, KeyboardInterrupt) else str(exc))
+        if created and args.capture.is_file():
+            try:
+                report["capture_sha256"] = inspect_file(args.capture)["capture_sha256"]
+            except (OSError, ValueError):
+                report["capture_integrity_verified"] = False
+        report["raw_capture_name"] = args.capture.name if created else None
         _write_report(output, report)
     return report
 
