@@ -177,4 +177,10 @@
   <data name="CatalogueConfirm" xml:space="preserve"><value>I confirm the VIN and reference digest.</value></data>
   <data name="CatalogueSaved" xml:space="preserve"><value>Projection saved.</value></data>
   <data name="CatalogueRejected" xml:space="preserve"><value>Projection rejected. Check the catalogue, reference and recording.</value></data>
+  <data name="LiveNativeRun" xml:space="preserve"><value>Native USB live recording</value></data>
+  <data name="LiveNativeInspect" xml:space="preserve"><value>Inspect CL/1 capture</value></data>
+  <data name="LiveNativeCaptureFilter" xml:space="preserve"><value>Native live capture (*.cl)|*.cl</value></data>
+  <data name="LiveNativeConfirm" xml:space="preserve"><value>I confirm the approved physical ECU, VIN, selected PIDs and stationary vehicle.</value></data>
+  <data name="LiveNativePids" xml:space="preserve"><value>Raw PID IDs (hex, comma separated)</value></data>
+  <data name="LiveNativeVinRequired" xml:space="preserve"><value>Enter the independently known VIN before inspection.</value></data>
 </root>
