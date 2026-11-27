@@ -11,7 +11,7 @@ TARGET = camarodiag-native
 .PHONY: all clean test install deb
 all: $(TARGET)
 
-$(TARGET): $(SOURCES) include/cf1.h include/cl1.h include/cl1_transport.h include/j1979_can.h include/j1979_isotp.h include/j1979_can_cli.h include/j1979_live.h
+$(TARGET): $(SOURCES) include/cf1.h include/cl1.h include/cl1_transport.h include/cl1_usb.h include/j1979_can.h include/j1979_isotp.h include/j1979_can_cli.h include/j1979_live.h
 	$(CC) $(CPPFLAGS) $(INCLUDES) $(CFLAGS) $(STRICT) $(SOURCES) $(LDFLAGS) $(LDLIBS) -o $@
 
 test: test-cf1 test-cu2 test-cu3 test-j1979-can test-j1979-isotp test-j1979-live test-j1979-cl1

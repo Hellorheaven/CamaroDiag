@@ -184,3 +184,26 @@ incomplet ; un rapport ancien ou réécrit ne passe pas la vérification
 canonique octet par octet. Les sources sont relues avant création privée
 et exclusive du rapport ou de la preuve. Aucun de ces contrôles
 hors ligne ne contacte l'ECU ou n'authentifie un transport physique.
+
+## Acquisition CU/3 USB CL/1 Mode 01 native en C
+
+```sh
+./camarodiag-native --j1979-live-usb-native \
+  --port /dev/ttyACM0 --key-file secret.bin \
+  --capture session.cl --output session.json \
+  --tx 7E0 --rx 7E8 --vin 2G1FA1E30D7654321 \
+  --pid 0C --pid 0D --cycles 30 --interval-ms 1000 \
+  --budget-ms 180000 --confirm-physical-channel
+```
+
+Cette voie utilise une authentification CU/3 HMAC-SHA256, la conservation
+en lecture seule des octets CL/1 (y compris troncatures), CRC/séquences,
+puis un rejeu C indépendant et relecture de la source avant le rapport.
+Le fichier original est conservé en cas d'échec. Aucun repli sur Python,
+CU/1/CU/2 ou autre ECU. Le rapport de succès est expressément une preuve
+de cohérence CL/1 hors ligne, **pas une attestation de véhicule physique**.
+Le secret est un fichier privé 32 octets, non écrit dans le JSON.
+
+Intégration ajoutée mais non encore compilée/testée, conformément à la
+consigne de gate unique. Le firmware connecté doit encore démontrer sa
+capacité CU/3 réelle avant une utilisation sur véhicule.

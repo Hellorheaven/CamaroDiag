@@ -2,6 +2,7 @@
 #include "cf1.h"
 #include "cf1_usb.h"
 #include "cl1.h"
+#include "cl1_usb.h"
 #include "j1979_can_cli.h"
 
 #include <errno.h>
@@ -779,11 +780,173 @@ static int cl1_verify_cli(const char *capture_path, const char *report_path,
     return ok?0:error("CL/1 verification refused: altered report, unstable input or output exists");
 }
 
+
+typedef struct {
+    cl1_plan plan;
+    const char *port,*credential,*capture,*output;
+    bool approved,tx_set,rx_set,vin_set,budget_set,cycles_set,interval_set,extended_set;
+} cl1_capture_options;
+static bool parse_cl1_capture(int argc,char **argv,cl1_capture_options *o) {
+    memset(o,0,sizeof(*o));
+    o->plan.budget_ms=180000;
+    o->plan.cycles=30;
+    o->plan.interval_ms=1000;
+    for (int i=2;i<argc;++i) {
+        const char *flag=argv[i];
+        if (!strcmp(flag,"--extended")) {
+            if (o->extended_set) return false;
+            o->extended_set=true;
+            o->plan.extended=true;
+            continue;
+        }
+        if (!strcmp(flag,"--confirm-physical-channel")) {
+            if (o->approved) return false;
+            o->approved=true;
+            continue;
+        }
+        if (i+1>=argc || argv[i+1][0]=='-') return false;
+        const char *value=argv[++i];
+        if (!strcmp(flag,"--port")) {
+            if (o->port) return false;
+            o->port=value;
+        } else if (!strcmp(flag,"--key-file")) {
+            if (o->credential) return false;
+            o->credential=value;
+        } else if (!strcmp(flag,"--capture")) {
+            if (o->capture) return false;
+            o->capture=value;
+        } else if (!strcmp(flag,"--output")) {
+            if (o->output) return false;
+            o->output=value;
+        } else if (!strcmp(flag,"--tx")) {
+            if (o->tx_set || !hex_uint32(value,&o->plan.tx)) return false;
+            o->tx_set=true;
+        } else if (!strcmp(flag,"--rx")) {
+            if (o->rx_set || !hex_uint32(value,&o->plan.rx)) return false;
+            o->rx_set=true;
+        } else if (!strcmp(flag,"--vin")) {
+            if (o->vin_set || !cf1_valid_vin(value)) return false;
+            o->vin_set=true;
+            memcpy(o->plan.vin,value,18);
+        } else if (!strcmp(flag,"--budget-ms")) {
+            if (o->budget_set || !decimal_uint32(value,&o->plan.budget_ms))
+                return false;
+            o->budget_set=true;
+        } else if (!strcmp(flag,"--cycles")) {
+            uint32_t n=0;
+            if (o->cycles_set || !decimal_uint32(value,&n) || n>1000)
+                return false;
+            o->cycles_set=true;
+            o->plan.cycles=(uint16_t)n;
+        } else if (!strcmp(flag,"--interval-ms")) {
+            uint32_t n=0;
+            if (o->interval_set || !decimal_uint32(value,&n) || n>60000)
+                return false;
+            o->interval_set=true;
+            o->plan.interval_ms=(uint16_t)n;
+        } else if (!strcmp(flag,"--pid")) {
+            uint32_t n=0;
+            if (o->plan.pid_count>=CL1_MAX_PIDS ||
+                !hex_uint32(value,&n) || n>255) return false;
+            o->plan.pids[o->plan.pid_count++]=(uint8_t)n;
+        } else return false;
+    }
+    return o->approved && o->tx_set && o->rx_set && o->vin_set &&
+        o->port && o->credential && o->capture && o->output &&
+        strcmp(o->capture,o->output) && strcmp(o->capture,o->credential) &&
+        strcmp(o->output,o->credential) &&
+        cl1_valid_plan(&o->plan);
+}
+static int capture_cl1_native(int argc,char **argv) {
+    cl1_capture_options o={0};
+    if (!parse_cl1_capture(argc,argv,&o))
+        return error("CU/3 requires explicit approved physical pair, VIN, PID, key, port, capture, output, cycles and interval");
+    if (!isatty(STDIN_FILENO))
+        return error("CU/3 requires a local interactive operator and a stationary vehicle");
+    fprintf(stderr,
+        "CU/3 native Mode 01 RAW recording, selected real USB connector and ECU; stationary vehicle? Type yes: ");
+    char confirmation[16]={0};
+    if (!fgets(confirmation,sizeof(confirmation),stdin) ||
+        strcmp(confirmation,"yes\n"))
+        return error("CU/3 physical consent refused, no bytes transmitted");
+    uint8_t key[32]={0};
+    if (!read_key_file(o.credential,key))
+        return error("CU/3 requires a private provisioned 32-byte key, no fallback");
+    struct sigaction action={0},oldint={0},oldterm={0};
+    action.sa_handler=cancel_handler;
+    sigemptyset(&action.sa_mask);
+    bool registered=sigaction(SIGINT,&action,&oldint)==0;
+    if (registered && sigaction(SIGTERM,&action,&oldterm)!=0) {
+        sigaction(SIGINT,&oldint,NULL);
+        registered=false;
+    }
+    cf1_usb_capture_result transport={0};
+    char failure[256]={0};
+    int received=registered ?
+        cl1_usb_capture(o.port,&o.plan,key,o.capture,
+                         &transport,failure,sizeof(failure)) : -1;
+    if (!registered)
+        snprintf(failure,sizeof(failure),"Cannot register cancellation handlers");
+    if (registered) {
+        sigaction(SIGINT,&oldint,NULL);
+        sigaction(SIGTERM,&oldterm,NULL);
+    }
+    OPENSSL_cleanse(key,sizeof(key));
+    /* Live credential proof is not an offline hardware attestation.
+     * The published schema records only independently replayed CL/1 bytes.
+     */
+    input capture={0},again={0};
+    char *report=NULL;
+    size_t size=0;
+    cl1_result replay={0};
+    bool complete=received==0 &&
+        load_regular(o.capture,CL1_MAX_CAPTURE,&capture);
+    if (complete) complete=cl1_project(&capture,o.plan.vin,false,
+                                      &report,&size,&replay) &&
+                           replay.completed && replay.initial_vin &&
+                           replay.final_vin && replay.inventory_complete;
+    if (complete) complete=load_regular(o.capture,CL1_MAX_CAPTURE,&again) &&
+                           same_input(&capture,&again);
+    if (complete) complete=atomic_create(o.output,report,size);
+    if (!complete) {
+        /* A failed live capture is still a valuable forensic prefix.
+         * Never turn its incomplete/unsafe status into a successful report.
+         */
+        char failed_report[1200];
+        int count=snprintf(failed_report,sizeof(failed_report),
+            "{\"schema\":\"camarodiag-j1979-live-capture-failure-linux-c-v1\","
+            "\"protocol\":\"SAE-J1979\",\"source\":\"LIVE_USB_CU3\","
+            "\"execution_completed\":false,\"capture_integrity_verified\":false,"
+            "\"physical_vehicle_verified\":false,\"permits_programming\":false,"
+            "\"client_proof_sent\":%s,\"terminal_received\":%s,"
+            "\"retained_bytes\":%zu,\"failure\":",
+            transport.client_proof_sent?"true":"false",
+            transport.terminal_received?"true":"false",
+            transport.raw_bytes_received);
+        if (count>0 && (size_t)count<sizeof(failed_report)-3) {
+            size_t position=(size_t)count;
+            /* Do not quote raw path, key, or external error text. */
+            const char *reason=received!=0 ? "USB_CAPTURE_INCOMPLETE" :
+                               "INDEPENDENT_CL1_REPLAY_FAILED";
+            int written=snprintf(failed_report+position,
+                sizeof(failed_report)-position,"\"%s\"}\n",reason);
+            if (written>0 && (size_t)written<sizeof(failed_report)-position)
+                atomic_create(o.output,failed_report,position+(size_t)written);
+        }
+        fprintf(stderr,"CU/3: no qualified complete report; raw capture retained when created (%s)\n",
+                failure[0]?failure:"independent replay failed or output unavailable");
+    }
+    free(report);
+    free_input(&capture);free_input(&again);
+    return complete?0:2;
+}
+
 static void usage(FILE *stream) {
     fprintf(stream,
         "CamaroDiag Linux native C — SAE J1979 Mode 02 CF/1\n"
         "Usage:\n"
         "  camarodiag-native --j1979-can --interface can0 --tx 7E0 --rx 7E8 --output evidence.json --vin VIN --budget-ms 180000 --confirm-physical-channel\n"
+        "  camarodiag-native --j1979-live-usb-native --port /dev/ttyACM0 --key-file key.bin --capture session.cl --output report.json --tx 7E0 --rx 7E8 --vin VIN --pid 0C --cycles 30 --interval-ms 1000 --budget-ms 180000 --confirm-physical-channel\n"
         "  camarodiag-native --j1979-live --interface can0 --tx 7E0 --rx 7E8 --vin VIN --pid 0C --cycles 30 --interval-ms 1000 --budget-ms 180000 --output live.json --confirm-physical-channel\n"
         "  camarodiag-native --inspect-j1979-live-native-prefix CAPTURE.cl VIN PREFIX.json\n"
         "  camarodiag-native --inspect-j1979-live-native CAPTURE.cl VIN REPORT.json\n"
@@ -805,6 +968,8 @@ int main(int argc, char **argv) {
     if (argc == 2 && (!strcmp(argv[1], "--help") || !strcmp(argv[1], "-h"))) {
         usage(stdout); return 0;
     }
+    if (argc >= 3 && !strcmp(argv[1], "--j1979-live-usb-native"))
+        return capture_cl1_native(argc,argv);
     if (argc >= 3 && (!strcmp(argv[1], "--j1979-can") ||
                       !strcmp(argv[1], "--j1979-live")))
         return j1979_can_cli(argc, argv);
