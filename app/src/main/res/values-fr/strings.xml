@@ -1317,4 +1317,16 @@
     <string name="functional_legacy_mutation_uncertain">Campagne legacy interrompue ou en échec. État de la demande potentiellement incertain. Ne relancez pas automatiquement.</string>
     <string name="j1979_live_raw_only">Trames brutes uniquement (sans interprétation numérique)</string>
     <string name="j1979_live_raw_count">PID %1$s : %2$d/%3$d réponses brutes corrélées</string>
+    <string name="j1979_catalogue_title">Catalogue PID documenté (hors ligne)</string>
+    <string name="j1979_catalogue_file">Catalogue JSON</string>
+    <string name="j1979_catalogue_reference">Référence documentée</string>
+    <string name="j1979_catalogue_report">Capture brute Mode 01</string>
+    <string name="j1979_catalogue_selected">Sélectionné</string>
+    <string name="j1979_catalogue_not_selected">À sélectionner</string>
+    <string name="j1979_catalogue_pin">SHA-256 indépendant de la référence</string>
+    <string name="j1979_catalogue_scope">Projection hors ligne des octets. Le rejeu du transport, la conformité normative et la provenance physique ne sont pas vérifiés.</string>
+    <string name="j1979_catalogue_confirm">Je confirme le VIN %1$s et l’empreinte de la référence.</string>
+    <string name="j1979_catalogue_project">Projeter et exporter</string>
+    <string name="j1979_catalogue_working">Projection du catalogue PID en cours…</string>
+    <string name="j1979_catalogue_rejected">Projection refusée. Vérifiez le catalogue, la référence, la capture et les limites de taille.</string>
 </resources>
