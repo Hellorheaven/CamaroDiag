@@ -14,6 +14,7 @@ from .recovery_history import _compare_history_value
 
 MAX_PROJECTION = 128 * 1024 * 1024
 LOCAL_SCHEMA = "camarodiag-j1979-catalogue-local-projection-v1"
+NATIVE_SCHEMA = "camarodiag-j1979-native-catalogue-projection-v1"
 
 def replay_file(path, vin):
     path = Path(path)
@@ -54,6 +55,25 @@ def build_projection(args, *, local=False):
     require(catalogue_sha == current_catalogue_sha and source_sha == current_source_sha,
             "Inputs changed during projection")
     return result
+
+def build_native_projection(args):
+    from .j1979_live_native import inspect_file, valid_vin
+    require(valid_vin(args.vin), "Independently supplied VIN required")
+    catalogue, catalogue_sha = read_catalogue(args.catalogue, args.reference, args.reference_sha256)
+    source = inspect_file(args.capture)
+    require(source["capture_integrity_verified"] and source["profile"]["expected_vin"] == args.vin,
+            "Original independently replayed CL/1 capture with matching VIN required")
+    result = project(source["result"], catalogue)
+    result.update(schema=NATIVE_SCHEMA, catalogue_sha256=catalogue_sha,
+                  source_capture_sha256=source["capture_sha256"], expected_vin_independently_supplied=True,
+                  final_identity_verified=source["summary"]["final_identity_verified"],
+                  native_capture_replayed=True, transport_frames_replayed=False)
+    _, current_catalogue_sha = read_catalogue(args.catalogue, args.reference, args.reference_sha256)
+    again = inspect_file(args.capture)
+    require(catalogue_sha == current_catalogue_sha and source == again,
+            "Native capture or catalogue changed during projection")
+    return result
+
 
 def write_new(path, result):
     # Serialize before exclusive creation so an invalid result does not leave
@@ -102,6 +122,14 @@ def main(argv=None):
                                 help="Independently verify an Android or Windows projection")
     projection_arguments(local)
     local.add_argument("--projection", type=Path, required=True)
+    native = commands.add_parser("project-native-live", help="Project original CL/1 capture")
+    native_verify = commands.add_parser("verify-native-projection", help="Verify native CL/1 projection")
+    for command in (native, native_verify):
+        common(command)
+        command.add_argument("--capture", type=Path, required=True)
+        command.add_argument("--vin", required=True)
+    native.add_argument("--output", type=Path, required=True)
+    native_verify.add_argument("--projection", type=Path, required=True)
     args = parser.parse_args(argv)
     try:
         digest(args.reference_sha256)
@@ -117,10 +145,13 @@ def main(argv=None):
             write_new(args.output, report)
         elif args.command == "project-live":
             write_new(args.output, build_projection(args))
+        elif args.command == "project-native-live":
+            write_new(args.output, build_native_projection(args))
         else:
             raw, stamp = _regular(args.projection, MAX_PROJECTION)
             actual = _json(raw)
-            expected = build_projection(args, local=args.command == "verify-local-projection")
+            expected = (build_native_projection(args) if args.command == "verify-native-projection" else
+                        build_projection(args, local=args.command == "verify-local-projection"))
             _compare_history_value(actual, expected, "catalogue projection")
             again, final = _regular(args.projection, MAX_PROJECTION)
             require(raw == again and stamp == final, "Projection changed during verification")
@@ -128,7 +159,7 @@ def main(argv=None):
                               "independent_source_replay_performed": True,
                               "projection_schema": expected["schema"],
                               "projection_sha256": stamp.digest,
-                              "source_report_sha256": expected["source_report_sha256"],
+                              **{key: expected[key] for key in ("source_report_sha256", "source_capture_sha256") if key in expected},
                               "catalogue_sha256": expected["catalogue_sha256"],
                               "normative_compliance_verified": False,
                               "physical_vehicle_verified": False}))
