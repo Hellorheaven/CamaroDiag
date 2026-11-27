@@ -1,3 +1,13 @@
+## Reprise PR117 — CAN physique, ELM CAN et journaux legacy (27/11/2026)
+
+- Base `fb100dc4ddca650b446b2c38425cbde3805ce3a1`, dernier SHA code `ceda2b44d7920fe74dcb9d661750dd79dc101c34`. Comparaison GitHub avant documentation : **19 commits, 29 fichiers, +1883/-39 lignes**. Objectif 10 000 lignes non atteint ; aucun build/test lancé.
+- Linux C++20 : maintenance CAN physique primaire Mode 04/08 via moteur partagé, consentement, journal CM/1 durable, verrouillage du répertoire et marqueur de récupération ; rapprochement indépendant du rapport. La fermeture du socket local n'atteste pas la désactivation physique du transceiver.
+- ELM CAN : profils fixes 6–9, configuration et sélection physique, décodage ISO-TP borné, attribution des réponses, scan/live et traces adaptateur ; aucune mutation via ce nouveau chemin.
+- Mode 02 direct SocketCAN : plan figé, moteur partagé, capture CF/1 persistée progressivement, inspection et preuve hors ligne existantes.
+- Legacy : journaux append-only LJ/1 pour scan LSR/1, freeze LFR/1 et live LLR/1 ; synchronisation par échange, contrôle CRC/ordre/portée, récupération canonique uniquement après terminal et rejeu, comparaison avec la capture finale. Un préfixe interrompu ne prouve pas la complétude.
+- Tests de régression ajoutés, **non exécutés**. Reste : qualification logicielle au gate unique, parité Python complète, notamment ELM CAN Mode 02/maintenance, rapports et raccordements produit ; données normatives J1979DA_202607 non disponibles. Qualification véhicule physique distincte.
+- Arbre Git : 128 fichiers Python, 19 C, zéro Java. Ne pas supprimer les implémentations historiques avant remplacement et validation. APK 2.0.47 absente des releases au contrôle ; pas de build, signature, publication ni merge. PR117 ouverte.
+
 ## Reprise PR117 — rejeu legacy, maintenance, découverte CAN et catalogues (27/11/2026)
 
 - Base `c0f582ad45c45de3a2f5cd26d729e85a26a89215`, dernier SHA code `d4b042da2f48991c48a2846b55d5899483420b1d`. Comparaison GitHub avant documentation : **20 commits, 33 fichiers, +2702/-36 lignes**. Objectif de 10 000 lignes non atteint ; aucun build/test exécuté.

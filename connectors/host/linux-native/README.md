@@ -306,3 +306,21 @@ Les tests sont raccordés au Makefile et réservés au gate de clôture. Aucune 
 Ce lot ajoute des chemins C++20 pour le scan legacy LSR/1, la maintenance legacy, la découverte CAN classique avec sélection physique explicite des calculateurs, et les catalogues de mesures fournis localement. Les projections sont calculées en fractions exactes et sont conditionnées à la vérification de la capture, du VIN, de la portée du transport et de l'empreinte SHA-256 de la référence. La CLI expose les options dans `--help`. Les rapports et preuves natifs ne sont pas automatiquement interchangeables avec les anciens schémas Python.
 
 La maintenance legacy demande une confirmation interactive et des journaux distincts ; une commande d'incertitude ne doit jamais être relancée automatiquement. Les captures de lecture legacy restent enregistrées en fin d'acquisition. Les tests de ce lot sont intégrés mais non exécutés ; aucune qualification matérielle, parité totale ni couverture normative n'est revendiquée.
+
+## Native J1979: direct CAN, ELM CAN and durable legacy journals
+
+The following commands are implemented in C++20; regression tests are registered in the native Makefile but have not yet been run at the protocol closure gate.
+
+- `--j1979-maintenance-can`: explicit primary physical ECM, private directory, CM/1 journal, independent inspection, one-shot operation and recovery marker. Local socket closure is not independent proof of physical transceiver shutdown. Retain the marker for manual review; do not automatically retry maintenance.
+- `--j1979-freeze-can`: explicit SocketCAN physical scope, shared Mode 02 acquisition, incremental CF/1 evidence and offline replay.
+- `--j1979-elm-can`, `--j1979-elm-live`: fixed ELM CAN profile, selected physical source and read-only diagnostic requests; raw adapter transcript retained in the report.
+- Legacy scan, freeze and live create an exclusive `.lj` journal beside the capture (or beside the scan report if no capture was requested). Each observation is synced before proceeding; the terminal denotes the end of recording, not diagnostic success. Offline inspection accepts structurally verified prefixes without claiming completeness. Recovery requires a valid terminal and deterministic replay.
+
+Offline journal commands (no vehicle transmission):
+
+```sh
+camarodiag-native --inspect-j1979-legacy-journal PROTOCOL SOURCE VIN JOURNAL.lj REPORT.json
+camarodiag-native --recover-j1979-legacy-journal PROTOCOL SOURCE VIN JOURNAL.lj RECOVERED_CAPTURE
+```
+
+Use a new output path; existing files are never overwritten. The recovered capture uses the corresponding LSR/1, LFR/1 or LLR/1 format. CRC consistency is not cryptographic authentication or physical-vehicle verification. Consult `--help` for the live command parameters.
