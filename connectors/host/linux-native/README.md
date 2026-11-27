@@ -80,3 +80,18 @@ L'outil relit le fichier et vérifie la campagne hors connexion avant export.
 Un rapport d'échec reste non validé et une capture interrompue est conservée
 pour analyse. Rien n'autorise la programmation ou une identification certaine
 de l'ECU physique. Cette voie n'a pas encore subi la validation de clôture.
+
+## Vérification indépendante d'une capture complète
+
+~~~sh
+./camarodiag-native --inspect-j1979-freeze-native complete.cf VIN complete.json
+./camarodiag-native --verify-j1979-freeze-native complete.cf complete.json preuve.json VIN
+~~~
+
+Le contrôle de capture complète reconstitue les enregistrements, les champs
+terminaux et leurs statuts. La preuve vérifie les originaux puis les relit
+avant publication. **Le rapport enregistré par la voie live USB contient des
+drapeaux d'authentification de session ; il ne se confond pas avec un rapport
+hors ligne**, et ne peut être accepté par le vérificateur hors ligne que si
+les champs et leur portée correspondent exactement. Ni rapport ni preuve ne
+sont une attestation d'identité matérielle.

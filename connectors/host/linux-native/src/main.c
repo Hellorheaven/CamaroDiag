@@ -341,6 +341,58 @@ static int inspect_complete(const char *capture_path, const char *vin, const cha
     free_input(&again); free_input(&original);
     return ok ? 0 : error("Full CF/1 inspection failed or output exists");
 }
+/* Full-terminal verification also replays every observation. It cannot use
+ * prefix verification (which rejects terminal records by design), and it
+ * never inherits live USB authentication claims from a JSON report.
+ */
+static int verify_complete(const char *capture_path, const char *report_path,
+                           const char *output_path, const char *vin) {
+    input capture = {0}, saved = {0}, capture_again = {0}, report_again = {0};
+    cf1_evidence evidence = {0};
+    json_writer projection = { .capacity = 65536 };
+    char failure[256] = {0};
+    bool valid = load_regular(capture_path, CF1_MAX_BYTES, &capture) &&
+                 load_regular(report_path, 67108864, &saved);
+    if (valid) valid = separate(&capture, &saved);
+    if (valid) valid = cf1_inspect_complete(capture.bytes, capture.length,
+                                          vin, &evidence,
+                                          failure, sizeof(failure)) == 0;
+    if (valid) {
+        projection.bytes = calloc(1, projection.capacity);
+        valid = projection.bytes != NULL;
+    }
+    if (valid) write_complete(&projection, &evidence, capture.digest,
+                              false, false, false);
+    if (valid) valid = !projection.failed &&
+                       projection.used == saved.length &&
+                       !memcmp(projection.bytes, saved.bytes, projection.used);
+    if (valid) valid = load_regular(capture_path, CF1_MAX_BYTES, &capture_again) &&
+                       load_regular(report_path, 67108864, &report_again) &&
+                       same_input(&capture, &capture_again) &&
+                       same_input(&saved, &report_again);
+    if (valid) {
+        char proof[1200];
+        int n = snprintf(proof, sizeof(proof),
+            "{\"schema\":\"camarodiag-j1979-native-freeze-complete-verification-v1\","
+            "\"consistent\":true,\"capture_integrity_verified\":true,"
+            "\"execution_completed\":%s,"
+            "\"physical_vehicle_verified\":false,"
+            "\"device_credential_authenticated\":false,"
+            "\"permits_programming\":false,"
+            "\"capture_sha256\":\"%s\",\"report_sha256\":\"%s\","
+            "\"verification_scope\":\"CANONICAL_OFFLINE_CF1\"}\n",
+            evidence.execution_completed ? "true" : "false",
+            capture.digest, saved.digest);
+        valid = n > 0 && (size_t)n < sizeof(proof) &&
+                atomic_create(output_path, proof, (size_t)n);
+    }
+    if (!valid && failure[0]) fprintf(stderr, "CF/1 full verification rejected: %s\n", failure);
+    free(projection.bytes);
+    cf1_evidence_free(&evidence);
+    free_input(&capture_again); free_input(&report_again);
+    free_input(&capture); free_input(&saved);
+    return valid ? 0 : error("Full CF/1 verification refused: altered or inconsistent evidence");
+}
 static int verify(const char *capture_path, const char *report_path,
                   const char *output_path, const char *vin) {
     input capture = {0}, stored = {0}, recheck_capture = {0}, recheck_report = {0};
@@ -570,6 +622,7 @@ static void usage(FILE *stream) {
         "  camarodiag-native --inspect-j1979-freeze-native-prefix CAPTURE.cf VIN PREFIX.json\n"
         "  camarodiag-native --inspect-j1979-freeze-native CAPTURE.cf VIN REPORT.json\n"
         "  camarodiag-native --verify-j1979-freeze-native-prefix CAPTURE.cf PREFIX.json PROOF.json VIN\n"
+        "  camarodiag-native --verify-j1979-freeze-native CAPTURE.cf REPORT.json PROOF.json VIN\n"
         "  camarodiag-native --help\n"
         "Examples:\n"
         "  camarodiag-native --inspect-j1979-freeze-native-prefix incomplete.cf 2G1FA1E30D7654321 partial.json\n"
@@ -587,6 +640,8 @@ int main(int argc, char **argv) {
         return inspect_complete(argv[2], argv[3], argv[4]);
     if (argc == 5 && !strcmp(argv[1], "--inspect-j1979-freeze-native-prefix"))
         return inspect(argv[2], argv[3], argv[4]);
+    if (argc == 6 && !strcmp(argv[1], "--verify-j1979-freeze-native"))
+        return verify_complete(argv[2], argv[3], argv[4], argv[5]);
     if (argc == 6 && !strcmp(argv[1], "--verify-j1979-freeze-native-prefix"))
         return verify(argv[2], argv[3], argv[4], argv[5]);
     usage(stderr);
