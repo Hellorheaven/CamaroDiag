@@ -194,6 +194,7 @@ internal static class J1979FreezeNative
                 if(kind!=3)throw new InvalidDataException("Duplicate CF/1 plan");
                 terminal=DecodeTerminal(body,profile,observations);
                 if(input.ReadByte()!=-1)throw new InvalidDataException("Trailing bytes after CF/1 terminal");
+                var final=terminal;
                 int position=0;
                 var replay=ObdJ1979FreezeCampaign.Execute(profile.Plan,request=>
                 {
@@ -202,7 +203,7 @@ internal static class J1979FreezeNative
                     if(!request.AsSpan().SequenceEqual(saved.Request))
                         throw new InvalidDataException("Unexpected CF/1 request order");
                     return saved.Read;
-                },()=>terminal.DurationMs);
+                },()=>final.DurationMs);
                 if(position!=observations.Count||replay.StopReason!=terminal.StopReason||
                    replay.Frames.Length!=terminal.VisitedFrames||replay.Completed!=terminal.Completed||
                    replay.IdentityRechecked!=terminal.IdentityRechecked||replay.AllFramesStable!=terminal.AllFramesStable||
@@ -212,7 +213,7 @@ internal static class J1979FreezeNative
             }
             if(result is null)throw new InvalidDataException("Incomplete CF/1 capture");
         }
-        catch(Exception e) when(e is IOException or ArgumentException or InvalidOperationException)
+        catch(Exception e) when(e is InvalidDataException or IOException or ArgumentException or InvalidOperationException)
         {error=e.Message;result=null;}
         return new("camarodiag-functional-j1979-native-freeze-v1","SAE-J1979","OFFLINE_CF1",
             false,false,error is null,false,observations.Count,error,profile,terminal,result);
