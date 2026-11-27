@@ -1,5 +1,6 @@
 #define _POSIX_C_SOURCE 200809L
 #include "cf1.h"
+#include "j1979_host_freeze.hpp"
 #include "cf1_usb.h"
 #include "cl1.h"
 #include "cl1_usb.h"
@@ -490,7 +491,7 @@ static bool decimal_uint32(const char *value, uint32_t *out) {
     if (errno || *end || n > UINT32_MAX) return false;
     *out = (uint32_t)n; return true;
 }
-static bool parse_capture_options(int argc, char **argv, capture_options *o) {
+static bool parse_capture_options(int argc, char **argv, capture_options *o,bool socketcan=false) {
     memset(o, 0, sizeof(*o));
     o->plan.budget_ms = 180000;
     bool tx = false, rx = false, budget = false, vin = false, extended = false;
@@ -507,10 +508,10 @@ static bool parse_capture_options(int argc, char **argv, capture_options *o) {
         }
         if (i + 1 >= argc || argv[i+1][0] == '-') return false;
         const char *value = argv[++i];
-        if (!strcmp(name, "--port")) {
+        if (!strcmp(name, socketcan?"--interface":"--port")) {
             if (o->port) return false;
             o->port = value;
-        } else if (!strcmp(name, "--key-file")) {
+        } else if (!socketcan&&!strcmp(name, "--key-file")) {
             if (o->credential) return false;
             o->credential = value;
         } else if (!strcmp(name, "--capture")) {
@@ -546,10 +547,9 @@ static bool parse_capture_options(int argc, char **argv, capture_options *o) {
         } else return false;
     }
     return o->approved && tx && rx && vin &&
-           o->port && o->credential && o->capture && o->report &&
+           o->port && (socketcan?j1979_isotp_valid_interface(o->port):o->credential!=nullptr) && o->capture && o->report &&
            strcmp(o->capture, o->report) &&
-           strcmp(o->credential, o->report) &&
-           strcmp(o->credential, o->capture) &&
+           (socketcan||(strcmp(o->credential, o->report) && strcmp(o->credential, o->capture))) &&
            cf1_valid_plan(&o->plan);
 }
 static bool read_key_file(const char *path, uint8_t key[32]) {
@@ -2284,6 +2284,64 @@ static int elm_can_cli(int argc,char** argv,bool live){
     }catch(const std::exception& e){return error(e.what());}
 }
 
+static int socket_freeze_cli(int argc,char** argv){
+    capture_options o{};
+    if(!parse_capture_options(argc,argv,&o,true))return error("Explicit physical SocketCAN, VIN, frame list and output required");
+    if(!isatty(STDIN_FILENO))return error("Interactive local consent required");
+    fputs("Confirm dedicated SocketCAN interface and documented stationary vehicle. Read-only Mode 02. Type yes: ",stderr);
+    char answer[16]{};
+    if(!fgets(answer,sizeof(answer),stdin)||strcmp(answer,"yes\n"))return error("Consent refused");
+    struct File{int fd;~File(){if(fd>=0)close(fd);}};
+    File capture{open(o.capture,O_WRONLY|O_CREAT|O_EXCL|O_NOFOLLOW|O_CLOEXEC,0600)};
+    if(capture.fd<0)return error("Capture destination unavailable");
+    File report{open(o.report,O_WRONLY|O_CREAT|O_EXCL|O_NOFOLLOW|O_CLOEXEC,0600)};
+    if(report.fd<0)return error("Report destination unavailable");
+    if(!sync_parent(o.capture)||!sync_parent(o.report))return error("Output reservation not durable");
+    legacy_cancelled=0;
+    struct Signals{
+        struct sigaction oldint{},oldterm{};
+        bool intr{},term{};
+        Signals(){
+            struct sigaction act{};act.sa_handler=legacy_signal;sigemptyset(&act.sa_mask);
+            intr=sigaction(SIGINT,&act,&oldint)==0;
+            term=intr&&sigaction(SIGTERM,&act,&oldterm)==0;
+        }
+        ~Signals(){if(term)sigaction(SIGTERM,&oldterm,nullptr);if(intr)sigaction(SIGINT,&oldint,nullptr);}
+    } signals;
+    try{
+        if(!signals.term)return error("Signal handlers unavailable");
+        const auto result=cd::hostfreeze::run_socket(o.plan,o.port,capture.fd,&legacy_cancelled);
+        const bool synced=fsync(capture.fd)==0;
+        const bool closed=close(capture.fd)==0;capture.fd=-1;
+        if(!synced||!closed||!result.capture_started)return error("CF/1 capture incomplete or unavailable");
+        input raw{},again{};
+        if(!load_regular(o.capture,CF1_MAX_BYTES,&raw))return error("No persisted CF/1 evidence");
+        struct Evidence{cf1_evidence value{};~Evidence(){cf1_evidence_free(&value);}} e;
+        char failure[256]{};
+        const int status=result.terminal_written?
+            cf1_inspect_complete(raw.bytes.get(),raw.length,o.plan.vin,&e.value,failure,sizeof(failure)):
+            cf1_inspect_prefix(raw.bytes.get(),raw.length,o.plan.vin,&e.value,failure,sizeof(failure));
+        if(status)return error(failure);
+        const auto& p=e.value.plan;
+        if(p.tx!=o.plan.tx||p.rx!=o.plan.rx||p.extended!=o.plan.extended||p.budget_ms!=o.plan.budget_ms||
+            p.frame_count!=o.plan.frame_count||p.pid_count!=o.plan.pid_count||
+            memcmp(p.frames,o.plan.frames,p.frame_count)||memcmp(p.pids,o.plan.pids,p.pid_count))
+            return error("Replayed CF/1 scope differs from approved plan");
+        if(!load_regular(o.capture,CF1_MAX_BYTES,&again)||!same_input(&raw,&again))
+            return error("Persisted CF/1 capture changed");
+        json_writer writer{65536};
+        writer.bytes.reset(new (std::nothrow) char[writer.capacity]{});
+        if(!writer.bytes)return error("Report allocation failed");
+        // Canonical offline report: never claim USB authentication for a
+        // local SocketCAN recording. Existing verification command applies.
+        if(result.terminal_written)write_complete(&writer,&e.value,raw.digest,false,false,false);
+        else write_prefix(&writer,&e.value,raw.digest);
+        if(writer.failed||!write_owned_file(report.fd,writer.bytes.get(),writer.used)||!sync_parent(o.report))
+            return error("CF/1 report not persisted");
+        return result.terminal_written&&e.value.execution_completed&&result.summary.allFramesStable&&!legacy_cancelled?0:2;
+    }catch(const std::exception& e){return error(e.what());}
+}
+
 static void usage(FILE *stream) {
     fprintf(stream,
         "CamaroDiag Linux native C++20 — SAE J1979\n"
@@ -2299,6 +2357,7 @@ static void usage(FILE *stream) {
         "  camarodiag-native --inspect-j1979-live-native CAPTURE.cl VIN REPORT.json\n"
         "  camarodiag-native --verify-j1979-live-native-prefix CAPTURE.cl PREFIX.json PROOF.json VIN\n"
         "  camarodiag-native --verify-j1979-live-native CAPTURE.cl REPORT.json PROOF.json VIN\n"
+        "  camarodiag-native --j1979-freeze-can --interface can0 --tx 7E0 --rx 7E8 --vin VIN --frame 00 --pid 0C --capture capture.cf --output report.json --confirm-physical-channel\n"
         "  camarodiag-native --j1979-freeze-native --port /dev/ttyACM0 --key-file key.bin --capture capture.cf --output rapport.json --tx 7E0 --rx 7E8 --vin VIN --frame 00 --pid 0C --budget-ms 60000 --confirm-physical-channel\n"
         "  camarodiag-native --inspect-j1979-freeze-native-prefix CAPTURE.cf VIN PREFIX.json\n"
         "  camarodiag-native --inspect-j1979-freeze-native CAPTURE.cf VIN REPORT.json\n"
@@ -2379,6 +2438,7 @@ int main(int argc, char **argv) {
     if (argc >= 3 && (!strcmp(argv[1], "--j1979-can") ||
                       !strcmp(argv[1], "--j1979-live")))
         return j1979_can_cli(argc, argv);
+    if (argc >= 3 && !strcmp(argv[1], "--j1979-freeze-can"))return socket_freeze_cli(argc,argv);
     if (argc >= 3 && !strcmp(argv[1], "--j1979-freeze-native"))
         return capture_native(argc, argv);
     if (argc == 5 && !strcmp(argv[1], "--inspect-j1979-live-native-prefix"))
