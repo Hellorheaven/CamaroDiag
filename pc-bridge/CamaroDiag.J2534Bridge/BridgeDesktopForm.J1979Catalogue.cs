@@ -57,7 +57,7 @@ internal sealed partial class BridgeDesktopForm
             };
             grid.Controls.Add(button,2,row);
         }
-        Browse(catalogue,0);Browse(reference,1,any:true);Browse(report,3);Browse(output,5,true);
+        Browse(catalogue,0);Browse(reference,1,any:true);Browse(report,3,any:true);Browse(output,5,true);
         var note=new Label{Text=J1979RecipeText("CatalogueScope"),Dock=DockStyle.Fill};
         grid.Controls.Add(note,0,6);grid.SetColumnSpan(note,3);
         var confirm=new CheckBox{Text=J1979RecipeText("CatalogueConfirm"),Dock=DockStyle.Fill};
