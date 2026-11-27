@@ -12,4 +12,24 @@
   <data name="OriginalBinRejected" xml:space="preserve"><value>Original BIN comparison failed: {0}</value></data>
   <data name="FailedSector" xml:space="preserve"><value>First mismatching ECU sector: 0x{0:X8}</value></data>
   <data name="OfflineNotice" xml:space="preserve"><value>Offline inspection only; this does not authorize ECU programming or restoration.</value></data>
+  <data name="ExportAssessment" xml:space="preserve"><value>Export assessment JSON</value></data>
+  <data name="AssessmentJsonFilter" xml:space="preserve"><value>JSON report (*.json)|*.json</value></data>
+  <data name="Inspecting" xml:space="preserve"><value>Inspecting evidence…</value></data>
+  <data name="EvidenceChanged" xml:space="preserve"><value>Evidence changed or could not be pinned. Open the journal again.</value></data>
+  <data name="AssessmentExported" xml:space="preserve"><value>Assessment exported.</value></data>
+  <data name="JournalName" xml:space="preserve"><value>Journal: {0}</value></data>
+  <data name="JournalState" xml:space="preserve"><value>Journal state: {0}</value></data>
+  <data name="JournalCounts" xml:space="preserve"><value>Prepared: {0} · written and verified: {1} · final readback: {2}</value></data>
+  <data name="JournalInvalid" xml:space="preserve"><value>Invalid journal sequence.</value></data>
+  <data name="LastStage" xml:space="preserve"><value>Last phase: {0}</value></data>
+  <data name="Unknown" xml:space="preserve"><value>Unknown</value></data>
+  <data name="TargetIdentity" xml:space="preserve"><value>Declared identity: {0} · VIN {1} · OSID {2}</value></data>
+  <data name="TargetUnverified" xml:space="preserve"><value>Identity not verified: {0}</value></data>
+  <data name="BackupStatus" xml:space="preserve"><value>Saved sectors: {0} · {1}/{2}</value></data>
+  <data name="IntegrityVerified" xml:space="preserve"><value>Integrity verified</value></data>
+  <data name="IntegrityUnverified" xml:space="preserve"><value>Not verified</value></data>
+  <data name="Snapshot" xml:space="preserve"><value>Evidence SHA-256: {0}</value></data>
+  <data name="GeometryMatches" xml:space="preserve"><value>Silicon erase geometry consistent; ECU board not qualified.</value></data>
+  <data name="GeometryUnqualified" xml:space="preserve"><value>Erase geometry inconsistent or unqualified.</value></data>
+  <data name="Sector" xml:space="preserve"><value>Original 0x{0:X8} · {1} bytes · SHA-256 {2}</value></data>
 </root>

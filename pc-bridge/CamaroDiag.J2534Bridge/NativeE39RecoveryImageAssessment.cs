@@ -10,11 +10,14 @@ namespace CamaroDiag.J2534Bridge;
 internal static class NativeE39RecoveryImageAssessment
 {
     internal sealed record Report(
-        bool Verified, int VerifiedSectors, string Problem, uint? FailedSectorAddress = null);
+        bool Verified, int VerifiedSectors, string Problem, uint? FailedSectorAddress = null,
+        string? SnapshotSha256 = null, string? MetadataSnapshotSha256 = null,
+        string? OriginalImageSha256 = null, long VerifiedBytes = 0);
 
     internal static Report Inspect(string journalPath, string originalImagePath)
     {
         var verified = 0;
+        long verifiedBytes = 0;
         uint? currentAddress = null;
         try
         {
@@ -67,6 +70,7 @@ internal static class NativeE39RecoveryImageAssessment
                     throw new InvalidDataException(
                         "Original BIN bytes differ from the live ECU sector capture.");
                 verified++;
+                verifiedBytes += block.Length;
             }
             if (verified == 0)
                 throw new InvalidDataException("No physical ECU sectors to compare.");
@@ -83,7 +87,10 @@ internal static class NativeE39RecoveryImageAssessment
                 final.JournalState != physical.JournalState ||
                 !final.Blocks.SequenceEqual(physical.Blocks))
                 throw new InvalidDataException("Physical backup evidence changed during original comparison.");
-            return new Report(true, verified, "");
+            if (NativeE39SavedBlockAssessment.InspectTargetMetadata(journalPath) != target)
+                throw new InvalidDataException("ECU metadata changed during final comparison.");
+            return new Report(true, verified, "", null, physical.SnapshotSha256,
+                target.MetadataSnapshotSha256, digest, verifiedBytes);
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException or
             InvalidDataException or ArgumentException or OverflowException or

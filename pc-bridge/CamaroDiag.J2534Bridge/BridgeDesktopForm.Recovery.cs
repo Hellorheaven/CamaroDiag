@@ -28,6 +28,10 @@ internal sealed partial class BridgeDesktopForm
         var verifyOriginal = Button(BridgeRecoveryPresentation.Text("VerifyOriginalButton"));
         verifyOriginal.Enabled = false;
         string? selectedJournal = null;
+        string? selectedOriginal = null;
+        BridgeRecoveryReport.Assessment? displayed = null;
+        var export = Button(BridgeRecoveryPresentation.Text("ExportAssessment"));
+        export.Enabled = false;
         var results = new TextBox
         {
             Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Vertical,
@@ -45,75 +49,27 @@ internal sealed partial class BridgeDesktopForm
             };
             if (dialog.ShowDialog(this) != DialogResult.OK) return;
             selectedJournal = dialog.FileName;
-            verifyOriginal.Enabled = true;
+            selectedOriginal = null;
+            displayed = null;
+            verifyOriginal.Enabled = export.Enabled = false;
             results.Text = "Analyse hors ligne…";
             choose.Enabled = false;
             try
             {
                 await RunBusyAsync(async () =>
                 {
-                    var bundle = await Task.Run(() =>
-                        NativeE39SavedBlockAssessment.InspectBundle(dialog.FileName));
-                    var savedBlocks = bundle.Blocks;
-                    var target = bundle.Target;
-                    var report = savedBlocks.JournalInspection ??
-                        new NativeE39FileWriteJournal.Inspection(savedBlocks.JournalState, false);
-                    var lines = new List<string>
-                    {
-                        "Fichier : " + Path.GetFileName(dialog.FileName),
-                        "État du journal : " + ExplainRecoveryState(report.State),
-                        "Ce résultat décrit le journal, pas l'état physique actuel du calculateur."
-                    };
-                    if (report.SequenceValid)
-                    {
-                        lines.Add("");
-                        lines.Add($"Secteurs préparés : {report.PreparedSectors}");
-                        lines.Add($"Secteurs écrits et vérifiés : {report.WrittenSectors}");
-                        lines.Add($"Secteurs relus en fin de transaction : {report.FinalReadbackSectors}");
-                        lines.Add("Dernière étape : " + (report.LastPhase ?? "aucune"));
-                    }
-                    else
-                        lines.Add("Séquence non validée : les compteurs ne constituent pas une preuve.");
-                    if (report.PossiblyIncompleteAddress is uint address)
-                        lines.Add($"Secteur potentiellement incomplet : 0x{address:X8}");
-                    lines.Add("");
-                    lines.Add("Identité déclarée dans le dossier de récupération : " +
-                        (target.Verified ? $"{target.Family} · VIN {target.Vin} · OSID {target.OsId}" :
-                            "NON VÉRIFIÉE (" + target.Problem + ")"));
-                    lines.Add("La déclaration sauvegardée ne remplace pas une identification ECU en direct.");
-                    lines.Add("Sauvegardes PHYSIQUES des secteurs originaux : " +
-                        (savedBlocks.Verified ? "INTÈGRES" : "NON VÉRIFIÉES"));
-                    lines.Add($"Secteurs originaux contrôlés : {savedBlocks.Blocks.Count}/{savedBlocks.ExpectedSectors}");
-                    if (savedBlocks.SnapshotSha256 is not null)
-                        lines.Add($"SHA-256 des preuves inspectées : {savedBlocks.SnapshotSha256}");
-                    if (!savedBlocks.Verified)
-                        lines.Add("Anomalie sauvegarde : " + savedBlocks.Problem);
-                    else
-                    {
-                        lines.Add("Géométrie secteurs silicium MPC5566 : " +
-                            (EcuPostFlashAssessment.MatchesSiliconEraseGeometry(savedBlocks.Blocks)
-                                ? "COHÉRENTE (non qualifiée pour cette carte ECU)"
-                                : "INCOHÉRENTE / NON QUALIFIÉE"));
-                        foreach (var block in savedBlocks.Blocks)
-                            lines.Add($"Original 0x{block.Address:X8} · {block.Length} octets · SHA-256 {block.OriginalSha256}");
-                    }
-                    lines.Add("Aucun secteur ne sera restauré automatiquement.");
-                    lines.Add("Recette véhicule après écriture : identité ECU, checksum OEM, DTC avant/après, " +
-                        "démarrage, ralenti, contrôles statiques, essai conduit par l'opérateur.");
-                    lines.Add("Avant restauration : confirmer l'état physique, les blocs, l'outil, " +
-                        "le mode récupération et une NOUVELLE autorisation OK puis Oui/Non.");
-                    lines.Add("");
-                    lines.Add(report.RequiresAssessment
-                        ? "Évaluation manuelle nécessaire : conserver les preuves, vérifier l'alimentation, " +
-                          "l'identité et le moyen de récupération documenté avant toute autre opération."
-                        : "La fin de transaction est enregistrée. Cela ne certifie ni le fonctionnement du " +
-                          "véhicule ni la possibilité de restaurer le calculateur.");
-                    results.Lines = lines.ToArray();
+                    var assessment = await Task.Run(() => BridgeRecoveryReport.Inspect(dialog.FileName));
+                    displayed = assessment;
+                    results.Lines = RecoveryAssessmentLines(assessment);
                 });
                 if (results.Text == "Analyse hors ligne…")
                     results.Text = "Journal non analysable. Aucune conclusion sur l'état du calculateur.";
             }
-            finally { choose.Enabled = true; }
+            finally {
+                choose.Enabled = true;
+                verifyOriginal.Enabled = displayed?.Backup.Verified == true && displayed.Target.Verified;
+                export.Enabled = displayed?.Journal.Sha256 is not null;
+            }
         };
         verifyOriginal.Click += async (_, _) =>
         {
@@ -125,37 +81,65 @@ internal sealed partial class BridgeDesktopForm
                 CheckFileExists = true, Multiselect = false
             };
             if (imageDialog.ShowDialog(this) != DialogResult.OK) return;
-            verifyOriginal.Enabled = false;
+            verifyOriginal.Enabled = export.Enabled = false;
             var journal = selectedJournal;
             var bin = imageDialog.FileName;
             try
             {
                 await RunBusyAsync(async () =>
                 {
-                    var comparison = await Task.Run(() =>
-                        NativeE39RecoveryImageAssessment.Inspect(journal, bin));
-                    var lines = results.Lines.ToList();
-                    lines.Add("");
-                    lines.Add(string.Format(
-                        System.Globalization.CultureInfo.CurrentUICulture,
-                        BridgeRecoveryPresentation.Text("OriginalBinName"),
-                        Path.GetFileName(bin)));
-                    lines.Add(comparison.Verified
-                        ? string.Format(System.Globalization.CultureInfo.CurrentUICulture,
-                            BridgeRecoveryPresentation.Text("OriginalBinMatched"),
-                            comparison.VerifiedSectors)
-                        : string.Format(System.Globalization.CultureInfo.CurrentUICulture,
-                            BridgeRecoveryPresentation.Text("OriginalBinRejected"),
-                            comparison.Problem));
-                    if (comparison.FailedSectorAddress is uint failedAddress)
-                        lines.Add(string.Format(System.Globalization.CultureInfo.CurrentUICulture,
-                            BridgeRecoveryPresentation.Text("FailedSector"),
-                            failedAddress));
-                    lines.Add(BridgeRecoveryPresentation.Text("OfflineNotice"));
-                    results.Lines = lines.ToArray();
+                    var previous=displayed;
+                    displayed=null;
+                    selectedOriginal=null;
+                    results.Text=BridgeRecoveryPresentation.Text("Inspecting");
+                    var assessment=await Task.Run(()=>BridgeRecoveryReport.Inspect(journal,bin));
+                    // Compare the journal/backup identity with the prior
+                    // display; never append a new comparison to an old view.
+                    if(previous is null || previous.Journal.Sha256!=assessment.Journal.Sha256 ||
+                        previous.Backup.SnapshotSha256!=assessment.Backup.SnapshotSha256 ||
+                        previous.Target!=assessment.Target)
+                        throw new InvalidDataException(BridgeRecoveryPresentation.Text("EvidenceChanged"));
+                    displayed=assessment;
+                    selectedOriginal=bin;
+                    results.Lines=RecoveryAssessmentLines(assessment);
                 });
             }
-            finally { verifyOriginal.Enabled = selectedJournal is not null; }
+            finally {
+                verifyOriginal.Enabled = displayed?.Backup.Verified == true && displayed.Target.Verified;
+                export.Enabled = displayed?.Journal.Sha256 is not null;
+                if(displayed is null)results.Text=BridgeRecoveryPresentation.Text("EvidenceChanged");
+            }
+        };
+        export.Click += async (_, _) =>
+        {
+            if(busy || selectedJournal is null || displayed is null)return;
+            using var save = new SaveFileDialog {
+                Title=BridgeRecoveryPresentation.Text("ExportAssessment"),
+                Filter=BridgeRecoveryPresentation.Text("AssessmentJsonFilter"),
+                FileName="CamaroDiag_E39_Recovery.json",AddExtension=true,DefaultExt="json",
+                OverwritePrompt=true
+            };
+            if(save.ShowDialog(this)!=DialogResult.OK)return;
+            var journal=selectedJournal;
+            var bin=selectedOriginal;
+            var previous=displayed;
+            export.Enabled=verifyOriginal.Enabled=false;
+            try {
+                await RunBusyAsync(async ()=>{
+                    try {
+                        var current=await Task.Run(()=>BridgeRecoveryReport.ExportCurrent(save.FileName,journal,bin,previous));
+                        displayed=current;
+                        results.Lines=RecoveryAssessmentLines(current);
+                        results.AppendText(Environment.NewLine+BridgeRecoveryPresentation.Text("AssessmentExported"));
+                    } catch(InvalidDataException) {
+                        displayed=null;selectedOriginal=null;
+                        results.Text=BridgeRecoveryPresentation.Text("EvidenceChanged");
+                    }
+                });
+            } finally {
+                verifyOriginal.Enabled=displayed?.Backup.Verified==true && displayed.Target.Verified;
+                export.Enabled=displayed?.Journal.Sha256 is not null;
+            }
         };
         chooseConnector.Click += async (_, _) =>
         {
@@ -170,7 +154,9 @@ internal sealed partial class BridgeDesktopForm
             // CDJ/1 is not an E39 write journal; do not retain the previous
             // E39 selection when showing unrelated connector evidence.
             selectedJournal = null;
-            verifyOriginal.Enabled = false;
+            selectedOriginal = null;
+            displayed = null;
+            verifyOriginal.Enabled = export.Enabled = false;
             results.Text = "Analyse CDJ/1 hors ligne…";
             chooseConnector.Enabled = choose.Enabled = false;
             try
@@ -204,10 +190,48 @@ internal sealed partial class BridgeDesktopForm
         actions.Controls.Add(choose);
         actions.Controls.Add(verifyOriginal);
         actions.Controls.Add(chooseConnector);
+        actions.Controls.Add(export);
         layout.Controls.Add(actions, 0, 1);
         layout.Controls.Add(results, 0, 2);
         tab.Controls.Add(layout);
         return tab;
+    }
+
+    private static string[] RecoveryAssessmentLines(BridgeRecoveryReport.Assessment report)
+    {
+        string T(string key)=>BridgeRecoveryPresentation.Text(key);
+        string F(string key,params object[] values)=>string.Format(
+            System.Globalization.CultureInfo.CurrentUICulture,T(key),values);
+        var audit=report.Journal;
+        var backup=report.Backup;
+        var lines=new List<string>{
+            F("JournalName",report.JournalName),
+            F("JournalState",ExplainRecoveryState(Enum.Parse<NativeE39FileWriteJournal.CompletionState>(audit.State))),
+            audit.SequenceValid?F("JournalCounts",audit.PreparedSectors,audit.WrittenSectors,audit.FinalReadbackSectors):
+                T("JournalInvalid"),
+            F("LastStage",audit.LastPhase??T("Unknown"))
+        };
+        if(audit.PossiblyIncompleteAddress is uint address)lines.Add(F("FailedSector",address));
+        lines.Add(report.Target.Verified?F("TargetIdentity",report.Target.Family!,report.Target.Vin!,report.Target.OsId!):
+            F("TargetUnverified",report.Target.Problem));
+        lines.Add(F("BackupStatus",backup.Verified?T("IntegrityVerified"):T("IntegrityUnverified"),
+            backup.Sectors.Count,backup.ExpectedSectors));
+        if(!backup.Verified)lines.Add(backup.Problem);
+        if(backup.SnapshotSha256 is not null)lines.Add(F("Snapshot",backup.SnapshotSha256));
+        if(backup.SiliconGeometryMatches.HasValue)lines.Add(backup.SiliconGeometryMatches.Value?
+            T("GeometryMatches"):T("GeometryUnqualified"));
+        foreach(var sector in backup.Sectors)lines.Add(F("Sector",sector.Address,sector.Length,sector.OriginalSha256));
+        if(report.OriginalBin is { } comparison){
+            lines.Add("");
+            lines.Add(F("OriginalBinName",report.OriginalBinName??""));
+            lines.Add(comparison.Verified?F("OriginalBinMatched",comparison.VerifiedSectors):
+                F("OriginalBinRejected",comparison.Problem));
+            if(comparison.FailedSectorAddress is uint failed)lines.Add(F("FailedSector",failed));
+        }
+        // Previous extensive technical explanations remain in source history;
+        // only decision-relevant state and safety limitations are displayed.
+        lines.Add(T("OfflineNotice"));
+        return lines.ToArray();
     }
 
     private static string ExplainRecoveryState(NativeE39FileWriteJournal.CompletionState state) =>

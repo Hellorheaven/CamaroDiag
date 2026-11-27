@@ -12,4 +12,24 @@
   <data name="OriginalBinRejected" xml:space="preserve"><value>Comparaison du BIN original refusée : {0}</value></data>
   <data name="FailedSector" xml:space="preserve"><value>Premier secteur ECU incohérent : 0x{0:X8}</value></data>
   <data name="OfflineNotice" xml:space="preserve"><value>Analyse hors ligne uniquement : aucune autorisation de programmation ou restauration ECU.</value></data>
+  <data name="ExportAssessment" xml:space="preserve"><value>Exporter le rapport JSON</value></data>
+  <data name="AssessmentJsonFilter" xml:space="preserve"><value>Rapport JSON (*.json)|*.json</value></data>
+  <data name="Inspecting" xml:space="preserve"><value>Analyse des preuves…</value></data>
+  <data name="EvidenceChanged" xml:space="preserve"><value>Les preuves ont changé ou ne peuvent être vérifiées. Rouvrez le journal.</value></data>
+  <data name="AssessmentExported" xml:space="preserve"><value>Rapport exporté.</value></data>
+  <data name="JournalName" xml:space="preserve"><value>Journal : {0}</value></data>
+  <data name="JournalState" xml:space="preserve"><value>État du journal : {0}</value></data>
+  <data name="JournalCounts" xml:space="preserve"><value>Préparés : {0} · écrits et vérifiés : {1} · relus : {2}</value></data>
+  <data name="JournalInvalid" xml:space="preserve"><value>Séquence du journal non validée.</value></data>
+  <data name="LastStage" xml:space="preserve"><value>Dernière étape : {0}</value></data>
+  <data name="Unknown" xml:space="preserve"><value>Inconnu</value></data>
+  <data name="TargetIdentity" xml:space="preserve"><value>Identité déclarée : {0} · VIN {1} · OSID {2}</value></data>
+  <data name="TargetUnverified" xml:space="preserve"><value>Identité non vérifiée : {0}</value></data>
+  <data name="BackupStatus" xml:space="preserve"><value>Secteurs sauvegardés : {0} · {1}/{2}</value></data>
+  <data name="IntegrityVerified" xml:space="preserve"><value>Intègres</value></data>
+  <data name="IntegrityUnverified" xml:space="preserve"><value>Non vérifiés</value></data>
+  <data name="Snapshot" xml:space="preserve"><value>SHA-256 des preuves : {0}</value></data>
+  <data name="GeometryMatches" xml:space="preserve"><value>Géométrie silicium cohérente ; carte ECU non qualifiée.</value></data>
+  <data name="GeometryUnqualified" xml:space="preserve"><value>Géométrie incohérente ou non qualifiée.</value></data>
+  <data name="Sector" xml:space="preserve"><value>Original 0x{0:X8} · {1} octets · SHA-256 {2}</value></data>
 </root>

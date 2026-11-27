@@ -131,6 +131,32 @@ internal static class NativeE39RecoveryImageAssessmentSelfTests
                 bundle.Blocks.JournalSnapshotSha256 is { Length: 64 } &&
                 bundle.Blocks.SnapshotSha256 == originalEvidence.SnapshotSha256,
                 "Composite inspection uses one pinned journal and stable target metadata");
+            var assessment=BridgeRecoveryReport.Inspect(journalPath,imagePath);
+            Check(assessment.Backup.Verified && assessment.OriginalBin is {Verified:true} &&
+                assessment.Backup.VerifiedBytes==sectorBytes && assessment.Backup.Sectors.Single().EnvelopeSha256 is {Length:64} &&
+                !assessment.PhysicalVehicleVerified && !assessment.RestoreAuthorized,
+                "Structured recovery export binds all offline evidence without restore authority");
+            Check(BridgeRecoveryReport.MatchesBundle(bundle,pass),"BIN comparison is pinned to bundle");
+            var exportPath=Path.Combine(folder,"recovery.json");
+            var exported=BridgeRecoveryReport.ExportCurrent(exportPath,journalPath,imagePath,assessment);
+            using(var exportedJson=JsonDocument.Parse(File.ReadAllBytes(exportPath))){
+                Check(exportedJson.RootElement.GetProperty("schema").GetString()=="camarodiag-offline-e39-recovery-assessment-v1" &&
+                    !exportedJson.RootElement.GetProperty("restoreAuthorized").GetBoolean() &&
+                    exportedJson.RootElement.GetProperty("backup").GetProperty("verifiedBytes").GetInt64()==sectorBytes,
+                    "Portable report has explicit non-authorization and verified byte count");
+            }
+            var existing=File.ReadAllBytes(exportPath);
+            bool refusedOverwrite=false;
+            try { BridgeRecoveryReport.ExportCurrent(exportPath,journalPath,imagePath,exported); }
+            catch(IOException){refusedOverwrite=true;}
+            Check(refusedOverwrite&&existing.SequenceEqual(File.ReadAllBytes(exportPath)),"Export never overwrites an existing file");
+            File.WriteAllText(metadataPath,unchangedMetadata+" ");
+            bool refusedStale=false;
+            var stalePath=Path.Combine(folder,"stale.json");
+            try { BridgeRecoveryReport.ExportCurrent(stalePath,journalPath,imagePath,assessment); }
+            catch(InvalidDataException){refusedStale=true;}
+            Check(refusedStale&&!File.Exists(stalePath),"Changed metadata invalidates displayed export");
+            File.WriteAllText(metadataPath,unchangedMetadata);
             Check(originalEvidence.EnvelopeSha256.Count == 1,
                 "Each original sector envelope has an independently pinned digest");
             Check(originalEvidence.Verified && originalEvidence.SnapshotSha256 is { Length: 64 },

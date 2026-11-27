@@ -1,3 +1,7 @@
+## C6 — rapport de récupération Windows exportable (27/11/2026)
+
+- Rapport JSON hors ligne E39 : identité déclarée, état journal, secteurs, hash des enveloppes et preuves, nombre d'octets contrôlés, comparaison BIN optionnelle et absence explicite d'autorisation de restauration. Relecture complète avant export et création exclusive, rejet du rapport si les preuves affichées ont changé. L'écran remplace le résultat précédent au lieu d'ajouter une comparaison à un ancien journal. Ressources FR/EN, régressions écrites non exécutées. Aucun accès ECU ni qualification matérielle. C6/J1979 ouverts.
+
 ## SAE J1979 — recette legacy ELM attribuée au répondant (27/11/2026)
 
 - Nouvelle découverte PID 00 avec en-têtes et checksums, classification individuelle des répondants (support, conflit, refus), confirmation de la variante et aucun repli anonyme. Le CLI Python accepte --source discover ou un identifiant documenté et --vin facultatif ; la recette filtre les réponses du calculateur choisi, conserve toutes les trames en preuve et exporte les inventaires, VIN/CALID/CVN, DTC, mesures, readiness, freeze et moniteurs. Pas de requête mutatrice, pas d'adressage physique revendiqué, pas de couverture intégrale. Régressions sur les cinq variantes et CLI écrites, non exécutées. C6/J1979 restent ouverts ; aucune CI intermédiaire, fusion ou Release.

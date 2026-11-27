@@ -11,7 +11,8 @@ internal static class BridgeRecoveryPresentationSelfTests
         {
             "VerifyOriginalButton", "ChooseOriginalTitle", "OriginalBinFilter",
             "OriginalBinName", "OriginalBinMatched", "OriginalBinRejected",
-            "FailedSector", "OfflineNotice"
+            "FailedSector", "OfflineNotice",
+            "ExportAssessment", "AssessmentJsonFilter", "Inspecting", "EvidenceChanged", "AssessmentExported", "JournalName", "JournalState", "JournalCounts", "JournalInvalid", "LastStage", "Unknown", "TargetIdentity", "TargetUnverified", "BackupStatus", "IntegrityVerified", "IntegrityUnverified", "Snapshot", "GeometryMatches", "GeometryUnqualified", "Sector"
         };
         foreach (var culture in new[] { CultureInfo.GetCultureInfo("fr"),
                     CultureInfo.GetCultureInfo("en") })
