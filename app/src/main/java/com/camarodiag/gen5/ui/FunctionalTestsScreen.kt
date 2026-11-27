@@ -61,6 +61,8 @@ fun FunctionalTestsScreen(
     onRunNetwork: (com.camarodiag.gen5.data.obd.J1979NetworkPlan,Long,VehicleProfile)->Unit,
     onRunNativeFreeze: (android.hardware.usb.UsbDevice, com.camarodiag.gen5.data.obd.CamaroDiagConnectorFreezeCampaign.Target,
         android.net.Uri,Long,VehicleProfile)->Unit,
+    onRunNativeLive: (android.hardware.usb.UsbDevice, com.camarodiag.gen5.data.obd.CamaroDiagConnectorLiveCampaign.Target,
+        android.net.Uri,Long,VehicleProfile)->Unit,
     nativeUsbEnabled: Boolean,
     onRunNativeUsb: (android.hardware.usb.UsbDevice, com.camarodiag.gen5.data.obd.CamaroDiagConnectorNativeCampaign.Target,
         android.net.Uri, Long, VehicleProfile) -> Unit
@@ -235,7 +237,7 @@ fun FunctionalTestsScreen(
                     J1979LivePanel(liveProtocol?.takeIf { it in 6..9 },state,vehicle,connectionGeneration,onRunLive,onExportLiveCsv)
                     J1979CataloguePanel(!state.running,vehicle,connectionGeneration,onProjectCatalogue)
                     J1979FreezePanel(liveProtocol?.takeIf { it in 1..9 },state,vehicle,connectionGeneration,onRunFreeze)
-                    NativeUsbFunctionalPanel(nativeUsbEnabled && !state.running, connectionGeneration, vehicle, onRunNativeUsb,onRunFreeze=onRunNativeFreeze)
+                    NativeUsbFunctionalPanel(nativeUsbEnabled && !state.running, connectionGeneration, vehicle, onRunNativeUsb,onRunFreeze=onRunNativeFreeze,onRunLive=onRunNativeLive)
                     Text(stringResource(R.string.functional_evap_scope), style = MaterialTheme.typography.bodySmall)
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Checkbox(evapConfirmedProfile, { evapConfirmedProfile = it },
