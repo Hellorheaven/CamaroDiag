@@ -63,25 +63,29 @@ public final class J1979MaintenanceUsb {
                 "budget_ms",(long)budgetMs,"expected_vin",vin);
         }
     }
-    static byte[] hello(Profile p,byte[] nonce)throws IOException{
+    static byte[] hello(Profile p,byte[] nonce)throws IOException{return hello(p,nonce,false);}
+    private static byte[] hello(Profile p,byte[] nonce,boolean archive)throws IOException{
         require(nonce!=null&&nonce.length==32&&any(nonce,0,32),"Invalid CU/4 nonce");
-        return ByteBuffer.allocate(HELLO_SIZE).put(new byte[]{'C','U',4,1}).put(p.encode()).put(nonce).array();
+        return ByteBuffer.allocate(HELLO_SIZE).put(new byte[]{'C','U',(byte)(archive?5:4),1}).put(p.encode()).put(nonce).array();
     }
-    private static boolean header(byte[] bytes,int size,int op){
-        return bytes!=null&&bytes.length==size&&bytes[0]=='C'&&bytes[1]=='U'&&bytes[2]==4&&bytes[3]==op;
+    private static boolean header(byte[] bytes,int size,int op){return header(bytes,size,op,4);}
+    private static boolean header(byte[] bytes,int size,int op,int version){
+        return bytes!=null&&bytes.length==size&&bytes[0]=='C'&&bytes[1]=='U'&&bytes[2]==version&&bytes[3]==op;
     }
-    static byte[] proof(byte[] request,byte[] challenge,byte[] key)throws IOException{
-        require(header(request,HELLO_SIZE,1)&&header(challenge,CHALLENGE_SIZE,2)&&key!=null&&key.length==32&&
+    static byte[] proof(byte[] request,byte[] challenge,byte[] key)throws IOException{return proof(request,challenge,key,false);}
+    private static byte[] proof(byte[] request,byte[] challenge,byte[] key,boolean archive)throws IOException{
+        int version=archive?5:4;
+        require(header(request,HELLO_SIZE,1,version)&&header(challenge,CHALLENGE_SIZE,2,version)&&key!=null&&key.length==32&&
             any(request,35,67)&&any(challenge,4,36),"Invalid CU/4 transcript");
-        byte[] transcript=new byte[96];transcript[0]='M';
+        byte[] transcript=new byte[96];transcript[0]=(byte)(archive?'R':'M');
         System.arraycopy(request,4,transcript,1,63);System.arraycopy(challenge,4,transcript,64,32);
         try{
             Mac mac=Mac.getInstance("HmacSHA256");mac.init(new SecretKeySpec(key,"HmacSHA256"));
             byte[] expected=mac.doFinal(transcript);
             try{require(MessageDigest.isEqual(expected,Arrays.copyOfRange(challenge,36,68)),"CU/4 device proof rejected");}
             finally{Arrays.fill(expected,(byte)0);}
-            transcript[0]='m';byte[] answer=mac.doFinal(transcript);
-            try{return ByteBuffer.allocate(PROOF_SIZE).put(new byte[]{'C','U',4,3}).put(answer).array();}
+            transcript[0]=(byte)(archive?'r':'m');byte[] answer=mac.doFinal(transcript);
+            try{return ByteBuffer.allocate(PROOF_SIZE).put(new byte[]{'C','U',(byte)version,3}).put(answer).array();}
             finally{Arrays.fill(answer,(byte)0);}
         }catch(GeneralSecurityException failure){throw new IOException("CU/4 cryptography unavailable",failure);}
         finally{Arrays.fill(transcript,(byte)0);}
@@ -160,4 +164,53 @@ public final class J1979MaintenanceUsb {
             "evidence_authenticated",false,"operator_consent_independently_verified",false,"permits_automatic_retry",false,
             "permits_programming",false,"host_elapsed_ms",Math.max(0,clock.getAsLong()-began),"error",error);
     }
+    public synchronized Map<String,Object> runArchive(Profile profile,byte[] key,OutputStream raw,
+                                                       BooleanSupplier allowed)throws IOException{
+        require(!used&&profile!=null&&key!=null&&key.length==32&&raw!=null&&allowed!=null,"Fresh CU/5 session required");
+        byte[] nonce=new byte[32];new SecureRandom().nextBytes(nonce);
+        byte[] request=hello(profile,nonce,true);used=true;
+        long began=clock.getAsLong();boolean authenticated=false;
+        Map<String,Object> declared=null,inspection=null;
+        String error=null;
+        ByteArrayOutputStream copy=new ByteArrayOutputStream();
+        try{
+            long start=clock.getAsLong();link.write(request,remaining(start,5000,allowed));
+            byte[] challenge=read(CHALLENGE_SIZE,start,5000,allowed,null,null);
+            byte[] answer=proof(request,challenge,key,true);authenticated=true;
+            try{link.checkNoBufferedInput();link.write(answer,remaining(start,5000,allowed));}
+            finally{Arrays.fill(answer,(byte)0);}
+            start=clock.getAsLong();int budget=40000;
+            byte[] head=read(RESULT_SIZE,start,budget,allowed,null,null);
+            require(header(head,RESULT_SIZE,4,5)&&(head[4]&~7)==0&&head[5]>=1&&head[5]<=4&&
+                head[6]==0&&head[7]==0,"Invalid CU/5 archive header");
+            long length=ByteBuffer.wrap(head,8,4).order(ByteOrder.LITTLE_ENDIAN).getInt()&0xffffffffL;
+            boolean terminal=(head[4]&1)!=0,damaged=(head[4]&2)!=0,recovery=(head[4]&4)!=0;
+            require(length>=47&&length<=J1979MaintenanceJournal.MAX_JOURNAL&&(!terminal||head[5]>=2)&&
+                ((terminal&&!damaged)||recovery),"Invalid CU/5 archive declaration");
+            declared=map("bytes",(int)length,"records",(int)head[5],"terminal_present",terminal,
+                "damaged_tail",damaged,"recovery_required",recovery);
+            read((int)length,start,budget,allowed,raw,copy);
+            link.checkNoBufferedInput();remaining(start,budget,allowed);
+            Map<String,Object> result=J1979MaintenanceJournal.inspect(copy.toByteArray(),profile.vin);
+            require(profile.view().equals(result.get("scope"))&&Boolean.valueOf(terminal).equals(result.get("terminal_present"))&&
+                ((java.util.List<?>)result.get("records")).size()==head[5]&&
+                (!Boolean.TRUE.equals(result.get("recovery_required"))||recovery),"CM/1 archive differs from declaration");
+            inspection=result;
+        }catch(IOException failure){error=failure.getMessage()==null?"CU/5 exchange failed":failure.getMessage();}
+        finally{
+            try{link.close();}catch(IOException failure){if(error==null)error="USB close failed";}
+            try{raw.flush();}catch(IOException failure){if(error==null)error="Journal flush failed";}
+        }
+        if(!allowed.getAsBoolean()&&error==null)error="CU/5 context revoked";
+        if(error!=null)inspection=null;
+        return map("schema","camarodiag-j1979-native-maintenance-archive-v1","protocol","SAE-J1979",
+            "source","READ_ONLY_USB_CU5","scope",profile.view(),"device_credential_authenticated",authenticated,
+            "archive_transfer_verified",inspection!=null,"journal_bytes_received",copy.size(),
+            "declared_archive",declared,"inspection",inspection,"recovery_required",inspection==null||
+                Boolean.TRUE.equals(declared.get("recovery_required")),"maintenance_command_sent",false,
+            "physical_vehicle_verified",false,"physical_stop_independently_verified",false,"evidence_authenticated",false,
+            "permits_automatic_retry",false,"permits_programming",false,"host_elapsed_ms",Math.max(0,clock.getAsLong()-began),
+            "error",error);
+    }
+
 }
