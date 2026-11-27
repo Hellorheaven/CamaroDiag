@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="j1979_native_prefix_title">Inspecter une capture CL/1 interrompue</string>
+    <string name="j1979_native_prefix_select">Sélectionner le fichier CL/1 original</string>
+    <string name="j1979_native_prefix_confirm">Confirmer le VIN connu indépendamment %1$s</string>
+    <string name="j1979_native_prefix_run">Inspecter et exporter le rapport partiel</string>
+    <string name="j1979_native_prefix_scope">Seuls les enregistrements complets sont contrôlés. Ni enregistrement terminé ni validation du véhicule.</string>
+    <string name="j1979_native_prefix_saved">Rapport de capture partielle exporté</string>
+    <string name="j1979_native_prefix_rejected">Inspection de la capture interrompue refusée</string>
+</resources>
