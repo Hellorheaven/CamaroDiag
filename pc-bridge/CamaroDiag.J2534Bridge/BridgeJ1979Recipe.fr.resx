@@ -183,4 +183,6 @@
   <data name="LiveNativeConfirm" xml:space="preserve"><value>Je confirme le calculateur physique autorisé, le VIN, les PID et le véhicule à l’arrêt.</value></data>
   <data name="LiveNativePids" xml:space="preserve"><value>PID bruts (hex., séparés par virgules)</value></data>
   <data name="LiveNativeVinRequired" xml:space="preserve"><value>Saisir le VIN connu indépendamment avant inspection.</value></data>
+  <data name="LiveNativeCsv" xml:space="preserve"><value>Exporter CL/1 en CSV</value></data>
+  <data name="LiveNativeCsvFilter" xml:space="preserve"><value>Échantillons CSV (*.csv)|*.csv</value></data>
 </root>
