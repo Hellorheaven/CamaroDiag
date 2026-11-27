@@ -50,7 +50,8 @@ data class J1979LiveReport(val plan: J1979LivePlan,val observedVin: String?,val 
     val completed: Boolean,val stopReason: String?,val durationMs: Long,
     val legacyExchanges: List<LegacyLiveExchange> = emptyList(),
     val multiSignalSummary: List<J1979LiveChannelSummary> = emptyList(),
-    val scalingConfiguration: List<ObdJ1979ScalingContext.Configuration>? = null) {
+    val scalingConfiguration: List<ObdJ1979ScalingContext.Configuration>? = null,
+    val trimLayout:ObdJ1979OperatingContext.Layout?=null) {
     val physicallyAddressed get() = !plan.target.legacy
     val scope get() = if(physicallyAddressed)"PHYSICAL_SELECTED_ECU_LIVE" else "FUNCTIONAL_SELECTED_RESPONSE_LIVE"
     val physicalVehicleVerified get() = false
@@ -67,7 +68,7 @@ internal object J1979LiveRecorder {
     private fun hex(n: Int) = ElmJ1979EvapTest.hex(n,2)
     fun numericPid(pid: Int): Boolean {
         if(pid !in 1..255 || pid%32==0)return false
-        if(ObdJ1979MultiSignal.width(pid)!=null)return true
+        if(ObdJ1979MultiSignal.width(pid)!=null||ObdJ1979OperatingContext.isTrim(pid))return true
         val request="01"+hex(pid)
         return listOf(1,2,4).any { width ->
             J1979CampaignSemantics.decodePositive(request,"41"+hex(pid)+"00".repeat(width))?.measurement()!=null
@@ -76,7 +77,7 @@ internal object J1979LiveRecorder {
     fun legacyNumericPid(pid:Int):Boolean=numericPid(pid)&&(ObdJ1979MultiSignal.width(pid)?:0)<=5
     fun allowed(request: ByteArray) = request.contentEquals(byteArrayOf(9,2)) ||
         request.size==2 && request[0]==1.toByte() &&
-        ((request[1].toInt() and 255)%32==0 || ObdJ1979ScalingContext.isConfiguration(request[1].toInt() and 255) || numericPid(request[1].toInt() and 255))
+        ((request[1].toInt() and 255)%32==0 || (request[1].toInt() and 255)==0x1D || ObdJ1979ScalingContext.isConfiguration(request[1].toInt() and 255) || numericPid(request[1].toInt() and 255))
     private class ChannelAccumulator(private val first:ObdJ1979MultiSignal.Signal) {
         private var count=0
         private var minimum=0.0
@@ -145,6 +146,11 @@ internal object J1979LiveRecorder {
         var completeInventory=false
         val requiredConfigs=plan.pids.mapNotNull(ObdJ1979ScalingContext::dependency).distinct().sorted()
         var scaling:ObdJ1979ScalingContext.Context?=null
+        val needsTrim=plan.pids.any(ObdJ1979OperatingContext::isTrim)
+        var layout:ObdJ1979OperatingContext.Layout?=null
+        fun buildLayout()=ObdJ1979OperatingContext.resolveLayout(admission.map {
+            ObdJ1979OperatingContext.Observation(it.requestHex,it.responseHex,it.status)
+        })
         fun buildScaling()=ObdJ1979ScalingContext.build(admission.map {
             ObdJ1979ScalingContext.Observation(it.requestHex,it.responseHex,it.status)
         })
@@ -192,6 +198,11 @@ internal object J1979LiveRecorder {
                             !ObdJ1979ScalingContext.validConfiguration(request[1].toInt() and 255,
                                 requireNotNull(reply.payload).drop(2).map { it.toInt() and 255 })){
                             status="FAILED";stop="INVALID_APPLICATION_RESPONSE";detail=stop;evidence=null
+                        }else if(phase=="SAMPLE"&&status in setOf("RAW","PASSED")&&
+                            pid!=null&&ObdJ1979OperatingContext.isTrim(pid)){
+                            multi=ObdJ1979OperatingContext.liveSignals(command,raw,layout?:buildLayout())
+                            if(multi==null){status="FAILED";stop="INVALID_MEASUREMENT";detail=stop;evidence=null}
+                            else if(multi.size<raw.length/2-2)detail="UPPER_BANK_UNVERIFIED"
                         }else if(phase=="SAMPLE"&&status in setOf("RAW","PASSED")&&
                             pid!=null&&ObdJ1979MultiSignal.width(pid)!=null){
                             multi=ObdJ1979MultiSignal.decodeResponse(command,raw)
@@ -295,6 +306,10 @@ internal object J1979LiveRecorder {
                 if(stop==null&&scaling!!.configurations.any { it.pid in requiredConfigs && it.state=="UNVERIFIED" })
                     stop="SCALING_UNVERIFIED"
             }
+            if(stop==null&&needsTrim){
+                if(0x1D in advertised)query(byteArrayOf(1,0x1D),"TRIM_LAYOUT")
+                layout=buildLayout()
+            }
             if(stop==null){
                 var next=elapsed()
                 for(cycle in 1..plan.cycles){
@@ -321,6 +336,7 @@ internal object J1979LiveRecorder {
             stop==null&&cycles==plan.cycles,stop,elapsed(),multiSignalSummary=channels.entries
                 .sortedWith(compareBy({it.key.first},{it.key.second}))
                 .map { (key,acc)->acc.snapshot(stats.getValue(key.first).snapshot().attempted) },
-            scalingConfiguration=if(requiredConfigs.isEmpty())null else (scaling?:buildScaling()).configurations)
+            scalingConfiguration=if(requiredConfigs.isEmpty())null else (scaling?:buildScaling()).configurations,
+            trimLayout=if(needsTrim)layout?:buildLayout() else null)
     }
 }
