@@ -19,4 +19,10 @@
     <string name="j1979_native_maintenance_unverified">Journal non vérifié ; aucun succès revendiqué.</string>
     <string name="j1979_native_maintenance_prefix_title">Inspecter un journal de maintenance interrompu</string>
     <string name="j1979_native_maintenance_prefix_scope">Seuls les enregistrements complets sont contrôlés. Un terminal absent ou incomplet laisse le résultat incertain. Ne pas relancer automatiquement.</string>
+    <string name="j1979_native_maintenance_archive">Lire une archive de maintenance (CU/5)</string>
+    <string name="j1979_native_maintenance_archive_budget">Budget de l’opération d’origine (ms)</string>
+    <string name="j1979_native_maintenance_archive_warning">Lecture seule du journal existant sélectionné ; aucune opération de maintenance n’est envoyée.</string>
+    <string name="j1979_native_maintenance_archive_accept">J’autorise la lecture seule du journal</string>
+    <string name="j1979_native_maintenance_archive_confirm">Confirmer la récupération du journal pour le VIN %1$s</string>
+    <string name="j1979_native_maintenance_archive_run">Récupérer le journal</string>
 </resources>
