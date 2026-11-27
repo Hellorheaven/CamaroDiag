@@ -28,6 +28,17 @@ class ObdJ1979ExtendedVehicleInfoTest {
         assertNull(ObdJ1979ExtendedVehicleInfo.can(8,can(8,words).dropLast(1)))
         assertNull(ObdJ1979ExtendedVehicleInfo.can(8,can(11,words)))
     }
+    @Test fun nativeRawDoesNotPromoteStatusOrAcceptMismatchedPayload() {
+        val hex=can(11,List(18){it}).joinToString("") { "%02X".format(it) }
+        val decoded=ObdJ1979ExtendedVehicleInfo.tryRaw("090B",hex,"RAW")
+        assertEquals(18,decoded?.counterCount)
+        assertNull(ObdJ1979ExtendedVehicleInfo.tryRaw("0908",hex,"RAW"))
+        assertNull(ObdJ1979ExtendedVehicleInfo.tryRaw("090B",hex,"PASSED"))
+        assertNull(ObdJ1979ExtendedVehicleInfo.tryRaw("090B",hex.dropLast(2),"RAW"))
+        assertNull(ObdJ1979ExtendedVehicleInfo.tryRaw("090B",hex+"00","RAW"))
+        assertNull(ObdJ1979ExtendedVehicleInfo.tryRaw("090B",null,"RAW"))
+        assertNull(ObdJ1979ExtendedVehicleInfo.tryRaw("090B","49ZZ","RAW"))
+    }
     @Test fun legacyRequiresExactNumberedRecordsFromSelectedSource() {
         val response=can(11,List(18){it})
         val rows=fragments(11,response.drop(3))
