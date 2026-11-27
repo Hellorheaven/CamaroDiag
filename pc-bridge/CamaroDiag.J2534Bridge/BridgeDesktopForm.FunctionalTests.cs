@@ -78,6 +78,7 @@ internal sealed partial class BridgeDesktopForm
         extraRecipes.Controls.Add(functionalRunNativeUsb);
         extraRecipes.Controls.Add(functionalRunNetwork);
         extraRecipes.Controls.Add(functionalRunLive);
+        WideRow(fields, functionalRunFreeze, 42);
         WideRow(fields, functionalRunLegacyMutation, 42);
         WideRow(fields, extraRecipes, 42);
         WideRow(fields, new Label
@@ -94,6 +95,9 @@ internal sealed partial class BridgeDesktopForm
         functionalRunJ1979.Click += async (_, _) => await RunWindowsJ1979Async();
         functionalRunNetwork.Click += async (_, _) => await RunWindowsNetworkAsync();
         functionalRunLive.Click += async (_, _) => await RunWindowsLiveAsync();
+        functionalRunFreeze.Click += async (_, _) => await RunWindowsFreezeAsync();
+        functionalRunLive.EnabledChanged += (_, _) => functionalRunFreeze.Enabled = functionalRunLive.Enabled;
+        functionalRunFreeze.Enabled = functionalRunLive.Enabled;
         functionalRunNativeUsb.Click += async (_, _) => await RunWindowsNativeUsbAsync();
         functionalRunLegacy.Click += async (_, _) => await RunWindowsLegacyAsync();
         functionalRunLegacyMutation.Click += async (_, _) => await RunWindowsLegacyMutationAsync();
@@ -101,6 +105,7 @@ internal sealed partial class BridgeDesktopForm
         functionalRunClear.Click += async (_, _) => await RunWindowsClearAsync();
         functionalCancel.Click += (_, _) => functionalCancellation?.Cancel();
         functionalExport.Click += (_, _) => ExportWindowsFunctionalResults();
+        functionalResults.TextChanged += (_, _) => completedFreeze = null;
         functionalRunLive.Enabled = functionalRunNetwork.Enabled = functionalRunNativeUsb.Enabled = functionalRunAll.Enabled = functionalRunJ1979.Enabled = functionalRunEvap.Enabled = functionalRunClear.Enabled = functionalRunLegacy.Enabled = functionalRunLegacyMutation.Enabled = functionalCancel.Enabled = functionalExport.Enabled = false;
         layout.Controls.Add(fields, 0, 0);
         layout.Controls.Add(functionalResults, 0, 1);
@@ -114,7 +119,7 @@ internal sealed partial class BridgeDesktopForm
         functionalGoogleSignIn.Enabled = false;
         functionalAuthentication.Text = "Connexion Google dans le navigateur système...";
         functionalRunLive.Enabled = functionalRunNetwork.Enabled = functionalRunNativeUsb.Enabled = functionalRunAll.Enabled = functionalRunJ1979.Enabled = functionalRunEvap.Enabled = functionalRunClear.Enabled = functionalRunLegacy.Enabled = functionalRunLegacyMutation.Enabled = functionalExport.Enabled = false;
-        completedJ1979 = null; completedNetwork = null; completedLive = null;
+        completedJ1979 = null; completedNetwork = null; completedLive = null; completedFreeze = null;
         completedEvap = null;
         completedClear = null;
         completedLegacy = null;
@@ -180,7 +185,7 @@ internal sealed partial class BridgeDesktopForm
         }
 
         busy = true;
-        completedJ1979 = null; completedNetwork = null; completedLive = null;
+        completedJ1979 = null; completedNetwork = null; completedLive = null; completedFreeze = null;
         completedEvap = null;
         completedClear = null;
         completedLegacy = null;
@@ -340,6 +345,11 @@ internal sealed partial class BridgeDesktopForm
     private void ExportWindowsFunctionalResults()
     {
         if (DateTimeOffset.UtcNow >= functionalAuthorizedUntil) return;
+        if (completedFreeze is not null)
+        {
+            ExportWindowsFreeze(completedFreeze);
+            return;
+        }
         if (completedLive is not null)
         {
             ExportWindowsLive(completedLive);
