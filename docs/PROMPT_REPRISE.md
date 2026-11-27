@@ -1,8 +1,17 @@
+## Correction du périmètre natif — directive propriétaire (27/11/2026)
+
+L'objectif est **zéro Python dans le produit final**, avec le langage natif pertinent par plateforme : Kotlin Android, C# Windows, C/C++ Linux, C++ ESP32. Le développement C++ existant doit être préservé et prolongé, non réécrit arbitrairement en C. Prioriser le remplacement effectif des fonctionnalités Python par leurs équivalents natifs, puis supprimer leurs appels, dépendances, scripts et modules seulement après parité fonctionnelle prouvée. Continuer uniquement le protocole SAE J1979 tant qu'il n'est pas clôturé ; les autres domaines Python seront migrés dans leur chantier dédié. Aucune APK Release tant que la PR n'a pas passé la validation finale prescrite.
+
+---
+
 ## Reprise SAE J1979 — 27/11/2026 — directive native et migration Linux C
 
 PR #117, branche `chore/unified-ci`, base du lot `bf19d75ee91a54119acae078c0e818b797de2fb8`.
-Décision propriétaire : Android Kotlin, Windows C#, Linux ARM/x64 C, ESP32
-C natif (C++ existant à rationaliser). Ne plus ajouter de fonctions Python.
+Décision propriétaire corrigée : remplacer **tout le Python** par des langages adaptés aux plateformes, sans convertir le C++ en C.
+- Android : Kotlin ; Windows : C# ; Linux ARM/x64 : C ou C++ ; ESP32-S3 : conserver C++/ESP-IDF/Arduino et ses transports natifs existants.
+- Les petits modules C Linux partagés restent permis lorsqu'ils sont utiles, mais ne doivent ni dupliquer ni remplacer des composants embarqués C++ déjà fonctionnels.
+- Ne plus développer de fonctionnalités Python. Retirer les modules Python seulement après reprise fonctionnelle de leurs usages, CLI/API/GUI, preuves, tests et packaging natifs, sans régression. Tout le périmètre Python du dépôt devra être éliminé, pas seulement Mode 01/02.
+- L'essai de second observateur ISO-TP en C pour ESP32 n'était pas demandé ; retirer ce doublon et garder `connectors/firmware/shared/j1979_can_read_session.h` et l'observateur C++ existants.
 
 - Windows C# : les commandes CLI CF/1 préfixe, vérification et acquisition
   sont désormais toutes dispatchées par `Program.cs`. Correction des
