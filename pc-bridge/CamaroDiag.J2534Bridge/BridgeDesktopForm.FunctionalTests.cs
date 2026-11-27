@@ -96,7 +96,11 @@ internal sealed partial class BridgeDesktopForm
         functionalRunNetwork.Click += async (_, _) => await RunWindowsNetworkAsync();
         functionalRunLive.Click += async (_, _) => await RunWindowsLiveAsync();
         functionalRunFreeze.Click += async (_, _) => await RunWindowsFreezeAsync();
-        functionalRunLive.EnabledChanged += (_, _) => functionalRunFreeze.Enabled = functionalRunLive.Enabled;
+        functionalRunLive.EnabledChanged += (_, _) =>
+        {
+            functionalRunFreeze.Enabled = functionalRunLive.Enabled;
+            if (!functionalRunLive.Enabled) completedFreeze = null;
+        };
         functionalRunFreeze.Enabled = functionalRunLive.Enabled;
         functionalRunNativeUsb.Click += async (_, _) => await RunWindowsNativeUsbAsync();
         functionalRunLegacy.Click += async (_, _) => await RunWindowsLegacyAsync();
