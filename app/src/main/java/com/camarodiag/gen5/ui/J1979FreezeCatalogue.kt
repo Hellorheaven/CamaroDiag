@@ -94,6 +94,48 @@ internal object J1979FreezeCatalogue {
                 require(rows.size <= LIMIT)
             }
         }
+        // A documented frame PID may be absent from an incomplete inventory.
+        // Keep requests, actual correlated responses and decoded values distinct.
+        val capturedFrames = result.frames.associateBy { it.frame }
+        val frameAudits = result.plan.frames.map { number ->
+            currentCoroutineContext().ensureActive()
+            val captured = capturedFrames[number]
+            val catalogued = catalogue.definitions.keys.asSequence()
+                .filter { it.first == number }.map { it.second }.toSet()
+            val advertised = captured?.advertisedPids?.filter { it != 2 && it % 32 != 0 }?.toSet()
+                ?: emptySet()
+            val frameRows = rows.filter { it["frame"] == number }
+            val requested = frameRows.map { it["pid"] as Int }.toSet()
+            val responded = frameRows.filter { it["source_status"] in setOf("RAW","PASSED") }
+                .map { it["pid"] as Int }.toSet()
+            val projected = frameRows.filter { it["projection_status"] == "PROJECTED" }
+                .map { it["pid"] as Int }.toSet()
+            linkedMapOf<String,Any?>(
+                "frame" to number,
+                "source_status" to (captured?.status ?: "UNVISITED"),
+                "inventory_complete" to (captured?.inventoryComplete ?: false),
+                "trigger_stable" to (captured?.triggerStable ?: false),
+                "documented_pids" to catalogued.sorted(),
+                "advertised_measurement_pids" to advertised.sorted(),
+                "requested_measurement_pids" to requested.sorted(),
+                "responded_measurement_pids" to responded.sorted(),
+                "projected_measurement_pids" to projected.sorted(),
+                "advertised_without_documentation" to (advertised-catalogued).sorted(),
+                "documented_without_advertisement" to
+                    if(captured?.inventoryComplete == true) (catalogued-advertised).sorted() else null,
+                "advertised_not_requested" to (advertised-requested).sorted(),
+                "documented_responses_not_projected" to
+                    ((responded intersect catalogued)-projected).sorted()
+            )
+        }
+        val catalogueCoverage = linkedMapOf<String,Any?>(
+            "scope" to "EXPLICIT_FREEZE_FRAMES_ONLY",
+            "normative_compliance_verified" to false,
+            "hardware_provenance_verified" to false,
+            "unrequested_catalogue_frames" to
+                (catalogue.definitions.keys.map { it.first }.toSet()-result.plan.frames.toSet()).sorted(),
+            "frames" to frameAudits
+        )
         val captureSha = J1979DocumentedCatalogue.sha(capture)
         val document = linkedMapOf<String,Any?>(
             "schema" to PROJECTION,"reference_edition" to catalogue.edition,"reference_sha256" to catalogue.referenceSha,
@@ -105,7 +147,7 @@ internal object J1979FreezeCatalogue {
             "reference_authenticity_verified" to false,"normative_compliance_verified" to false,
             "physical_vehicle_verified" to false,"authenticated" to false,"permits_programming" to false,
             "diagnostic_verdict" to null,"frames" to frames,"unvisited_frames" to result.unvisitedFrames,
-            "counts" to counts,"rows" to rows)
+            "counts" to counts,"rows" to rows,"catalogue_coverage" to catalogueCoverage)
         return J1979CatalogueProjection.Result(document,catalogue.sha,catalogue.referenceSha,captureSha,counts)
     }
 }
