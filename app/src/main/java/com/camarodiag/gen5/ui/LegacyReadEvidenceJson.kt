@@ -3,11 +3,29 @@ package com.camarodiag.gen5.ui
 import com.camarodiag.gen5.data.obd.LegacyReadReport
 import com.camarodiag.gen5.data.obd.J1979ScalingJson
 import com.camarodiag.gen5.data.obd.J1979DerivedEvidenceJson
+import com.camarodiag.gen5.data.obd.ObdLegacyMonitorValues
 import org.json.JSONArray
 import org.json.JSONObject
 
 internal object LegacyReadEvidenceJson {
     private fun value(it: Any?): Any = it ?: JSONObject.NULL
+    private fun monitor(item:ObdLegacyMonitorValues.Projected):JSONObject {
+        val r=item.record
+        val result=JSONObject().put("request_hex",item.requestHex).put("record_index",item.recordIndex)
+            .put("mode",r.mode).put("test_id",r.testId).put("sensor_mask",value(r.sensorMask))
+            .put("encoded_data_hex",r.encodedDataHex).put("value_encoded",r.valueEncoded)
+            .put("monitor_verdict",JSONObject.NULL)
+        if(r.mode==5) result.put("minimum_encoded",value(r.minimumEncoded))
+            .put("maximum_encoded",value(r.maximumEncoded))
+        else result.put("component_and_limit_encoded",value(r.componentAndLimitEncoded))
+            .put("component_id",value(r.componentId)).put("limit_type",value(r.limitType))
+            .put("limit_encoded",value(r.limitEncoded)).put("encoded_relation",value(r.encodedRelation))
+        return result.put("scaled",r.scaled?.let {
+            JSONObject().put("definition",it.definition).put("name",it.name).put("unit",it.unit)
+                .put("value",it.value).put("minimum",value(it.minimum)).put("maximum",value(it.maximum))
+                .put("numeric_relation",it.numericRelation)
+        } ?: JSONObject.NULL)
+    }
     fun encode(report: LegacyReadReport): JSONObject = JSONObject()
         .put("schema","camarodiag-functional-j1979-legacy-source-v1")
         .put("expectedProtocol",report.target.protocol)
@@ -52,6 +70,7 @@ internal object LegacyReadEvidenceJson {
         .put("freezeTrigger",report.freezeTrigger?.let {
             JSONObject().put("present",it.present).put("dtc",value(it.dtc))
         } ?: JSONObject.NULL)
+        .put("legacy_monitor_results",JSONArray(report.legacyMonitorResults.map(::monitor)))
         .put("monitorRecords",JSONArray(report.monitors.map {
             JSONObject().put("mode",it.mode).put("testId",it.testId).put("sensorMask",value(it.sensorMask))
                 .put("encodedDataHex",it.encodedDataHex).put("componentAndLimitEncoded",value(it.componentAndLimitEncoded))
