@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import com.camarodiag.gen5.R
 import com.camarodiag.gen5.data.obd.CamaroDiagConnectorNativeCampaign
 import com.camarodiag.gen5.data.obd.CamaroDiagConnectorFreezeCampaign
+import com.camarodiag.gen5.data.obd.CamaroDiagConnectorLiveCampaign
 import com.camarodiag.gen5.data.obd.UsbPermissionResultBus
 import com.camarodiag.gen5.domain.model.VehicleProfile
 
@@ -29,7 +30,8 @@ internal fun NativeUsbFunctionalPanel(
     enabled: Boolean, generation: Long, vehicle: VehicleProfile,
     onRun: (UsbDevice, CamaroDiagConnectorNativeCampaign.Target, Uri, Long, VehicleProfile) -> Unit,
     asScan:Boolean=false,
-    onRunFreeze: ((UsbDevice, CamaroDiagConnectorFreezeCampaign.Target, Uri, Long, VehicleProfile) -> Unit)? = null
+    onRunFreeze: ((UsbDevice, CamaroDiagConnectorFreezeCampaign.Target, Uri, Long, VehicleProfile) -> Unit)? = null,
+    onRunLive: ((UsbDevice, CamaroDiagConnectorLiveCampaign.Target, Uri, Long, VehicleProfile) -> Unit)? = null
 ) {
     val context = LocalContext.current
     val manager = context.getSystemService(UsbManager::class.java)
@@ -43,6 +45,10 @@ internal fun NativeUsbFunctionalPanel(
     var credential by remember(generation, vehicle) { mutableStateOf<Uri?>(null) }
     var granted by remember(generation, vehicle) { mutableStateOf(false) }
     var freeze by remember(generation,vehicle) { mutableStateOf(false) }
+    var live by remember(generation,vehicle) { mutableStateOf(false) }
+    var livePids by remember(generation,vehicle) { mutableStateOf("05,0C,0D") }
+    var cycles by remember(generation,vehicle) { mutableStateOf("30") }
+    var interval by remember(generation,vehicle) { mutableStateOf("1000") }
     var frames by remember(generation,vehicle) { mutableStateOf("00") }
     var pids by remember(generation,vehicle) { mutableStateOf("") }
     var budget by remember(generation,vehicle) { mutableStateOf("180") }
@@ -71,14 +77,25 @@ internal fun NativeUsbFunctionalPanel(
     val response = address(rx)
     val target = if (device != null && control != null && data != null && request != null && response != null)
         CamaroDiagConnectorNativeCampaign.Target(control.id, data.id, request, response,
-            extended, if(freeze) (budget.toIntOrNull() ?: 0)*1000 else 60000, vehicle.vin, "ECM", device.deviceName, maxOf(1L,generation)) else null
+            extended, if(freeze || live) (budget.toIntOrNull() ?: 0)*1000 else 60000, vehicle.vin, "ECM", device.deviceName, maxOf(1L,generation)) else null
     val freezeTarget = if (freeze && target != null) {
         val selectedFrames=parseFreezeIds(frames,8,false)
         val selectedPids=parseFreezeIds(pids,64,true)
         if(selectedFrames != null && selectedPids != null)
             CamaroDiagConnectorFreezeCampaign.Target(target,selectedFrames,selectedPids) else null
     } else null
-    val scopeValid = if(freeze) freezeTarget?.valid == true else target?.valid == true
+    val liveTarget = if(live && target != null) {
+        val ids=livePids.split(",").map { it.trim().takeIf { s -> s.matches(Regex("[0-9A-F]{2}")) }?.toIntOrNull(16) }
+        val count=cycles.toIntOrNull()
+        val delay=interval.toIntOrNull()
+        if(ids.all { it!=null } && count!=null && delay!=null)
+            CamaroDiagConnectorLiveCampaign.Target(target,ids.filterNotNull(),count,delay) else null
+    } else null
+    val scopeValid = when {
+        freeze -> freezeTarget?.valid == true
+        live -> liveTarget?.valid == true
+        else -> target?.valid == true
+    }
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(stringResource(if(asScan) R.string.functional_native_usb_scan_title else R.string.functional_native_usb_title))
         Box {
@@ -117,7 +134,7 @@ internal fun NativeUsbFunctionalPanel(
         }
         if(onRunFreeze != null && !asScan) {
             Row(verticalAlignment=Alignment.CenterVertically) {
-                Checkbox(freeze,{ freeze=it; confirmed=false },enabled=enabled)
+                Checkbox(freeze,{ freeze=it; if(it)live=false; confirmed=false },enabled=enabled)
                 Text(stringResource(R.string.j1979_freeze_native_title))
             }
             if(freeze) {
@@ -132,12 +149,33 @@ internal fun NativeUsbFunctionalPanel(
                     enabled=enabled,modifier=Modifier.fillMaxWidth())
             }
         }
+        if(onRunLive != null && !asScan) {
+            Row(verticalAlignment=Alignment.CenterVertically) {
+                Checkbox(live,{ live=it; if(it)freeze=false; confirmed=false },enabled=enabled)
+                Text(stringResource(R.string.j1979_native_live_title))
+            }
+            if(live) {
+                OutlinedTextField(livePids,{livePids=it.take(95).uppercase(java.util.Locale.ROOT);confirmed=false},
+                    singleLine=true,label={Text(stringResource(R.string.j1979_native_live_pids))},
+                    enabled=enabled,modifier=Modifier.fillMaxWidth())
+                OutlinedTextField(cycles,{cycles=it.take(4);confirmed=false},singleLine=true,
+                    label={Text(stringResource(R.string.j1979_native_live_cycles))},
+                    enabled=enabled,modifier=Modifier.fillMaxWidth())
+                OutlinedTextField(interval,{interval=it.take(5);confirmed=false},singleLine=true,
+                    label={Text(stringResource(R.string.j1979_native_live_interval))},
+                    enabled=enabled,modifier=Modifier.fillMaxWidth())
+                OutlinedTextField(budget,{budget=it.take(3);confirmed=false},singleLine=true,
+                    label={Text(stringResource(R.string.j1979_live_budget))},
+                    enabled=enabled,modifier=Modifier.fillMaxWidth())
+            }
+        }
         OutlinedButton(onClick = { picker.launch(arrayOf("*/*")) }, enabled = enabled) {
             Text(stringResource(if (credential == null) R.string.functional_native_usb_key else R.string.functional_native_usb_key_selected))
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Checkbox(confirmed, { confirmed = it }, enabled = enabled)
             Text(if(freeze) stringResource(R.string.j1979_freeze_confirm,vehicle.vin)
+                else if(live) stringResource(R.string.j1979_native_live_confirm,vehicle.vin)
                 else stringResource(R.string.functional_native_usb_confirm))
         }
         Button(onClick = {
@@ -146,9 +184,10 @@ internal fun NativeUsbFunctionalPanel(
                 manager?.hasPermission(device) == true) {
                 confirmed = false; credential = null
                 if(freeze) freezeTarget?.let { onRunFreeze?.invoke(device,it,uri,generation,vehicle) }
+                else if(live) liveTarget?.let { onRunLive?.invoke(device,it,uri,generation,vehicle) }
                 else onRun(device, target, uri, generation, vehicle)
             }
         }, enabled = enabled && granted && confirmed && credential != null && scopeValid,
-            modifier = Modifier.fillMaxWidth()) { Text(stringResource(if(freeze) R.string.j1979_freeze_run else if(asScan) R.string.functional_native_usb_scan_run else R.string.functional_native_usb_run)) }
+            modifier = Modifier.fillMaxWidth()) { Text(stringResource(if(freeze) R.string.j1979_freeze_run else if(live) R.string.j1979_native_live_run else if(asScan) R.string.functional_native_usb_scan_run else R.string.functional_native_usb_run)) }
     }
 }
