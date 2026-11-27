@@ -1273,7 +1273,7 @@ class BluetoothObdManager(context: Context) {
         val epoch = transportSessionEpoch.capture()
         val original = standardElmProfile
         val target = plan.target
-        val tx = target.idHex(requireNotNull(target.requestId))
+        val tx = target.requestId?.let(target::idHex)
         val rx = target.idHex(target.responseId)
         fun guard() {
             transportSessionEpoch.requireQueuedCurrent(epoch)
@@ -1287,13 +1287,41 @@ class BluetoothObdManager(context: Context) {
             var observedProtocol: Int? = null
             var result: J1979FreezeResult? = null
             var failure: String? = null
+            var legacyExchanges=emptyList<LegacyLiveExchange>()
             try {
-                for (command in listOf("ATSP${target.protocol}","ATE0","ATL0","ATH1","ATS1","ATD0",
-                    "ATCAF0","ATSH $tx","ATCRA $rx","ATFCSH $tx","ATFCSD 30 00 00","ATFCSM1","ATCFC1")) {
+                val config=if(target.legacy){
+                    val header=when(target.protocol){1->"616AF1";4,5->"C033F1";else->"686AF1"}
+                    listOf("ATSP${target.protocol}","ATE0","ATL0","ATH1","ATS1","ATSH $header")
+                } else listOf("ATSP${target.protocol}","ATE0","ATL0","ATH1","ATS1","ATD0",
+                    "ATCAF0","ATSH $tx","ATCRA $rx","ATFCSH $tx","ATFCSD 30 00 00","ATFCSM1","ATCFC1")
+                for (command in config) {
                     guard()
                     check(CanConsoleAdapterRestorationPolicy.accepted(sendAtCommandInternal(command,1500L,
                         expectedEpoch=epoch,preserveLines=true,beforeTransmit=::guard)))
                 }
+                if(target.legacy) {
+                    val link=ElmLegacyLiveLink(target,exchange={command,timeout ->
+                        val allowed=command in setOf("0100","0900","0901","0902") ||
+                            command.matches(Regex("02[0-9A-F]{4}")) &&
+                            command.takeLast(2).toInt(16) in plan.frames &&
+                            command.substring(2,4).toInt(16).let { pid ->
+                                pid%32==0||pid==2||plan.selectedPids.isEmpty()||pid in plan.selectedPids
+                            }
+                        check(allowed)
+                        guard()
+                        sendAtCommandInternal(command,timeout,expectedEpoch=epoch,preserveLines=true,beforeTransmit=::guard)
+                    },probe={ timeout ->
+                        sendAtCommandInternal("ATDPN",timeout,expectedEpoch=epoch,preserveLines=true,beforeTransmit=::guard)
+                    },requireCurrent=::guard,freeze=plan)
+                    try {
+                        result=J1979FreezeCampaign.run(plan,link::query,::guard,
+                            requestTimeout={if(it[0]==9.toByte())20000L else 4000L})
+                    } finally {
+                        legacyExchanges=link.traces
+                        rawProtocol=legacyExchanges.lastOrNull { it.requestHex=="ATDPN" }?.rawResponse
+                        observedProtocol=rawProtocol?.let(ElmLegacyResponseFrames::fixedProtocol)
+                    }
+                } else {
                 val protocolReply = sendAtCommandInternal("ATDPN",1500L,expectedEpoch=epoch,
                     preserveLines=true,beforeTransmit=::guard)
                 check(protocolReply.length <= J1979FreezeCampaign.MAX_RAW)
@@ -1317,6 +1345,7 @@ class BluetoothObdManager(context: Context) {
                     }
                     J1979LiveRecorder.Reply(response,raw)
                 },guard=::guard)
+                }
             } catch (_: CancellationException) {
                 failure = "CANCELLED"
             } catch (_: Exception) {
@@ -1325,7 +1354,9 @@ class BluetoothObdManager(context: Context) {
                 withContext(NonCancellable) {
                     if (transportSessionEpoch.isCurrent(epoch)) {
                         var restored = true
-                        for (command in ElmUdsPayloadTransport.restoreCommandsFor(original.protocol)) {
+                        val restore=if(target.legacy)original.restoreCommands() else
+                            ElmUdsPayloadTransport.restoreCommandsFor(original.protocol)
+                        for (command in restore) {
                             val response = runCatching { sendAtCommandInternal(command,1500L,expectedEpoch=epoch) }.getOrNull()
                             if (response == null || !CanConsoleAdapterRestorationPolicy.accepted(response)) restored = false
                         }
@@ -1340,7 +1371,7 @@ class BluetoothObdManager(context: Context) {
                 J1979FreezeCampaign.Read(if (failure == "CANCELLED") "CANCELLED" else "CONTEXT_CHANGED",
                     null,0,false)
             })
-            J1979FreezeReport(retained,started,System.currentTimeMillis(),rawProtocol,observedProtocol,failure).also(retain)
+            J1979FreezeReport(retained,started,System.currentTimeMillis(),rawProtocol,observedProtocol,failure,legacyExchanges).also(retain)
         }
     }
 
