@@ -38,6 +38,8 @@ internal static class ObdJ1979FunctionalScan
                 s.ResponseHex is not null)
             .Select(s=>ObdJ1979ExtendedVehicleInfo.Can(
                 Convert.ToByte(s.RequestHex[2..],16),Convert.FromHexString(s.ResponseHex!))).ToArray();
+        public IReadOnlyList<object> ScaledMonitorRecords => Steps.SelectMany(s=>
+            ObdJ1979Mode06.Project(s.RequestHex,s.ResponseHex,s.Status)).Select(ObdJ1979Mode06.Evidence).ToArray();
         public IReadOnlyList<ObdJ1979Mode06.Test> MonitorTests => Steps
             .Where(s=>s.Status=="PASSED" && s.RequestHex.Length==4 &&
                 s.RequestHex.StartsWith("06", StringComparison.Ordinal) &&
