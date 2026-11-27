@@ -94,6 +94,34 @@ public final class J1979FreezeUsbTest {
         for(byte[] bad:new byte[][]{damaged,Arrays.copyOf(capture,capture.length-1),concat(capture,new byte[]{0})}){
             assert !J1979FreezeUsbCapture.decode(new ByteArrayInputStream(bad),profile).frameIntegrityVerified;
         }
+        byte[] prefix=Arrays.copyOf(capture,capture.length-32); // 8+20+4-byte terminal omitted
+        J1979FreezeUsbCapture.Prefix parsed=J1979FreezeUsbCapture.inspectPrefix(prefix,VIN);
+        assert parsed.observations.size()==6&&parsed.completeRecords==7;
+        assert parsed.discardedTailBytes==0&&parsed.interruption.equals("MISSING_TERMINAL");
+        assert parsed.lastCompleteOffset==prefix.length;
+        byte[] onlyPlan=Arrays.copyOf(capture,12+J1979FreezeUsbAuth.PLAN_SIZE);
+        assert J1979FreezeUsbCapture.inspectPrefix(onlyPlan,VIN).observations.size()==0;
+        byte[] partialHeader=concat(prefix,new byte[]{'C','F',1,3,7});
+        assert J1979FreezeUsbCapture.inspectPrefix(partialHeader,VIN)
+            .interruption.equals("TRUNCATED_HEADER");
+        byte[] partialTerminal=Arrays.copyOf(capture,capture.length-1);
+        assert J1979FreezeUsbCapture.inspectPrefix(partialTerminal,VIN)
+            .interruption.equals("TRUNCATED_RECORD");
+        byte[] corruptedPrefix=prefix.clone();
+        corruptedPrefix[corruptedPrefix.length-5]^=1;
+        for(byte[] bad:new byte[][]{capture,corruptedPrefix,
+                concat(prefix,new byte[]{'X'}),concat(prefix,new byte[]{'C','F',1,3,8})}){
+            boolean rejected=false;
+            try{J1979FreezeUsbCapture.inspectPrefix(bad,VIN);}
+            catch(IOException expected){rejected=true;}
+            assert rejected:"CF/1 prefix must reject complete or malformed records";
+        }
+        {
+            boolean rejected=false;
+            try{J1979FreezeUsbCapture.inspectPrefix(prefix,"1G1FA1E30D7654321");}
+            catch(IOException expected){rejected=true;}
+            assert rejected:"CF/1 prefix VIN must be supplied independently";
+        }
         Sim link=new Sim(concat(challenge,capture));
         ByteArrayOutputStream output=new ByteArrayOutputStream();
         J1979FreezeUsbCapture.Result live=new J1979FreezeUsbCapture(link).runRequest(
