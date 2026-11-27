@@ -87,6 +87,25 @@ internal static class ObdJ1979ExtendedVehicleInfo
         throw new InvalidDataException("Invalid extended legacy InfoType.");
     }
 
+    internal static Record? TryRaw(string requestHex,string? responseHex,string status)
+    {
+        if(status!="RAW"||requestHex.Length!=4||!requestHex.StartsWith("09",StringComparison.Ordinal)||
+            !byte.TryParse(requestHex.AsSpan(2),NumberStyles.HexNumber,CultureInfo.InvariantCulture,out byte type)||
+            !IsExtended(type)||responseHex is null||responseHex.Length is <6 or >8190)
+            return null;
+        try{return Can(type,Convert.FromHexString(responseHex));}
+        catch(Exception error) when(error is InvalidDataException or FormatException){return null;}
+    }
+
+    internal static object Evidence(Record record)
+    {
+        if(record.CounterCount is null)return new {info_type=record.InfoType,values=record.Values};
+        return new {info_type=record.InfoType,general_denominator=record.GeneralDenominator,
+            ignition_cycles=record.IgnitionCycles,counter_count=record.CounterCount,
+            monitors=(record.Monitors??[]).Select(m=>new {monitor=m.Name,numerator=m.Numerator,
+                denominator=m.Denominator,ratio=m.Ratio}),regulatory_verdict=(string?)null};
+    }
+
     internal static string Format(Record record)
     {
         if(record.CounterCount is null)return string.Join(", ",record.Values);
