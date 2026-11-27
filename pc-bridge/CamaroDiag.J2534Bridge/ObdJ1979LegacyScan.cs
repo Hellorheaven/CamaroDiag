@@ -26,6 +26,7 @@ internal static class ObdJ1979LegacyScan
         public IReadOnlyList<DtcSummary> DtcModes { get; init; }=[];
         public IReadOnlyList<ObdJ1979PidValues.Value> Measurements { get; init; }=[];
         public IReadOnlyList<ObdJ1979MultiSignal.Record> MultiSignalRecords { get; init; }=[];
+        public IReadOnlyList<ObdJ1979Status.Record> StatusRecords { get; init; }=[];
         public J1979CampaignSemantics.Readiness? Readiness { get; init; }
         public IReadOnlyList<Identification> IdentificationRecords { get; init; }=[];
         public IReadOnlyList<MonitorRecord> MonitorRecords { get; init; }=[];
@@ -57,6 +58,7 @@ internal static class ObdJ1979LegacyScan
         var dtcs=new Dictionary<byte,string[]>();
         var measurements=new List<ObdJ1979PidValues.Value>();
         var multiSignals=new List<ObdJ1979MultiSignal.Record>();
+        var statusRecords=new List<ObdJ1979Status.Record>();
         var identification=new List<Identification>();
         var monitors=new List<MonitorRecord>();
         J1979CampaignSemantics.Readiness? readiness=null;
@@ -67,7 +69,7 @@ internal static class ObdJ1979LegacyScan
             DeclaredVin=expectedVin,Inventory=inventories.ToArray(),
             DtcModes=new byte[]{3,7,10}.Select(mode=>new DtcSummary(mode,dtcs.GetValueOrDefault(mode),
                 steps.SingleOrDefault(x=>x.RequestHex==mode.ToString("X2"))?.Status)).ToArray(),
-            Measurements=measurements.ToArray(),MultiSignalRecords=multiSignals.ToArray(),Readiness=readiness,IdentificationRecords=identification.ToArray(),
+            Measurements=measurements.ToArray(),MultiSignalRecords=multiSignals.ToArray(),StatusRecords=statusRecords.ToArray(),Readiness=readiness,IdentificationRecords=identification.ToArray(),
             MonitorRecords=monitors.ToArray(),FreezeFrameTrigger=freeze
         };
 
@@ -280,6 +282,8 @@ internal static class ObdJ1979LegacyScan
                 2 when mode == 2 => 2,
                 _ => ObdJ1979PidValues.DataLength(pid)
             };
+            if(mode==1 && ObdJ1979Status.Width(pid) is not null &&
+                ObdJ1979Status.DecodeData(pid,r.AsSpan(offset)) is null)return false;
             if(mode==1 && ObdJ1979MultiSignal.Width(pid) is not null)
                 return ObdJ1979MultiSignal.DecodeData(pid,r.AsSpan(offset)) is not null;
             return width is null || r.Length == offset + width.Value;
@@ -290,10 +294,16 @@ internal static class ObdJ1979LegacyScan
             byte[] request=mode==2?[mode,pid,0]:[mode,pid];
             var rows=Read(request,r=>PidRecord(r,mode,pid),single:true);
             if(rows.Length!=1)return rows;
+            var states=ObdJ1979Status.DecodeResponse(request,rows[0]);
+            if(states is not null)statusRecords.Add(new(Convert.ToHexString(request),states));
             var multi=ObdJ1979MultiSignal.DecodeResponse(request,rows[0]);
             if(multi is not null){
                 multiSignals.Add(new(Convert.ToHexString(request),multi));
-                steps[^1]=steps[^1] with {Status="RAW",Detail=ObdJ1979MultiSignal.Format(multi)};
+                steps[^1]=steps[^1] with {Status="RAW",Detail=(states is null?"":ObdJ1979Status.Format(states)+"; ")+ObdJ1979MultiSignal.Format(multi)};
+                return rows;
+            }
+            if(states is not null && pid is not (0x13 or 0x1D)){
+                steps[^1]=steps[^1] with {Status="RAW",Detail=ObdJ1979Status.Format(states)};
                 return rows;
             }
             var value=ObdJ1979PidValues.Decode(request,rows[0]);
