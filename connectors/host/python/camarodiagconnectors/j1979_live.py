@@ -92,7 +92,8 @@ class _Accumulator:
 
 
 def record(exchange, plan: Plan, *, clock=time.monotonic, sleep=time.sleep,
-           require_current=lambda:None, on_observation=lambda _:None):
+           require_current=lambda:None, on_observation=lambda _:None,
+           request_timeout=lambda _:2.5):
     """Capture a private prefix even on cancellation or transport failure.
 
     A cycle is a sequence of individual requests, not simultaneous samples.
@@ -138,7 +139,10 @@ def record(exchange, plan: Plan, *, clock=time.monotonic, sleep=time.sleep,
              "elapsed_ms":None,"duration_ms":None,"status":"NOT_TESTED","detail":None,
              "measurement":None,"application_evidence":None}
         try:
-            raw=exchange(request,min(2.5,remaining()))
+            allowed_timeout=request_timeout(request)
+            if not math.isfinite(allowed_timeout) or not 0<allowed_timeout<=30:
+                raise ValueError("Invalid per-request time limit")
+            raw=exchange(request,min(allowed_timeout,remaining()))
             if not isinstance(raw,bytes) or len(raw)>4095:
                 raise ValueError("Invalid response type or length")
             row["response_hex"]=raw.hex().upper()

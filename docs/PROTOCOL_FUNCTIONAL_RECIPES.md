@@ -140,3 +140,7 @@ Tests privés : sélectionner l'interface J2534, arrêter le pont et la console,
 ### J1979 — enregistrement physique des mesures / physical live recording
 
 Linux SocketCAN `camarodiagconnectors-j1979-live`, Windows J2534 `--j1979-live` ou bouton Enregistrement J1979 dans les tests privés. Canal physique et VIN attendus explicites, PID numériques sélectionnés et annoncés, limite de cycles/temps, contrôle VIN initial et final et périodique pour les campagnes longues. Export JSON/CSV : aucune mesure inventée à la suite d'un silence. Les lectures d'un cycle ne sont pas simultanées. Aucune mutation, aucun essai physique revendiqué.
+
+### J1979 legacy — enregistrement continu / legacy live
+
+CLI hôte ELM `camarodiagconnectors-j1979-legacy-live` : cinq variantes fixes, sélection de la source de réponse, contrôle du VIN fragmenté et du protocole, acquisition des seuls PID numériques annoncés, rapport et CSV exclusifs. La source filtre la réponse, non la portée de transmission. Traces originales et représentation applicative normalisée distinctes. Aucun Mode 04/08. Les essais matériels sont à réaliser séparément.

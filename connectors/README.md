@@ -261,3 +261,11 @@ camarodiagconnectors-j1979-live --interface can0 --tx 7E0 --rx 7E8 --vin VIN_DOC
 Remplacer VIN et adresses par ceux documentés. La recette vérifie le VIN avant, pendant les campagnes longues et à la fin. Seuls les PID numériques sélectionnés et confirmés par une chaîne de bitmaps sont interrogés. Chaque valeur possède son horodatage et sa réponse ; zéro n'est jamais utilisé à la place d'un timeout. Les cycles ne sont pas des acquisitions simultanées. Export JSON/CSV exclusif, limite de temps et d'observations. Le rapport est incomplet si l'identité finale est perdue ; aucune preuve physique ou mutation revendiquée.
 
 The live recorder uses one documented physical CAN channel, verified VIN and advertised numeric Mode 01 PIDs. Per-request timestamps and raw evidence, no reused stale values, bounded cycles/deadline, no mutations. Output paths must be new.
+
+### SAE J1979 — enregistrement legacy ELM / legacy live recording
+
+```sh
+camarodiagconnectors-j1979-legacy-live --port /dev/ttyUSB0 --protocol 2 --source 10 --vin VIN_DOCUMENTE --pid 05 --pid 0C --cycles 30 --interval 1 --confirm-dedicated-adapter --confirm-functional-scope --output legacy-live.json --csv legacy-live.csv
+```
+
+Variantes 1 PWM, 2 VPW, 3 ISO 9141-2, 4 KWP slow init, 5 KWP fast init. Sélectionner la vraie source et le VIN documentés. Chaque contrôle VIN relit PID00, ATDPN, 0900/0901/0902 sur la source choisie ; trames numérotées et checksums obligatoires. Les demandes restent fonctionnelles, aucune preuve d’adressage physique. Le JSON distingue les données applicatives normalisées des trames réellement reçues. Seuls les PID numériques annoncés sont lus, avec horodatage et statistiques ; les absences de réponse ne deviennent jamais des valeurs. Aucun effacement/actionnement. / Dedicated ELM, explicit legacy variant and response source, shared time budget, original frame evidence and no physical addressing or coverage claim.

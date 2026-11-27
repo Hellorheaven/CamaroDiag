@@ -131,10 +131,12 @@ class LegacyElmSerial:
                                warning_acknowledged=warning_acknowledged, confirmed_yes=confirmed_yes,
                                save_baseline=save_baseline, require_current=require_current)
 
-    def observed_protocol(self) -> int:
+    def observed_protocol(self, timeout: float = 2.0) -> int:
         if not self._ready:
             raise RuntimeError("No synchronized ELM session")
-        raw = self._command("ATDPN", 2.0)
+        if not 0 < timeout <= 2.0:
+            raise ValueError("Invalid protocol probe timeout")
+        raw = self._command("ATDPN", timeout)
         values = [s.strip().upper() for s in raw.splitlines()
                   if s.strip() and s.strip().upper() != "ATDPN"]
         if values != [str(self.protocol)]:

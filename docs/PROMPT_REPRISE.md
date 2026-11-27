@@ -1,3 +1,7 @@
+## SAE J1979 — enregistreur legacy ELM hôte (27/11/2026)
+
+- Nouvelle recette continue sur les cinq variantes ELM, source documentée et VIN vérifié par cinq fragments avec PID00 et ATDPN à chaque contrôle d'identité. Moteur de cycles réutilisé avec budget par requête logique et conservation de toutes les trames brutes, distinction explicite entre réponse normalisée et transport legacy. CLI, JSON/CSV, documentation FR/EN, régressions écrites non exécutées. Aucun adressage physique revendiqué, aucune mutation. C6/J1979 ouverts.
+
 ## SAE J1979 — enregistrement continu Android ELM/STN (27/11/2026)
 
 - Moteur Mode 01 numérique sur adresse physique explicite, VIN et ATDPN initial/périodique/final, inventaire de support, cycles à budget global et mesures horodatées indépendantes, statistiques, préfixe d'annulation conservé après restauration du profil. Intégration dans tests privés Android, paramètres FR/EN, affichage progressif, JSON et CSV dans stockage autorisé. Aucune mutation ni qualification physique. Tests écrits non exécutés ; C6 et J1979 ouverts. Chemins Kotlin canoniques contrôlés avant publication.
