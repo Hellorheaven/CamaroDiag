@@ -105,15 +105,18 @@ void CaptureJournal::append_single(Data single){
 }
 void CaptureJournal::append(const ScanExchange& x){
     if(kind_!=JournalKind::scan)throw std::logic_error("Wrong journal exchange kind");
-    auto v=scan_;v.trace.push_back(x);append_single(encode_scan_capture(v));
+    try{auto v=scan_;v.trace.push_back(x);append_single(encode_scan_capture(v));}
+    catch(const std::exception&){failed_=true;throw std::runtime_error("Legacy journal rejected observation");}
 }
 void CaptureJournal::append(const FreezeExchange& x){
     if(kind_!=JournalKind::freeze)throw std::logic_error("Wrong journal exchange kind");
-    auto v=freeze_;v.trace.push_back(x);append_single(encode_freeze_capture(v));
+    try{auto v=freeze_;v.trace.push_back(x);append_single(encode_freeze_capture(v));}
+    catch(const std::exception&){failed_=true;throw std::runtime_error("Legacy journal rejected observation");}
 }
 void CaptureJournal::append(const LiveExchange& x){
     if(kind_!=JournalKind::live)throw std::logic_error("Wrong journal exchange kind");
-    auto v=live_;v.trace.push_back(x);append_single(encode_live_capture(v));
+    try{auto v=live_;v.trace.push_back(x);append_single(encode_live_capture(v));}
+    catch(const std::exception&){failed_=true;throw std::runtime_error("Legacy journal rejected observation");}
 }
 void CaptureJournal::finish(){
     if(!count_||finished_||failed_)throw std::runtime_error("No completed journal recording");
