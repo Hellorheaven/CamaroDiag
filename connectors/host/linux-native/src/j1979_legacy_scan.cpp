@@ -200,8 +200,8 @@ public:
             if(result_.final_vin!=result_.expected_vin)throw TransportError("FINAL_VIN_UNVERIFIED_OR_CHANGED");
             (void)remaining();
             result_.identity_rechecked=true;
-            result_.completed=mode1.complete;
-            if(!result_.completed)result_.error="MODE01_INVENTORY_PARTIAL";
+            result_.completed=mode1.complete&&std::none_of(result_.steps.begin(),result_.steps.end(),[](const ScanStep& step){return step.status=="FAILED";});
+            if(!result_.completed)result_.error=mode1.complete?"OBSERVATION_FAILED":"MODE01_INVENTORY_PARTIAL";
         }catch(const Cancelled&){result_.error="CANCELLED";}
         catch(const TransportError& e){result_.error=e.what();}
         return std::move(result_);
