@@ -80,6 +80,7 @@ int cf1_inspect_prefix(const uint8_t *raw, size_t length,
 int cf1_inspect_complete(const uint8_t *raw, size_t length,
                          const char *independent_vin, cf1_evidence *out,
                          char *error, size_t error_size);
+bool cf1_measurement_correlated(const cf1_observation *observation);
 void cf1_evidence_free(cf1_evidence *evidence);
 uint32_t cf1_crc32(const uint8_t *data, size_t size);
 bool cf1_valid_vin(const char *vin);

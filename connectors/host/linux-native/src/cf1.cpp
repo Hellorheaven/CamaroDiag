@@ -224,6 +224,10 @@ static bool measurement_response(const cf1_observation *o, uint8_t pid,
         if (two[i] == pid) return data_length == 2;
     return true;
 }
+bool cf1_measurement_correlated(const cf1_observation *o){
+    return o&&o->request_length==3&&o->request[0]==2&&o->request[1]!=2&&o->request[1]%32&&
+        measurement_response(o,o->request[1],o->request[2]);
+}
 static const cf1_observation *request_frame(replay *r, uint8_t pid, uint8_t frame) {
     uint8_t req[3] = {2, pid, frame};
     return read_recipe(r, req, 3);
