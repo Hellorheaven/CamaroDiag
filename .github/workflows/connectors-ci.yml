@@ -60,6 +60,8 @@ jobs:
           /tmp/j1979_can_read_exchange_test
           g++ -std=c++11 -Wall -Wextra -Werror -pedantic connectors/firmware/shared/native-tests/j1979_can_campaign_test.cpp -o /tmp/j1979_can_campaign_test
           /tmp/j1979_can_campaign_test
+          g++ -std=c++11 -Wall -Wextra -Werror -pedantic connectors/firmware/shared/native-tests/j1979_freeze_campaign_test.cpp -o /tmp/j1979_freeze_campaign_test
+          /tmp/j1979_freeze_campaign_test
           g++ -std=c++11 -Wall -Wextra -Werror -pedantic connectors/firmware/shared/native-tests/j1979_campaign_evidence_test.cpp -o /tmp/j1979_campaign_evidence_test
           /tmp/j1979_campaign_evidence_test
           g++ -std=c++11 -Wall -Wextra -Werror -pedantic connectors/firmware/esp32s3/native-tests/j1979_usb_campaign_test.cpp -o /tmp/j1979_usb_campaign_test
