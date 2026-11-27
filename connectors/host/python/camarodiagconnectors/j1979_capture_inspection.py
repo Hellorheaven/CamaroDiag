@@ -143,8 +143,17 @@ def verify(capture, report, *, expected_vin=None):
     compare(report, "service_observations", replay["service_observations"])
     # Older v1 reports did not provide this derived view; if present it must
     # exactly match the captured response, not a producer-supplied claim.
+    from .j1979_multi_signal import historical_projection
+    catalog = "NOT_REPORTED"
     if "multi_signal_records" in report:
-        compare(report, "multi_signal_records", replay["multi_signal_records"])
+        if _same(report["multi_signal_records"], replay["multi_signal_records"]):
+            catalog = "CURRENT"
+        elif _same(report["multi_signal_records"], historical_projection(replay["multi_signal_records"])):
+            catalog = "HISTORICAL_49"
+        else:
+            differences.append("multi_signal_records")
+    if "status_records" in report:
+        compare(report, "status_records", replay["status_records"])
     if "extended_vehicle_info" in report:
         compare(report, "extended_vehicle_info", replay["extended_vehicle_info"])
     wanted_summary = replay["summary"]
@@ -227,6 +236,8 @@ def verify(capture, report, *, expected_vin=None):
         "service_observations": replay["service_observations"],
         "extended_vehicle_info": replay["extended_vehicle_info"],
         "multi_signal_records": replay["multi_signal_records"],
+        "multi_signal_report_catalog": catalog,
+        "status_records": replay["status_records"],
         "capture_error": replay["error"],
         "host_error": report.get("error"),
         "device_credential_independently_verified": False,
