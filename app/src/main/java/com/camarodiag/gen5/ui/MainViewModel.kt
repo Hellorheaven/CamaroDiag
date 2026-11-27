@@ -6784,6 +6784,35 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun exportFunctionalNativeLiveCsv() {
+        val account=authenticatedAccountUid?:return
+        val generation=accountSessionGeneration
+        val snapshot=_functionalTestState.value
+        val evidence=snapshot.nativeLiveEvidence?:return
+        if(snapshot.running||!snapshot.canExport||!evidence.captureIntegrityVerified)return
+        fun current()=isCurrentAccountGeneration(generation)&&authenticatedAccountUid==account&&
+            currentLicenseLevel==LicenseLevel.OWNER&&_functionalTestState.value===snapshot
+        viewModelScope.launch {
+            if(!confirmFunctionalTestOwner(account)||!current())return@launch
+            try {
+                val bytes=withContext(Dispatchers.IO) {
+                    check(current())
+                    val replay=com.camarodiag.gen5.data.obd.CamaroDiagConnectorLiveCampaign.verifiedReplay(evidence)
+                    val output=J1979NativeLiveCsv.encode(replay)
+                    check(current())
+                    output
+                }
+                val path=CamaroDiagExportStorage.write(getApplication<Application>(),
+                    "CamaroDiag_SAE-J1979_NATIVE_LIVE_${snapshot.startedAtMillis}.csv","text/csv",
+                    category=CamaroDiagExportStorage.Category.TESTS,beforePublish={
+                        check(current() && com.camarodiag.gen5.data.obd.CamaroDiagConnectorLiveCampaign.digest(evidence.capture)==evidence.sha256)
+                    }){it.write(bytes)}
+                if(current())_connectionMessage.value=localizedContext.getString(R.string.export_folder_success)+"\n"+path
+            }catch(cancelled:CancellationException){throw cancelled}
+            catch(_:Exception){if(current())_connectionMessage.value=localizedContext.getString(R.string.export_folder_failed)}
+        }
+    }
+
     fun exportFunctionalLiveCsv() {
         val account=authenticatedAccountUid?:return
         val generation=accountSessionGeneration
