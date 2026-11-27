@@ -8,27 +8,46 @@ from pathlib import Path
 import sys
 
 from .j1979_catalogue import read_catalogue, project, require, digest
-from .j1979_live_inspection import inspect, MAX_REPORT_BYTES
+from .j1979_live_inspection import inspect, _unwrap, MAX_REPORT_BYTES
 from .recovery_bundle import _regular, _json
 from .recovery_history import _compare_history_value
 
 MAX_PROJECTION = 128 * 1024 * 1024
+LOCAL_SCHEMA = "camarodiag-j1979-catalogue-local-projection-v1"
 
 def replay_file(path, vin):
     path = Path(path)
     raw, stamp = _regular(path, MAX_REPORT_BYTES)
-    result = inspect(_json(raw), expected_vin=vin)
+    document = _json(raw)
+    result = inspect(document, expected_vin=vin)
+    wrapper, original = _unwrap(document)
+    if wrapper is not original and "completed" in wrapper:
+        require(type(wrapper["completed"]) is bool, "Invalid outer completion status")
+        # A Windows UI cancellation can invalidate completion after a fully
+        # recorded acquisition. Do not promote it back to completed.
+        if not wrapper["completed"]:
+            result["completed"] = False
     again, final = _regular(path, MAX_REPORT_BYTES)
     require(raw == again and stamp == final, "Live report changed during replay")
     return result, stamp.digest
 
-def build_projection(args):
+def build_projection(args, *, local=False):
     catalogue, catalogue_sha = read_catalogue(args.catalogue, args.reference, args.reference_sha256)
     replay, source_sha = replay_file(args.report, args.vin)
     result = project(replay, catalogue)
     result.update({"catalogue_sha256": catalogue_sha,
                    "source_report_sha256": source_sha,
                    "expected_vin_independently_supplied": True})
+    if local:
+        # Native applications project application-level bytes and explicitly
+        # decline to claim an independent transport replay. Compare every
+        # projected field with a fresh independent replay of the original.
+        result.update(schema=LOCAL_SCHEMA, source_replay_verified=False,
+                      source_application_replay_verified=True,
+                      final_identity_verified=replay["final_identity_verified"])
+        result["channel"] = {key: value for key, value in result["channel"].items()
+                             if key != "link_checksum_verified"}
+        require(bool(result["rows"]), "Local projection requires admitted samples")
     # Revalidate the independently supplied material before writing any output.
     _, current_catalogue_sha = read_catalogue(args.catalogue, args.reference, args.reference_sha256)
     _, current_source_sha = replay_file(args.report, args.vin)
@@ -79,6 +98,10 @@ def main(argv=None):
     verify = commands.add_parser("verify-projection")
     projection_arguments(verify)
     verify.add_argument("--projection", type=Path, required=True)
+    local = commands.add_parser("verify-local-projection",
+                                help="Independently verify an Android or Windows projection")
+    projection_arguments(local)
+    local.add_argument("--projection", type=Path, required=True)
     args = parser.parse_args(argv)
     try:
         digest(args.reference_sha256)
@@ -97,11 +120,13 @@ def main(argv=None):
         else:
             raw, stamp = _regular(args.projection, MAX_PROJECTION)
             actual = _json(raw)
-            expected = build_projection(args)
+            expected = build_projection(args, local=args.command == "verify-local-projection")
             _compare_history_value(actual, expected, "catalogue projection")
             again, final = _regular(args.projection, MAX_PROJECTION)
             require(raw == again and stamp == final, "Projection changed during verification")
             print(json.dumps({"verified": True,
+                              "independent_source_replay_performed": True,
+                              "projection_schema": expected["schema"],
                               "projection_sha256": stamp.digest,
                               "source_report_sha256": expected["source_report_sha256"],
                               "catalogue_sha256": expected["catalogue_sha256"],
