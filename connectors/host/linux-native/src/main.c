@@ -1,10 +1,13 @@
 #define _POSIX_C_SOURCE 200809L
 #include "cf1.h"
+#include "cf1_usb.h"
 
 #include <errno.h>
 #include <fcntl.h>
 #include <inttypes.h>
 #include <openssl/evp.h>
+#include <openssl/crypto.h>
+#include <signal.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -220,19 +223,23 @@ static void write_prefix(json_writer *j, const cf1_evidence *e, const char *capt
     else write_literal(j, "null");
     write_literal(j, "}\n");
 }
-static void write_complete(json_writer *j, const cf1_evidence *e, const char *digest) {
+static void write_complete(json_writer *j, const cf1_evidence *e, const char *digest,
+                           bool live, bool authenticated, bool proof_sent) {
     write_literal(j, "{\n"
         "\"schema\":\"camarodiag-functional-j1979-native-freeze-v1\","
         "\"protocol\":\"SAE-J1979\","
-        "\"source\":\"OFFLINE_CF1\","
-        "\"capture_integrity_verified\":");
+        "\"source\":");
+    write_string(j, live ? "LIVE_USB_CU2" : "OFFLINE_CF1");
+    write_literal(j, ",\"capture_integrity_verified\":");
     write_bool(j, e->capture_integrity_verified);
     write_literal(j, ",\"execution_completed\":"); write_bool(j, e->execution_completed);
     write_literal(j,
         ",\"terminal_present\":true,"
-        "\"device_credential_authenticated\":false,"
-        "\"client_proof_sent\":false,"
-        "\"physical_vehicle_verified\":false,"
+        "\"device_credential_authenticated\":");
+    write_bool(j, authenticated);
+    write_literal(j, ",\"client_proof_sent\":");
+    write_bool(j, proof_sent);
+    write_literal(j, ",\"physical_vehicle_verified\":false,"
         "\"hardware_provenance_verified\":false,"
         "\"permits_programming\":false,"
         "\"evidence_authenticated\":false,"
@@ -323,7 +330,7 @@ static int inspect_complete(const char *capture_path, const char *vin, const cha
     if (ok) {
         writer.bytes = calloc(1, writer.capacity);
         ok = writer.bytes != NULL;
-        if (ok) write_complete(&writer, &evidence, original.digest);
+        if (ok) write_complete(&writer, &evidence, original.digest, false, false, false);
         if (writer.failed) ok = false;
     }
     if (ok) ok = load_regular(capture_path, CF1_MAX_BYTES, &again) &&
@@ -369,10 +376,197 @@ static int verify(const char *capture_path, const char *report_path,
     free_input(&capture); free_input(&stored);
     return ok ? 0 : error("CF/1 verification refused: wrong report, unstable inputs, or output exists");
 }
+typedef struct {
+    cf1_plan plan;
+    const char *port, *credential, *capture, *report;
+    bool approved;
+} capture_options;
+static bool hex_uint32(const char *value, uint32_t *out) {
+    if (!value || !*value || *value == '-' || *value == '+') return false;
+    if (value[0] == '0' && (value[1] == 'x' || value[1] == 'X'))
+        value += 2;
+    if (!*value) return false;
+    for (const char *p = value; *p; ++p)
+        if (!((*p >= '0' && *p <= '9') ||
+              (*p >= 'a' && *p <= 'f') ||
+              (*p >= 'A' && *p <= 'F'))) return false;
+    errno = 0;
+    char *end = NULL;
+    unsigned long n = strtoul(value, &end, 16);
+    if (errno || *end || n > UINT32_MAX) return false;
+    *out = (uint32_t)n; return true;
+}
+static bool decimal_uint32(const char *value, uint32_t *out) {
+    if (!value || !*value) return false;
+    for (const char *p = value; *p; ++p)
+        if (*p < '0' || *p > '9') return false;
+    errno = 0;
+    char *end = NULL;
+    unsigned long n = strtoul(value, &end, 10);
+    if (errno || *end || n > UINT32_MAX) return false;
+    *out = (uint32_t)n; return true;
+}
+static bool parse_capture_options(int argc, char **argv, capture_options *o) {
+    memset(o, 0, sizeof(*o));
+    o->plan.budget_ms = 180000;
+    bool tx = false, rx = false, budget = false, vin = false, extended = false;
+    for (int i = 2; i < argc; ++i) {
+        const char *name = argv[i];
+        if (!strcmp(name, "--extended")) {
+            if (extended) return false;
+            extended = o->plan.extended = true;
+            continue;
+        }
+        if (!strcmp(name, "--confirm-physical-channel")) {
+            if (o->approved) return false;
+            o->approved = true; continue;
+        }
+        if (i + 1 >= argc || argv[i+1][0] == '-') return false;
+        const char *value = argv[++i];
+        if (!strcmp(name, "--port")) {
+            if (o->port) return false;
+            o->port = value;
+        } else if (!strcmp(name, "--key-file")) {
+            if (o->credential) return false;
+            o->credential = value;
+        } else if (!strcmp(name, "--capture")) {
+            if (o->capture) return false;
+            o->capture = value;
+        } else if (!strcmp(name, "--output")) {
+            if (o->report) return false;
+            o->report = value;
+        } else if (!strcmp(name, "--tx")) {
+            if (tx || !hex_uint32(value, &o->plan.tx)) return false;
+            tx = true;
+        } else if (!strcmp(name, "--rx")) {
+            if (rx || !hex_uint32(value, &o->plan.rx)) return false;
+            rx = true;
+        } else if (!strcmp(name, "--vin")) {
+            if (vin || !cf1_valid_vin(value)) return false;
+            memcpy(o->plan.vin, value, 18);
+            vin = true;
+        } else if (!strcmp(name, "--budget-ms")) {
+            if (budget || !decimal_uint32(value, &o->plan.budget_ms))
+                return false;
+            budget = true;
+        } else if (!strcmp(name, "--frame") || !strcmp(name, "--pid")) {
+            uint32_t byte = 0;
+            if (!hex_uint32(value, &byte) || byte > 255) return false;
+            if (!strcmp(name, "--frame")) {
+                if (o->plan.frame_count >= CF1_MAX_FRAMES) return false;
+                o->plan.frames[o->plan.frame_count++] = (uint8_t)byte;
+            } else {
+                if (o->plan.pid_count >= CF1_MAX_PIDS) return false;
+                o->plan.pids[o->plan.pid_count++] = (uint8_t)byte;
+            }
+        } else return false;
+    }
+    return o->approved && tx && rx && vin &&
+           o->port && o->credential && o->capture && o->report &&
+           strcmp(o->capture, o->report) &&
+           strcmp(o->credential, o->report) &&
+           strcmp(o->credential, o->capture) &&
+           cf1_valid_plan(&o->plan);
+}
+static bool read_key_file(const char *path, uint8_t key[32]) {
+    int fd = open(path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK);
+    if (fd < 0) return false;
+    struct stat st;
+    bool ok = fstat(fd, &st) == 0 && S_ISREG(st.st_mode) &&
+        st.st_size == 32 && (st.st_mode & 0007) == 0;
+    if (ok) {
+        size_t n = 0;
+        while (n < 32) {
+            ssize_t got = read(fd, key + n, 32 - n);
+            if (got < 0 && errno == EINTR) continue;
+            if (got <= 0) { ok = false; break; }
+            n += (size_t)got;
+        }
+    }
+    if (close(fd) < 0) ok = false;
+    if (!ok) OPENSSL_cleanse(key, 32);
+    return ok;
+}
+static void cancel_handler(int signum) {
+    (void)signum;
+    cf1_usb_request_cancel();
+}
+static int capture_native(int argc, char **argv) {
+    capture_options o = {0};
+    if (!parse_capture_options(argc, argv, &o))
+        return error("Explicit physical scope, key, port, VIN, frame and --confirm-physical-channel required");
+    if (!isatty(STDIN_FILENO))
+        return error("CU/2 requires an interactive local operator approval");
+    fprintf(stderr,
+        "Selected real USB connector and physical ECU; read-only Mode 02, stationary vehicle? [yes/no] ");
+    char answer[16] = {0};
+    if (!fgets(answer, sizeof(answer), stdin) || strcmp(answer, "yes\n"))
+        return error("No live CU/2 session without explicit confirmation");
+    uint8_t key[32] = {0};
+    if (!read_key_file(o.credential, key))
+        return error("Invalid 32-byte credential file or unsafe file permissions");
+    struct sigaction action = {0}, oldint = {0}, oldterm = {0};
+    action.sa_handler = cancel_handler;
+    sigemptyset(&action.sa_mask);
+    sigaction(SIGINT, &action, &oldint);
+    sigaction(SIGTERM, &action, &oldterm);
+    cf1_usb_capture_result usb = {0};
+    char failure[256] = {0};
+    int transport = cf1_usb_capture(o.port, &o.plan, key, o.capture,
+                                     &usb, failure, sizeof(failure));
+    sigaction(SIGINT, &oldint, NULL);
+    sigaction(SIGTERM, &oldterm, NULL);
+    OPENSSL_cleanse(key, sizeof(key));
+    input capture = {0}, again = {0};
+    cf1_evidence evidence = {0};
+    bool valid = transport == 0 &&
+                 load_regular(o.capture, CF1_MAX_BYTES, &capture);
+    if (valid) {
+        valid = cf1_inspect_complete(capture.bytes, capture.length,
+                                    o.plan.vin, &evidence,
+                                    failure, sizeof(failure)) == 0;
+    }
+    if (valid) valid = load_regular(o.capture, CF1_MAX_BYTES, &again) &&
+                       same_input(&capture, &again);
+    json_writer writer = { .capacity = 65536 };
+    writer.bytes = calloc(1, writer.capacity);
+    if (!writer.bytes) valid = false;
+    if (writer.bytes && valid) {
+        write_complete(&writer, &evidence, capture.digest, true,
+                       usb.authenticated, usb.client_proof_sent);
+    } else if (writer.bytes) {
+        write_literal(&writer,
+            "{\"schema\":\"camarodiag-functional-j1979-native-freeze-v1\","
+            "\"protocol\":\"SAE-J1979\","
+            "\"source\":\"LIVE_USB_CU2\","
+            "\"capture_integrity_verified\":false,"
+            "\"execution_completed\":false,"
+            "\"physical_vehicle_verified\":false,"
+            "\"permits_programming\":false,"
+            "\"device_credential_authenticated\":");
+        write_bool(&writer, usb.authenticated);
+        write_literal(&writer, ",\"client_proof_sent\":");
+        write_bool(&writer, usb.client_proof_sent);
+        write_literal(&writer, ",\"observations_received\":0,\"error\":");
+        write_string(&writer, failure[0] ? failure : "Capture not fully validated");
+        write_literal(&writer, "}\n");
+    }
+    bool persisted = writer.bytes && !writer.failed &&
+        atomic_create(o.report, writer.bytes, writer.used);
+    int status = valid && evidence.execution_completed && persisted ? 0 : 2;
+    if (!persisted)
+        fprintf(stderr, "Native CF/1 report could not be created; original capture is preserved\n");
+    if (!valid)
+        fprintf(stderr, "Native CF/1 not validated: %s\n", failure[0] ? failure : "Unexpected failure");
+    free(writer.bytes); free_input(&capture); free_input(&again);
+    cf1_evidence_free(&evidence);
+    return status;
+}
 static void usage(FILE *stream) {
     fprintf(stream,
-        "CamaroDiag Linux native C — SAE J1979 Mode 02 CF/1 (offline, read-only)\n"
+        "CamaroDiag Linux native C — SAE J1979 Mode 02 CF/1\n"
         "Usage:\n"
+        "  camarodiag-native --j1979-freeze-native --port /dev/ttyACM0 --key-file key.bin --capture capture.cf --output rapport.json --tx 7E0 --rx 7E8 --vin VIN --frame 00 --pid 0C --budget-ms 60000 --confirm-physical-channel\n"
         "  camarodiag-native --inspect-j1979-freeze-native-prefix CAPTURE.cf VIN PREFIX.json\n"
         "  camarodiag-native --inspect-j1979-freeze-native CAPTURE.cf VIN REPORT.json\n"
         "  camarodiag-native --verify-j1979-freeze-native-prefix CAPTURE.cf PREFIX.json PROOF.json VIN\n"
@@ -380,12 +574,15 @@ static void usage(FILE *stream) {
         "Examples:\n"
         "  camarodiag-native --inspect-j1979-freeze-native-prefix incomplete.cf 2G1FA1E30D7654321 partial.json\n"
         "  camarodiag-native --verify-j1979-freeze-native-prefix incomplete.cf partial.json proof.json 2G1FA1E30D7654321\n"
-        "No vehicle transmission, no auto-discovery, no physical evidence verdict.\n");
+        "Live acquisition: explicit CU/2 proof and local confirmation; offline commands send nothing.\n"
+        "Never treats a CRC as cryptographic ECU proof. No automatic retry or write service.\n");
 }
 int main(int argc, char **argv) {
     if (argc == 2 && (!strcmp(argv[1], "--help") || !strcmp(argv[1], "-h"))) {
         usage(stdout); return 0;
     }
+    if (argc >= 3 && !strcmp(argv[1], "--j1979-freeze-native"))
+        return capture_native(argc, argv);
     if (argc == 5 && !strcmp(argv[1], "--inspect-j1979-freeze-native"))
         return inspect_complete(argv[2], argv[3], argv[4]);
     if (argc == 5 && !strcmp(argv[1], "--inspect-j1979-freeze-native-prefix"))

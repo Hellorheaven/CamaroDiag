@@ -57,3 +57,26 @@ les autres outils hôtes et l'interface Linux ne sont pas encore portés.
 Ne retirer les anciens outils qu'après remplacement complet de leurs
 contrats, tests et interfaces. La CI de clôture protocolaire doit être
 lancée uniquement lorsque tous ces raccordements sont terminés.
+
+## Acquisition CU/2 native sur Linux
+
+Le firmware compatible doit être qualifié et doté préalablement d'un secret
+partagé de 32 octets. Le terminal local demande une seconde confirmation ;
+aucun échange, recherche de port, découverte de véhicule ou réessai automatique
+n'est déclenché par --help, ni par l'analyse hors connexion.
+
+~~~sh
+./camarodiag-native --j1979-freeze-native \
+  --port /dev/ttyACM0 --key-file key.bin \
+  --capture campagne.cf --output campagne.json \
+  --tx 7E0 --rx 7E8 --vin 2G1FA1E30D7654321 \
+  --frame 00 --pid 0C --budget-ms 60000 \
+  --confirm-physical-channel
+~~~
+
+Le C authentifie le défi CU/2 par HMAC-SHA256 avant d'envoyer la preuve client,
+puis enregistre les octets CF/1 de la liaison, y compris les fins tronquées.
+L'outil relit le fichier et vérifie la campagne hors connexion avant export.
+Un rapport d'échec reste non validé et une capture interrompue est conservée
+pour analyse. Rien n'autorise la programmation ou une identification certaine
+de l'ECU physique. Cette voie n'a pas encore subi la validation de clôture.
