@@ -1,6 +1,7 @@
 #pragma once
 #include "host_session_arbiter.h"
 #include "../../shared/j1979_campaign_evidence.h"
+#include "../../shared/j1979_freeze_evidence.h"
 
 namespace cd {
 // Integration boundary for a qualified native USB owner, not discovery.
@@ -11,6 +12,8 @@ class J1979UsbCampaign {
   struct Profile {
     uint32_t tx=0,rx=0,budgetMs=0;
     bool extended=false;
+    bool freeze=false;
+    J1979FreezeScope freezeScope{};
   };
   class Owner {
    public:
@@ -31,11 +34,13 @@ class J1979UsbCampaign {
   struct Report {
     Outcome outcome=Outcome::Denied;
     J1979CanCampaign::Summary campaign;
+    J1979FreezeCampaign::Summary freezeCampaign;
   };
 
   static Report run(HostSessionArbiter& arbiter,Owner& owner,
       J1979CanReadLink& hardware,J1979CampaignEvidence::Writer& writer,
       const Profile& profile,J1979CanReadExchange::Result& scratch){
+    if(profile.freeze)return Report{};
     return runImpl(arbiter,owner,&hardware,nullptr,writer,profile,scratch);
   }
   // Interprocessor CI/2 client: its SPI port and STM32 endpoint must both
@@ -43,7 +48,15 @@ class J1979UsbCampaign {
   static Report runApplication(HostSessionArbiter& arbiter,Owner& owner,
       J1979CanCampaign::ApplicationLink& hardware,J1979CampaignEvidence::Writer& writer,
       const Profile& profile,J1979CanReadExchange::Result& scratch){
-    if(!hardware.matches(profile.tx,profile.rx,profile.extended))return Report{};
+    if(profile.freeze||!hardware.matches(profile.tx,profile.rx,profile.extended))return Report{};
+    return runImpl(arbiter,owner,nullptr,&hardware,writer,profile,scratch);
+  }
+  static Report runFreezeApplication(HostSessionArbiter& arbiter,Owner& owner,
+      J1979CanCampaign::ApplicationLink& hardware,J1979CampaignEvidence::Writer& writer,
+      const Profile& profile,J1979CanReadExchange::Result& scratch){
+    if(!profile.freeze||!profile.freezeScope.valid()||
+       !hardware.matches(profile.tx,profile.rx,profile.extended)||
+       !hardware.matchesFreeze(profile.freezeScope))return Report{};
     return runImpl(arbiter,owner,nullptr,&hardware,writer,profile,scratch);
   }
  private:
@@ -91,6 +104,9 @@ class J1979UsbCampaign {
       bool matches(uint32_t tx,uint32_t rx,bool ext)const override{
         return h_&&h_->matches(tx,rx,ext);
       }
+      bool matchesFreeze(const J1979FreezeScope& scope)const override{
+        return h_&&h_->matchesFreeze(scope);
+      }
       uint32_t monotonicMs()override{return h_?h_->monotonicMs():0;}
       void exchange(const uint8_t* req,size_t size,uint32_t timeout,
           J1979CanReadExchange::Result& result)override{
@@ -130,12 +146,18 @@ class J1979UsbCampaign {
     } output(guard,writer,arbiter,owner,profile,lease);
 
     J1979CampaignEvidence stream(output);
+    J1979FreezeEvidence freezeStream(output);
     // Never start an electrical channel before exclusive ownership. Recheck
     // authorization immediately before and after the hardware start.
     const bool channelStarted=guard.admitted()&&owner.startReadChannel(profile,lease);
     const bool started=channelStarted&&(application?remote.active():link.active())&&
-      stream.begin(profile.tx,profile.rx,profile.extended,profile.budgetMs);
-    if(started){
+      (profile.freeze?freezeStream.begin(profile.tx,profile.rx,profile.extended,
+        profile.budgetMs,profile.freezeScope):
+        stream.begin(profile.tx,profile.rx,profile.extended,profile.budgetMs));
+    if(started&&profile.freeze){
+      report.freezeCampaign=J1979FreezeCampaign::runApplication(remote,profile.tx,
+        profile.rx,profile.extended,profile.budgetMs,profile.freezeScope,freezeStream,scratch);
+    }else if(started){
       report.campaign=application?
         J1979CanCampaign::runApplication(remote,profile.tx,profile.rx,profile.extended,
           profile.budgetMs,stream,scratch):
@@ -155,9 +177,10 @@ class J1979UsbCampaign {
     }
     output.afterVerifiedStop();
     if(!channelStarted)report.outcome=Outcome::StartFailed;
-    else if(!started||!output.permitted()||!stream.finish(report.campaign))
+    else if(!started||!output.permitted()||!(profile.freeze?freezeStream.finish(report.freezeCampaign):stream.finish(report.campaign)))
       report.outcome=Outcome::EvidenceLost;
-    else report.outcome=report.campaign.end==J1979CanCampaign::End::Complete?
+    else report.outcome=(profile.freeze?report.freezeCampaign.completed:
+      report.campaign.end==J1979CanCampaign::End::Complete)?
       Outcome::Complete:Outcome::Partial;
     if(owner.currentEvidence(profile).recoveryPending){
       arbiter.latchRecovery();report.outcome=Outcome::EvidenceLost;return report;
