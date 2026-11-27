@@ -107,13 +107,15 @@ internal static class J1979FreezeNativeCli
         writer.WriteLine(J1979FreezeNative.EncodeReport(report));writer.Flush();output.Flush(true);
     }
 
-    internal static J1979FreezeNative.Report Inspect(string source,string destination)
+    internal static J1979FreezeNative.Report Inspect(string source,string destination,Func<bool>? current=null)
     {
         if(Path.GetFullPath(source).Equals(Path.GetFullPath(destination),StringComparison.OrdinalIgnoreCase))
             throw new ArgumentException("Capture and report paths must differ");
+        if(current is not null&&!current())throw new OperationCanceledException();
         using var input=new FileStream(source,FileMode.Open,FileAccess.Read,FileShare.Read);
         if(input.Length>J1979FreezeNative.MaximumCapture)throw new InvalidDataException("CF/1 capture exceeds bound");
         var report=J1979FreezeNative.Decode(input);
+        if(current is not null&&!current())throw new OperationCanceledException();
         using var output=new FileStream(destination,FileMode.CreateNew,FileAccess.Write,FileShare.None);
         Write(output,report);return report;
     }
