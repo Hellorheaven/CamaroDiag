@@ -63,6 +63,7 @@ internal static class SelfTests
         J1979UsbSelfTests.Run();
         J1979FreezeNativeSelfTests.Run();
         J1979LiveNativeSelfTests.Run();
+        J1979MaintenanceSelfTests.Run();
         Require(BinaryDiscovery.Crc32("123456789"u8)==0xcbf43926u);
         using(var link=new Simulation(false,false))
         {
