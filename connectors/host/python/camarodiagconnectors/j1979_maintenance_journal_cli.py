@@ -87,11 +87,17 @@ def acquire(args, *, prompt=input):
     # evidence must never be followed by command transmission.
     report_fd=os.open(args.output,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600)
     report=None
+    entered_usb=False
     with os.fdopen(report_fd,"wb") as report_stream:
         try:
+            write_new(args.output.with_name(args.output.name+".pending.json"), {
+                "schema":"camarodiag-j1979-maintenance-host-pending-v1",
+                "scope":scope.report(),"started_at_utc":started.isoformat(),
+                "raw_journal_name":args.journal.name,"permits_automatic_retry":False})
             raw_fd=os.open(args.journal,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600)
             with os.fdopen(raw_fd,"wb") as raw:
                 with serial.Serial(args.port,baudrate=115200,timeout=0.1,write_timeout=1) as device:
+                    entered_usb=True
                     report=capture(device,scope,key,raw)
                 raw.flush()
                 os.fsync(raw.fileno())
@@ -103,14 +109,14 @@ def acquire(args, *, prompt=input):
             if report is None:
                 report={"schema":"camarodiag-functional-j1979-native-maintenance-v1","protocol":"SAE-J1979",
                         "source":"LIVE_USB_CU4","scope":scope.report(),"device_credential_authenticated":False,
-                        "proof_transmission_attempted":False,"client_proof_sent":False,"journal_bytes_received":0,
+                        "proof_transmission_attempted":None if entered_usb else False,"client_proof_sent":False,"journal_bytes_received":0,
                         "cancelled":isinstance(exc,KeyboardInterrupt),"declared_recovery_in_envelope":None,
                         "physical_vehicle_verified":False,"evidence_authenticated":False,
                         "operator_consent_independently_verified":False,"permits_automatic_retry":False,
                         "permits_programming":False,"host_elapsed_ms":0}
             report.update(journal_transfer_verified=False,terminal_present=False,inspection=None,
-                          recovery_required=report["proof_transmission_attempted"],
-                          command_outcome_unknown=report["proof_transmission_attempted"],
+                          recovery_required=report["proof_transmission_attempted"] is not False,
+                          command_outcome_unknown=report["proof_transmission_attempted"] is not False,
                           error=str(exc) or type(exc).__name__)
         report["version"]="CU/4"
         report["declared_connector"]=args.port
