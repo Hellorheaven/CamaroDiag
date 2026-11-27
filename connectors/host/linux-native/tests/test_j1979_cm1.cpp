@@ -1,4 +1,7 @@
 #include "j1979_cm1.hpp"
+#include "j1979_cu45_session.hpp"
+#include <openssl/evp.h>
+#include <openssl/hmac.h>
 #include <algorithm>
 #include <array>
 #include <cassert>
@@ -76,8 +79,8 @@ struct Fixture {
         Buffer out;for(unsigned i=0;i<count;++i)append(out,records.at(i));return out;
     }
 };
-enum class Result {complete,refused,uncertain,remaining};
-Fixture fixture(unsigned operation,Result result=Result::complete,bool extended=false){
+enum class FixtureResult {complete,refused,uncertain,remaining};
+Fixture fixture(unsigned operation,FixtureResult result=FixtureResult::complete,bool extended=false){
     const std::span<const std::string_view> plan=operation==1?std::span<const std::string_view>(clear):
         std::span<const std::string_view>(evap);
     const std::span<const unsigned> phase=operation==1?std::span<const unsigned>(stages):
@@ -85,9 +88,9 @@ Fixture fixture(unsigned operation,Result result=Result::complete,bool extended=
     std::vector<Buffer> rows;
     for(unsigned i=0;i<plan.size();++i){
         unsigned state=1;
-        auto res=response(plan[i],i,result==Result::remaining);
-        if(phase[i]==6&&result==Result::refused){state=2;res={0x7f,hex(plan[i])[0],0x22};}
-        if(phase[i]==6&&result==Result::uncertain){state=3;res.clear();}
+        auto res=response(plan[i],i,result==FixtureResult::remaining);
+        if(phase[i]==6&&result==FixtureResult::refused){state=2;res={0x7f,hex(plan[i])[0],0x22};}
+        if(phase[i]==6&&result==FixtureResult::uncertain){state=3;res.clear();}
         rows.push_back(row(phase[i],state,plan[i],res,i));
         if(state!=1)break;
     }
@@ -96,10 +99,10 @@ Fixture fixture(unsigned operation,Result result=Result::complete,bool extended=
     const auto sc=scope(operation,extended);
     unsigned outcome=operation==1?5:6,reason=0,nrc=0,a=before|16|32|1|2|4|8,b=16;
     if(operation==1){a|=64;b|=15;}
-    if(result==Result::remaining){reason=13;b&=~4u;}
-    if(result==Result::refused||result==Result::uncertain){
-        outcome=result==Result::refused?2:3;reason=result==Result::refused?11:10;
-        nrc=result==Result::refused?0x22:0;a=before|16|32|1|2|4;b=16|(result==Result::uncertain?32:0);
+    if(result==FixtureResult::remaining){reason=13;b&=~4u;}
+    if(result==FixtureResult::refused||result==FixtureResult::uncertain){
+        outcome=result==FixtureResult::refused?2:3;reason=result==FixtureResult::refused?11:10;
+        nrc=result==FixtureResult::refused?0x22:0;a=before|16|32|1|2|4;b=16|(result==FixtureResult::uncertain?32:0);
     }
     return {{record(sc,0,1,{},rows,0),
         record(sc,1,2,summary(0,0,baseline,0,before|16,0),rows,baseline),
@@ -111,22 +114,22 @@ template<class F>void rejected(F action){
 }
 void terminal_cases(){
     for(unsigned op:{1u,2u})for(bool extended:{false,true}){
-        for(auto expected:{Result::complete,Result::refused,Result::uncertain}){
+        for(auto expected:{FixtureResult::complete,FixtureResult::refused,FixtureResult::uncertain}){
             const auto f=fixture(op,expected,extended);
             auto e=inspect(f.joined(),vin,false);
             assert(e.records.size()==4&&e.terminal&&e.baseline&&e.intent);
             assert(e.scope.extended==extended&&e.scope.operation==op);
-            const unsigned outcome=expected==Result::refused?2:expected==Result::uncertain?3:op==1?5:6;
+            const unsigned outcome=expected==FixtureResult::refused?2:expected==FixtureResult::uncertain?3:op==1?5:6;
             assert(e.terminal->outcome==outcome);
-            assert(e.recovery_required()==(expected==Result::uncertain));
-            assert((e.terminal->a&8)!=0u ? expected==Result::complete : expected!=Result::complete);
+            assert(e.recovery_required()==(expected==FixtureResult::uncertain));
+            assert((e.terminal->a&8)!=0u ? expected==FixtureResult::complete : expected!=FixtureResult::complete);
             const auto json=report(e,std::string(64,'a'));
             assert(json.find("\"permits_automatic_retry\":false")!=std::string::npos);
             assert(json.find("\"physical_vehicle_verified\":false")!=std::string::npos);
             assert(json.find("\"protocol\":\"SAE-J1979\"")!=std::string::npos);
         }
     }
-    const auto e=inspect(fixture(1,Result::remaining).joined(),vin,false);
+    const auto e=inspect(fixture(1,FixtureResult::remaining).joined(),vin,false);
     assert(e.terminal&&e.terminal->reason==13&&!e.recovery_required());
 }
 void interrupted(){
@@ -163,7 +166,7 @@ void corrupt_and_forged(){
     f=fixture(1);
     f.records[3][header_size+scope_size+summary_size+8]^=1;fix_crc(f.records[3]);
     rejected([&]{inspect(f.joined(),vin,false);});
-    f=fixture(2,Result::uncertain);
+    f=fixture(2,FixtureResult::uncertain);
     f.records[3][header_size+scope_size+5]&=std::uint8_t(~32u);fix_crc(f.records[3]);
     rejected([&]{inspect(f.joined(),vin,false);});
     f=fixture(1);
@@ -172,5 +175,166 @@ void corrupt_and_forged(){
     append(partial,torn);
     rejected([&]{inspect(partial,vin,true);});
 }
+namespace transport {
+using namespace cd::cu45;
+Nonce key(){Nonce k{};for(unsigned i=0;i<k.size();++i)k[i]=static_cast<std::uint8_t>(i);return k;}
+Nonce host(){Nonce n{};n.fill('H');return n;}
+Nonce device(){Nonce n{};n.fill('D');return n;}
+std::array<std::uint8_t,32> mac(const Buffer& data){
+    std::array<std::uint8_t,32> output{};
+    unsigned length=0;const auto k=key();
+    assert(HMAC(EVP_sha256(),k.data(),k.size(),data.data(),data.size(),output.data(),&length));
+    assert(length==output.size());return output;
 }
-int main(){terminal_cases();interrupted();corrupt_and_forged();}
+Challenge challenge(Mode mode,const Hello& h){
+    Challenge c{};c[0]='C';c[1]='U';c[2]=static_cast<std::uint8_t>(mode);c[3]=2;
+    const auto d=device();std::copy(d.begin(),d.end(),c.begin()+4);
+    Buffer transcript{static_cast<std::uint8_t>(mode==Mode::archive?'R':'M')};
+    transcript.insert(transcript.end(),h.begin()+4,h.end());transcript.insert(transcript.end(),d.begin(),d.end());
+    const auto tag=mac(transcript);std::copy(tag.begin(),tag.end(),c.begin()+36);return c;
+}
+Proof client(Mode mode,const Hello& h){
+    Proof p{};p[0]='C';p[1]='U';p[2]=static_cast<std::uint8_t>(mode);p[3]=3;
+    const auto d=device();
+    Buffer transcript{static_cast<std::uint8_t>(mode==Mode::archive?'r':'m')};
+    transcript.insert(transcript.end(),h.begin()+4,h.end());transcript.insert(transcript.end(),d.begin(),d.end());
+    const auto tag=mac(transcript);std::copy(tag.begin(),tag.end(),p.begin()+4);return p;
+}
+Buffer result_wire(Mode mode,const Buffer& raw,unsigned count,bool terminal,bool damaged,bool recovery){
+    Buffer result(12,0);result[0]='C';result[1]='U';result[2]=static_cast<std::uint8_t>(mode);result[3]=4;
+    if(mode==Mode::archive){
+        result[4]=std::uint8_t((terminal?1:0)|(damaged?2:0)|(recovery?4:0));
+        result[5]=std::uint8_t(count);
+    }else result[4]=recovery?3:2;
+    p32(result,8,static_cast<std::uint32_t>(raw.size()));append(result,raw);
+    if(mode==Mode::archive){
+        Buffer receipt(12,0);receipt[0]='C';receipt[1]='U';receipt[2]=5;receipt[3]=5;
+        p32(receipt,4,static_cast<std::uint32_t>(raw.size()));p32(receipt,8,crc(raw,raw.size()));
+        append(result,receipt);
+    }
+    return result;
+}
+struct LinkSim:Link{
+    Hello expected{};
+    Proof expected_proof{};
+    Buffer initial,after,available;
+    unsigned writes{},quiets{};
+    std::size_t offset{};
+    bool closed{},fail_proof{},fail_close{},fail_quiet{};
+    void write(Bytes b,std::uint64_t deadline)override{
+        assert(deadline>0);
+        ++writes;offset=0;
+        if(writes==1){
+            assert(std::equal(b.begin(),b.end(),expected.begin(),expected.end()));
+            available=initial;
+        }else if(writes==2){
+            assert(std::equal(b.begin(),b.end(),expected_proof.begin(),expected_proof.end()));
+            if(fail_proof)throw TransportError("SIMULATED_UNCERTAIN_PROOF");
+            available=after;
+        }else assert(false);
+    }
+    std::size_t read(std::span<std::uint8_t> b,std::uint64_t deadline)override{
+        assert(deadline>0);
+        const auto n=std::min({b.size(),std::size_t(7),available.size()-offset});
+        std::copy_n(available.begin()+offset,n,b.begin());offset+=n;return n;
+    }
+    void quiet(std::uint64_t)override{
+        ++quiets;
+        if(offset!=available.size()||fail_quiet)throw TransportError("SIMULATED_TRAILING_INPUT");
+    }
+    void finish()override{closed=true;if(fail_close)throw TransportError("SIMULATED_CLOSE_FAILURE");}
+};
+LinkSim simulator(Mode mode,const Scope& sc,const Buffer& wire){
+    LinkSim sim;
+    assert(hello(mode,sc,host(),sim.expected));
+    const auto c=challenge(mode,sim.expected);
+    sim.initial.assign(c.begin(),c.end());
+    sim.expected_proof=client(mode,sim.expected);
+    sim.after=wire;return sim;
+}
+void authentication(){
+    for(const auto mode:{Mode::maintenance,Mode::archive}){
+        for(const auto op:{1u,2u}){
+            Scope sc{op,false,0x7e0,0x7e8,60000,std::string(vin)};
+            Hello h{};
+            assert(hello(mode,sc,host(),h));
+            const auto c=challenge(mode,h);Proof answer{};
+            assert(proof(mode,h,c,key(),answer)&&answer==client(mode,h));
+            for(std::size_t i=0;i<c.size();++i){
+                auto changed=c;changed[i]^=1;answer.fill(255);
+                assert(!proof(mode,h,changed,key(),answer));
+                assert(std::all_of(answer.begin(),answer.end(),[](auto b){return b==0;}));
+            }
+            for(std::size_t i=0;i<h.size();++i){
+                auto changed=h;changed[i]^=1;assert(!proof(mode,changed,c,key(),answer));
+            }
+            assert(!proof(mode==Mode::archive?Mode::maintenance:Mode::archive,h,c,key(),answer));
+            assert(!hello(mode,sc,Nonce{},h));
+            sc.tx=0x7df;assert(!hello(mode,sc,host(),h));
+        }
+    }
+}
+void transfers(){
+    for(const auto mode:{Mode::maintenance,Mode::archive}){
+        for(const auto op:{1u,2u}){
+            const Scope sc{op,false,0x7e0,0x7e8,60000,std::string(vin)};
+            for(const auto outcome:{FixtureResult::complete,FixtureResult::refused,FixtureResult::uncertain}){
+                const auto f=fixture(op,outcome);
+                const unsigned count_min=mode==Mode::archive?1:4;
+                for(unsigned count=count_min;count<=4;++count){
+                    const auto raw=f.joined(count);
+                    const bool recovery=count!=4||outcome==FixtureResult::uncertain;
+                    const auto wire=result_wire(mode,raw,count,count==4,false,recovery);
+                    for(unsigned scenario=0;scenario<=9;++scenario){
+                        auto sim=simulator(mode,sc,wire);
+                        if(scenario==1)sim.initial[36]^=1;
+                        if(scenario==2)sim.after.pop_back();
+                        if(scenario==3)sim.fail_proof=true;
+                        if(scenario==4)sim.after.push_back(0);
+                        if(scenario==5)sim.after[2]=mode==Mode::archive?4:5;
+                        if(scenario==6)sim.fail_close=true;
+                        if(scenario==7)sim.fail_quiet=true;
+                        if(scenario==8)sim.after[12+15]^=1;
+                        Buffer persisted;
+                        std::uint64_t tick=100;
+                        Session session(sim,[&]{return tick++;},[&]{return scenario!=9||sim.writes<2;});
+                        const auto result=session.run(mode,sc,key(),host(),[&](Bytes bytes){
+                            persisted.insert(persisted.end(),bytes.begin(),bytes.end());
+                        },true);
+                        assert(sim.closed&&result.journal==persisted);
+                        assert(result.verified()==(scenario==0));
+                        if(scenario==0){
+                            assert(result.inspection&&result.journal==raw&&result.recovery_required()==recovery);
+                            const auto report=cd::cu45::report(result,std::string(64,'a'));
+                            assert(report.find("\"permits_automatic_retry\":false")!=std::string::npos);
+                            assert(report.find("\"physical_vehicle_verified\":false")!=std::string::npos);
+                        }else if(mode==Mode::archive)assert(result.recovery_required());
+                        else assert(result.recovery_required()==(scenario!=1&&scenario!=7));
+                        rejected([&]{session.run(mode,sc,key(),host(),[](Bytes){},true);});
+                        assert(sim.writes<=2);
+                    }
+                }
+            }
+        }
+    }
+}
+void torn_archive(){
+    const Scope sc{1,false,0x7e0,0x7e8,60000,std::string(vin)};
+    const auto f=fixture(1);auto raw=f.joined(3);
+    raw.insert(raw.end(),f.records[3].begin(),f.records[3].begin()+17);
+    auto sim=simulator(Mode::archive,sc,result_wire(Mode::archive,raw,3,false,true,true));
+    Session session(sim,[]{return std::uint64_t{100};},[]{return true;});
+    const auto r=session.run(Mode::archive,sc,key(),host(),[](Bytes){},true);
+    assert(r.verified()&&r.inspection->prefix&&r.recovery_required());
+    assert(r.inspection->total_bytes-r.inspection->verified_bytes==17);
+    auto no=simulator(Mode::archive,sc,result_wire(Mode::archive,raw,3,false,false,true));
+    Session refused(no,[]{return std::uint64_t{100};},[]{return true;});
+    assert(!refused.run(Mode::archive,sc,key(),host(),[](Bytes){},true).verified());
+    auto not_authorized=simulator(Mode::maintenance,sc,{});
+    Session denied(not_authorized,[]{return std::uint64_t{100};},[]{return true;});
+    rejected([&]{denied.run(Mode::maintenance,sc,key(),host(),[](Bytes){},false);});
+    assert(not_authorized.writes==0);
+}
+}
+}
+int main(){terminal_cases();interrupted();corrupt_and_forged();transport::authentication();transport::transfers();transport::torn_archive();}

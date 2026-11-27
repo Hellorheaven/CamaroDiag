@@ -62,8 +62,8 @@ test-cu1: build/test_j1979_cu1.o build/j1979_cu1.o build/j1979_cj1.o build/j1979
 test-j1979-cj1: build/test_j1979_cj1.o build/j1979_cj1.o build/j1979_policy.o $(DECODER_OBJECTS)
 	$(CXX) $(LDFLAGS) $^ -o $@
 
-test-j1979-cm1: build/test_j1979_cm1.o build/j1979_cm1.o
-	$(CXX) $(LDFLAGS) $^ -o $@
+test-j1979-cm1: build/test_j1979_cm1.o build/j1979_cm1.o build/j1979_cu45.o build/j1979_cu45_session.o build/j1979_cu45_report.o
+	$(CXX) $(LDFLAGS) $^ $(LDLIBS) -o $@
 
 test-j1979-context: build/test_j1979_context.o build/j1979_context.o
 	$(CXX) $(LDFLAGS) $^ -o $@
