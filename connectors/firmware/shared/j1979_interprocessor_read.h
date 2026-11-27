@@ -1,6 +1,7 @@
 #pragma once
 #include "interprocessor_link.h"
 #include "j1979_can_campaign.h"
+#include "j1979_freeze_sequence.h"
 
 namespace cd { namespace readlink {
 // CI/2 application mailbox. Separate from CI/1 discovery; no implicit upgrade.
@@ -71,7 +72,7 @@ class Endpoint {
   using Admission=bool(*)();
   Endpoint(J1979CanReadLink& bus,Exchange::Result& scratch,uint32_t tx,uint32_t rx,
       bool ext,Admission admitted,const J1979FreezeScope* freeze=nullptr):bus_(bus),scratch_(scratch),tx_(tx),rx_(rx),
-      ext_(ext),admitted_(admitted),scoped_(freeze!=nullptr),scope_(freeze?*freeze:J1979FreezeScope{}){}
+      ext_(ext),admitted_(admitted),scoped_(freeze!=nullptr),scope_(freeze?*freeze:J1979FreezeScope{}),sequence_(scope_){}
   Endpoint(const Endpoint&)=delete;
   Endpoint& operator=(const Endpoint&)=delete;
   bool closed()const{return closed_;}
@@ -87,11 +88,12 @@ class Endpoint {
       const size_t reqSize=p.length-11;
       if(timeout<1||timeout>4000||get32(p.body+2)!=tx_||
          get32(p.body+6)!=rx_||p.body[10]!=(ext_?1:0)||
-         !(scoped_?scope_.allows(p.body+11,reqSize):
+         !(scoped_?sequence_.allows(p.body+11,reqSize):
            J1979ReadEvidence::readRequest(J1979ReadEvidence::Variant::ClassicCan,p.body+11,reqSize)))
         return fail();
       Exchange::run(bus_,tx_,rx_,ext_,p.body+11,reqSize,timeout,scratch_,scoped_?&scope_:nullptr);
       if(!validResult(p.body+11,reqSize,scratch_,scoped_?&scope_:nullptr))return fail();
+      if(scoped_&&!sequence_.observe(p.body+11,reqSize,scratch_))return fail();
       scratchSize_=scratch_.responseSize;offset_=0;
       r.op=Op::Result;r.length=7;r.body[0]=wireState(scratch_.state);
       put16(r.body+1,uint16_t(scratchSize_));put32(r.body+3,scratch_.elapsedMs);
@@ -113,6 +115,7 @@ class Endpoint {
   J1979CanReadLink& bus_;Exchange::Result& scratch_;
   uint32_t tx_,rx_;bool ext_;Admission admitted_;
   bool scoped_;const J1979FreezeScope scope_;
+  J1979FreezeSequence sequence_;
   size_t scratchSize_=0,offset_=0;
   uint16_t next_=0;bool closed_=false;
 };
@@ -150,7 +153,7 @@ class Client final:public J1979CanCampaign::ApplicationLink {
   bool read(const uint8_t* req,size_t n,uint16_t timeout,Exchange::Result& out){
     out.state=State::Fault;out.responseSize=0;out.elapsedMs=0;
     if(!active()||!req||n>7||timeout<2||timeout>4000||
-       !(scoped_?scope_.allows(req,n):
+       !(scoped_?sequence_.allows(req,n):
          J1979ReadEvidence::readRequest(J1979ReadEvidence::Variant::ClassicCan,req,n)))return fail();
     Packet p,r;p.op=Op::Read;p.length=uint8_t(n+11);
     // Reserve part of the absolute exchange budget for mailbox overhead.
@@ -179,6 +182,7 @@ class Client final:public J1979CanCampaign::ApplicationLink {
     if(!validResult(req,n,out,scoped_?&scope_:nullptr)){
       out.state=State::Fault;out.responseSize=0;return fail();
     }
+    if(scoped_&&!sequence_.observe(req,n,out))return fail();
     if(out.state==State::Fault)closed_=true;
     return true;
   }
@@ -197,6 +201,7 @@ class Client final:public J1979CanCampaign::ApplicationLink {
   }
   Transport& transport_;uint32_t tx_,rx_;bool ext_;
   bool scoped_;const J1979FreezeScope scope_;
+  J1979FreezeSequence sequence_;
   uint16_t next_=0;bool closed_=false;
 };
 } }
