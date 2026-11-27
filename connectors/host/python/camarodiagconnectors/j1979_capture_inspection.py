@@ -1,4 +1,4 @@
-"""Independent replay of CJ/1 captures against exported Python/Windows reports.
+"""Independent replay of CJ/1 captures against exported Python/Windows/Android reports.
 
 The capture is unsigned. This checks consistency, never authenticates hardware,
 a credential exchange, the vehicle or the author of the JSON.
@@ -18,7 +18,9 @@ from .j1979_campaign_evidence import decode, vin_match
 MAX_CAPTURE = 2048 * (8 + 4110 + 4)
 MAX_JSON = 32 * 1024 * 1024
 PYTHON_SCHEMA = "camarodiag-functional-j1979-embedded-evidence-v1"
-WINDOWS_SCHEMA = "camarodiag-functional-j1979-native-usb-v1"
+NATIVE_SCHEMA = "camarodiag-functional-j1979-native-usb-v1"
+# Both Android and Windows use the same native export schema.
+WINDOWS_SCHEMA = NATIVE_SCHEMA
 PROFILE_FIELDS = ("request_can_id", "response_can_id", "extended", "budget_ms")
 STEP_FIELDS = ("sequence", "request_hex", "response_hex", "status", "duration_ms",
                "dtc_codes", "negative_response_code", "measurement", "monitor_records",
@@ -74,8 +76,11 @@ def _load_report(raw):
 def _same(actual, expected):
     """Do not accept bool as an integer or coerce textual data."""
     if type(expected) is float:
-        return (type(actual) in (int, float) and math.isfinite(actual)
-                and math.isclose(actual, expected, rel_tol=1e-12, abs_tol=1e-12))
+        try:
+            return (type(actual) in (int, float) and math.isfinite(actual)
+                    and math.isclose(actual, expected, rel_tol=1e-12, abs_tol=1e-12))
+        except OverflowError:
+            return False
     if type(actual) is not type(expected):
         return False
     if isinstance(expected, dict):
@@ -122,6 +127,9 @@ def verify(capture, report, *, expected_vin=None):
             differences.append(flag)
     compare(report, "physical_vehicle_verified", False)
     compare(report, "observed_vin", replay["observed_vin"])
+    if report["schema"] == NATIVE_SCHEMA and report.get("capture_integrity_verified") is True:
+        # A complete native capture contains start + observations + summary.
+        compare(report, "records", len(replay["steps"]) + 2)
     steps = report.get("steps")
     if not isinstance(steps, list) or len(steps) != len(replay["steps"]):
         differences.append("steps.length")
@@ -181,7 +189,7 @@ def verify(capture, report, *, expected_vin=None):
                          replay["capture_integrity_verified"], cancelled=cancelled,
                          device_credential_authenticated=credential)
         compare(report, "vin_match", vin_match(host_view, declared, require_device_auth=live))
-    if expected_vin is not None and declared != expected_vin:
+    if expected_vin is not None and declared is not None and declared != expected_vin:
         differences.append("expected_vin")
     independent_vin = vin_match(replay, expected_vin if expected_vin is not None else
                                 declared if _valid_vin(declared) else None)
@@ -196,6 +204,8 @@ def verify(capture, report, *, expected_vin=None):
         "report_consistent": consistent,
         "differences": differences,
         "source_schema": report["schema"],
+        "host_platform": ("ANDROID" if "app_version" in report else "WINDOWS")
+                         if report["schema"] == NATIVE_SCHEMA else "PYTHON",
         "capture_sha256": hashlib.sha256(capture).hexdigest(),
         "capture_bytes": len(capture),
         "capture_integrity_verified": replay["capture_integrity_verified"],
