@@ -1,3 +1,10 @@
+## Reprise — SAE J1979 / richesse quatre bancs et cycle courant (27 novembre 2026)
+
+- PR #117 / chore/unified-ci : PID 06–09 et 55–58 à longueur variable (un/deux octets), valeurs par banc, attribution du second octet uniquement avec preuve positive PID 1D du calculateur sélectionné. Une absence de preuve n'établit pas l'absence de banc ; conserver l'octet brut, sans inventer de valeur. PID 41 séparé du PID 01 : support, activation et complétude du cycle courant, états essence/diesel, bits réservés et incohérences.
+- Décodeurs et projections Android/Kotlin, Windows/C# et Linux/Python ; scans CAN/legacy/USB, console, affichages diagnostic, export JSON et vérification indépendante. Live : admission PID 1D si annoncé, statistiques par canal, CSV et comparaison de rapports sans imputation des bancs manquants. Mode 02 frame 0 pris en charge par les projections de richesse corrélées.
+- Lot précédent conservé : inspections indépendantes des rapports de mutation legacy/CAN et de découverte legacy, commandes CLI, renforcement des preuves pré-effacement. Aucun nouveau droit de mutation firmware.
+- Régressions écrites pour Python/Kotlin/C#/C++ et intégrations non compilées/non exécutées conformément à AGENTS.md. Catalogue J1979DA moderne et couverture firmware restant à compléter. J1979 et C6 ouverts ; C8 non démarré. Aucun lancement CI intermédiaire, aucune fusion ni Release.
+
 ## Reprise — SAE J1979 — moniteurs et vérification legacy (27 novembre 2026)
 
 - PR #117 / chore/unified-ci : 79 UASID CAN historiques (Annexe E 2006), décodeurs Mode 05 standard TID 01–0A (Annexe C), distinction du Mode 06 legacy et des échelles OEM. Projections Android/Windows/Linux, réexamen des captures natives, affichage réseau et USB. Correction du courant large bande personnalisé (PID 4F, complément à deux), sans changer l'encodage par défaut.
