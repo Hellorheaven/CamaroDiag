@@ -31,6 +31,9 @@ class J1979CanCampaign {
     virtual ~ApplicationLink()=default;
     virtual bool active()=0;
     virtual bool matches(uint32_t tx,uint32_t rx,bool extended)const=0;
+    // Only an independently scoped application link may enter the explicit
+    // freeze-frame campaign. Old read links never advertise this scope.
+    virtual bool matchesFreeze(const J1979FreezeScope&)const{return false;}
     virtual uint32_t monotonicMs()=0;
     virtual void exchange(const uint8_t* request,size_t size,uint32_t timeout,
                           Exchange::Result& result)=0;
