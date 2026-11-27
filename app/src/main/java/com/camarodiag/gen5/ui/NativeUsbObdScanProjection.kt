@@ -96,7 +96,8 @@ internal object NativeUsbObdScanProjection {
             val data=bytes(row)
             ObdVehicleInfoRead(id,raw(row).ifEmpty { row.optString("status") },
                 if(positive(row)&&data.size>2&&data.take(2)==listOf(73,id)&&
-                    (id==2||if(id%32==0) pageVerified(9,id) else advertised(9,id))) listOf(data) else emptyList())
+                    (id==2||if(id%32==0) pageVerified(9,id) else advertised(9,id))) listOf(data) else emptyList(),
+                extendedRecords=values.extendedVehicleInfo.filter { it.infoType==id })
         }
         val controls=modeRows(8).mapNotNull { row ->
             val id=pid(row) ?: return@mapNotNull null
