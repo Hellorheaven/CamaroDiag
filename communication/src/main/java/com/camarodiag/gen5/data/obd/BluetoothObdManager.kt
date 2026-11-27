@@ -938,9 +938,9 @@ class BluetoothObdManager(context: Context) {
         }
 
     suspend fun runElmClearRecipe(expectedVin: String, approval: EcuWriteConsentFlow.Approval,
-        isCurrent: () -> Boolean): ObdClearRecipeResult =
+        isCurrent: () -> Boolean, saveBaseline: suspend (ObdClearRecipeResult) -> Unit): ObdClearRecipeResult =
         withPrimaryObdMutationSession(expectedVin, approval, isCurrent, "04") { protocol, guard, exchange ->
-            ElmJ1979ClearRecipe.run(protocol, expectedVin, guard, exchange)
+            ElmJ1979ClearRecipe.run(protocol, expectedVin, guard, saveBaseline, exchange)
         }
 
     val legacyMutationProtocol: Int?
