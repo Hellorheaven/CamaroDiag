@@ -224,4 +224,8 @@
   <data name="NativeArchiveAccept" xml:space="preserve"><value>I authorize read-only export</value></data>
   <data name="NativeArchiveConfirm" xml:space="preserve"><value>Confirm retrieval of the existing journal</value></data>
   <data name="NativeArchiveReadOnly" xml:space="preserve"><value>Read-only archive (no new vehicle test)</value></data>
+  <data name="FreezePrefixInspect" xml:space="preserve"><value>Inspect interrupted CF/1</value></data>
+  <data name="FreezePrefixSaved" xml:space="preserve"><value>Partial CF/1 inspection saved (not a completed capture).</value></data>
+  <data name="FreezePrefixConfirm" xml:space="preserve"><value>Independently confirm expected VIN {0}. Only complete records will be inspected. Continue?</value></data>
+  <data name="FreezePrefixSummary" xml:space="preserve"><value>Complete observations: {0}; unverified trailing bytes: {1}; state: {2}</value></data>
 </root>
