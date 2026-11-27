@@ -6785,6 +6785,43 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun inspectFunctionalNativeLivePrefix(source: Uri,confirmedConnection: Long,confirmedVehicle: VehicleProfile) {
+        val account=authenticatedAccountUid ?: return
+        val generation=accountSessionGeneration
+        if(source.scheme!="content" || functionalCatalogueJob?.isActive==true || _functionalTestState.value.running ||
+            confirmedConnection!=connectionAttemptGeneration || confirmedVehicle!=_vehicle.value ||
+            !J1979CatalogueProjection.validVin(confirmedVehicle.vin))return
+        fun current()=isCurrentAccountGeneration(generation)&&authenticatedAccountUid==account&&
+            currentLicenseLevel==LicenseLevel.OWNER&&confirmedConnection==connectionAttemptGeneration&&
+            confirmedVehicle==_vehicle.value&&!_functionalTestState.value.running
+        functionalCatalogueJob=viewModelScope.launch {
+            if(!confirmFunctionalTestOwner(account)||!current())return@launch
+            _connectionMessage.value=localizedContext.getString(R.string.j1979_catalogue_working)
+            try {
+                val path=withContext(Dispatchers.IO) {
+                    val context=getApplication<Application>()
+                    val resolver=context.contentResolver
+                    val job=currentCoroutineContext()[Job]
+                    fun requireCurrent(){check(job?.isActive==true&&current())}
+                    val prepared=J1979NativePrefixFiles.prepare(resolver,source,confirmedVehicle.vin,::requireCurrent)
+                    CamaroDiagExportStorage.write(context,
+                        "CamaroDiag_SAE-J1979_NATIVE_PREFIX_"+System.currentTimeMillis()+".json",
+                        "application/json",category=CamaroDiagExportStorage.Category.TESTS,
+                        beforePublish={
+                            requireCurrent()
+                            check(J1979NativePrefixFiles.digest(resolver,source,::requireCurrent)==prepared.sha256)
+                        },verifyStaged={input -> PhysicalRecoveryEvidenceJson.requireExactJson(input,prepared.bytes)}) {
+                        it.write(prepared.bytes)
+                    }
+                }
+                if(current())_connectionMessage.value=localizedContext.getString(R.string.j1979_native_prefix_saved)+"\n"+path
+            }catch(cancelled:CancellationException){throw cancelled}
+            catch(_:Exception){
+                if(current())_connectionMessage.value=localizedContext.getString(R.string.j1979_native_prefix_rejected)
+            }
+        }
+    }
+
     fun exportFunctionalNativeLiveCsv() {
         val account=authenticatedAccountUid?:return
         val generation=accountSessionGeneration
