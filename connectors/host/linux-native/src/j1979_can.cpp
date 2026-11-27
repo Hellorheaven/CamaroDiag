@@ -187,7 +187,7 @@ static j1979_can_step *read_one(const j1979_can_plan *p, j1979_can_result *r,
         snprintf(step->detail, sizeof(step->detail), "TRANSPORT_ERROR");
         stop(r, "TRANSPORT_ERROR"); return step;
     }
-    if (!valid_response(request, count, answer, capacity, step)) {
+    if (!valid_response(request, count, answer.data(), capacity, step)) {
         snprintf(step->status, sizeof(step->status), "FAILED");
     }
     return step;
