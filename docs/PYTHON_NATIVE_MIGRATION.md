@@ -27,4 +27,4 @@ Les modules Python hors SAE J1979 (DoIP, mémoire, découverte générique, réc
 
 ## Correction de portée effectuée
 
-Les nouveaux fichiers ISO-TP `connectors/firmware/shared/j1979_isotp_native_c.{c,h}` et l'inclusion provisoire `connectors/firmware/esp32s3/src/j1979_native_c.c` ne faisaient que dupliquer un moteur embarqué C++ existant. Ils sont retirés. Le pont Linux continue à utiliser son implémentation native C utile ; le firmware ESP32 conserve les classes C++ existantes. Aucun développement Python nouveau n'est autorisé.
+Les nouveaux fichiers ISO-TP `connectors/firmware/shared/j1979_isotp_native_c.{c,h}` et l'inclusion provisoire `connectors/firmware/esp32s3/src/j1979_native_c.c` ne faisaient que dupliquer un moteur embarqué C++ existant. Ils sont retirés. Le pont Linux a migré ses sources `main` et `cf1_usb` et les sept tests C vers C++20 (SHA `170d8af5836146358c5c455a3e6a13b40d42268d`, non compilé à ce stade) ; le firmware ESP32 conserve les classes C++ existantes. Aucun développement Python nouveau n'est autorisé.

@@ -1,3 +1,11 @@
+## Reprise SAE J1979 — migration C++20 Linux, 27/11/2026 (directive définitive)
+
+- PR #117, branche `chore/unified-ci`. Android exclusivement Kotlin, Windows exclusivement C#, Linux exclusivement C++20 ; choix natif ESP32 délégué, moteurs C++ conservés.
+- Commits `418e339971d263dc4f0fab7ee74de5efafa777e4`, `10c866f9fdc455d1d3641484ba525e0466c6826e`, `170d8af5836146358c5c455a3e6a13b40d42268d` : portage des deux sources Linux restantes (`cf1_usb`, `main`) et des sept tests C vers C++20 ; allocations de capture et de preuves à propriété unique, contrôle de délais et restauration du port préservés, Makefile sans règle C. Les noms de schéma existants restent inchangés pour compatibilité. Diff GitHub avant cette note : 3 commits, 12 fichiers, +180/-170 lignes (renommages détectés).
+- Non compilé/non testé à ce stade : gate à la clôture effective uniquement. Reste la migration fonctionnelle Python et Java, le raccordement et la revue de SAE J1979, la référence normative autorisée, puis gate unique et APK v2.0.47 signée. Pas de release ni fusion effectuée. Ne pas confondre cette conversion de langage avec une clôture protocole ou une validation matérielle.
+
+---
+
 ## Directive prioritaire actualisée — utiliser C++20, pas C (27/11/2026)
 
 L'utilisateur a expressément corrigé les échanges précédents : pour Linux ARM/x64 et ESP32-S3, **développer en C++**, pas en C. Sur Android conserver Kotlin, sur Windows C#. Ne plus écrire de nouveau Python ni de nouveau C pour les protocoles. Le C++ moderne n'est pas intrinsèquement sûr : exiger RAII, propriété claire, containers bornés, spans et validation stricte des octets/tailles.
