@@ -8,15 +8,16 @@ namespace CamaroDiag.J2534Bridge;
 /// timestamp per exchange, no inferred simultaneous or cached samples.</summary>
 internal static class ObdJ1979LiveRecorder
 {
+    internal static bool RawPid(byte pid)=>pid!=0&&pid%32!=0;
     internal static bool NumericPid(byte pid)=>ObdJ1979PidValues.DataLength(pid) is not null ||
         ObdJ1979MultiSignal.Width(pid) is not null || ObdJ1979OperatingContext.IsTrim(pid);
     internal static bool LegacyNumericPid(byte pid)=>NumericPid(pid) &&
         (ObdJ1979MultiSignal.Width(pid)??0)<=5;
-    internal sealed record Plan(byte[] Pids,string ExpectedVin,int Cycles=30,int IntervalMs=1000,int BudgetMs=180000)
+    internal sealed record Plan(byte[] Pids,string ExpectedVin,int Cycles=30,int IntervalMs=1000,int BudgetMs=180000,bool RawOnly=false)
     {
         internal Plan Validate(){
             if(Pids is null||Pids.Length is <1 or >32||Pids.Distinct().Count()!=Pids.Length||
-                Pids.Any(x=>!NumericPid(x))||
+                Pids.Any(x=>RawOnly?!RawPid(x):!NumericPid(x))||
                 !System.Text.RegularExpressions.Regex.IsMatch(ExpectedVin??"",@"\A[A-HJ-NPR-Z0-9]{17}\z")||
                 Cycles is <1 or >1000||Cycles*Pids.Length>10000||IntervalMs is <100 or >60000||
                 BudgetMs is <1 or >600000)throw new ArgumentException("Invalid selected PID/VIN/time plan.");
@@ -38,6 +39,7 @@ internal static class ObdJ1979LiveRecorder
         IReadOnlyList<Observation> Admission,IReadOnlyList<Observation> Observations,
         IReadOnlyList<Summary> Summary,bool Completed,string? StopReason,long DurationMs)
     {
+        public bool RawOnly {get;init;}
         public IReadOnlyList<ChannelSummary> MultiSignalSummary {get;init;}=[];
         public IReadOnlyList<ObdJ1979ScalingContext.Configuration>? ScalingConfiguration {get;init;}
         public ObdJ1979OperatingContext.Layout? TrimLayout {get;init;}
@@ -90,7 +92,7 @@ internal static class ObdJ1979LiveRecorder
 
     internal static Result Run(Func<byte[],int,byte[]> exchange,Plan requested,Action requireActive,
         Action<Observation>? onObservation=null,Func<long>? clock=null,Action<int>? delay=null,
-        Func<byte[],int>? requestTimeout=null)
+        Func<byte[],int>? requestTimeout=null,bool legacy=false)
     {
         var plan=requested.Validate();
         var watch=Stopwatch.StartNew();
@@ -109,14 +111,15 @@ internal static class ObdJ1979LiveRecorder
         long? lastIdentity=null;
         int completedCycles=0;
         bool inventoryComplete=false;
-        var requiredConfigs=plan.Pids.Select(p=>ObdJ1979ScalingContext.Dependency(p)).OfType<int>().Distinct().Order().ToArray();
+        var requiredConfigs=plan.RawOnly?Array.Empty<int>():plan.Pids.Select(p=>ObdJ1979ScalingContext.Dependency(p)).OfType<int>().Distinct().Order().ToArray();
         ObdJ1979ScalingContext.Context? scaling=null;
-        bool needsTrim=plan.Pids.Any(pid=>ObdJ1979OperatingContext.IsTrim(pid));
+        bool needsTrim=!plan.RawOnly&&plan.Pids.Any(pid=>ObdJ1979OperatingContext.IsTrim(pid));
         ObdJ1979OperatingContext.Layout? layout=null;
         ObdJ1979OperatingContext.Layout BuildLayout()=>ObdJ1979OperatingContext.ResolveLayout(admission.Select(
             s=>new ObdJ1979OperatingContext.Observation(s.RequestHex,s.ResponseHex,s.Status)));
         ObdJ1979ScalingContext.Context BuildScaling()=>ObdJ1979ScalingContext.Context.Build(admission.Select(
             s=>new ObdJ1979ScalingContext.Observation(s.RequestHex,s.ResponseHex,s.Status)));
+        long rawBytes=0;
         bool Active(){
             if(stop is not null)return false;
             requireActive();
@@ -138,8 +141,19 @@ internal static class ObdJ1979LiveRecorder
                 var limit=requestTimeout?.Invoke(request)??2500;
                 if(limit is <100 or >30000)throw new ArgumentException("Invalid logical request deadline.");
                 raw=exchange(request,(int)Math.Min(limit,Math.Max(1,Remaining())));
+                if(raw is null||raw.Length is 0 or >4095)throw new InvalidDataException("Invalid live payload size.");
+                rawBytes+=raw.Length;
+                if(rawBytes>16L*1024*1024){raw=null;throw new InvalidDataException("Live payload evidence budget exceeded.");}
                 requireActive();
                 if(Remaining()<=0){stop="BUDGET_EXHAUSTED";detail="LATE_RESPONSE";}
+                else if(plan.RawOnly&&phase=="SAMPLE"){
+                    if(raw.Length<3||legacy&&raw.Length>7)throw new InvalidDataException("Invalid raw response envelope.");
+                    if(raw.Length==3&&raw[0]==0x7f&&raw[1]==1&&raw[2] is not (0 or 0x78)){
+                        status="NEGATIVE";detail=$"NRC_{raw[2]:X2}";
+                    }else if(raw[0]==0x41&&raw[1]==request[1]){
+                        status="RAW";detail="RAW_UNINTERPRETED";
+                    }else throw new InvalidDataException("Wrong raw response service or PID.");
+                }
                 else{
                     evidence=J1979CampaignSemantics.DecodeObservation(request,raw);
                     if(evidence is null)throw new InvalidDataException("Uncorrelated response.");
@@ -269,7 +283,13 @@ internal static class ObdJ1979LiveRecorder
                 }
             }
             if(stop is null&&completedCycles==plan.Cycles)Identity("FINAL_VIN");
-            if(stop is null&&!observations.Any(x=>x.Measurement is not null||x.MultiSignals is {Count:>0}))stop="NO_VERIFIED_MEASUREMENT";
+            if(stop is null){
+                if(plan.RawOnly){
+                    if(plan.Pids.Any(pid=>!observations.Any(row=>row.Pid==pid&&row.Status=="RAW")))
+                        stop="SELECTED_RAW_PID_NO_RESPONSE";
+                }else if(!observations.Any(x=>x.Measurement is not null||x.MultiSignals is {Count:>0}))
+                    stop="NO_VERIFIED_MEASUREMENT";
+            }
         }catch(OperationCanceledException){stop="CANCELLED";}
         catch(Exception e) when(e is IOException or InvalidDataException or ArgumentException or InvalidOperationException){
             stop="CONTEXT_OR_SINK_ERROR";
@@ -277,6 +297,7 @@ internal static class ObdJ1979LiveRecorder
         return new(plan.ExpectedVin,vin,plan.Pids,advertised.ToArray(),pages.ToArray(),inventoryComplete,
             plan.Cycles,completedCycles,plan.IntervalMs,plan.BudgetMs,admission.ToArray(),observations.ToArray(),
             plan.Pids.Select(pid=>stats[pid].Report()).ToArray(),stop is null&&completedCycles==plan.Cycles,stop,Elapsed()){
+                RawOnly=plan.RawOnly,
                 TrimLayout=needsTrim?layout??BuildLayout():null,
                 ScalingConfiguration=requiredConfigs.Length==0?null:(scaling??BuildScaling()).Configurations,
                 MultiSignalSummary=channels.OrderBy(x=>x.Key.Pid).ThenBy(x=>x.Key.Name,StringComparer.Ordinal)
@@ -288,7 +309,7 @@ internal static class ObdJ1979LiveRecorder
     {
         static string Escape(string? field)=>field is null?"":"\""+field.Replace("\"","\"\"")+"\"";
         static string Number(double? value)=>value?.ToString("R",CultureInfo.InvariantCulture)??"";
-        bool multi=report.SelectedPids.Any(pid=>ObdJ1979MultiSignal.Width(pid) is not null||ObdJ1979OperatingContext.IsTrim(pid));
+        bool multi=!report.RawOnly&&report.SelectedPids.Any(pid=>ObdJ1979MultiSignal.Width(pid) is not null||ObdJ1979OperatingContext.IsTrim(pid));
         const string header="cycle,pid_hex,started_elapsed_ms,elapsed_ms,duration_ms,status,value,unit,request_hex,response_hex,detail";
         yield return multi?header+",signal_name,raw_encoded":header;
         foreach(var row in report.Observations){
