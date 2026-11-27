@@ -1,8 +1,14 @@
+// Native C++20 CF/1 prefix inspection with scoped ownership.
 #include "cf1.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <array>
+#include <span>
+#include <algorithm>
+#include <memory>
+#include <new>
 
 static uint16_t little16(const uint8_t *p) {
     return (uint16_t)((uint16_t)p[0] | ((uint16_t)p[1] << 8));
@@ -63,7 +69,7 @@ bool cf1_valid_plan(const cf1_plan *p) {
 }
 static int decode_plan(const uint8_t *body, cf1_plan *p,
                        const char *expected, char *err, size_t cap) {
-    memset(p, 0, sizeof(*p));
+    *p = {};
     p->tx = little32(body);
     p->rx = little32(body + 4);
     if (body[8] > 1) return reject(err, cap, "Invalid extended CAN flag");
@@ -330,24 +336,27 @@ static int replay_prefix(cf1_evidence *e, char *error, size_t cap) {
 }
 void cf1_evidence_free(cf1_evidence *e) {
     if (!e) return;
-    free(e->observations);
-    memset(e, 0, sizeof(*e));
+    delete[] e->observations;
+    *e = {};
 }
 int cf1_inspect_prefix(const uint8_t *raw, size_t length,
                        const char *independent_vin, cf1_evidence *out,
                        char *error, size_t cap) {
     if (!out) return reject(error, cap, "Missing result storage");
-    memset(out, 0, sizeof(*out));
+    *out = {};
     if (!raw || length == 0 || length > CF1_MAX_BYTES ||
         !cf1_valid_vin(independent_vin))
         return reject(error, cap, "Invalid CF/1 prefix size or independently supplied VIN");
-    out->observations = calloc(CF1_MAX_STEPS, sizeof(*out->observations));
-    if (!out->observations) return reject(error, cap, "Insufficient memory for bounded CF/1 replay");
+    std::unique_ptr<cf1_observation[]> owned{
+        new (std::nothrow) cf1_observation[CF1_MAX_STEPS]{}};
+    if (!owned) return reject(error, cap, "Insufficient memory for bounded CF/1 replay");
+    out->observations = owned.release();
+    const std::span<const uint8_t> capture{raw,length};
     size_t position = 0;
     while (position < length) {
         size_t left = length - position;
         size_t n = left < 8 ? left : 8;
-        const uint8_t *h = raw + position;
+        const uint8_t *h = capture.data() + position;
         const uint8_t magic[3] = {'C', 'F', 1};
         if (memcmp(h, magic, n < 3 ? n : 3))
             return reject(error, cap, "Invalid CF/1 prefix magic");
