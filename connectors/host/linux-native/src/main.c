@@ -525,7 +525,7 @@ static bool read_key_file(const char *path, uint8_t key[32]) {
     if (fd < 0) return false;
     struct stat st;
     bool ok = fstat(fd, &st) == 0 && S_ISREG(st.st_mode) &&
-        st.st_size == 32 && (st.st_mode & 0007) == 0;
+        st.st_size == 32 && (st.st_mode & 0077) == 0;
     if (ok) {
         size_t n = 0;
         while (n < 32) {

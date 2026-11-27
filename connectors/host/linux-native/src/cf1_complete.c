@@ -53,7 +53,7 @@ int cf1_inspect_complete(const uint8_t *raw, size_t length,
             return denial(error, capacity, "Truncated or excessive CF/1 full records");
         const uint8_t *h = raw + pos;
         if (h[0] != 'C' || h[1] != 'F' || h[2] != 1 ||
-            le16(h + 4) != seq || h[3] != (seq == 0 ? 1 : h[3]) ||
+            le16(h + 4) != seq || (seq == 0 && h[3] != 1) ||
             (seq && h[3] != 2 && h[3] != 3))
             return denial(error, capacity, "Wrong CF/1 terminal stream ordering");
         uint16_t n = le16(h + 6);

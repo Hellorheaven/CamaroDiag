@@ -71,7 +71,8 @@ static int write_deadline(int fd, const uint8_t *bytes, size_t n, uint64_t deadl
         if (count <= 0) return -1;
         offset += (size_t)count;
     }
-    return cancelled ? -1 : 0;
+    /* The last successful write can itself cross a deadline. */
+    return cancelled || monotonic_ms() >= deadline ? -1 : 0;
 }
 static int read_deadline(int fd, uint8_t *bytes, size_t n, uint64_t deadline) {
     size_t offset = 0;
@@ -82,7 +83,8 @@ static int read_deadline(int fd, uint8_t *bytes, size_t n, uint64_t deadline) {
         if (count <= 0) continue; /* VMIN=0 permits an empty read. */
         offset += (size_t)count;
     }
-    return cancelled ? -1 : 0;
+    /* A complete final read that arrives late still exceeds the CU/2 deadline. */
+    return cancelled || monotonic_ms() >= deadline ? -1 : 0;
 }
 static bool configure_serial(int fd, struct termios *saved) {
     if (!isatty(fd) || tcgetattr(fd, saved) != 0) return false;
