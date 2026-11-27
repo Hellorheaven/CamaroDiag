@@ -41,7 +41,8 @@ data class J1979NetworkStep(
     val requestHex: String,val responseHex: String?,val rawResponse: String?,
     val status: String,val detail: String?,val durationMs: Long,
     val application: J1979CampaignSemantics.Step?,
-    val extendedVehicleInfo: ObdJ1979ExtendedVehicleInfo.Result? = null
+    val extendedVehicleInfo: ObdJ1979ExtendedVehicleInfo.Result? = null,
+    val multiSignalRecord: ObdJ1979MultiSignal.Record? = null
 )
 data class J1979NetworkInventory(
     val mode: Int,val status: String,val advertised: List<Int>,val pages: Int
@@ -197,6 +198,7 @@ internal object J1979NetworkCampaign {
                 var response:String?=null
                 var evidence:J1979CampaignSemantics.Step?=null
                 var extended:ObdJ1979ExtendedVehicleInfo.Result?=null
+                var multi:ObdJ1979MultiSignal.Record?=null
                 var status="NOT_TESTED"
                 var detail:String?=null
                 try {
@@ -213,6 +215,13 @@ internal object J1979NetworkCampaign {
                         else {
                             status=evidence.status
                             detail=evidence.negativeResponseCode()?.let { "NRC_"+ElmJ1979EvapTest.hex(it,2) }
+                            if(status in setOf("RAW","PASSED") && request.size==2 &&
+                                u(request[0])==1 && ObdJ1979MultiSignal.width(u(request[1]))!=null){
+                                multi=ObdJ1979MultiSignal.tryRecord(command,response,status)
+                                if(multi==null){
+                                    status="FAILED";detail="INVALID_MULTI_SIGNAL";evidence=null
+                                }else detail="MULTI_SIGNAL_DECODED"
+                            }
                             if(status=="RAW" && request.size==2 && u(request[0])==9 &&
                                 u(request[1]) in ObdJ1979ExtendedVehicleInfo.extendedTypes) {
                                 extended=reply.payload?.let { bytes ->
@@ -226,9 +235,9 @@ internal object J1979NetworkCampaign {
                             }
                         }
                     }
-                }catch(_:CancellationException){status="NOT_TESTED";stop="CANCELLED";detail=stop;evidence=null;extended=null}
+                }catch(_:CancellationException){status="NOT_TESTED";stop="CANCELLED";detail=stop;evidence=null;extended=null;multi=null}
                 catch(e:Exception){status="FAILED";stop="TRANSPORT_OR_CONTEXT_ERROR";detail=e.javaClass.simpleName;evidence=null;extended=null}
-                steps+=J1979NetworkStep(command,response,reply?.raw,status,detail,(clock()-begun).coerceAtLeast(0),evidence,extended)
+                steps+=J1979NetworkStep(command,response,reply?.raw,status,detail,(clock()-begun).coerceAtLeast(0),evidence,extended,multi)
                 return evidence?.takeIf { status=="PASSED" }
             }
             suspend fun inventory(mode:Int,cached:J1979CampaignSemantics.Step?=null,members:Boolean=true){
