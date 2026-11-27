@@ -37,6 +37,10 @@ internal static class Program
         if (BridgeCommandLineHelp.IsHelpRequest(args))
             return BridgeCommandLineHelp.Run(args);
 
+        // Offline catalogue processing rejects mixed flags before any driver I/O.
+        if (args.Contains(ObdJ1979CatalogueCli.Command, StringComparer.OrdinalIgnoreCase))
+            return ObdJ1979CatalogueCli.Run(args);
+
         // Parse the complete backup invocation first; a mixed command never
         // falls through to an unrelated driver, programming or network path.
         if (args.Contains(DoIpBackupCli.BackupCommand, StringComparer.OrdinalIgnoreCase) ||
