@@ -45,6 +45,22 @@ class FreezeNativePrefixTests(unittest.TestCase):
         self.assertEqual(result["observed_final_vin_in_prefix"], VIN)
         self.assertTrue(decode(io.BytesIO(raw))["error"])
 
+    def test_frame_progress_is_provisional_when_terminal_missing(self):
+        parts = original()
+        result = inspect_prefix(b"".join(parts[:-1]), expected_vin=VIN)
+        self.assertEqual([x["frame"] for x in result["observed_frame_progress"]], [0, 1])
+        self.assertTrue(all(not row["status_finalized"]
+                            for row in result["observed_frame_progress"]))
+        self.assertEqual(result["observed_frame_progress"][0]["provisional_status"], "COMPLETE")
+        self.assertEqual(result["observed_frame_progress"][0]["advertised_measurement_pids"], [12, 13])
+        self.assertEqual(result["observed_frame_progress"][0]["read_measurement_pids"], [12, 13])
+        self.assertEqual(result["observed_frame_progress"][0]["measurement_observation_count"], 2)
+        self.assertEqual(result["observed_frame_progress"][0]["trigger_dtc_in_prefix"], "P0301")
+        self.assertTrue(result["observed_frame_progress"][0]["trigger_stable_in_prefix"])
+        self.assertFalse(result["execution_completed"])
+        early = inspect_prefix(parts[0], expected_vin=VIN)
+        self.assertEqual(early["observed_frame_progress"], [])
+
     def test_plan_only_preserves_context_and_zero_observations(self):
         first = original()[0]
         report = inspect_prefix(first, expected_vin=VIN)

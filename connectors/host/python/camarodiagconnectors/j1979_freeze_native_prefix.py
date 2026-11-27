@@ -109,6 +109,25 @@ def inspect_prefix(raw: bytes, *, expected_vin: str) -> dict:
     # terminal context change is used strictly to stop independent replay.
     steps = partial_result["steps"][:len(observations)]
     _check(len(steps) == len(observations), "CF/1 prefix step mismatch")
+    # A completed frame recipe can appear within an interrupted stream.
+    # Its local status is useful for forensic reconstruction but MUST NOT be
+    # interpreted as a completed capture or a physical snapshot.
+    frame_progress = [
+        {
+            "frame": row["frame"],
+            "provisional_status": row["status"],
+            "status_finalized": False,
+            "inventory_complete_in_prefix": row["inventory_complete"],
+            "trigger_dtc_in_prefix": row["trigger_dtc"],
+            "trigger_recheck_dtc_in_prefix": row["final_trigger_dtc"],
+            "trigger_stable_in_prefix": row["trigger_stable"],
+            "advertised_measurement_pids": sorted(
+                pid for pid in row["advertised_pids"] if pid != 2 and pid % 32 != 0),
+            "read_measurement_pids": sorted(row["read_pids"]),
+            "measurement_observation_count": len(row["measurement_steps"]),
+        }
+        for row in partial_result["frames"]
+    ]
     return {
         "schema": SCHEMA,
         "protocol": "SAE-J1979",
@@ -133,6 +152,7 @@ def inspect_prefix(raw: bytes, *, expected_vin: str) -> dict:
         "observed_final_vin_in_prefix": partial_result["final_vin"],
         "independently_replayed_steps": steps,
         "visited_frame_numbers_in_prefix": [f["frame"] for f in partial_result["frames"]],
+        "observed_frame_progress": frame_progress,
         "frame_states_are_provisional": True,
         "timing_independently_verified": False,
         "recorded_observation_duration_ms": sum(r.duration_ms for _, r in observations),
