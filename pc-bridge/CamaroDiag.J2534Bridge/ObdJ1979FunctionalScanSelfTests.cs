@@ -78,7 +78,7 @@ internal static class ObdJ1979FunctionalScanSelfTests
             },()=>{},TimeSpan.FromMinutes(1));
         var ipt=extendedReport.ExtendedVehicleInfo.Single();
         Assert(ipt is {GeneralDenominator:65535,IgnitionCycles:40000,CounterCount:16} &&
-            ipt.Monitors![0] is {Ratio:2d} && ipt.Monitors[1].Ratio is null,
+            ipt.Monitors is {Count:>1} monitors && monitors[0] is {Ratio:2d} && monitors[1].Ratio is null,
             "Extended IPT engineering view is independent of CJ/1 historical RAW state");
         Assert(extendedReport.Steps.Single(x=>x.RequestHex=="0908") is {Status:"RAW",Detail:"EXTENDED_INFOTYPE_DECODED"},
             "Retain historical application shape");
