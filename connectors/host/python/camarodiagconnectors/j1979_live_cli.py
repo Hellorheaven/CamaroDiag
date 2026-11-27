@@ -70,7 +70,9 @@ def run(argv=None):
                 if args.quiet:
                     return
                 value=row["measurement"]
-                display=f'{value["number"]:.3f} {value["unit"]}' if value else row["status"]
+                signals=row.get("multi_signals")
+                display=("; ".join(f'{v["name"]}={v["number"]:.3f} {v["unit"]}' for v in signals)
+                         if signals else f'{value["number"]:.3f} {value["unit"]}' if value else row["status"])
                 print(f'{row["elapsed_ms"]} ms {row["pid"]:02X} {display}',flush=True)
             try:
                 with LinuxIsoTp(args.interface,args.tx,args.rx) as transport:
