@@ -1,6 +1,34 @@
 # Recettes fonctionnelles par protocole / Protocol acceptance
+
+## SAE J1979 — nouvelle voie Linux C (27/11/2026)
+
+La voie `connectors/host/linux-native` peut recevoir un plan Mode 02
+explicitement confirmé, vérifier le défi CU/2 en HMAC-SHA256 avant l'envoi de
+la preuve client, enregistrer les octets CF/1 sur le port CDC sélectionné,
+et inspecter une capture interrompue ou complète indépendamment des données
+déclarées dans les rapports. Un préfixe sans terminal reste incomplet, une
+capture complète sans VIN final lié ou DTC stable n'est pas une recette réussie.
+
+**Recettes à exécuter au gate final, pas lors des sous-lots :** captures
+synthétiques C pour plan, PID, VIN, en-têtes, CRC, doublons, corruption,
+fin tronquée, preuve HMAC valide et invalide, contrôle après interruption,
+interdiction de réessai et frontières d'autorisation ; validation Android
+Kotlin et Windows C# et des firmwares avec warnings fatals ; construction
+Linux ARM et x64 ; contrôle du package .deb. Captures et JSON source sont
+rejoués sur le même SHA. Les schémas JSON Linux C ont un suffixe
+`linux-c-v1` tant que la projection commune Windows/Android n'est pas
+complète. Un résultat logiciel réussi ne remplace pas la recette ECU réelle.
+
+**Restant pour clôturer J1979 :** restauration de toutes les capacités
+protocolaires Linux Python, interopérabilité complète des exports,
+reprise des interfaces Linux et fonctions hors Mode 02, dernier raccordement
+firmware/ECU, complétude de couverture normative avec référence autorisée,
+et gate de clôture. L'APK Release signé n'est pas encore généré.
+
+---
+
 Les modèles ci-dessous sont des candidats, pas des confirmations de compatibilité sur un VIN. Vérifier ECU, marché, variante, câblage et interface. / Candidates only: verify actual ECU, market, variant, wiring and interface. Priorité Camaro puis parc disponible / Camaro first, then owner's fleet.
-Statut logiciel distinct de la recette physique : **Terminé — à tester en réel** (software complete — physical test pending), puis **Terminé — validé en réel** sur le périmètre prouvé. DoIP : logiciel validé au SHA e3b5f2a5a0ef704da7a5d622ef8b11116f337d96 ; recette fonctionnelle dédiée à compléter ; aucun essai réel revendiqué. J1979 : en cours.
+Statut logiciel distinct de la recette physique : **Terminé — à tester en réel** (software complete — physical test pending), puis **Terminé — validé en réel** sur le périmètre prouvé. DoIP : logiciel validé au SHA e3b5f2a5a0ef704da7a5d622ef8b11116f337d96 ; recette fonctionnelle dédiée à compléter ; aucun essai réel revendiqué. J1979 : en cours (migration Linux C native partielle, gate non lancé).
 | Protocole | Candidats prioritaires / candidates | Interface et preuve / interface and evidence |
 |---|---|---|
 | SAE J1979 | Camaro 2012; Mach-E 2023 (réponse OBD déjà observée); 207 CC 2010; Corolla 2023; X1 F48 2020 | ELM/STN/J2534 compatible; PID, DTC, VIN, services applicables |

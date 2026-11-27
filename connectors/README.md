@@ -4,6 +4,23 @@ Sous-projet logiciel de **[CamaroDiag](https://github.com/Hellorheaven/CamaroDia
 
 > **Prototype initial non validé sur matériel.** Aucun pilotage CAN, aucune lecture/écriture EEPROM, aucun pilote J2534 ni programmation ECU réelle n'est implémenté. Ne connecter ce firmware ni à un véhicule, ni à une puce ou à une alimentation automobile.
 
+## Migration native en cours (27/11/2026)
+
+L'architecture cible est désormais **Android Kotlin, Windows C#, Linux ARM/x64 C
+et firmware ESP32-S3 C** (C++ conservé uniquement en attendant remplacement
+sûr des composants existants). Le répertoire `host/linux-native` contient une
+première implémentation C du protocole SAE J1979 Mode 02 CF/1, incluant
+lecture de captures, contrôle des reçus, authentification CU/2, acquisition USB
+CDC avec confirmation locale et préparation d'un paquet Debian. Les nouvelles
+preuves C utilisent des schémas distincts tant que l'interopérabilité des
+rapports entre plateformes n'est pas rapprochée.
+
+**Ce portage est partiel et non validé au gate final.** Les fonctions historiques
+`host/python` ne peuvent pas encore être supprimées sans perdre des opérations
+actives ; elles sont figées pour les nouvelles évolutions protocolaires et
+seront retirées au fur et à mesure de leurs équivalents natifs complets.
+Aucune APK Release ni paquet .deb compilé n'est revendiqué pour ce lot.
+
 ## Objectifs
 - **Véhicule** : HS CAN (DLC 6/14), GM Single-Wire CAN/SAE J2411 (DLC 1) et autres réseaux *après vérification par modèle et année*.
 - **Windows** : DLL Pass-Thru J2534 à implémenter ; USB câblé pour les opérations critiques.

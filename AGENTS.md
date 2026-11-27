@@ -1,5 +1,11 @@
 # Règles durables de développement — CamaroDiag
 
+## Architecture native — directive du propriétaire du 27/11/2026 (prioritaire)
+
+- **Android : Kotlin ; Windows : C# ; Linux ARM/x64 : C natif ; firmware ESP32-S3 : C natif**, tout composant C++ existant restant à évaluer avant migration sans rupture. Ne plus développer de nouvelles fonctionnalités de protocole en Python ; éviter toute dépendance Python au fonctionnement des applications et ponts livrés.
+- **Migrer les outils Python déjà introduits vers les hôtes natifs sans perte de fonctionnalités**, de contrats CLI, de formats de preuve, de sécurité, de tests et de protection du contexte ECU. Ne pas supprimer brutalement `connectors/host/python` tant que des fonctions uniques y sont utilisées. L'emploi éventuel de Python en *outillage de compilation* (p. ex. PlatformIO) est distinct de Python dans l'application livrée et devra être documenté.
+- Pour SAE J1979 en cours : achever le transport, le rejeu indépendant, les opérations et interfaces applicables des hôtes et du firmware, rapprocher les schémas de preuve, écrire les tests et **n'exécuter qu'un seul gate à la clôture réelle**. L'APK Release production selon v2.0.46 seulement après cette clôture réussie, au SHA validé et avec signature vérifiée. Ne pas remplacer une APK signée par un build de démonstration ou un artefact fictif.
+
 ## PR active — décision du propriétaire du 24/11/2026
 
 La PR #95 est fusionnée et fermée. **La seule PR active est désormais #117**, branche `chore/unified-ci` vers `main`, continuation intégrale des reliquats PR95. Les références historiques ci-dessous à PR95 désignent le périmètre hérité, non une PR encore ouverte. C6 reste actif ; **DoIP ISO 13400 est validé côté logiciel**, uniquement au SHA `e3b5f2a5a0ef704da7a5d622ef8b11116f337d96` par la campagne [#45805147429](https://github.com/Hellorheaven/CamaroDiag/actions/runs/45805147429) (Android, Windows, Python, natif, firmware). La qualification ECU réelle reste pour la Release ; C8 final reste à réaliser. Appliquer toutes les exigences existantes à la PR117 et vérifier son HEAD avant chaque reprise. La CI intermédiaire PR95 ne valide pas les futurs changements PR117.

@@ -1,3 +1,38 @@
+## Reprise SAE J1979 — 27/11/2026 — directive native et migration Linux C
+
+PR #117, branche `chore/unified-ci`, base du lot `bf19d75ee91a54119acae078c0e818b797de2fb8`.
+Décision propriétaire : Android Kotlin, Windows C#, Linux ARM/x64 C, ESP32
+C natif (C++ existant à rationaliser). Ne plus ajouter de fonctions Python.
+
+- Windows C# : les commandes CLI CF/1 préfixe, vérification et acquisition
+  sont désormais toutes dispatchées par `Program.cs`. Correction des
+  sauts de ligne C# des premières modifications, tests du routage écrits.
+- Linux C11 : ajout de `connectors/host/linux-native` avec analyse stricte
+  de capture CF/1 interrompue et complète, séquence/CRC/VIN/pair CAN/Mode 02,
+  rejeu d'observations, contrôle du résumé terminal, CSPRNG et preuve
+  réciproque CU/2 HMAC-SHA256, acquisition série CDC physique explicite et
+  confirmation opérateur, conservation des fragments reçus, rapports JSON
+  avec SHA256, vérification indépendante des sources, Makefile, fixtures C,
+  recette native inscrite dans le workflow Connectors final, et préparation
+  de paquet .deb ARM/x64. Les schémas Linux sont distingués explicitement
+  de ceux Python/C#/Kotlin pour éviter une fausse promesse de compatibilité.
+- Le code C est nouveau et **non compilé / non testé** à cette étape, selon
+  l'interdiction des validations intermédiaires. Aucun gate, APK, package .deb
+  compilé, merge ou Release n'a été exécuté.
+- **Important : ni protocole SAE J1979 complet, ni suppression totale du
+  Python, ni APK Release atteint.** Ne jamais supprimer les anciens modules
+  Python tant que leurs fonctions uniques ne sont pas remplacées et raccordées.
+  Couverture normative autorisée J1979DA_202607 non fournie ; ne rien inventer.
+  La recette matérielle demeure « à tester en réel » mais ne bloque pas la
+  clôture logicielle lorsque ses critères applicables seront remplis.
+- Après intégration complète des fonctions et interfaces du protocole, seul
+  le gate final `.github/ci-final-checkpoint-request.txt` est autorisé.
+  APK signé et vérifié selon le processus v2.0.46 sur SHA qualifié uniquement
+  à ce moment. Le workflow Release existant ne build que depuis `main`,
+  donc une publication de la PR sans fusion demandera un circuit adapté.
+
+---
+
 ## Reprise SAE J1979 — 27/11/2026 — enquête CF/1 interrompue et vérification trois hôtes
 
 PR #117, branche `chore/unified-ci`, base `9ad7f914e81bbf089f04d7a775d129ef3a4be85c`. Avant cette note, au SHA `2c6ab94e887270747b7c9b09870085458e63ddf2` : **15 commits, 20 fichiers, +576/-14 lignes** selon comparaison GitHub. Cible de 10 000 lignes utiles non atteinte ; aucun code de remplissage.
