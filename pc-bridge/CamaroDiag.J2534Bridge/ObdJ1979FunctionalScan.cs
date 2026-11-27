@@ -79,6 +79,13 @@ internal static class ObdJ1979FunctionalScan
             {
                 response = exchange(request, (int)Math.Min(2500, remaining.TotalMilliseconds));
                 requireActive();
+                if(watch.Elapsed >= budget){
+                    expired=true;
+                    stopReason="BUDGET_EXHAUSTED";
+                    steps.Add(new(Convert.ToHexString(request),Convert.ToHexString(response),
+                        "NOT_TESTED","LATE_RESPONSE",timer.ElapsedMilliseconds));
+                    return null;
+                }
                 var reply = ObdJ1979Transaction.Decode(request, response,
                     expectIdentifierEcho: request.Length >= 2);
                 var application=J1979CampaignSemantics.DecodeObservation(request,response);
@@ -94,6 +101,11 @@ internal static class ObdJ1979FunctionalScan
                 if (request[0] is 1 or 2 or 9 &&
                     response.Length <= (request[0] == 2 ? 3 : 2))
                     throw new InvalidDataException("Missing diagnostic record data.");
+                if(application.Shape=="RAW"){
+                    steps.Add(new(Convert.ToHexString(request),Convert.ToHexString(response),
+                        "RAW",null,timer.ElapsedMilliseconds,application));
+                    return null;
+                }
                 var detail = decode is null
                     ? ObdJ1979Interpretation.Interpret(request, response).Description
                     : decode(response);

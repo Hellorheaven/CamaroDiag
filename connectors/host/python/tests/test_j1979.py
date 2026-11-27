@@ -113,6 +113,34 @@ class J1979Tests(unittest.TestCase):
         report = scan(exchange, budget=0.1, clock=lambda: now[0])
         self.assertEqual(["0902"], sent)
         self.assertEqual("BUDGET_EXHAUSTED", report["stop_reason"])
+        self.assertIsNone(report["observed_vin"])
+        self.assertEqual("LATE_RESPONSE", report["steps"][0]["detail"])
+        self.assertIsNone(report["steps"][0]["application_evidence"])
+
+    def test_raw_records_are_not_reported_as_passed(self):
+        replies = dict(REPLIES, **{"0900": bytes.fromhex("4900C0000000"),
+                                  "0901": bytes.fromhex("490101")})
+        result = scan(lambda req, _: replies[req.hex().upper()])
+        row = next(x for x in result["steps"] if x["request_hex"] == "0901")
+        self.assertEqual("RAW", row["status"])
+        self.assertEqual("490101", row["response_hex"])
+        self.assertIsNone(row["decoded"])
+        self.assertEqual({"shape": "RAW"}, row["application_evidence"])
+
+    def test_interrupt_stops_and_retains_prefix(self):
+        sent = []
+        def exchange(req, _):
+            sent.append(req.hex().upper())
+            if len(sent) == 1:
+                return REPLIES["0902"]
+            raise KeyboardInterrupt()
+        report = scan(exchange)
+        self.assertEqual(["0902", "03"], sent)
+        self.assertFalse(report["completed"])
+        self.assertTrue(report["cancelled"])
+        self.assertEqual("CANCELLED", report["stop_reason"])
+        self.assertEqual(VIN, report["observed_vin"])
+        self.assertEqual("CANCELLED", report["steps"][-1]["detail"])
 
     def test_socket_drains_stale_replies_and_waits_for_final_response(self):
         from unittest.mock import Mock

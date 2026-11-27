@@ -53,6 +53,21 @@ internal static class ObdJ1979FunctionalScanSelfTests
         Assert(report.Steps.Single(x=>x.RequestHex=="0101").ApplicationEvidence?.Readiness?.MilOn==false,
             "Readiness structured without claiming test results");
 
+        var rawReport=ObdJ1979FunctionalScan.Run((request,timeout)=>
+            Convert.ToHexString(request) switch {
+                "0100"=>[0x41,0,0x80,0,0,0x01],
+                "0120"=>[0x41,0x20,0x80,0,0,0],
+                "0121"=>[0x41,0x21,0,1],
+                "0101"=>[0x41,1,0,0,0,0],
+                "0900"=>[0x49,0,0x80,0,0,0],
+                "0901"=>[0x49,1,1],
+                _=>Exchange(request,timeout)
+            },()=>{},TimeSpan.FromMinutes(1));
+        Assert(rawReport.Steps.Single(x=>x.RequestHex=="0901") is
+            {Status:"RAW",ApplicationEvidence:{Shape:"RAW",Measurement:null}},
+            "unknown InfoType retained as raw, not passed");
+        Assert(rawReport.Measurements.Any(x=>x.Pid==0x21),"known measurement remains typed");
+
         var malformed = ObdJ1979FunctionalScan.Run((request, _) =>
             request[0] == 1 ? [0x41, 0x20, 0, 0, 0, 0] : [0x7F, request[0], 0x11],
             () => {}, TimeSpan.FromMinutes(1));

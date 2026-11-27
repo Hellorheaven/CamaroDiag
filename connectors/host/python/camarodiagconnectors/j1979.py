@@ -245,13 +245,26 @@ def scan(exchange: Exchange, *, budget: float = 180.0,
         application = None
         try:
             response = exchange(request, min(2.5, left))
+            if clock() - started >= budget:
+                stop = "BUDGET_EXHAUSTED"
+                detail = "LATE_RESPONSE"
+                steps.append({"request_hex": request.hex().upper(),
+                              "response_hex": response.hex().upper(),
+                              "status": "NOT_TESTED", "detail": detail, "decoded": None,
+                              "application_evidence": None,
+                              "duration_ms": round((clock() - begin) * 1000)})
+                return None
             detail = _validate(request, response)
             application = decode_observation(request, response)
             if application is None:
                 raise ValueError("Invalid application record")
-            if detail is None:
+            if application["shape"] == "RAW":
+                status = "RAW"
+            elif detail is None:
                 result = decode(response) if decode else response.hex().upper()
                 status = "PASSED"
+        except KeyboardInterrupt:
+            status, detail, stop = "NOT_TESTED", "CANCELLED", "CANCELLED"
         except TimeoutError:
             detail = "TIMEOUT"
         except ValueError as exc:
@@ -333,6 +346,7 @@ def scan(exchange: Exchange, *, budget: float = 180.0,
         if info != 2:
             read(bytes((9, info)))
     return {"observed_vin": vin, "steps": steps, "advertised_control_tests": controls,
+            "cancelled": stop == "CANCELLED",
             **summarize_observations(steps),
             "completed": stop is None, "stop_reason": stop,
             "duration_ms": round((clock() - started) * 1000),

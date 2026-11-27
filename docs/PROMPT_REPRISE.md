@@ -1,3 +1,7 @@
+## J1979 — recettes CAN physiques : réponses brutes, échéance et interruption (27/11/2026)
+
+- Windows J2534 et Linux SocketCAN distinguent désormais RAW de PASSED dans les étapes, sans décodage inventé ; les réponses reçues hors budget restent brutes et ne publient pas de mesure/VIN. Linux conserve le préfixe lors de Ctrl+C pendant un échange, arrête les transmissions et synchronise le rapport JSON exclusif sur disque. Les observations antérieures restent des observations, non une preuve physique. Régressions Windows/Python écrites, non exécutées. C6/J1979 ouverts, aucune CI intermédiaire, fusion ou Release.
+
 ## C6 — nettoyage borné du staging de récupération Android (27/11/2026)
 
 - Le nettoyage ne parcourt plus récursivement les dossiers : inventaire des seuls chemins créés, identité/type vérifiés avant suppression, refus des entrées inattendues, des substitutions et alias, suppression non récursive. Les fichiers partiellement copiés sont enregistrés dès l'ouverture. Une erreur secondaire de nettoyage est attachée à l'erreur d'inspection initiale, y compris annulation ; en cas de succès elle invalide le rapport. Les vérifications de chemin ne garantissent pas l'absence de races ; stockage privé requis. Deux régressions écrites, non exécutées. C6/J1979 ouverts, aucune CI intermédiaire, fusion ou Release.

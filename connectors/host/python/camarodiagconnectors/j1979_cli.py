@@ -44,6 +44,10 @@ def run(argv=None) -> dict:
         try:
             with LinuxIsoTp(args.interface, args.tx, args.rx) as transport:
                 result = scan(transport.exchange, budget=args.budget)
+        except KeyboardInterrupt:
+            result = {"completed": False, "cancelled": True, "stop_reason": "CANCELLED",
+                      "observed_vin": None, "steps": [],
+                      "not_executed": ["MODE_04_CLEAR", "MODE_05_LEGACY", "MODE_08_CONTROL"]}
         except (OSError, ValueError) as exc:
             result = {"completed": False, "stop_reason": type(exc).__name__,
                       "observed_vin": None, "steps": [],
@@ -59,6 +63,8 @@ def run(argv=None) -> dict:
                   **result}
         json.dump(report, output, indent=2, ensure_ascii=True)
         output.write("\n")
+        output.flush()
+        os.fsync(output.fileno())
     return report
 
 
