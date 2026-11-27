@@ -3,6 +3,9 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /* Port of the existing Python ISO 15031-5:2006 Annex E subset, never an
  * inferred definition for unknown monitor unit/scaling IDs. This numeric
@@ -30,4 +33,7 @@ bool j1979_monitor_decode(const uint8_t request[2],const uint8_t *response,
 size_t j1979_monitor_count(const uint8_t request[2],
                            const uint8_t *response,size_t length);
 const char *j1979_monitor_relation_name(j1979_monitor_relation value);
+#ifdef __cplusplus
+}
+#endif
 #endif

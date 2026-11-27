@@ -1,9 +1,18 @@
+// SAE J1979 decoded measurements: C++20 bounded spans and value semantics.
 #include "j1979_measurement.h"
-#include <string.h>
+#include <array>
+#include <cstddef>
+#include <cstdint>
+#include <span>
 
-static unsigned known_width(uint8_t pid) {
+static constexpr unsigned known_width(uint8_t pid) {
     switch (pid) {
-                case 0x0c:         case 0x10:         case 0x1f:         case 0x21:         case 0x22:         case 0x23:         case 0x31:         case 0x32:         case 0x3c:         case 0x3d:         case 0x3e:         case 0x3f:         case 0x42:         case 0x43:         case 0x44:         case 0x4d:         case 0x4e:         case 0x53:         case 0x54:         case 0x59:         case 0x5d:         case 0x5e:         case 0x63: return 2;
+        case 0x0c: case 0x10: case 0x1f: case 0x21: case 0x22:
+        case 0x23: case 0x31: case 0x32: case 0x3c: case 0x3d:
+        case 0x3e: case 0x3f: case 0x42: case 0x43: case 0x44:
+        case 0x4d: case 0x4e: case 0x53: case 0x54: case 0x59:
+        case 0x5d: case 0x5e: case 0x63:
+            return 2;
         case 0xa6:return 4;
         default:return 1;
     }
@@ -12,11 +21,12 @@ bool j1979_measurement_decode(const uint8_t *req,size_t qlen,
                               const uint8_t *res,size_t n,
                               j1979_measurement *out) {
     if (!out) return false;
-    memset(out,0,sizeof(*out));
+    *out = {};
     if (!req || !res || (qlen!=2 && qlen!=3) ||
         (req[0]!=1 && req[0]!=2) ||
         (req[0]==1 && qlen!=2) ||
         (req[0]==2 && (qlen!=3 || req[2]!=0))) return false;
+    const std::span<const uint8_t> response{res,n};
     const size_t offset=req[0]==2 ? 3u:2u;
     if (n<offset+1u || res[0]!=(uint8_t)(req[0]+0x40) ||
         res[1]!=req[1] || (req[0]==2 && res[2]!=0))
@@ -24,7 +34,7 @@ bool j1979_measurement_decode(const uint8_t *req,size_t qlen,
     unsigned width=known_width(req[1]);
     bool trim=req[1]>=6 && req[1]<=9;
     if (n!=offset+width && !(trim && n==offset+2)) return false;
-    const uint8_t *bytes=res+offset;
+    const std::span<const uint8_t> bytes=response.subspan(offset);
     const double a=bytes[0];
     const double b=width>=2 ? bytes[1] : 0;
     const int pair=(int)bytes[0]*256+(width>=2?bytes[1]:0);

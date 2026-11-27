@@ -1,18 +1,44 @@
+# CamaroDiag Linux native bridge: new J1979 decoding is C++20.
+# Legacy C transport and capture files remain temporarily ABI-compatible;
+# their replacement must use C++, with no new Python or C implementation.
 CC ?= cc
+CXX ?= c++
 CFLAGS ?= -O2 -g
+CXXFLAGS ?= -O2 -g
 CPPFLAGS ?=
 LDFLAGS ?=
 LDLIBS ?= -lcrypto
-STRICT = -std=c11 -Wall -Wextra -Wpedantic -Werror -D_FILE_OFFSET_BITS=64
+CSTRICT = -std=c11 -Wall -Wextra -Wpedantic -Werror -D_FILE_OFFSET_BITS=64
+CXXSTRICT = -std=c++20 -Wall -Wextra -Wpedantic -Werror -D_FILE_OFFSET_BITS=64
 INCLUDES = -Iinclude -I../../firmware/shared
-SOURCES = ../../firmware/shared/j1979_native_c.c src/cf1.c src/cf1_complete.c src/cf1_crypto.c src/cf1_usb.c src/cl1.c src/cl1_crypto.c src/j1979_can.c src/j1979_monitor_scaling.c src/j1979_vehicle_info.c src/j1979_measurement.c src/j1979_isotp.c src/j1979_live.c src/j1979_can_cli.c src/main.c
 TARGET = camarodiag-native
+
+LEGACY_C_SOURCES = src/cf1.c src/cf1_complete.c src/cf1_crypto.c src/cf1_usb.c src/cl1.c src/cl1_crypto.c src/j1979_can.c src/j1979_isotp.c src/j1979_live.c src/j1979_can_cli.c src/main.c
+CXX_SOURCES = src/j1979_monitor_scaling.cpp src/j1979_vehicle_info.cpp src/j1979_measurement.cpp
+LEGACY_C_OBJECTS = $(patsubst src/%.c,build/%.o,$(LEGACY_C_SOURCES)) build/j1979_native_c.o
+CXX_OBJECTS = $(patsubst src/%.cpp,build/%.o,$(CXX_SOURCES))
+DECODER_OBJECTS = build/j1979_monitor_scaling.o build/j1979_vehicle_info.o build/j1979_measurement.o
 
 .PHONY: all clean test install deb
 all: $(TARGET)
 
-$(TARGET): $(SOURCES) include/cf1.h include/cl1.h include/cl1_transport.h include/cl1_usb.h include/j1979_can.h include/j1979_monitor_scaling.h include/j1979_vehicle_info.h include/j1979_measurement.h include/j1979_isotp.h include/j1979_can_cli.h include/j1979_live.h ../../firmware/shared/j1979_native_c.h
-	$(CC) $(CPPFLAGS) $(INCLUDES) $(CFLAGS) $(STRICT) $(SOURCES) $(LDFLAGS) $(LDLIBS) -o $@
+build:
+	mkdir -p $@
+
+build/%.o: src/%.c | build
+	$(CC) $(CPPFLAGS) $(INCLUDES) $(CFLAGS) $(CSTRICT) -c $< -o $@
+
+build/%.o: src/%.cpp | build
+	$(CXX) $(CPPFLAGS) $(INCLUDES) $(CXXFLAGS) $(CXXSTRICT) -c $< -o $@
+
+build/test_%.o: tests/test_%.c | build
+	$(CC) $(CPPFLAGS) $(INCLUDES) $(CFLAGS) $(CSTRICT) -c $< -o $@
+
+build/j1979_native_c.o: ../../firmware/shared/j1979_native_c.c ../../firmware/shared/j1979_native_c.h | build
+	$(CC) $(CPPFLAGS) $(INCLUDES) $(CFLAGS) $(CSTRICT) -c $< -o $@
+
+$(TARGET): $(LEGACY_C_OBJECTS) $(CXX_OBJECTS)
+	$(CXX) $(CXXFLAGS) $(CXXSTRICT) $^ $(LDFLAGS) $(LDLIBS) -o $@
 
 test: test-j1979-measurement test-j1979-monitor test-j1979-vehicle-info test-j1979-native-c test-cf1 test-cu2 test-cu3 test-j1979-can test-j1979-isotp test-j1979-live test-j1979-cl1
 	./test-j1979-measurement
@@ -27,41 +53,41 @@ test: test-j1979-measurement test-j1979-monitor test-j1979-vehicle-info test-j19
 	./test-j1979-live
 	./test-j1979-cl1
 
-test-j1979-measurement: tests/test_j1979_measurement.c src/j1979_measurement.c include/j1979_measurement.h
-	$(CC) $(CPPFLAGS) $(INCLUDES) $(CFLAGS) $(STRICT) tests/test_j1979_measurement.c src/j1979_measurement.c $(LDFLAGS) -o $@
+test-j1979-measurement: build/test_j1979_measurement.o build/j1979_measurement.o
+	$(CXX) $(LDFLAGS) $^ -o $@
 
-test-j1979-vehicle-info: tests/test_j1979_vehicle_info.c src/j1979_vehicle_info.c include/j1979_vehicle_info.h
-	$(CC) $(CPPFLAGS) $(INCLUDES) $(CFLAGS) $(STRICT) tests/test_j1979_vehicle_info.c src/j1979_vehicle_info.c $(LDFLAGS) -o $@
+test-j1979-vehicle-info: build/test_j1979_vehicle_info.o build/j1979_vehicle_info.o
+	$(CXX) $(LDFLAGS) $^ -o $@
 
-test-j1979-monitor: tests/test_j1979_monitor_scaling.c src/j1979_monitor_scaling.c include/j1979_monitor_scaling.h
-	$(CC) $(CPPFLAGS) $(INCLUDES) $(CFLAGS) $(STRICT) tests/test_j1979_monitor_scaling.c src/j1979_monitor_scaling.c $(LDFLAGS) -o $@
+test-j1979-monitor: build/test_j1979_monitor_scaling.o build/j1979_monitor_scaling.o
+	$(CXX) $(LDFLAGS) $^ -o $@
 
 test-j1979-native-c: tests/test_j1979_native_c.c ../../firmware/shared/j1979_native_c.c
-	$(CC) $(CPPFLAGS) $(INCLUDES) $(CFLAGS) $(STRICT) tests/test_j1979_native_c.c ../../firmware/shared/j1979_native_c.c $(LDFLAGS) -o $@
+	$(CC) $(CPPFLAGS) $(INCLUDES) $(CFLAGS) $(CSTRICT) $^ $(LDFLAGS) -o $@
 
 test-cf1: tests/test_cf1.c src/cf1.c src/cf1_complete.c include/cf1.h
-	$(CC) $(CPPFLAGS) $(INCLUDES) $(CFLAGS) $(STRICT) tests/test_cf1.c src/cf1.c src/cf1_complete.c $(LDFLAGS) -o $@
+	$(CC) $(CPPFLAGS) $(INCLUDES) $(CFLAGS) $(CSTRICT) tests/test_cf1.c src/cf1.c src/cf1_complete.c $(LDFLAGS) -o $@
 
 test-cu3: tests/test_cu3.c src/cl1_crypto.c src/cl1.c src/cf1.c include/cl1_transport.h
-	$(CC) $(CPPFLAGS) $(INCLUDES) $(CFLAGS) $(STRICT) tests/test_cu3.c src/cl1_crypto.c src/cl1.c src/cf1.c $(LDFLAGS) $(LDLIBS) -o $@
+	$(CC) $(CPPFLAGS) $(INCLUDES) $(CFLAGS) $(CSTRICT) tests/test_cu3.c src/cl1_crypto.c src/cl1.c src/cf1.c $(LDFLAGS) $(LDLIBS) -o $@
 
 test-cu2: tests/test_cu2.c src/cf1.c src/cf1_crypto.c include/cf1.h include/cf1_transport.h
-	$(CC) $(CPPFLAGS) $(INCLUDES) $(CFLAGS) $(STRICT) tests/test_cu2.c src/cf1.c src/cf1_crypto.c $(LDFLAGS) $(LDLIBS) -o $@
+	$(CC) $(CPPFLAGS) $(INCLUDES) $(CFLAGS) $(CSTRICT) tests/test_cu2.c src/cf1.c src/cf1_crypto.c $(LDFLAGS) $(LDLIBS) -o $@
 
-test-j1979-can: tests/test_j1979_can.c src/j1979_can.c ../../firmware/shared/j1979_native_c.c include/j1979_can.h
-	$(CC) $(CPPFLAGS) $(INCLUDES) $(CFLAGS) $(STRICT) tests/test_j1979_can.c src/j1979_can.c src/j1979_monitor_scaling.c src/j1979_vehicle_info.c src/j1979_measurement.c ../../firmware/shared/j1979_native_c.c $(LDFLAGS) -o $@
+test-j1979-can: build/test_j1979_can.o build/j1979_can.o $(DECODER_OBJECTS) build/j1979_native_c.o
+	$(CXX) $(LDFLAGS) $^ -o $@
 
-test-j1979-isotp: tests/test_j1979_isotp.c src/j1979_isotp.c src/j1979_can.c include/j1979_isotp.h include/j1979_can.h
-	$(CC) $(CPPFLAGS) $(INCLUDES) $(CFLAGS) $(STRICT) tests/test_j1979_isotp.c src/j1979_isotp.c src/j1979_can.c src/j1979_monitor_scaling.c src/j1979_vehicle_info.c src/j1979_measurement.c ../../firmware/shared/j1979_native_c.c $(LDFLAGS) -o $@
+test-j1979-isotp: build/test_j1979_isotp.o build/j1979_isotp.o build/j1979_can.o $(DECODER_OBJECTS) build/j1979_native_c.o
+	$(CXX) $(LDFLAGS) $^ -o $@
 
-
-test-j1979-live: tests/test_j1979_live.c src/j1979_live.c src/j1979_can.c include/j1979_live.h
-	$(CC) $(CPPFLAGS) $(INCLUDES) $(CFLAGS) $(STRICT) tests/test_j1979_live.c src/j1979_live.c src/j1979_can.c src/j1979_monitor_scaling.c src/j1979_vehicle_info.c src/j1979_measurement.c ../../firmware/shared/j1979_native_c.c $(LDFLAGS) -o $@
+test-j1979-live: build/test_j1979_live.o build/j1979_live.o build/j1979_can.o $(DECODER_OBJECTS) build/j1979_native_c.o
+	$(CXX) $(LDFLAGS) $^ -o $@
 
 test-j1979-cl1: tests/test_j1979_cl1.c src/cl1.c src/cf1.c include/cl1.h include/cf1.h
-	$(CC) $(CPPFLAGS) $(INCLUDES) $(CFLAGS) $(STRICT) tests/test_j1979_cl1.c src/cl1.c src/cf1.c $(LDFLAGS) -o $@
+	$(CC) $(CPPFLAGS) $(INCLUDES) $(CFLAGS) $(CSTRICT) tests/test_j1979_cl1.c src/cl1.c src/cf1.c $(LDFLAGS) -o $@
 
 clean:
+	rm -rf build
 	rm -f $(TARGET) test-j1979-measurement test-j1979-monitor test-j1979-vehicle-info test-j1979-native-c test-cf1 test-cu2 test-cu3 test-j1979-can test-j1979-isotp test-j1979-live test-j1979-cl1
 
 PREFIX ?= /usr/local

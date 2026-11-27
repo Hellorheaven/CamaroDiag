@@ -1,12 +1,21 @@
+// SAE J1979 Mode 06: C++20 bounded numeric projection.
 #include "j1979_monitor_scaling.h"
-#include <string.h>
+#include <array>
+#include <cstdint>
+#include <span>
 
 /* Exact curated engineering multipliers formerly in
  * connectors/host/python/camarodiagconnectors/j1979_monitor_scaling.py.
  * Keep the original byte encoding as authoritative evidence.
  */
-typedef struct {uint8_t id;const char *unit;double factor;bool signed_value;double offset;} definition;
-static const definition definitions[]={
+struct definition {
+    uint8_t id;
+    const char *unit;
+    double factor;
+    bool signed_value;
+    double offset;
+};
+static constexpr definition definitions[]={
     {0x01, "1", 1, false, 0},
     {0x02, "1", 0.1, false, 0},
     {0x03, "1", 0.01, false, 0},
@@ -88,8 +97,8 @@ static const definition definitions[]={
     {0xfe, "Pa", 0.25, true, 0},
 };
 static const definition *lookup(uint8_t id) {
-    for (size_t i=0;i<sizeof(definitions)/sizeof(definitions[0]);++i)
-        if (definitions[i].id==id) return &definitions[i];
+    for (const definition &entry : definitions)
+        if (entry.id == id) return &entry;
     return NULL;
 }
 static double convert(const definition *d,uint16_t encoded) {
@@ -100,8 +109,7 @@ static double convert(const definition *d,uint16_t encoded) {
 bool j1979_monitor_scale(uint8_t id,uint16_t raw,uint16_t low,
                          uint16_t high,j1979_monitor_record *out) {
     if (!out) return false;
-    out->scaled=false;
-    out->unit=NULL;
+    *out = {};
     const definition *d=lookup(id);
     if (!d || (id==0x2e && (raw>1 || low>1 || high>1))) return false;
     out->value=convert(d,raw);
@@ -138,10 +146,12 @@ size_t j1979_monitor_count(const uint8_t request[2],
 bool j1979_monitor_decode(const uint8_t request[2],const uint8_t *response,
                           size_t length,size_t index,j1979_monitor_record *out) {
     if (!out) return false;
-    memset(out,0,sizeof(*out));
-    size_t count=j1979_monitor_count(request,response,length);
+    *out = {};
+    const std::span<const uint8_t> bytes{response,length};
+    const size_t count=j1979_monitor_count(request,response,length);
     if (!count || index>=count) return false;
-    const uint8_t *p=response+1u+9u*index;
+    const std::span<const uint8_t> entry=bytes.subspan(1u+9u*index,9u);
+    const uint8_t *p=entry.data();
     out->monitor_id=p[0];
     out->test_id=p[1];
     out->scaling_id=p[2];

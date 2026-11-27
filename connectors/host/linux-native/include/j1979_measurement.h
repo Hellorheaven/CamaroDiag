@@ -3,6 +3,9 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /* Raw evidence remains authoritative. Numeric values come only from the
  * explicitly selected classic SAE Mode 01/02 definitions in the existing
@@ -21,4 +24,7 @@ typedef struct {
 bool j1979_measurement_decode(const uint8_t *request,size_t request_size,
                               const uint8_t *response,size_t response_size,
                               j1979_measurement *out);
+#ifdef __cplusplus
+}
+#endif
 #endif

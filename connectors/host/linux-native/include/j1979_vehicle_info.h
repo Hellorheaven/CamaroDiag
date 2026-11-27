@@ -3,6 +3,9 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /* Strict CAN Mode 09 InfoTypes 08/0B/0D/0F, ported from the existing
  * j1979_vehicle_info.py rules. Does not infer vehicle or ECU provenance.
@@ -26,4 +29,7 @@ typedef struct {
 /* Entire complete CAN response, never legacy fragments across responders. */
 bool j1979_vehicle_info_decode(uint8_t info_type,const uint8_t *response,
                                size_t response_size,j1979_vehicle_info *out);
+#ifdef __cplusplus
+}
+#endif
 #endif
