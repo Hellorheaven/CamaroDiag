@@ -66,7 +66,8 @@ internal object NativeUsbObdScanProjection {
         fun pageVerified(mode:Int,id:Int)=chain(mode).pages.any { it.base==id }
         val contextual=values.contextualMeasurements.records.filter { it.requestHex.startsWith("01") }
             .associateBy { it.requestHex.takeLast(2).toInt(16) }
-        val singleLive=values.measurements.filter { it.mode==1&&advertised(1,it.pid)&&it.pid !in contextual }.mapNotNull { value ->
+        val trims=values.operatingContext.fuelTrims.filter { it.frame==null }.associateBy { it.requestHex.takeLast(2).toInt(16) }
+        val singleLive=values.measurements.filter { it.mode==1&&advertised(1,it.pid)&&it.pid !in contextual&&it.pid !in trims }.mapNotNull { value ->
             val row=modeRows(1).singleOrNull { positive(it)&&pid(it)==value.pid } ?: return@mapNotNull null
             val data=bytes(row)
             if(data.size<3||data[0]!=65||data[1]!=value.pid) return@mapNotNull null
@@ -86,11 +87,23 @@ internal object NativeUsbObdScanProjection {
                 signal.number?.let { number -> ObdValue(id,signal.name,number.toString(),signal.unit,data.drop(2),responder) }
             }
         }
-        val live=singleLive+multiLive+contextualLive
+        val trimLive=trims.flatMap { (id,record) ->
+            val row=modeRows(1).singleOrNull { pid(it)==id } ?: return@flatMap emptyList()
+            record.signals.mapNotNull { signal ->
+                signal.number?.let { ObdValue(id,signal.name,it.toString(),signal.unit,bytes(row).drop(2),responder) }
+            }
+        }
+        val cycleLive=values.operatingContext.driveCycle?.let { cycle ->
+            val row=modeRows(1).singleOrNull { pid(it)==0x41 }
+            if(row==null)emptyList() else cycle.monitors.filter { it.supported==true }.map { monitor ->
+                ObdValue(0x41,monitor.name,if(monitor.complete==true)"COMPLETE" else "INCOMPLETE","",bytes(row).drop(2),responder)
+            }
+        }.orEmpty()
+        val live=singleLive+multiLive+contextualLive+trimLive+cycleLive
         val reads=modeRows(1).mapNotNull { row ->
             val id=pid(row)?.takeIf { it%32!=0 } ?: return@mapNotNull null
             val data=bytes(row)
-            val eligible=advertised(1,id)&&(positive(row)||values.multiSignalRecords.any { it.requestHex==row.optString("request_hex") }||id in contextual)&&
+            val eligible=advertised(1,id)&&(positive(row)||values.multiSignalRecords.any { it.requestHex==row.optString("request_hex") }||id in contextual||id in trims||id==0x41&&values.operatingContext.driveCycle!=null)&&
                 data.size>2&&data[0]==65&&data[1]==id
             val observation=if(data.size>2&&data[0]==65&&data[1]==id)
                 listOf(ObdMode01Observation(responder,data.drop(2),eligible,live.count { it.pid==id })) else emptyList()
