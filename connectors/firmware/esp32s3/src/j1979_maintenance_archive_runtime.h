@@ -2,6 +2,7 @@
 #include "j1979_maintenance_archive_usb.h"
 #include "j1979_usb_crypto.h"
 #include "../../shared/j1979_maintenance_spi.h"
+#include "../../shared/j1979_maintenance_archive_owner.h"
 
 namespace cd {
 class J1979MaintenanceArchiveRemote final:public J1979MaintenanceArchive::Source {
@@ -35,6 +36,8 @@ class J1979MaintenanceArchiveSecurity final:public J1979MaintenanceArchiveUsb::S
   using Scope=J1979MaintenanceScope;
   struct Snapshot {
     uint64_t connection=0,credential=0,approval=0;
+    // storageExclusive means the archive session retains exclusion against
+    // new writers until the USB receipt, not the local storage read lease.
     bool archiveApproved=false,txInhibited=false,storageExclusive=false,entropyReady=false;
   };
   class Board {
@@ -83,7 +86,8 @@ inline J1979MaintenanceArchiveUsb::Report serveJ1979RemoteArchive(
 }
 inline J1979MaintenanceArchiveUsb::Report serveJ1979LocalArchive(
     J1979MaintenanceArchiveUsb::Channel& channel,J1979MaintenanceArchiveSecurity& security,
-    J1979MaintenanceStorage& storage,J1979MaintenanceArchive::Owner& owner,const J1979MaintenanceScope& scope){
+    J1979MaintenanceStorage& storage,J1979MaintenanceArchiveOwner::Board& board,const J1979MaintenanceScope& scope){
+  J1979MaintenanceArchiveOwner owner(board,scope);
   J1979MaintenanceArchive::LocalSource source(storage,owner,scope);
   return J1979MaintenanceArchiveUsb::serve(channel,security,source);
 }
