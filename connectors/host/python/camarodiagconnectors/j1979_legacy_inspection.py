@@ -156,7 +156,10 @@ def _identity(kind,rows,counts):
 def _unwrap(root):
     _require(root.get("schema") in SCHEMAS,"Unsupported selected-source legacy schema")
     driver="result" in root
-    body=_dict(root.get("result") if driver else root,"legacy report")
+    body=_dict(root.get("result") if driver else root.get("legacyRead",root),"legacy report")
+    if "legacyRead" in root:
+        _require(body.get("schema") in SCHEMAS,"Invalid nested Android legacy report")
+        _require(_get(root,"selected_vin")==_get(body,"declared_vin"),"Android outer VIN scope differs")
     if driver:
         protocol=VARIANTS.get(root.get("variant"))
         _require(protocol is not None,"Unknown J2534 legacy variant")
@@ -188,6 +191,8 @@ def _unwrap(root):
                    if s.strip() and s.strip().upper()!="ATDPN"]
             _require(lines==[str(protocol)],"Fixed protocol probe differs")
     _flag_false(root,"physical_vehicle_verified")
+    _flag_false(body,"physical_vehicle_verified")
+    _flag_false(root,"whole_vehicle_coverage_verified")
     _flag_false(body,"whole_vehicle_coverage_verified")
     return body,protocol,source,driver,observed
 
@@ -485,6 +490,10 @@ def inspect(root,*,expected_vin=None):
         controls=sorted(chains.get((8,None),{}).get("ids",set()))
         _require(_equal(claimed("advertised_control_tests"),controls),"Advertised control tests differ from inventory")
         checked.append("advertised_control_tests")
+    for freeze_name in ("freeze_trigger","freeze_frame_trigger"):
+        if claimed(freeze_name) is not None:
+            _require(_equal(_normalize(claimed(freeze_name)),freeze),"Freeze trigger differs from selected ECU")
+            checked.append(freeze_name)
     if claimed("freeze_triggers") is not None:
         _require(freeze is not None and project_claims("freeze_triggers",[freeze],("present","dtc")),"Freeze trigger differs from selected ECU")
         checked.append("freeze_triggers")
