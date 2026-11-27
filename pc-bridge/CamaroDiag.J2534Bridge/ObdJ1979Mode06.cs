@@ -3,15 +3,56 @@ namespace CamaroDiag.J2534Bridge;
 /// <summary>
 /// SAE J1979 classic Mode 06 ISO 15765-4 CAN on-board monitor records.
 /// Availability bitmaps and individual test records use different response
-/// layouts. The unit-and-scaling ID is retained without inventing a unit
-/// conversion from the SAE J1979DA table.
+/// layouts. Known engineering scales use an explicit historical Annex E
+/// subset; unknown IDs remain raw, and no monitor verdict is inferred.
 /// </summary>
 internal static class ObdJ1979Mode06
 {
     internal sealed record Availability(byte BaseId, IReadOnlyList<byte> MonitorIds,
         bool HasNextPage);
     internal sealed record Test(byte MonitorId, byte TestId, byte UnitScalingId,
-        ushort Value, ushort Minimum, ushort Maximum);
+        ushort Value, ushort Minimum, ushort Maximum)
+    {
+        public ScaledValue? Scaled => DecodeScale(UnitScalingId, Value, Minimum, Maximum);
+    }
+
+    internal sealed record ScaledValue(string Unit, double Value, double Minimum,
+        double Maximum, string NumericRelation)
+    {
+        public string Definition => "ISO15031-5:2006-ANNEX-E-SUBSET";
+    }
+
+    internal static ScaledValue? DecodeScale(byte id, ushort value, ushort minimum, ushort maximum)
+    {
+        (string Unit, double Factor, bool Signed)? definition = id switch
+        {
+            0x0A => ("mV", 0.122d, false),
+            0x0B => ("V", 0.001d, false),
+            0x0D => ("mA", 0.00390625d, false),
+            0x0E => ("A", 0.001d, false),
+            0x0F => ("A", 0.01d, false),
+            0x10 => ("ms", 1d, false),
+            0x24 => ("count", 1d, false),
+            0x25 => ("km", 1d, false),
+            0x2F => ("%", 0.01d, false),
+            0x31 => ("L", 0.001d, false),
+            0x84 => ("1", 0.001d, true),
+            0x85 => ("1", 0.0000305d, true),
+            0x86 => ("1", 0.000305d, true),
+            0x8E => ("A", 0.001d, true),
+            0x90 => ("ms", 1d, true),
+            0x96 => ("degC", 0.1d, true),
+            _ => null
+        };
+        if (definition is not { } scale) return null;
+        double Decode(ushort raw) =>
+            (scale.Signed && raw >= 32768 ? (int)raw - 65536 : raw) * scale.Factor;
+        var actual = Decode(value);
+        var low = Decode(minimum);
+        var high = Decode(maximum);
+        return new(scale.Unit, actual, low, high, low > high ? "INVERTED_LIMITS" :
+            actual < low ? "BELOW" : actual > high ? "ABOVE" : "WITHIN");
+    }
 
     internal static Availability DecodeAvailability(ReadOnlySpan<byte> request,
         ReadOnlySpan<byte> response)
