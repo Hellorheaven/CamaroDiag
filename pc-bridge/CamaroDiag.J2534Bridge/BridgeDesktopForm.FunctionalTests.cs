@@ -78,7 +78,9 @@ internal sealed partial class BridgeDesktopForm
         extraRecipes.Controls.Add(functionalRunNativeUsb);
         extraRecipes.Controls.Add(functionalRunNetwork);
         extraRecipes.Controls.Add(functionalRunLive);
-        WideRow(fields, functionalRunFreeze, 42);
+        var freezeActions=new FlowLayoutPanel { Dock=DockStyle.Fill };
+        freezeActions.Controls.Add(functionalRunFreeze);freezeActions.Controls.Add(functionalRunLegacyFreeze);
+        WideRow(fields,freezeActions,42);
         var nativeFreezeActions=new FlowLayoutPanel { Dock=DockStyle.Fill };
         nativeFreezeActions.Controls.Add(functionalRunNativeFreeze);
         nativeFreezeActions.Controls.Add(functionalInspectNativeFreeze);
@@ -100,10 +102,13 @@ internal sealed partial class BridgeDesktopForm
         functionalRunNetwork.Click += async (_, _) => await RunWindowsNetworkAsync();
         functionalRunLive.Click += async (_, _) => await RunWindowsLiveAsync();
         functionalRunFreeze.Click += async (_, _) => await RunWindowsFreezeAsync();
+        functionalRunLegacyFreeze.Click += async (_, _) => await RunWindowsLegacyFreezeAsync();
+        functionalRunLegacy.EnabledChanged += (_, _) => functionalRunLegacyFreeze.Enabled=functionalRunLegacy.Enabled;
+        functionalRunLegacyFreeze.Enabled=functionalRunLegacy.Enabled;
         functionalRunLive.EnabledChanged += (_, _) =>
         {
             functionalRunFreeze.Enabled = functionalRunLive.Enabled;
-            if (!functionalRunLive.Enabled) completedFreeze = null;
+            if (!functionalRunLive.Enabled) { completedFreeze = null; completedLegacyFreeze=null; }
         };
         functionalRunFreeze.Enabled = functionalRunLive.Enabled;
         functionalRunNativeUsb.Click += async (_, _) => await RunWindowsNativeUsbAsync();
@@ -117,7 +122,7 @@ internal sealed partial class BridgeDesktopForm
         functionalRunClear.Click += async (_, _) => await RunWindowsClearAsync();
         functionalCancel.Click += (_, _) => functionalCancellation?.Cancel();
         functionalExport.Click += (_, _) => ExportWindowsFunctionalResults();
-        functionalResults.TextChanged += (_, _) => completedFreeze = null;
+        functionalResults.TextChanged += (_, _) => { completedFreeze = null; completedLegacyFreeze=null; };
         functionalRunLive.Enabled = functionalRunNetwork.Enabled = functionalRunNativeUsb.Enabled = functionalRunAll.Enabled = functionalRunJ1979.Enabled = functionalRunEvap.Enabled = functionalRunClear.Enabled = functionalRunLegacy.Enabled = functionalRunLegacyMutation.Enabled = functionalCancel.Enabled = functionalExport.Enabled = false;
         layout.Controls.Add(fields, 0, 0);
         layout.Controls.Add(functionalResults, 0, 1);
@@ -357,6 +362,10 @@ internal sealed partial class BridgeDesktopForm
     private void ExportWindowsFunctionalResults()
     {
         if (DateTimeOffset.UtcNow >= functionalAuthorizedUntil) return;
+        if(completedLegacyFreeze is not null)
+        {
+            ExportWindowsLegacyFreeze(completedLegacyFreeze);return;
+        }
         if (completedFreeze is not null)
         {
             ExportWindowsFreeze(completedFreeze);
