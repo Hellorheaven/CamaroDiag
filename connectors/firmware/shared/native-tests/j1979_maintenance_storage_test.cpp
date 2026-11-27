@@ -1,4 +1,5 @@
 #include "../j1979_maintenance_flash_medium.h"
+#include "../j1979_maintenance_archive.h"
 #include <cassert>
 #include <vector>
 
@@ -136,4 +137,41 @@ static void guardCodec(){
   state.guard=Store::Guard::Provisioned;
   assert(!Store::encode(state,bytes,sizeof(bytes)));
 }
-int main(){bootAndSeal();interruptedBoot();corruption();powerCuts();guardCodec();}
+struct ArchiveOwner final:cd::J1979MaintenanceArchive::Owner{
+  Scope scope=target();bool allowed=true,acquired=false;unsigned acquisitions=0,releases=0;
+  bool acquire(const Scope& expected)override{++acquisitions;acquired=scope.same(expected);return acquired&&allowed;}
+  bool admitted(const Scope& expected)override{return acquired&&allowed&&scope.same(expected);}
+  void release()override{++releases;acquired=false;}
+};
+static void archive(){
+  using Archive=cd::J1979MaintenanceArchive;
+  for(unsigned scenario=0;scenario<5;++scenario){
+    Fixture f;assert(f.journal.begin(target()));
+    if(scenario==0){
+      Campaign::Evidence e{};e.scope=target();e.summary.outcome=Sequence::Outcome::NotTested;
+      e.summary.reason=Sequence::Reason::Context;e.physicalStopVerified=true;
+      assert(f.journal.finish(e));
+    }
+    if(scenario==2)f.flash.memory[f.flash.slots.start+Medium::SlotStride+Medium::SlotHeader]=0;
+    Store::Scratch scratch{};Store rebooted(f.medium,scratch);
+    assert(!rebooted.inspect());
+    const unsigned writes=f.flash.writes;
+    ArchiveOwner owner;Archive::LocalSource source(rebooted,owner,target());
+    Archive::Info info;
+    if(scenario==3)owner.allowed=false;
+    if(scenario==3){assert(!source.open(target(),info)&&owner.releases==1);continue;}
+    assert(source.open(target(),info)&&info.terminal==(scenario==0));
+    assert(info.recoveryRequired==(scenario!=0)&&info.damagedTail==(scenario==2));
+    std::vector<uint8_t> data(info.bytes);
+    for(size_t pos=0;pos<data.size();){
+      size_t n=data.size()-pos<13?data.size()-pos:13;
+      assert(source.read(pos,data.data()+pos,n));pos+=n;
+    }
+    assert(data[0]=='C'&&data[1]=='M'&&data[3]==1);
+    if(scenario==4)f.flash.memory[f.flash.slots.start+Medium::SlotHeader+10]^=1;
+    assert(source.finish()==(scenario!=4));
+    source.close();source.close();assert(owner.releases==1&&!owner.acquired);
+    assert(f.flash.writes==writes); // retrieval never changes durable guard or slots
+  }
+}
+int main(){bootAndSeal();interruptedBoot();corruption();powerCuts();guardCodec();archive();}
