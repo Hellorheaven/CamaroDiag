@@ -12,9 +12,10 @@ class StmJ1979Runtime {
   StmJ1979Runtime(StmJ1979ReadSession::Board& board,FDCAN_HandleTypeDef& can,
       SPI_HandleTypeDef& spi,StmJ1979FdcanLink::Admission admission,
       StmJ1979SpiPort::Ready ready,StmJ1979FdcanLink::Fault interlockFault,
-      J1979CanReadExchange::Result& scratch,uint32_t tx,uint32_t rx,bool ext)
+      J1979CanReadExchange::Result& scratch,uint32_t tx,uint32_t rx,bool ext,
+      const J1979FreezeScope* freeze=nullptr)
     :can_(can,admission,interlockFault),spi_(spi,admission,ready,interlockFault),
-     endpoint_(can_,scratch,tx,rx,ext,admission),slave_(spi_,endpoint_),
+     endpoint_(can_,scratch,tx,rx,ext,admission,freeze),slave_(spi_,endpoint_),
      session_(board,slave_,tx,rx,ext){}
   StmJ1979Runtime(const StmJ1979Runtime&)=delete;
   StmJ1979Runtime& operator=(const StmJ1979Runtime&)=delete;
