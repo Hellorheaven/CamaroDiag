@@ -351,10 +351,12 @@ class Obd2FeatureEngine(
         val values = mutableListOf<ObdValue>()
         val reads = mutableListOf<ObdMode01Read>()
         val configByAddress = mutableMapOf<String,MutableMap<Int,MutableList<List<Int>?>>>()
+        val layoutByAddress=mutableMapOf<String,Int>()
+        val readinessByAddress=mutableMapOf<String,List<Int>>()
         // Read equipment configuration before dependent values. Never query
         // an unadvertised identifier and never share scales between ECUs.
         val ordered = supportedPids.filter { it in 1..255 && it % 32 != 0 }
-            .sortedWith(compareBy<Int>({ if(ObdJ1979ScalingContext.isConfiguration(it))0 else 1 },{it}))
+            .sortedWith(compareBy<Int>({ if(ObdJ1979ScalingContext.isConfiguration(it)||it in setOf(1,0x1D))0 else 1 },{it}))
         for (pid in ordered) {
             currentCoroutineContext().ensureActive()
             val response = ask("01%02X".format(Locale.US, pid), 1200L)
@@ -376,7 +378,21 @@ class Obd2FeatureEngine(
                         cfg.getOrPut(pid){mutableListOf()}.add(
                             if(eligible && ObdJ1979ScalingContext.validConfiguration(pid,data))listOf(0x41,pid)+data else null)
                     }
+                    if(eligible&&address!=null){
+                        if(pid==0x1D&&data.size==1)layoutByAddress[address]=data[0]
+                        if(pid==1&&data.size==4)readinessByAddress[address]=data.toList()
+                    }
                     val decoded = if (!eligible || ObdJ1979ScalingContext.isConfiguration(pid))emptyList()
+                        else if(ObdJ1979OperatingContext.isTrim(pid)){
+                            ObdJ1979OperatingContext.decodeTrim(listOf(1,pid),data,address?.let(layoutByAddress::get))?.signals.orEmpty().mapNotNull { signal ->
+                                signal.number?.let { ObdValue(pid,signal.name,it.toString(),signal.unit,data,address) }
+                            }
+                        } else if(pid==0x41){
+                            ObdJ1979OperatingContext.decodeCycle(data,address?.let(readinessByAddress::get))?.monitors.orEmpty()
+                                .filter { it.supported==true }.map { monitor ->
+                                    ObdValue(pid,monitor.name,if(monitor.complete==true)"COMPLETE" else "INCOMPLETE","",data,address)
+                                }
+                        }
                         else if (ObdJ1979ScalingContext.dependency(pid)!=null && address!=null) {
                             val supported = byResponder[address] ?: if(physicalCanResponder==address)supportedPids else emptySet()
                             val verified = inventoryVerified && (byResponder.containsKey(address)||physicalCanResponder==address)
