@@ -285,6 +285,10 @@ public final class J1979CampaignSemantics {
         if(m==2&&(r.length<3||r[2]!=req[2]))return 0;
         if(pid%32==0)return r.length==off+4&&!(pid==224&&(r[r.length-1]&1)!=0)?1:0;
         if(m==1||m==2){
+            if((pid>=6&&pid<=9)||(pid>=0x55&&pid<=0x58)){
+                if(r.length==off+1)return pid<0x55?1:2;
+                return r.length==off+2?2:0;
+            }
             int width=m==2&&pid==2?2:(pid==1||pid==0xA6)?4:Arrays.binarySearch(ONE,pid)>=0?1:Arrays.binarySearch(TWO,pid)>=0?2:0;
             return width>0?(r.length==off+width?1:0):(r.length>off?2:0);
         }
