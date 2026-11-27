@@ -8,7 +8,7 @@ from pathlib import Path
 import sys
 from datetime import datetime, timezone
 
-from .j1979_maintenance_journal import inspect, require, MAX_JOURNAL, Scope
+from .j1979_maintenance_journal import inspect, inspect_prefix, require, MAX_JOURNAL, Scope
 from .j1979_maintenance_usb import capture, scope_bytes
 from .recovery_bundle import _regular, _json
 from .recovery_history import _compare_history_value
@@ -16,21 +16,21 @@ from .recovery_history import _compare_history_value
 MAX_REPORT = 1024 * 1024
 
 
-def inspect_file(path, *, expected_vin):
+def inspect_file(path, *, expected_vin, prefix=False):
     raw, stamp = _regular(Path(path), MAX_JOURNAL)
-    result = inspect(raw, expected_vin=expected_vin)
+    result = (inspect_prefix if prefix else inspect)(raw, expected_vin=expected_vin)
     again, after = _regular(Path(path), MAX_JOURNAL)
     require(raw == again and stamp == after, "CM/1 changed during inspection")
     result["journal_sha256"] = stamp.digest
     return result
 
 
-def verify_files(journal, report, *, expected_vin):
+def verify_files(journal, report, *, expected_vin, prefix=False):
     journal, report = Path(journal), Path(report)
     require(journal.resolve() != report.resolve(), "Input paths must differ")
     raw, stamp = _regular(journal, MAX_JOURNAL)
     original, report_stamp = _regular(report, MAX_REPORT)
-    expected = inspect(raw, expected_vin=expected_vin)
+    expected = (inspect_prefix if prefix else inspect)(raw, expected_vin=expected_vin)
     expected["journal_sha256"] = stamp.digest
     actual = _json(original)
     _compare_history_value(actual, expected, "maintenance_journal")
@@ -144,12 +144,12 @@ def can_id(text):
 def run(argv=None, *, prompt=input):
     parser = argparse.ArgumentParser(allow_abbrev=False, description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
-    for name in ("inspect", "verify"):
+    for name in ("inspect", "verify", "inspect-prefix", "verify-prefix"):
         cmd = sub.add_parser(name, allow_abbrev=False)
         cmd.add_argument("--journal", required=True, type=Path)
         cmd.add_argument("--vin", required=True)
         cmd.add_argument("--output", required=True, type=Path)
-        if name == "verify":
+        if name in ("verify", "verify-prefix"):
             cmd.add_argument("--report", required=True, type=Path)
     live=sub.add_parser("capture",allow_abbrev=False)
     live.add_argument("--operation",choices=("clear","evap"),required=True)
@@ -167,11 +167,13 @@ def run(argv=None, *, prompt=input):
     if args.command=="capture":
         return acquire(args,prompt=prompt)
     paths = [args.journal, args.output]
-    if args.command == "verify":
+    if args.command in ("verify", "verify-prefix"):
         paths.append(args.report)
     require(len({path.resolve() for path in paths}) == len(paths), "Input and output paths must differ")
-    result = (inspect_file(args.journal, expected_vin=args.vin) if args.command == "inspect"
-              else verify_files(args.journal, args.report, expected_vin=args.vin))
+    prefix=args.command.endswith("-prefix")
+    result = (inspect_file(args.journal, expected_vin=args.vin,prefix=prefix)
+              if args.command in ("inspect","inspect-prefix")
+              else verify_files(args.journal, args.report, expected_vin=args.vin,prefix=prefix))
     write_new(args.output, result)
     return result
 
@@ -189,7 +191,8 @@ def main():
         print(json.dumps({key:result[key] for key in ("journal_transfer_verified","recovery_required","command_outcome_unknown","error")}))
         raise SystemExit(2 if not result["journal_transfer_verified"] else 7 if result["recovery_required"] else 0)
     source = result.get("replayed", result)
-    print(json.dumps({"record_consistency_verified": True,
+    print(json.dumps({"record_consistency_verified": source["record_consistency_verified"],
+                      "prefix_integrity_verified": source.get("prefix_integrity_verified",False),
                       "terminal_present": source["terminal_present"],
                       "recovery_required": source["recovery_required"],
                       "permits_automatic_retry": False}))
