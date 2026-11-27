@@ -5,6 +5,7 @@
 #include "cl1_usb.h"
 #include "j1979_can_cli.h"
 #include "j1979_cm1.hpp"
+#include "j1979_cj1.hpp"
 #include <exception>
 
 #include <errno.h>
@@ -952,6 +953,19 @@ static int capture_cl1_native(int argc,char **argv) {
     return complete?0:2;
 }
 
+static int cj1_inspect_cli(const char* capture_path,const char* vin,const char* output) {
+    input original{},again{};
+    try {
+        if(!load_regular(capture_path,cd::cj1::max_capture,&original))return error("CJ/1 input invalid");
+        const auto evidence=cd::cj1::inspect({original.bytes.get(),original.length});
+        const auto report=cd::cj1::report(evidence,vin,original.digest);
+        if(!load_regular(capture_path,cd::cj1::max_capture,&again)||!same_input(&original,&again))
+            return error("CJ/1 source changed during inspection");
+        if(!atomic_create(output,report.data(),report.size()))return error("CJ/1 output already exists or unavailable");
+        return evidence.integrity_verified&&evidence.end==1&&evidence.vin==vin?0:2;
+    }catch(const std::exception& e){return error(e.what());}
+}
+
 static int cm1_cli(const char* journal_path,const char* report_path,const char* proof_path,
                    const char* vin,bool prefix) {
     input original{},again{},stored{},stored_again{};
@@ -1007,6 +1021,7 @@ static void usage(FILE *stream) {
         "  camarodiag-native --inspect-j1979-maintenance-prefix JOURNAL.cm VIN REPORT.json\n"
         "  camarodiag-native --verify-j1979-maintenance JOURNAL.cm REPORT.json PROOF.json VIN\n"
         "  camarodiag-native --verify-j1979-maintenance-prefix JOURNAL.cm REPORT.json PROOF.json VIN\n"
+        "  camarodiag-native --inspect-j1979-campaign CAPTURE.cj VIN REPORT.json\n"
         "  camarodiag-native --help\n"
         "Examples:\n"
         "  camarodiag-native --inspect-j1979-freeze-native-prefix incomplete.cf 2G1FA1E30D7654321 partial.json\n"
@@ -1018,6 +1033,8 @@ int main(int argc, char **argv) {
     if (argc == 2 && (!strcmp(argv[1], "--help") || !strcmp(argv[1], "-h"))) {
         usage(stdout); return 0;
     }
+    if (argc==5 && !strcmp(argv[1],"--inspect-j1979-campaign"))
+        return cj1_inspect_cli(argv[2],argv[3],argv[4]);
     if (argc==5 && !strcmp(argv[1],"--inspect-j1979-maintenance"))
         return cm1_cli(argv[2],argv[4],nullptr,argv[3],false);
     if (argc==5 && !strcmp(argv[1],"--inspect-j1979-maintenance-prefix"))
