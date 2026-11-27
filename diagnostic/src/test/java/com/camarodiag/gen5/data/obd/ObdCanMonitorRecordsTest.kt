@@ -43,6 +43,19 @@ class ObdCanMonitorRecordsTest {
         assertEquals(122.0, requireNotNull(voltage.scaled()).value, 1e-10)
     }
 
+    @Test fun historicalScalingCatalogueAndOffsets() {
+        val defined=(0..255).filter { ObdCanMonitorRecords.Result(1,1,it,0,0,1).scaled()!=null }
+        assertEquals(79,defined.size)
+        assertFalse(defined.contains(0x99))
+        val temperature=ObdCanMonitorRecords.Result(1,1,0x16,400,0,1000).scaled()!!
+        assertEquals(0.0,temperature.value,1e-9)
+        assertEquals(-40.0,temperature.minimum,1e-9)
+        assertEquals(60.0,temperature.maximum,1e-9)
+        val percentage=ObdCanMonitorRecords.Result(1,1,0x39,32768,0,65535).scaled()!!
+        assertEquals(0.0,percentage.value,1e-9)
+        assertNull(ObdCanMonitorRecords.Result(1,1,0x2E,2,0,1).scaled())
+    }
+
     @Test fun malformedOrUnavailableResultsNeverBecomeMeasurements() {
         assertNull(ObdCanMonitorRecords.support("7F0611", 0))
         assertNull(ObdCanMonitorRecords.support("46008000", 0))
