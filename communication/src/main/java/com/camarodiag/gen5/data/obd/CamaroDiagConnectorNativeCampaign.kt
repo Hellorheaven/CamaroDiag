@@ -121,6 +121,16 @@ object CamaroDiagConnectorNativeCampaign {
             put("frame_integrity_verified", frames)
             put("capture_integrity_verified", semantic)
             put("cancelled", cancelled)
+            put("multi_signal_records",JSONArray(steps.mapNotNull {
+                ObdJ1979MultiSignal.tryRecord(it.requestHex,it.responseHex,it.status)
+            }.map { record ->
+                JSONObject().put("request_hex",record.requestHex)
+                    .put("signals",JSONArray(record.signals.map { signal ->
+                        JSONObject().put("pid",signal.pid).put("name",signal.name)
+                            .put("unit",signal.unit).put("number",signal.number)
+                            .put("raw_encoded",signal.rawEncoded)
+                    }))
+            }))
             put("extended_vehicle_info", JSONArray(steps.mapNotNull { step ->
                 ObdJ1979ExtendedVehicleInfo.tryRaw(step.requestHex,step.responseHex,step.status)
             }.map { record ->
