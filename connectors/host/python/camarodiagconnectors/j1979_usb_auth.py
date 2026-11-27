@@ -23,11 +23,16 @@ def _key(key: bytes) -> bytes:
     return key
 
 
-def hello(tx: int, rx: int, extended: bool, budget_ms: int,
-          *, nonce: bytes | None = None) -> bytes:
-    if (type(extended) is not bool or not _physical_pair(tx, rx, int(extended)) or
+def validate_profile(tx: int, rx: int, extended: bool, budget_ms: int):
+    if (type(tx) is not int or type(rx) is not int or type(budget_ms) is not int or
+            type(extended) is not bool or not _physical_pair(tx, rx, int(extended)) or
             not 1 <= budget_ms <= 600000):
         raise ValueError("Invalid physical J1979 profile")
+
+
+def hello(tx: int, rx: int, extended: bool, budget_ms: int,
+          *, nonce: bytes | None = None) -> bytes:
+    validate_profile(tx, rx, extended, budget_ms)
     nonce = secrets.token_bytes(_NONCE) if nonce is None else nonce
     if not isinstance(nonce, bytes) or len(nonce) != _NONCE or not any(nonce):
         raise ValueError("Invalid host nonce")
