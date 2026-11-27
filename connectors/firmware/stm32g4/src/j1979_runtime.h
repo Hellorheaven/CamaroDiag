@@ -13,13 +13,18 @@ class StmJ1979Runtime {
       SPI_HandleTypeDef& spi,StmJ1979FdcanLink::Admission admission,
       StmJ1979SpiPort::Ready ready,StmJ1979FdcanLink::Fault interlockFault,
       J1979CanReadExchange::Result& scratch,uint32_t tx,uint32_t rx,bool ext,
-      const J1979FreezeScope* freeze=nullptr)
+      const J1979FreezeScope* freeze=nullptr,const J1979LiveScope* live=nullptr)
     :can_(can,admission,interlockFault),spi_(spi,admission,ready,interlockFault),
-     endpoint_(can_,scratch,tx,rx,ext,admission,freeze),slave_(spi_,endpoint_),
-     session_(board,slave_,tx,rx,ext){}
+     endpoint_(can_,scratch,tx,rx,ext,admission,freeze,live),slave_(spi_,endpoint_),
+     session_(board,slave_,tx,rx,ext),scopeValid_(!(freeze&&live)&&
+       (!freeze||freeze->valid())&&(!live||live->valid())),liveBudget_(live?live->budgetMs:0){}
   StmJ1979Runtime(const StmJ1979Runtime&)=delete;
   StmJ1979Runtime& operator=(const StmJ1979Runtime&)=delete;
-  bool start(uint32_t idleBudget){return session_.begin(idleBudget);}
+  bool start(uint32_t idleBudget){
+    // Scope is provisioned independently of the ESP32 request. The local
+    // board task remains responsible for qualifying that exact scope.
+    return scopeValid_&&(!liveBudget_||idleBudget>=liveBudget_)&&session_.begin(idleBudget);
+  }
   bool poll(){return session_.poll();}
   // The board task calls this only after NSS rises and independent clock
   // monitor reports framing. Never invoke this from SPI IRQ.
@@ -37,5 +42,6 @@ class StmJ1979Runtime {
   StmJ1979FdcanLink can_;StmJ1979SpiPort spi_;
   readlink::Endpoint endpoint_;readlink::SpiSlave slave_;
   StmJ1979ReadSession session_;
+  const bool scopeValid_;const uint32_t liveBudget_;
 };
 }
