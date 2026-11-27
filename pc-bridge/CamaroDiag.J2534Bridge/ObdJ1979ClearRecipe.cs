@@ -13,8 +13,9 @@ internal static class ObdJ1979ClearRecipe
 
     internal static Result Run(string expectedVin, bool primaryPhysicalChannel,
         bool warningAcknowledged, bool confirmedYes, Action requireCurrent,
-        Func<byte[], int, byte[]> read, Func<byte[]> transmitApprovedReset)
+        Func<byte[], int, byte[]> read, Func<byte[]> transmitApprovedReset, Action<Result> saveBaseline)
     {
+        ArgumentNullException.ThrowIfNull(saveBaseline);
         if (!primaryPhysicalChannel || !warningAcknowledged || !confirmedYes ||
             !System.Text.RegularExpressions.Regex.IsMatch(expectedVin ?? "", @"\A[A-HJ-NPR-Z0-9]{17}\z"))
             throw new UnauthorizedAccessException("Physical ECM, VIN and two confirmations required.");
@@ -24,7 +25,7 @@ internal static class ObdJ1979ClearRecipe
         string? vin = null;
         bool attempted = false, acknowledged = false;
         Result Finish(string outcome, string? reason = null) => new(outcome, attempted,
-            acknowledged, vin, reason, observations.ToArray(), before, after);
+            acknowledged, vin, reason, observations.ToArray(), new Dictionary<string,string[]?>(before), new Dictionary<string,string[]?>(after));
         byte[] Query(string stage, byte[] request, Func<byte[], string> decode)
         {
             requireCurrent();
@@ -88,6 +89,14 @@ internal static class ObdJ1979ClearRecipe
             var rpm = Query("PRECONDITION", [1, 0x0C], Convert.ToHexString);
             if (!StandardObdPhysicalPolicy.CanClear(true, primaryPhysicalChannel, speed, rpm))
                 return Finish("NOT_TESTED", "STATIONARY_EVIDENCE_REQUIRED");
+            saveBaseline(Finish("BASELINE_SAVED"));
+            requireCurrent();
+            var freshVin = ObdJ1979Vin.DecodeIsoTp(Query("RECHECK", [9,2], Convert.ToHexString));
+            if (freshVin != vin) return Finish("NOT_TESTED","IDENTITY_CHANGED_AFTER_BASELINE");
+            speed = Query("RECHECK", [1,0x0D], Convert.ToHexString);
+            rpm = Query("RECHECK", [1,0x0C], Convert.ToHexString);
+            if (!StandardObdPhysicalPolicy.CanClear(true,primaryPhysicalChannel,speed,rpm))
+                return Finish("NOT_TESTED","STATIONARY_EVIDENCE_CHANGED");
             requireCurrent();
             attempted = true;
             observations.Add(new("RESET", "04", null, null, null));
