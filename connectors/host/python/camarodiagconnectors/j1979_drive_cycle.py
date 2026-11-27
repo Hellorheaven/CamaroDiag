@@ -8,6 +8,8 @@ The current monitoring cycle is not readiness since DTC clearing.
 """
 from __future__ import annotations
 
+import re
+
 TRIMS = frozenset((6,7,8,9,0x55,0x56,0x57,0x58))
 CONTINUOUS = ("misfire","fuel-system","components")
 SPARK = ("catalyst","heated-catalyst","evaporative-system","secondary-air",None,
@@ -17,7 +19,8 @@ DIESEL = ("nmhc-catalyst","nox-aftertreatment",None,"boost-pressure",None,
 
 
 def _bytes(value):
-    if not isinstance(value,str) or len(value)>8190 or len(value)%2:
+    if (not isinstance(value,str) or len(value)>8190 or len(value)%2 or
+            re.fullmatch(r"[0-9A-Fa-f]+",value) is None):
         return None
     try:
         return bytes.fromhex(value)
@@ -32,7 +35,7 @@ def _records(steps):
             continue
         request = _bytes(row.get("request_hex"))
         response = _bytes(row.get("response_hex"))
-        if not request or not response:
+        if not request or not response or len(response)<=len(request):
             continue
         if request[0]==1 and len(request)==2 and response[:2]==bytes((0x41,request[1])):
             yield request,response[2:]
@@ -90,7 +93,8 @@ def cycle_data(data, baseline):
     if (c|d)&reserved:
         return None
     valid_baseline=(baseline is not None and len(baseline)==4 and
-                    bool(baseline[1]&8)==compression)
+                    bool(baseline[1]&8)==compression and
+                    not (baseline[1]&0x80) and not ((baseline[2]|baseline[3])&reserved))
     support_b=baseline[1] if valid_baseline else None
     support_c=baseline[2] if valid_baseline else None
     monitors=[]
@@ -119,9 +123,9 @@ def cycle_data(data, baseline):
 def project(steps):
     """One physical target or one explicitly selected legacy responder only."""
     rows=list(_records(steps))
-    layouts=[data[0] for req,data in rows if req==b"\x01\x1d" and len(data)==1]
-    layout=layouts[0] if len(layouts)==1 else None
-    baseline=[data for req,data in rows if req==b"\x01\x01" and len(data)==4]
+    layouts=[data for req,data in rows if req==b"\x01\x1d"]
+    layout=layouts[0][0] if len(layouts)==1 and len(layouts[0])==1 else None
+    baseline=[data for req,data in rows if req==b"\x01\x01"]
     baseline=baseline[0] if len(baseline)==1 else None
     cycles=[data for req,data in rows if req==b"\x01\x41"]
     cycle=cycle_data(cycles[0],baseline) if len(cycles)==1 else None
