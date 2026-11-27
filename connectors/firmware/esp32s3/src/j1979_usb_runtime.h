@@ -63,8 +63,20 @@ inline J1979UsbCampaign::Report serveJ1979RemoteUsb(
     HostSessionArbiter& arbiter,J1979UsbCampaign::Owner& owner,
     readlink::SpiMasterPort& spi,const J1979UsbCampaign::Profile& profile,
     J1979CanReadExchange::Result& scratch){
+  if(profile.freeze)return J1979UsbCampaign::Report{};
   readlink::SpiTransport transport(spi);
   readlink::Client client(transport,profile.tx,profile.rx,profile.extended);
   return J1979UsbService::serve(channel,security,arbiter,owner,client,scratch);
+}
+
+inline J1979UsbCampaign::Report serveJ1979RemoteFreezeUsb(
+    J1979UsbService::Channel& channel,J1979UsbAuthSession::Security& security,
+    HostSessionArbiter& arbiter,J1979UsbCampaign::Owner& owner,
+    readlink::SpiMasterPort& spi,const J1979UsbCampaign::Profile& profile,
+    J1979CanReadExchange::Result& scratch){
+  if(!profile.freeze||!profile.freezeScope.valid())return J1979UsbCampaign::Report{};
+  readlink::SpiTransport transport(spi);
+  readlink::Client client(transport,profile.tx,profile.rx,profile.extended,&profile.freezeScope);
+  return J1979UsbService::serveFreeze(channel,security,arbiter,owner,client,scratch);
 }
 }
