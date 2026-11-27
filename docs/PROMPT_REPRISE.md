@@ -1,3 +1,10 @@
+## Reprise — C6 / historique des preuves de récupération (27 novembre 2026)
+
+- PR #117 / chore/unified-ci : historique natif Windows de 2 à 8 journaux ordonnés explicitement, vérification de chaque inventaire, préfixe octet par octet, identité et enveloppes originales invariantes. Comparaison des états enregistrés, refus des divergences et des extensions après état terminal, relecture de toutes les sources avant export JSON exclusif.
+- Interface Windows : sélection/réorganisation des journaux, présentation FR/EN, état et empreintes des captures, transitions, avertissement hors ligne. Aucun accès ECU ni autorisation de restauration.
+- CLI Python : rejeu indépendant des rapports d'historique Python via `verify-recovery-history-report`, contrôle des champs et de la stabilité des sources, identité Android attendue effectivement comparée et protection des répertoires de sauvegarde lors des exports. Le schéma JSON d'historique natif Windows reste distinct du schéma Python ; le rejeu croisé de ces deux formats reste à intégrer.
+- Régressions Python et C# ajoutées, non exécutées. Aucun build, checkpoint CI, merge ni Release. C6 et SAE J1979 restent ouverts ; C8 non démarré. Les preuves hors ligne ne constituent ni preuve matérielle ni autorisation de programmation.
+
 ## Reprise — SAE J1979 / richesse quatre bancs et cycle courant (27 novembre 2026)
 
 - PR #117 / chore/unified-ci : PID 06–09 et 55–58 à longueur variable (un/deux octets), valeurs par banc, attribution du second octet uniquement avec preuve positive PID 1D du calculateur sélectionné. Une absence de preuve n'établit pas l'absence de banc ; conserver l'octet brut, sans inventer de valeur. PID 41 séparé du PID 01 : support, activation et complétude du cycle courant, états essence/diesel, bits réservés et incohérences.
