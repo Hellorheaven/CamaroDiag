@@ -1294,9 +1294,11 @@ class BluetoothObdManager(context: Context) {
                     check(CanConsoleAdapterRestorationPolicy.accepted(sendAtCommandInternal(command,1500L,
                         expectedEpoch=epoch,preserveLines=true,beforeTransmit=::guard)))
                 }
-                rawProtocol = sendAtCommandInternal("ATDPN",1500L,expectedEpoch=epoch,
-                    preserveLines=true,beforeTransmit=::guard).take(J1979FreezeCampaign.MAX_RAW)
-                observedProtocol = J1979FreezeCampaign.fixedProtocol(rawProtocol)
+                val protocolReply = sendAtCommandInternal("ATDPN",1500L,expectedEpoch=epoch,
+                    preserveLines=true,beforeTransmit=::guard)
+                check(protocolReply.length <= J1979FreezeCampaign.MAX_RAW)
+                rawProtocol = protocolReply
+                observedProtocol = J1979FreezeCampaign.fixedProtocol(protocolReply)
                 check(observedProtocol == target.protocol) { "ELM fixed CAN protocol unverified." }
                 var rawBudget = 16L * 1024 * 1024
                 result = J1979FreezeCampaign.run(plan,exchange={ payload,timeout ->
