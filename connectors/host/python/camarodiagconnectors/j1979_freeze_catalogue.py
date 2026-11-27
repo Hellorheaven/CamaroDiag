@@ -134,7 +134,67 @@ def project_freeze(source, catalogue, catalogue_sha, expected_vin):
             "reference_authenticity_verified":False,"normative_compliance_verified":False,
             "physical_vehicle_verified":False,"authenticated":False,"permits_programming":False,
             "diagnostic_verdict":None,"frames":frames,"unvisited_frames":result["unvisited_frames"],
-            "counts":counts,"rows":rows}
+            "counts":counts,"rows":rows,
+            "catalogue_coverage":audit_freeze_coverage(source,catalogue,rows)}
+
+
+def audit_freeze_coverage(source, catalogue, rows):
+    """Report documented/advertised/requested PID sets without claiming SAE coverage.
+
+    An incomplete Mode 02 bitmap cannot establish that any catalogue PID is
+    unsupported. A request step is not a vehicle response, and a correlated
+    response is not a documented physical measurement.
+    """
+    result = source["result"]
+    by_frame = {frame["frame"]: frame for frame in result["frames"]}
+    documented = {}
+    for frame, definition in catalogue.definitions:
+        documented.setdefault(frame, set()).add(definition.pid)
+    requested = {}
+    responded = {}
+    projected = {}
+    for row in rows:
+        number, pid = row["frame"], row["pid"]
+        requested.setdefault(number, set()).add(pid)
+        if row["source_status"] in ("RAW", "PASSED"):
+            responded.setdefault(number, set()).add(pid)
+        if row["projection_status"] == "PROJECTED":
+            projected.setdefault(number, set()).add(pid)
+
+    frames = []
+    scoped = set(result["plan"]["frames"])
+    for number in result["plan"]["frames"]:
+        state = by_frame.get(number)
+        catalogued = documented.get(number, set())
+        advertised = ({pid for pid in state["advertised_pids"]
+                       if pid != 2 and pid % 32 != 0} if state else set())
+        asked = requested.get(number, set())
+        answered = responded.get(number, set())
+        projected_pids = projected.get(number, set())
+        complete = state["inventory_complete"] if state else False
+        frames.append({
+            "frame": number,
+            "source_status": state["status"] if state else "UNVISITED",
+            "inventory_complete": complete,
+            "trigger_stable": state["trigger_stable"] if state else False,
+            "documented_pids": sorted(catalogued),
+            "advertised_measurement_pids": sorted(advertised),
+            "requested_measurement_pids": sorted(asked),
+            "responded_measurement_pids": sorted(answered),
+            "projected_measurement_pids": sorted(projected_pids),
+            "advertised_without_documentation": sorted(advertised - catalogued),
+            "documented_without_advertisement": (
+                sorted(catalogued - advertised) if complete else None),
+            "advertised_not_requested": sorted(advertised - asked),
+            "documented_responses_not_projected": sorted((answered & catalogued) - projected_pids),
+        })
+    return {
+        "scope": "EXPLICIT_FREEZE_FRAMES_ONLY",
+        "normative_compliance_verified": False,
+        "hardware_provenance_verified": False,
+        "unrequested_catalogue_frames": sorted(set(documented) - scoped),
+        "frames": frames,
+    }
 
 
 def build_freeze_projection(args):

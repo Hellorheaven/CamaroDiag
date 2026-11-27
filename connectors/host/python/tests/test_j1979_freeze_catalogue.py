@@ -49,6 +49,42 @@ class FreezeCatalogueTests(unittest.TestCase):
         self.assertEqual(rows[(1,13)]["projection_status"], "NO_DOCUMENTED_DEFINITION")
         self.assertEqual(result["counts"], {"PROJECTED":3,"NO_DOCUMENTED_DEFINITION":1})
 
+    def test_coverage_distinguishes_advertised_requested_and_documented(self):
+        _, source = capture()
+        projected = project_freeze(source, FreezeCatalogue.parse(catalogue()), "b"*64, VIN)
+        audit = projected["catalogue_coverage"]
+        self.assertEqual(audit["scope"], "EXPLICIT_FREEZE_FRAMES_ONLY")
+        self.assertFalse(audit["normative_compliance_verified"])
+        self.assertFalse(audit["hardware_provenance_verified"])
+        self.assertEqual(audit["unrequested_catalogue_frames"], [])
+        self.assertEqual([row["frame"] for row in audit["frames"]], [0, 1])
+        first, second = audit["frames"]
+        self.assertEqual(first["advertised_measurement_pids"], [12, 13])
+        self.assertEqual(first["documented_pids"], [12, 13])
+        self.assertEqual(first["requested_measurement_pids"], [12, 13])
+        self.assertEqual(first["projected_measurement_pids"], [12, 13])
+        self.assertEqual(first["advertised_without_documentation"], [])
+        self.assertEqual(first["documented_without_advertisement"], [])
+        self.assertEqual(second["documented_pids"], [12])
+        self.assertEqual(second["advertised_measurement_pids"], [12, 13])
+        self.assertEqual(second["advertised_without_documentation"], [13])
+        self.assertEqual(second["responded_measurement_pids"], [12, 13])
+        self.assertEqual(second["projected_measurement_pids"], [12])
+        self.assertEqual(second["documented_responses_not_projected"], [])
+
+    def test_coverage_incomplete_inventory_does_not_infer_unsupported_pid(self):
+        from camarodiagconnectors.j1979_freeze_catalogue import audit_freeze_coverage
+        _, source = capture()
+        source["result"]["frames"][0]["inventory_complete"] = False
+        output = audit_freeze_coverage(source, FreezeCatalogue.parse(catalogue()), [])
+        self.assertIsNone(output["frames"][0]["documented_without_advertisement"])
+        self.assertEqual(output["frames"][0]["requested_measurement_pids"], [])
+        self.assertFalse(output["normative_compliance_verified"])
+        source["result"]["frames"] = []
+        output = audit_freeze_coverage(source, FreezeCatalogue.parse(catalogue()), [])
+        self.assertEqual([x["source_status"] for x in output["frames"]], ["UNVISITED", "UNVISITED"])
+        self.assertTrue(all(x["documented_without_advertisement"] is None for x in output["frames"]))
+
     def test_changed_trigger_suppresses_interpretation(self):
         triggers = 0
         def replacement(request, index):
