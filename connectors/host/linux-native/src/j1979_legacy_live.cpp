@@ -234,7 +234,7 @@ LiveResult acquire_live(Elm& elm,unsigned source,const LivePlan& plan,Clock cloc
             }catch(const Cancelled&){row.raw.clear();row.outcome=FreezeOutcome::cancelled;}
             catch(const std::exception&){row.raw.clear();row.outcome=FreezeOutcome::transport;}
             x.ended_ms=time();
-            if(row.outcome==FreezeOutcome::received&&x.ended_ms>=plan.budget_ms)row.outcome=FreezeOutcome::late;
+            if(row.outcome==FreezeOutcome::received&&(x.ended_ms>=plan.budget_ms||x.ended_ms-x.started_ms>timeout))row.outcome=FreezeOutcome::late;
         }
         row.duration_ms=x.ended_ms-x.started_ms;return x;
     }).run();
