@@ -6,6 +6,7 @@ A positive diagnostic response is not proof of monitor success or a write.
 from __future__ import annotations
 
 import re
+from .j1979_status import width as status_width, decode_response as status_decode, from_steps as status_records
 import socket
 import time
 from collections.abc import Callable
@@ -266,6 +267,9 @@ def scan(exchange: Exchange, *, budget: float = 180.0,
             if request[0] == 1 and len(request) == 2 and multi_width(request[1]) is not None and application["shape"] in ("RAW", "PASSED"):
                 if multi_decode(request, response) is None:
                     raise ValueError("Invalid multi-signal PID record")
+            if request[0] == 1 and len(request) == 2 and status_width(request[1]) is not None and application["shape"] in ("RAW", "PASSED"):
+                if status_decode(request, response) is None:
+                    raise ValueError("Invalid categorical PID record")
             if application["shape"] == "RAW":
                 # CJ/1 v1 records preserve their historical shape. Extended
                 # Mode 09 has a separately validated typed view.
@@ -370,6 +374,7 @@ def scan(exchange: Exchange, *, budget: float = 180.0,
             "completed": stop is None, "stop_reason": stop,
             "duration_ms": round((clock() - started) * 1000),
             "multi_signal_records": multi_records(steps),
+            "status_records": status_records(steps),
             "extended_vehicle_info": [s["decoded"] for s in steps
                                       if s["status"] == "RAW" and s["decoded"] is not None
                                       and s["request_hex"] in ("0908", "090B", "090D", "090F")],
