@@ -168,7 +168,7 @@ def acquire_archive(args, *, prompt=input):
                 report={"schema":"camarodiag-j1979-native-maintenance-archive-v1","protocol":"SAE-J1979",
                         "source":"READ_ONLY_USB_CU5","scope":scope.report(),"device_credential_authenticated":False,
                         "journal_bytes_received":None,"declared_archive":None,"host_elapsed_ms":None}
-            report.update(archive_transfer_verified=False,inspection=None,recovery_required=True,
+            report.update(archive_transfer_verified=False,archive_close_receipt_verified=False,inspection=None,recovery_required=True,
                           maintenance_command_sent=False,physical_vehicle_verified=False,
                           physical_stop_independently_verified=False,evidence_authenticated=False,
                           permits_automatic_retry=False,permits_programming=False,error=str(exc) or type(exc).__name__)
