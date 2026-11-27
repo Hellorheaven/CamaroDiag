@@ -1,5 +1,7 @@
 package com.camarodiag.gen5.ui
 
+import com.camarodiag.gen5.data.obd.CamaroDiagConnectorFreezeCampaign
+import com.camarodiag.gen5.data.obd.J1979FreezeResult
 import com.camarodiag.gen5.data.obd.J1979FreezeEvidence
 import com.camarodiag.gen5.data.obd.J1979FreezePage
 import com.camarodiag.gen5.data.obd.J1979FreezeReport
