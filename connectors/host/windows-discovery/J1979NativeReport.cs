@@ -39,6 +39,8 @@ internal static class J1979NativeReport
                 measurement=s.PidMeasurement is { } value?new {
                     mode=value.Mode,pid=value.Pid,name=value.Name,number=value.Number,unit=value.Unit
                 }:null}),
+            scaled_monitor_records=result.Steps.SelectMany(s=>ObdJ1979Mode06.Project(s.RequestHex,s.ResponseHex,s.Status))
+                .Select(ObdJ1979Mode06.Evidence),
             contextual_measurements=ObdJ1979ScalingContext.Evidence(ObdJ1979ScalingContext.Project(
                 result.Steps.Select(s=>new ObdJ1979ScalingContext.Observation(s.RequestHex,s.ResponseHex,s.Status)))),
             status_records=result.Steps.Select(s=>ObdJ1979Status.TryRecord(s.RequestHex,s.ResponseHex,s.Status))
