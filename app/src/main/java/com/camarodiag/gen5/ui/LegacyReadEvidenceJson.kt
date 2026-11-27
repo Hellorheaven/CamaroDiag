@@ -4,6 +4,7 @@ import com.camarodiag.gen5.data.obd.LegacyReadReport
 import com.camarodiag.gen5.data.obd.J1979ScalingJson
 import com.camarodiag.gen5.data.obd.J1979DerivedEvidenceJson
 import com.camarodiag.gen5.data.obd.ObdLegacyMonitorValues
+import com.camarodiag.gen5.data.obd.J1979OperatingContextJson
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -56,6 +57,7 @@ internal object LegacyReadEvidenceJson {
                 .put("number",it.number).put("unit",it.unit)
         }))
         .put("statusRecords",J1979DerivedEvidenceJson.states(report.statusRecords))
+        .put("operatingContext",J1979OperatingContextJson.encode(report.operatingContext))
         .put("contextualMeasurements",J1979ScalingJson.encode(report.contextualMeasurements))
         .put("multiSignalRecords",JSONArray(report.multiSignalRecords.map(J1979MultiSignalJson::encode)))
         .put("identification",JSONArray(report.identification.map {
