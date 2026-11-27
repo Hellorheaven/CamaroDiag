@@ -89,7 +89,7 @@ internal static class ObdJ1979FreezeCampaign
     {
         ArgumentNullException.ThrowIfNull(request);
         if (!Outcomes.Contains(read.Outcome) || read.DurationMs is < 0 or > 3600000 ||
-            read.Response is { Length: > MaximumResponse } ||
+            read.Response is { Length: 0 or > MaximumResponse } ||
             ((read.Outcome is "RECEIVED" or "LATE_RESPONSE") != (read.Response is not null)) ||
             ((read.Outcome is "RECEIVED" or "LATE_RESPONSE" or "TIMEOUT" or "TRANSPORT_ERROR") && !read.TransmissionAttempted) ||
             (read.Outcome == "BUDGET" && read.TransmissionAttempted))
@@ -273,7 +273,7 @@ internal static class ObdJ1979FreezeCampaign
                 int maximum=requestTimeout?.Invoke(request)??2500;
                 if(maximum is <100 or >20000)throw new ArgumentException("Invalid logical read deadline");
                 var response = exchange(request,(int)Math.Min(maximum,left));
-                if (response is null || response.Length > MaximumResponse) return Observation("TRANSPORT_ERROR");
+                if (response is null || response.Length is 0 or > MaximumResponse) return Observation("TRANSPORT_ERROR");
                 requireCurrent();
                 return Elapsed() >= plan.BudgetMs ? Observation("LATE_RESPONSE",response) : Observation("RECEIVED",response);
             }
