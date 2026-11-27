@@ -128,7 +128,7 @@ jobs:
         run: |
           mkdir -p /tmp/android-protocol
           command -v kotlinc
-          kotlinc -Werror -jvm-target 17 -include-runtime -d /tmp/android-cu-auth.jar $(find connectors/host/android/src/main/java/com/camarodiag/connectors -name '*.kt' ! -name 'UsbJ1979.kt' | sort) connectors/host/android/src/main/java/com/camarodiag/connectors/J1979CampaignSemantics.java connectors/host/android/src/main/java/com/camarodiag/connectors/J1979LiveNativeReplay.java
+          kotlinc -Werror -jvm-target 17 -include-runtime -d /tmp/android-cu-auth.jar $(find connectors/host/android/src/main/java/com/camarodiag/connectors -name '*.kt' ! -name 'UsbJ1979.kt' | sort) connectors/host/android/src/main/java/com/camarodiag/connectors/J1979CampaignSemantics.java connectors/host/android/src/main/java/com/camarodiag/connectors/J1979LiveNativeReplay.java connectors/host/android/src/main/java/com/camarodiag/connectors/J1979MaintenanceJournal.java
           javac -Xlint:all -Werror -d /tmp/android-protocol connectors/host/android/src/main/java/com/camarodiag/connectors/BinaryDiscovery.java connectors/host/android/src/test/java/com/camarodiag/connectors/BinaryDiscoveryTest.java
           java -ea -cp /tmp/android-protocol:/tmp/android-cu-auth.jar com.camarodiag.connectors.BinaryDiscoveryTest
           javac -Xlint:all -Werror -cp /tmp/android-cu-auth.jar -d /tmp/android-protocol connectors/host/android/src/main/java/com/camarodiag/connectors/J1979CampaignSemantics.java connectors/host/android/src/test/java/com/camarodiag/connectors/J1979UsbTest.java
@@ -137,7 +137,7 @@ jobs:
           java -ea -cp /tmp/android-protocol:/tmp/android-cu-auth.jar com.camarodiag.connectors.J1979FreezeUsbTest
           javac -Xlint:all -Werror -cp /tmp/android-protocol:/tmp/android-cu-auth.jar -d /tmp/android-protocol connectors/host/android/src/main/java/com/camarodiag/connectors/J1979LiveNativeReplay.java connectors/host/android/src/test/java/com/camarodiag/connectors/J1979LiveUsbTest.java
           java -ea -cp /tmp/android-protocol:/tmp/android-cu-auth.jar com.camarodiag.connectors.J1979LiveUsbTest
-          javac -Xlint:all -Werror -cp /tmp/android-protocol:/tmp/android-cu-auth.jar -d /tmp/android-protocol connectors/host/android/src/main/java/com/camarodiag/connectors/J1979MaintenanceJournal.java connectors/host/android/src/main/java/com/camarodiag/connectors/J1979MaintenanceUsb.java connectors/host/android/src/test/java/com/camarodiag/connectors/J1979MaintenanceUsbTest.java
+          javac -Xlint:all -Werror -cp /tmp/android-protocol:/tmp/android-cu-auth.jar -d /tmp/android-protocol connectors/host/android/src/main/java/com/camarodiag/connectors/J1979MaintenanceJournal.java connectors/host/android/src/test/java/com/camarodiag/connectors/J1979MaintenanceUsbTest.java
           java -ea -cp /tmp/android-protocol:/tmp/android-cu-auth.jar com.camarodiag.connectors.J1979MaintenanceUsbTest
       - name: Use runner Android SDK
         run: |

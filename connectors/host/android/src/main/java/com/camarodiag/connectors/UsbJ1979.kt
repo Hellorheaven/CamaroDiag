@@ -50,7 +50,7 @@ object UsbJ1979 {
     @Throws(IOException::class)
     fun captureMaintenance(manager: UsbManager?, device: UsbDevice?, controlId: Int, dataId: Int,
                            profile: J1979MaintenanceUsb.Profile?, credential: ByteArray?,
-                           raw: OutputStream?, stillSelected: BooleanSupplier?): MutableMap<String, Any> {
+                           raw: OutputStream?, stillSelected: BooleanSupplier?): MutableMap<String, Any?> {
         requireNotNull(profile) { "Explicit CU/4 profile required" }
         return open(manager, device, controlId, dataId, credential, raw, stillSelected) { link, key, output, selected ->
             J1979MaintenanceUsb(link).run(profile, key, output, selected)
@@ -61,7 +61,7 @@ object UsbJ1979 {
     @Throws(IOException::class)
     fun captureMaintenanceArchive(manager: UsbManager?, device: UsbDevice?, controlId: Int, dataId: Int,
                                   profile: J1979MaintenanceUsb.Profile?, credential: ByteArray?,
-                                  raw: OutputStream?, stillSelected: BooleanSupplier?): MutableMap<String, Any> {
+                                  raw: OutputStream?, stillSelected: BooleanSupplier?): MutableMap<String, Any?> {
         requireNotNull(profile) { "Explicit CU/5 archive scope required" }
         return open(manager, device, controlId, dataId, credential, raw, stillSelected) { link, key, output, selected ->
             J1979MaintenanceUsb(link).runArchive(profile, key, output, selected)
