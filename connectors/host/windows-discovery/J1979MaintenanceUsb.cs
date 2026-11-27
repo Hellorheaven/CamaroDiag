@@ -32,26 +32,27 @@ internal sealed class J1979MaintenanceUsb(J1979UsbCapture.ILink link,Func<long>?
             ["budget_ms"]=BudgetMs,["expected_vin"]=Vin};
     }
     private static void Require(bool value,string message){if(!value)throw new InvalidDataException(message);}
-    internal static byte[] Hello(Profile profile,byte[]? nonce=null)
+    internal static byte[] Hello(Profile profile,byte[]? nonce=null,bool archive=false)
     {
         nonce??=RandomNumberGenerator.GetBytes(32);
         Require(nonce.Length==32&&nonce.Any(x=>x!=0),"Invalid CU/4 client nonce");
-        return [(byte)'C',(byte)'U',4,1,..profile.Encode(),..nonce];
+        return [(byte)'C',(byte)'U',(byte)(archive?5:4),1,..profile.Encode(),..nonce];
     }
-    internal static byte[] Proof(byte[] request,byte[] challenge,byte[] key)
+    internal static byte[] Proof(byte[] request,byte[] challenge,byte[] key,bool archive=false)
     {
-        Require(request.Length==HelloSize&&request.AsSpan(0,4).SequenceEqual(new byte[]{(byte)'C',(byte)'U',4,1})&&
+        byte version=(byte)(archive?5:4);
+        Require(request.Length==HelloSize&&request.AsSpan(0,4).SequenceEqual(new byte[]{(byte)'C',(byte)'U',version,1})&&
             request.AsSpan(35,32).ToArray().Any(x=>x!=0)&&challenge.Length==ChallengeSize&&
-            challenge.AsSpan(0,4).SequenceEqual(new byte[]{(byte)'C',(byte)'U',4,2})&&
+            challenge.AsSpan(0,4).SequenceEqual(new byte[]{(byte)'C',(byte)'U',version,2})&&
             challenge.AsSpan(4,32).ToArray().Any(x=>x!=0)&&key.Length==32,"Invalid CU/4 transcript");
-        byte[] transcript=[(byte)'M',..request[4..],..challenge[4..36]];
+        byte[] transcript=[(byte)(archive?'R':'M'),..request[4..],..challenge[4..36]];
         byte[]? expected=null,answer=null;
         try
         {
             expected=HMACSHA256.HashData(key,transcript);
             Require(CryptographicOperations.FixedTimeEquals(expected,challenge.AsSpan(36,32)),"CU/4 device proof rejected");
-            transcript[0]=(byte)'m';answer=HMACSHA256.HashData(key,transcript);
-            return [(byte)'C',(byte)'U',4,3,..answer];
+            transcript[0]=(byte)(archive?'r':'m');answer=HMACSHA256.HashData(key,transcript);
+            return [(byte)'C',(byte)'U',version,3,..answer];
         }
         finally
         {
@@ -152,4 +153,61 @@ internal sealed class J1979MaintenanceUsb(J1979UsbCapture.ILink link,Func<long>?
             ["operator_consent_independently_verified"]=false,["permits_automatic_retry"]=false,
             ["permits_programming"]=false,["host_elapsed_ms"]=Math.Max(0,now()-began),["error"]=error};
     }
+    internal Dictionary<string,object?> RunArchive(Profile profile,byte[] key,Stream raw,Func<bool> current,byte[]? nonce=null)
+    {
+        if(used)throw new InvalidOperationException("Fresh CU/5 session required");
+        byte[] hello=Hello(profile,nonce,archive:true);
+        Require(key.Length==32&&raw.CanWrite,"Invalid CU/5 capture");
+        used=true;long began=now();bool authenticated=false;
+        Dictionary<string,object?>? declared=null,inspection=null;
+        string? error=null;
+        using var copy=new MemoryStream();
+        try
+        {
+            long start=now();link.Write(hello,Remaining(start,5000,current));
+            byte[] challenge=Read(ChallengeSize,start,5000,current,null,null);
+            byte[] proof=Proof(hello,challenge,key,archive:true);authenticated=true;
+            try{link.CheckNoBufferedInput();link.Write(proof,Remaining(start,5000,current));}
+            finally{CryptographicOperations.ZeroMemory(proof);}
+            start=now();const int budget=40000;
+            byte[] head=Read(ResultSize,start,budget,current,null,null);
+            Require(head.AsSpan(0,4).SequenceEqual(new byte[]{(byte)'C',(byte)'U',5,4})&&
+                (head[4]&~7)==0&&head[5] is >=1 and <=4&&head[6]==0&&head[7]==0,"Invalid CU/5 archive header");
+            uint length=BinaryPrimitives.ReadUInt32LittleEndian(head.AsSpan(8));
+            bool terminal=(head[4]&1)!=0,damaged=(head[4]&2)!=0,recovery=(head[4]&4)!=0;
+            Require(length is >=47 and <=J1979MaintenanceJournal.MaxJournal&&(!terminal||head[5]>=2)&&
+                ((terminal&&!damaged)||recovery),"Invalid CU/5 archive declaration");
+            declared=new(){["bytes"]=(int)length,["records"]=(int)head[5],["terminal_present"]=terminal,
+                ["damaged_tail"]=damaged,["recovery_required"]=recovery};
+            _=Read((int)length,start,budget,current,raw,copy);
+            link.CheckNoBufferedInput();_=Remaining(start,budget,current);
+            var result=J1979MaintenanceJournal.Inspect(copy.ToArray(),profile.Vin);
+            Require(JsonSerializer.Serialize(result["scope"])==JsonSerializer.Serialize(profile.View())&&
+                Equals(result["terminal_present"],terminal)&&result["records"] is string[] records&&
+                records.Length==head[5]&&(!Equals(result["recovery_required"],true)||recovery),
+                "CM/1 archive differs from declaration");
+            inspection=result;
+        }
+        catch(Exception e) when(e is IOException or InvalidDataException or TimeoutException or ArgumentException or
+            InvalidOperationException or UnauthorizedAccessException or OperationCanceledException or OverflowException)
+        {error=e.Message;}
+        finally
+        {
+            try{link.Dispose();}catch(Exception e) when(e is IOException or InvalidOperationException or TimeoutException){error??=e.Message;}
+            try{raw.Flush();}catch(IOException e){error??=e.Message;}
+        }
+        if(!current())error??="CU/5 context revoked";
+        if(error is not null)inspection=null;
+        return new(){
+            ["schema"]="camarodiag-j1979-native-maintenance-archive-v1",["protocol"]="SAE-J1979",
+            ["source"]="READ_ONLY_USB_CU5",["scope"]=profile.View(),["device_credential_authenticated"]=authenticated,
+            ["archive_transfer_verified"]=inspection is not null,["journal_bytes_received"]=copy.Length,
+            ["declared_archive"]=declared,["inspection"]=inspection,
+            ["recovery_required"]=inspection is null||Equals(declared!["recovery_required"],true),
+            ["maintenance_command_sent"]=false,["physical_vehicle_verified"]=false,
+            ["physical_stop_independently_verified"]=false,["evidence_authenticated"]=false,
+            ["permits_automatic_retry"]=false,["permits_programming"]=false,
+            ["host_elapsed_ms"]=Math.Max(0,now()-began),["error"]=error};
+    }
+
 }
