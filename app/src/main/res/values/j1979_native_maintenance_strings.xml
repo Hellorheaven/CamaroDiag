@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="j1979_native_maintenance_title">Inspect native maintenance journal</string>
+    <string name="j1979_native_maintenance_select">Select original CM/1 journal</string>
+    <string name="j1979_native_maintenance_run">Inspect and export journal report</string>
+    <string name="j1979_native_maintenance_scope">Offline evidence only. Acknowledgment does not prove a completed monitor or authorize another command.</string>
+    <string name="j1979_native_maintenance_saved">Maintenance journal report exported</string>
+    <string name="j1979_native_maintenance_rejected">Maintenance journal inspection rejected</string>
+</resources>
