@@ -76,6 +76,15 @@ object CamaroDiagConnectorFreezeCampaign {
         return result
     }
 
+    /** Replay a local capture without opening USB or using a credential. */
+    suspend fun inspectCapture(raw: ByteArray, expectedVin: String): Pair<J1979FreezeUsbAuth.Profile,J1979FreezeResult> {
+        require(raw.isNotEmpty() && raw.size.toLong() <= J1979FreezeUsbCapture.MAX_CAPTURE.toLong())
+        val decoded = J1979FreezeUsbCapture.decode(raw.inputStream(),null)
+        val profile = requireNotNull(decoded.profile)
+        require(profile.vin == expectedVin) { "Independent VIN differs from CF/1" }
+        return profile to replay(decoded,profile)
+    }
+
     private fun digest(file: File): String {
         val hash = MessageDigest.getInstance("SHA-256")
         var count = 0L
