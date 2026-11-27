@@ -50,4 +50,11 @@ bool StmJ1979SpiPort::completed(maintenance_link::SpiSlave& slave,uint32_t bits,
   }
   armed_=false;return slave.completed(maintenance_link::Size,true);
 }
+bool StmJ1979SpiPort::completed(archive_link::SpiSlave& slave,uint32_t bits,bool clean){
+  if(!armed_||!admitted()||!clean||bits!=archive_link::Size*8u||
+     HAL_SPI_GetState(&spi_)!=HAL_SPI_STATE_READY||spi_.RxXferCount||spi_.TxXferCount){
+    slave.abort();fault();return false;
+  }
+  armed_=false;return slave.completed(archive_link::Size,true);
+}
 }
