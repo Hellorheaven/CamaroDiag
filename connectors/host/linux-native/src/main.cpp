@@ -23,6 +23,7 @@
 #include "j1979_legacy_journal.hpp"
 #include "j1979_legacy_mutation.hpp"
 #include "j1979_legacy_mutation_inspection.hpp"
+#include "j1979_can_history.hpp"
 #include "j1979_legacy_freeze_wire.hpp"
 #include "j1979_legacy_live_wire.hpp"
 #include <time.h>
@@ -2741,6 +2742,24 @@ static int legacy_mutation_inspect_cli(int argc,char** argv){
     }catch(const std::exception& e){return error(e.what());}
 }
 
+static int historical_can_mutation_cli(int argc,char** argv){
+    if(argc!=6||!cf1_valid_vin(argv[2]))return error("Independent VIN, historical CAN report, baseline or -, and output required");
+    try{
+        input original{},base{};
+        if(!load_regular(argv[3],cd::canhistory::max_report,&original))return error("Invalid historical CAN report");
+        const bool has_base=strcmp(argv[4],"-")!=0;
+        if(has_base&&(!load_regular(argv[4],cd::canhistory::max_report,&base)||!separate(&original,&base)))
+            return error("Independent historical baseline file required");
+        const auto view=[](const input& f){return f.length?std::string_view(reinterpret_cast<const char*>(f.bytes.get()),f.length):std::string_view{};};
+        const auto replay=cd::canhistory::inspect(view(original),view(base),argv[2]);
+        if(!recheck_input(argv[3],cd::canhistory::max_report,original)||
+            (has_base&&!recheck_input(argv[4],cd::canhistory::max_report,base)))return error("Historical CAN report changed");
+        const auto json=cd::canhistory::report(replay,original.digest,has_base?base.digest:"");
+        if(!atomic_create(argv[5],json.data(),json.size()))return error("Inspection output unavailable");
+        return 0;
+    }catch(const std::exception& e){return error(e.what());}
+}
+
 static void usage(FILE *stream) {
     fprintf(stream,
         "CamaroDiag Linux native C++20 — SAE J1979\n"
@@ -2792,6 +2811,7 @@ static void usage(FILE *stream) {
         "  camarodiag-native --recover-j1979-legacy-journal PROTOCOL SOURCE VIN JOURNAL.lj CAPTURE\n"
         "  camarodiag-native --inspect-j1979-legacy-scan PROTOCOL SOURCE VIN CAPTURE.lsr REPORT.json\n"
         "  camarodiag-native --verify-j1979-legacy-scan PROTOCOL SOURCE VIN CAPTURE.lsr REPORT.json PROOF.json\n"
+        "  camarodiag-native --inspect-j1979-historical-can-maintenance VIN REPORT.json BASELINE.json|- PROOF.json\n"
         "  camarodiag-native --inspect-j1979-legacy-maintenance VIN FINAL.json BASELINE.json INTENT.json PROOF.json\n"
         "  camarodiag-native --j1979-legacy-maintenance --operation clear --port /dev/ttyUSB0 --protocol 2 --engine-source 10 --source 10 --vin VIN --baseline baseline.json --intent intent.json --output result.json --confirm-functional-scope --acknowledge-maintenance-warning\n"
         "  camarodiag-native --inspect-j1979-legacy-discovery PROTOCOL RAW_RESPONSE RAW_ATDPN REPORT.json\n"
@@ -2822,6 +2842,7 @@ int main(int argc, char **argv) {
     if (argc==7 && !strcmp(argv[1],"--recover-j1979-legacy-journal"))return legacy_journal_cli(argv[2],argv[3],argv[4],argv[5],argv[6],true);
     if (argc==7 && !strcmp(argv[1],"--inspect-j1979-legacy-scan"))return legacy_scan_replay(argv[2],argv[3],argv[4],argv[5],argv[6],nullptr);
     if (argc==8 && !strcmp(argv[1],"--verify-j1979-legacy-scan"))return legacy_scan_replay(argv[2],argv[3],argv[4],argv[5],argv[6],argv[7]);
+    if (argc>=3 && !strcmp(argv[1],"--inspect-j1979-historical-can-maintenance"))return historical_can_mutation_cli(argc,argv);
     if (argc>=3 && !strcmp(argv[1],"--inspect-j1979-legacy-maintenance"))return legacy_mutation_inspect_cli(argc,argv);
     if (argc>=3 && !strcmp(argv[1],"--j1979-legacy-maintenance"))return legacy_maintenance_cli(argc,argv);
     if (argc>=3 && !strcmp(argv[1],"--j1979-legacy"))return legacy_discovery_cli(argc,argv,true);

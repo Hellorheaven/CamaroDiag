@@ -7,7 +7,6 @@ namespace cd::canhistory {
 namespace {
 using V=json::Value;
 using legacy::hex;
-using legacy::unhex;
 constexpr std::array<std::string_view,3> modes{"03","07","0A"};
 constexpr std::string_view clear_schema="camarodiag-functional-j1979-clear-v1",
     evap_schema="camarodiag-functional-j1979-evap-v1",baseline_schema="camarodiag-j1979-can-clear-baseline-v1";
@@ -82,7 +81,9 @@ Data bytes(std::string_view s,size_t max,bool canonical){
     require(s.size()<=2*max&&s.size()%2==0&&std::all_of(s.begin(),s.end(),[](char c){
         return (c>='0'&&c<='9')||(c>='A'&&c<='F')||(c>='a'&&c<='f');
     }),"Invalid historical hex");
-    const auto data=unhex(s);
+    auto nibble=[](char c)->unsigned{return c<='9'?unsigned(c-'0'):c<='F'?unsigned(c-'A'+10):unsigned(c-'a'+10);};
+    Data data;data.reserve(s.size()/2);
+    for(size_t i=0;i<s.size();i+=2)data.push_back(static_cast<uint8_t>((nibble(s[i])<<4)|nibble(s[i+1])));
     require(!canonical||hex(data)==s,"Noncanonical request");return data;
 }
 Row read_row(const V& row,bool evap){
@@ -245,6 +246,9 @@ Inspection inspect(std::string_view raw,std::string_view baseline,std::string_vi
         const auto* clear=root.find("clearBaseline");const auto* generic=root.find("baseline");
         require(!clear||!generic,"Ambiguous embedded baseline");
         if(const auto* embedded=clear?clear:generic;embedded&&!embedded->null()){
+            for(auto key:{"request_can_id","tx_can_id"})if(const auto* v=alias(*embedded,key))require(identifier(*v)==doc.scope.tx,"Embedded baseline TX differs");
+            for(auto key:{"response_can_id","rx_can_id"})if(const auto* v=alias(*embedded,key))require(identifier(*v)==doc.scope.rx,"Embedded baseline RX differs");
+            if(const auto* v=alias(*embedded,"expected_vin"))require(v->string()==doc.scope.vin,"Embedded baseline VIN differs");
             compare(*embedded);result.baseline_origin="EMBEDDED_COPY";
         }
     }
