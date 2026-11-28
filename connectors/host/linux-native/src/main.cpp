@@ -25,6 +25,7 @@
 #include "j1979_legacy_mutation_inspection.hpp"
 #include "j1979_can_history.hpp"
 #include "j1979_network_history.hpp"
+#include "j1979_native_live_inspection.hpp"
 #include "j1979_historical_can_plan.hpp"
 #include "j1979_legacy_discovery_history.hpp"
 #include "j1979_legacy_discovery_binding.hpp"
@@ -2820,6 +2821,7 @@ static void usage(FILE *stream) {
         "  camarodiag-native --inspect-j1979-legacy-maintenance VIN FINAL.json BASELINE.json INTENT.json PROOF.json\n"
         "  camarodiag-native --j1979-legacy-maintenance --operation clear --port /dev/ttyUSB0 --protocol 2 --engine-source 10 --source 10 --vin VIN --baseline baseline.json --intent intent.json --output result.json --confirm-functional-scope --acknowledge-maintenance-warning\n"
         "  camarodiag-native --inspect-j1979-legacy-discovery PROTOCOL RAW_RESPONSE RAW_ATDPN REPORT.json\n"
+        "  camarodiag-native --inspect-j1979-native-live TX RX VIN REPORT.json PROOF.json\n"
         "  camarodiag-native --inspect-j1979-native-can-plan TX RX VIN REPORT.json PROOF.json\n"
         "  camarodiag-native verify-network --report REPORT.json [--vin VIN] --output PROOF.json\n"
         "  camarodiag-native --inspect-j1979-historical-can-network VIN|- REPORT.json PROOF.json\n"
@@ -2923,7 +2925,7 @@ static int historical_can_network_cli(const char* vin,const char* path,const cha
         return 0;
     }catch(const std::exception& e){return error(e.what());}
 }
-static int native_can_plan_cli(const char* tx_text,const char* rx_text,const char* vin,const char* path,const char* output){
+static int native_can_plan_cli(const char* tx_text,const char* rx_text,const char* vin,const char* path,const char* output,bool live=false){
     try{
         auto parse_id=[](std::string_view s){
             std::uint32_t n{};
@@ -2932,14 +2934,16 @@ static int native_can_plan_cli(const char* tx_text,const char* rx_text,const cha
                 throw std::invalid_argument("Explicit hexadecimal CAN identifier required");
             return n;
         };
-        constexpr std::size_t maximum=32*1024*1024;
+        const std::size_t maximum=live?64u*1024u*1024u:32u*1024u*1024u;
         input original{},again{};
         if(!load_regular(path,maximum,&original))return error("Bounded native physical report required");
         const std::string_view raw(reinterpret_cast<const char*>(original.bytes.get()),original.length);
-        const auto result=cd::network::history::inspect_native_plan(cd::json::parse_report(raw,maximum),
-            {parse_id(tx_text),parse_id(rx_text)},vin);
-        const auto proof="{\"source_sha256\":"+cd::json::quote(original.digest)+",\"inspection\":"+
-            cd::network::history::native_plan_report(result)+"}\n";
+        const cd::network::Pair pair{parse_id(tx_text),parse_id(rx_text)};
+        const auto root=cd::json::parse_report(raw,maximum);
+        const auto inspection=live?cd::network::history::native_live_report(
+            cd::network::history::inspect_native_live(root,pair,vin)):
+            cd::network::history::native_plan_report(cd::network::history::inspect_native_plan(root,pair,vin));
+        const auto proof="{\"source_sha256\":"+cd::json::quote(original.digest)+",\"inspection\":"+inspection+"}\n";
         if(!load_regular(path,maximum,&again)||!same_input(&original,&again))return error("Native physical report changed");
         if(!atomic_create(output,proof.data(),proof.size()))return error("Native physical proof destination unavailable");
         return 0;
@@ -2962,6 +2966,7 @@ static int verify_network_compat_cli(int argc,char** argv){
     return historical_can_network_cli(vin,path,output);
 }
 int main(int argc, char **argv) {
+    if(argc==7&&!strcmp(argv[1],"--inspect-j1979-native-live"))return native_can_plan_cli(argv[2],argv[3],argv[4],argv[5],argv[6],true);
     if(argc==7&&!strcmp(argv[1],"--inspect-j1979-native-can-plan"))return native_can_plan_cli(argv[2],argv[3],argv[4],argv[5],argv[6]);
     if(argc>=2&&!strcmp(argv[1],"verify-network"))return verify_network_compat_cli(argc,argv);
     if(argc==5&&!strcmp(argv[1],"--inspect-j1979-historical-can-network"))return historical_can_network_cli(argv[2],argv[3],argv[4]);
