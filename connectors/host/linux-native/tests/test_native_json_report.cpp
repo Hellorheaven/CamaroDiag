@@ -31,4 +31,18 @@ int main(){
     assert(parse_report("18446744073709551615").unsigned_integer()==UINT64_MAX);
     const auto min=parse("-9223372036854775808");
     assert(min.signed_integer()==INT64_MIN);
+
+    const auto encoded=serialize(report);
+    assert(parse_report(encoded).at("fraction").finite_number()==-12.125);
+    assert(serialize(parse_report(encoded))==encoded);
+    rejects([&]{(void)serialize(report,5);});
+    rejects([]{(void)serialize(Value{Integer{"1,2"}});});
+    rejects([]{(void)serialize(Value{Decimal{"NaN"}});});
+    rejects([]{(void)serialize(Value{Decimal{"1"}});});
+    rejects([]{(void)serialize(Value{Integer{"1.0"}});});
+    const auto escaped=Value{std::string("A\n\t\"\\B")};
+    assert(parse_report(serialize(escaped)).string()==escaped.string());
+    Value deep{};
+    for(unsigned i=0;i<66;++i)deep=Value{Value::Array{std::move(deep)}};
+    rejects([&]{(void)serialize(deep);});
 }

@@ -112,6 +112,9 @@ void rejects(const std::string& raw){
     try{(void)replay(raw);}catch(const std::exception&){rejected=true;}
     assert(rejected);
 }
+auto project(const j1979_live_plan& p,const j1979_live_result& r){
+    return cd::network::history::project_native_live(cd::json::parse_report(json_report(p,r)),{0x7e0,0x7e8},vin);
+}
 void check_replay(const j1979_live_plan& p,const j1979_live_result& r){
     auto checked=replay(json_report(p,r));
     assert(checked.completed==r.completed&&checked.cycles==r.cycles_completed);
@@ -155,6 +158,20 @@ int main(void) {
     fclose(stream);
     check_replay(p,r);
     const auto original=json_report(p,r);
+    const auto projection=project(p,r);
+    assert(projection.complete&&projection.report.at("identity_rechecked").boolean());
+    const auto& channels=projection.report.at("channel_summary").array();
+    assert(channels.size()==2);
+    assert(channels[0].at("pid").unsigned_integer()==12);
+    assert(channels[0].at("mean").finite_number()==1726);
+    assert(channels[0].at("count").unsigned_integer()==2);
+    assert(channels[1].at("mean").finite_number()==42);
+    assert(projection.report.at("samples").array().size()==4);
+    assert(!projection.report.at("physical_vehicle_verified").boolean());
+    const auto csv=cd::network::history::native_live_csv(projection);
+    assert(csv.find("signal_name,raw_encoded,scale_source")!=std::string::npos);
+    assert(csv.find("\"engine-rpm\"")!=std::string::npos);
+    assert(csv.find("\"vehicle-speed\"")!=std::string::npos);
     rejects(change(original,"\"number\":1726","\"number\":1727"));
     rejects(change(original,"\"raw_samples\":4","\"raw_samples\":3"));
     rejects(change(original,"\"request_hex\":\"010C\"","\"request_hex\":\"010D\""));
@@ -176,7 +193,14 @@ int main(void) {
     f = fake{}; f.clock=1000; f.bad_final_vin=true;
     p=plan(&f);assert(j1979_live_record(&p,&r)==0);
     assert(!r.completed && !strcmp(r.stop_reason,"VIN_MISMATCH"));
-    assert(!r.final_vin_valid);check_replay(p,r);j1979_live_free(&r);
+    assert(!r.final_vin_valid);check_replay(p,r);
+    const auto unidentified=project(p,r);
+    assert(!unidentified.complete&&!unidentified.report.at("identity_rechecked").boolean());
+    assert(unidentified.report.at("channel_summary").array().empty());
+    for(const auto& sample:unidentified.report.at("samples").array()){
+        assert(!sample.at("engineering_verified").boolean()&&sample.at("signals").array().empty());
+    }
+    j1979_live_free(&r);
 
     f = fake{}; f.clock=1000; f.negative_sample=true;
     p=plan(&f);assert(j1979_live_record(&p,&r)==0);

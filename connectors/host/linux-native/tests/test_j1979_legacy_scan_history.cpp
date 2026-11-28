@@ -139,6 +139,11 @@ int main(){
         if(!driver)assert(inspected.other_sources==std::set<unsigned>{0x11});
         const auto proof=cd::json::parse_report(historical_scan_report(inspected));
         assert(proof.at("link_checksum_verified").boolean()!=driver&&!proof.at("physical_vehicle_verified").boolean());
+        const auto& derived=proof.at("derived");
+        assert(derived.at("identification").array().at(0).at("values").array().at(0).string()==vin);
+        assert(derived.at("dtc_modes").array().at(0).at("codes").array().at(0).string()=="P0123");
+        assert(derived.at("monitor_records").array().at(0).at("value_encoded").unsigned_integer()==1);
+        assert(derived.at("measurements").array().size()==2);
         rejects(change(raw,"\"number\":50.0","\"number\":51.0"));
         rejects(change(raw,"\"number\":1000.0","\"number\":999.0"));
         rejects(change(raw,"\"codes\":[\"P0123\"]","\"codes\":[\"P0456\"]"));

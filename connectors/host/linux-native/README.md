@@ -452,3 +452,13 @@ camarodiag-native verify-j1979-capture --capture CAPTURE.cj1 --report HOST.json 
 camarodiag-native verify-native-freeze --capture CAPTURE.cf --report HOST.json --vin VIN17 --output PROOF.json
 ```
 Historical Android, Windows and Python CJ/1 and CF/1 JSON reports are compared with the binary records. The CF/1 verifier independently reconstructs the full historical recipe and checks it against the native binary replay; partial captures cannot establish completion. Both commands preserve source SHA-256 and do not independently validate the declared live credentials or actual physical ECU. They require distinct inputs and a new proof path.
+
+### Native raw live engineering projection
+
+After a native SocketCAN or ELM ISO-TP raw recording, replay it using independent identifiers and VIN:
+
+```sh
+camarodiag-native project-native-live --report live.json --tx 7E0 --rx 7E8 --vin VIN17 --output projection.json
+camarodiag-native export-native-live-csv --report live.json --tx 7E0 --rx 7E8 --vin VIN17 --output samples.csv
+```
+The source recording is never rewritten. The commands verify the raw request sequence and canonical report before projecting values, preserve missing values, and require initial/final VIN agreement before attaching engineering interpretations. Context-dependent scaling is never silently replaced by historic default arithmetic. Partial projections are retained with exit status 2. JSON binds the original SHA-256; CSV is a convenience view, not an independently authenticated proof. Neither command opens a vehicle connection.
