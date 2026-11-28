@@ -27,6 +27,12 @@ int main(){
     rejects(replace(native,"\"physical_vehicle_verified\":false","\"physical_vehicle_verified\":true"));
     rejects(replace(native,"\"next_page\":true","\"next_page\":false"));
     rejects(replace(native,"\"eligible_response_ids\":[\"7E8\"]","\"eligible_response_ids\":[\"7E9\"]"));
+    const Frame ignored{0x123,false,false,false,{1,2,3}};
+    auto ignored_report=report(replay_discovery(false,true,std::array{positive,ignored},"",100));
+    auto with_ignored=history::inspect_discovery(cd::json::parse(ignored_report));
+    assert(with_ignored.discovery.ignored==1&&with_ignored.discovery.frames.size()==2&&with_ignored.discovery.completed);
+    rejects(replace(ignored_report,"\"ignored_frame_count\":1","\"ignored_frame_count\":0"));
+    rejects(replace(ignored_report,"\"stop_reason\":null","\"stop_reason\":\"BOGUS\""));
     auto historical=replace(native,"camarodiag-j1979-can-discovery-linux-v1","camarodiag-functional-j1979-can-discovery-v1");
     assert(history::inspect_discovery(cd::json::parse(replace(historical,"\"supported_pids\":[5]","\"supported_pids\":[5,32]"))).discovery.completed);
     Frame conflict=positive;conflict.data[3]=4;

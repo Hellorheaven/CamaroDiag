@@ -61,13 +61,16 @@ std::vector<std::uint8_t> bytes(const Value& v,std::size_t max){
     }
     return out;
 }
-Frame frame(const Value& v,bool extended,bool android,bool request=false){
+Frame frame(const Value& v,bool extended,bool android,bool request=false,bool native_raw=false){
     Frame f{};f.id=address(required(v,android&&!request?"response_id":"can_id"));
     f.extended=flag(v,"extended",extended);f.rtr=flag(v,"rtr");f.error=flag(v,"error");
     f.data=bytes(required(v,"data_hex"),8);
-    require(f.extended==extended&&!f.rtr&&!f.error,"Wrong classic CAN frame flags");
-    if(request)require(f==functional_request(extended),"Unexpected functional PID00 request");
-    else require(response_pair(f.id,extended).has_value(),"Unrelated recorded CAN response");
+    require(f.id<=(f.extended?0x1fffffffu:0x7ffu),"Invalid classic CAN identifier width");
+    if(!native_raw){
+        require(f.extended==extended&&!f.rtr&&!f.error,"Wrong classic CAN frame flags");
+        if(request)require(f==functional_request(extended),"Unexpected functional PID00 request");
+        else require(response_pair(f.id,extended).has_value(),"Unrelated recorded CAN response");
+    }
     return f;
 }
 std::optional<unsigned> probe(std::string_view raw){
@@ -206,7 +209,13 @@ Inspection inspect_discovery(const Value& root){
     auto& out=result.discovery;out.extended=extended;
     out.sent=required(*d,"request_sent").boolean();out.completed=required(*d,"completed").boolean();
     const auto& stop=optional(*d,"stop_reason");
-    if(!stop.null()){out.stop=stop.string();require(!out.stop.empty()&&out.stop.size()<=80,"Invalid discovery stop reason");}
+    if(!stop.null()){
+        out.stop=stop.string();
+        require(!out.stop.empty()&&out.stop.size()<=80&&
+            std::all_of(out.stop.begin(),out.stop.end(),[](unsigned char c){
+                return (c>='A'&&c<='Z')||(c>='a'&&c<='z')||(c>='0'&&c<='9')||c=='_';
+            }),"Invalid discovery stop reason");
+    }
     require(out.completed==out.stop.empty()&&(!out.completed||out.sent),"Inconsistent discovery completion");
     if(d!=&root)require(required(root,"completed").boolean()==out.completed,"Outer discovery completion differs");
     if(android&&out.completed){
@@ -220,9 +229,17 @@ Inspection inspect_discovery(const Value& root){
     const auto* raw=property(*d,"raw_frames");
     if(!raw)raw=d->find("frames");
     require(raw,"Missing CAN discovery bytes");
-    for(const auto& v:array(*raw,max_frames))out.frames.push_back(frame(v,extended,android));
+    const bool native=contains_schema(root,"camarodiag-j1979-can-discovery-linux-v1");
+    for(const auto& v:array(*raw,max_frames))out.frames.push_back(frame(v,extended,android,false,native));
     require(out.sent||out.frames.empty(),"Response recorded without discovery transmission");
-    out.responders=group(out.frames,extended,android);
+    if(native){
+        auto reason=out.stop;
+        if(reason=="NO_VERIFIED_RESPONDER")reason.clear();
+        const auto replay=replay_discovery(extended,out.sent,out.frames,reason,out.duration_ms);
+        require(replay.completed==out.completed&&replay.stop==out.stop&&replay.ignored==out.ignored,
+            "Native discovery stop or ignored-frame count differs");
+        out.responders=replay.responders;
+    }else out.responders=group(out.frames,extended,android);
     const auto& rows=array(required(*d,"responders"),max_frames);
     require(rows.size()==out.responders.size(),"Missing or additional responder");
     std::set<std::uint32_t> seen;
