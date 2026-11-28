@@ -10,6 +10,15 @@ Cet ordre supplante tout calendrier antérieur contradictoire. Objectif par sess
 
 Dernier HEAD de développement avant enregistrement de cet ordre : `943dbd33da58afe7250aa3134a1aca149002eb77` (7 commits, 17 fichiers, +869/-38 depuis `f51ddc82c950950d1f2efe48fa710c6dc44ef5a0`). Rejeu CAN historique et natif, CLI verify-network, classification et acquisition live ; compilation non exécutée, parité non attestée.
 
+## Reprise PR117 — compatibilité historique et projections live natives (28/11/2026)
+
+- Dernier SHA code : `4162bc40a37894f0e8f5f2f00bebca0e31da6399`. Depuis le dernier bilan visible `fc733622ae7a9af45472ec8d539e2561394861c3` : **17 commits, 37 fichiers, +2106/-68 lignes** (comparaison GitHub avant ce point documentaire). Depuis la reprise `d9fc7c98018db0b9e8eb2b96720163501f778599` : 8 commits, 22 fichiers, +580/-55. Objectif de volume non atteint.
+- Portage des commandes historiques J1979 hors ligne (comparaison live, captures CJ/1 et CF/1, maintenance CAN/legacy et découverte/rapprochement legacy). Compatibilité des formats et parité à qualifier ; aucune suppression anticipée du Python.
+- Rejeu live : horodatages de début de cycle compatibles avec les délais réels d'ordonnancement ; vérification des inventaires, états historiques, VIN, champs de portée et annulation ; projections live natives JSON/CSV et statistiques par PID/canal après rejeu indépendant, identité finale et contexte vérifiés pour les valeurs interprétées. Reconstruction des mesures, identifications Mode 09, DTC, inventaires et moniteurs legacy.
+- Durcissement CAN physique : taille maximale ISO-TP, longueur de réponse invalide lors d'un échec transport, refus des réponses positives hors délai, préservation du motif terminal lors d'une interruption locale. Sérialisation JSON bornée commune et régressions écrites.
+- Restent notamment la parité de l'acquisition live numérique Python, les raccordements produit et firmware, le contrôle des exports historiques sur corpus réel, la référence normative J1979DA_202607 et la qualification logicielle. Interface Linux graphique encore à réaliser selon le périmètre de clôture. Aucun build/test exécuté ; gate unique de fin de protocole non déclenché.
+- Dernière release publiée vérifiée : v2.0.46. APK v2.0.47 non produite, non signée et non publiée. Le connecteur GitHub disponible ne fournit pas de déclenchement de workflow ou de publication de release, et le workflow de release est limité à main ; ne pas fusionner prématurément pour contourner cette limite. Migration générale Python/C et autres protocoles après v47.
+
 ## Reprise PR117 — journaux ELM, campagnes et inspection de maintenance historique (28/11/2026)
 
 - Base `5bb8f0be3eee83cdec13fad9a093f6a3eb999d6e`, dernier SHA code `c0ece3575a372c0ab12d83f499b78b1ed47fc033`. Comparaison GitHub avant documentation : **20 commits de développement, 27 fichiers, +1872/-108 lignes**. Objectif 10 000 lignes non atteint. Aucun build ou test lancé.
