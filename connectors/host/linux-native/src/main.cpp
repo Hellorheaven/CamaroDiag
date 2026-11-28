@@ -2229,7 +2229,7 @@ static int direct_maintenance_cli(int argc,char** argv,bool elm=false){
 
 struct ElmCanOptions{
     cd::elmcan::Scope scope;
-    const char* port{},*vin{},*output{};
+    const char* port{},*vin{},*output{},*adapter_capture{};
     unsigned baud{38400},budget{180000},cycles{30},interval{1000};
     std::vector<uint8_t> pids;
     bool profile{},tx{},rx{},confirmed{},baud_set{},budget_set{},cycles_set{},interval_set{};
@@ -2268,6 +2268,7 @@ static bool parse_elm_can(int argc,char** argv,ElmCanOptions& o,bool live){
             if(flag=="--port")dest=&o.port;
             else if(flag=="--vin")dest=&o.vin;
             else if(flag=="--output")dest=&o.output;
+            else if(flag=="--adapter-capture")dest=&o.adapter_capture;
             if(!dest||*dest)return false;
             *dest=value;
         }
@@ -2285,6 +2286,8 @@ static int elm_can_cli(int argc,char** argv,bool live){
     if(!fgets(answer,sizeof(answer),stdin)||strcmp(answer,"yes\n"))return error("Consent refused");
     struct File{int fd;~File(){if(fd>=0)close(fd);}} out{open(o.output,O_WRONLY|O_CREAT|O_EXCL|O_NOFOLLOW|O_CLOEXEC,0600)};
     if(out.fd<0)return error("ELM CAN report destination unavailable");
+    File trace_out{o.adapter_capture?open(o.adapter_capture,O_WRONLY|O_CREAT|O_EXCL|O_NOFOLLOW|O_CLOEXEC,0600):-1};
+    if(o.adapter_capture&&(trace_out.fd<0||!sync_parent(o.adapter_capture)))return error("Adapter transcript destination unavailable");
     legacy_cancelled=0;
     struct Signals{
         struct sigaction oldint{},oldterm{};
@@ -2342,6 +2345,14 @@ static int elm_can_cli(int argc,char** argv,bool live){
     try{
         const std::span<const cd::elmcan::Observation> evidence=session?
             std::span<const cd::elmcan::Observation>(session->evidence()):std::span<const cd::elmcan::Observation>{};
+        const cd::elmcan::Trace trace{o.scope,o.vin,live?cd::elmcan::TraceOperation::live:cd::elmcan::TraceOperation::scan,
+            std::vector<cd::elmcan::Observation>(evidence.begin(),evidence.end())};
+        const auto replay=cd::elmcan::replay_trace(trace);
+        if(completed&&(!replay.configured||replay.terminal_fault))return error("Adapter raw evidence does not support completion");
+        if(o.adapter_capture){
+            const auto bytes=cd::elmcan::encode_trace(trace);
+            if(!write_owned_file(trace_out.fd,bytes.data(),bytes.size()))return error("Adapter transcript persistence failed");
+        }
         const auto json=cd::elmcan::report(o.scope,o.vin,live?"LIVE":"SCAN",native_report,evidence,reason,completed);
         if(!write_owned_file(out.fd,json.data(),json.size())||!sync_parent(o.output))return error("ELM CAN report persistence failed");
         return completed?0:2;
@@ -2596,8 +2607,8 @@ static void usage(FILE *stream) {
         "  camarodiag-native --inspect-j1979-elm-trace PROFILE TX RX VIN TRACE.ecr PROOF.json\n"
         "  camarodiag-native --verify-j1979-elm-trace PROFILE TX RX VIN TRACE.ecr CAPTURE PROOF.json\n"
         "  camarodiag-native --j1979-elm-can-freeze --port /dev/ttyUSB0 --profile 6 --tx 7E0 --rx 7E8 --vin VIN --frame 00 --pid 0C --capture freeze.cf --output freeze.json --confirm-physical-channel [--extended] [--adapter-capture trace.ecr]\n"
-        "  camarodiag-native --j1979-elm-can --profile 6 --port /dev/ttyUSB0 --tx 7E0 --rx 7E8 --vin VIN --output scan.json --confirm-physical-channel\n"
-        "  camarodiag-native --j1979-elm-live --profile 6 --port /dev/ttyUSB0 --tx 7E0 --rx 7E8 --vin VIN --pid 0C --output live.json --confirm-physical-channel\n"
+        "  camarodiag-native --j1979-elm-can --profile 6 --port /dev/ttyUSB0 --tx 7E0 --rx 7E8 --vin VIN --output scan.json --confirm-physical-channel [--adapter-capture trace.ecr]\n"
+        "  camarodiag-native --j1979-elm-live --profile 6 --port /dev/ttyUSB0 --tx 7E0 --rx 7E8 --vin VIN --pid 0C --output live.json --confirm-physical-channel [--adapter-capture trace.ecr]\n"
         "  camarodiag-native --j1979-can-network --interface can0 --rx 7E8 --rx 7E9 --vin VIN --output network.json --confirm-functional-scope [--extended]\n"
         "  camarodiag-native --j1979-can --interface can0 --tx 7E0 --rx 7E8 --output evidence.json --vin VIN --budget-ms 180000 --confirm-physical-channel\n"
         "  camarodiag-native --j1979-live-usb-native --port /dev/ttyACM0 --key-file key.bin --capture session.cl --output report.json --tx 7E0 --rx 7E8 --vin VIN --pid 0C --cycles 30 --interval-ms 1000 --budget-ms 180000 --confirm-physical-channel\n"
