@@ -24,6 +24,7 @@
 #include "j1979_legacy_mutation.hpp"
 #include "j1979_legacy_mutation_inspection.hpp"
 #include "j1979_can_history.hpp"
+#include "j1979_network_history.hpp"
 #include "j1979_legacy_discovery_history.hpp"
 #include "j1979_legacy_discovery_binding.hpp"
 #include "j1979_legacy_freeze_wire.hpp"
@@ -2817,6 +2818,7 @@ static void usage(FILE *stream) {
         "  camarodiag-native --inspect-j1979-legacy-maintenance VIN FINAL.json BASELINE.json INTENT.json PROOF.json\n"
         "  camarodiag-native --j1979-legacy-maintenance --operation clear --port /dev/ttyUSB0 --protocol 2 --engine-source 10 --source 10 --vin VIN --baseline baseline.json --intent intent.json --output result.json --confirm-functional-scope --acknowledge-maintenance-warning\n"
         "  camarodiag-native --inspect-j1979-legacy-discovery PROTOCOL RAW_RESPONSE RAW_ATDPN REPORT.json\n"
+        "  camarodiag-native --inspect-j1979-can-discovery-report REPORT.json PROOF.json\n"
         "  camarodiag-native --inspect-j1979-historical-legacy-discovery REPORT.json PROOF.json\n"
         "  camarodiag-native --bind-j1979-historical-legacy-discovery PROTOCOL SOURCE VIN DISCOVERY.json CAPTURE.lsr PROOF.json\n"
         "  camarodiag-native --inspect-j1979-catalogue live|freeze CATALOGUE REFERENCE SHA256 OUTPUT\n"
@@ -2869,7 +2871,21 @@ static int bind_legacy_discovery_cli(const char* protocol_arg,const char* source
         return 0;
     }catch(const std::exception& e){return error(e.what());}
 }
+static int historical_can_discovery_cli(const char* path,const char* output){
+    try{
+        constexpr std::size_t maximum=4*1024*1024;
+        input original{},again{};
+        if(!load_regular(path,maximum,&original))return error("Bounded CAN discovery report required");
+        const std::string_view raw(reinterpret_cast<const char*>(original.bytes.get()),original.length);
+        const auto inspected=cd::network::history::inspect_discovery(cd::json::parse(raw,maximum));
+        const auto proof=cd::network::history::report(inspected,original.digest);
+        if(!load_regular(path,maximum,&again)||!same_input(&original,&again))return error("CAN discovery report changed");
+        if(!atomic_create(output,proof.data(),proof.size()))return error("CAN discovery proof destination unavailable");
+        return 0;
+    }catch(const std::exception& e){return error(e.what());}
+}
 int main(int argc, char **argv) {
+    if(argc==4&&!strcmp(argv[1],"--inspect-j1979-can-discovery-report"))return historical_can_discovery_cli(argv[2],argv[3]);
     if(argc==8&&!strcmp(argv[1],"--bind-j1979-historical-legacy-discovery"))return bind_legacy_discovery_cli(argv[2],argv[3],argv[4],argv[5],argv[6],argv[7]);
     if(argc==4&&!strcmp(argv[1],"--inspect-j1979-historical-legacy-discovery"))return historical_legacy_discovery_cli(argv[2],argv[3]);
     if (argc == 2 && (!strcmp(argv[1], "--help") || !strcmp(argv[1], "-h"))) {

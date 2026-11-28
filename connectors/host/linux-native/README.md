@@ -388,3 +388,9 @@ files are hashed and reread; changed PID00 bitmap is reported rather than
 silently replacing the historical selection. A failed scan remains failed.
 This does not yet port inspection of historical selected-source scan JSON
 from Android, ELM or J2534.
+
+### Historical classic CAN discovery verification
+
+`camarodiag-native --inspect-j1979-can-discovery-report discovery.json proof.json`
+
+Offline replay of native SocketCAN, historical Python, J2534 and Android discovery-only exports, including fixed Android ELM profile, short complete single-frame DLC, pending/terminal responses, conflict detection, exact responder evidence and eligible IDs. No physical scan, automatic selection or programming authority is inferred. Network reports containing selected physical scans must not be used with this command; the physical campaign verification remains a separate migration item.
