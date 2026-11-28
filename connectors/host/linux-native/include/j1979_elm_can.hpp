@@ -3,6 +3,7 @@
 #include "j1979_can.h"
 #include "j1979_live.h"
 #include "j1979_freeze_scope.h"
+namespace cd::hostmaint {class ElmOwner;}
 namespace cd::elmcan {
 using legacy::Bytes;
 using legacy::Data;
@@ -29,6 +30,7 @@ struct Observation{
 std::string report(const Scope&,std::string_view vin,std::string_view operation,std::string_view native_report,
     std::span<const Observation>,std::string_view error,bool completed);
 class Session{
+    friend class cd::hostmaint::ElmOwner;
     legacy::Link& link_;
     Scope scope_;
     legacy::Current current_;

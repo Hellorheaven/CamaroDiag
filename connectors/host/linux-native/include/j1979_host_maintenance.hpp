@@ -1,6 +1,7 @@
 #pragma once
 #include "j1979_maintenance_campaign.h"
 #include "j1979_maintenance_journal.h"
+#include "j1979_elm_can.hpp"
 #include <functional>
 #include <string>
 #include <string_view>
@@ -17,6 +18,8 @@ struct Result{
 };
 Result run_socket(const Scope&,const char* interface,const char* directory,const char* journal_name,
     bool warning,bool approved,const volatile sig_atomic_t* cancel);
+struct ElmResult{Result result;std::vector<elmcan::Observation> observations;};
+ElmResult run_elm(const Scope&,elmcan::Scope,legacy::Link&,Current,const char* directory,const char* journal_name,bool warning,bool approved);
 std::string report(const Result&,std::string_view digest,std::string_view independent_journal_report);
 class FileStorage final:public Journal::Storage{
     int dir_{-1},fd_{-1},marker_{-1};

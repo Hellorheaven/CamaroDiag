@@ -59,8 +59,10 @@ class Serial final:public Link{
     void require_current()const{
         if(!current_||!current_())throw Cancelled();
     }
-    void release()noexcept{
-        if(fd_>=0){if(configured_)tcsetattr(fd_,TCSANOW,&saved_);close(fd_);fd_=-1;}
+    bool release()noexcept{
+        if(fd_<0)return true;
+        const bool restored=!configured_||tcsetattr(fd_,TCSANOW,&saved_)==0;
+        const bool closed=close(fd_)==0;fd_=-1;return restored&&closed;
     }
     void ready(short events,std::uint64_t deadline){
         for(;;){
@@ -101,6 +103,7 @@ public:
         }catch(...){release();throw;}
     }
     ~Serial()override{release();}
+    bool finish()override{retired_=true;return release();}
     std::string command(std::string_view command,unsigned timeout)override{
         if(retired_||command.empty()||command.size()>32||timeout<1||timeout>4000)
             throw TransportError("Retired or invalid ELM session");

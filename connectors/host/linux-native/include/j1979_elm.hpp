@@ -12,6 +12,8 @@ using Clock=std::function<std::uint64_t()>;
 class Link {
 public:
     virtual ~Link()=default;
+    // Explicit local descriptor retirement. A false result is not proof of closure.
+    virtual bool finish(){return false;}
     virtual std::string command(std::string_view,unsigned timeout_ms)=0;
 };
 class MutationSession;
