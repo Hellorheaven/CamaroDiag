@@ -488,7 +488,7 @@ void hex(std::ostream& out,Bytes data) {
 std::optional<unsigned> multi_width(unsigned pid) {
     const auto* d=find(pid);return d?std::optional<unsigned>{d->width}:std::nullopt;
 }
-std::optional<MultiRecord> multi_signal(const Observation& row,const ScalingContext* context) {
+static std::optional<MultiRecord> decode_multi(const Observation& row,const ScalingContext* context,bool historical) {
     if(row.request.size()!=2||row.request[0]!=1)return {};
     const auto data=payload(row);
     const unsigned pid=row.request[1];
@@ -513,7 +513,7 @@ std::optional<MultiRecord> multi_signal(const Observation& row,const ScalingCont
         if(field.signed_value&&raw>=(std::uint64_t{1}<<(8*field.width-1)))
             encoded-=std::int64_t{1}<<(8*field.width);
         std::optional<double> number;
-        if(contextual){
+        if(contextual&&!historical){
             if(decoded){
                 const auto it=std::find_if(decoded->signals.begin(),decoded->signals.end(),
                     [&](const Signal& value){return value.name==field.name&&value.raw==raw;});
@@ -523,6 +523,12 @@ std::optional<MultiRecord> multi_signal(const Observation& row,const ScalingCont
         result.signals.push_back({field.name,field.unit,raw,number,contextual});
     }
     return result;
+}
+std::optional<MultiRecord> multi_signal(const Observation& row,const ScalingContext* context) {
+    return decode_multi(row,context,false);
+}
+std::optional<MultiRecord> historical_multi_signal(const Observation& row) {
+    return decode_multi(row,nullptr,true);
 }
 void write_multi_json(std::ostream& out,std::span<const Observation> rows,const ScalingContext* context) {
     out<<'[';

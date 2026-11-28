@@ -1,5 +1,6 @@
 #include "j1979_historical_can_plan.hpp"
 #include "j1979_context.hpp"
+#include "j1979_multi.hpp"
 #include "j1979_status.hpp"
 #include "j1979_monitor_scaling.h"
 #include "j1979_vehicle_info.h"
@@ -134,6 +135,33 @@ std::string info(const PlanInspection& p){
     }
     o<<']';return o.str();
 }
+bool extended_pid(unsigned pid){
+    constexpr std::array<unsigned,18> extended{0x6b,0x6f,0x81,0x82,0x83,0x84,0x85,0x87,
+        0x89,0x8a,0x8b,0x8c,0x8d,0x8e,0x8f,0x93,0x94,0x9c};
+    return std::find(extended.begin(),extended.end(),pid)!=extended.end();
+}
+std::string multi(std::span<const cd::j1979::Observation> observations,bool old_catalogue){
+    std::ostringstream o;o.imbue(std::locale::classic());o<<'[';
+    bool first=true;
+    for(const auto& observation:observations){
+        const auto decoded=cd::j1979::historical_multi_signal(observation);
+        if(!decoded||(old_catalogue&&extended_pid(decoded->pid)))continue;
+        if(!first)o<<',';
+        first=false;
+        o<<"{\"request_hex\":"<<json::quote(hex(observation.request))<<",\"signals\":[";
+        bool first_signal=true;
+        for(const auto& signal:decoded->signals){
+            require(signal.number.has_value(),"Historical multi-signal arithmetic missing");
+            if(!first_signal)o<<',';
+            first_signal=false;
+            o<<"{\"pid\":"<<decoded->pid<<",\"name\":"<<json::quote(signal.name)
+                <<",\"unit\":"<<json::quote(signal.unit)<<",\"raw_encoded\":"<<signal.raw<<",\"number\":";
+            number(o,*signal.number);o<<'}';
+        }
+        o<<"]}";
+    }
+    o<<']';return o.str();
+}
 Value canonical_info(const Value& claimed){
     Value::Array rows;
     const auto normalized=normalize(claimed);
@@ -190,7 +218,19 @@ void verify_derived_summary(const Value& body,PlanInspection& p){
             ++p.derived_groups_checked;
         }
     }
+    const auto current_multi=multi(observations,false);
+    std::string catalogue="NOT_REPORTED";
+    if(const auto* saved=claim(body,"multi_signal_records")){
+        const auto canonical=normalize(*saved);
+        if(equal(canonical,json::parse_report(current_multi)))catalogue="CURRENT";
+        else{
+            require(equal(canonical,json::parse_report(multi(observations,true))),"Historical multi-signal records differ");
+            catalogue="HISTORICAL_49";
+        }
+        ++p.derived_groups_checked;
+    }
     p.derived_summary="{\"scaled_monitor_records\":"+m+",\"extended_vehicle_info\":"+v+",\"status_records\":"+s+
-        ",\"contextual_and_multisignal_verified\":false}";
+        ",\"multi_signal_records\":"+current_multi+",\"multi_signal_report_catalog\":"+json::quote(catalogue)+
+        ",\"historical_arithmetic_only\":true,\"contextual_verified\":false}";
 }
 }

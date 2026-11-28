@@ -83,6 +83,26 @@ int main(){
     const auto raw_position=report.find("\"value_encoded\":1000");assert(raw_position!=std::string::npos);
     report.replace(raw_position,std::string("\"value_encoded\":1000").size(),"\"value_encoded\":1001");
     rejects(report);
+    auto multis=steps;
+    // PID 14 (narrowband) with unavailable trim, PID 24 with historical
+    // arithmetic, and extended PID 84 with an exact old-catalogue exclusion.
+    multis[4]=row("0100","410008001001");
+    multis.insert(multis.begin()+5,row("0120","412010000001"));
+    multis.insert(multis.begin()+6,row("0140","414000000001"));
+    multis.insert(multis.begin()+7,row("0160","416000000001"));
+    multis.insert(multis.begin()+8,row("0180","418010000000"));
+    multis.insert(multis.begin()+10,row("0114","411464FF","RAW"));
+    multis.insert(multis.begin()+11,row("0124","412480002000","RAW"));
+    multis.insert(multis.begin()+12,row("0184","418464","RAW"));
+    auto multi_body=wrap(multis);
+    const auto mplan=inspect_plan(cd::json::parse_report(multi_body),PlanOrder::historical,std::string(vin));
+    assert(cd::json::parse_report(mplan.derived_summary).at("multi_signal_records").array().size()==3);
+    const std::string saved=R"([{"request_hex":"0114","signals":[{"pid":20,"name":"o2-sensor-1-voltage","unit":"V","raw_encoded":100,"number":0.5}]},{"request_hex":"0124","signals":[{"pid":36,"name":"wideband-o2-sensor-1-equivalence-ratio","unit":"ratio","raw_encoded":32768,"number":1},{"pid":36,"name":"wideband-o2-sensor-1-voltage","unit":"V","raw_encoded":8192,"number":1}]}])";
+    multi_body.pop_back();multi_body+=",\"multi_signal_records\":"+saved+"}";
+    const auto old=inspect_plan(cd::json::parse_report(multi_body),PlanOrder::historical,std::string(vin));
+    assert(cd::json::parse_report(old.derived_summary).at("multi_signal_report_catalog").string()=="HISTORICAL_49");
+    auto wrong_multi=multi_body;const auto number_pos=wrong_multi.find("\"number\":0.5");
+    assert(number_pos!=std::string::npos);wrong_multi.replace(number_pos,12,"\"number\":0.6");rejects(wrong_multi);
     auto changed=steps;changed[5]=row("0106","410680");rejects(wrap(changed));
     changed=steps;changed[5]=row("0105","4105");rejects(wrap(changed));
     changed=steps;changed[5]=row("04","44");rejects(wrap(changed));

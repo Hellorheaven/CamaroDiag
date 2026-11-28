@@ -18,5 +18,7 @@ struct MultiRecord {
 std::optional<unsigned> multi_width(unsigned pid);
 std::optional<MultiRecord> multi_signal(const Observation& row,
     const ScalingContext* context=nullptr);
+// Archived numeric arithmetic only, never use for live measurements.
+std::optional<MultiRecord> historical_multi_signal(const Observation& row);
 void write_multi_json(std::ostream&,std::span<const Observation>,const ScalingContext* context=nullptr);
 }
