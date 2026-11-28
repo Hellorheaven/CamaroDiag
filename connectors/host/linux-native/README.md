@@ -366,3 +366,17 @@ camarodiag-native --inspect-j1979-historical-can-maintenance VIN result.json bas
 ```
 
 VIN doit être remplacé par le VIN documenté. Les inspecteurs hors ligne n'ouvrent aucun canal véhicule et ne prouvent ni consentement, ni durabilité avant transmission, ni authenticité du calculateur. Le nouvel inspecteur legacy exige les deux préfixes séparés pour une commande déclarée tentée. Le vérificateur historique CAN distingue une baseline absente, séparée ou embarquée. Tests raccordés au Makefile, non exécutés.
+
+
+### Historical legacy PID00 discovery inspection (offline)
+
+`camarodiag-native --inspect-j1979-historical-legacy-discovery discovery.json proof.json`
+
+Replays historical Android, ELM and J2534 discovery reports and checks the
+recorded responder classifications, raw frames, bitmaps and eligibility.
+The output includes the input SHA-256; the command never opens a transport,
+does not select an ECU, and creates a new proof without overwriting a file.
+J2534 driver frames do not supply independent link checksums. A consistent
+historical report does not authorize a new session or prove vehicle coverage.
+This is the discovery-only portion of the Python inspection migration;
+historical selected-source scan binding remains to be ported.

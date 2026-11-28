@@ -24,6 +24,7 @@
 #include "j1979_legacy_mutation.hpp"
 #include "j1979_legacy_mutation_inspection.hpp"
 #include "j1979_can_history.hpp"
+#include "j1979_legacy_discovery_history.hpp"
 #include "j1979_legacy_freeze_wire.hpp"
 #include "j1979_legacy_live_wire.hpp"
 #include <time.h>
@@ -2815,6 +2816,7 @@ static void usage(FILE *stream) {
         "  camarodiag-native --inspect-j1979-legacy-maintenance VIN FINAL.json BASELINE.json INTENT.json PROOF.json\n"
         "  camarodiag-native --j1979-legacy-maintenance --operation clear --port /dev/ttyUSB0 --protocol 2 --engine-source 10 --source 10 --vin VIN --baseline baseline.json --intent intent.json --output result.json --confirm-functional-scope --acknowledge-maintenance-warning\n"
         "  camarodiag-native --inspect-j1979-legacy-discovery PROTOCOL RAW_RESPONSE RAW_ATDPN REPORT.json\n"
+        "  camarodiag-native --inspect-j1979-historical-legacy-discovery REPORT.json PROOF.json\n"
         "  camarodiag-native --inspect-j1979-catalogue live|freeze CATALOGUE REFERENCE SHA256 OUTPUT\n"
         "  camarodiag-native --project-j1979-catalogue cl1|cf1|llr1 CATALOGUE REFERENCE SHA256 CAPTURE VIN OUTPUT [PROTOCOL SOURCE]\n"
         "  camarodiag-native --verify-j1979-catalogue cl1|cf1|llr1 CATALOGUE REFERENCE SHA256 CAPTURE VIN PROJECTION PROOF [PROTOCOL SOURCE]\n"
@@ -2825,7 +2827,21 @@ static void usage(FILE *stream) {
         "Live acquisition: explicit CU/2 proof and local confirmation; offline commands send nothing.\n"
         "Never treats a CRC as cryptographic ECU proof. No automatic retry or write service.\n");
 }
+static int historical_legacy_discovery_cli(const char* path,const char* output){
+    try{
+        input original{},again{};
+        constexpr std::size_t max_size=4*1024*1024;
+        if(!load_regular(path,max_size,&original))return error("Bounded historical discovery report required");
+        const std::string_view raw(reinterpret_cast<const char*>(original.bytes.get()),original.length);
+        const auto result=cd::legacy::history::inspect(cd::json::parse(raw,max_size));
+        const auto proof=cd::legacy::history::report(result,original.digest);
+        if(!load_regular(path,max_size,&again)||!same_input(&original,&again))return error("Historical report changed");
+        if(!atomic_create(output,proof.data(),proof.size()))return error("Discovery proof destination unavailable");
+        return 0;
+    }catch(const std::exception& e){return error(e.what());}
+}
 int main(int argc, char **argv) {
+    if(argc==4&&!strcmp(argv[1],"--inspect-j1979-historical-legacy-discovery"))return historical_legacy_discovery_cli(argv[2],argv[3]);
     if (argc == 2 && (!strcmp(argv[1], "--help") || !strcmp(argv[1], "-h"))) {
         usage(stdout); return 0;
     }
