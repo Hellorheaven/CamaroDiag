@@ -85,6 +85,17 @@ object J1979LiveUsbTest {
         check(decoded.captureIntegrityVerified && decoded.completed() && decoded.observationsReceived == 7)
         check((decoded.summary?.get("raw") as? Number)?.toInt() == 4 &&
             decoded.report()["physical_vehicle_verified"] == false && !decoded.deviceCredentialAuthenticated)
+        val projection=J1979LiveScalarProjection.project(decoded,VIN)
+        check(projection.identityRechecked&&projection.numericProjectionComplete&&projection.samples.size==4)
+        check(projection.channels[0].mean==40.5&&projection.channels[0].count==2)
+        check(projection.channels[1].mean==1165.125&&projection.channels[1].missing==0)
+        check(projection.report()["physical_vehicle_verified"]==false)
+        check(J1979LiveScalarProjection.csv(projection).toString(Charsets.UTF_8).contains("DOCUMENTED_SCALAR"))
+        rejects { J1979LiveScalarProjection.project(decoded,"1FA6P8TH0L5100000") }
+        val unverified=J1979LiveNativeReplay.Result(decoded.profile,decoded.observationsReceived,true,false,false,false,
+            "OFFLINE_CL1",decoded.summary?.plus("final_identity_verified" to false),decoded.result,null,null)
+        val partial=J1979LiveScalarProjection.project(unverified,VIN)
+        check(!partial.identityRechecked&&!partial.numericProjectionComplete&&partial.samples.all { it.number==null })
         for (change in listOf(intArrayOf(3,25,6),intArrayOf(4,6,5),intArrayOf(5,8,20),
             intArrayOf(8,12,5),intArrayOf(1,3,1),intArrayOf(2,28,0),intArrayOf(7,27,0))) {
             val rows = bodies(profile)
