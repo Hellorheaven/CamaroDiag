@@ -168,16 +168,12 @@ int j1979_can_cli(int argc, char **argv) {
         (o.live ? j1979_live_record(&live_plan,&live_result) :
                   j1979_can_scan(&plan,&result)) : -1;
     if (!opened) fprintf(stderr,"Native J1979: selected SocketCAN ISO-TP unavailable\n");
-    if (cancel_requested) {
-        if (o.live) {
-            live_result.completed=false;
-            snprintf(live_result.stop_reason,sizeof(live_result.stop_reason),"CANCELLED");
-        } else {
-            result.cancelled=true;
-            result.completed=false;
-            snprintf(result.stop_reason,sizeof(result.stop_reason),"CANCELLED");
-        }
-    } else if (scan_status || !opened) {
+    /* Do not rewrite the engine's terminal evidence after a signal. A
+     * signal during an exchange withdraws current(); a signal after a
+     * completed exchange cannot retroactively invalidate its response. */
+    if (cancel_requested && !o.live && !result.completed &&
+        !strcmp(result.stop_reason,"CONTEXT_CHANGED")) result.cancelled=true;
+    if (scan_status || !opened) {
         if (o.live) {
             live_result.completed=false;
             snprintf(live_result.stop_reason,sizeof(live_result.stop_reason),"%s",

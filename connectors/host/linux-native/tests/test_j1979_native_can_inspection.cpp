@@ -106,4 +106,8 @@ int main(){
     f={};f.inactive=true;
     const auto inactive=history::inspect_native_plan(cd::json::parse_report(fixture(f)),pair,vin);
     assert(!inactive.completed&&inactive.stop_reason=="CONTEXT_CHANGED"&&inactive.steps==0);
+    auto cancelled=replace(fixture(f),"\"cancelled\":false","\"cancelled\":true");
+    auto interrupted=history::inspect_native_plan(cd::json::parse_report(cancelled),pair,vin);
+    assert(!interrupted.completed&&interrupted.stop_reason=="CONTEXT_CHANGED");
+    rejects(replace(raw,"\"cancelled\":false","\"cancelled\":true"));
 }

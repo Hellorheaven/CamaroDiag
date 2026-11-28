@@ -42,6 +42,7 @@ class Replay {
     std::size_t index_{};
     std::string declared_stop_,expected_vin_;
     j1979_can_result result_{};
+    bool declared_cancelled_{};
     enum class Role {member,inventory,initial_vin,final_vin,freeze_trigger};
     void stop(std::string_view reason){if(!result_.stop_reason[0])set(result_.stop_reason,reason);}
     bool stopped()const{return result_.stop_reason[0]!=0;}
@@ -150,9 +151,9 @@ class Replay {
             if(result_.advertised[mode][id]&&id%32!=0&&!(mode==9&&id==2))read(req(id));
     }
 public:
-    Replay(std::vector<Recorded>& rows,std::string stop_reason,std::string expected):
+    Replay(std::vector<Recorded>& rows,std::string stop_reason,std::string expected,bool cancelled):
         recorded_(rows),rows_(std::max<std::size_t>(1,rows.size())),
-        declared_stop_(std::move(stop_reason)),expected_vin_(std::move(expected)){
+        declared_stop_(std::move(stop_reason)),expected_vin_(std::move(expected)),declared_cancelled_(cancelled){
         result_.steps=rows_.data();
         set(result_.vin_match,"UNVERIFIED");set(result_.final_vin_match,"NOT_TESTED");
     }
@@ -195,7 +196,10 @@ public:
             stop("OBSERVATION_INCOMPLETE");
         require(declared_stop_==result_.stop_reason,"Native stop reason differs from replay");
         result_.step_count=index_;result_.duration_ms=duration;
-        result_.cancelled=declared_stop_=="CANCELLED";
+        // The local signal itself is host metadata, not replay-proven.
+        // It may accompany an observed context withdrawal only.
+        require(!declared_cancelled_||declared_stop_=="CONTEXT_CHANGED","Invalid cancellation claim");
+        result_.cancelled=declared_cancelled_;
         result_.completed=!stopped()&&result_.final_vin_valid;
         return result_;
     }
@@ -235,7 +239,7 @@ NativeInspection inspect_native_plan(const Value& root,Pair pair,std::string_vie
     std::uint64_t summed_duration=0;
     for(const auto& row:steps){recorded.push_back(parse_step(row));summed_duration+=recorded.back().duration;}
     require(summed_duration<=duration,"Native exchange durations exceed campaign duration");
-    Replay replay(recorded,stop,std::string(expected_vin));
+    Replay replay(recorded,stop,std::string(expected_vin),root.at("cancelled").boolean());
     const auto& result=replay.run(duration);
     j1979_can_plan plan{};const std::string vin(expected_vin);
     plan.tx=pair.tx;plan.rx=pair.rx;plan.expected_vin=vin.c_str();
