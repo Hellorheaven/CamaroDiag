@@ -1,0 +1,147 @@
+#include "j1979_socket_campaign.hpp"
+#include <algorithm>
+#include <array>
+#include <cassert>
+#include <cstdlib>
+#include <stdexcept>
+#include <sys/stat.h>
+#include <unistd.h>
+using namespace cd::socketcampaign;
+namespace {
+constexpr std::string_view vin="1G1FA1RXXR0123456";
+struct File{
+    int fd{-1};
+    File(){
+        char named[]="/tmp/camarodiag-scj-XXXXXX";
+        fd=mkstemp(named);assert(fd>=0);name=named;
+        assert(fchmod(fd,0600)==0);
+    }
+    std::string name;
+    ~File(){if(fd>=0)close(fd);if(!name.empty())unlink(name.c_str());}
+    Data read()const{
+        struct stat s{};assert(fstat(fd,&s)==0&&s.st_size>=0);
+        Data out(static_cast<std::size_t>(s.st_size));
+        std::size_t at=0;
+        while(at<out.size()){
+            auto n=pread(fd,out.data()+at,out.size()-at,static_cast<off_t>(at));
+            assert(n>0);at+=static_cast<std::size_t>(n);
+        }
+        return out;
+    }
+};
+struct Fake{
+    std::uint64_t time{1000};
+    unsigned calls{},vin_calls{};
+    bool revoked{},timeout_speed{},bad_final{},oversize{},fail_persistence{};
+    int fd{-1};
+};
+std::uint64_t clock(void* p){return static_cast<Fake*>(p)->time;}
+bool current(void* p){return !static_cast<Fake*>(p)->revoked;}
+bool wait(void* p,unsigned n){static_cast<Fake*>(p)->time+=n;return true;}
+int exchange(void* context,const uint8_t* q,std::size_t n,uint8_t* r,std::size_t* size,unsigned timeout){
+    auto& f=*static_cast<Fake*>(context);
+    assert(j1979_can_allowed_read(q,n)&&timeout&&timeout<=2500);
+    ++f.calls;f.time+=5;
+    if(f.fail_persistence){assert(fchmod(f.fd,0644)==0);return -1;}
+    Data out;
+    if(n==2&&q[0]==9&&q[1]==2){
+        ++f.vin_calls;out={0x49,2,1};
+        const std::string_view identity=f.bad_final&&f.vin_calls>1?"2G1FA1RXXR0123456":vin;
+        out.insert(out.end(),identity.begin(),identity.end());
+    }else if(n==1)out={static_cast<uint8_t>(q[0]+0x40),0};
+    else if(n==3&&q[0]==2&&q[1]==2)out={0x42,2,0,0,0};
+    else if(q[1]==0)out={static_cast<uint8_t>(q[0]+0x40),0,0,static_cast<uint8_t>(q[0]==1?0x18:0),0,0};
+    else if(q[0]==1&&q[1]==12){
+        if(f.oversize){*size=4096;return 0;}
+        out={0x41,12,0x1a,0xf8};
+    }else if(q[0]==1&&q[1]==13){
+        if(f.timeout_speed){*size=0;return 1;}
+        out={0x41,13,42};
+    }else assert(false);
+    assert(out.size()<=*size);std::copy(out.begin(),out.end(),r);*size=out.size();return 0;
+}
+Plan plan(bool live){
+    Plan p{};p.operation=live?Operation::live:Operation::scan;p.tx=0x7e0;p.rx=0x7e8;
+    p.vin=vin;p.interface="vcan0";p.budget_ms=90000;
+    if(live){p.pids={12,13};p.cycles=2;p.interval_ms=500;}
+    assert(p.valid());return p;
+}
+Link link(Fake& f){return {exchange,clock,current,wait,&f};}
+template<class F>void rejects(F f){
+    bool rejected=false;try{f();}catch(const std::exception&){rejected=true;}assert(rejected);
+}
+Data rebuilt(const Journal& j){
+    auto result=encode_header(j.plan);
+    for(std::size_t i=0;i<j.events.size();++i){
+        auto frame=encode_event(j.events[i],i);result.insert(result.end(),frame.begin(),frame.end());
+    }
+    return result;
+}
+void complete(bool live,Fake f={}){
+    File file;
+    Writer w(file.fd,plan(live));
+    const auto r=record(plan(live),link(f),w);
+    const auto prefix=decode(file.read(),true);
+    assert(!prefix.terminal);
+    const auto interrupted=replay(prefix);
+    assert(interrupted.prefix&&!interrupted.completed&&interrupted.report.empty());
+    rejects([&]{(void)decode(file.read(),false);});
+    finish(w,r);
+    const auto data=file.read();
+    const auto j=decode(data,false);
+    assert(j.terminal&&!j.torn&&j.plan==plan(live)&&j.verified_bytes==data.size());
+    assert(rebuilt(j)==data);
+    const auto same=replay(j);
+    assert(same.report==r.report&&same.completed==r.completed&&same.stop==r.stop&&same.exchanges==f.calls);
+    assert(r.completed==(!f.timeout_speed&&!f.bad_final&&!f.oversize));
+    const auto checked=proof(j,same,sha256(data));
+    assert(checked.at("report_sha256").string()==sha256(std::string_view(r.report)));
+    assert(!checked.at("physical_vehicle_verified").boolean()&&!checked.at("permits_automatic_retry").boolean());
+    auto corrupt=data;corrupt.back()^=1;rejects([&]{(void)decode(corrupt,true);});
+    auto extra=data;extra.push_back('E');rejects([&]{(void)decode(extra,true);});
+    auto short_tail=data;short_tail.pop_back();
+    const auto torn=decode(short_tail,true);
+    assert(torn.torn&&!torn.terminal&&replay(torn).prefix);
+    auto wrong=j;wrong.events.back().bytes[0]^=1;
+    rejects([&]{(void)replay(decode(rebuilt(wrong),false));});
+    auto changed=j;
+    auto intent=std::find_if(changed.events.begin(),changed.events.end(),[](const Event& e){return e.kind==Kind::intent;});
+    assert(intent!=changed.events.end());
+    intent->bytes={1,0};
+    rejects([&]{(void)replay(decode(rebuilt(changed),false));});
+    // Cut exactly after intent: the outcome is unknown, not a timeout.
+    const auto first=std::find_if(j.events.begin(),j.events.end(),[](const Event& e){return e.kind==Kind::intent;});
+    auto pending=j;pending.events.resize(static_cast<std::size_t>(first-j.events.begin())+1);
+    const auto prefix_check=replay(decode(rebuilt(pending),true));
+    assert(prefix_check.prefix&&prefix_check.pending_exchange&&!prefix_check.completed&&prefix_check.exchanges==1);
+    rejects([&]{w.append({Kind::clock,1,0,{}});});
+}
+}
+int main(){
+    complete(false);complete(true);
+    Fake f{};f.timeout_speed=true;complete(true,f);
+    f={};f.bad_final=true;complete(true,f);complete(false,f);
+    f={};f.oversize=true;complete(true,f);complete(false,f);
+    auto p=plan(true);p.pids={12,12};assert(!p.valid());
+    p=plan(true);p.tx=0x7df;assert(!p.valid());
+    p=plan(true);p.vin="INVALID";assert(!p.valid());
+    rejects([]{(void)encode_event({Kind::intent,100,0,{4}},0);});
+    rejects([]{(void)encode_event({Kind::response,1,0,{0x41,0}},0);});
+    // Failure before first intent does not dispatch an ECU request.
+    {
+        File file;Writer w(file.fd,plan(true));Fake transport{};
+        assert(fchmod(file.fd,0644)==0);
+        rejects([&]{(void)record(plan(true),link(transport),w);});
+        assert(transport.calls==0);
+    }
+    // Failure after dispatch leaves a recoverable intent with no reply.
+    {
+        File file;Writer w(file.fd,plan(true));Fake transport{};
+        transport.fail_persistence=true;transport.fd=file.fd;
+        rejects([&]{(void)record(plan(true),link(transport),w);});
+        assert(transport.calls==1);
+        const auto j=decode(file.read(),true);
+        const auto r=replay(j);
+        assert(r.pending_exchange&&r.prefix&&!r.completed);
+    }
+}
