@@ -1,6 +1,7 @@
 #include "j1979_legacy_freeze.hpp"
 #include "j1979_legacy_identity.hpp"
 #include "j1979_measurement.h"
+#include "j1979_legacy_shape.hpp"
 #include <algorithm>
 #include <array>
 #include <stdexcept>
@@ -112,6 +113,7 @@ class Recipe{
             if(r.size()==5)step.status="PASSED";
             else {step.status="FAILED";step.detail="INVALID_TRIGGER_DTC";}
         }else{
+            if(pid_shape(q,r)==ApplicationShape::invalid){step.status="FAILED";step.detail="INVALID_PID_DATA_WIDTH";return;}
             if(q[2]==0){
                 const unsigned width=j1979_measurement_width(q[1]);
                 const bool trim=q[1]>=6&&q[1]<=9;

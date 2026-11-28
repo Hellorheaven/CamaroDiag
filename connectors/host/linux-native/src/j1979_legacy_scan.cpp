@@ -1,6 +1,7 @@
 #include "j1979_legacy_scan.hpp"
 #include "j1979_legacy_identity.hpp"
 #include "j1979_legacy_info.hpp"
+#include "j1979_legacy_shape.hpp"
 #include "j1979_policy.h"
 #include "j1979_projection.hpp"
 #include <algorithm>
@@ -13,9 +14,6 @@ namespace {
 using Validator=std::function<bool(const Data&)>;
 constexpr unsigned max_steps=4096;
 constexpr std::size_t max_raw=8*1024*1024;
-bool prefix(const Data& row,Bytes required){
-    return row.size()>=required.size()&&std::equal(required.begin(),required.end(),row.begin());
-}
 class Campaign {
     using Observe=std::function<ScanExchange(std::string_view)>;
     Observe observe_;
@@ -150,16 +148,14 @@ class Campaign {
     std::vector<Data> read_pid(unsigned mode,unsigned pid){
         Data q{static_cast<std::uint8_t>(mode),static_cast<std::uint8_t>(pid)};
         if(mode==2)q.push_back(0);
-        return read(q,[&](const Data& r){
-            Data expected=q;expected[0]+=0x40;
-            if(!prefix(r,expected)||r.size()<=expected.size()||r.size()>7)return false;
-            if(mode==1&&(pid==0x13||pid==0x1d)&&r.size()!=3)return false;
-            if(mode==1){
-                const cd::j1979::Observation row{q,r,true,true};
-                if(!cd::j1979::known_shape(row))return false;
-            }
-            return true;
+        auto rows=read(q,[&](const Data& r){
+            const auto shape=pid_shape(q,r);
+            return shape==ApplicationShape::positive||shape==ApplicationShape::raw;
         },true);
+        if(rows.size()==1&&pid_shape(q,rows.front())==ApplicationShape::raw){
+            result_.steps.back().status="RAW";result_.steps.back().detail="UNINTERPRETED_PID";
+        }
+        return rows;
     }
 public:
     Campaign(Protocol protocol,unsigned source,std::string_view vin,unsigned budget,Observe observe)
