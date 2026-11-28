@@ -1,3 +1,12 @@
+## Reprise PR117 — Mode 02 et maintenance ELM CAN, décodage legacy (28/11/2026)
+
+- Base `23d213871e14c9fe362fd791becb064add26647c`, dernier SHA code `1b237cb012a57b9a0a13ffb852e37e3d46379949`. Comparaison GitHub avant documentation : **20 commits, 33 fichiers, +1451/-97 lignes**. Objectif 10 000 lignes non atteint. Aucun build/test lancé conformément au gate unique de fin de protocole.
+- Linux C++20 : ELM CAN profils fixes 6–9, Mode 02 avec plan CF/1, capture incrémentale, reprise hors ligne et rapport adaptateur ; maintenance primaire Mode 04/08 avec journal CM/1, contrôle de l'immobilité/VIN, refus avant mutation, intention durable, arrêt local et refus de réponse CAN étrangère. Aucun réessai automatique ni attestation physique.
+- Traces ECR/1 : format binaire borné et CRC, rejeu des configurations et des réponses adaptateur, rapprochement avec captures CF/1 et CM/1, option de conservation pour scan/live/freeze/maintenance. Persistance ECR/1 en fin de session, pas encore incrémentale ; la capture CF/1 et le journal CM/1 restent progressifs. Le rejeu ECR/1 scan/live porte sur la trace adaptateur, pas encore sur le plan complet.
+- Legacy : portage du décodage Mode 05/06, Mode 09 CALID/CVN/nom ECU/identification et compteurs IPT, largeur PID et statut RAW, valeurs figées pour frames numérotées uniquement si identité recontrôlée et trigger stable ; contexte opérationnel courant distinct du freeze. Régressions écrites non exécutées.
+- Arbre Git : 128 fichiers Python, 19 C, zéro Java. Les anciennes implémentations restent présentes ; migration totale non réalisée. Reste : parité des rapports/commandes et raccordements produit, autres outils Python, C MPC5566, référence normative J1979DA_202607 non disponible, qualification logicielle au gate puis validation matérielle séparée.
+- APK 2.0.47 (versionCode 64) absente des releases au contrôle. Pas de build, signature, publication ni merge. J1979 et PR #117 restent ouverts ; conserver les étapes C6/C8 et autres protocoles selon l'ordre convenu.
+
 ## Reprise PR117 — CAN physique, ELM CAN et journaux legacy (27/11/2026)
 
 - Base `fb100dc4ddca650b446b2c38425cbde3805ce3a1`, dernier SHA code `ceda2b44d7920fe74dcb9d661750dd79dc101c34`. Comparaison GitHub avant documentation : **19 commits, 29 fichiers, +1883/-39 lignes**. Objectif 10 000 lignes non atteint ; aucun build/test lancé.

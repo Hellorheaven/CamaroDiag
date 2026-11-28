@@ -324,3 +324,28 @@ camarodiag-native --recover-j1979-legacy-journal PROTOCOL SOURCE VIN JOURNAL.lj 
 ```
 
 Use a new output path; existing files are never overwritten. The recovered capture uses the corresponding LSR/1, LFR/1 or LLR/1 format. CRC consistency is not cryptographic authentication or physical-vehicle verification. Consult `--help` for the live command parameters.
+
+## ELM CAN Mode 02, maintenance et vérification des traces (28/11/2026)
+
+Les profils CAN fixes 6–9 sont désormais raccordés aux commandes natives
+`--j1979-elm-can-freeze` et `--j1979-elm-can-maintenance` avec sélection physique explicite.
+La première utilise le plan CF/1 et la seconde le moteur partagé Mode 04/08
+et le journal durable CM/1. La maintenance exclut les réponses CAN étrangères,
+exige les contrôles de consentement, VIN et immobilité, et interdit tout réessai
+automatique. La fermeture du descripteur série ne prouve pas l'arrêt physique
+du transceiver.
+
+L'option `--adapter-capture` conserve une trace ECR/1 pour les commandes ELM CAN
+scan, live, freeze et maintenance. ECR/1 est écrit à la fin de session ; les
+captures CF/1 et CM/1 restent incrémentales. Le contrôle hors ligne peut
+rejouer les échanges ELM et les rapprocher des observations CF/1 ou CM/1.
+Les preuves scan/live ECR/1 ne constituent pas encore un rejeu intégral de
+leur recette. Utiliser `--help` pour les arguments exacts des commandes
+`--inspect-j1979-elm-trace` et `--verify-j1979-elm-trace`.
+
+Le rapport legacy expose également les décodages Mode 05/06, les identifiants
+et compteurs Mode 09 et le contexte de mesure courant. Les mesures figées
+numérotées ne sont interprétées qu'avec un trigger stable et un VIN recontrôlé,
+sans emprunter les paramètres de mesure actuels. Les régressions ajoutées
+n'ont pas été exécutées. Il ne s'agit ni d'une qualification du véhicule,
+ni d'une parité Python complète, ni d'une release.
