@@ -10,5 +10,6 @@ struct HistoricalFreeze {
 // Only application-level consistency. Link evidence is validated separately.
 HistoricalFreeze replay_historical_freeze(const json::Value&,std::optional<std::string> expected={});
 void validate_historical_timestamp(const json::Value&);
+HistoricalFreeze rebuild_historical_freeze(const json::Value& plan,const json::Value::Array& observations,unsigned duration);
 std::string encode_historical_json(const json::Value&);
 }

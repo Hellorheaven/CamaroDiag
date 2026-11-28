@@ -83,9 +83,10 @@ struct Row{
             {"detail",text_or_null(reason)},{"evidence",evidence}});
     }
 };
-Row classify(const Value& v,const Bytes& request){
-    json::fields(v,{"request_hex","response_hex","transport_outcome","duration_ms",
+Row classify(const Value& v,const Bytes& request,bool claimed=true){
+    if(claimed)json::fields(v,{"request_hex","response_hex","transport_outcome","duration_ms",
         "transmission_attempted","status","detail","evidence"});
+    else json::fields(v,{"request_hex","response_hex","transport_outcome","duration_ms","transmission_attempted"});
     Row r{};
     r.request=hex_bytes(v.at("request_hex"),3);require(r.request==request,"Unexpected historical freeze request order");
     r.outcome=v.at("transport_outcome").string();
@@ -166,13 +167,14 @@ class Replay{
     Array steps_,frames_;
     std::string stop_;
     std::uint64_t elapsed_{};
+    bool claimed_{};
     std::optional<Row> read(Bytes q){
         if(!stop_.empty())return {};
         require(steps_.size()<saved_.size(),"Missing historical freeze exchange");
         const auto& original=saved_[steps_.size()];
-        auto r=classify(original,q);
+        auto r=classify(original,q,claimed_);
         auto rebuilt=r.value();
-        require(equal(original,rebuilt),"Historical freeze step claim differs from raw evidence");
+        require(!claimed_||equal(original,rebuilt),"Historical freeze step claim differs from raw evidence");
         elapsed_+=r.duration;steps_.push_back(std::move(rebuilt));
         if(r.outcome=="BUDGET"||r.outcome=="LATE_RESPONSE")stop_="BUDGET_EXHAUSTED";
         else if(r.outcome=="TRANSPORT_ERROR"||r.outcome=="CANCELLED"||r.outcome=="CONTEXT_CHANGED")stop_=r.outcome;
@@ -236,7 +238,7 @@ class Replay{
         return result();
     }
 public:
-    Replay(const legacy::FreezePlan& p,const Array& saved):plan_(p),saved_(saved){}
+    Replay(const legacy::FreezePlan& p,const Array& saved,bool claimed=true):plan_(p),saved_(saved),claimed_(claimed){}
     Value run(unsigned duration,const Value& plan_json){
         Value initial,final;
         if(const auto r=accepted({9,2}))initial=r->at("vin");
@@ -284,6 +286,13 @@ HistoricalFreeze replay_historical_freeze(const Value& root,std::optional<std::s
     require(equal(root,replayed),"Historical freeze report differs from application replay");
     const bool completed=replayed.at("completed").boolean(),stable=replayed.at("all_frames_stable").boolean();
     return {std::move(p),std::move(replayed),completed,stable};
+}
+HistoricalFreeze rebuild_historical_freeze(const Value& plan_value,const Value::Array& observations,unsigned duration){
+    auto p=plan(plan_value);
+    require(!observations.empty()&&observations.size()<=8*(8+2+247)+2&&duration<=3600000,"Historical freeze reconstruction limits");
+    auto replayed=Replay(p,observations,false).run(duration,plan_value);
+    const bool complete=replayed.at("completed").boolean(),stable=replayed.at("all_frames_stable").boolean();
+    return {std::move(p),std::move(replayed),complete,stable};
 }
 std::string encode_historical_json(const Value& v){
     std::ostringstream o;o.imbue(std::locale::classic());encode(o,v);return o.str();

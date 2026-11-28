@@ -17,6 +17,7 @@
 #include "j1979_cu45_session.hpp"
 #include "j1979_cj1.hpp"
 #include "j1979_cj1_history.hpp"
+#include "j1979_cf1_history.hpp"
 #include "j1979_cu1.hpp"
 #include "j1979_discovery.hpp"
 #include "j1979_legacy_scan.hpp"
@@ -1127,6 +1128,35 @@ static int capture_cu1(int argc,char** argv) {
         const int close_status=close(output.fd);output.fd=-1;
         if(close_status)return error("CU/1 report close failed");
         return evidence.integrity_verified&&evidence.end==1&&evidence.vin==options.vin?0:2;
+    }catch(const std::exception& e){return error(e.what());}
+}
+static int verify_historical_cf1_cli(int argc,char** argv){
+    const char* capture=nullptr;const char* report=nullptr;const char* output=nullptr;
+    std::optional<std::string> vin;
+    for(int i=2;i<argc;){
+        const std::string_view key(argv[i++]);
+        if(i>=argc||std::string_view(argv[i]).starts_with("--"))return error("Missing verify-native-freeze option value");
+        const char* value=argv[i++];
+        if(key=="--capture"&&!capture)capture=value;
+        else if(key=="--report"&&!report)report=value;
+        else if(key=="--output"&&!output)output=value;
+        else if(key=="--vin"&&!vin)vin=value;
+        else return error("Unexpected or duplicate verify-native-freeze option");
+    }
+    if(!capture||!report||!output)return error("verify-native-freeze requires capture, report and output");
+    try{
+        input raw{},stored{},again{},stored_again{};
+        constexpr std::size_t max_report=64u*1024u*1024u;
+        if(!load_regular(capture,CF1_MAX_BYTES,&raw)||!load_regular(report,max_report,&stored)||!separate(&raw,&stored))
+            return error("Distinct bounded CF/1 and report inputs required");
+        const auto saved=cd::json::parse_report({reinterpret_cast<const char*>(stored.bytes.get()),stored.length},max_report);
+        const auto checked=cd::cfhistory::verify({raw.bytes.get(),raw.length},saved,raw.digest,stored.digest,vin);
+        const auto proof=cd::network::history::encode_historical_json(checked.proof)+"\n";
+        if(!load_regular(capture,CF1_MAX_BYTES,&again)||!same_input(&raw,&again)||
+            !load_regular(report,max_report,&stored_again)||!same_input(&stored,&stored_again))
+            return error("CF/1 input changed during historical verification");
+        if(!atomic_create(output,proof.data(),proof.size()))return error("Historical CF/1 proof destination unavailable");
+        return checked.verified?0:2;
     }catch(const std::exception& e){return error(e.what());}
 }
 static int verify_historical_cj1_cli(int argc,char** argv){
@@ -2857,6 +2887,7 @@ static void usage(FILE *stream) {
         "  camarodiag-native --inspect-j1979-native-live TX RX VIN REPORT.json PROOF.json\n"
         "  camarodiag-native --inspect-j1979-native-can-plan TX RX VIN REPORT.json PROOF.json\n"
         "  camarodiag-native compare-live --report A.json --report B.json [--vin VIN] --output PROOF.json\n"
+        "  camarodiag-native verify-native-freeze --capture CAPTURE.cf --report REPORT.json [--vin VIN] --output PROOF.json\n"
         "  camarodiag-native verify-j1979-capture --capture CAPTURE.cj1 --report REPORT.json [--vin VIN] --output PROOF.json\n"
         "  camarodiag-native verify-live --report REPORT.json [--vin VIN] --output PROOF.json\n"
         "  camarodiag-native verify-freeze --report REPORT.json [--vin VIN] --output PROOF.json\n"
@@ -3110,6 +3141,7 @@ int main(int argc, char **argv) {
     if (argc>=3 && !strcmp(argv[1],"--j1979-legacy-discover"))return legacy_discovery_cli(argc,argv);
     if (argc==6 && !strcmp(argv[1],"--inspect-j1979-legacy-discovery"))return replay_legacy_discovery(argv[2],argv[3],argv[4],argv[5]);
     if (argc>=3 && !strcmp(argv[1],"--j1979-usb"))return capture_cu1(argc,argv);
+    if(argc>=2&&!strcmp(argv[1],"verify-native-freeze"))return verify_historical_cf1_cli(argc,argv);
     if(argc>=2&&!strcmp(argv[1],"verify-j1979-capture"))return verify_historical_cj1_cli(argc,argv);
     if (argc==6 && !strcmp(argv[1],"--verify-j1979-campaign"))return verify_cj1_cli(argv[2],argv[3],argv[4],argv[5]);
     if (argc==5 && !strcmp(argv[1],"--inspect-j1979-campaign"))
