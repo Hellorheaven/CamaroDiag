@@ -8,9 +8,26 @@ namespace cd::legacy::history {
 namespace {
 using json::Value;
 void require(bool b,const char* reason){if(!b)throw std::invalid_argument(reason);}
+const Value* property(const Value& v,std::string_view key){
+    std::string camel;camel.reserve(key.size());bool upper=false;
+    for(char c:key){
+        if(c=='_'){upper=true;continue;}
+        if(upper&&c>='a'&&c<='z')c=static_cast<char>(c-'a'+'A');
+        camel+=c;upper=false;
+    }
+    const auto* snake=v.find(key);
+    const auto* alternate=camel==key?nullptr:v.find(camel);
+    require(!snake||!alternate,"Ambiguous snake_case/camelCase property");
+    return snake?snake:alternate;
+}
 const Value& optional(const Value& v,std::string_view k){
     static const Value null{};
-    const auto* p=v.find(k);return p?*p:null;
+    const auto* p=property(v,k);return p?*p:null;
+}
+const Value& required(const Value& v,std::string_view k){
+    const auto* p=property(v,k);
+    require(p!=nullptr,"Required discovery property missing");
+    return *p;
 }
 std::optional<std::string> nullable(const Value& v){
     if(v.null())return {};
@@ -20,7 +37,7 @@ std::optional<std::string> nullable(const Value& v){
 void no_claims(const Value& v){
     for(const auto k:{"physical_vehicle_verified","whole_vehicle_coverage_verified",
         "evidence_authenticated","permits_programming","automatic_selection_permitted"}){
-        const auto* p=v.find(k);
+        const auto* p=property(v,k);
         require(!p||(!p->null()&&!p->boolean()),"Unsupported discovery claim");
     }
 }
@@ -104,8 +121,8 @@ std::vector<Responder> project(const std::vector<Frame>& frames,bool elm){
     return out;
 }
 void compare_frame(const Value& v,const Frame& f){
-    require(v.at("source").string()==address(f.source)&&
-        v.at("raw_hex").string()==hex(f.raw)&&v.at("payload_hex").string()==hex(f.payload),
+    require(required(v,"source").string()==address(f.source)&&
+        required(v,"raw_hex").string()==hex(f.raw)&&required(v,"payload_hex").string()==hex(f.payload),
         "Saved frame differs from original bytes");
 }
 void compare_frames(const Value& v,const std::vector<Frame>& f){
@@ -118,10 +135,10 @@ void compare_android(const Value& body,const std::vector<Responder>& expected){
     require(a.size()==expected.size(),"Android responder count differs");
     for(std::size_t i=0;i<a.size();++i){
         const auto& r=expected[i];const auto& v=a[i];
-        require(v.at("source").string()==address(r.source)&&v.at("status").string()==r.status,
+        require(required(v,"source").string()==address(r.source)&&v.at("status").string()==r.status,
             "Android responder differs");
-        expect_null_or_string(v.at("supported_pid_bitmap"),r.bitmap?std::optional<std::string>(hex(*r.bitmap)):std::nullopt);
-        const auto& raw=bounded(v.at("raw_frames"),128);
+        expect_null_or_string(required(v,"supported_pid_bitmap"),r.bitmap?std::optional<std::string>(hex(*r.bitmap)):std::nullopt);
+        const auto& raw=bounded(required(v,"raw_frames"),128);
         require(raw.size()==r.observations.size(),"Android frame count differs");
         for(std::size_t j=0;j<raw.size();++j)require(raw[j].string()==hex(r.observations[j].raw),"Android frame differs");
     }
@@ -131,7 +148,7 @@ void compare_elm(const Value& body,const std::vector<Responder>& expected){
     require(a.size()==expected.size(),"ELM responder count differs");
     for(std::size_t i=0;i<a.size();++i){
         const auto& r=expected[i];const auto& v=a[i];
-        require(v.at("source").string()==address(r.source)&&v.at("status").string()==r.status,
+        require(required(v,"source").string()==address(r.source)&&v.at("status").string()==r.status,
             "ELM responder differs");
         const auto& p=optional(v,"supported_pids");
         const auto& n=optional(v,"has_next_page");
@@ -146,9 +163,9 @@ void compare_elm(const Value& body,const std::vector<Responder>& expected){
     }
 }
 Frame driver_frame(const Value& v,Protocol p,unsigned id){
-    auto raw=bytes(v.at("raw_hex"),11);
-    auto payload=bytes(v.at("payload_hex"),7);
-    require(raw.size()>=4&&raw[2]==id&&source(v.at("source"))==id,"Driver source differs");
+    auto raw=bytes(required(v,"raw_hex"),11);
+    auto payload=bytes(required(v,"payload_hex"),7);
+    require(raw.size()>=4&&raw[2]==id&&source(required(v,"source"))==id,"Driver source differs");
     std::size_t offset=3;
     if(p==Protocol::kwp_slow||p==Protocol::kwp_fast){
         require((raw[0]&0xc0)==0x80&&raw[1]==0xf1,"Invalid driver KWP address");
@@ -158,8 +175,9 @@ Frame driver_frame(const Value& v,Protocol p,unsigned id){
     }else require(raw[0]==(p==Protocol::pwm?0x41:0x48)&&raw[1]==0x6b,"Invalid driver header");
     require(std::equal(raw.begin()+static_cast<std::ptrdiff_t>(offset),raw.end(),payload.begin(),payload.end()),
         "Driver payload differs from raw bytes");
-    require(v.at("timestamp").unsigned_integer()<=0xffffffffu,"Invalid driver timestamp");
-    if(!v.at("in_frame_response_hex").null())(void)bytes(v.at("in_frame_response_hex"),12);
+    require(required(v,"timestamp").unsigned_integer()<=0xffffffffu,"Invalid driver timestamp");
+    const auto& ifr=optional(v,"in_frame_response_hex");
+    if(!ifr.null()&&!ifr.string().empty())(void)bytes(ifr,12);
     return {id,std::move(raw),std::move(payload)};
 }
 std::optional<Protocol> historical_probe(std::string raw){
@@ -168,10 +186,10 @@ std::optional<Protocol> historical_probe(std::string raw){
     return fixed_protocol(raw);
 }
 DiscoveryInspection android(const Value& body){
-    DiscoveryInspection r;r.platform="ANDROID";r.protocol=protocol_number(body.at("selected_protocol"));
-    const auto probe=historical_probe(string(body.at("raw_protocol_response"),4096));
-    require(observed(body.at("observed_protocol"))==probe,"Android protocol probe differs");
-    const auto& raw=string(body.at("raw_response"),32768);
+    DiscoveryInspection r;r.platform="ANDROID";r.protocol=protocol_number(required(body,"selected_protocol"));
+    const auto probe=historical_probe(string(required(body,"raw_protocol_response"),4096));
+    require(observed(required(body,"observed_protocol"))==probe,"Android protocol probe differs");
+    const auto& raw=string(required(body,"raw_response"),32768);
     r.error=nullable(optional(body,"error"));
     std::vector<Frame> parsed;
     if(probe!=r.protocol)require(r.error=="PROTOCOL_UNVERIFIED","Unreflected protocol mismatch");
@@ -184,20 +202,20 @@ DiscoveryInspection android(const Value& body){
     r.responders=project(parsed,false);compare_android(body,r.responders);
     r.completed=!r.error;r.probe_verified=probe==r.protocol;r.checksum_verified=!parsed.empty();
     if(r.completed)r.eligible=eligible(r.responders);
-    expect_sources(body.at("verified_sources"),r.eligible);return r;
+    expect_sources(required(body,"verified_sources"),r.eligible);return r;
 }
 DiscoveryInspection driver(const Value& root,const Value& body){
     DiscoveryInspection r;r.platform="J2534";r.protocol=variant(root.at("variant"));
-    require(root.at("selected_response_source").null(),"Discovery pins a source");
+    require(optional(root,"selected_response_source").null(),"Discovery pins a source");
     require(root.at("baud").unsigned_integer()==(r.protocol==Protocol::pwm?41600u:10400u),"Driver baud differs");
     const bool kwp=r.protocol==Protocol::kwp_slow||r.protocol==Protocol::kwp_fast;
     const Data tx{static_cast<std::uint8_t>(kwp?0xc2:r.protocol==Protocol::pwm?0x61:0x68),
         static_cast<std::uint8_t>(kwp?0x33:0x6a),0xf1,1,0};
-    require(body.at("request_hex").string()=="0100"&&bytes(body.at("tx_hex"),10)==tx,"Driver discovery request differs");
+    require(required(body,"request_hex").string()=="0100"&&bytes(required(body,"tx_hex"),10)==tx,"Driver discovery request differs");
     const auto& groups=bounded(body.at("sources"),254);
     std::vector<Frame> all;
     for(const auto& group:groups){
-        const auto id=source(group.at("response_source"));
+        const auto id=source(required(group,"response_source"));
         const auto& a=bounded(group.at("records"),128);
         for(const auto& v:a)all.push_back(driver_frame(v,r.protocol,id));
     }
@@ -205,12 +223,12 @@ DiscoveryInspection driver(const Value& root,const Value& body){
     require(groups.size()==r.responders.size(),"Driver responder count differs");
     for(std::size_t i=0;i<groups.size();++i){
         const auto& v=groups[i];const auto& row=r.responders[i];
-        require(v.at("response_source").string()==address(row.source)&&v.at("status").string()==row.status,
+        require(required(v,"response_source").string()==address(row.source)&&v.at("status").string()==row.status,
             "Driver responder differs");
         require(v.at("detail").string()==(row.bitmap?hex(*row.bitmap):row.detail),"Driver status detail differs");
     }
     r.eligible=eligible(r.responders);
-    require(body.at("has_verified_source").boolean()==!r.eligible.empty(),"Driver eligibility differs");
+    require(required(body,"has_verified_source").boolean()==!r.eligible.empty(),"Driver eligibility differs");
     r.error=nullable(optional(root,"error"));r.completed=!r.error;
     if(!r.completed)r.eligible.clear();
     // The driver did not supply a link checksum or independently observed probe.

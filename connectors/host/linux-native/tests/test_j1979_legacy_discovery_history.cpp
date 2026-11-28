@@ -47,6 +47,35 @@ int main(){
     rejects(replace(driver,"\"has_verified_source\":true","\"has_verified_source\":false"));
     rejects(replace(driver,"\"selected_response_source\":null","\"selected_response_source\":\"10\""));
     rejects(replace(driver,"\"error\":null","\"physical_vehicle_verified\":true,\"error\":null"));
+    auto camel_android=android;
+    for(const auto& [snake,camel]:std::vector<std::pair<std::string,std::string>>{
+        {"selected_protocol","selectedProtocol"},{"observed_protocol","observedProtocol"},
+        {"raw_protocol_response","rawProtocolResponse"},{"raw_response","rawResponse"},
+        {"supported_pid_bitmap","supportedPidBitmap"},{"raw_frames","rawFrames"},{"verified_sources","verifiedSources"}})
+        camel_android=replace(camel_android,snake,camel);
+    assert(history::inspect(cd::json::parse(camel_android)).eligible==a.eligible);
+    rejects(replace(camel_android,"\"selectedProtocol\":3","\"selectedProtocol\":3,\"selected_protocol\":3"));
+    auto camel_driver=driver;
+    for(const auto& [snake,camel]:std::vector<std::pair<std::string,std::string>>{
+        {"selected_response_source","selectedResponseSource"},{"request_hex","requestHex"},{"tx_hex","txHex"},
+        {"has_verified_source","hasVerifiedSource"},{"response_source","responseSource"},
+        {"raw_hex","rawHex"},{"payload_hex","payloadHex"},{"in_frame_response_hex","inFrameResponseHex"}})
+        camel_driver=replace(camel_driver,snake,camel);
+    camel_driver=replace(camel_driver,",\"inFrameResponseHex\":null","");
+    assert(history::inspect(cd::json::parse(camel_driver)).eligible==d.eligible);
+    rejects(replace(camel_driver,"\"rawHex\":","\"raw_hex\":\"486B10410080000001\",\"rawHex\":"));
+    rejects(replace(camel_driver,"\"error\":null","\"physicalVehicleVerified\":true,\"error\":null"));
+    for(unsigned n=1;n<=5;++n){
+        const auto p=static_cast<Protocol>(n);
+        Data pos{static_cast<std::uint8_t>(n>=4?0x86:n==1?0x41:0x48),
+            static_cast<std::uint8_t>(n>=4?0xf1:0x6b),0x10,0x41,0,0x80,0,0,1};
+        pos.push_back(checksum(p,pos));
+        auto variant=replace(replace(elm,"\"expected_protocol\":3","\"expected_protocol\":"+std::to_string(n)),
+            "\"observed_protocol\":3","\"observed_protocol\":"+std::to_string(n));
+        while(variant.find(wire)!=std::string::npos&&wire!=hex(pos))variant=replace(variant,wire,hex(pos));
+        const auto inspected=history::inspect(cd::json::parse(variant));
+        assert(inspected.protocol==p&&inspected.eligible==std::vector<unsigned>{16});
+    }
     auto proof=cd::json::parse(history::report(d,"test-digest"));
     assert(!proof.at("physical_vehicle_verified").boolean()&&!proof.at("automatic_selection_permitted").boolean());
     assert(proof.at("source_sha256").string()=="test-digest");
