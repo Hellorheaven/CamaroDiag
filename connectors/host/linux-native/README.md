@@ -416,7 +416,7 @@ When a historical step includes structured application evidence, the verifier no
 ```sh
 camarodiag-native --inspect-j1979-native-live 7E0 7E8 VIN17 LIVE.json PROOF.json
 ```
-Use the independently known 17-character VIN instead of `VIN17`. The command replays the native Linux CAN live sequence (SocketCAN or ELM application report), checks the support pages, selected PIDs, identity checks, cycle timing, stop state and numeric projections. It compares the regenerated report, writes a new proof with the source SHA-256, never connects to a vehicle, and does not prove adapter authenticity, physical provenance or actual clock behavior. JSON timing contains only exchange timestamps, not every clock callback; exceptional clock regressions and some historical timing ambiguities may be rejected. Historical Python/Android/Windows live formats are a separate migration target.
+Use the independently known 17-character VIN instead of `VIN17`. The command replays the native Linux CAN live sequence (SocketCAN or ELM application report), checks the support pages, selected PIDs, identity checks, cycle timing, stop state and numeric projections. It compares the regenerated report, writes a new proof with the source SHA-256, never connects to a vehicle, and does not prove adapter authenticity, physical provenance or actual clock behavior. JSON timing contains only exchange timestamps, not every clock callback; exceptional clock regressions and some historical timing ambiguities may be rejected. Historical Python/Android/Windows live formats use the separate verify-live command below.
 
 ### Historical selected-source legacy campaigns
 
@@ -432,3 +432,10 @@ camarodiag-native verify-freeze --report CAN-FREEZE.json --vin VIN17 --output PR
 camarodiag-native verify-legacy-freeze --report LEGACY-FREEZE.json --vin VIN17 --output PROOF.json
 ```
 The commands independently reconstruct each requested frame, support page, initial/final trigger, attempted read, stop condition and identity from saved responses. Android ISO-TP and headered ELM transcripts are replayed; J2534 header evidence does not prove driver-managed link checksums. Additional manufacturer-specific frame numbers remain raw except for the defined trigger and support inventory. Both commands require a new output file, recheck the original input and retain its SHA-256. These are offline consistency inspections, not authenticated physical tests.
+
+### Historical live evidence
+
+```sh
+camarodiag-native verify-live --report LIVE.json --vin VIN17 --output PROOF.json
+```
+Replays chronological identity admission, selected PID inventory, configuration and trim layout, sample ordering, scalar and multisignal statistics, and available selected-source transport transcripts. Historical raw-only Android CAN data is reassembled independently; legacy ELM headers and checksums are checked and J2534 driver headers are compared without claiming link checksum verification. No vehicle connection, authenticity claim, programming permission or time alignment is implied.
