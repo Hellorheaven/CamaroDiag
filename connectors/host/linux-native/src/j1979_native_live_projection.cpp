@@ -154,7 +154,7 @@ NativeLiveProjection project_native_live(const json::Value& source,Pair pair,std
     for(const auto& row:rows)if(row.phase=="INVENTORY"||row.phase=="CONTEXT")observations.push_back(row.observation());
     const auto context=identity?cd::j1979::derive_context(observations):cd::j1979::Context{};
     std::map<unsigned,std::map<std::string,unsigned>> statuses;
-    std::map<unsigned,unsigned> attempts,interpreted;
+    std::map<unsigned,unsigned> attempts,interpreted,fully_interpreted;
     using Key=std::tuple<unsigned,std::string,std::string>;
     std::map<Key,Stats> stats;
     Array samples,summary,channels;
@@ -162,12 +162,13 @@ NativeLiveProjection project_native_live(const json::Value& source,Pair pair,std
         if(r.phase!="SAMPLE")continue;
         ++attempts[r.pid];++statuses[r.pid][r.status];
         const auto decoded=engineering(r,context,identity);
-        Array signals;bool any=false;
+        Array signals;bool any=false,all=!decoded.empty();
         for(const auto& c:decoded){
-            signals.push_back(channel(c));any=any||c.value.has_value();
+            signals.push_back(channel(c));any=any||c.value.has_value();all=all&&c.value.has_value();
             auto& stat=stats[{r.pid,c.name,c.unit}];stat.add(c,r.end);
         }
         if(any)++interpreted[r.pid];
+        if(all)++fully_interpreted[r.pid];
         auto fields=r.source->object();
         // Preserve authoritative raw bytes and response status, replace only
         // the non-authoritative display projection in this separate report.
@@ -176,15 +177,22 @@ NativeLiveProjection project_native_live(const json::Value& source,Pair pair,std
         constexpr char digits[]="0123456789ABCDEF";
         std::string pid_hex{digits[r.pid>>4],digits[r.pid&15]};
         fields.emplace("pid_hex",text(pid_hex));fields.emplace("signals",arr(std::move(signals)));
-        fields.emplace("engineering_verified",flag(any));samples.push_back(obj(std::move(fields)));
+        fields.emplace("engineering_verified",flag(any));
+        fields.emplace("all_observed_signals_interpreted",flag(all));samples.push_back(obj(std::move(fields)));
     }
-    bool all_selected=true;
+    bool all_selected=true,all_samples=true;
+    const unsigned requested=small(root.at("requested_cycles"),1000);
     for(const auto& p:root.at("selected_pids").array()){
         const auto pid=small(p,255);Object status;
         for(const auto& [k,n]:statuses[pid])status.emplace(k,integer(n));
         const auto seen=attempts[pid],values=interpreted[pid];
+        const auto full=fully_interpreted[pid];
         all_selected=all_selected&&values!=0;
+        all_samples=all_samples&&seen==requested&&full==requested;
+        require(requested>=seen&&seen>=values&&values>=full,"Invalid numeric sample accounting");
         summary.push_back(obj({{"pid",integer(pid)},{"attempted",integer(seen)},{"engineering_samples",integer(values)},
+            {"requested_samples",integer(requested)},{"unattempted_samples",integer(requested-seen)},
+            {"fully_interpreted_samples",integer(full)},{"partially_interpreted_samples",integer(values-full)},
             {"uninterpreted_or_missing",integer(seen-values)},{"status_counts",obj(std::move(status))}}));
     }
     for(const auto& [key,stat]:stats){
@@ -192,11 +200,12 @@ NativeLiveProjection project_native_live(const json::Value& source,Pair pair,std
         fields.emplace("pid",integer(pid));fields.emplace("name",text(name));fields.emplace("unit",text(unit));
         channels.push_back(obj(std::move(fields)));
     }
-    const bool complete=verified.completed&&identity&&all_selected;
+    const bool complete=verified.completed&&identity&&all_selected&&all_samples;
     auto projection=obj({{"schema",text("camarodiag-j1979-native-live-projection-v1")},
         {"source_transport",text(verified.transport)},{"vin",text(vin)},{"tx_can_id",root.at("tx_can_id")},
         {"rx_can_id",root.at("rx_can_id")},{"source_completed",flag(verified.completed)},{"identity_rechecked",flag(identity)},
         {"numeric_projection_complete",flag(complete)},{"all_selected_pids_interpreted",flag(all_selected)},
+        {"all_requested_samples_interpreted",flag(all_samples)},
         {"source_stop_reason",root.at("stop_reason")},{"completed_cycles",integer(verified.cycles)},
         {"requested_cycles",root.at("requested_cycles")},{"summary",arr(std::move(summary))},
         {"channel_summary",arr(std::move(channels))},{"samples",arr(std::move(samples))},

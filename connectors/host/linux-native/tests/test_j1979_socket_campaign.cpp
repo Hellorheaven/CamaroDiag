@@ -1,5 +1,6 @@
 #include "j1979_socket_campaign.hpp"
 #include "j1979_live_export.hpp"
+#include "j1979_native_live_inspection.hpp"
 #include <filesystem>
 #include <algorithm>
 #include <array>
@@ -152,6 +153,33 @@ int main(){
         assert(unlink(json.c_str())==0&&unlink(csv.c_str())==0);
         assert(symlink(raw.name.c_str(),json.c_str())==0);
         rejects([&]{cd::liveexport::Destination forbidden(json.c_str());});
+        assert(unlink(json.c_str())==0);
+    }
+    for(bool bad_identity:{false,true}){
+        File file,raw;
+        Writer w(file.fd,plan(true));Fake transport{};
+        transport.bad_final=bad_identity;transport.timeout_speed=!bad_identity;
+        const auto result=record(plan(true),link(transport),w);
+        assert(!result.completed);
+        assert(write(raw.fd,result.report.data(),result.report.size())==static_cast<ssize_t>(result.report.size()));
+        finish(w,result);
+        const auto json=raw.name+".json";
+        {
+            cd::liveexport::Destination projection(json.c_str()),none(nullptr);
+            const auto exported=cd::liveexport::publish(raw.fd,raw.name.c_str(),result.report,
+                {0x7e0,0x7e8},vin,projection,none);
+            assert(!exported.complete&&exported.samples==4);
+            const auto root=cd::network::history::project_native_live(cd::json::parse_report(result.report),
+                {0x7e0,0x7e8},vin).report;
+            assert(root.at("identity_rechecked").boolean()==!bad_identity);
+            assert(!root.at("all_requested_samples_interpreted").boolean());
+            for(const auto& summary:root.at("summary").array()){
+                assert(summary.at("requested_samples").unsigned_integer()==2);
+                if(bad_identity)assert(summary.at("engineering_samples").unsigned_integer()==0);
+            }
+            if(bad_identity)for(const auto& sample:root.at("samples").array())
+                assert(sample.at("signals").array().empty());
+        }
         assert(unlink(json.c_str())==0);
     }
     auto p=plan(true);p.pids={12,12};assert(!p.valid());

@@ -1,4 +1,5 @@
 #include "j1979_elm_can_campaign.hpp"
+#include "j1979_native_live_inspection.hpp"
 #include <algorithm>
 #include <cassert>
 #include <deque>
@@ -85,6 +86,15 @@ void variants(){
             assert(at!=changed.events.end());++at->aux;rejects([&]{replay_campaign(changed);});
             changed=captured;changed.trace.rows.pop_back();rejects([&]{replay_campaign(changed);});
             if(live){
+                const auto result=replay_campaign(parsed);
+                const auto projected=cd::network::history::project_native_live(
+                    cd::json::parse_report(result.native_report),{parsed.plan.target.tx,parsed.plan.target.rx},vin);
+                assert(projected.complete&&projected.report.at("samples").array().size()==2);
+                assert(projected.report.at("source_transport").string()=="ELM_SERIAL_CLASSIC_ISOTP");
+                const auto& summary=projected.report.at("channel_summary").array();
+                assert(summary.size()==1&&summary[0].at("minimum").finite_number()==2000);
+                assert(summary[0].at("maximum").finite_number()==2100&&summary[0].at("mean").finite_number()==2050);
+                assert(cd::network::history::native_live_csv(projected).find("engine-rpm")!=std::string::npos);
                 changed=captured;
                 auto wait=std::find_if(changed.events.begin(),changed.events.end(),[](const Event& e){return e.kind==EventKind::wait;});
                 assert(wait!=changed.events.end());++wait->value;rejects([&]{replay_campaign(changed);});
@@ -97,9 +107,15 @@ void incomplete(){
     Fake wrong(6);wrong.live(true,false);
     auto changed=acquire(wrong,plan(6,true),false);
     assert(replay_campaign(changed).stop=="VIN_MISMATCH");
+    const auto wrong_projection=cd::network::history::project_native_live(cd::json::parse_report(replay_campaign(changed).native_report),{0x7e0,0x7e8},vin);
+    assert(!wrong_projection.complete&&!wrong_projection.report.at("identity_rechecked").boolean());
+    for(const auto& sample:wrong_projection.report.at("samples").array())assert(sample.at("signals").array().empty());
     Fake missing(6);missing.live(false,true);
     auto partial=acquire(missing,plan(6,true),false);
     assert(replay_campaign(partial).stop=="INCOMPLETE_SAMPLES");
+    const auto partial_projection=cd::network::history::project_native_live(cd::json::parse_report(replay_campaign(partial).native_report),{0x7e0,0x7e8},vin);
+    assert(!partial_projection.complete&&partial_projection.report.at("identity_rechecked").boolean());
+    assert(partial_projection.report.at("summary").array()[0].at("engineering_samples").unsigned_integer()==1);
     auto invalid=plan(6,true);invalid.pids={12,12};assert(!invalid.valid());
     invalid=plan(6,false);invalid.cycles=1;assert(!invalid.valid());
 }

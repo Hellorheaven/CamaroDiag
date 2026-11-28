@@ -63,7 +63,19 @@ Index index(const NativeLiveProjection& r){
     require(r.complete==body.at("numeric_projection_complete").boolean(),"Projection completion differs");
     const auto& pids=body.at("summary").array();
     require(!pids.empty()&&pids.size()<=32,"Native projection PID limit");
-    for(const auto& row:pids)require(out.pids.emplace(pid(row),&row).second,"Duplicate native PID summary");
+    for(const auto& row:pids){
+        require(out.pids.emplace(pid(row),&row).second,"Duplicate native PID summary");
+        const auto wanted=row.at("requested_samples").unsigned_integer();
+        const auto tried=row.at("attempted").unsigned_integer();
+        const auto usable=row.at("engineering_samples").unsigned_integer();
+        const auto full=row.at("fully_interpreted_samples").unsigned_integer();
+        require(wanted>=tried&&tried>=usable&&usable>=full&&
+            row.at("unattempted_samples").unsigned_integer()==wanted-tried&&
+            row.at("partially_interpreted_samples").unsigned_integer()==usable-full&&
+            row.at("uninterpreted_or_missing").unsigned_integer()==tried-usable,
+            "Invalid native projection coverage");
+        if(out.complete)require(wanted==full,"Complete projection has missing numeric samples");
+    }
     const auto& channels=body.at("channel_summary").array();
     require(channels.size()<=320,"Native projection channel limit");
     for(const auto& row:channels){
