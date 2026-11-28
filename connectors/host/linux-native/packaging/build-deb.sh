@@ -1,10 +1,11 @@
 #!/bin/sh
 # Debian/Ubuntu/Raspberry Pi OS packaging glue; no Python at build or runtime.
-# This packages only native C SAE J1979 tools; does not imply ECU qualification.
+# Native C++20 SAE J1979 tools; optional Qt desktop; no ECU qualification implied.
 set -eu
 
 cd "$(dirname "$0")/.."
 binary=$1
+desktop=${2-}
 if [ ! -f "$binary" ]; then
     echo "Native binary missing. Build with make before packaging." >&2
     exit 2
@@ -20,16 +21,26 @@ command -v dpkg-shlibdeps >/dev/null 2>&1 || {
 arch=$(dpkg --print-architecture)
 version=0.1.0
 name=camarodiag-native-j1979
+if [ -n "$desktop" ]; then
+    test -f "$desktop" || { echo "Native desktop missing." >&2; exit 2; }
+    name=camarodiag-native-j1979-desktop
+fi
 root=$(mktemp -d)
 trap 'rm -rf "$root"' EXIT HUP INT TERM
 mkdir -p "$root/DEBIAN" "$root/usr/bin" "$root/usr/share/doc/$name"
 install -m 0755 "$binary" "$root/usr/bin/camarodiag-native"
 install -m 0644 README.md "$root/usr/share/doc/$name/README.md"
+if [ -n "$desktop" ]; then
+    install -m 0755 "$desktop" "$root/usr/bin/camarodiag-j1979-desktop"
+    mkdir -p "$root/usr/share/applications"
+    install -m 0644 packaging/camarodiag-j1979.desktop "$root/usr/share/applications/"
+fi
 
 # dpkg-shlibdeps derives ABI/SSL dependencies for the actual binary, so
 # Debian 12, 13, Ubuntu and ARM family variants are not hardcoded.
-deps=$(dpkg-shlibdeps -O -e"$root/usr/bin/camarodiag-native" |
-    sed -n 's/^shlibs:Depends=//p')
+set -- -O -e"$root/usr/bin/camarodiag-native"
+if [ -n "$desktop" ]; then set -- "$@" -e"$root/usr/bin/camarodiag-j1979-desktop"; fi
+deps=$(dpkg-shlibdeps "$@" | sed -n 's/^shlibs:Depends=//p')
 if [ -z "$deps" ]; then
     echo "Could not resolve native shared-library dependencies." >&2
     exit 2
@@ -43,8 +54,8 @@ Priority: optional
 Architecture: $arch
 Maintainer: CamaroDiag project
 Depends: $deps
-Description: Native C SAE J1979 CF/1 connector inspection tools
- Native Linux diagnostics, explicitly scoped to SAE J1979 Mode 02.
+Description: Native C++20 SAE J1979 connector and evidence inspection tools
+ Native Linux diagnostics, explicitly scoped to SAE J1979.
  Hardware communication requires qualified connector and operator approval.
  This package does not install Python, pyserial or a background daemon.
 EOF
@@ -56,4 +67,4 @@ if [ -e "$output" ]; then
     exit 2
 fi
 dpkg-deb --build --root-owner-group "$root" "$output"
-echo "Staged native C package: $output (not a published Release)"
+echo "Staged native C++20 package: $output (not a published Release)"

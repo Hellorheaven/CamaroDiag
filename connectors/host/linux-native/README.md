@@ -480,3 +480,14 @@ camarodiag-native --j1979-can-network --interface can0 --rx 7E8 --rx 7E9 --vin V
 camarodiag-native verify-network-journals --report network.json --journal-directory NEW_DIR --interface can0 --vin VIN17 --output network-proof.json
 ```
 The directory must not exist. Functional discovery is saved before physical scans; each attempted selected ECU receives a private SCJ journal. The verifier rejects unrelated entries, foreign scope, swapped journals, missing successful reports and invalid terminal states. Header-only or torn journals retain their interrupted status; the command never connects to an ECU. A completed proof requires all selected ECU journals to bind to the report. This does not independently authenticate the original vehicle, adapter or discovery transmission.
+
+### Interface graphique native J1979 (Qt 6)
+
+Installer les dépendances de développement C++20, OpenSSL et Qt 6 Widgets (`qt6-base-dev`, `pkg-config`).
+
+```sh
+make all gui
+./camarodiag-j1979-desktop
+make deb-gui
+```
+L’interface utilise le binaire `camarodiag-native` voisin, sans shell ni élévation de privilèges. Elle fournit les formulaires des acquisitions CAN, ELM, legacy, USB et des vérifications hors ligne, un aperçu de commande, un journal d’exécution borné et un lecteur de rapports JSON/CSV. La confirmation explicite est transmise uniquement après la demande du moteur via un pseudo-terminal local ; pas de réessai automatique. Les opérations mutatrices restent dans la CLI distincte. Le paquet desktop inclut le binaire CLI, sans Python ; les dépendances Qt sont résolues par `dpkg-shlibdeps`. Ne pas installer simultanément le paquet CLI et le paquet desktop (ils fournissent le même exécutable). Qualification ARM/x64 et tests à exécuter au gate de clôture.

@@ -1,7 +1,6 @@
 #include "j1979_desktop_commands.hpp"
 #include "j1979_can.h"
 #include "j1979_isotp.h"
-#include "j1979_legacy.hpp"
 #include <algorithm>
 #include <charconv>
 #include <filesystem>
@@ -134,7 +133,7 @@ Invocation prepare(const Operation& supplied,const Values& values){
             if(field.key=="port")require(value.starts_with("/dev/"),"Port série local /dev requis");
         }else if(field.kind==K::can_id){
             ids[field.key]=parse(value,16,0,0x1fffffff,"Identifiant CAN invalide");
-            if(field.key=="source")require(value.size()==2&&cd::legacy::valid_source(ids.at(field.key)),"Source legacy invalide");
+            if(field.key=="source")require(value.size()==2&&ids.at(field.key)>0&&ids.at(field.key)<255&&ids.at(field.key)!=0xf1,"Source legacy invalide");
         }else if(field.kind==K::decimal||field.kind==K::protocol||field.kind==K::profile){
             const auto n=parse(value,10,field.kind==K::protocol?1:field.kind==K::profile?6:field.minimum,
                 field.kind==K::protocol?5:field.kind==K::profile?9:field.maximum,"Valeur numérique hors limites");

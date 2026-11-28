@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=CamaroDiag J1979
+Comment=Native SAE J1979 diagnostics and local evidence inspection
+Exec=camarodiag-j1979-desktop
+Terminal=false
+Categories=Utility;
+StartupNotify=true

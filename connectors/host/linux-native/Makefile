@@ -12,7 +12,7 @@ CXX_SOURCES = src/j1979_network_journal_history.cpp src/j1979_network_journal_re
 CXX_OBJECTS = $(patsubst src/%.cpp,build/%.o,$(CXX_SOURCES))
 DECODER_OBJECTS = build/j1979_projection.o build/j1979_status.o build/j1979_multi.o build/j1979_context.o build/j1979_monitor_scaling.o build/j1979_vehicle_info.o build/j1979_measurement.o
 
-.PHONY: all clean test install deb
+.PHONY: all clean test install deb gui install-gui deb-gui
 all: $(TARGET)
 
 build:
@@ -191,10 +191,10 @@ test-j1979-can: build/test_j1979_can.o build/j1979_can.o $(DECODER_OBJECTS) buil
 test-j1979-isotp: build/test_j1979_isotp.o build/j1979_isotp.o build/j1979_can.o $(DECODER_OBJECTS) build/j1979_policy.o
 	$(CXX) $(LDFLAGS) $^ -o $@
 
-test-j1979-desktop-process: build/test_j1979_desktop_process.o build/j1979_desktop_process.o build/j1979_desktop_commands.o build/j1979_can.o build/j1979_isotp.o build/j1979_legacy.o build/j1979_policy.o $(DECODER_OBJECTS)
+test-j1979-desktop-process: build/test_j1979_desktop_process.o build/j1979_desktop_process.o build/j1979_desktop_commands.o build/j1979_can.o build/j1979_isotp.o build/j1979_policy.o $(DECODER_OBJECTS)
 	$(CXX) $(LDFLAGS) $^ $(LDLIBS) -lutil -pthread -o $@
 
-test-j1979-desktop-commands: build/test_j1979_desktop_commands.o build/j1979_desktop_commands.o build/j1979_can.o build/j1979_isotp.o build/j1979_legacy.o build/j1979_policy.o $(DECODER_OBJECTS)
+test-j1979-desktop-commands: build/test_j1979_desktop_commands.o build/j1979_desktop_commands.o build/j1979_can.o build/j1979_isotp.o build/j1979_policy.o $(DECODER_OBJECTS)
 	$(CXX) $(LDFLAGS) $^ $(LDLIBS) -o $@
 
 test-j1979-network-journal: build/test_j1979_network_journal.o build/j1979_network_journal.o build/j1979_network_journal_history.o build/j1979_network_journal_read.o build/j1979_socket_campaign.o build/j1979_socket_campaign_wire.o build/j1979_socket_campaign_storage.o build/j1979_network_history.o build/j1979_can_network.o build/j1979_can_network_report.o build/j1979_historical_can_plan.o build/j1979_historical_can_summary.o build/j1979_historical_can_derived.o build/j1979_native_can_inspection.o build/j1979_isotp.o build/j1979_can.o build/j1979_live.o build/native_json.o build/j1979_policy.o $(DECODER_OBJECTS)
@@ -211,7 +211,7 @@ test-j1979-cl1: build/test_j1979_cl1.o build/cl1.o build/cf1.o
 
 clean:
 	rm -rf build
-	rm -f $(TARGET) test-j1979-desktop-process test-j1979-desktop-commands test-j1979-network-journal test-j1979-socket-campaign test-j1979-legacy-mutation-history test-j1979-historical-live test-j1979-historical-freeze test-j1979-legacy-scan-history test-j1979-native-can-inspection test-j1979-historical-can-network test-j1979-historical-can-plan test-native-json-report test-j1979-network-history test-j1979-legacy-discovery-history test-j1979-can-history test-j1979-elm-campaign test-j1979-elm-journal test-j1979-legacy-decoding test-j1979-legacy-journal test-j1979-host-freeze test-j1979-elm-can test-j1979-host-maintenance test-j1979-catalogue test-j1979-can-network test-j1979-legacy-mutation test-j1979-legacy-live test-j1979-legacy-freeze test-j1979-legacy-scan test-j1979-legacy test-j1979-projection test-cu1 test-j1979-cj1 test-j1979-cm1 test-j1979-context test-j1979-measurement test-j1979-monitor test-j1979-vehicle-info test-j1979-native-c test-cf1 test-cu2 test-cu3 test-j1979-can test-j1979-isotp test-j1979-live test-j1979-cl1
+	rm -f $(TARGET) camarodiag-j1979-desktop test-j1979-desktop-process test-j1979-desktop-commands test-j1979-network-journal test-j1979-socket-campaign test-j1979-legacy-mutation-history test-j1979-historical-live test-j1979-historical-freeze test-j1979-legacy-scan-history test-j1979-native-can-inspection test-j1979-historical-can-network test-j1979-historical-can-plan test-native-json-report test-j1979-network-history test-j1979-legacy-discovery-history test-j1979-can-history test-j1979-elm-campaign test-j1979-elm-journal test-j1979-legacy-decoding test-j1979-legacy-journal test-j1979-host-freeze test-j1979-elm-can test-j1979-host-maintenance test-j1979-catalogue test-j1979-can-network test-j1979-legacy-mutation test-j1979-legacy-live test-j1979-legacy-freeze test-j1979-legacy-scan test-j1979-legacy test-j1979-projection test-cu1 test-j1979-cj1 test-j1979-cm1 test-j1979-context test-j1979-measurement test-j1979-monitor test-j1979-vehicle-info test-j1979-native-c test-cf1 test-cu2 test-cu3 test-j1979-can test-j1979-isotp test-j1979-live test-j1979-cl1
 
 PREFIX ?= /usr/local
 DESTDIR ?=
@@ -222,3 +222,24 @@ install: $(TARGET)
 
 deb: $(TARGET)
 	sh packaging/build-deb.sh "$(TARGET)"
+
+# Optional native Qt 6 Widgets front end. Core CLI remains headless.
+QT_CFLAGS = $(shell pkg-config --cflags Qt6Widgets)
+QT_LIBS = $(shell pkg-config --libs Qt6Widgets)
+DESKTOP_OBJECTS = build/j1979_desktop_commands.o build/j1979_desktop_process.o build/j1979_desktop_ui.o build/j1979_can.o build/j1979_isotp.o build/j1979_policy.o $(DECODER_OBJECTS)
+
+build/j1979_desktop_ui.o: src/j1979_desktop_ui.cpp | build
+	$(CXX) $(CPPFLAGS) $(INCLUDES) $(CXXFLAGS) $(CXXSTRICT) $(QT_CFLAGS) -fPIC -c $< -o $@
+
+camarodiag-j1979-desktop: $(DESKTOP_OBJECTS)
+	$(CXX) $(LDFLAGS) $^ $(LDLIBS) $(QT_LIBS) -lutil -o $@
+
+gui: camarodiag-j1979-desktop
+
+install-gui: install gui
+	install -m 0755 camarodiag-j1979-desktop "$(DESTDIR)$(PREFIX)/bin/camarodiag-j1979-desktop"
+	install -d "$(DESTDIR)$(PREFIX)/share/applications"
+	install -m 0644 packaging/camarodiag-j1979.desktop "$(DESTDIR)$(PREFIX)/share/applications/camarodiag-j1979.desktop"
+
+deb-gui: $(TARGET) gui
+	sh packaging/build-deb.sh "$(TARGET)" camarodiag-j1979-desktop
