@@ -417,3 +417,10 @@ When a historical step includes structured application evidence, the verifier no
 camarodiag-native --inspect-j1979-native-live 7E0 7E8 VIN17 LIVE.json PROOF.json
 ```
 Use the independently known 17-character VIN instead of `VIN17`. The command replays the native Linux CAN live sequence (SocketCAN or ELM application report), checks the support pages, selected PIDs, identity checks, cycle timing, stop state and numeric projections. It compares the regenerated report, writes a new proof with the source SHA-256, never connects to a vehicle, and does not prove adapter authenticity, physical provenance or actual clock behavior. JSON timing contains only exchange timestamps, not every clock callback; exceptional clock regressions and some historical timing ambiguities may be rejected. Historical Python/Android/Windows live formats are a separate migration target.
+
+### Historical selected-source legacy campaigns
+
+```sh
+camarodiag-native verify-legacy --report ARCHIVE.json --vin VIN17 --output PROOF.json
+``
+The original report is read-only and the output must be new. Historical J1850 PWM/VPW, ISO 9141 and KWP slow/fast ELM, Android and J2534 source reports are inspected from application requests, raw frames, selected-source payloads and advertised inventory. Optional numeric, readiness, monitor and scaling claims are recomputed where supported. J2534 driver frames cannot establish the omitted link checksum. Historical completion is not native current identity recheck, hardware qualification or permission to transmit. Some historical schemas and extensions still require parity review before retiring Python.
