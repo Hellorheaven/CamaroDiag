@@ -1,5 +1,9 @@
 #include "j1979_legacy_scan.hpp"
 #include "j1979_legacy_monitor.hpp"
+#include "j1979_legacy_info.hpp"
+#include <map>
+#include <algorithm>
+#include <utility>
 #include "j1979_policy.h"
 #include "j1979_measurement.h"
 #include "j1979_multi.hpp"
@@ -115,6 +119,44 @@ std::string scan_report(const Scan& s){
         o<<",\"measurement\":";measurement(o,step,s.identity_rechecked);
         o<<",\"dtc_codes\":";dtcs(o,step,s.identity_rechecked);
         o<<",\"monitor_records\":";monitors(o,step,s.identity_rechecked);
+        o<<'}';
+    });
+    std::vector<Identification> identities;
+    if(s.identity_rechecked){
+        std::map<unsigned,unsigned> counts;
+        for(const auto& step:s.steps){
+            if(step.request.size()!=2||step.request[0]!=9||step.status!="PASSED"||step.selected.empty())continue;
+            const unsigned kind=step.request[1];
+            if(count_kind(kind)){
+                if(step.selected.size()==1&&step.selected[0].size()==3)counts[kind]=step.selected[0][2];
+                continue;
+            }
+            const auto count=counts.find(matching_count_kind(kind));
+            if(count==counts.end()||std::any_of(identities.begin(),identities.end(),[&](const auto& v){return v.kind==kind;}))continue;
+            if(auto item=decode_identification(kind,count->second,step.selected);item&&item->interpreted)
+                identities.push_back(std::move(*item));
+        }
+    }
+    o<<",\"identification\":";
+    array(o,identities,[&](const Identification& i){
+        o<<"{\"info_type\":"<<i.kind<<",\"source\":";quote(o,source_hex(s.source));
+        o<<",\"values\":";array(o,i.values,[&](const auto& value){quote(o,value);});
+        o<<",\"raw_data_hex\":";quote(o,hex(i.encoded));
+        o<<",\"counters\":";
+        if(i.counters){
+            const auto& c=*i.counters;
+            o<<"{\"general_denominator\":"<<c.general_denominator<<",\"ignition_cycles\":"<<c.ignition_cycles
+                <<",\"counter_count\":"<<c.counter_count<<",\"monitors\":[";
+            for(unsigned n=0;n<c.monitor_count;++n){
+                if(n)o<<',';
+                const auto& monitor=c.monitors[n];
+                o<<"{\"monitor\":";quote(o,monitor.name);
+                o<<",\"numerator\":"<<monitor.numerator<<",\"denominator\":"<<monitor.denominator<<",\"ratio\":";
+                if(monitor.ratio_valid)o<<monitor.ratio;else o<<"null";
+                o<<'}';
+            }
+            o<<"],\"regulatory_verdict\":null}";
+        }else o<<"null";
         o<<'}';
     });
     std::vector<cd::j1979::Observation> rows;

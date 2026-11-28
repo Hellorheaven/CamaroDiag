@@ -1,5 +1,6 @@
 #include "j1979_legacy_scan.hpp"
 #include "j1979_legacy_identity.hpp"
+#include "j1979_legacy_info.hpp"
 #include "j1979_policy.h"
 #include "j1979_projection.hpp"
 #include <algorithm>
@@ -124,7 +125,7 @@ class Campaign {
         std::map<unsigned,unsigned> counts;
         for(auto pid:info.advertised){
             if(pid==1||pid==2)continue;
-            if((pid%2==1&&pid<=9)||pid==12||pid==14){
+            if(count_kind(pid)){
                 auto rows=read({9,static_cast<std::uint8_t>(pid)},[=](const Data& r){
                     return r.size()==3&&r[0]==0x49&&r[1]==pid&&r[2]>0&&r[2]<=128;
                 },true);
@@ -134,10 +135,15 @@ class Campaign {
                     return r.size()==7&&r[0]==0x49&&r[1]==pid&&r[2]>0;
                 },false);
                 if(rows.empty())continue;
-                auto count=counts.find(pid==11?7:pid-1);
-                bool ordered=count!=counts.end()&&rows.size()==count->second;
-                for(std::size_t n=0;n<rows.size();++n)ordered=ordered&&rows[n][2]==n+1;
-                if(!ordered)mark_last("IDENTIFICATION_SEGMENTS_UNVERIFIED");
+                const auto count=counts.find(matching_count_kind(pid));
+                if(count==counts.end()){
+                    mark_last("IDENTIFICATION_COUNT_UNVERIFIED");continue;
+                }
+                const auto decoded=decode_identification(pid,count->second,rows);
+                if(!decoded)mark_last("IDENTIFICATION_SEGMENTS_OR_FORMAT_INVALID");
+                else if(!decoded->interpreted){
+                    result_.steps.back().status="RAW";result_.steps.back().detail="UNINTERPRETED_INFOTYPE";
+                }
             }
         }
     }
