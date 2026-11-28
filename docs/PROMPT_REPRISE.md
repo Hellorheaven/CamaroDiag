@@ -1,3 +1,15 @@
+## Ordre d'exécution obligatoire — décision propriétaire du 28/11/2026 (priorité maximale)
+
+1. Reprendre la PR #117 et son HEAD réel, sans créer une autre branche ou PR.
+2. Terminer intégralement SAE J1979, protocole actuellement actif, y compris les migrations natives strictement indispensables à sa clôture, puis effectuer son unique gate de clôture logicielle. Préparer la recette physique séparément.
+3. **Avant toute migration générale et avant de reprendre les autres protocoles : produire, signer, vérifier et publier l'APK Release v2.0.47 (versionCode 64), comme la v2.0.46.** Le propriétaire autorise expressément cette release. Ne pas fusionner prématurément la PR pour déclencher la publication. Ne pas annoncer la publication sans preuve de l'artefact signé et du SHA réellement validé.
+4. Après publication de la v2.0.47, migrer tout le Python et le C restant dans l'ensemble du programme vers Kotlin (Android), C# (Windows), C++20 (Linux ARM/ARM64/x64), C++ moderne privilégié pour ESP32 et les composants firmware natifs, sans perte de fonctionnalité ni simple renommage. Vérifier la parité avant suppression et traiter aussi les appels et dépendances de livraison. Ne pas remplacer du C++ existant par du C.
+5. Ensuite terminer les autres protocoles et chantiers, et finaliser la PR #117 selon les critères de clôture et règles de fusion applicables.
+
+Cet ordre supplante tout calendrier antérieur contradictoire. Objectif par session : lots complets d'au moins 10 000 lignes utiles et plusieurs dizaines de commits fonctionnels cohérents, sans inflation ni fractionnement artificiel. Ne pas lancer de gate intermédiaire ; ne pas passer à une étape ultérieure tant que sa condition préalable n'est pas satisfaite. Rapporter les résultats effectivement obtenus et les blocages.
+
+Dernier HEAD de développement avant enregistrement de cet ordre : `943dbd33da58afe7250aa3134a1aca149002eb77` (7 commits, 17 fichiers, +869/-38 depuis `f51ddc82c950950d1f2efe48fa710c6dc44ef5a0`). Rejeu CAN historique et natif, CLI verify-network, classification et acquisition live ; compilation non exécutée, parité non attestée.
+
 ## Reprise PR117 — journaux ELM, campagnes et inspection de maintenance historique (28/11/2026)
 
 - Base `5bb8f0be3eee83cdec13fad9a093f6a3eb999d6e`, dernier SHA code `c0ece3575a372c0ab12d83f499b78b1ed47fc033`. Comparaison GitHub avant documentation : **20 commits de développement, 27 fichiers, +1872/-108 lignes**. Objectif 10 000 lignes non atteint. Aucun build ou test lancé.

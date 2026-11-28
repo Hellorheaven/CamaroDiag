@@ -1,5 +1,15 @@
 # Règles durables de développement — CamaroDiag
 
+## Ordre d'exécution obligatoire — décision propriétaire du 28/11/2026 (priorité maximale)
+
+1. Reprendre la PR #117 et son HEAD réel, sans créer une autre branche ou PR.
+2. Terminer intégralement SAE J1979, protocole actuellement actif, y compris les migrations natives strictement indispensables à sa clôture, puis effectuer son unique gate de clôture logicielle. Préparer la recette physique séparément.
+3. **Avant toute migration générale et avant de reprendre les autres protocoles : produire, signer, vérifier et publier l'APK Release v2.0.47 (versionCode 64), comme la v2.0.46.** Le propriétaire autorise expressément cette release. Ne pas fusionner prématurément la PR pour déclencher la publication. Ne pas annoncer la publication sans preuve de l'artefact signé et du SHA réellement validé.
+4. Après publication de la v2.0.47, migrer tout le Python et le C restant dans l'ensemble du programme vers Kotlin (Android), C# (Windows), C++20 (Linux ARM/ARM64/x64), C++ moderne privilégié pour ESP32 et les composants firmware natifs, sans perte de fonctionnalité ni simple renommage. Vérifier la parité avant suppression et traiter aussi les appels et dépendances de livraison. Ne pas remplacer du C++ existant par du C.
+5. Ensuite terminer les autres protocoles et chantiers, et finaliser la PR #117 selon les critères de clôture et règles de fusion applicables.
+
+Cet ordre supplante tout calendrier antérieur contradictoire. Objectif par session : lots complets d'au moins 10 000 lignes utiles et plusieurs dizaines de commits fonctionnels cohérents, sans inflation ni fractionnement artificiel. Ne pas lancer de gate intermédiaire ; ne pas passer à une étape ultérieure tant que sa condition préalable n'est pas satisfaite. Rapporter les résultats effectivement obtenus et les blocages.
+
 ## Architecture native — directive du propriétaire du 27/11/2026 (prioritaire)
 
 - **Directive propriétaire définitive : Android exclusivement Kotlin, Windows exclusivement C#, Linux exclusivement C++20 (ARM/ARM64 et x64). Aucun nouveau code C, Java ou Python dans ces produits. ESP32/ESP32-S3 : choix natif délégué, C++ moderne privilégié ; conserver les moteurs C++ existants.** Directive propriétaire corrigée le 27/11/2026 : le but est de remplacer tout Python dans le produit final, **pas de remplacer C++ par C**. Conserver les transports et moteurs C++ ESP32 déjà implémentés. Pour Linux, utiliser des composants modernes C++20 avec RAII, std::unique_ptr, std::vector ou std::span et des limites explicites sur les tampons ; les composants C historiques ne restent que durant leur migration contrôlée. Ne plus ajouter de fonctionnalité Python ni de dépendance Python au produit livré.

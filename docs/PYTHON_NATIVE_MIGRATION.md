@@ -2,6 +2,10 @@
 
 Directive utilisateur : **supprimer tout Python du projet livré**, sans réécrire les composants natifs existants pour changer de langage. Le C++ ESP32 est conservé. Les scripts Python restent transitoirement en dépôt tant que le remplacement natif de leurs capacités n'est pas complet et validé : ne pas provoquer de régression par suppression prématurée.
 
+## Séquencement prioritaire (28/11/2026)
+
+Clôturer SAE J1979 avec ses seules migrations indispensables, puis publier l'APK signée v2.0.47 avant la migration générale de tout le Python et C restant. La finalisation des autres protocoles et de la PR #117 vient ensuite. Voir l'ordre obligatoire en tête de `AGENTS.md`. Les anciennes mentions d'une migration par chantier n'autorisent pas à différer la release 47 au profit d'une migration générale.
+
 ## Cibles techniques
 
 | Plateforme | Implémentation native à privilégier |
