@@ -15,7 +15,7 @@ bool private_regular(int fd,std::size_t expected){
         !(s.st_mode&077)&&s.st_size>=0&&static_cast<std::uint64_t>(s.st_size)==expected;
 }
 }
-Writer::Writer(int fd,const Plan& p):fd_(fd){
+Writer::Writer(int fd,const Plan& p):fd_(fd),plan_(p){
     if(!private_regular(fd_,0)||lseek(fd_,0,SEEK_CUR)!=0)
         throw std::invalid_argument("SCJ requires a newly created private regular file");
     persist(encode_header(p));
@@ -59,8 +59,8 @@ void Writer::append_batch(std::span<const Event> events){
     }
     Data wire;
     for(std::size_t i=0;i<events.size();++i){
-        if(events[i].kind==Kind::terminal&&i+1!=events.size()){
-            failed_=true;throw std::runtime_error("SCJ terminal must be last");
+        if(events[i].kind==Kind::terminal){
+            failed_=true;throw std::runtime_error("SCJ terminal requires independent seal");
         }
         const auto frame=encode_event(events[i],sequence_+i);
         if(frame.size()>max_journal-bytes_-wire.size()){
@@ -71,6 +71,44 @@ void Writer::append_batch(std::span<const Event> events){
     // One fsync/readback per group: all callback observations and intent
     // are durable before the vehicle request, without a sync per clock tick.
     persist(wire);
-    sequence_+=events.size();finished_=events.back().kind==Kind::terminal;
+    sequence_+=events.size();
+}
+
+void Writer::seal(const Result& result){
+    using network::history::detail::require;
+    if(!healthy()||!private_regular(fd_,bytes_))throw std::runtime_error("SCJ seal destination unavailable");
+    require(!result.prefix&&!result.report.empty()&&result.report.size()<=max_report,"SCJ terminal needs an engine result");
+    Data persisted(bytes_);
+    std::size_t at=0;
+    while(at<persisted.size()){
+        const auto n=pread(fd_,persisted.data()+at,persisted.size()-at,static_cast<off_t>(at));
+        if(n<0&&errno==EINTR)continue;
+        if(n<=0){failed_=true;throw std::runtime_error("SCJ full readback failed");}
+        at+=static_cast<std::size_t>(n);
+    }
+    try{
+        auto verified=decode(persisted,true);
+        require(verified.plan==plan_&&!verified.terminal&&!verified.torn&&verified.verified_bytes==bytes_&&
+            verified.events.size()==sequence_,"SCJ recorded prefix differs from writer state");
+        const auto digest=network::history::detail::bytes(json::Value{sha256(std::string_view(result.report))},32);
+        Event terminal{Kind::terminal,result.completed?1u:0u,0,digest};
+        verified.events.push_back(terminal);verified.terminal=true;
+        const auto rebuilt=replay(verified);
+        require(rebuilt.report==result.report&&rebuilt.stop==result.stop&&rebuilt.completed==result.completed&&
+            rebuilt.exchanges==result.exchanges&&rebuilt.dispatch_calls==result.dispatch_calls&&
+            rebuilt.response_records==result.response_records,"SCJ final replay differs from recorded campaign");
+        // Recheck destination before terminal publication, including all
+        // previous frames, not only the last append.
+        Data check(persisted.size());at=0;
+        while(at<check.size()){
+            const auto n=pread(fd_,check.data()+at,check.size()-at,static_cast<off_t>(at));
+            if(n<0&&errno==EINTR)continue;
+            if(n<=0)throw std::runtime_error("SCJ final readback failed");
+            at+=static_cast<std::size_t>(n);
+        }
+        require(check==persisted&&private_regular(fd_,bytes_),"SCJ evidence changed during seal");
+        require(sequence_<max_events,"SCJ terminal exceeds event bound");
+        persist(encode_event(terminal,sequence_));++sequence_;finished_=true;
+    }catch(...){failed_=true;throw;}
 }
 }

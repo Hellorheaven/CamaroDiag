@@ -50,6 +50,7 @@ Result replay(const Journal&);
 json::Value proof(const Journal&,const Result&,std::string_view journal_digest);
 class Writer {
     int fd_;
+    Plan plan_;
     std::size_t bytes_{},sequence_{};
     bool failed_{},finished_{};
     void persist(Bytes);
@@ -59,6 +60,8 @@ public:
     Writer& operator=(const Writer&)=delete;
     void append(const Event&);
     void append_batch(std::span<const Event>);
+    const Plan& plan()const noexcept{return plan_;}
+    void seal(const Result&);
     bool healthy()const noexcept{return !failed_&&!finished_;}
 };
 // All callback implementations are injected; replay never opens a transport.

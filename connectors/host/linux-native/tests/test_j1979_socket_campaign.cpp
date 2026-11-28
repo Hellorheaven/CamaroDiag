@@ -141,6 +141,32 @@ int main(){
         const auto checked=replay(j);
         assert(checked.report==r.report&&!checked.completed&&checked.dispatch_calls==0);
     }
+    // A writer for a different plan is rejected before any ECU exchange.
+    {
+        File file;Writer w(file.fd,plan(true));Fake transport{};
+        rejects([&]{(void)record(plan(false),link(transport),w);});
+        assert(transport.calls==0);
+    }
+    // A same-length corruption in a previously persisted frame is
+    // detected by the full replay before the terminal can be sealed.
+    {
+        File file;Writer w(file.fd,plan(true));Fake transport{};
+        const auto result=record(plan(true),link(transport),w);
+        const auto header=encode_header(plan(true));
+        unsigned char byte{};
+        assert(pread(file.fd,&byte,1,static_cast<off_t>(header.size()+15))==1);
+        byte^=1;
+        assert(pwrite(file.fd,&byte,1,static_cast<off_t>(header.size()+15))==1);
+        rejects([&]{finish(w,result);});
+        assert(!w.healthy());
+    }
+    {
+        File file;Writer w(file.fd,plan(true));Fake transport{};
+        auto result=record(plan(true),link(transport),w);
+        result.report+=" ";
+        rejects([&]{finish(w,result);});
+        assert(!decode(file.read(),true).terminal);
+    }
     // Failure before first intent does not dispatch an ECU request.
     {
         File file;Writer w(file.fd,plan(true));Fake transport{};

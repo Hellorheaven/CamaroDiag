@@ -215,15 +215,14 @@ Value num(std::size_t n){return Value{json::Integer{std::to_string(n)}};}
 Value flag(bool b){return Value{b};}
 }
 Result record(const Plan& p,const Link& link,Writer& w){
+    require(w.healthy()&&w.plan()==p,"SCJ writer plan differs from acquisition");
     Recording c(link,w);
     auto out=run(p,c);
     c.drain();out.dispatch_calls=c.dispatch_calls();out.response_records=c.response_records();
     return out;
 }
 void finish(Writer& writer,const Result& r){
-    require(!r.report.empty()&&r.report.size()<=max_report&&!r.prefix,"SCJ terminal requires complete engine result");
-    const auto digest=network::history::detail::bytes(Value{sha256(std::string_view(r.report))},32);
-    writer.append({Kind::terminal,r.completed?1u:0u,0,digest});
+    writer.seal(r);
 }
 Result replay(const Journal& j){
     require(j.plan.valid()&&j.events.size()<=max_events,"Invalid SCJ replay scope");
