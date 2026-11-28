@@ -127,6 +127,7 @@ public:
         const auto& row=capture_.trace.rows[row_++];
         require(std::equal(q.begin(),q.end(),row.request.begin(),row.request.end())&&row.timeout_ms==timeout&&
             row.response.size()<=std::min(size,r.size()),"Campaign application evidence mismatch");
+        require(time_&&row.duration_ms<=3600000-time_,"Invalid campaign exchange time");
         minimum_=time_+row.duration_ms;
         size=row.response.size();std::copy(row.response.begin(),row.response.end(),r.begin());
         if(row.status<0)transport_fault_=true;
@@ -135,7 +136,7 @@ public:
     bool wait(unsigned ms)override{
         const auto e=next(EventKind::wait);
         require(!revoked_&&!transport_fault_&&ms>=1&&ms<=100&&e.value==ms&&e.aux<=1,"Invalid campaign wait transcript");
-        if(e.aux)minimum_=time_+ms;
+        if(e.aux){require(time_&&ms<=3600000-time_,"Invalid campaign wait deadline");minimum_=time_+ms;}
         else revoked_=true;
         return e.aux!=0;
     }

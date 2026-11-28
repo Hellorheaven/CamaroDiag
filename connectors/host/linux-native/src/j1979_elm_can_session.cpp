@@ -25,15 +25,15 @@ bool acknowledged(std::string_view raw,std::string_view command){
     }
     return tokens==std::vector<std::string>{"OK"};
 }
-unsigned elapsed(std::uint64_t start){
-    const auto end=legacy::monotonic_ms();
+unsigned elapsed(std::uint64_t start,const legacy::Clock& clock){
+    const auto end=clock();
     if(!start||end<start||end-start>3600000)throw legacy::TransportError("ELM CAN clock invalid");
     return static_cast<unsigned>(end-start);
 }
 }
-Session::Session(legacy::Link& link,Scope scope,legacy::Current current,EvidenceSink sink)
-    :link_(link),scope_(scope),current_(std::move(current)),sink_(std::move(sink)){
-    if(!scope_.valid()||!current_)throw std::invalid_argument("Explicit fixed CAN ELM profile and physical pair required");
+Session::Session(legacy::Link& link,Scope scope,legacy::Current current,EvidenceSink sink,legacy::Clock clock)
+    :link_(link),scope_(scope),current_(std::move(current)),sink_(std::move(sink)),clock_(std::move(clock)){
+    if(!scope_.valid()||!current_||!clock_)throw std::invalid_argument("Explicit fixed CAN ELM profile and physical pair required");
 }
 bool Session::current()const{return configured_&&!retired_&&current_();}
 void Session::record(Observation row){
@@ -48,9 +48,9 @@ std::string Session::setup(std::string_view command,unsigned timeout){
     if(retired_||!current_()||evidence_.size()>=max_rows||max_raw-total_raw_<32768)
         throw legacy::TransportError("ELM CAN setup revoked or evidence limit");
     Observation row{};row.command=command;row.timeout_ms=timeout;
-    const auto start=legacy::monotonic_ms();
+    const auto start=clock_();
     try{
-        row.raw=link_.command(command,timeout);row.duration_ms=elapsed(start);
+        row.raw=link_.command(command,timeout);row.duration_ms=elapsed(start,clock_);
         if(row.duration_ms>=timeout||!current_())throw legacy::TransportError("ELM CAN setup context or deadline changed");
         row.status=0;
     }catch(const std::exception& e){
@@ -90,10 +90,10 @@ int Session::exchange_admitted(Bytes request,std::span<uint8_t> response,std::si
     Observation row{};row.timeout_ms=timeout;row.request.assign(request.begin(),request.end());
     Data frame{static_cast<uint8_t>(request.size())};frame.insert(frame.end(),request.begin(),request.end());
     row.command=legacy::hex(frame);
-    const auto start=legacy::monotonic_ms();
+    const auto start=clock_();
     int status=-1;
     try{
-        row.raw=link_.command(row.command,timeout);row.duration_ms=elapsed(start);
+        row.raw=link_.command(row.command,timeout);row.duration_ms=elapsed(start,clock_);
         if(row.duration_ms>=timeout||!current())throw legacy::TransportError("ELM CAN exchange context or deadline changed");
         const auto decoded=decode(row.raw,scope_,request);
         if(exclusive_response&&decoded.other_frames)throw legacy::TransportError("Unexpected CAN responder in maintenance session");

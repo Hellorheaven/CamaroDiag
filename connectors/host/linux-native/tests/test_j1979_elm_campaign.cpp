@@ -57,7 +57,7 @@ CampaignPlan plan(unsigned profile,bool live){
 }
 CampaignCapture acquire(Fake& fake,const CampaignPlan& p,bool want_completed=true){
     uint64_t clock=100;fake.clock=&clock;
-    Session session(fake,p.target,[]{return true;});session.configure();
+    Session session(fake,p.target,[]{return true;},{},[&]{return clock;});session.configure();
     CampaignCapture captured;
     auto r=record_campaign(session,p,[&]{return clock;},[&](unsigned wait){clock+=wait;return true;},captured);
     assert(fake.rows.empty()&&r.completed==want_completed&&r.steps>0&&!r.native_report.empty());

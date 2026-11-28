@@ -39,11 +39,12 @@ class Session{
     std::size_t total_raw_{};
     std::vector<Observation> evidence_;
     EvidenceSink sink_;
+    legacy::Clock clock_;
     std::string setup(std::string_view,unsigned);
     void record(Observation);
     int exchange_admitted(Bytes,std::span<uint8_t>,std::size_t&,unsigned,bool,bool exclusive_response=false);
 public:
-    Session(legacy::Link&,Scope,legacy::Current,EvidenceSink={});
+    Session(legacy::Link&,Scope,legacy::Current,EvidenceSink={},legacy::Clock=legacy::monotonic_ms);
     Session(const Session&)=delete;
     Session& operator=(const Session&)=delete;
     void configure();
