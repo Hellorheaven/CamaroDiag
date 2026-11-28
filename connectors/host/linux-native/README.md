@@ -378,5 +378,13 @@ The output includes the input SHA-256; the command never opens a transport,
 does not select an ECU, and creates a new proof without overwriting a file.
 J2534 driver frames do not supply independent link checksums. A consistent
 historical report does not authorize a new session or prove vehicle coverage.
-This is the discovery-only portion of the Python inspection migration;
-historical selected-source scan binding remains to be ported.
+The discovery-to-native-scan comparison uses a replayed LSR/1 capture,
+not claims in an edited scan JSON report:
+
+`camarodiag-native --bind-j1979-historical-legacy-discovery 2 10 1G1YY22G965109876 discovery.json scan.lsr proof.json`
+
+An explicitly chosen protocol, source and VIN are required. Both input
+files are hashed and reread; changed PID00 bitmap is reported rather than
+silently replacing the historical selection. A failed scan remains failed.
+This does not yet port inspection of historical selected-source scan JSON
+from Android, ELM or J2534.

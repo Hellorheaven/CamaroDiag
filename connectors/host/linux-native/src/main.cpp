@@ -25,6 +25,7 @@
 #include "j1979_legacy_mutation_inspection.hpp"
 #include "j1979_can_history.hpp"
 #include "j1979_legacy_discovery_history.hpp"
+#include "j1979_legacy_discovery_binding.hpp"
 #include "j1979_legacy_freeze_wire.hpp"
 #include "j1979_legacy_live_wire.hpp"
 #include <time.h>
@@ -2817,6 +2818,7 @@ static void usage(FILE *stream) {
         "  camarodiag-native --j1979-legacy-maintenance --operation clear --port /dev/ttyUSB0 --protocol 2 --engine-source 10 --source 10 --vin VIN --baseline baseline.json --intent intent.json --output result.json --confirm-functional-scope --acknowledge-maintenance-warning\n"
         "  camarodiag-native --inspect-j1979-legacy-discovery PROTOCOL RAW_RESPONSE RAW_ATDPN REPORT.json\n"
         "  camarodiag-native --inspect-j1979-historical-legacy-discovery REPORT.json PROOF.json\n"
+        "  camarodiag-native --bind-j1979-historical-legacy-discovery PROTOCOL SOURCE VIN DISCOVERY.json CAPTURE.lsr PROOF.json\n"
         "  camarodiag-native --inspect-j1979-catalogue live|freeze CATALOGUE REFERENCE SHA256 OUTPUT\n"
         "  camarodiag-native --project-j1979-catalogue cl1|cf1|llr1 CATALOGUE REFERENCE SHA256 CAPTURE VIN OUTPUT [PROTOCOL SOURCE]\n"
         "  camarodiag-native --verify-j1979-catalogue cl1|cf1|llr1 CATALOGUE REFERENCE SHA256 CAPTURE VIN PROJECTION PROOF [PROTOCOL SOURCE]\n"
@@ -2840,7 +2842,35 @@ static int historical_legacy_discovery_cli(const char* path,const char* output){
         return 0;
     }catch(const std::exception& e){return error(e.what());}
 }
+static int bind_legacy_discovery_cli(const char* protocol_arg,const char* source_arg,const char* vin,
+    const char* discovery_path,const char* capture_path,const char* output){
+    try{
+        uint32_t protocol_num=0;
+        if(!decimal_uint32(protocol_arg,&protocol_num)||protocol_num<1||protocol_num>5)
+            return error("Explicit protocol 1..5 required");
+        const auto p=static_cast<cd::legacy::Protocol>(protocol_num);
+        const auto source_bytes=cd::legacy::unhex(source_arg);
+        if(source_bytes.size()!=1||!cd::legacy::valid_source(source_bytes[0]))
+            return error("Explicit two-digit source required");
+        input discovery{},capture{},d_again{},c_again{};
+        constexpr std::size_t json_max=4*1024*1024;
+        if(!load_regular(discovery_path,json_max,&discovery)||
+            !load_regular(capture_path,cd::legacy::scan_max_capture,&capture))
+            return error("Bounded regular discovery report and LSR/1 capture required");
+        const std::string_view raw(reinterpret_cast<const char*>(discovery.bytes.get()),discovery.length);
+        const auto verified=cd::legacy::history::inspect(cd::json::parse(raw,json_max));
+        const auto result=cd::legacy::history::bind_capture(verified,
+            cd::legacy::Bytes(capture.bytes.get(),capture.length),p,source_bytes[0],vin);
+        const auto proof=cd::legacy::history::binding_report(result,discovery.digest,capture.digest);
+        if(!load_regular(discovery_path,json_max,&d_again)||!same_input(&discovery,&d_again)||
+            !load_regular(capture_path,cd::legacy::scan_max_capture,&c_again)||!same_input(&capture,&c_again))
+            return error("Discovery or capture changed");
+        if(!atomic_create(output,proof.data(),proof.size()))return error("Binding proof destination unavailable");
+        return 0;
+    }catch(const std::exception& e){return error(e.what());}
+}
 int main(int argc, char **argv) {
+    if(argc==8&&!strcmp(argv[1],"--bind-j1979-historical-legacy-discovery"))return bind_legacy_discovery_cli(argv[2],argv[3],argv[4],argv[5],argv[6],argv[7]);
     if(argc==4&&!strcmp(argv[1],"--inspect-j1979-historical-legacy-discovery"))return historical_legacy_discovery_cli(argv[2],argv[3]);
     if (argc == 2 && (!strcmp(argv[1], "--help") || !strcmp(argv[1], "-h"))) {
         usage(stdout); return 0;

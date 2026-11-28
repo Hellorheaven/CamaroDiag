@@ -1,4 +1,5 @@
 #include "j1979_legacy_scan_wire.hpp"
+#include "j1979_legacy_discovery_binding.hpp"
 #include <cassert>
 #include <deque>
 #include <utility>
@@ -79,6 +80,27 @@ int main(){
     assert(parsed.trace==s.trace&&parsed.vin==vin);
     assert(scan_report(inspect_scan_capture(capture,Protocol::vpw,0x10,vin))==report);
     auto rejects=[](auto f){bool failed=false;try{f();}catch(const std::exception&){failed=true;}assert(failed);};
+    // Bind a separately validated Android discovery to the native capture.
+    const auto discovery_wire=wire({0x41,0,0,0x10,0,0});
+    const auto raw_frame=discovery_wire.substr(0,discovery_wire.size()-1);
+    const auto discovery=std::string("{\"legacySourceDiscovery\":{\"selected_protocol\":2,\"observed_protocol\":2,\"raw_protocol_response\":\"2\",\"raw_response\":\"")
+        +raw_frame+"\",\"error\":null,\"sources\":[{\"source\":\"10\",\"status\":\"PASSED\",\"supported_pid_bitmap\":\"00100000\",\"raw_frames\":[\""
+        +raw_frame+"\"]}],\"verified_sources\":[\"10\"]}}";
+    const auto historical=history::inspect(cd::json::parse(discovery));
+    const auto binding=history::bind_capture(historical,capture,Protocol::vpw,0x10,vin);
+    assert(binding.scan_completed&&binding.identity_rechecked&&binding.observed_vin==vin);
+    assert(binding.scan_bitmap&&*binding.scan_bitmap==binding.discovery_bitmap);
+    const auto binding_json=cd::json::parse(history::binding_report(binding,"discovery","capture"));
+    assert(binding_json.at("bitmap_unchanged").boolean()&&!binding_json.at("current_authorization_verified").boolean());
+    auto older=historical;
+    older.responders[0].bitmap=std::array<std::uint8_t,4>{0,0,0,0};
+    const auto changed_binding=history::bind_capture(older,capture,Protocol::vpw,0x10,vin);
+    assert(!cd::json::parse(history::binding_report(changed_binding,"d","c")).at("bitmap_unchanged").boolean());
+    rejects([&]{history::bind_capture(historical,capture,Protocol::vpw,0x20,vin);});
+    rejects([&]{history::bind_capture(historical,capture,Protocol::iso9141,0x10,vin);});
+    rejects([&]{history::bind_capture(historical,capture,Protocol::vpw,0x10,"1G1YY22G965109877");});
+    older.completed=false;
+    rejects([&]{history::bind_capture(older,capture,Protocol::vpw,0x10,vin);});
     auto tampered=capture;tampered.back()^=1;
     rejects([&]{decode_scan_capture(tampered);});
     tampered=capture;tampered.pop_back();
