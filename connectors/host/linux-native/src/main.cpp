@@ -2122,7 +2122,7 @@ public:
 };
 struct DirectMaintenanceOptions {
     cd::hostmaint::Scope scope{};
-    const char* interface{},*directory{},*journal{},*output{},*adapter_capture{};
+    const char* interface{},*directory{},*journal{},*output{},*adapter_capture{},*adapter_journal{};
     unsigned profile{},baud{38400};
     bool profile_set{},baud_set{};
     bool operation{},tx{},rx{},budget{},extended{},vin{},confirmed{},warning{};
@@ -2646,11 +2646,54 @@ static int elm_trace_cli(int argc,char** argv,bool correlate){
     }catch(const std::exception& e){return error(e.what());}
 }
 
+static int elm_journal_cli(int argc,char** argv,bool recover){
+    if(argc!=8)return error("Independent ELM profile, TX, RX, VIN, EJR/1 and destination required");
+    uint32_t profile=0,tx=0,rx=0;
+    if(!decimal_uint32(argv[2],&profile)||!hex_uint32(argv[3],&tx)||!hex_uint32(argv[4],&rx)||
+        !cf1_valid_vin(argv[5])||!cd::elmcan::Scope{profile,tx,rx}.valid())
+        return error("Invalid independent ELM CAN target");
+    try{
+        input raw{};
+        if(!load_regular(argv[6],cd::elmcan::journal_max_bytes,&raw))
+            return error("Invalid bounded EJR/1 journal");
+        const cd::elmcan::Bytes bytes{raw.bytes.get(),raw.length};
+        const auto e=cd::elmcan::inspect_journal(bytes,!recover);
+        if(e.trace.target.profile!=profile||e.trace.target.tx!=tx||e.trace.target.rx!=rx||e.trace.vin!=argv[5])
+            return error("EJR/1 differs from independently selected target");
+        if(!recheck_input(argv[6],cd::elmcan::journal_max_bytes,raw))return error("EJR/1 changed during replay");
+        if(recover){
+            const auto canonical=cd::elmcan::encode_trace(e.trace);
+            if(!atomic_create(argv[7],canonical.data(),canonical.size()))
+                return error("ECR/1 destination unavailable");
+            return 0;
+        }
+        const auto json=std::string("{\"schema\":\"camarodiag-j1979-elm-journal-replay-v1\","
+            "\"verified_prefix\":true,\"physical_vehicle_verified\":false,\"evidence_authenticated\":false,"
+            "\"recipe_correlated\":false,\"permits_programming\":false,\"permits_automatic_retry\":false,"
+            "\"terminal_present\":")+(e.terminal?"true":"false")+
+            ",\"torn_tail\":"+(e.torn?"true":"false")+
+            ",\"verified_bytes\":"+std::to_string(e.verified_bytes)+
+            ",\"total_bytes\":"+std::to_string(e.total_bytes)+
+            ",\"adapter_configuration_replayed\":"+(e.replay.configured?"true":"false")+
+            ",\"setup_rows\":"+std::to_string(e.replay.setup_rows)+
+            ",\"diagnostic_rows\":"+std::to_string(e.replay.diagnostic_rows)+
+            ",\"positive\":"+std::to_string(e.replay.positive)+
+            ",\"negative\":"+std::to_string(e.replay.negative)+
+            ",\"no_data\":"+std::to_string(e.replay.no_data)+
+            ",\"faults\":"+std::to_string(e.replay.faults)+
+            ",\"journal_sha256\":\""+raw.digest+"\"}\n";
+        if(!atomic_create(argv[7],json.data(),json.size()))return error("Journal inspection destination unavailable");
+        return e.terminal&&e.replay.configured&&!e.replay.terminal_fault?0:2;
+    }catch(const std::exception& e){return error(e.what());}
+}
+
 static void usage(FILE *stream) {
     fprintf(stream,
         "CamaroDiag Linux native C++20 — SAE J1979\n"
         "Usage:\n"
         "  camarodiag-native --j1979-can-discover --interface can0 --window-ms 1500 --output responders.json --confirm-functional-scope [--extended]\n"
+        "  camarodiag-native --inspect-j1979-elm-journal PROFILE TX RX VIN TRACE.ejr PROOF.json\n"
+        "  camarodiag-native --recover-j1979-elm-journal PROFILE TX RX VIN TRACE.ejr TRACE.ecr\n"
         "  camarodiag-native --inspect-j1979-elm-trace PROFILE TX RX VIN TRACE.ecr PROOF.json\n"
         "  camarodiag-native --verify-j1979-elm-trace PROFILE TX RX VIN TRACE.ecr CAPTURE PROOF.json\n"
         "  camarodiag-native --j1979-elm-can-freeze --port /dev/ttyUSB0 --profile 6 --tx 7E0 --rx 7E8 --vin VIN --frame 00 --pid 0C --capture freeze.cf --output freeze.json --confirm-physical-channel [--extended] [--adapter-capture trace.ecr] [--adapter-journal trace.ejr]\n"
@@ -2670,7 +2713,7 @@ static void usage(FILE *stream) {
         "  camarodiag-native --inspect-j1979-freeze-native CAPTURE.cf VIN REPORT.json\n"
         "  camarodiag-native --verify-j1979-freeze-native-prefix CAPTURE.cf PREFIX.json PROOF.json VIN\n"
         "  camarodiag-native --verify-j1979-freeze-native CAPTURE.cf REPORT.json PROOF.json VIN\n"
-        "  camarodiag-native --j1979-elm-can-maintenance --profile 6 --port /dev/ttyUSB0 --operation clear --tx 7E0 --rx 7E8 --vin VIN --budget-ms 60000 --journal-directory DIR --journal-name operation.cm --output report.json --confirm-physical-channel --acknowledge-maintenance-warning [--extended]\n"
+        "  camarodiag-native --j1979-elm-can-maintenance --profile 6 --port /dev/ttyUSB0 --operation clear --tx 7E0 --rx 7E8 --vin VIN --budget-ms 60000 --journal-directory DIR --journal-name operation.cm --output report.json --confirm-physical-channel --acknowledge-maintenance-warning [--extended] [--adapter-capture trace.ecr] [--adapter-journal trace.ejr]\n"
         "  camarodiag-native --j1979-maintenance-can --operation clear --interface can0 --tx 7E0 --rx 7E8 --vin VIN --budget-ms 60000 --journal-directory PRIVATE_DIR --journal-name session.cm --output report.json --confirm-physical-channel --acknowledge-maintenance-warning\n"
         "  camarodiag-native --j1979-maintenance-usb --operation clear --port /dev/ttyACM0 --key-file key.bin --journal session.cm --output report.json --tx 7E0 --rx 7E8 --vin VIN --budget-ms 60000 --confirm-physical-channel --acknowledge-maintenance-warning\n"
         "  camarodiag-native --j1979-maintenance-archive --operation clear --port /dev/ttyACM0 --key-file key.bin --journal recovered.cm --output recovery.json --tx 7E0 --rx 7E8 --vin VIN --budget-ms 60000 --confirm-physical-channel\n"
@@ -2744,6 +2787,8 @@ int main(int argc, char **argv) {
         return cm1_cli(argv[2],argv[3],argv[4],argv[5],true);
     if (argc >= 3 && !strcmp(argv[1], "--j1979-live-usb-native"))
         return capture_cl1_native(argc,argv);
+    if (argc>=3 && !strcmp(argv[1],"--inspect-j1979-elm-journal"))return elm_journal_cli(argc,argv,false);
+    if (argc>=3 && !strcmp(argv[1],"--recover-j1979-elm-journal"))return elm_journal_cli(argc,argv,true);
     if (argc>=3 && !strcmp(argv[1],"--inspect-j1979-elm-trace"))return elm_trace_cli(argc,argv,false);
     if (argc>=3 && !strcmp(argv[1],"--verify-j1979-elm-trace"))return elm_trace_cli(argc,argv,true);
     if (argc>=3 && !strcmp(argv[1],"--j1979-elm-can-freeze"))return elm_freeze_cli(argc,argv);
