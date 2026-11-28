@@ -19,6 +19,24 @@ uint32_t crc(Bytes b){
 }
 template<class Container>void append(Data& out,const Container& bytes){out.insert(out.end(),bytes.begin(),bytes.end());}
 }
+Data encode_trace_row(const Observation& row,std::uint32_t seq){
+    require(row.status>=-1&&row.status<=1&&row.command.size()>=2&&row.command.size()<=32&&
+        row.request.size()<=7&&row.raw.size()<=32768&&row.response.size()<=4095&&row.error.size()<=512,
+        "Invalid ELM row bounds");
+    Data bytes(record,0);
+    const size_t at=0;
+    put(bytes,at,static_cast<uint32_t>(seq));
+    bytes[at+4]=static_cast<uint8_t>(row.status+1);
+    bytes[at+5]=static_cast<uint8_t>(row.command.size());
+    bytes[at+6]=static_cast<uint8_t>(row.request.size());
+    put(bytes,at+8,row.duration_ms);put(bytes,at+12,row.timeout_ms);
+    put(bytes,at+16,static_cast<uint32_t>(row.raw.size()));
+    put(bytes,at+20,static_cast<uint32_t>(row.response.size()));
+    put(bytes,at+24,static_cast<uint32_t>(row.error.size()));
+    append(bytes,row.command);append(bytes,row.request);append(bytes,row.raw);append(bytes,row.response);append(bytes,row.error);
+    const auto sum=crc(Bytes(bytes).subspan(at));const auto end=bytes.size();bytes.resize(end+4);put(bytes,end,sum);
+    return bytes;
+}
 Data encode_trace(const Trace& t){
     (void)replay_trace(t);
     Data bytes(head,0);
@@ -29,21 +47,32 @@ Data encode_trace(const Trace& t){
     // Header fields occupy 37 bytes, three reserved bytes, and CRC32.
     bytes.resize(head+4);put(bytes,head,crc(Bytes(bytes).first(head)));
     for(size_t seq=0;seq<t.rows.size();++seq){
-        const auto& row=t.rows[seq];
-        const auto at=bytes.size();bytes.resize(at+record,0);
-        put(bytes,at,static_cast<uint32_t>(seq));
-        bytes[at+4]=static_cast<uint8_t>(row.status+1);
-        bytes[at+5]=static_cast<uint8_t>(row.command.size());
-        bytes[at+6]=static_cast<uint8_t>(row.request.size());
-        put(bytes,at+8,row.duration_ms);put(bytes,at+12,row.timeout_ms);
-        put(bytes,at+16,static_cast<uint32_t>(row.raw.size()));
-        put(bytes,at+20,static_cast<uint32_t>(row.response.size()));
-        put(bytes,at+24,static_cast<uint32_t>(row.error.size()));
-        append(bytes,row.command);append(bytes,row.request);append(bytes,row.raw);append(bytes,row.response);append(bytes,row.error);
-        const auto sum=crc(Bytes(bytes).subspan(at));const auto end=bytes.size();bytes.resize(end+4);put(bytes,end,sum);
-        require(bytes.size()<=trace_max_bytes,"ELM trace byte limit");
+        const auto row=encode_trace_row(t.rows[seq],static_cast<uint32_t>(seq));
+        require(row.size()<=trace_max_bytes-bytes.size(),"ELM trace byte limit");
+        append(bytes,row);
     }
     return bytes;
+}
+Observation decode_trace_row(Bytes b,std::uint32_t seq,std::size_t& consumed){
+    consumed=0;
+    constexpr size_t pos=0;
+    require(b.size()-pos>=record+4,"Truncated ECR/1 record");
+    const auto h=b.subspan(pos,record);
+    require(get(h,0)==seq&&h[4]<=2&&h[5]>=2&&h[5]<=32&&h[6]<=7&&!h[7],"Invalid ECR/1 flags");
+    const auto raw=get(h,16),reply=get(h,20),error=get(h,24);
+    require(raw<=32768&&reply<=4095&&error<=512,"ECR/1 row bounds");
+    const size_t full=record+h[5]+h[6]+raw+reply+error+4;
+    require(full<=b.size()-pos&&get(b,pos+full-4)==crc(b.subspan(pos,full-4)),"ECR/1 size or CRC mismatch");
+    Observation row{};
+    row.status=int(h[4])-1;row.duration_ms=get(h,8);row.timeout_ms=get(h,12);
+    auto cursor=pos+record;
+    auto field=[&](size_t n){const auto part=b.subspan(cursor,n);cursor+=n;return part;};
+    const auto command=field(h[5]),request=field(h[6]),raw_bytes=field(raw),response=field(reply),err=field(error);
+    row.command.assign(command.begin(),command.end());row.request.assign(request.begin(),request.end());
+    row.raw.assign(raw_bytes.begin(),raw_bytes.end());row.response.assign(response.begin(),response.end());
+    row.error.assign(err.begin(),err.end());
+    consumed=full;
+    return row;
 }
 Trace decode_trace(Bytes b){
     require(b.size()>=head+4&&b.size()<=trace_max_bytes&&std::equal(magic.begin(),magic.end(),b.begin())&&
@@ -54,22 +83,10 @@ Trace decode_trace(Bytes b){
     t.vin.assign(b.begin()+20,b.begin()+37);
     size_t pos=head+4,raw_total=0;
     for(uint32_t seq=0;seq<count;++seq){
-        require(b.size()-pos>=record+4,"Truncated ECR/1 record");
-        const auto h=b.subspan(pos,record);
-        require(get(h,0)==seq&&h[4]<=2&&h[5]>=2&&h[5]<=32&&h[6]<=7&&!h[7],"Invalid ECR/1 flags");
-        const auto raw=get(h,16),reply=get(h,20),error=get(h,24);
-        require(raw<=32768&&raw<=trace_max_raw-raw_total&&reply<=4095&&error<=512,"ECR/1 row bounds");
-        const size_t full=record+h[5]+h[6]+raw+reply+error+4;
-        require(full<=b.size()-pos&&get(b,pos+full-4)==crc(b.subspan(pos,full-4)),"ECR/1 size or CRC mismatch");
-        Observation row{};
-        row.status=int(h[4])-1;row.duration_ms=get(h,8);row.timeout_ms=get(h,12);
-        auto cursor=pos+record;
-        auto field=[&](size_t n){const auto part=b.subspan(cursor,n);cursor+=n;return part;};
-        const auto command=field(h[5]),request=field(h[6]),raw_bytes=field(raw),response=field(reply),err=field(error);
-        row.command.assign(command.begin(),command.end());row.request.assign(request.begin(),request.end());
-        row.raw.assign(raw_bytes.begin(),raw_bytes.end());row.response.assign(response.begin(),response.end());
-        row.error.assign(err.begin(),err.end());
-        t.rows.push_back(std::move(row));pos+=full;raw_total+=raw;
+        size_t consumed=0;
+        auto row=decode_trace_row(b.subspan(pos),seq,consumed);
+        require(row.raw.size()<=trace_max_raw-raw_total,"ECR/1 aggregate raw limit");
+        raw_total+=row.raw.size();pos+=consumed;t.rows.push_back(std::move(row));
     }
     require(pos==b.size(),"Trailing ECR/1 bytes");
     (void)replay_trace(t);

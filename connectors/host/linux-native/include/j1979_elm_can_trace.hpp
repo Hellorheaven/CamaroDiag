@@ -17,6 +17,9 @@ struct Replay{
     std::size_t setup_rows{},diagnostic_rows{},positive{},negative{},no_data{},faults{};
     bool configured{},terminal_fault{};
 };
+// Row codec shared by the closed ECR/1 file and incremental EJR/1 journal.
+Data encode_trace_row(const Observation&,std::uint32_t sequence);
+Observation decode_trace_row(Bytes,std::uint32_t sequence,std::size_t& consumed);
 Data encode_trace(const Trace&);
 Trace decode_trace(Bytes);
 Replay replay_trace(const Trace&);
