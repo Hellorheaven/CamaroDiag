@@ -6,6 +6,7 @@
 #include "j1979_socket_campaign.hpp"
 #include "j1979_live_export.hpp"
 #include "j1979_live_options.hpp"
+#include "j1979_live_progress.hpp"
 #include <time.h>
 #include <memory>
 #include <exception>
@@ -34,7 +35,7 @@ typedef struct {
     uint32_t tx, rx;
     unsigned budget_ms, cycles, interval_ms, pid_count;
     uint8_t pids[J1979_LIVE_MAX_PIDS];
-    bool live, confirmed, tx_set, rx_set, cycles_set, interval_set;
+    bool live, confirmed, tx_set, rx_set, cycles_set, interval_set, quiet;
 } options;
 static bool parse_hex(const char *s, uint32_t *out) {
     if (!s || !*s || *s == '-' || *s == '+') return false;
@@ -63,6 +64,10 @@ static bool parse(int argc, char **argv, options *o) {
     bool has_budget=false;
     for (int i=2;i<argc;++i) {
         const char *flag=argv[i];
+        if (!strcmp(flag,"--quiet")&&o->live) {
+            if(o->quiet)return false;
+            o->quiet=true;continue;
+        }
         if (!strcmp(flag,"--confirm-physical-channel")) {
             if (o->confirmed) return false;
             o->confirmed=true;
@@ -228,7 +233,8 @@ int j1979_can_cli(int argc, char **argv) {
         try{
             if(!opened)throw std::runtime_error("Selected SocketCAN ISO-TP unavailable");
             const cd::socketcampaign::Link physical{j1979_isotp_exchange,journal_clock,j1979_isotp_current,journal_wait,&link};
-            const auto result=cd::socketcampaign::record(scope,physical,*journal);
+            const auto result=cd::socketcampaign::record(scope,physical,*journal,
+                o.live&&!o.quiet?cd::liveoptions::show_sample:nullptr);
             j1979_isotp_close(&link);
             if(fwrite(result.report.data(),1,result.report.size(),stream)!=result.report.size()||
                 fflush(stream)||fsync(fd))
@@ -270,7 +276,8 @@ int j1979_can_cli(int argc, char **argv) {
     live_plan.interval_ms=o.interval_ms;
     std::copy_n(o.pids,o.pid_count,live_plan.pids);
     int scan_status=opened ?
-        (o.live ? j1979_live_record(&live_plan,&live_result) :
+        (o.live ? j1979_live_record_observed(&live_plan,&live_result,
+            o.quiet?nullptr:cd::liveoptions::show_sample,nullptr) :
                   j1979_can_scan(&plan,&result)) : -1;
     if (!opened) fprintf(stderr,"Native J1979: selected SocketCAN ISO-TP unavailable\n");
     /* Do not rewrite the engine's terminal evidence after a signal. A

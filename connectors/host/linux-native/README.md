@@ -611,3 +611,15 @@ et non avec verify-native-live-projection et le seul rapport JSON.
 Le format historique demeure disponible. La nouvelle provenance figure
 aussi dans chaque ligne CSV. Les trois fonctions hors ligne sont
 accessibles dans le bureau Linux. Aucun test de clôture exécuté à ce stade.
+
+
+### Migration de la CLI live historique
+
+Les chemins SocketCAN, ELM CAN et legacy acceptent désormais les durées
+en secondes (\`--interval\` et \`--budget\`) en plus des variantes en
+millisecondes. La conversion est exacte à la milliseconde et refuse
+les doublons. La progression affiche les échantillons ou échanges
+provisoires avant le contrôle VIN final ; \`--quiet\` désactive ces
+lignes sans modifier le journal ni le rapport. Les valeurs numériques
+attribuées restent réservées à la projection après vérification finale.
+Le rejeu n'appelle jamais le callback d'affichage.

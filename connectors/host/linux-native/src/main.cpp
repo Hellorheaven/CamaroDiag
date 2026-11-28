@@ -8,6 +8,7 @@
 #include "j1979_socket_campaign.hpp"
 #include "j1979_live_export.hpp"
 #include "j1979_live_options.hpp"
+#include "j1979_live_progress.hpp"
 #include "j1979_network_journal.hpp"
 #include "j1979_can_network.hpp"
 #include "j1979_elm_can.hpp"
@@ -1725,11 +1726,15 @@ struct LegacyLiveOptions{
     uint32_t baud{38400};
     cd::legacy::LivePlan plan;
     const char* port{},*capture{},*output{},*csv{};
-    bool protocol_set{},source_set{},baud_set{},budget_set{},approved{},cycles_set{},interval_set{};
+    bool protocol_set{},source_set{},baud_set{},budget_set{},approved{},cycles_set{},interval_set{},quiet{};
 };
 static bool parse_legacy_live(int argc,char** argv,LegacyLiveOptions& o){
     for(int i=2;i<argc;++i){
         const std::string_view flag=argv[i];
+        if(flag=="--quiet"){
+            if(o.quiet)return false;
+            o.quiet=true;continue;
+        }
         if(flag=="--raw-only"){
             if(o.plan.raw_only)return false;
             o.plan.raw_only=true;continue;
@@ -1823,7 +1828,12 @@ static int legacy_live_cli(int argc,char** argv){
             result=cd::legacy::acquire_live(elm,o.source,o.plan,cd::legacy::monotonic_ms,current,[](unsigned ms){
                 struct timespec delay{static_cast<time_t>(ms/1000),static_cast<long>((ms%1000)*1000000)};
                 nanosleep(&delay,nullptr);
-            },[&](const auto& row){journal.append(row);});
+            },[&](const auto& row){
+                journal.append(row);
+                if(!o.quiet&&row.phase==cd::legacy::LivePhase::sample&&row.exchange.command!="WAIT")
+                    fprintf(stderr,"J1979 legacy pending identity: %u ms cycle %u request %s exchange outcome %u\n",
+                        row.ended_ms,row.cycle,row.exchange.command.c_str(),static_cast<unsigned>(row.exchange.outcome));
+            });
         }
         journal.finish();
         const auto raw=cd::legacy::encode_live_capture({o.protocol,o.source,o.plan,result.trace});
@@ -2465,11 +2475,15 @@ struct ElmCanOptions{
     const char* native_report{},*projection{},*csv{};
     unsigned baud{38400},budget{180000},cycles{30},interval{1000};
     std::vector<uint8_t> pids;
-    bool profile{},tx{},rx{},confirmed{},baud_set{},budget_set{},cycles_set{},interval_set{};
+    bool profile{},tx{},rx{},confirmed{},baud_set{},budget_set{},cycles_set{},interval_set{},quiet{};
 };
 static bool parse_elm_can(int argc,char** argv,ElmCanOptions& o,bool live){
     for(int i=2;i<argc;++i){
         std::string_view flag=argv[i];
+        if(flag=="--quiet"&&live){
+            if(o.quiet)return false;
+            o.quiet=true;continue;
+        }
         if(flag=="--confirm-physical-channel"){
             if(o.confirmed)return false;
             o.confirmed=true;continue;
@@ -2575,7 +2589,7 @@ static int elm_can_cli(int argc,char** argv,bool live){
                 if(errno!=EINTR||!current())return false;
             }
             return current();
-        },captured);
+        },captured,live&&!o.quiet?cd::liveoptions::show_sample:nullptr);
         if(o.campaign_capture){
             const auto bytes=cd::elmcan::encode_campaign(captured);
             if(!write_owned_file(campaign_out.fd,bytes.data(),bytes.size()))
@@ -3084,7 +3098,7 @@ static void usage(FILE *stream) {
         "  camarodiag-native --j1979-can --interface can0 --tx 7E0 --rx 7E8 --output evidence.json --vin VIN --budget-ms 180000 --confirm-physical-channel [--journal capture.scj]\n"
         "  camarodiag-native --j1979-live-usb-native --port /dev/ttyACM0 --key-file key.bin --capture session.cl --output report.json --tx 7E0 --rx 7E8 --vin VIN --pid 0C --cycles 30 --interval-ms 1000 --budget-ms 180000 --confirm-physical-channel [--projection-output NUMERIC.json] [--csv SAMPLES.csv]\n"
         "  camarodiag-native --j1979-live --interface can0 --tx 7E0 --rx 7E8 --vin VIN --pid 0C --cycles 30 --interval-ms 1000 --budget-ms 180000 --output live.json --confirm-physical-channel [--journal capture.scj] [--projection-output NUMERIC.json] [--csv SAMPLES.csv]\n"
-        "    Live SocketCAN, ELM CAN and legacy: --interval SECONDS and --budget SECONDS are exact aliases; do not combine with their millisecond variants.\n"
+        "    Live SocketCAN, ELM CAN and legacy: --interval SECONDS and --budget SECONDS are exact aliases; do not combine with their millisecond variants. --quiet suppresses provisional sample progress.\n"
         "    Numeric SocketCAN exports require --journal. Raw evidence is never overwritten.\n"
         "  camarodiag-native --inspect-j1979-live-native-prefix CAPTURE.cl VIN PREFIX.json\n"
         "  camarodiag-native --inspect-j1979-live-native CAPTURE.cl VIN REPORT.json\n"

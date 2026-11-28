@@ -18,6 +18,12 @@ const Operation& find(std::string_view id){
 template<class F>void rejects(F f){bool denied=false;try{f();}catch(const std::invalid_argument&){denied=true;}assert(denied);}
 }
 int main(){
+    for(const auto* name:{"can-live","elm-live","legacy-live"}){
+        const auto& fields=find(name).fields;
+        const auto quiet=std::find_if(fields.begin(),fields.end(),[](const auto& field){return field.key=="quiet";});
+        assert(quiet!=fields.end()&&quiet->flag=="--quiet"&&!quiet->required);
+    }
+
     unsigned milliseconds=99;
     assert(cd::liveoptions::seconds_ms("1.125",milliseconds)&&milliseconds==1125);
     assert(cd::liveoptions::seconds_ms("0.1000",milliseconds)&&milliseconds==100);
