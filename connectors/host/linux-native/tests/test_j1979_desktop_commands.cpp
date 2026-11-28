@@ -94,6 +94,26 @@ int main(){
     assert(!ready.physical&&std::count(ready.args.begin(),ready.args.end(),"--baseline")==0);
     mutation["baseline"]=second;ready=prepare(find("verify-can-mutation"),mutation);
     assert(std::count(ready.args.begin(),ready.args.end(),"--baseline")==1);
+    Values elm{{"port","/dev/ttyUSB0"},{"profile","6"},{"tx","7E0"},{"rx","7E8"},{"vin",values["vin"]},
+        {"adapter-capture",directory+"/adapter.ecr"},{"adapter",directory+"/adapter.ejr"},{"campaign",directory+"/campaign.ecp"},{"output",proof},{"baud","38400"}};
+    ready=prepare(find("elm-scan"),elm);
+    assert(std::count(ready.args.begin(),ready.args.end(),"--adapter-capture")==1);
+    assert(std::count(ready.args.begin(),ready.args.end(),"--baud")==1);
+    elm["profile"]="7";rejects([&]{(void)prepare(find("elm-scan"),elm);});
+    elm["tx"]="18DA10F1";elm["rx"]="18DAF110";assert(prepare(find("elm-scan"),elm).physical);
+    elm["adapter-capture"]=elm["adapter"];rejects([&]{(void)prepare(find("elm-scan"),elm);});
+    Values legacy_read{{"port","/dev/ttyUSB0"},{"protocol","2"},{"source","10"},{"vin",values["vin"]},
+        {"capture",directory+"/legacy.lsr"},{"output",directory+"/legacy.json"}};
+    assert(prepare(find("legacy-scan"),legacy_read).physical);
+    auto legacy_collision=legacy_read;legacy_collision["output"]=legacy_read["capture"]+".lj";
+    rejects([&]{(void)prepare(find("legacy-scan"),legacy_collision);});
+    const auto sidecar=legacy_read["capture"]+".lj";
+    {std::ofstream file(sidecar);file<<"existing";}
+    rejects([&]{(void)prepare(find("legacy-scan"),legacy_read);});
+    assert(std::filesystem::remove(sidecar));
+    assert(symlink((directory+"/missing").c_str(),sidecar.c_str())==0);
+    rejects([&]{(void)prepare(find("legacy-scan"),legacy_read);});
+    assert(unlink(sidecar.c_str())==0);
     for(const auto& path:{capture,report,second})assert(std::filesystem::remove(path));
     assert(rmdir(name)==0);
 }

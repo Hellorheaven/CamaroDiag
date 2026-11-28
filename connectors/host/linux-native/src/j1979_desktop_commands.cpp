@@ -18,6 +18,8 @@ Field tx(){return f("tx","CAN TX (hex)","--tx",K::can_id,"7E0");}
 Field rx(){return f("rx","CAN RX (hex)","--rx",K::can_id,"7E8");}
 Field interface(){return f("interface","Interface SocketCAN","--interface",K::text,"can0");}
 Field port(){return f("port","Port série","--port",K::text,"/dev/ttyUSB0");}
+Field baud(){return f("baud","Vitesse série (bit/s)","--baud",K::decimal,"",false,1200,1000000);}
+Field adapter_capture(){return f("adapter-capture","Nouvelle capture adaptateur ECR","--adapter-capture",K::output_file,"",false);}
 Field profile(){return f("profile","Profil ELM CAN (6–9)","--profile",K::profile,"6");}
 Field protocol(){return f("protocol","Protocole legacy (1–5)","--protocol",K::protocol,"2");}
 Field source(){return f("source","Source legacy (hex, 2 chiffres)","--source",K::can_id,"10");}
@@ -87,13 +89,13 @@ const std::vector<Operation>& operations(){
         op("can-live","CAN — Mesures live","Acquisition brute bornée avec relecture d’identité ; projection numérique séparée.","--j1979-live",{interface(),tx(),rx(),vin(),pids(),cycles(),interval(),budget(),journal(true),output()},physical),
         op("can-network","CAN — Plusieurs ECU","Découverte puis campagne ordonnée des ECU explicitement choisis.","--j1979-can-network",{interface(),extended(),f("targets","RX sélectionnés (hex)","--rx",K::can_ids,"7E8 7E9"),vin(),window(),budget(),directory(true),output()},functional),
         op("can-freeze","CAN — Trames figées","Lecture Mode 02 sur le calculateur choisi.","--j1979-freeze-can",{interface(),tx(),rx(),vin(),extended(),frames(),pids(),budget(60000),capture(true),output()},physical),
-        op("elm-scan","ELM CAN — Lecture ECU","Profil ELM imposé, réponses ISO-TP, journal adaptateur facultatif.","--j1979-elm-can",{port(),profile(),tx(),rx(),vin(),budget(),adapter_journal(),campaign(),output()},physical),
-        op("elm-freeze","ELM CAN — Trames figées","Lecture Mode 02 sur un profil ELM fixé et un calculateur choisi.","--j1979-elm-can-freeze",{port(),profile(),tx(),rx(),vin(),extended(),frames(),pids(),budget(60000),capture(true),adapter_journal(),output()},physical),
-        op("elm-live","ELM CAN — Mesures live","Acquisition CAN via adaptateur série, sélection physique.","--j1979-elm-live",{port(),profile(),tx(),rx(),vin(),pids(),cycles(),interval(),budget(),adapter_journal(),campaign(),output()},physical),
+        op("elm-scan","ELM CAN — Lecture ECU","Profil ELM imposé, réponses ISO-TP, journal adaptateur facultatif.","--j1979-elm-can",{port(),baud(),profile(),tx(),rx(),vin(),budget(),adapter_capture(),adapter_journal(),campaign(),output()},physical),
+        op("elm-freeze","ELM CAN — Trames figées","Lecture Mode 02 sur un profil ELM fixé et un calculateur choisi.","--j1979-elm-can-freeze",{port(),baud(),profile(),tx(),rx(),vin(),extended(),frames(),pids(),budget(60000),capture(true),adapter_capture(),adapter_journal(),output()},physical),
+        op("elm-live","ELM CAN — Mesures live","Acquisition CAN via adaptateur série, sélection physique.","--j1979-elm-live",{port(),baud(),profile(),tx(),rx(),vin(),pids(),cycles(),interval(),budget(),adapter_capture(),adapter_journal(),campaign(),output()},physical),
         op("legacy-discover","Legacy — Découverte","J1850, ISO 9141 ou KWP : un protocole sélectionné.","--j1979-legacy-discover",{port(),protocol(),f("baud","Vitesse série","--baud",K::decimal,"38400",false,1200,1000000),output()},physical),
-        op("legacy-scan","Legacy — Lecture source","Source de réponse choisie ; pas d’adressage physique revendiqué.","--j1979-legacy",{port(),protocol(),source(),vin(),budget(),capture(true),output()},physical),
-        op("legacy-live","Legacy — Mesures live","Mesures de la source sélectionnée, avec trace LLR.","--j1979-legacy-live",{port(),protocol(),source(),vin(),pids(),cycles(),interval(),budget(),raw(),capture(true),output()},physical),
-        op("legacy-freeze","Legacy — Trames figées","Mode 02, source de réponse sélectionnée.","--j1979-legacy-freeze",{port(),protocol(),source(),vin(),frames(),pids(),budget(),capture(true),output()},physical),
+        op("legacy-scan","Legacy — Lecture source","Source de réponse choisie ; pas d’adressage physique revendiqué.","--j1979-legacy",{port(),baud(),protocol(),source(),vin(),budget(),capture(true),output()},physical),
+        op("legacy-live","Legacy — Mesures live","Mesures de la source sélectionnée, avec trace LLR.","--j1979-legacy-live",{port(),baud(),protocol(),source(),vin(),pids(),cycles(),interval(),budget(),raw(),capture(true),output()},physical),
+        op("legacy-freeze","Legacy — Trames figées","Mode 02, source de réponse sélectionnée.","--j1979-legacy-freeze",{port(),baud(),protocol(),source(),vin(),frames(),pids(),budget(),capture(true),output()},physical),
         op("usb-scan","USB natif — Lecture ECU","Capture CJ/1 via connecteur natif et clé locale.","--j1979-usb",{port(),key(),tx(),rx(),vin(),extended(),budget(60000),capture(true),output()},physical),
         op("usb-freeze","USB natif — Trames figées","Capture CF/1 via connecteur natif.","--j1979-freeze-native",{port(),key(),tx(),rx(),vin(),frames(),pids(),budget(),capture(true),output()},physical),
         op("usb-live","USB natif — Mesures live","Capture CL/1 via connecteur natif.","--j1979-live-usb-native",{port(),key(),tx(),rx(),vin(),extended(),pids(),cycles(),interval(),budget(),capture(true),output()},physical),
@@ -159,7 +161,7 @@ Invocation prepare(const Operation& supplied,const Values& values){
     }
     std::map<std::string,unsigned> ids;
     std::set<std::filesystem::path> paths;
-    unsigned selected_count=0,cycle_count=30;
+    unsigned selected_count=0,cycle_count=30,elm_profile=0;
     for(const auto& field:op.fields){
         const auto it=values.find(field.key);
         const std::string value=it==values.end()?"":it->second;
@@ -181,6 +183,7 @@ Invocation prepare(const Operation& supplied,const Values& values){
             const auto n=parse(value,10,field.kind==K::protocol?1:field.kind==K::profile?6:field.minimum,
                 field.kind==K::protocol?5:field.kind==K::profile?9:field.maximum,"Valeur numérique hors limites");
             if(field.key=="cycles")cycle_count=n;
+            if(field.key=="profile")elm_profile=n;
         }else if(field.kind==K::pids||field.kind==K::frames||field.kind==K::can_ids){
             const auto tokens=words(value);std::set<unsigned> seen;
             require(!tokens.empty()&&tokens.size()<=(field.kind==K::frames?8u:32u),"Liste vide ou trop longue");
@@ -219,7 +222,22 @@ Invocation prepare(const Operation& supplied,const Values& values){
     }
     if(ids.contains("tx")&&ids.contains("rx"))
         require(j1979_can_physical_pair(ids.at("tx"),ids.at("rx")),"Paire CAN physique invalide");
+    if(elm_profile&&ids.contains("tx"))
+        require((elm_profile==7||elm_profile==9)==(ids.at("tx")>0x7ffu),"Profil ELM et adressage CAN incompatibles");
     require(selected_count*cycle_count<=10000,"Nombre total d’échantillons supérieur à 10 000");
+    // The legacy engine creates a sidecar journal from the capture path.
+    // Reserve that destination at admission as well, including broken links.
+    if(op.physical&&(op.id=="legacy-scan"||op.id=="legacy-live"||op.id=="legacy-freeze")){
+        namespace fs=std::filesystem;
+        std::error_code ec;
+        auto capture_path=fs::absolute(fs::path(values.at("capture")),ec).lexically_normal();
+        require(!ec,"Chemin de capture invalide");
+        auto journal_path=fs::path(capture_path.string()+".lj");
+        require(!paths.contains(journal_path),"Le journal legacy implicite doit être distinct des autres sorties");
+        auto status=fs::symlink_status(journal_path,ec);
+        require((!ec&&!fs::exists(status))||ec==std::errc::no_such_file_or_directory,
+                "Le journal legacy implicite existe déjà");
+    }
     if(ids.contains("tx")&&ids.contains("rx")&&std::any_of(op.fields.begin(),op.fields.end(),[](const Field& a){return a.key=="extended";})){
         const bool extended=values.contains("extended")&&values.at("extended")=="true";
         require(extended==(ids.at("tx")>0x7ff),"Adressage 11/29 bits incohérent");

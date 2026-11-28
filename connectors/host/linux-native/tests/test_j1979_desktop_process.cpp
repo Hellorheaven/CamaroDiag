@@ -37,6 +37,19 @@ int main(int argc,char** argv){
     for(unsigned i=0;i<200&&offline.running();++i){output+=offline.drain();(void)offline.poll(code);std::this_thread::sleep_for(std::chrono::milliseconds(5));}
     output+=offline.drain();
     assert(code==0&&output.find("offline complete")!=std::string::npos&&!offline.approve());
+    // The same GUI process controller can perform successive independent
+    // operations without inheriting the previous terminal or consent state.
+    assert(offline.descriptor()==-1);
+    offline.start(self,{"verify-live",{"verify-live"},false,{}});
+    code=-1;
+    for(unsigned i=0;i<200&&offline.running();++i){(void)offline.poll(code);std::this_thread::sleep_for(std::chrono::milliseconds(5));}
+    assert(code==0&&!offline.running());
+    // Even without an explicit final drain a new session is independent.
+    offline.start(self,{"verify-live",{"verify-live"},false,{}});
+    code=-1;
+    for(unsigned i=0;i<200&&offline.running();++i){(void)offline.drain();(void)offline.poll(code);std::this_thread::sleep_for(std::chrono::milliseconds(5));}
+    (void)offline.drain();
+    assert(code==0&&offline.descriptor()==-1&&!offline.approve());
     Process denied;denied.start(self,cmd);denied.cancel();code=-1;
     for(unsigned i=0;i<200&&denied.running();++i){(void)denied.drain();(void)denied.poll(code);std::this_thread::sleep_for(std::chrono::milliseconds(5));}
     assert(!denied.running()&&code!=0&&!denied.approve());

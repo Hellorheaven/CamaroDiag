@@ -49,7 +49,10 @@ Process::~Process(){
     else close_master();
 }
 void Process::start(const std::string& executable,const Invocation& inv){
-    require(!running()&&master_<0,"An operation is already running");
+    require(!running(),"An operation is already running");
+    // A caller may discard the last preview after observing the exit status.
+    // Closing an already reaped process's PTY cannot cancel an active child.
+    if(master_>=0)close_master();
     require(executable_regular(executable),"Native executable must be a trusted local regular file");
     const auto& allowed=operations();
     const auto op=std::find_if(allowed.begin(),allowed.end(),[&](const Operation& candidate){return candidate.command==inv.command;});
@@ -103,6 +106,13 @@ std::string Process::drain(){
         if(n<0&&(errno==EAGAIN||errno==EWOULDBLOCK))break;
         if(n<=0){close_master();break;}
         out.append(buffer.data(),static_cast<std::size_t>(n));
+    }
+    // Once waitpid has reaped the child, never retain a PTY indefinitely.
+    // The last bounded read may be truncated if a descendant inherited it.
+    // Do not make a subsequent independent operation depend on that descriptor.
+    if(child_<=0&&master_>=0){
+        close_master();
+        out+="\n[Local process output ended; remaining terminal data not retained]\n";
     }
     if(physical_&&!approved_&&!cancelled_){
         prompt_tail_+=out;
