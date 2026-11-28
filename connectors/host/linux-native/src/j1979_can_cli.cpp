@@ -5,6 +5,7 @@
 #include "j1979_live.h"
 #include "j1979_socket_campaign.hpp"
 #include "j1979_live_export.hpp"
+#include "j1979_live_options.hpp"
 #include <time.h>
 #include <memory>
 #include <exception>
@@ -94,8 +95,9 @@ static bool parse(int argc, char **argv, options *o) {
         } else if (!strcmp(flag,"--vin")) {
             if (o->vin||!j1979_can_valid_vin(value)) return false;
             o->vin=value;
-        } else if (!strcmp(flag,"--budget-ms")) {
-            if (has_budget||!parse_milliseconds(value,&o->budget_ms)) return false;
+        } else if (!strcmp(flag,"--budget-ms")||(!strcmp(flag,"--budget")&&o->live)) {
+            if (has_budget||(!strcmp(flag,"--budget")?
+                !cd::liveoptions::seconds_ms(value,o->budget_ms):!parse_milliseconds(value,&o->budget_ms))) return false;
             has_budget=true;
         } else if (!strcmp(flag,"--pid") && o->live) {
             uint32_t pid=0;
@@ -108,8 +110,9 @@ static bool parse(int argc, char **argv, options *o) {
             if (o->cycles_set || !parse_milliseconds(value,&o->cycles) ||
                 o->cycles>1000) return false;
             o->cycles_set=true;
-        } else if (!strcmp(flag,"--interval-ms") && o->live) {
-            if (o->interval_set || !parse_milliseconds(value,&o->interval_ms) ||
+        } else if ((!strcmp(flag,"--interval-ms")||!strcmp(flag,"--interval")) && o->live) {
+            if (o->interval_set || (!strcmp(flag,"--interval")?
+                !cd::liveoptions::seconds_ms(value,o->interval_ms):!parse_milliseconds(value,&o->interval_ms)) ||
                 o->interval_ms<100 || o->interval_ms>60000) return false;
             o->interval_set=true;
         } else return false;

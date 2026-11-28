@@ -1,3 +1,4 @@
+#include "j1979_live_options.hpp"
 #include "j1979_desktop_commands.hpp"
 #include <algorithm>
 #include <cassert>
@@ -17,6 +18,13 @@ const Operation& find(std::string_view id){
 template<class F>void rejects(F f){bool denied=false;try{f();}catch(const std::invalid_argument&){denied=true;}assert(denied);}
 }
 int main(){
+    unsigned milliseconds=99;
+    assert(cd::liveoptions::seconds_ms("1.125",milliseconds)&&milliseconds==1125);
+    assert(cd::liveoptions::seconds_ms("0.1000",milliseconds)&&milliseconds==100);
+    assert(cd::liveoptions::seconds_ms("600",milliseconds)&&milliseconds==600000);
+    for(auto invalid:{"0","600.001","1.0001","NaN","-1","1e2","1,5","1.","999999999999",""})
+        assert(!cd::liveoptions::seconds_ms(invalid,milliseconds));
+
     char name[]="/tmp/camarodiag-desktop-XXXXXX";
     assert(mkdtemp(name));
     const std::string directory=name;

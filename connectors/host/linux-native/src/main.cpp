@@ -7,6 +7,7 @@
 #include "j1979_can_cli.h"
 #include "j1979_socket_campaign.hpp"
 #include "j1979_live_export.hpp"
+#include "j1979_live_options.hpp"
 #include "j1979_network_journal.hpp"
 #include "j1979_can_network.hpp"
 #include "j1979_elm_can.hpp"
@@ -1751,16 +1752,16 @@ static bool parse_legacy_live(int argc,char** argv,LegacyLiveOptions& o){
         }else if(flag=="--baud"){
             if(o.baud_set||!decimal_uint32(value,&o.baud))return false;
             o.baud_set=true;
-        }else if(flag=="--budget-ms"){
+        }else if(flag=="--budget-ms"||flag=="--budget"){
             uint32_t n=0;
-            if(o.budget_set||!decimal_uint32(value,&n))return false;
+            if(o.budget_set||(flag=="--budget"?!cd::liveoptions::seconds_ms(value,n):!decimal_uint32(value,&n)))return false;
             o.plan.budget_ms=n;o.budget_set=true;
         }else if(flag=="--vin"){
             if(!o.plan.vin.empty())return false;
             o.plan.vin=value;
-        }else if(flag=="--cycles"||flag=="--interval-ms"){
+        }else if(flag=="--cycles"||flag=="--interval-ms"||flag=="--interval"){
             auto& seen=flag=="--cycles"?o.cycles_set:o.interval_set;
-            uint32_t n=0;if(seen||!decimal_uint32(value,&n))return false;
+            uint32_t n=0;if(seen||(flag=="--interval"?!cd::liveoptions::seconds_ms(value,n):!decimal_uint32(value,&n)))return false;
             seen=true;if(flag=="--cycles")o.plan.cycles=n;else o.plan.interval_ms=n;
         }else if(flag=="--pid"){
             uint32_t n=0;
@@ -2486,14 +2487,15 @@ static bool parse_elm_can(int argc,char** argv,ElmCanOptions& o,bool live){
                 std::find(o.pids.begin(),o.pids.end(),pid)!=o.pids.end())return false;
             o.pids.push_back(static_cast<uint8_t>(pid));
         }else if(flag=="--profile"||flag=="--baud"||flag=="--budget-ms"||
-                 (live&&(flag=="--cycles"||flag=="--interval-ms"))){
+                 (live&&(flag=="--cycles"||flag=="--interval-ms"||flag=="--interval"||flag=="--budget"))){
             bool* seen=nullptr;unsigned* dest=nullptr;
             if(flag=="--profile"){seen=&o.profile;dest=&o.scope.profile;}
             else if(flag=="--baud"){seen=&o.baud_set;dest=&o.baud;}
-            else if(flag=="--budget-ms"){seen=&o.budget_set;dest=&o.budget;}
+            else if(flag=="--budget-ms"||flag=="--budget"){seen=&o.budget_set;dest=&o.budget;}
             else if(flag=="--cycles"){seen=&o.cycles_set;dest=&o.cycles;}
             else{seen=&o.interval_set;dest=&o.interval;}
-            uint32_t n=0;if(*seen||!decimal_uint32(value,&n))return false;
+            uint32_t n=0;if(*seen||((flag=="--interval"||flag=="--budget")?
+                !cd::liveoptions::seconds_ms(value,n):!decimal_uint32(value,&n)))return false;
             *seen=true;*dest=n;
         }else{
             const char** dest=nullptr;
@@ -3082,6 +3084,7 @@ static void usage(FILE *stream) {
         "  camarodiag-native --j1979-can --interface can0 --tx 7E0 --rx 7E8 --output evidence.json --vin VIN --budget-ms 180000 --confirm-physical-channel [--journal capture.scj]\n"
         "  camarodiag-native --j1979-live-usb-native --port /dev/ttyACM0 --key-file key.bin --capture session.cl --output report.json --tx 7E0 --rx 7E8 --vin VIN --pid 0C --cycles 30 --interval-ms 1000 --budget-ms 180000 --confirm-physical-channel [--projection-output NUMERIC.json] [--csv SAMPLES.csv]\n"
         "  camarodiag-native --j1979-live --interface can0 --tx 7E0 --rx 7E8 --vin VIN --pid 0C --cycles 30 --interval-ms 1000 --budget-ms 180000 --output live.json --confirm-physical-channel [--journal capture.scj] [--projection-output NUMERIC.json] [--csv SAMPLES.csv]\n"
+        "    Live SocketCAN, ELM CAN and legacy: --interval SECONDS and --budget SECONDS are exact aliases; do not combine with their millisecond variants.\n"
         "    Numeric SocketCAN exports require --journal. Raw evidence is never overwritten.\n"
         "  camarodiag-native --inspect-j1979-live-native-prefix CAPTURE.cl VIN PREFIX.json\n"
         "  camarodiag-native --inspect-j1979-live-native CAPTURE.cl VIN REPORT.json\n"
