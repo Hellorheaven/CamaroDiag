@@ -61,7 +61,14 @@ CampaignCapture acquire(Fake& fake,const CampaignPlan& p,bool want_completed=tru
     uint64_t clock=100;fake.clock=&clock;
     Session session(fake,p.target,[]{return true;},{},[&]{return clock;});session.configure();
     CampaignCapture captured;
-    auto r=record_campaign(session,p,[&]{return clock;},[&](unsigned wait){clock+=wait;return true;},captured);
+    unsigned observed=0;
+    const auto observer=[](void* context,const j1979_live_step* step){
+        assert(step&&std::string_view(step->phase)=="SAMPLE");
+        ++*static_cast<unsigned*>(context);
+    };
+    auto r=record_campaign(session,p,[&]{return clock;},[&](unsigned wait){clock+=wait;return true;},captured,observer,&observed);
+    if(p.operation==TraceOperation::scan)assert(observed==0);
+    if(p.operation==TraceOperation::live&&want_completed)assert(observed==p.pids.size()*p.cycles);
     assert(fake.rows.empty()&&r.completed==want_completed&&r.steps>0&&!r.native_report.empty());
     const auto replay=replay_campaign(captured);
     assert(replay.completed==r.completed&&replay.native_report==r.native_report);

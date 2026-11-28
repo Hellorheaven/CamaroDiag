@@ -25,7 +25,7 @@ struct Channel{
     }
     static bool delay(void* p,unsigned ms){return static_cast<Channel*>(p)->wait(ms);}
 };
-CampaignResult run(Channel& link,const CampaignPlan& p){
+CampaignResult run(Channel& link,const CampaignPlan& p,j1979_live_observer observer=nullptr,void* observer_context=nullptr){
     require(p.valid(),"Invalid ELM campaign plan");
     j1979_can_plan plan{Channel::query,Channel::tick,Channel::active,&link,p.target.tx,p.target.rx,p.budget_ms,p.vin.c_str()};
     char* buffer=nullptr;size_t bytes=0;
@@ -48,7 +48,7 @@ CampaignResult run(Channel& link,const CampaignPlan& p){
         live.cycles=p.cycles;live.interval_ms=p.interval_ms;live.wait=Channel::delay;
         std::copy(p.pids.begin(),p.pids.end(),live.pids);
         struct Owner{j1979_live_result r{};~Owner(){j1979_live_free(&r);}} out;
-        if(j1979_live_record(&live,&out.r)||!out.r.steps)throw std::runtime_error("LIVE_ENGINE_FAILED");
+        if(j1979_live_record_observed(&live,&out.r,observer,observer_context)||!out.r.steps)throw std::runtime_error("LIVE_ENGINE_FAILED");
         result.completed=out.r.completed&&out.r.initial_vin_valid&&out.r.final_vin_valid;
         result.stop=out.r.stop_reason;result.steps=out.r.step_count;
         serialized=j1979_live_write_json_transport(stream.file,&live,&out.r,p.interface.c_str(),"ELM_SERIAL_CLASSIC_ISOTP");
@@ -155,12 +155,13 @@ bool CampaignPlan::valid()const{
     for(auto pid:pids){if(!pid||pid%32==0||seen[pid])return false;seen[pid]=true;}
     return true;
 }
-CampaignResult record_campaign(Session& session,const CampaignPlan& plan,legacy::Clock clock,Wait wait,CampaignCapture& capture){
+CampaignResult record_campaign(Session& session,const CampaignPlan& plan,legacy::Clock clock,Wait wait,CampaignCapture& capture,
+    j1979_live_observer observer,void* observer_context){
     require(plan.valid()&&clock&&wait&&session.current()&&scope_equal(session.scope(),plan.target)&&session.evidence().size()==15,
         "Fresh configured ELM campaign required");
     capture={};capture.plan=plan;
     Recording recording(session,clock,wait,capture.events);
-    auto result=run(recording,plan);
+    auto result=run(recording,plan,observer,observer_context);
     capture.trace={plan.target,plan.vin,plan.operation,session.evidence()};
     const auto replay=replay_campaign(capture);
     require(result.native_report==replay.native_report&&result.stop==replay.stop&&result.completed==replay.completed,

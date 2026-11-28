@@ -44,6 +44,13 @@ typedef struct {
 
 bool j1979_live_plan_valid(const j1979_live_plan *plan);
 int j1979_live_record(const j1979_live_plan *plan, j1979_live_result *result);
+/* A synchronous, display-only sample observer. It receives the retained
+ * raw application step, not an authenticated or final engineering value.
+ * It must not issue transport operations, throw, or retain step pointers.
+ * The replay engine never invokes the observer. */
+typedef void (*j1979_live_observer)(void *context,const j1979_live_step *sample);
+int j1979_live_record_observed(const j1979_live_plan *plan,j1979_live_result *result,
+                               j1979_live_observer observer,void *observer_context);
 void j1979_live_free(j1979_live_result *result);
 bool j1979_live_write_json(FILE *stream, const j1979_live_plan *plan,
                            const j1979_live_result *result,

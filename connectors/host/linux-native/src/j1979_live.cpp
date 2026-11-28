@@ -214,6 +214,10 @@ static bool delay_until(const j1979_live_plan *p,j1979_live_result *r,
     }
 }
 int j1979_live_record(const j1979_live_plan *p,j1979_live_result *r) {
+    return j1979_live_record_observed(p,r,nullptr,nullptr);
+}
+int j1979_live_record_observed(const j1979_live_plan *p,j1979_live_result *r,
+                               j1979_live_observer observer,void *observer_context) {
     if (!r) return -1;
     *r={};
     if (!j1979_live_plan_valid(p)) return -1;
@@ -239,6 +243,9 @@ int j1979_live_record(const j1979_live_plan *p,j1979_live_result *r) {
         for (unsigned i=0;i<p->pid_count && !r->stop_reason[0];++i) {
             j1979_live_step *s=query(p,r,start,"SAMPLE",cycle,1,p->pids[i]);
             if (!s) break;
+            // Display may report progress, but cannot alter the recorded
+            // step or the engine's identity/admission decisions.
+            if(observer)observer(observer_context,s);
             if (!passed(s)) {
                 ++r->missing_samples;
                 if (strcmp(s->status,"TIMEOUT") && strcmp(s->status,"NEGATIVE"))

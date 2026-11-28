@@ -157,7 +157,13 @@ int main(){
     {
         File file,raw;
         Writer w(file.fd,plan(true));Fake transport{};
-        const auto result=record(plan(true),link(transport),w);
+        unsigned observed=0;
+        const auto observer=[](void* context,const j1979_live_step* row){
+            assert(row&&std::string_view(row->phase)=="SAMPLE"&&row->cycle>0);
+            ++*static_cast<unsigned*>(context);
+        };
+        const auto result=record(plan(true),link(transport),w,observer,&observed);
+        assert(observed==4);
         assert(write(raw.fd,result.report.data(),result.report.size())==static_cast<ssize_t>(result.report.size()));
         finish(w,result);
         const auto json=raw.name+".json",csv=raw.name+".csv";

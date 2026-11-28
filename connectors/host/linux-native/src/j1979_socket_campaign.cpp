@@ -26,7 +26,7 @@ struct Channel {
 };
 struct ScanOwner {j1979_can_result data{};~ScanOwner(){j1979_can_result_free(&data);}};
 struct LiveOwner {j1979_live_result data{};~LiveOwner(){j1979_live_free(&data);}};
-Result run(const Plan& p,Channel& c){
+Result run(const Plan& p,Channel& c,j1979_live_observer observer=nullptr,void* observer_context=nullptr){
     require(p.valid(),"Invalid SCJ plan");
     j1979_can_plan plan{Channel::query,Channel::tick,Channel::active,&c,p.tx,p.rx,p.budget_ms,p.vin.c_str()};
     char* buffer=nullptr;std::size_t size=0;
@@ -51,7 +51,7 @@ Result run(const Plan& p,Channel& c){
         live.cycles=p.cycles;live.interval_ms=p.interval_ms;live.wait=Channel::delay;
         std::copy(p.pids.begin(),p.pids.end(),live.pids);
         LiveOwner r;
-        if(j1979_live_record(&live,&r.data)||!r.data.steps)throw std::runtime_error("SCJ live failed");
+        if(j1979_live_record_observed(&live,&r.data,observer,observer_context)||!r.data.steps)throw std::runtime_error("SCJ live failed");
         out.completed=r.data.completed&&r.data.initial_vin_valid&&r.data.final_vin_valid;
         out.stop=r.data.stop_reason;
         out.exchanges=static_cast<unsigned>(r.data.step_count);
@@ -214,10 +214,10 @@ Value text(std::string_view s){return Value{std::string(s)};}
 Value num(std::size_t n){return Value{json::Integer{std::to_string(n)}};}
 Value flag(bool b){return Value{b};}
 }
-Result record(const Plan& p,const Link& link,Writer& w){
+Result record(const Plan& p,const Link& link,Writer& w,j1979_live_observer observer,void* observer_context){
     require(w.healthy()&&w.plan()==p,"SCJ writer plan differs from acquisition");
     Recording c(link,w);
-    auto out=run(p,c);
+    auto out=run(p,c,observer,observer_context);
     c.drain();out.dispatch_calls=c.dispatch_calls();out.response_records=c.response_records();
     return out;
 }

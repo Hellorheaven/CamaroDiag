@@ -28,7 +28,8 @@ struct CampaignResult{
     size_t steps{};
 };
 using Wait=std::function<bool(unsigned)>;
-CampaignResult record_campaign(Session&,const CampaignPlan&,legacy::Clock,Wait,CampaignCapture&);
+CampaignResult record_campaign(Session&,const CampaignPlan&,legacy::Clock,Wait,CampaignCapture&,
+    j1979_live_observer observer=nullptr,void* observer_context=nullptr);
 CampaignResult replay_campaign(const CampaignCapture&);
 Data encode_campaign(const CampaignCapture&);
 CampaignCapture decode_campaign(Bytes);

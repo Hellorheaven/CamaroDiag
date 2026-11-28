@@ -73,6 +73,6 @@ struct Link {
     j1979_live_wait wait{};
     void* context{};
 };
-Result record(const Plan&,const Link&,Writer&);
+Result record(const Plan&,const Link&,Writer&,j1979_live_observer observer=nullptr,void* observer_context=nullptr);
 void finish(Writer&,const Result&);
 }
