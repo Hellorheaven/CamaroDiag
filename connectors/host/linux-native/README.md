@@ -577,3 +577,37 @@ de preuve JSON. Le format portable reste distinct du format Linux enrichi.
 Aucun de ces contrôles ne contacte le véhicule. Les tests synthétiques
 des trois hôtes utilisent la même chronologie de température/régime ;
 leur exécution reste réservée au gate de clôture.
+
+
+## Journal-backed numerical projection and comparison
+
+The live SocketCAN and ELM CAN paths now independently reconstruct the
+report from the sealed SCJ/1 or ECP/1 recording before optional numerical
+JSON/CSV publication. An independently replayed source is required for this
+path; a standalone native JSON report can still be inspected, but is
+explicitly distinguished from transport evidence.
+
+~~~sh
+camarodiag-native project-live-evidence --scj session.scj --tx 7E0 --rx 7E8 --vin VIN --output numeric.json
+camarodiag-native export-live-evidence-csv --ecp session.ecp --profile 6 --tx 7E0 --rx 7E8 --vin VIN --output samples.csv
+camarodiag-native verify-live-evidence --scj session.scj --projection numeric.json --tx 7E0 --rx 7E8 --vin VIN --output proof.json
+camarodiag-native compare-native-live --scj session.scj --ecp session.ecp --profile 6 --tx 7E0 --rx 7E8 --vin VIN --output comparison.json
+~~~
+
+Each offline projection accepts exactly one of --scj, --ecp, --cl1 or
+--report. ECP requires a separately selected ELM CAN profile; the comparison
+uses that same profile for all ECP inputs. Maximum offline source size is
+64 MiB, with a 128 MiB aggregate input limit for comparison. Source digests
+and the digest of the replayed raw report are recorded separately. CSV
+rows carry both digests, VIN, CAN pair, and completion/replay flags.
+Existing report-only projection commands keep their original CSV layout.
+A journal and its exact derived report cannot count twice as independent
+recordings. These checks prove software consistency, not physical
+authenticity or authorization.
+
+FR : les sorties numériques produites en direct avec SocketCAN ou ELM CAN
+se vérifient désormais avec verify-live-evidence et la preuve originale,
+et non avec verify-native-live-projection et le seul rapport JSON.
+Le format historique demeure disponible. La nouvelle provenance figure
+aussi dans chaque ligne CSV. Les trois fonctions hors ligne sont
+accessibles dans le bureau Linux. Aucun test de clôture exécuté à ce stade.

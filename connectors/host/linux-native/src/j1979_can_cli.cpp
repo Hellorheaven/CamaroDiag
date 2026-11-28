@@ -180,9 +180,10 @@ int j1979_can_cli(int argc, char **argv) {
         return 2;
     }
     FILE *stream=fdopen(fd,"w");
-    if (!stream) {close(fd);unlink(o.output);return 2;}
+    if (!stream) {close(fd);return 2;}
     std::unique_ptr<cd::liveexport::Destination> projection,csv;
     try{
+        cd::liveexport::validate_reservation(fd,o.output);
         projection=std::make_unique<cd::liveexport::Destination>(o.projection);
         csv=std::make_unique<cd::liveexport::Destination>(o.csv);
     }catch(const std::exception& e){
@@ -197,6 +198,7 @@ int j1979_can_cli(int argc, char **argv) {
             scope=journal_plan(o);
             if(!scope.valid())throw std::invalid_argument("Invalid journal campaign scope");
             journal_fd.value=open(o.journal,O_RDWR|O_CREAT|O_EXCL|O_NOFOLLOW|O_CLOEXEC,0600);
+            cd::liveexport::validate_reservation(journal_fd.value,o.journal);
             journal=std::make_unique<cd::socketcampaign::Writer>(journal_fd.value,scope);
         }catch(const std::exception& e){
             fprintf(stderr,"SocketCAN journal unavailable: %s\n",e.what());

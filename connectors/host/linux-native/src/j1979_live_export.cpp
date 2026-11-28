@@ -75,13 +75,18 @@ void check_source(int fd,const char* path,std::string_view expected){
         "Live source report changed during readback");
 }
 }
+void validate_reservation(int fd,const char* path){
+    require(private_file(fd,path).st_size==0,"Reserved evidence file is not empty");
+    sync_parent(path);
+    require(private_file(fd,path).st_size==0,"Reserved evidence changed after directory sync");
+}
 Destination::Destination(const char* path){
     if(!path)return;
     path_=path;
     require(!path_.empty(),"Empty live export destination");
     fd_=open(path_.c_str(),O_RDWR|O_CREAT|O_EXCL|O_NOFOLLOW|O_CLOEXEC,0600);
     require(fd_>=0,"Live export destination already exists or cannot be reserved");
-    try{check_empty();sync_parent(path_.c_str());}catch(...){close(fd_);fd_=-1;throw;}
+    try{validate_reservation(fd_,path_.c_str());}catch(...){close(fd_);fd_=-1;throw;}
 }
 Destination::~Destination(){if(fd_>=0)close(fd_);}
 void Destination::verify()const{

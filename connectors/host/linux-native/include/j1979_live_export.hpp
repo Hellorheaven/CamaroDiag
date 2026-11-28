@@ -22,6 +22,9 @@ public:
     void check_empty()const;
     void persist(std::string_view);
 };
+// Check a newly reserved descriptor is still named, private and empty,
+// and synchronize its directory before vehicle I/O.
+void validate_reservation(int fd,const char* path);
 struct Result {
     bool complete{};
     std::string source_sha256;

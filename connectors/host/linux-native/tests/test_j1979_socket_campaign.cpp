@@ -108,6 +108,10 @@ void complete(bool live,Fake f={}){
         assert(projected.source_sha256==sha256(data)&&projected.raw_report_sha256==sha256(r.report));
         assert(projected.projection.report.at("transport_recipe_replayed").boolean());
         assert(projected.projection.report.at("evidence_kind").string()=="SCJ/1");
+        const auto csv=cd::network::history::native_live_csv(projected.projection);
+        assert(csv.find("evidence_kind,source_sha256,raw_report_sha256")!=std::string::npos);
+        assert(csv.find(projected.source_sha256)!=std::string::npos&&csv.find(projected.raw_report_sha256)!=std::string::npos);
+        assert(csv.find(vin)!=std::string::npos);
         const auto report=cd::network::history::project_live_evidence(LiveEvidenceKind::report,
             {reinterpret_cast<const std::uint8_t*>(r.report.data()),r.report.size()},{0x7e0,0x7e8},vin);
         assert(!report.projection.report.at("original_capture_replayed").boolean());

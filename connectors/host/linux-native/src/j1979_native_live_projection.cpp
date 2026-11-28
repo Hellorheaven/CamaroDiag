@@ -125,13 +125,19 @@ std::string csv_cell(const Value& v){
     if(const auto* n=std::get_if<json::Decimal>(&v.data))return n->text;
     throw std::invalid_argument("Unexpected live CSV cell type");
 }
-void csv_line(std::ostringstream& csv,const Value& row,const Value* signal){
+void csv_line(std::ostringstream& csv,const Value& row,const Value* signal,const Value* evidence){
     bool first=true;
     const auto append=[&](const Value& v){if(!first)csv<<',';first=false;csv<<csv_cell(v);};
     for(auto key:{"cycle","pid_hex","started_elapsed_ms","elapsed_ms","duration_ms","status"})append(row.at(key));
     for(auto key:{"number","unit"})append(signal?signal->at(key):Value{});
     for(auto key:{"request_hex","response_hex","detail"})append(row.at(key));
     for(auto key:{"name","raw_encoded","scale_source","scale_configuration"})append(signal?signal->at(key):Value{});
+    if(evidence){
+        for(auto key:{"evidence_kind","source_sha256","raw_report_sha256","vin","tx_can_id","rx_can_id"})
+            append(evidence->at(key));
+        for(auto key:{"original_capture_replayed","transport_recipe_replayed","identity_rechecked","numeric_projection_complete"})
+            append(text(evidence->at(key).boolean()?"true":"false"));
+    }
     csv<<'\n';
 }
 }
@@ -258,11 +264,20 @@ json::Value verify_native_live_projection(const json::Value& source,const json::
 }
 std::string native_live_csv(const NativeLiveProjection& p){
     std::ostringstream csv;csv.imbue(std::locale::classic());
-    csv<<"cycle,pid_hex,started_elapsed_ms,elapsed_ms,duration_ms,status,value,unit,request_hex,response_hex,detail,signal_name,raw_encoded,scale_source,scale_configuration\n";
+    constexpr auto limit=64u*1024u*1024u;
+    const auto* evidence=p.report.find("evidence_kind")?&p.report:nullptr;
+    csv<<"cycle,pid_hex,started_elapsed_ms,elapsed_ms,duration_ms,status,value,unit,request_hex,response_hex,detail,signal_name,raw_encoded,scale_source,scale_configuration";
+    if(evidence)csv<<",evidence_kind,source_sha256,raw_report_sha256,vin,tx_can_id,rx_can_id,original_capture_replayed,transport_recipe_replayed,identity_rechecked,numeric_projection_complete";
+    csv<<'\n';
     for(const auto& row:p.report.at("samples").array()){
         const auto& signals=row.at("signals").array();
-        if(signals.empty())csv_line(csv,row,nullptr);
-        else for(const auto& signal:signals)csv_line(csv,row,&signal);
+        const auto emit=[&](const Value* signal){
+            csv_line(csv,row,signal,evidence);
+            const auto pos=csv.tellp();
+            require(pos>=0&&static_cast<std::uint64_t>(pos)<=limit,"Native live CSV size limit");
+        };
+        if(signals.empty())emit(nullptr);
+        else for(const auto& signal:signals)emit(&signal);
     }
     auto result=csv.str();require(result.size()<=64u*1024u*1024u,"Native live CSV size limit");
     return result;
