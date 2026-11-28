@@ -2,6 +2,7 @@
 #include "j1979_can_network.hpp"
 #include "native_json.hpp"
 #include "j1979_historical_can_plan.hpp"
+#include "j1979_native_can_inspection.hpp"
 namespace cd::network::history {
 struct Inspection {
     Discovery discovery;
@@ -15,6 +16,7 @@ struct PhysicalRow {
     Pair pair;
     std::string status,error;
     std::optional<PlanInspection> plan;
+    std::optional<NativeInspection> native_plan;
 };
 struct NetworkInspection {
     Inspection admission;

@@ -33,6 +33,7 @@
 #include <time.h>
 #include <array>
 #include <algorithm>
+#include <charconv>
 #include <string_view>
 #include <exception>
 
@@ -2819,6 +2820,7 @@ static void usage(FILE *stream) {
         "  camarodiag-native --inspect-j1979-legacy-maintenance VIN FINAL.json BASELINE.json INTENT.json PROOF.json\n"
         "  camarodiag-native --j1979-legacy-maintenance --operation clear --port /dev/ttyUSB0 --protocol 2 --engine-source 10 --source 10 --vin VIN --baseline baseline.json --intent intent.json --output result.json --confirm-functional-scope --acknowledge-maintenance-warning\n"
         "  camarodiag-native --inspect-j1979-legacy-discovery PROTOCOL RAW_RESPONSE RAW_ATDPN REPORT.json\n"
+        "  camarodiag-native --inspect-j1979-native-can-plan TX RX VIN REPORT.json PROOF.json\n"
         "  camarodiag-native verify-network --report REPORT.json [--vin VIN] --output PROOF.json\n"
         "  camarodiag-native --inspect-j1979-historical-can-network VIN|- REPORT.json PROOF.json\n"
         "  camarodiag-native --inspect-j1979-historical-can-plan historical|android VIN|- REPORT.json PROOF.json\n"
@@ -2921,6 +2923,28 @@ static int historical_can_network_cli(const char* vin,const char* path,const cha
         return 0;
     }catch(const std::exception& e){return error(e.what());}
 }
+static int native_can_plan_cli(const char* tx_text,const char* rx_text,const char* vin,const char* path,const char* output){
+    try{
+        auto parse_id=[](std::string_view s){
+            std::uint32_t n{};
+            const auto [end,ec]=std::from_chars(s.data(),s.data()+s.size(),n,16);
+            if(s.empty()||s.size()>8||ec!=std::errc{}||end!=s.data()+s.size()||n>0x1fffffffu)
+                throw std::invalid_argument("Explicit hexadecimal CAN identifier required");
+            return n;
+        };
+        constexpr std::size_t maximum=32*1024*1024;
+        input original{},again{};
+        if(!load_regular(path,maximum,&original))return error("Bounded native physical report required");
+        const std::string_view raw(reinterpret_cast<const char*>(original.bytes.get()),original.length);
+        const auto result=cd::network::history::inspect_native_plan(cd::json::parse_report(raw,maximum),
+            {parse_id(tx_text),parse_id(rx_text)},vin);
+        const auto proof="{\"source_sha256\":"+cd::json::quote(original.digest)+",\"inspection\":"+
+            cd::network::history::native_plan_report(result)+"}\n";
+        if(!load_regular(path,maximum,&again)||!same_input(&original,&again))return error("Native physical report changed");
+        if(!atomic_create(output,proof.data(),proof.size()))return error("Native physical proof destination unavailable");
+        return 0;
+    }catch(const std::exception& e){return error(e.what());}
+}
 static int verify_network_compat_cli(int argc,char** argv){
     const char* path=nullptr;const char* vin="-";const char* output=nullptr;
     bool vin_seen=false;
@@ -2938,6 +2962,7 @@ static int verify_network_compat_cli(int argc,char** argv){
     return historical_can_network_cli(vin,path,output);
 }
 int main(int argc, char **argv) {
+    if(argc==7&&!strcmp(argv[1],"--inspect-j1979-native-can-plan"))return native_can_plan_cli(argv[2],argv[3],argv[4],argv[5],argv[6]);
     if(argc>=2&&!strcmp(argv[1],"verify-network"))return verify_network_compat_cli(argc,argv);
     if(argc==5&&!strcmp(argv[1],"--inspect-j1979-historical-can-network"))return historical_can_network_cli(argv[2],argv[3],argv[4]);
     if(argc==6&&!strcmp(argv[1],"--inspect-j1979-historical-can-plan"))return historical_can_plan_cli(argv[2],argv[3],argv[4],argv[5]);

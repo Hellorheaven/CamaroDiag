@@ -185,7 +185,8 @@ bool supported_schema(const Value& v){
     return contains_schema(v,"camarodiag-j1979-network-v1")||
         contains_schema(v,"camarodiag-functional-j1979-can-discovery-v1")||
         contains_schema(v,"camarodiag-functional-j1979-can-network-v1")||
-        contains_schema(v,"camarodiag-j1979-can-discovery-linux-v1");
+        contains_schema(v,"camarodiag-j1979-can-discovery-linux-v1")||
+        contains_schema(v,"camarodiag-j1979-can-network-linux-v1");
 }
 const Value& unwrap(const Value& v){
     no_claims(v);
@@ -209,6 +210,12 @@ static Inspection inspect_admission(const Value& root,bool campaign){
         if(!campaign)require(array(required(root,"ecus"),max_targets).empty()&&
             array(required(root,"selected_response_ids"),max_targets).empty(),"Use discovery-only Android report");
         d=&required(root,"discovery");
+    }else if(campaign&&contains_schema(root,"camarodiag-j1979-can-network-linux-v1")){
+        require(required(root,"protocol").string()=="SAE-J1979"&&
+            required(root,"scope").string()=="EXPLICIT_PHYSICAL_RESPONDER_SET","Invalid native network scope");
+        result.platform="LINUX_NATIVE";d=&required(root,"discovery");
+        require(contains_schema(*d,"camarodiag-j1979-can-discovery-linux-v1"),"Native network requires native discovery");
+        extended=addressing(required(*d,"addressing"));
     }else if(contains_schema(root,campaign?"camarodiag-functional-j1979-can-network-v1":
         "camarodiag-functional-j1979-can-discovery-v1")&&root.find("profile")){
         result.platform="J2534";const auto p=bounded_int(required(root,"profile"),36);
@@ -326,7 +333,8 @@ NetworkInspection inspect_network(const Value& source,std::optional<std::string>
         discovery_only=array(required(root,"selected_response_ids"),max_targets).empty();
     out.discovery_only=discovery_only;
     out.admission=inspect_admission(root,!discovery_only);
-    const bool android=out.admission.platform=="ANDROID",windows=out.admission.platform=="J2534";
+    const bool android=out.admission.platform=="ANDROID",windows=out.admission.platform=="J2534",
+        native=out.admission.platform=="LINUX_NATIVE";
     const auto& d=out.admission.discovery;
     const Value* body=&root;
     if(discovery_only){
@@ -347,7 +355,7 @@ NetworkInspection inspect_network(const Value& source,std::optional<std::string>
     no_claims(*body);
     out.vin=vin_value(optional(*body,"declared_vin"));
     if(expected_vin)require(out.vin==expected_vin,"Network VIN differs from independent target");
-    if(android)require(out.vin.has_value(),"Android network VIN missing");
+    if(android||native)require(out.vin.has_value(),"Selected physical network VIN missing");
     out.completed=required(root,"completed").boolean();
     require(required(*body,"completed").boolean()==out.completed,"Outer network completion differs");
     out.stop=optional_text(*body,"stop_reason");
@@ -369,8 +377,10 @@ NetworkInspection inspect_network(const Value& source,std::optional<std::string>
     });
     const auto& rows=array(required(*body,android?"ecus":"ecu_reports"),max_targets);
     require(rows.size()<=out.selected.size(),"Unselected physical ECU");
+    if(native)require(rows.size()==out.selected.size(),"Native report must retain every selected ECU row");
     if(out.completed)require(all_eligible&&rows.size()==out.selected.size(),"Completed network lacks selected ECU");
     bool terminal=false;
+    std::string native_stop=native&&!all_eligible?"SELECTED_RESPONDER_UNVERIFIED":"";
     for(std::size_t i=0;i<rows.size();++i){
         const auto& v=rows[i];no_claims(v);
         PhysicalRow row{};
@@ -386,17 +396,43 @@ NetworkInspection inspect_network(const Value& source,std::optional<std::string>
             no_claims(evidence);
             if(const auto* tx=property(evidence,"tx_can_id"))require(address(*tx)==row.pair.tx,"Inner physical TX differs");
             if(const auto* rx=property(evidence,"rx_can_id"))require(address(*rx)==row.pair.rx,"Inner physical RX differs");
+            if(native){
+                require(all_eligible&&!terminal&&native_stop.empty(),"Native report contains a campaign after selection or terminal failure");
+                row.native_plan=inspect_native_plan(evidence,row.pair,*out.vin);
+                require(row.native_plan->transport=="LINUX_SOCKETCAN_ISOTP","Native network physical transport differs");
+                require(row.status!="PASSED"||row.native_plan->completed,"Successful native ECU has incomplete campaign");
+                if(row.status=="PASSED")require(row.error.empty(),"Successful native ECU has error");
+                else require(row.error=="CANCELLED"||row.error=="BUDGET_EXHAUSTED"||
+                    (!row.native_plan->completed&&row.error==row.native_plan->stop_reason),
+                    "Native ECU row error differs from replay");
+            }else{
             row.plan=inspect_plan(evidence,android?PlanOrder::android:PlanOrder::historical,out.vin);
             if(!row.plan->steps.empty())require(all_eligible&&!terminal,"Read attempted after unverified or terminal target");
             require(row.status!="PASSED"||row.plan->completed,"Successful ECU lacks complete physical plan");
             if(!row.plan->completed&&(android||windows||terminal_error(row.error)||terminal_error(row.plan->stop_reason)))terminal=true;
+            }
         }else{
             require(row.status!="PASSED","Successful ECU has no physical report");
             if(android||windows||terminal_error(row.error))terminal=true;
         }
-        if(out.completed)require(row.status=="PASSED"&&row.plan&&row.plan->completed,"Completed network contains failed ECU");
+        if(native){
+            if(!native_stop.empty()){
+                require(row.status=="NOT_TESTED"&&!row.native_plan&&row.error==native_stop,
+                    "Native report did not preserve terminal untested row");
+            }else if(row.status!="PASSED"){
+                require(!row.error.empty(),"Incomplete native ECU lacks reason");
+                if(!row.native_plan)require(row.error=="CANCELLED"||row.error=="BUDGET_EXHAUSTED"||
+                    row.error=="TRANSPORT_UNAVAILABLE"||row.error=="CAMPAIGN_FAILED"||row.error=="PHYSICAL_SCAN_FAILED",
+                    "Unknown native untested outcome");
+                native_stop=row.error;terminal=true;
+            }
+        }
+        if(out.completed)require(row.status=="PASSED"&&
+            (native?(row.native_plan&&row.native_plan->completed):(row.plan&&row.plan->completed)),
+            "Completed network contains failed ECU");
         out.rows.push_back(std::move(row));
     }
+    if(native)require(out.stop==native_stop&&out.completed==native_stop.empty(),"Native network stop differs from selected ECU outcomes");
     return out;
 }
 std::string report(const NetworkInspection& r,std::string_view digest){
@@ -414,7 +450,8 @@ std::string report(const NetworkInspection& r,std::string_view digest){
         const auto& row=r.rows[i];
         o<<"{\"request_id\":"<<json::quote(hex(row.pair.tx))<<",\"response_id\":"<<json::quote(hex(row.pair.rx))
             <<",\"status\":"<<json::quote(row.status)<<",\"error\":"<<(row.error.empty()?"null":json::quote(row.error))
-            <<",\"plan\":"<<(row.plan?plan_report(*row.plan):"null")<<'}';
+            <<",\"plan\":"<<(row.plan?plan_report(*row.plan):"null")
+            <<",\"native_plan\":"<<(row.native_plan?native_plan_report(*row.native_plan):"null")<<'}';
     }
     o<<"],\"source_sha256\":"<<(digest.empty()?"null":json::quote(digest))
         <<",\"derived_projections_verified\":false,\"authenticated\":false,\"physical_vehicle_verified\":false,"

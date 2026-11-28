@@ -1,4 +1,5 @@
 #include "j1979_native_can_inspection.hpp"
+#include "j1979_network_history.hpp"
 #include "j1979_can.h"
 #include <algorithm>
 #include <cassert>
@@ -65,6 +66,23 @@ int main(){
     rejects(replace(raw,"\"physical_vehicle_verified\":false","\"physical_vehicle_verified\":true"));
     rejects(replace(raw,"\"duration_ms\":0","\"duration_ms\":-1"));
     rejects(raw,{0x7e1,0x7e9});
+    Frame frame{pair.rx,false,false,false,{6,0x41,0,8,0,0,0,0}};
+    Scan network{};
+    network.discovery=replay_discovery(false,true,std::array{frame},"",0);
+    network.vin=vin;network.completed=true;network.selected={pair.rx};
+    network.ecus={{pair,"PASSED","",raw}};
+    auto network_json=report(network);
+    auto inspected=history::inspect_network(cd::json::parse_report(network_json),std::string(vin));
+    assert(inspected.completed&&inspected.rows[0].native_plan&&inspected.rows[0].native_plan->steps==11);
+    auto invalid_network=replace(network_json,"\"number\":60","\"number\":61");
+    bool rejected=false;
+    try{(void)history::inspect_network(cd::json::parse_report(invalid_network),std::string(vin));}
+    catch(const std::exception&){rejected=true;}
+    assert(rejected);
+    network.completed=false;network.stop="CANCELLED";
+    network.ecus[0].status="NOT_TESTED";network.ecus[0].error="CANCELLED";
+    inspected=history::inspect_network(cd::json::parse_report(report(network)),std::string(vin));
+    assert(!inspected.completed&&inspected.rows[0].native_plan->completed);
     Fake f{};f.partial=true;
     const auto partial=history::inspect_native_plan(cd::json::parse_report(fixture(f)),pair,vin);
     assert(!partial.completed&&partial.stop_reason=="INVENTORY_INCOMPLETE");

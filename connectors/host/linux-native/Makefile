@@ -66,7 +66,7 @@ test: test-j1979-native-can-inspection test-j1979-historical-can-network test-j1
 	./test-j1979-live
 	./test-j1979-cl1
 
-test-j1979-native-can-inspection: build/test_j1979_native_can_inspection.o build/j1979_native_can_inspection.o build/native_json.o build/j1979_can.o $(DECODER_OBJECTS) build/j1979_policy.o
+test-j1979-native-can-inspection: build/test_j1979_native_can_inspection.o build/j1979_native_can_inspection.o build/native_json.o build/j1979_can.o $(DECODER_OBJECTS) build/j1979_policy.o build/j1979_network_history.o build/j1979_can_network.o build/j1979_can_network_report.o build/j1979_historical_can_plan.o build/j1979_historical_can_summary.o build/j1979_historical_can_derived.o
 	$(CXX) $(LDFLAGS) $^ -o $@
 
 test-j1979-historical-can-plan: build/test_j1979_historical_can_plan.o build/j1979_historical_can_plan.o build/j1979_historical_can_summary.o build/j1979_historical_can_derived.o $(DECODER_OBJECTS) build/native_json.o build/j1979_policy.o
@@ -75,10 +75,10 @@ test-j1979-historical-can-plan: build/test_j1979_historical_can_plan.o build/j19
 test-native-json-report: build/test_native_json_report.o build/native_json.o
 	$(CXX) $(LDFLAGS) $^ -o $@
 
-test-j1979-network-history: build/test_j1979_network_history.o build/j1979_network_history.o build/j1979_can_network.o build/j1979_can_network_report.o build/j1979_historical_can_plan.o build/j1979_historical_can_summary.o build/j1979_historical_can_derived.o $(DECODER_OBJECTS) build/j1979_policy.o build/native_json.o
+test-j1979-network-history: build/test_j1979_network_history.o build/j1979_network_history.o build/j1979_can_network.o build/j1979_can_network_report.o build/j1979_historical_can_plan.o build/j1979_historical_can_summary.o build/j1979_historical_can_derived.o $(DECODER_OBJECTS) build/j1979_policy.o build/native_json.o build/j1979_native_can_inspection.o build/j1979_can.o
 	$(CXX) $(LDFLAGS) $^ -o $@
 
-test-j1979-historical-can-network: build/test_j1979_historical_can_network.o build/j1979_network_history.o build/j1979_can_network.o build/j1979_can_network_report.o build/j1979_historical_can_plan.o build/j1979_historical_can_summary.o build/j1979_historical_can_derived.o $(DECODER_OBJECTS) build/j1979_policy.o build/native_json.o
+test-j1979-historical-can-network: build/test_j1979_historical_can_network.o build/j1979_network_history.o build/j1979_can_network.o build/j1979_can_network_report.o build/j1979_historical_can_plan.o build/j1979_historical_can_summary.o build/j1979_historical_can_derived.o $(DECODER_OBJECTS) build/j1979_policy.o build/native_json.o build/j1979_native_can_inspection.o build/j1979_can.o
 	$(CXX) $(LDFLAGS) $^ -o $@
 
 test-j1979-legacy-discovery-history: build/test_j1979_legacy_discovery_history.o build/j1979_legacy_discovery_history.o build/native_json.o build/j1979_legacy.o build/j1979_legacy_identity.o build/j1979_legacy_freeze_plan.o

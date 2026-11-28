@@ -96,7 +96,7 @@ Recorded parse_step(const Value& v){
     return out;
 }
 class Replay {
-    const std::vector<Recorded>& recorded_;
+    std::vector<Recorded>& recorded_;
     std::vector<j1979_can_step> rows_;
     std::uint8_t empty_payload_{};
     std::size_t index_{};
@@ -170,15 +170,14 @@ class Replay {
                 "Native report ends before next required request");
             stop(declared_stop_);return nullptr;
         }
-        const auto& src=recorded_[index_];
+        auto& src=recorded_[index_];
         require(src.request==q,"Unexpected native request or service order");
         auto& step=rows_[index_++];
         step.request_size=static_cast<std::uint8_t>(q.size());
         std::copy(q.begin(),q.end(),step.request);
         if(src.response){
-            // The serializer does not mutate the replay bytes. Its C-style
-            // compatibility structure retains a non-const borrowed pointer.
-            step.response=src.response->empty()?&empty_payload_:const_cast<std::uint8_t*>(src.response->data());
+            // Borrow the owned mutable replay buffer; no cast or transfer of ownership.
+            step.response=src.response->empty()?&empty_payload_:src.response->data();
             step.response_size=src.response->size();
         }
         step.duration_ms=src.duration;
@@ -207,7 +206,7 @@ class Replay {
             if(result_.advertised[mode][id]&&id%32!=0&&!(mode==9&&id==2))read(req(id));
     }
 public:
-    Replay(const std::vector<Recorded>& rows,std::string stop_reason,std::string expected):
+    Replay(std::vector<Recorded>& rows,std::string stop_reason,std::string expected):
         recorded_(rows),rows_(std::max<std::size_t>(1,rows.size())),
         declared_stop_(std::move(stop_reason)),expected_vin_(std::move(expected)){
         result_.steps=rows_.data();
