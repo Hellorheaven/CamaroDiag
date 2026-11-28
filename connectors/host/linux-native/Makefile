@@ -59,7 +59,7 @@ test: test-j1979-legacy-journal test-j1979-host-freeze test-j1979-elm-can test-j
 test-j1979-legacy-journal: build/test_j1979_legacy_journal.o build/j1979_legacy_journal.o build/j1979_legacy_scan.o build/j1979_legacy_scan_wire.o build/j1979_legacy_freeze.o build/j1979_legacy_freeze_wire.o build/j1979_legacy_live.o build/j1979_legacy_live_wire.o build/j1979_legacy_live_plan.o build/j1979_legacy_identity.o build/j1979_legacy_freeze_plan.o build/j1979_legacy.o build/j1979_elm.o $(DECODER_OBJECTS) build/j1979_policy.o
 	$(CXX) $(LDFLAGS) $^ -o $@
 
-test-j1979-host-freeze: build/test_j1979_host_freeze.o build/j1979_host_freeze.o build/cf1.o build/cf1_complete.o build/j1979_isotp.o build/j1979_can.o $(DECODER_OBJECTS) build/j1979_policy.o
+test-j1979-host-freeze: build/test_j1979_host_freeze.o build/j1979_host_freeze.o build/j1979_elm_can_session.o build/j1979_elm_can_decode.o build/j1979_legacy.o build/j1979_legacy_identity.o build/j1979_legacy_freeze_plan.o build/j1979_elm.o build/cf1.o build/cf1_complete.o build/j1979_isotp.o build/j1979_can.o $(DECODER_OBJECTS) build/j1979_policy.o
 	$(CXX) $(LDFLAGS) $^ -o $@
 
 test-j1979-elm-can: build/test_j1979_elm_can.o build/j1979_elm_can_decode.o build/j1979_elm_can_session.o build/j1979_elm_can_report.o build/j1979_legacy.o build/j1979_legacy_identity.o build/j1979_legacy_freeze_plan.o build/j1979_elm.o build/j1979_can.o $(DECODER_OBJECTS) build/j1979_policy.o

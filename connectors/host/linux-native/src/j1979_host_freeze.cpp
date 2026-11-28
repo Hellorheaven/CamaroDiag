@@ -81,15 +81,77 @@ public:
         return fd>=0&&close(fd)==0;
     }
 };
-}
-Result run_socket(const cf1_plan& p,const char* interface,int fd,const volatile sig_atomic_t* cancel){
-    if(!cf1_valid_plan(&p)||!j1979_isotp_valid_interface(interface)||(cancel&&*cancel))
-        throw std::invalid_argument("Explicit approved SocketCAN freeze plan required");
+class ElmApplication final:public Campaign::Link{
+    elmcan::Session& session_;
+    const J1979FreezeScope scope_;
+public:
+    ElmApplication(elmcan::Session& session,const J1979FreezeScope& scope):session_(session),scope_(scope){}
+    bool active()override{return session_.current()&&now()!=0;}
+    bool matches(uint32_t tx,uint32_t rx,bool ext)const override{
+        const auto& target=session_.scope();
+        return target.tx==tx&&target.rx==rx&&target.extended()==ext;
+    }
+    bool matchesFreeze(const J1979FreezeScope& scope)const override{return scope_.same(scope);}
+    uint32_t monotonicMs()override{return static_cast<uint32_t>(now());}
+    void exchange(const uint8_t* q,size_t n,uint32_t timeout,J1979CanReadExchange::Result& r)override{
+        r.state=State::Fault;r.responseSize=0;r.elapsedMs=0;
+        if(!active()||!scope_.allows(q,n))return;
+        const auto start=now();
+        size_t capacity=sizeof(r.response);
+        const int status=session_.exchange_freeze(scope_,{q,n},r.response,capacity,timeout);
+        const auto end=now();
+        if(end<start||end-start>timeout||!active())return;
+        r.elapsedMs=static_cast<uint32_t>(end-start);
+        if(status==1){r.state=State::Timeout;return;}
+        if(status!=0||!capacity||capacity>sizeof(r.response))return;
+        using R=J1979ReadEvidence::Result;
+        switch(J1979ReadEvidence::classifyFreeze(scope_,q,n,r.response,capacity)){
+        case R::Positive:r.state=State::Positive;break;
+        case R::Raw:r.state=State::Raw;break;
+        case R::Negative:r.state=State::Negative;break;
+        default:return;
+        }
+        r.responseSize=capacity;
+    }
+};
+J1979FreezeScope freeze_scope(const cf1_plan& p){
     J1979FreezeScope scope{};
     std::copy_n(reinterpret_cast<const uint8_t*>(p.vin),17,scope.vin);
     scope.frameCount=p.frame_count;scope.pidCount=p.pid_count;
     std::copy_n(p.frames,p.frame_count,scope.frames);std::copy_n(p.pids,p.pid_count,scope.pids);
     if(!scope.valid())throw std::invalid_argument("Noncanonical freeze plan");
+    return scope;
+}
+}
+ElmResult run_elm(const cf1_plan& p,elmcan::Scope target,legacy::Link& link,legacy::Current current,int fd){
+    if(!cf1_valid_plan(&p)||!target.valid()||target.tx!=p.tx||target.rx!=p.rx||target.extended()!=p.extended||
+        !current||!current())throw std::invalid_argument("Explicit fixed ELM CAN freeze plan required");
+    const auto scope=freeze_scope(p);
+    Writer writer(fd);J1979FreezeEvidence evidence(writer);
+    ElmResult result{};
+    if(!evidence.begin(p.tx,p.rx,p.extended,p.budget_ms,scope))return result;
+    result.capture.capture_started=true;
+    elmcan::Session session(link,target,current);
+    try{
+        session.configure();
+        ElmApplication application(session,scope);
+        J1979CanReadExchange::Result scratch{};
+        result.capture.summary=Campaign::runApplication(application,p.tx,p.rx,p.extended,scope,p.budget_ms,evidence,scratch);
+        // The CF/1 terminal certifies the read recipe, not a hardware
+        // shutdown. This adapter has no independently verified stop signal.
+        if(result.capture.summary.steps&&result.capture.summary.stop!=Campaign::Stop::SinkStopped)
+            result.capture.terminal_written=evidence.finish(result.capture.summary);
+    }catch(const std::exception& e){
+        result.error=e.what();
+        result.capture.summary.stop=Campaign::Stop::ContextChanged;
+    }
+    result.observations=session.evidence();
+    return result;
+}
+Result run_socket(const cf1_plan& p,const char* interface,int fd,const volatile sig_atomic_t* cancel){
+    if(!cf1_valid_plan(&p)||!j1979_isotp_valid_interface(interface)||(cancel&&*cancel))
+        throw std::invalid_argument("Explicit approved SocketCAN freeze plan required");
+    const auto scope=freeze_scope(p);
     Writer writer(fd);J1979FreezeEvidence evidence(writer);
     Result result{};
     if(!evidence.begin(p.tx,p.rx,p.extended,p.budget_ms,scope))return result;
