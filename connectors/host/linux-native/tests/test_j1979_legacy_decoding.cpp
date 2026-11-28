@@ -1,5 +1,8 @@
 #include "j1979_legacy_info.hpp"
 #include "j1979_legacy_monitor.hpp"
+#include "j1979_legacy_shape.hpp"
+#include <algorithm>
+#include <utility>
 #include <cassert>
 #include <cmath>
 #include <sstream>
@@ -57,6 +60,25 @@ void monitor(){
     assert(!decode_monitor(Data{5,1,3},Data{0x45,1,3,0}));
     assert(!decode_monitor(Data{6,0},Data{0x46,0,0,0,0,0,0}));
 }
+void shape(){
+    using S=ApplicationShape;
+    assert(pid_shape(Data{1,12},Data{0x41,12,0x1f,0x40})==S::positive);
+    assert(pid_shape(Data{1,12},Data{0x41,12,0x1f})==S::invalid);
+    assert(pid_shape(Data{1,12},Data{0x41,13,0x1f,0x40})==S::invalid);
+    assert(pid_shape(Data{1,12},Data{0x7f,1,0x12})==S::negative);
+    assert(pid_shape(Data{1,12},Data{0x7f,1,0x78})==S::invalid);
+    assert(pid_shape(Data{1,0},Data{0x41,0,0,0,0,0})==S::positive);
+    assert(pid_shape(Data{1,224},Data{0x41,224,0,0,0,1})==S::invalid);
+    assert(pid_shape(Data{1,6},Data{0x41,6,128,129})==S::positive);
+    assert(pid_shape(Data{1,6},Data{0x41,6,1,2,3})==S::invalid);
+    assert(pid_shape(Data{2,12,7},Data{0x42,12,7,0x1f,0x40})==S::positive);
+    assert(pid_shape(Data{2,12,7},Data{0x42,12,0,0x1f,0x40})==S::invalid);
+    assert(pid_shape(Data{2,12,7},Data{0x42,12,7,0x1f})==S::invalid);
+    assert(pid_shape(Data{2,2,7},Data{0x42,2,7,0,0})==S::positive);
+    assert(pid_shape(Data{1,0xef},Data{0x41,0xef,1})==S::raw);
+    assert(pid_shape(Data{2,0xef,7},Data{0x42,0xef,7,1})==S::raw);
+    assert(pid_shape(Data{4},Data{0x44})==S::invalid);
+}
 void identity(){
     constexpr std::string_view vin="1G1FA1RXXR0123456";
     Data data(3,0);data.insert(data.end(),vin.begin(),vin.end());
@@ -92,4 +114,4 @@ void identity(){
     assert(unknown&&!unknown->interpreted&&unknown->values.empty());
 }
 }
-int main(){monitor();identity();}
+int main(){monitor();identity();shape();}

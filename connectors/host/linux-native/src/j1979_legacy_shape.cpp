@@ -16,7 +16,7 @@ ApplicationShape pid_shape(Bytes q,Bytes r){
     const auto width=j1979_measurement_width(pid);
     const auto count=r.size()-off;
     const bool trim=cd::j1979::trim_pid(pid);
-    if(trim)return (count==1||count==2)?S::positive:S::invalid;
+    if(trim)return (count==1||count==2)?(mode==2?S::raw:S::positive):S::invalid;
     if(width&&count!=width)return S::invalid;
     if(mode==2){
         // Frozen context-dependent signals must not inherit the current

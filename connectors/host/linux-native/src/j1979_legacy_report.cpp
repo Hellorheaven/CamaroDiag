@@ -37,7 +37,7 @@ template<class T,class F> void array(std::ostream& o,const T& rows,F f){
     o<<']';
 }
 void measurement(std::ostream& o,const ScanStep& step,bool verified){
-    if(step.selected.size()!=1||!verified){o<<"null";return;}
+    if(step.selected.size()!=1||!verified||step.status!="PASSED"){o<<"null";return;}
     const auto& r=step.selected.front();
     j1979_measurement m{};
     if(!j1979_measurement_decode(step.request.data(),step.request.size(),r.data(),r.size(),&m)){
