@@ -15,6 +15,6 @@ struct ElmResult {
     std::vector<elmcan::Observation> observations;
     std::string error;
 };
-ElmResult run_elm(const cf1_plan&,elmcan::Scope,legacy::Link&,legacy::Current,int capture_fd);
+ElmResult run_elm(const cf1_plan&,elmcan::Scope,legacy::Link&,legacy::Current,int capture_fd,elmcan::EvidenceSink={});
 Result run_socket(const cf1_plan&,const char* interface,int capture_fd,const volatile sig_atomic_t* cancel);
 }

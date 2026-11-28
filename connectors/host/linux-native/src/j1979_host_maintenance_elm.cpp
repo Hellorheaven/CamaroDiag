@@ -44,8 +44,8 @@ class ElmOwner final:public Campaign::Owner,public Campaign::Link {
         result.responseSize=size;
     }
 public:
-    ElmOwner(const Scope& scope,elmcan::Scope target,legacy::Link& link,Journal& journal,Current current,bool approved)
-      :scope_(scope),session_(link,target,current),transport_(link),journal_(journal),current_(std::move(current)),authorized_(approved){
+    ElmOwner(const Scope& scope,elmcan::Scope target,legacy::Link& link,Journal& journal,Current current,bool approved,elmcan::EvidenceSink sink)
+      :scope_(scope),session_(link,target,current,std::move(sink)),transport_(link),journal_(journal),current_(std::move(current)),authorized_(approved){
         if(!scope_.valid()||!target.valid()||target.tx!=scope_.tx||target.rx!=scope_.rx||
             target.extended()!=scope_.extended||!current_||!approved)throw std::invalid_argument("Invalid ELM primary maintenance scope");
     }
@@ -79,7 +79,7 @@ public:
     const auto& observations()const{return session_.evidence();}
 };
 ElmResult run_elm(const Scope& scope,elmcan::Scope target,legacy::Link& link,Current current,
-                  const char* directory,const char* name,bool warning,bool approved){
+                  const char* directory,const char* name,bool warning,bool approved,elmcan::EvidenceSink sink){
     if(!scope.valid()||!target.valid()||target.tx!=scope.tx||target.rx!=scope.rx||
         target.extended()!=scope.extended||!warning||!approved||!current||!current())
         throw std::invalid_argument("Explicit fixed ELM primary maintenance approval required");
@@ -87,7 +87,7 @@ ElmResult run_elm(const Scope& scope,elmcan::Scope target,legacy::Link& link,Cur
     FileStorage storage(directory,name);r.journal_created=true;
     Journal::Scratch scratch{};
     Journal journal(storage,scratch);
-    ElmOwner owner(scope,target,link,journal,current,approved);
+    ElmOwner owner(scope,target,link,journal,current,approved,std::move(sink));
     Scratch exchange{};
     Campaign::run(owner,journal,owner,scope,r.evidence,exchange);
     r.elm_transport=true;r.local_serial_closed=r.evidence.physicalStopVerified;

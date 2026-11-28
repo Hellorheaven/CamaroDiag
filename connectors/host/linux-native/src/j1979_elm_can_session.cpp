@@ -31,8 +31,8 @@ unsigned elapsed(std::uint64_t start){
     return static_cast<unsigned>(end-start);
 }
 }
-Session::Session(legacy::Link& link,Scope scope,legacy::Current current)
-    :link_(link),scope_(scope),current_(std::move(current)){
+Session::Session(legacy::Link& link,Scope scope,legacy::Current current,EvidenceSink sink)
+    :link_(link),scope_(scope),current_(std::move(current)),sink_(std::move(sink)){
     if(!scope_.valid()||!current_)throw std::invalid_argument("Explicit fixed CAN ELM profile and physical pair required");
 }
 bool Session::current()const{return configured_&&!retired_&&current_();}
@@ -41,6 +41,8 @@ void Session::record(Observation row){
         retired_=true;throw legacy::TransportError("ELM CAN evidence limit");
     }
     total_raw_+=row.raw.size();evidence_.push_back(std::move(row));
+    try{if(sink_)sink_(evidence_.back());}
+    catch(...){retired_=true;throw;}
 }
 std::string Session::setup(std::string_view command,unsigned timeout){
     if(retired_||!current_()||evidence_.size()>=max_rows||max_raw-total_raw_<32768)

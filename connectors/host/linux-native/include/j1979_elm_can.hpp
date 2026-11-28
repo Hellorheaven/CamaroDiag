@@ -27,6 +27,7 @@ struct Observation{
     unsigned duration_ms{},timeout_ms{};
     int status{-1};
 };
+using EvidenceSink=std::function<void(const Observation&)>;
 std::string report(const Scope&,std::string_view vin,std::string_view operation,std::string_view native_report,
     std::span<const Observation>,std::string_view error,bool completed);
 class Session{
@@ -37,11 +38,12 @@ class Session{
     bool configured_{},used_{},retired_{};
     std::size_t total_raw_{};
     std::vector<Observation> evidence_;
+    EvidenceSink sink_;
     std::string setup(std::string_view,unsigned);
     void record(Observation);
     int exchange_admitted(Bytes,std::span<uint8_t>,std::size_t&,unsigned,bool,bool exclusive_response=false);
 public:
-    Session(legacy::Link&,Scope,legacy::Current);
+    Session(legacy::Link&,Scope,legacy::Current,EvidenceSink={});
     Session(const Session&)=delete;
     Session& operator=(const Session&)=delete;
     void configure();

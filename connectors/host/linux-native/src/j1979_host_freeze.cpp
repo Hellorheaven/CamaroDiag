@@ -123,7 +123,7 @@ J1979FreezeScope freeze_scope(const cf1_plan& p){
     return scope;
 }
 }
-ElmResult run_elm(const cf1_plan& p,elmcan::Scope target,legacy::Link& link,legacy::Current current,int fd){
+ElmResult run_elm(const cf1_plan& p,elmcan::Scope target,legacy::Link& link,legacy::Current current,int fd,elmcan::EvidenceSink sink){
     if(!cf1_valid_plan(&p)||!target.valid()||target.tx!=p.tx||target.rx!=p.rx||target.extended()!=p.extended||
         !current||!current())throw std::invalid_argument("Explicit fixed ELM CAN freeze plan required");
     const auto scope=freeze_scope(p);
@@ -131,7 +131,7 @@ ElmResult run_elm(const cf1_plan& p,elmcan::Scope target,legacy::Link& link,lega
     ElmResult result{};
     if(!evidence.begin(p.tx,p.rx,p.extended,p.budget_ms,scope))return result;
     result.capture.capture_started=true;
-    elmcan::Session session(link,target,current);
+    elmcan::Session session(link,target,current,std::move(sink));
     try{
         session.configure();
         ElmApplication application(session,scope);
