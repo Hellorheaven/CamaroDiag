@@ -11,12 +11,14 @@ struct MutationPlan {
     unsigned engine{},budget_ms{60000};
     std::set<unsigned> sources;
     bool valid()const;
+    bool operator==(const MutationPlan&)const=default;
 };
 struct MutationObservation {
     std::string stage,command,raw,error;
     std::vector<Frame> frames;
     unsigned started_ms{},ended_ms{};
     bool attempted{};
+    bool operator==(const MutationObservation&)const=default;
 };
 using DtcSnapshot=std::map<unsigned,std::map<unsigned,std::optional<std::vector<std::string>>>>;
 struct MutationResult {

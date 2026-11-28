@@ -38,6 +38,12 @@ class Recipe {
     MutationJournal journal_;
     std::uint64_t started_,previous_;
     std::size_t retained_{};
+    std::optional<unsigned> identity_at_,speed_at_,rpm_at_;
+    unsigned freshness(unsigned now)const{
+        if(!identity_at_||!speed_at_||!rpm_at_)return 0;
+        const auto oldest=std::min({*identity_at_,*speed_at_,*rpm_at_});
+        return now>=oldest&&now-oldest<5000?5000-(now-oldest):0;
+    }
     unsigned elapsed(){
         const auto n=clock_();
         if(n<previous_||n-started_>3600000)throw TransportError("CLOCK_INVALID");
@@ -57,9 +63,13 @@ class Recipe {
     std::vector<Frame> exchange(std::string stage,Data q,bool mutation=false){
         if(r_.observations.size()>=40||retained_>1024*1024-32768)
             throw TransportError("EVIDENCE_LIMIT");
-        const unsigned timeout=std::min(4000u,remaining());
+        unsigned timeout=std::min(4000u,remaining());
         MutationObservation row{};row.stage=std::move(stage);row.command=hex(q);row.started_ms=elapsed();
         if(!mutation&&!read_allowed(q))throw std::logic_error("Non-read prerequisite");
+        if(mutation){
+            timeout=std::min(timeout,freshness(row.started_ms));
+            if(!timeout)throw TransportError("STALE_STATIONARY_OR_IDENTITY_EVIDENCE");
+        }
         row.attempted=true;
         try{
             if(mutation){
@@ -116,9 +126,12 @@ class Recipe {
             if(!vin||*vin!=r_.plan.vin)return false;
             if(s==r_.plan.engine)r_.vin=*vin;
         }
-        return r_.vin==r_.plan.vin;
+        const bool matched=r_.vin==r_.plan.vin;
+        if(matched)identity_at_=r_.observations.back().ended_ms;
+        return matched;
     }
     bool stationary(Data q,Data expected){
+        const auto pid=q.at(1);
         const auto rows=exchange("STATIONARY",std::move(q));
         if(for_source(rows,r_.plan.engine)!=std::vector<Data>{expected})return false;
         std::set<unsigned> seen;
@@ -129,6 +142,8 @@ class Recipe {
             if(row.source==r_.plan.engine||p.size()!=3||p[0]!=0x7f||p[1]!=1||
                 (p[2]!=0x11&&p[2]!=0x12&&p[2]!=0x31))return false;
         }
+        if(pid==0x0d)speed_at_=r_.observations.back().ended_ms;
+        else rpm_at_=r_.observations.back().ended_ms;
         return true;
     }
     bool parked(){
@@ -208,6 +223,7 @@ public:
             if(!scope()||!parked())return finish("NOT_TESTED","STATIONARY_OR_SCOPE_UNVERIFIED");
             journal_("BASELINE",r_);r_.baseline_saved=true;
             if(!protocol()||!scope()||!identity()||!parked())return finish("NOT_TESTED","CONTEXT_CHANGED_BEFORE_INTENT");
+            if(!freshness(elapsed()))return finish("NOT_TESTED","STALE_STATIONARY_OR_IDENTITY_EVIDENCE");
             (void)remaining();
             journal_("INTENT",r_);r_.intent_saved=true;
             // After the durable intent a revocation is not silently ignored.
@@ -217,8 +233,8 @@ public:
             if(clear){
                 snapshot("AFTER",r_.after);
                 if(r_.complete_ack&&verified(r_.after,3)){
-                    if(residual())return finish("ACKNOWLEDGED_READBACK","DTCS_STILL_PRESENT");
                     if(!verified(r_.after,7))return finish("ACKNOWLEDGED_PARTIAL","PENDING_READBACK_UNAVAILABLE");
+                    if(residual())return finish("ACKNOWLEDGED_READBACK","DTCS_STILL_PRESENT");
                     return finish("ACKNOWLEDGED_READBACK");
                 }
             }else if(r_.complete_ack)return finish("ACKNOWLEDGED","LEAK_TEST_NOT_PERFORMED");
