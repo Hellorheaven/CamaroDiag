@@ -26,6 +26,7 @@
 #include "j1979_legacy_scan.hpp"
 #include "j1979_legacy_scan_wire.hpp"
 #include "j1979_legacy_journal.hpp"
+#include "j1979_legacy_live_journal.hpp"
 #include "j1979_legacy_mutation.hpp"
 #include "j1979_legacy_mutation_inspection.hpp"
 #include "j1979_can_history.hpp"
@@ -2790,6 +2791,37 @@ static int elm_freeze_cli(int argc,char** argv){
     }catch(const std::exception& e){return error(e.what());}
 }
 
+static int legacy_live_journal_cli(int argc,char** argv,std::string_view command){
+    const bool verify=command=="--verify-j1979-legacy-live-journal";
+    const bool csv=command=="--export-j1979-legacy-live-journal-csv";
+    uint32_t p=0,n=0;
+    if(argc!=(verify?8:7)||!decimal_uint32(argv[2],&p)||p<1||p>5||
+        strlen(argv[3])!=2||!hex_uint32(argv[3],&n)||!cd::legacy::valid_source(n)||!cf1_valid_vin(argv[4]))
+        return error("Independent legacy protocol, response source, VIN, sealed LJ/1 and output required");
+    const char* path=argv[5];const char* output=argv[verify?7:6];
+    try{
+        constexpr std::size_t max_report=64u*1024u*1024u;
+        input journal{},candidate{};
+        if(!load_regular(path,cd::legacy::journal_max_bytes,&journal))return error("Invalid bounded legacy live journal");
+        const auto result=cd::legacy::project_live_journal({journal.bytes.get(),journal.length},
+            static_cast<cd::legacy::Protocol>(p),n,argv[4]);
+        if(result.journal_sha256!=journal.digest)return error("Legacy journal digest differs");
+        std::string bytes;bool consistent=true;
+        if(verify){
+            if(!load_regular(argv[6],max_report,&candidate)||!separate(&journal,&candidate))
+                return error("Distinct bounded legacy live report required");
+            const auto proof=cd::legacy::verify_live_journal(result,cd::json::parse_report(
+                {reinterpret_cast<const char*>(candidate.bytes.get()),candidate.length},max_report),candidate.digest);
+            consistent=proof.at("consistent").boolean();
+            bytes=cd::json::serialize(proof)+"\n";
+            if(!recheck_input(argv[6],max_report,candidate))return error("Legacy live report changed");
+        }else bytes=csv?result.csv:cd::json::serialize(result.report)+"\n";
+        if(!recheck_input(path,cd::legacy::journal_max_bytes,journal))return error("Legacy live journal changed");
+        if(!atomic_create(output,bytes.data(),bytes.size()))return error("Legacy live journal output unavailable");
+        return consistent&&result.completed?0:2;
+    }catch(const std::exception& e){return error(e.what());}
+}
+
 static int legacy_journal_cli(const char* protocol,const char* source,const char* vin,const char* path,const char* output,bool recover){
     uint32_t p=0,n=0;
     if(!decimal_uint32(protocol,&p)||!cd::legacy::valid_protocol(static_cast<cd::legacy::Protocol>(p))||
@@ -3081,6 +3113,9 @@ static void usage(FILE *stream) {
         "  camarodiag-native --inspect-j1979-legacy-live PROTOCOL SOURCE VIN CAPTURE.llr REPORT.json\n"
         "  camarodiag-native --verify-j1979-legacy-live PROTOCOL SOURCE VIN CAPTURE.llr REPORT.json PROOF.json\n"
         "  camarodiag-native --inspect-j1979-legacy-journal PROTOCOL SOURCE VIN JOURNAL.lj REPORT.json\n"
+        "  camarodiag-native --project-j1979-legacy-live-journal 2 10 VIN SESSION.lj NUMERIC.json\n"
+        "  camarodiag-native --export-j1979-legacy-live-journal-csv 2 10 VIN SESSION.lj SAMPLES.csv\n"
+        "  camarodiag-native --verify-j1979-legacy-live-journal 2 10 VIN SESSION.lj NUMERIC.json PROOF.json\n"
         "  camarodiag-native --recover-j1979-legacy-journal PROTOCOL SOURCE VIN JOURNAL.lj CAPTURE\n"
         "  camarodiag-native --inspect-j1979-legacy-scan PROTOCOL SOURCE VIN CAPTURE.lsr REPORT.json\n"
         "  camarodiag-native --verify-j1979-legacy-scan PROTOCOL SOURCE VIN CAPTURE.lsr REPORT.json PROOF.json\n"
@@ -3781,6 +3816,9 @@ int main(int argc, char **argv) {
     if (argc>=3 && !strcmp(argv[1],"--j1979-legacy-freeze"))return legacy_freeze_cli(argc,argv);
     if (argc==7 && !strcmp(argv[1],"--inspect-j1979-legacy-freeze"))return legacy_freeze_replay(argv[2],argv[3],argv[4],argv[5],argv[6],nullptr);
     if (argc==8 && !strcmp(argv[1],"--verify-j1979-legacy-freeze"))return legacy_freeze_replay(argv[2],argv[3],argv[4],argv[5],argv[6],argv[7]);
+    if(argc>=2&&(!strcmp(argv[1],"--project-j1979-legacy-live-journal")||
+        !strcmp(argv[1],"--export-j1979-legacy-live-journal-csv")||!strcmp(argv[1],"--verify-j1979-legacy-live-journal")))
+        return legacy_live_journal_cli(argc,argv,argv[1]);
     if (argc==7 && !strcmp(argv[1],"--inspect-j1979-legacy-journal"))return legacy_journal_cli(argv[2],argv[3],argv[4],argv[5],argv[6],false);
     if (argc==7 && !strcmp(argv[1],"--recover-j1979-legacy-journal"))return legacy_journal_cli(argv[2],argv[3],argv[4],argv[5],argv[6],true);
     if (argc==7 && !strcmp(argv[1],"--inspect-j1979-legacy-scan"))return legacy_scan_replay(argv[2],argv[3],argv[4],argv[5],argv[6],nullptr);

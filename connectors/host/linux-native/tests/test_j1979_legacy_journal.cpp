@@ -1,4 +1,5 @@
 #include "j1979_legacy_journal.hpp"
+#include "j1979_legacy_live_journal.hpp"
 #include <cassert>
 #include <cstdlib>
 #include <filesystem>
@@ -74,10 +75,23 @@ void live(){
     {CaptureJournal writer(path.c_str(),scope);writer.append(row);writer.finish();}
     scope.trace.push_back(row);
     check_complete(load(path),encode_live_capture(scope),JournalKind::live,1,84);
+    const auto original=load(path);
+    const auto projection=project_live_journal(original,protocol,source,vin);
+    assert(!projection.completed&&projection.report.at("journal_terminal_verified").boolean());
+    assert(!projection.report.at("identity_rechecked").boolean());
+    assert(projection.report.at("journal_sha256").string()==projection.journal_sha256);
+    assert(projection.report.at("capture_sha256").string()==projection.capture_sha256);
+    assert(projection.csv.starts_with("cycle,pid_hex"));
+    assert(verify_live_journal(projection,projection.report,std::string(64,'a')).at("consistent").boolean());
+    auto changed=projection.report.object();
+    changed["journal_sha256"]=cd::json::Value{std::string(64,'b')};
+    assert(!verify_live_journal(projection,cd::json::Value{changed},std::string(64,'a')).at("consistent").boolean());
+    rejects([&]{(void)project_live_journal(original,protocol,0x11,vin);});
     const auto interrupted=t.file("interrupted.lj");scope.trace.clear();
     {CaptureJournal writer(interrupted.c_str(),scope);writer.append(row);}
     const auto e=inspect_journal(load(interrupted),protocol,source,vin);
     assert(!e.terminal&&e.observations==1&&e.torn_bytes==0);
+    rejects([&]{(void)project_live_journal(load(interrupted),protocol,source,vin);});
 }
 }
 int main(){scan();freeze();live();}

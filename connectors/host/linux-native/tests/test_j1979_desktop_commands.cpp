@@ -87,6 +87,13 @@ int main(){
     live_evidence["projection"]=report;
     assert(prepare(find("verify-live-evidence"),live_evidence).args.front()=="verify-live-evidence");
     live_evidence["cl1"]=second;rejects([&]{(void)prepare(find("verify-live-evidence"),live_evidence);});
+    Values legacy_lj{{"journal",capture},{"protocol","2"},{"source","10"},{"vin",values["vin"]},{"output",proof}};
+    assert((prepare(find("project-legacy-live-journal"),legacy_lj).args==std::vector<std::string>{
+        "--project-j1979-legacy-live-journal","2","10",values["vin"],capture,proof}));
+    assert(prepare(find("csv-legacy-live-journal"),legacy_lj).args.front()=="--export-j1979-legacy-live-journal-csv");
+    rejects([&]{(void)prepare(find("verify-legacy-live-journal"),legacy_lj);});
+    legacy_lj["report"]=report;
+    assert(prepare(find("verify-legacy-live-journal"),legacy_lj).args.front()=="--verify-j1979-legacy-live-journal");
     Values usb_live{{"port","/dev/ttyACM0"},{"key",report},{"tx","7E0"},{"rx","7E8"},{"vin",values["vin"]},
         {"pids","0C"},{"capture",directory+"/new.cl"},{"output",directory+"/usb.json"},
         {"numeric-output",directory+"/usb-numeric.json"},{"csv-output",directory+"/usb.csv"}};
