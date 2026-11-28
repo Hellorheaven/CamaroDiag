@@ -188,6 +188,21 @@ int main(void) {
     assert(projection.report.at("samples").array().size()==4);
     assert(!projection.report.at("physical_vehicle_verified").boolean());
     const std::array digests{std::string(64,'a'),std::string(64,'b')};
+    const auto bound=cd::network::history::bind_native_live_projection(projection,digests[0]);
+    const auto raw_source=cd::json::parse_report(original);
+    const auto check_projection=[&](const cd::json::Value& saved){
+        return cd::network::history::verify_native_live_projection(raw_source,saved,{0x7e0,0x7e8},vin,digests[0],digests[1]);
+    };
+    const auto verified_projection=check_projection(bound.report);
+    assert(verified_projection.at("verified").boolean()&&verified_projection.at("numeric_projection_complete").boolean());
+    auto altered=bound.report.object();
+    altered["source_sha256"]=cd::json::Value{digests[1]};
+    assert(!check_projection(cd::json::Value{altered}).at("verified").boolean());
+    altered=bound.report.object();
+    auto changed=altered.at("channel_summary").array();
+    auto fields=changed[0].object();fields["mean"]=cd::json::Value{cd::json::Integer{"0"}};
+    changed[0]=cd::json::Value{fields};altered["channel_summary"]=cd::json::Value{changed};
+    assert(!check_projection(cd::json::Value{altered}).at("verified").boolean());
     const std::array projections{projection,projection};
     const auto comparison=cd::network::history::compare_native_live(projections,digests);
     assert(comparison.at("shared_pids").array().size()==2);

@@ -2936,6 +2936,7 @@ static void usage(FILE *stream) {
         "  camarodiag-native --inspect-j1979-native-can-plan TX RX VIN REPORT.json PROOF.json\n"
         "  camarodiag-native verify-legacy-discovery --report REPORT.json --output PROOF.json\n"
         "  camarodiag-native compare-legacy-discovery-scan --discovery DISCOVERY.json --scan SCAN.json --output PROOF.json\n"
+        "  camarodiag-native verify-native-live-projection --report RAW.json --projection NUMERIC.json --tx 7E0 --rx 7E8 --vin VIN --output PROOF.json\n"
         "  camarodiag-native project-native-live --report REPORT.json --tx 7E0 --rx 7E8 --vin VIN --output PROJECTION.json\n"
         "  camarodiag-native export-native-live-csv --report REPORT.json --tx 7E0 --rx 7E8 --vin VIN --output SAMPLES.csv\n"
         "  camarodiag-native compare-native-live --report A.json --report B.json --tx 7E0 --rx 7E8 --vin VIN --output PROOF.json\n"
@@ -3074,20 +3075,21 @@ static int native_can_plan_cli(const char* tx_text,const char* rx_text,const cha
         return 0;
     }catch(const std::exception& e){return error(e.what());}
 }
-static int project_native_live_cli(int argc,char** argv,bool csv){
-    const char* path=nullptr;const char* output=nullptr;const char* vin=nullptr;const char* tx=nullptr;const char* rx=nullptr;
+static int project_native_live_cli(int argc,char** argv,bool csv,bool verify=false){
+    const char* path=nullptr;const char* output=nullptr;const char* vin=nullptr;const char* tx=nullptr;const char* rx=nullptr;const char* projection=nullptr;
     for(int i=2;i<argc;){
         const std::string_view key(argv[i++]);
         if(i>=argc||std::string_view(argv[i]).starts_with("--"))return error("Missing native live projection option value");
         const char* value=argv[i++];
         if(key=="--report"&&!path)path=value;
+        else if(key=="--projection"&&verify&&!projection)projection=value;
         else if(key=="--output"&&!output)output=value;
         else if(key=="--vin"&&!vin)vin=value;
         else if(key=="--tx"&&!tx)tx=value;
         else if(key=="--rx"&&!rx)rx=value;
         else return error("Unexpected or duplicate native live projection option");
     }
-    if(!path||!output||!vin||!tx||!rx)return error("Native live projection requires report, TX, RX, VIN and output");
+    if(!path||!output||!vin||!tx||!rx||(verify&&!projection))return error("Native live projection requires report, TX, RX, VIN, output and projection for verification");
     try{
         const auto id=[](std::string_view s){
             std::uint32_t n{};const auto [end,ec]=std::from_chars(s.data(),s.data()+s.size(),n,16);
@@ -3099,10 +3101,22 @@ static int project_native_live_cli(int argc,char** argv,bool csv){
         input original{},again{};
         if(!load_regular(path,maximum,&original))return error("Bounded native live report required");
         const std::string_view raw(reinterpret_cast<const char*>(original.bytes.get()),original.length);
-        auto projected=cd::network::history::project_native_live(cd::json::parse_report(raw,maximum),{id(tx),id(rx)},vin);
-        auto fields=projected.report.object();
-        fields.emplace("source_sha256",cd::json::Value{std::string(original.digest)});
-        projected.report=cd::json::Value{std::move(fields)};
+        const auto root=cd::json::parse_report(raw,maximum);
+        if(verify){
+            input stored{},stored_again{};
+            if(!load_regular(projection,maximum,&stored)||!separate(&original,&stored))
+                return error("Distinct bounded native live projection required");
+            const auto saved=cd::json::parse_report({reinterpret_cast<const char*>(stored.bytes.get()),stored.length},maximum);
+            const auto checked=cd::network::history::verify_native_live_projection(root,saved,{id(tx),id(rx)},vin,original.digest,stored.digest);
+            const auto proof=cd::json::serialize(checked)+"\n";
+            if(!load_regular(path,maximum,&again)||!same_input(&original,&again)||
+                !load_regular(projection,maximum,&stored_again)||!same_input(&stored,&stored_again))
+                return error("Native projection or source changed");
+            if(!atomic_create(output,proof.data(),proof.size()))return error("Native projection proof destination unavailable");
+            return checked.at("verified").boolean()?0:2;
+        }
+        auto projected=cd::network::history::bind_native_live_projection(
+            cd::network::history::project_native_live(root,{id(tx),id(rx)},vin),original.digest);
         const auto output_data=csv?cd::network::history::native_live_csv(projected):cd::json::serialize(projected.report)+"\n";
         if(!load_regular(path,maximum,&again)||!same_input(&original,&again))return error("Native live source changed");
         if(!atomic_create(output,output_data.data(),output_data.size()))return error("Native live projection output unavailable");
@@ -3279,6 +3293,7 @@ int main(int argc, char **argv) {
     if(argc>=2&&!strcmp(argv[1],"compare-legacy-discovery-scan"))return historical_discovery_compat_cli(argc,argv,true);
     if(argc==7&&!strcmp(argv[1],"--inspect-j1979-native-live"))return native_can_plan_cli(argv[2],argv[3],argv[4],argv[5],argv[6],true);
     if(argc==7&&!strcmp(argv[1],"--inspect-j1979-native-can-plan"))return native_can_plan_cli(argv[2],argv[3],argv[4],argv[5],argv[6]);
+    if(argc>=2&&!strcmp(argv[1],"verify-native-live-projection"))return project_native_live_cli(argc,argv,false,true);
     if(argc>=2&&!strcmp(argv[1],"project-native-live"))return project_native_live_cli(argc,argv,false);
     if(argc>=2&&!strcmp(argv[1],"export-native-live-csv"))return project_native_live_cli(argc,argv,true);
     if(argc>=2&&!strcmp(argv[1],"compare-native-live"))return compare_native_live_cli(argc,argv);

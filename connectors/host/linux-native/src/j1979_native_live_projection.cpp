@@ -204,6 +204,45 @@ NativeLiveProjection project_native_live(const json::Value& source,Pair pair,std
         {"time_aligned",flag(false)},{"diagnostic_verdict",Value{}}});
     return {std::move(projection),complete};
 }
+namespace {
+bool valid_digest(std::string_view digest){
+    return digest.size()==64&&std::all_of(digest.begin(),digest.end(),[](char c){
+        return (c>='0'&&c<='9')||(c>='a'&&c<='f');
+    });
+}
+}
+NativeLiveProjection bind_native_live_projection(NativeLiveProjection p,std::string_view digest){
+    require(valid_digest(digest),"Invalid native source digest");
+    auto fields=p.report.object();
+    require(fields.emplace("source_sha256",text(digest)).second,"Projection already bound");
+    p.report=obj(std::move(fields));return p;
+}
+json::Value verify_native_live_projection(const json::Value& source,const json::Value& saved,
+    Pair pair,std::string_view vin,std::string_view source_digest,std::string_view projection_digest){
+    require(valid_digest(source_digest)&&valid_digest(projection_digest)&&source_digest!=projection_digest,
+        "Invalid or identical native source and projection digests");
+    no_claims(saved);
+    const auto rebuilt=bind_native_live_projection(project_native_live(source,pair,vin),source_digest);
+    const bool consistent=compare(saved,rebuilt.report);
+    // An edited report is never accepted as an input for later comparison,
+    // even if the displayed average happens to agree with the raw evidence.
+    Array discrepancies;
+    const auto& expected=rebuilt.report.object();
+    const auto& actual=saved.object();
+    for(const auto& [key,value]:expected){
+        const auto it=actual.find(key);
+        if(it==actual.end()||!compare(it->second,value,key))discrepancies.push_back(text(key));
+    }
+    for(const auto& [key,value]:actual){
+        (void)value;if(!expected.contains(key))discrepancies.push_back(text(key));
+    }
+    return obj({{"schema",text("camarodiag-j1979-native-live-projection-verification-v1")},
+        {"consistent",flag(consistent)},{"verified",flag(consistent)},{"numeric_projection_complete",flag(consistent&&rebuilt.complete)},
+        {"source_sha256",text(source_digest)},{"projection_sha256",text(projection_digest)},
+        {"vin",text(vin)},{"tx_can_id",rebuilt.report.at("tx_can_id")},{"rx_can_id",rebuilt.report.at("rx_can_id")},
+        {"differences",arr(std::move(discrepancies))},{"physical_vehicle_verified",flag(false)},
+        {"authenticated",flag(false)},{"permits_programming",flag(false)}});
+}
 std::string native_live_csv(const NativeLiveProjection& p){
     std::ostringstream csv;csv.imbue(std::locale::classic());
     csv<<"cycle,pid_hex,started_elapsed_ms,elapsed_ms,duration_ms,status,value,unit,request_hex,response_hex,detail,signal_name,raw_encoded,scale_source,scale_configuration\n";
