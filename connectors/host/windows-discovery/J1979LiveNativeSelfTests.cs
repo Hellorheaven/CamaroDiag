@@ -102,8 +102,21 @@ internal static class J1979LiveNativeSelfTests
             string report=Path.Combine(directory.FullName,"projection.json");
             File.WriteAllBytes(source,capture);
             J1979LiveNativeCli.ExportScalar(source,Vin,report,csv:false);
-            Check(J1979LiveNativeCli.VerifyScalar(source,Vin,report).NumericProjectionComplete,
+            string proof=Path.Combine(directory.FullName,"proof.json");
+            Check(J1979LiveNativeCli.VerifyScalar(source,Vin,report,proof).NumericProjectionComplete,
                 "canonical scalar export is reproducible");
+            using(var receipt=System.Text.Json.JsonDocument.Parse(File.ReadAllBytes(proof)))
+            {
+                var root=receipt.RootElement;
+                Check(root.GetProperty("consistent").GetBoolean()&&
+                    !root.GetProperty("physical_vehicle_verified").GetBoolean()&&
+                    root.GetProperty("projection_sha256").GetString()==
+                    Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(report))).ToLowerInvariant(),"portable proof scope");
+            }
+            bool collision=false;
+            try{J1979LiveNativeCli.VerifyScalar(source,Vin,report,proof);}
+            catch(IOException){collision=true;}
+            Check(collision,"existing proof not overwritten");
 
             void Reject(string vin,string reason)
             {

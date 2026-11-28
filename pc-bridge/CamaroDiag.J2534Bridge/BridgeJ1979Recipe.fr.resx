@@ -243,4 +243,8 @@
   <data name="LiveNativeScalarScope" xml:space="preserve"><value>Valeurs scalaires documentées uniquement ; les échelles ECU non enregistrées restent indéterminées.</value></data>
   <data name="LiveNativeScalarIdentity" xml:space="preserve"><value>Identité finale non vérifiée : aucune valeur numérique.</value></data>
   <data name="LiveNativeScalarMean" xml:space="preserve"><value>Moy.</value></data>
+  <data name="LiveNativeScalarVerify" xml:space="preserve"><value>Vérifier le rapport scalaire CL/1</value></data>
+  <data name="LiveNativeScalarVerifyConfirm" xml:space="preserve"><value>Je confirme indépendamment le VIN {0}. Vérifier ces fichiers originaux hors ligne ?</value></data>
+  <data name="LiveNativeScalarVerified" xml:space="preserve"><value>Rapport scalaire vérifié à partir de la capture originale.</value></data>
+  <data name="LiveNativeScalarRejected" xml:space="preserve"><value>Rapport scalaire refusé. Vérifier la capture originale et le VIN indépendant.</value></data>
 </root>

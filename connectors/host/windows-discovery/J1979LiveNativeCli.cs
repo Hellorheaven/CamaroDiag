@@ -231,11 +231,15 @@ internal static class J1979LiveNativeCli
         return JsonSerializer.SerializeToUtf8Bytes(fields,options);
     }
 
-    internal static J1979LiveScalarProjection.Projection VerifyScalar(string source,string vin,string projectionPath)
+    internal static J1979LiveScalarProjection.Projection VerifyScalar(string source,string vin,string projectionPath,string? proofPath=null,Func<bool>? current=null)
     {
         if(!J1979LiveNative.ValidVin(vin)||
             Path.GetFullPath(source).Equals(Path.GetFullPath(projectionPath),StringComparison.OrdinalIgnoreCase))
             throw new ArgumentException("Independent VIN and distinct capture and projection files required");
+        if(proofPath is not null&&(Path.GetFullPath(source).Equals(Path.GetFullPath(proofPath),StringComparison.OrdinalIgnoreCase)||
+            Path.GetFullPath(projectionPath).Equals(Path.GetFullPath(proofPath),StringComparison.OrdinalIgnoreCase)))
+            throw new ArgumentException("Proof must be a separate new file");
+        if(current is not null&&!current())throw new OperationCanceledException("Owner revoked");
         foreach(string path in new[]{source,projectionPath})
             if((File.GetAttributes(path)&(FileAttributes.ReparsePoint|FileAttributes.Directory))!=0)
                 throw new InvalidDataException("Regular capture and projection files required");
@@ -252,12 +256,26 @@ internal static class J1979LiveNativeCli
         candidate.ReadExactly(supplied);
         if(candidate.ReadByte()!=-1)throw new InvalidDataException("Projection changed during verification");
         J1979PortableScalarVerification.Verify(expected,supplied);
+        byte[] candidateDigest=SHA256.HashData(supplied);
         candidate.Position=0;
-        if(!CryptographicOperations.FixedTimeEquals(SHA256.HashData(supplied),SHA256.HashData(candidate)))
+        if(!CryptographicOperations.FixedTimeEquals(candidateDigest,SHA256.HashData(candidate)))
             throw new InvalidDataException("Projection changed during verification");
         capture.Position=0;
         if(digest!=Convert.ToHexString(SHA256.HashData(capture)).ToLowerInvariant())
             throw new InvalidDataException("CL/1 changed during verification");
+        if(current is not null&&!current())throw new OperationCanceledException("Owner revoked");
+        if(proofPath is not null)
+        {
+            byte[] proof=JsonSerializer.SerializeToUtf8Bytes(new{
+                schema="camarodiag-j1979-cl1-projection-verification-v1",consistent=true,
+                capture_sha256=digest,projection_sha256=Convert.ToHexString(candidateDigest).ToLowerInvariant(),
+                numeric_projection_complete=projection.NumericProjectionComplete,
+                physical_vehicle_verified=false,authenticated=false,permits_programming=false
+            });
+            // Both original streams remain locked for read until proof is durable.
+            using var output=new FileStream(proofPath,FileMode.CreateNew,FileAccess.Write,FileShare.None);
+            output.Write(proof);output.Flush(true);
+        }
         return projection;
     }
 
@@ -293,9 +311,9 @@ internal static class J1979LiveNativeCli
             if(args.Length==0)return 2;
             if(args[0]==VerifyScalarCommand)
             {
-                if(args.Length!=4)throw new ArgumentException(
-                    "Expected CL/1 source, independently supplied VIN and canonical Windows JSON projection");
-                var projection=VerifyScalar(args[1],args[2],args[3]);
+                if(args.Length is not (4 or 5))throw new ArgumentException(
+                    "Expected CL/1 source, independent VIN, portable JSON projection and optional new proof");
+                var projection=VerifyScalar(args[1],args[2],args[3],args.Length==5?args[4]:null);
                 Console.WriteLine(JsonSerializer.Serialize(new{
                     projection_verified=true,projection.IdentityRechecked,projection.NumericProjectionComplete}));
                 return projection.NumericProjectionComplete?0:7;

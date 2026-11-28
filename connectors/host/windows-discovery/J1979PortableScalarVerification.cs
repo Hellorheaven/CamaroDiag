@@ -56,7 +56,7 @@ internal static class J1979PortableScalarVerification
             case JsonValueKind.Array:
             {
                 if(expected.GetArrayLength()!=actual.GetArrayLength())return false;
-                using var a=expected.EnumerateArray();using var b=actual.EnumerateArray();
+                var a=expected.EnumerateArray();var b=actual.EnumerateArray();
                 while(a.MoveNext())
                     if(!b.MoveNext()||!Same(a.Current,b.Current,field,ref nodes))return false;
                 return !b.MoveNext();

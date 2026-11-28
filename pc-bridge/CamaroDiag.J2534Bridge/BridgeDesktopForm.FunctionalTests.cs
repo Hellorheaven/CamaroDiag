@@ -91,6 +91,7 @@ internal sealed partial class BridgeDesktopForm
         nativeFreezeActions.Controls.Add(functionalExportNativeLiveCsv);
         nativeFreezeActions.Controls.Add(functionalProjectNativeLive);
         nativeFreezeActions.Controls.Add(functionalExportNativeScalarCsv);
+        nativeFreezeActions.Controls.Add(functionalVerifyNativeScalar);
         nativeFreezeActions.Controls.Add(functionalInspectNativePrefix);
         nativeFreezeActions.Controls.Add(functionalInspectNativeMaintenance);
         nativeFreezeActions.Controls.Add(functionalInspectNativeMaintenancePrefix);
@@ -137,13 +138,14 @@ internal sealed partial class BridgeDesktopForm
         functionalExportNativeLiveCsv.Click += async (_, _) => await ExportWindowsNativeLiveCsvAsync();
         functionalProjectNativeLive.Click += async (_, _) => await ProjectWindowsNativeLiveAsync();
         functionalExportNativeScalarCsv.Click += async (_, _) => await ExportWindowsNativeScalarCsvAsync();
+        functionalVerifyNativeScalar.Click += async (_, _) => await VerifyWindowsNativeScalarAsync();
         functionalInspectNativePrefix.Click += async (_, _) => await InspectWindowsNativePrefixAsync();
         functionalInspectNativeMaintenance.Click += async (_, _) => await InspectWindowsNativeMaintenanceAsync();
         functionalInspectNativeMaintenancePrefix.Click += async (_, _) => await InspectWindowsNativeMaintenanceAsync(prefix:true);
         functionalRunNativeMaintenance.Click += async (_, _) => await RunWindowsNativeMaintenanceAsync();
         functionalRunNativeArchive.Click += async (_, _) => await RunWindowsNativeMaintenanceAsync(archive:true);
-        functionalRunNativeUsb.EnabledChanged += (_, _) => functionalRunNativeArchive.Enabled = functionalRunNativeMaintenance.Enabled = functionalInspectNativeMaintenancePrefix.Enabled = functionalInspectNativeMaintenance.Enabled = functionalInspectNativePrefix.Enabled = functionalProjectNativeLive.Enabled = functionalExportNativeScalarCsv.Enabled = functionalExportNativeLiveCsv.Enabled = functionalRunNativeLive.Enabled = functionalInspectNativeLive.Enabled = functionalRunNativeFreeze.Enabled = functionalInspectNativeFreeze.Enabled = functionalVerifyNativeFreezePrefix.Enabled = functionalInspectNativeFreezePrefix.Enabled = functionalRunNativeUsb.Enabled;
-        functionalRunNativeArchive.Enabled = functionalRunNativeMaintenance.Enabled = functionalInspectNativeMaintenancePrefix.Enabled = functionalInspectNativeMaintenance.Enabled = functionalInspectNativePrefix.Enabled = functionalProjectNativeLive.Enabled = functionalExportNativeScalarCsv.Enabled = functionalExportNativeLiveCsv.Enabled = functionalRunNativeLive.Enabled = functionalInspectNativeLive.Enabled = functionalRunNativeFreeze.Enabled = functionalInspectNativeFreeze.Enabled = functionalVerifyNativeFreezePrefix.Enabled = functionalInspectNativeFreezePrefix.Enabled = functionalRunNativeUsb.Enabled;
+        functionalRunNativeUsb.EnabledChanged += (_, _) => functionalRunNativeArchive.Enabled = functionalRunNativeMaintenance.Enabled = functionalInspectNativeMaintenancePrefix.Enabled = functionalInspectNativeMaintenance.Enabled = functionalInspectNativePrefix.Enabled = functionalVerifyNativeScalar.Enabled = functionalProjectNativeLive.Enabled = functionalExportNativeScalarCsv.Enabled = functionalExportNativeLiveCsv.Enabled = functionalRunNativeLive.Enabled = functionalInspectNativeLive.Enabled = functionalRunNativeFreeze.Enabled = functionalInspectNativeFreeze.Enabled = functionalVerifyNativeFreezePrefix.Enabled = functionalInspectNativeFreezePrefix.Enabled = functionalRunNativeUsb.Enabled;
+        functionalRunNativeArchive.Enabled = functionalRunNativeMaintenance.Enabled = functionalInspectNativeMaintenancePrefix.Enabled = functionalInspectNativeMaintenance.Enabled = functionalInspectNativePrefix.Enabled = functionalVerifyNativeScalar.Enabled = functionalProjectNativeLive.Enabled = functionalExportNativeScalarCsv.Enabled = functionalExportNativeLiveCsv.Enabled = functionalRunNativeLive.Enabled = functionalInspectNativeLive.Enabled = functionalRunNativeFreeze.Enabled = functionalInspectNativeFreeze.Enabled = functionalVerifyNativeFreezePrefix.Enabled = functionalInspectNativeFreezePrefix.Enabled = functionalRunNativeUsb.Enabled;
         functionalRunLegacy.Click += async (_, _) => await RunWindowsLegacyAsync();
         functionalRunLegacyMutation.Click += async (_, _) => await RunWindowsLegacyMutationAsync();
         functionalRunEvap.Click += async (_, _) => await RunWindowsEvapAsync();

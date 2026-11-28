@@ -14,6 +14,7 @@ internal sealed partial class BridgeDesktopForm
     private readonly Button functionalExportNativeLiveCsv=Button(J1979RecipeText("LiveNativeCsv"));
     private readonly Button functionalProjectNativeLive=Button(J1979RecipeText("LiveNativeScalar"));
     private readonly Button functionalExportNativeScalarCsv=Button(J1979RecipeText("LiveNativeScalarCsv"));
+    private readonly Button functionalVerifyNativeScalar=Button(J1979RecipeText("LiveNativeScalarVerify"));
     private readonly Button functionalInspectNativePrefix=Button(J1979RecipeText("LiveNativePrefix"));
 
     private J1979LiveNativeCli.Options? ChooseNativeLiveOptions()
@@ -201,6 +202,59 @@ internal sealed partial class BridgeDesktopForm
             if(!IsDisposed&&!Disposing)
             {
                 functionalGoogleSignIn.Enabled=true;
+                functionalRunLive.Enabled=functionalRunNetwork.Enabled=functionalRunNativeUsb.Enabled=
+                    functionalRunAll.Enabled=functionalRunJ1979.Enabled=functionalRunEvap.Enabled=
+                    functionalRunClear.Enabled=functionalRunLegacy.Enabled=functionalRunLegacyMutation.Enabled=
+                    DateTimeOffset.UtcNow<functionalAuthorizedUntil;
+            }
+        }
+    }
+
+    private async Task VerifyWindowsNativeScalarAsync()
+    {
+        if(busy||functionalCancellation is not null||DateTimeOffset.UtcNow>=functionalAuthorizedUntil)return;
+        var expiry=functionalAuthorizedUntil;
+        string vin=functionalEvapVin.Text.Trim().ToUpperInvariant();
+        if(!J1979LiveNative.ValidVin(vin)){ShowError(J1979RecipeText("LiveNativeVinRequired"));return;}
+        using var capture=new OpenFileDialog{Title=J1979RecipeText("LiveNativeInspect"),
+            CheckFileExists=true,Multiselect=false,Filter=J1979RecipeText("LiveNativeCaptureFilter")};
+        if(capture.ShowDialog(this)!=DialogResult.OK)return;
+        using var report=new OpenFileDialog{Title=J1979RecipeText("LiveNativeScalar"),CheckFileExists=true,
+            Multiselect=false,Filter=J1979RecipeText("JsonFilter")};
+        if(report.ShowDialog(this)!=DialogResult.OK)return;
+        if(MessageBox.Show(this,string.Format(CultureInfo.CurrentCulture,
+            J1979RecipeText("LiveNativeScalarVerifyConfirm"),vin),J1979RecipeText("LiveNativeScalarVerify"),
+            MessageBoxButtons.YesNo,MessageBoxIcon.Question)!=DialogResult.Yes)return;
+        using var proof=new SaveFileDialog{Filter=J1979RecipeText("JsonFilter"),DefaultExt="json",
+            AddExtension=true,OverwritePrompt=false,FileName="CamaroDiag_CL1_Scalar_Verification.json"};
+        if(proof.ShowDialog(this)!=DialogResult.OK||busy||functionalCancellation is not null||
+            DateTimeOffset.UtcNow>=expiry||functionalAuthorizedUntil!=expiry||
+            functionalEvapVin.Text.Trim().ToUpperInvariant()!=vin)return;
+        using var cancellation=new CancellationTokenSource();
+        functionalCancellation=cancellation;busy=true;
+        functionalRunLive.Enabled=functionalRunNetwork.Enabled=functionalRunNativeUsb.Enabled=
+            functionalRunAll.Enabled=functionalRunJ1979.Enabled=functionalRunEvap.Enabled=
+            functionalRunClear.Enabled=functionalRunLegacy.Enabled=functionalRunLegacyMutation.Enabled=
+            functionalGoogleSignIn.Enabled=functionalExport.Enabled=false;
+        functionalCancel.Enabled=true;functionalResults.Text=J1979RecipeText("Running");
+        bool Current()=>!cancellation.IsCancellationRequested&&DateTimeOffset.UtcNow<expiry&&
+            functionalAuthorizedUntil==expiry;
+        try
+        {
+            var projected=await Task.Run(()=>J1979LiveNativeCli.VerifyScalar(capture.FileName,vin,
+                report.FileName,proof.FileName,Current));
+            if(!IsDisposed&&!Disposing&&Current())
+                functionalResults.Text=J1979RecipeText("LiveNativeScalarVerified")+Environment.NewLine+
+                    FormatNativeScalar(projected,proof.FileName);
+        }
+        catch(OperationCanceledException){if(!IsDisposed&&!Disposing)functionalResults.Text=J1979RecipeText("Cancelled");}
+        catch(Exception){if(!IsDisposed&&!Disposing)functionalResults.Text=J1979RecipeText("LiveNativeScalarRejected");}
+        finally
+        {
+            functionalCancellation=null;busy=false;
+            if(!IsDisposed&&!Disposing)
+            {
+                functionalCancel.Enabled=false;functionalGoogleSignIn.Enabled=true;
                 functionalRunLive.Enabled=functionalRunNetwork.Enabled=functionalRunNativeUsb.Enabled=
                     functionalRunAll.Enabled=functionalRunJ1979.Enabled=functionalRunEvap.Enabled=
                     functionalRunClear.Enabled=functionalRunLegacy.Enabled=functionalRunLegacyMutation.Enabled=
