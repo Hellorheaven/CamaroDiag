@@ -161,7 +161,15 @@ bool j1979_monitor_decode(const uint8_t request[2],const uint8_t *response,
     /* Unknown or reserved scaling stays visible as raw numbers, never
      * upgraded to a measurement or a diagnostic PASS/FAIL verdict.
      */
-    j1979_monitor_scale(out->scaling_id,out->encoded_value,
-                        out->encoded_minimum,out->encoded_maximum,out);
+    j1979_monitor_record projection{};
+    if (j1979_monitor_scale(out->scaling_id,out->encoded_value,
+                           out->encoded_minimum,out->encoded_maximum,&projection)) {
+        out->scaled=projection.scaled;
+        out->unit=projection.unit;
+        out->value=projection.value;
+        out->minimum=projection.minimum;
+        out->maximum=projection.maximum;
+        out->relation=projection.relation;
+    }
     return true;
 }

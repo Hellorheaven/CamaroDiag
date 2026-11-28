@@ -43,6 +43,24 @@ int main(void) {
     assert(j1979_monitor_decode(request,unknown,sizeof(unknown),0,&record));
     assert(!record.scaled && record.encoded_value==1 &&
            record.encoded_minimum==0 && record.encoded_maximum==2);
+    assert(record.monitor_id==0x21 && record.test_id==2 &&
+           record.scaling_id==0xf0 && record.unit==nullptr);
+    const uint8_t combined[]={0x46,
+        0x21,0x01,0x07,0x03,0xe8,0,0,0x07,0xd0,
+        0x21,0x03,0x2e,0,2,0,0,0,1,
+        0x21,0x04,0x96,0xff,0x9c,0xff,0x38,0,0x32};
+    assert(j1979_monitor_count(request,combined,sizeof(combined))==3);
+    assert(j1979_monitor_decode(request,combined,sizeof(combined),1,&record));
+    assert(record.monitor_id==0x21 && record.test_id==3 &&
+           record.scaling_id==0x2e && record.encoded_value==2 &&
+           record.encoded_minimum==0 && record.encoded_maximum==1 &&
+           !record.scaled && record.unit==nullptr);
+    assert(j1979_monitor_decode(request,combined,sizeof(combined),2,&record));
+    assert(record.monitor_id==0x21 && record.test_id==4 &&
+           record.scaling_id==0x96 && record.encoded_value==0xff9c &&
+           record.encoded_minimum==0xff38 && record.encoded_maximum==0x0032 &&
+           record.scaled && record.value==-10 && record.minimum==-20 &&
+           record.maximum==5);
     unknown[1]=0x22;
     assert(!j1979_monitor_decode(request,unknown,sizeof(unknown),0,&record));
     assert(j1979_monitor_count(request,unknown,sizeof(unknown))==0);
