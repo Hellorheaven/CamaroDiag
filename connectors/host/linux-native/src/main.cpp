@@ -25,6 +25,7 @@
 #include "j1979_legacy_mutation_inspection.hpp"
 #include "j1979_can_history.hpp"
 #include "j1979_network_history.hpp"
+#include "j1979_historical_can_plan.hpp"
 #include "j1979_legacy_discovery_history.hpp"
 #include "j1979_legacy_discovery_binding.hpp"
 #include "j1979_legacy_freeze_wire.hpp"
@@ -2818,6 +2819,7 @@ static void usage(FILE *stream) {
         "  camarodiag-native --inspect-j1979-legacy-maintenance VIN FINAL.json BASELINE.json INTENT.json PROOF.json\n"
         "  camarodiag-native --j1979-legacy-maintenance --operation clear --port /dev/ttyUSB0 --protocol 2 --engine-source 10 --source 10 --vin VIN --baseline baseline.json --intent intent.json --output result.json --confirm-functional-scope --acknowledge-maintenance-warning\n"
         "  camarodiag-native --inspect-j1979-legacy-discovery PROTOCOL RAW_RESPONSE RAW_ATDPN REPORT.json\n"
+        "  camarodiag-native --inspect-j1979-historical-can-plan historical|android VIN|- REPORT.json PROOF.json\n"
         "  camarodiag-native --inspect-j1979-can-discovery-report REPORT.json PROOF.json\n"
         "  camarodiag-native --inspect-j1979-historical-legacy-discovery REPORT.json PROOF.json\n"
         "  camarodiag-native --bind-j1979-historical-legacy-discovery PROTOCOL SOURCE VIN DISCOVERY.json CAPTURE.lsr PROOF.json\n"
@@ -2884,7 +2886,26 @@ static int historical_can_discovery_cli(const char* path,const char* output){
         return 0;
     }catch(const std::exception& e){return error(e.what());}
 }
+static int historical_can_plan_cli(const char* order,const char* vin,const char* path,const char* output){
+    try{
+        const std::string_view mode(order);
+        if(mode!="historical"&&mode!="android")return error("Explicit historical or android order required");
+        std::optional<std::string> expected;
+        if(std::string_view(vin)!="-")expected=vin;
+        constexpr std::size_t maximum=16*1024*1024;
+        input original{},again{};
+        if(!load_regular(path,maximum,&original))return error("Bounded physical report required");
+        const std::string_view raw(reinterpret_cast<const char*>(original.bytes.get()),original.length);
+        const auto result=cd::network::history::inspect_plan(cd::json::parse_report(raw,maximum),
+            mode=="android"?cd::network::history::PlanOrder::android:cd::network::history::PlanOrder::historical,expected);
+        const auto proof=cd::network::history::plan_report(result,original.digest);
+        if(!load_regular(path,maximum,&again)||!same_input(&original,&again))return error("Physical report changed");
+        if(!atomic_create(output,proof.data(),proof.size()))return error("Physical plan proof destination unavailable");
+        return 0;
+    }catch(const std::exception& e){return error(e.what());}
+}
 int main(int argc, char **argv) {
+    if(argc==6&&!strcmp(argv[1],"--inspect-j1979-historical-can-plan"))return historical_can_plan_cli(argv[2],argv[3],argv[4],argv[5]);
     if(argc==4&&!strcmp(argv[1],"--inspect-j1979-can-discovery-report"))return historical_can_discovery_cli(argv[2],argv[3]);
     if(argc==8&&!strcmp(argv[1],"--bind-j1979-historical-legacy-discovery"))return bind_legacy_discovery_cli(argv[2],argv[3],argv[4],argv[5],argv[6],argv[7]);
     if(argc==4&&!strcmp(argv[1],"--inspect-j1979-historical-legacy-discovery"))return historical_legacy_discovery_cli(argv[2],argv[3]);

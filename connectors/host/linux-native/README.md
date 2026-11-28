@@ -394,3 +394,9 @@ from Android, ELM or J2534.
 `camarodiag-native --inspect-j1979-can-discovery-report discovery.json proof.json`
 
 Offline replay of native SocketCAN, historical Python, J2534 and Android discovery-only exports, including fixed Android ELM profile, short complete single-frame DLC, pending/terminal responses, conflict detection, exact responder evidence and eligible IDs. No physical scan, automatic selection or programming authority is inferred. Network reports containing selected physical scans must not be used with this command; the physical campaign verification remains a separate migration item.
+
+### Historical physical CAN read sequence inspection
+
+`camarodiag-native --inspect-j1979-historical-can-plan historical VIN report.json proof.json`
+
+Use `android` for interleaved inventory and final VIN read. Historical Python/J2534 order is separate from the native SocketCAN recipe. Validates read-only scope, raw response envelopes, negative codes, inventory order, terminal cutoffs and raw VIN. The result explicitly does not attest derived projections, transport provenance or whole-network verification. Input JSON may contain finite measured decimals; integer fields remain exact. No live channel is opened.
