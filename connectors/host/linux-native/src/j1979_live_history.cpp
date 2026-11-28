@@ -142,6 +142,7 @@ std::string application(const HistoricalLiveRow& r,bool raw_only,bool legacy){
     if(raw_only&&r.sample)return b.size()<=(legacy?7u:4095u)?"RAW":"";
     if(q[0]==9)return b.size()==20&&b[2]==1&&cd_j1979_native_vin(
         reinterpret_cast<const char*>(b.data()+3),17)?"PASSED":"";
+    if(legacy&&b.size()>7)return {};
     const unsigned pid=q[1];const auto size=b.size()-2;
     if(pid%32==0)return size==4&&!(pid==224&&(b.back()&1))?"PASSED":"";
     if(cd::j1979::trim_pid(pid)){

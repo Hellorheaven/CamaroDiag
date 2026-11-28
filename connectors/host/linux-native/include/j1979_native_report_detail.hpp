@@ -49,7 +49,7 @@ inline bool numeric(const Value& v){
 inline bool compare(const Value& actual,const Value& expected,std::string_view field={}){
     // Only continuous quantities admit numeric tolerance. Addresses, bitmap
     // IDs, counts, encoded bytes and times remain integer-typed and exact.
-    const bool continuous=field=="number"||field=="value"||field=="minimum"||field=="maximum"||field=="ratio";
+    const bool continuous=field=="number"||field=="value"||field=="minimum"||field=="maximum"||field=="ratio"||field=="mean"||field=="last_verified_value";
     if(continuous&&numeric(actual)&&numeric(expected)){
         const auto v=expected.finite_number(),a=actual.finite_number();
         return std::abs(a-v)<=std::max(1e-9,1e-9*std::abs(v));

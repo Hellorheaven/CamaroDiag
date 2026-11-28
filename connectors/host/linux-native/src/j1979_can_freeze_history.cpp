@@ -161,6 +161,9 @@ bool elm_replay(const Value& root,const HistoricalFreeze& result,Pair pair,unsig
 }
 std::string id(unsigned v){std::ostringstream o;o<<std::uppercase<<std::hex<<v;return o.str();}
 }
+std::optional<unsigned> historical_elm_can_probe(const json::Value& v){return probe(v);}
+std::vector<std::uint8_t> historical_elm_can_payload(std::string_view raw,Pair pair){return decode(raw,pair);}
+bool historical_elm_no_data(std::string_view raw){return lines(raw)==std::vector<std::string>{"NO DATA"};}
 CanFreezeInspection inspect_historical_can_freeze(const json::Value& root,std::optional<std::string> expected){
     CanFreezeInspection out{};
     out.transport=root.at("transport").string();
