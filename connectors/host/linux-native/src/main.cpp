@@ -1711,7 +1711,7 @@ struct LegacyLiveOptions{
     unsigned source{};
     uint32_t baud{38400};
     cd::legacy::LivePlan plan;
-    const char* port{},*capture{},*output{};
+    const char* port{},*capture{},*output{},*csv{};
     bool protocol_set{},source_set{},baud_set{},budget_set{},approved{},cycles_set{},interval_set{};
 };
 static bool parse_legacy_live(int argc,char** argv,LegacyLiveOptions& o){
@@ -1761,12 +1761,14 @@ static bool parse_legacy_live(int argc,char** argv,LegacyLiveOptions& o){
             if(flag=="--port")slot=&o.port;
             else if(flag=="--capture")slot=&o.capture;
             else if(flag=="--output")slot=&o.output;
+            else if(flag=="--csv")slot=&o.csv;
             if(!slot||*slot)return false;
             *slot=value;
         }
     }
     return o.approved&&o.protocol_set&&o.source_set&&o.port&&o.capture&&o.output&&
-        strcmp(o.capture,o.output)&&cd::legacy::valid_protocol(o.protocol)&&o.plan.valid();
+        strcmp(o.capture,o.output)&&(!o.csv||(strcmp(o.csv,o.capture)&&strcmp(o.csv,o.output)))&&
+        cd::legacy::valid_protocol(o.protocol)&&o.plan.valid();
 }
 static int legacy_live_cli(int argc,char** argv){
     LegacyLiveOptions o;
@@ -1780,6 +1782,10 @@ static int legacy_live_cli(int argc,char** argv){
     if(capture.fd<0)return error("Capture destination unavailable");
     File output{open(o.output,O_WRONLY|O_CREAT|O_EXCL|O_NOFOLLOW|O_CLOEXEC,0600)};
     if(output.fd<0)return error("Report destination unavailable");
+    std::unique_ptr<cd::liveexport::Destination> csv;
+    try{csv=std::make_unique<cd::liveexport::Destination>(o.csv);}
+    catch(const std::exception& e){return error(e.what());}
+    if(!sync_parent(o.capture)||!sync_parent(o.output))return error("Legacy output reservation not durable");
     legacy_cancelled=0;
     struct Signals{
         struct sigaction oldint{},oldterm{};
@@ -1819,6 +1825,15 @@ static int legacy_live_cli(int argc,char** argv){
         const auto report=cd::legacy::live_report(replay);
         if(report!=cd::legacy::live_report(result))return error("Live result differs from independent raw replay");
         if(!write_owned_file(output.fd,report.data(),report.size()))return error("Live report persistence failed");
+        if(csv->requested()){
+            const auto table=cd::legacy::live_csv(replay);
+            input before{},after{};
+            if(!load_regular(o.capture,cd::legacy::live_max_capture,&before)||!same_input(&original,&before))
+                return error("Legacy capture changed before CSV export");
+            csv->persist(table);
+            if(!load_regular(o.capture,cd::legacy::live_max_capture,&after)||!same_input(&original,&after))
+                return error("Legacy capture changed after CSV export");
+        }
         return replay.completed&&replay.identity_rechecked?0:2;
     }catch(const std::exception& e){return error(e.what());}
 }
@@ -3045,7 +3060,7 @@ static void usage(FILE *stream) {
         "  camarodiag-native --j1979-legacy-freeze --port /dev/ttyUSB0 --protocol 2 --source 10 --vin VIN --frame 00 --pid 0C --capture freeze.lfr --output freeze.json --confirm-physical-channel\n"
         "  camarodiag-native --inspect-j1979-legacy-freeze PROTOCOL SOURCE VIN CAPTURE.lfr REPORT.json\n"
         "  camarodiag-native --verify-j1979-legacy-freeze PROTOCOL SOURCE VIN CAPTURE.lfr REPORT.json PROOF.json\n"
-        "  camarodiag-native --j1979-legacy-live --port /dev/ttyUSB0 --protocol 2 --source 10 --vin VIN --pid 0C --cycles 30 --interval-ms 1000 --capture session.llr --output live.json --confirm-physical-channel [--raw-only]\n"
+        "  camarodiag-native --j1979-legacy-live --port /dev/ttyUSB0 --protocol 2 --source 10 --vin VIN --pid 0C --cycles 30 --interval-ms 1000 --capture session.llr --output live.json --confirm-physical-channel [--raw-only] [--csv SAMPLES.csv]\n"
         "  camarodiag-native --inspect-j1979-legacy-live PROTOCOL SOURCE VIN CAPTURE.llr REPORT.json\n"
         "  camarodiag-native --verify-j1979-legacy-live PROTOCOL SOURCE VIN CAPTURE.llr REPORT.json PROOF.json\n"
         "  camarodiag-native --inspect-j1979-legacy-journal PROTOCOL SOURCE VIN JOURNAL.lj REPORT.json\n"

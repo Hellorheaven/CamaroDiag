@@ -85,7 +85,9 @@ void variants(){
         auto raw=encode_live_capture({p,0x10,plan(),t});
         auto decoded=decode_live_capture(raw);
         assert(decoded.plan==plan()&&decoded.trace==t&&decoded.source==0x10&&decoded.protocol==p);
-        assert(live_report(inspect_live_capture(raw,p,0x10,VIN))==report);
+        const auto reconstructed=inspect_live_capture(raw,p,0x10,VIN);
+        assert(live_report(reconstructed)==report);
+        assert(live_csv(reconstructed)==csv);
         rejects([&]{inspect_live_capture(raw,p,0x20,VIN);});
         rejects([&]{inspect_live_capture(raw,p,0x10,OTHER);});
         auto corrupt=raw;corrupt.back()^=1;rejects([&]{decode_live_capture(corrupt);});

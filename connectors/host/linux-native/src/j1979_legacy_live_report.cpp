@@ -1,6 +1,7 @@
 #include "j1979_legacy_live.hpp"
 #include "j1979_measurement.h"
 #include "j1979_multi.hpp"
+#include "j1979_status.hpp"
 #include <algorithm>
 #include <cmath>
 #include <iomanip>
@@ -77,6 +78,9 @@ std::vector<Value> values(const LiveResult& r,const LiveSample& s,const cd::j197
     }else if(const auto decoded=cd::j1979::scale(row,context.scaling)){
         for(const auto& v:decoded->signals)out.push_back({v.name,v.unit,v.number});
     }else if(const auto decoded=cd::j1979::multi_signal(row,&context.scaling)){
+        // Do not export numeric slots from a status record whose reserved
+        // bits or application layout were rejected by the strict decoder.
+        if(cd::j1979::status_width(s.pid)&&!cd::j1979::status_record(row))return {};
         for(const auto& v:decoded->signals)out.push_back({std::string(v.name),std::string(v.unit),v.number});
     }else{
         j1979_measurement m{};

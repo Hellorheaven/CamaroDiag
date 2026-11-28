@@ -142,6 +142,14 @@ int main(){
     Values legacy_read{{"port","/dev/ttyUSB0"},{"protocol","2"},{"source","10"},{"vin",values["vin"]},
         {"capture",directory+"/legacy.lsr"},{"output",directory+"/legacy.json"}};
     assert(prepare(find("legacy-scan"),legacy_read).physical);
+    auto legacy_live=legacy_read;
+    legacy_live["pids"]="0C";legacy_live["csv-output"]=directory+"/legacy.csv";
+    ready=prepare(find("legacy-live"),legacy_live);
+    assert(std::count(ready.args.begin(),ready.args.end(),"--csv")==1);
+    legacy_live["csv-output"]=legacy_live["capture"]+".lj";
+    rejects([&]{(void)prepare(find("legacy-live"),legacy_live);});
+    legacy_live["csv-output"]=legacy_live["output"];
+    rejects([&]{(void)prepare(find("legacy-live"),legacy_live);});
     auto legacy_collision=legacy_read;legacy_collision["output"]=legacy_read["capture"]+".lj";
     rejects([&]{(void)prepare(find("legacy-scan"),legacy_collision);});
     const auto sidecar=legacy_read["capture"]+".lj";
