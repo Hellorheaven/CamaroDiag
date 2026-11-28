@@ -90,7 +90,7 @@ ElmResult run_elm(const Scope& scope,elmcan::Scope target,legacy::Link& link,Cur
     ElmOwner owner(scope,target,link,journal,current,approved);
     Scratch exchange{};
     Campaign::run(owner,journal,owner,scope,r.evidence,exchange);
-    r.local_socket_closed=false; // serial, not SocketCAN
+    r.elm_transport=true;r.local_serial_closed=r.evidence.physicalStopVerified;
     r.recovery_latched=storage.latched()||owner.latched()||r.evidence.recoveryRequired;
     if(!r.evidence.terminalPersisted)r.error="TERMINAL_NOT_PERSISTED";
     result.observations=owner.observations();

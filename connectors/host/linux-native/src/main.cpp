@@ -2087,9 +2087,11 @@ static int catalogue_projection_cli(int argc,char** argv,bool verify){
 struct DirectMaintenanceOptions {
     cd::hostmaint::Scope scope{};
     const char* interface{},*directory{},*journal{},*output{};
+    unsigned profile{},baud{38400};
+    bool profile_set{},baud_set{};
     bool operation{},tx{},rx{},budget{},extended{},vin{},confirmed{},warning{};
 };
-static bool parse_direct_maintenance(int argc,char** argv,DirectMaintenanceOptions& o){
+static bool parse_direct_maintenance(int argc,char** argv,DirectMaintenanceOptions& o,bool elm){
     for(int i=2;i<argc;++i){
         const std::string_view flag=argv[i];
         if(flag=="--extended"||flag=="--confirm-physical-channel"||flag=="--acknowledge-maintenance-warning"){
@@ -2110,6 +2112,11 @@ static bool parse_direct_maintenance(int argc,char** argv,DirectMaintenanceOptio
             auto& id=flag=="--tx"?o.scope.tx:o.scope.rx;
             if(seen||!hex_uint32(value,&id))return false;
             seen=true;
+        }else if(elm&&(flag=="--profile"||flag=="--baud")){
+            auto& seen=flag=="--profile"?o.profile_set:o.baud_set;
+            auto& dest=flag=="--profile"?o.profile:o.baud;
+            if(seen||!decimal_uint32(value,&dest))return false;
+            seen=true;
         }else if(flag=="--budget-ms"){
             if(o.budget||!decimal_uint32(value,&o.scope.budgetMs))return false;
             o.budget=true;
@@ -2118,7 +2125,7 @@ static bool parse_direct_maintenance(int argc,char** argv,DirectMaintenanceOptio
             o.vin=true;memcpy(o.scope.vin,value,17);
         }else{
             const char** slot=nullptr;
-            if(flag=="--interface")slot=&o.interface;
+            if(flag==(elm?"--port":"--interface"))slot=&o.interface;
             else if(flag=="--journal-directory")slot=&o.directory;
             else if(flag=="--journal-name")slot=&o.journal;
             else if(flag=="--output")slot=&o.output;
@@ -2128,15 +2135,18 @@ static bool parse_direct_maintenance(int argc,char** argv,DirectMaintenanceOptio
     }
     o.scope.extended=o.extended;
     return o.operation&&o.tx&&o.rx&&o.budget&&o.vin&&o.confirmed&&o.warning&&o.directory&&o.journal&&
-        o.output&&j1979_isotp_valid_interface(o.interface)&&o.scope.valid();
+        o.output&&o.scope.valid()&&(elm?(o.interface&&o.profile_set&&
+        cd::elmcan::Scope{o.profile,o.scope.tx,o.scope.rx}.valid()&&
+        cd::elmcan::Scope{o.profile,o.scope.tx,o.scope.rx}.extended()==o.scope.extended):
+        j1979_isotp_valid_interface(o.interface));
 }
-static int direct_maintenance_cli(int argc,char** argv){
+static int direct_maintenance_cli(int argc,char** argv,bool elm=false){
     DirectMaintenanceOptions o;
-    if(!parse_direct_maintenance(argc,argv,o))return error("Dedicated primary ECM, private journal directory, VIN and explicit maintenance authorization required");
+    if(!parse_direct_maintenance(argc,argv,o,elm))return error("Dedicated primary ECM, private journal directory, VIN and explicit maintenance authorization required");
     if(!isatty(STDIN_FILENO))return error("Interactive local approval required");
     fputs("WARNING: clearing DTCs erases diagnostic data and readiness; EVAP is an active test. "
         "Use only an authorized stationary vehicle with manufacturer conditions verified. "
-        "Local socket closure is not proof of physical transceiver shutdown. "
+        "Local descriptor closure is not proof of physical transceiver shutdown. "
         "The recovery marker requires review; never retry automatically. Type AUTHORIZE MAINTENANCE: ",stderr);
     char answer[64]{};
     if(!fgets(answer,sizeof(answer),stdin)||strcmp(answer,"AUTHORIZE MAINTENANCE\n"))return error("Consent refused");
@@ -2154,10 +2164,17 @@ static int direct_maintenance_cli(int argc,char** argv){
         }
         ~Signals(){if(term)sigaction(SIGTERM,&oldterm,nullptr);if(intr)sigaction(SIGINT,&oldint,nullptr);}
     } signals;
-    cd::hostmaint::Result r{};r.evidence.scope=o.scope;
+    cd::hostmaint::Result r{};r.evidence.scope=o.scope;r.elm_transport=elm;
+    std::vector<cd::elmcan::Observation> adapter;
     try{
         if(!signals.term)throw std::runtime_error("SIGNAL_HANDLERS_UNAVAILABLE");
-        r=cd::hostmaint::run_socket(o.scope,o.interface,o.directory,o.journal,true,true,&legacy_cancelled);
+        if(elm){
+            const auto current=[](){return legacy_cancelled==0;};
+            auto link=cd::legacy::serial_link(o.interface,o.baud,current);
+            auto result=cd::hostmaint::run_elm(o.scope,{o.profile,o.scope.tx,o.scope.rx},*link,current,
+                o.directory,o.journal,true,true);
+            r=std::move(result.result);adapter=std::move(result.observations);
+        }else r=cd::hostmaint::run_socket(o.scope,o.interface,o.directory,o.journal,true,true,&legacy_cancelled);
     }catch(const std::exception& e){r.error=e.what();}
     try{
         std::string digest,replay;
@@ -2183,7 +2200,10 @@ static int direct_maintenance_cli(int argc,char** argv){
                 }catch(const std::exception& e){r.recovery_latched=true;r.error=e.what();}
             }else{r.recovery_latched=true;r.error="JOURNAL_MISSING_OR_EMPTY";}
         }
-        const auto json=cd::hostmaint::report(r,digest,replay);
+        auto json=cd::hostmaint::report(r,digest,replay);
+        if(elm)json=cd::elmcan::report({o.profile,o.scope.tx,o.scope.rx},
+            {reinterpret_cast<const char*>(o.scope.vin),17},"MAINTENANCE",json,adapter,r.error,
+            r.error.empty()&&!r.recovery_latched&&r.evidence.terminalPersisted&&!replay.empty());
         if(!write_owned_file(out.fd,json.data(),json.size())||!sync_parent(o.output))
             return error("Report persistence failed; recovery marker retained");
         using Outcome=cd::hostmaint::Campaign::Outcome;
@@ -2515,6 +2535,7 @@ static void usage(FILE *stream) {
         "  camarodiag-native --inspect-j1979-freeze-native CAPTURE.cf VIN REPORT.json\n"
         "  camarodiag-native --verify-j1979-freeze-native-prefix CAPTURE.cf PREFIX.json PROOF.json VIN\n"
         "  camarodiag-native --verify-j1979-freeze-native CAPTURE.cf REPORT.json PROOF.json VIN\n"
+        "  camarodiag-native --j1979-elm-can-maintenance --profile 6 --port /dev/ttyUSB0 --operation clear --tx 7E0 --rx 7E8 --vin VIN --budget-ms 60000 --journal-directory DIR --journal-name operation.cm --output report.json --confirm-physical-channel --acknowledge-maintenance-warning [--extended]\n"
         "  camarodiag-native --j1979-maintenance-can --operation clear --interface can0 --tx 7E0 --rx 7E8 --vin VIN --budget-ms 60000 --journal-directory PRIVATE_DIR --journal-name session.cm --output report.json --confirm-physical-channel --acknowledge-maintenance-warning\n"
         "  camarodiag-native --j1979-maintenance-usb --operation clear --port /dev/ttyACM0 --key-file key.bin --journal session.cm --output report.json --tx 7E0 --rx 7E8 --vin VIN --budget-ms 60000 --confirm-physical-channel --acknowledge-maintenance-warning\n"
         "  camarodiag-native --j1979-maintenance-archive --operation clear --port /dev/ttyACM0 --key-file key.bin --journal recovered.cm --output recovery.json --tx 7E0 --rx 7E8 --vin VIN --budget-ms 60000 --confirm-physical-channel\n"
@@ -2574,6 +2595,7 @@ int main(int argc, char **argv) {
     if (argc==6 && !strcmp(argv[1],"--verify-j1979-campaign"))return verify_cj1_cli(argv[2],argv[3],argv[4],argv[5]);
     if (argc==5 && !strcmp(argv[1],"--inspect-j1979-campaign"))
         return cj1_inspect_cli(argv[2],argv[3],argv[4]);
+    if (argc>=3 && !strcmp(argv[1],"--j1979-elm-can-maintenance"))return direct_maintenance_cli(argc,argv,true);
     if (argc>=3 && !strcmp(argv[1],"--j1979-maintenance-can"))return direct_maintenance_cli(argc,argv);
     if (argc>=3 && !strcmp(argv[1],"--j1979-maintenance-usb"))return capture_cu45(argc,argv,cd::cu45::Mode::maintenance);
     if (argc>=3 && !strcmp(argv[1],"--j1979-maintenance-archive"))return capture_cu45(argc,argv,cd::cu45::Mode::archive);

@@ -36,8 +36,11 @@ void bytes(std::ostream& o,const uint8_t* p,size_t n){
 std::string report(const Result& r,std::string_view digest,std::string_view replay){
     const auto& e=r.evidence;const auto& s=e.summary;
     std::ostringstream o;o.imbue(std::locale::classic());
-    o<<"{\"schema\":\"camarodiag-j1979-socketcan-maintenance-v1\",\"protocol\":\"SAE-J1979\","
-        "\"transport\":\"SOCKETCAN_ISOTP\",\"scope\":\"PHYSICAL_PRIMARY_ECM\",\"operation\":";
+    o<<"{\"schema\":";
+    quote(o,r.elm_transport?"camarodiag-j1979-elm-maintenance-v1":"camarodiag-j1979-socketcan-maintenance-v1");
+    o<<",\"protocol\":\"SAE-J1979\",\"transport\":";
+    quote(o,r.elm_transport?"ELM_SERIAL_CLASSIC_ISOTP":"SOCKETCAN_ISOTP");
+    o<<",\"scope\":\"PHYSICAL_PRIMARY_ECM\",\"operation\":";
     quote(o,e.scope.operation==Scope::Operation::Clear?"CLEAR":"EVAP");
     o<<",\"expected_vin\":";quote(o,{reinterpret_cast<const char*>(e.scope.vin),17});
     o<<",\"tx_can_id\":\""<<std::uppercase<<std::hex<<e.scope.tx<<"\",\"rx_can_id\":\""<<e.scope.rx
@@ -51,7 +54,7 @@ std::string report(const Result& r,std::string_view digest,std::string_view repl
       <<",\"command_attempted\":"<<tf(s.attempted)<<",\"acknowledged\":"<<tf(s.acknowledged)
       <<",\"after_confirmed_verified\":"<<tf(s.afterConfirmed)<<",\"after_pending_verified\":"<<tf(s.afterPending)
       <<",\"after_confirmed_empty\":"<<tf(s.afterConfirmedEmpty)<<",\"after_pending_empty\":"<<tf(s.afterPendingEmpty)
-      <<",\"local_socket_closed\":"<<tf(r.local_socket_closed)
+      <<",\"local_socket_closed\":"<<tf(r.local_socket_closed)<<",\"local_serial_closed\":"<<tf(r.local_serial_closed)
       <<",\"physical_stop_independently_verified\":false,\"physical_vehicle_verified\":false,"
         "\"physical_transceiver_disabled_verified\":false,\"monitor_completion_verified\":false,"
         "\"whole_vehicle_coverage_verified\":false,\"permits_automatic_retry\":false,\"permits_programming\":false,"
