@@ -1,4 +1,4 @@
-#include "j1979_legacy_mutation.hpp"
+#include "j1979_legacy_mutation_inspection.hpp"
 #include <algorithm>
 #include <cassert>
 #include <deque>
@@ -17,7 +17,8 @@ struct Fake:Link{
     Protocol p;
     std::deque<std::pair<std::string,std::string>> script;
     unsigned mutation_count{};
-    bool baseline{},intent{},fail_mutation{};
+    bool baseline{},intent{},fail_mutation{},delay_intent{};
+    std::string baseline_json,intent_json;
     explicit Fake(Protocol protocol):p(protocol){}
     void add(std::string cmd,std::string raw){script.emplace_back(std::move(cmd),std::move(raw));}
     void configure(){
@@ -80,16 +81,21 @@ MutationResult run(Fake& f,MutationOperation op,bool fail_intent=false){
     const auto current=[](){return true;};
     auto journal=[&](std::string_view stage,const MutationResult& r){
         assert(!r.attempted);
-        if(stage=="BASELINE"){assert(!f.baseline&&!f.intent);f.baseline=true;}
+        auto saved=r;saved.outcome=stage;
+        if(stage=="BASELINE"){assert(!f.baseline&&!f.intent);f.baseline=true;f.baseline_json=mutation_report(saved);}
         else{
             assert(stage=="INTENT"&&f.baseline&&!f.intent&&r.baseline_saved);
             if(fail_intent)throw TransportError("SIMULATED_DISK_FAILURE");
-            f.intent=true;
+            f.intent=true;f.intent_json=mutation_report(saved);
+            if(f.delay_intent)tick+=5001;
         }
     };
     rejects([&]{session.run(p,false,true,clock,current,journal);});
     auto result=session.run(p,true,true,clock,current,journal);
     rejects([&]{session.run(p,true,true,clock,current,journal);});
+    const auto checked=inspect_mutation(mutation_report(result),f.baseline_json,f.intent_json,vin);
+    assert(checked.result.outcome==result.outcome&&checked.result.attempted==result.attempted);
+    assert(checked.baseline_correlated==f.baseline&&checked.intent_correlated==f.intent);
     MutationSession another(elm);
     rejects([&]{another.run(p,true,true,clock,current,journal);});
     return result;
@@ -107,6 +113,17 @@ void variants(){
         const auto json=mutation_report(result);
         assert(json.find("\"whole_vehicle_coverage_verified\":false")!=std::string::npos);
         assert(json.find("\"permits_automatic_retry\":false")!=std::string::npos);
+        const auto checked=inspect_mutation(json,clear.baseline_json,clear.intent_json,vin);
+        assert(checked.sequence_complete&&checked.fresh_checks&&checked.baseline_correlated&&checked.intent_correlated);
+        rejects([&]{inspect_mutation(json,clear.baseline_json,{},vin);});
+        rejects([&]{inspect_mutation(json,{},clear.intent_json,vin);});
+        rejects([&]{inspect_mutation(json,clear.baseline_json,clear.intent_json,"1G1YY22G965109877");});
+        auto forged=result;forged.after.at(0x10).at(3)=std::vector<std::string>{"P0133"};
+        rejects([&]{inspect_mutation(mutation_report(forged),clear.baseline_json,clear.intent_json,vin);});
+        forged=result;forged.observations.back().frames.clear();
+        rejects([&]{inspect_mutation(mutation_report(forged),clear.baseline_json,clear.intent_json,vin);});
+        forged=result;forged.observations.push_back(forged.observations.back());
+        rejects([&]{inspect_mutation(mutation_report(forged),clear.baseline_json,clear.intent_json,vin);});
         Fake evap(p);evap.admission(MutationOperation::evap);evap.recheck();
         evap.add("08010000000000",wire(p,0x10,{0x48,1,0,0,0,0,0}));
         auto e=run(evap,MutationOperation::evap);
@@ -119,6 +136,9 @@ void failures(){
     Fake disk(p);disk.admission(MutationOperation::clear);disk.recheck();
     auto d=run(disk,MutationOperation::clear,true);
     assert(d.baseline_saved&&!d.intent_saved&&!d.attempted&&disk.mutation_count==0);
+    Fake stale(p);stale.admission(MutationOperation::clear);stale.recheck();stale.delay_intent=true;
+    auto late=run(stale,MutationOperation::clear);
+    assert(late.intent_saved&&!late.attempted&&stale.mutation_count==0&&late.reason=="STALE_STATIONARY_OR_IDENTITY_EVIDENCE");
     Fake moving(p);moving.admission(MutationOperation::clear);moving.probe();moving.scope();moving.identity();moving.parked(true);
     auto m=run(moving,MutationOperation::clear);
     assert(m.baseline_saved&&!m.attempted&&moving.mutation_count==0);

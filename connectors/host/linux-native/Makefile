@@ -86,7 +86,7 @@ test-j1979-catalogue: build/test_j1979_catalogue.o build/native_json.o build/j19
 test-j1979-can-network: build/test_j1979_can_network.o build/j1979_can_network.o build/j1979_can_network_report.o build/j1979_can_network_scan.o build/j1979_isotp.o build/j1979_can.o $(DECODER_OBJECTS) build/j1979_policy.o
 	$(CXX) $(LDFLAGS) $^ -o $@
 
-test-j1979-legacy-mutation: build/test_j1979_legacy_mutation.o build/j1979_legacy_mutation.o build/j1979_legacy_mutation_report.o build/j1979_legacy_identity.o build/j1979_legacy_freeze_plan.o build/j1979_legacy.o build/j1979_elm.o build/j1979_policy.o
+test-j1979-legacy-mutation: build/test_j1979_legacy_mutation.o build/j1979_legacy_mutation_inspection.o build/j1979_legacy_mutation_parse.o build/native_json.o build/j1979_legacy_mutation.o build/j1979_legacy_mutation_report.o build/j1979_legacy_identity.o build/j1979_legacy_freeze_plan.o build/j1979_legacy.o build/j1979_elm.o build/j1979_policy.o
 	$(CXX) $(LDFLAGS) $^ -o $@
 
 test-j1979-legacy-live: build/test_j1979_legacy_live.o build/j1979_legacy_live_plan.o build/j1979_legacy_live.o build/j1979_legacy_live_report.o build/j1979_legacy_live_wire.o build/j1979_legacy.o build/j1979_legacy_identity.o build/j1979_legacy_freeze_plan.o build/j1979_elm.o $(DECODER_OBJECTS) build/j1979_policy.o
