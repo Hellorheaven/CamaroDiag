@@ -93,6 +93,37 @@ internal static class J1979LiveNativeSelfTests
         Reject(bodies.Take(bodies.Count-1).SelectMany((b,i)=>Frame(i==0?1:2,i,b)).ToArray());
     }
 
+    private static void VerifyScalarExport(byte[] capture)
+    {
+        var directory=Directory.CreateTempSubdirectory("camarodiag-live-");
+        try
+        {
+            string source=Path.Combine(directory.FullName,"live.cl");
+            string report=Path.Combine(directory.FullName,"projection.json");
+            File.WriteAllBytes(source,capture);
+            J1979LiveNativeCli.ExportScalar(source,Vin,report,csv:false);
+            Check(J1979LiveNativeCli.VerifyScalar(source,Vin,report).NumericProjectionComplete,
+                "canonical scalar export is reproducible");
+
+            void Reject(string vin,string reason)
+            {
+                try{_ = J1979LiveNativeCli.VerifyScalar(source,vin,report);}
+                catch(InvalidDataException){return;}
+                throw new InvalidOperationException(reason);
+            }
+
+            Reject("1FA6P8TH0L5100000","projection verification accepted a different VIN");
+            byte[] original=File.ReadAllBytes(report);
+            var tampered=(byte[])original.Clone();
+            tampered[1]=(byte)(tampered[1]^1);
+            File.WriteAllBytes(report,tampered);
+            Reject(Vin,"projection verification accepted a same-length change");
+            File.WriteAllBytes(report,[..original,0]);
+            Reject(Vin,"projection verification accepted trailing bytes");
+        }
+        finally{directory.Delete(recursive:true);}
+    }
+
     internal static void Run()
     {
         var profile=new J1979LiveNative.Profile(0x7e0,0x7e8,false,Vin,[5,12],2,100,1000);
@@ -108,6 +139,7 @@ internal static class J1979LiveNativeSelfTests
             new byte[]{(byte)'C',(byte)'U',3,3}.Concat(HMACSHA256.HashData(key,transcript))),"CU/3 proof");
         byte[] capture=Capture(Bodies(profile));
         Prefix(profile,capture);
+        VerifyScalarExport(capture);
         var replay=J1979LiveNative.Decode(new MemoryStream(capture),profile);
         Check(replay.CaptureIntegrityVerified&&replay.Summary?.Completed==true&&replay.Summary.Raw==4,"complete recording");
         Check(replay.Result?.Samples.Length==4&&replay.Result.Observations.Length==7,"all samples and admission retained");

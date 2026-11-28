@@ -11,6 +11,7 @@ internal static class J1979LiveNativeCli
 {
     internal const string CaptureCommand="--j1979-live-native",InspectCommand="--inspect-j1979-live-native",CsvCommand="--export-j1979-live-native-csv",PrefixCommand="--inspect-j1979-live-prefix";
     internal const string ScalarCommand="--project-j1979-live-native",ScalarCsvCommand="--export-j1979-live-native-values-csv";
+    internal const string VerifyScalarCommand="--verify-j1979-live-native-projection";
     internal sealed record Options(string Port,string KeyPath,string CapturePath,string OutputPath,J1979LiveNative.Profile Profile);
 
     internal static Options Parse(string[] args)
@@ -207,23 +208,62 @@ internal static class J1979LiveNativeCli
         using var input=new FileStream(source,FileMode.Open,FileAccess.Read,FileShare.Read);
         var (replay,digest)=ReplayPersisted(input);
         var projection=J1979LiveScalarProjection.Project(replay,vin);
-        byte[] bytes;
-        if(csv)bytes=J1979LiveScalarProjection.Csv(projection,digest);
-        else{
-            var options=new JsonSerializerOptions{PropertyNamingPolicy=JsonNamingPolicy.SnakeCaseLower,WriteIndented=true};
-            var payload=JsonSerializer.SerializeToElement(projection,options);
-            var fields=payload.EnumerateObject().ToDictionary(p=>p.Name,p=>(object?)p.Value);
-            fields["capture_sha256"]=digest;
-            fields["expected_vin_independently_supplied"]=true;
-            bytes=JsonSerializer.SerializeToUtf8Bytes(fields,options);
-        }
-        if(bytes.Length>64*1024*1024)throw new InvalidDataException("Projection exceeds byte limit");
+        byte[] bytes=csv?J1979LiveScalarProjection.Csv(projection,digest):EncodeScalarJson(projection,digest);
+        if(bytes.Length>MaximumProjectionBytes)throw new InvalidDataException("Projection exceeds byte limit");
         input.Position=0;
         if(digest!=Convert.ToHexString(SHA256.HashData(input)).ToLowerInvariant())
             throw new InvalidDataException("CL/1 changed during projection");
         if(current is not null&&!current())throw new OperationCanceledException("Owner revoked");
         using var output=new FileStream(destination,FileMode.CreateNew,FileAccess.Write,FileShare.None);
         output.Write(bytes);output.Flush(true);
+        return projection;
+    }
+
+    private const int MaximumProjectionBytes=64*1024*1024;
+
+    private static byte[] EncodeScalarJson(J1979LiveScalarProjection.Projection projection,string digest)
+    {
+        var options=new JsonSerializerOptions{PropertyNamingPolicy=JsonNamingPolicy.SnakeCaseLower,WriteIndented=true};
+        var payload=JsonSerializer.SerializeToElement(projection,options);
+        var fields=payload.EnumerateObject().ToDictionary(p=>p.Name,p=>(object?)p.Value);
+        fields["capture_sha256"]=digest;
+        fields["expected_vin_independently_supplied"]=true;
+        return JsonSerializer.SerializeToUtf8Bytes(fields,options);
+    }
+
+    internal static J1979LiveScalarProjection.Projection VerifyScalar(string source,string vin,string projectionPath)
+    {
+        if(!J1979LiveNative.ValidVin(vin)||
+            Path.GetFullPath(source).Equals(Path.GetFullPath(projectionPath),StringComparison.OrdinalIgnoreCase))
+            throw new ArgumentException("Independent VIN and distinct capture and projection files required");
+        foreach(string path in new[]{source,projectionPath})
+            if((File.GetAttributes(path)&(FileAttributes.ReparsePoint|FileAttributes.Directory))!=0)
+                throw new InvalidDataException("Regular capture and projection files required");
+
+        using var capture=new FileStream(source,FileMode.Open,FileAccess.Read,FileShare.Read);
+        using var candidate=new FileStream(projectionPath,FileMode.Open,FileAccess.Read,FileShare.Read);
+        if(candidate.Length is <=0 or >MaximumProjectionBytes)
+            throw new InvalidDataException("Invalid projection byte length");
+
+        var (replay,digest)=ReplayPersisted(capture);
+        var projection=J1979LiveScalarProjection.Project(replay,vin);
+        byte[] expected=EncodeScalarJson(projection,digest);
+        if(candidate.Length!=expected.Length)
+            throw new InvalidDataException("Projection differs from the canonical Windows export");
+
+        Span<byte> block=stackalloc byte[4096];
+        for(int offset=0;offset<expected.Length;offset+=block.Length)
+        {
+            int count=Math.Min(block.Length,expected.Length-offset);
+            candidate.ReadExactly(block[..count]);
+            if(!block[..count].SequenceEqual(expected.AsSpan(offset,count)))
+                throw new InvalidDataException("Projection differs from the canonical Windows export");
+        }
+        if(candidate.ReadByte()!=-1)
+            throw new InvalidDataException("Projection changed during verification");
+        capture.Position=0;
+        if(digest!=Convert.ToHexString(SHA256.HashData(capture)).ToLowerInvariant())
+            throw new InvalidDataException("CL/1 changed during verification");
         return projection;
     }
 
@@ -257,6 +297,15 @@ internal static class J1979LiveNativeCli
         try
         {
             if(args.Length==0)return 2;
+            if(args[0]==VerifyScalarCommand)
+            {
+                if(args.Length!=4)throw new ArgumentException(
+                    "Expected CL/1 source, independently supplied VIN and canonical Windows JSON projection");
+                var projection=VerifyScalar(args[1],args[2],args[3]);
+                Console.WriteLine(JsonSerializer.Serialize(new{
+                    projection_verified=true,projection.IdentityRechecked,projection.NumericProjectionComplete}));
+                return projection.NumericProjectionComplete?0:7;
+            }
             if(args[0] is ScalarCommand or ScalarCsvCommand)
             {
                 if(args.Length!=4)throw new ArgumentException("Expected CL/1 source, independently supplied VIN and new output");

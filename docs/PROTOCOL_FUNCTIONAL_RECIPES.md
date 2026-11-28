@@ -391,7 +391,11 @@ camarodiagconnectors-j1979-catalogue verify-native-projection --capture live.cl 
 CamaroDiag.J2534Bridge.exe --j1979-live-native --port COM5 --key-file host.key --tx 7E0 --rx 7E8 --vin DOCUMENTED_VIN --pid 05 --pid 0C --cycles 30 --interval-ms 1000 --confirm-physical-channel --capture live.cl --output live.json
 CamaroDiag.J2534Bridge.exe --inspect-j1979-live-native live.cl DOCUMENTED_VIN inspected.json
 CamaroDiag.J2534Bridge.exe --export-j1979-live-native-csv live.cl DOCUMENTED_VIN live.csv
+CamaroDiag.J2534Bridge.exe --project-j1979-live-native live.cl DOCUMENTED_VIN scalar.json
+CamaroDiag.J2534Bridge.exe --verify-j1979-live-native-projection live.cl DOCUMENTED_VIN scalar.json
 ```
+
+La vérification scalaire Windows régénère le JSON canonique depuis la capture originale et le VIN fourni séparément. Elle compare tous les octets, y compris le SHA-256 de la capture, sans ouvrir de port série. Une projection concordante et complète retourne 0, une projection concordante et partielle retourne 7, et un écart retourne 2. Conserver le JSON original pour cette vérification.
 
 Pour le catalogue Windows, la commande existante `--j1979-project-catalogue` accepte le fichier CL/1 via `--report`. Android accepte également l'original CL/1 dans le sélecteur de source du catalogue. Les projections natives utilisent le même schéma que Linux, avec empreinte SHA-256 de la capture et distinction entre rejeu applicatif et preuve des trames physiques.
 
