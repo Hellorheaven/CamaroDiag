@@ -1,4 +1,5 @@
 #include "j1979_legacy_scan.hpp"
+#include "j1979_legacy_monitor.hpp"
 #include "j1979_policy.h"
 #include "j1979_measurement.h"
 #include "j1979_multi.hpp"
@@ -44,9 +45,9 @@ void measurement(std::ostream& o,const ScanStep& step,bool verified){
     o<<",\"context_required\":";truth(o,m.context_required);
     o<<",\"upper_trim_unverified\":";truth(o,m.upper_trim_unverified);o<<'}';
 }
-void dtcs(std::ostream& o,const ScanStep& step){
+void dtcs(std::ostream& o,const ScanStep& step,bool identity_verified){
     const auto mode=step.request[0];
-    if(mode!=3&&mode!=7&&mode!=10){o<<"null";return;}
+    if((mode!=3&&mode!=7&&mode!=10)||!identity_verified||step.status!="PASSED"||step.selected.empty()){o<<"null";return;}
     std::set<std::string> codes;
     for(const auto& row:step.selected){
         if(row.size()!=7)continue;
@@ -57,21 +58,19 @@ void dtcs(std::ostream& o,const ScanStep& step){
     }
     array(o,codes,[&](const auto& code){quote(o,code);});
 }
-void monitors(std::ostream& o,const ScanStep& step){
+void monitors(std::ostream& o,const ScanStep& step,bool identity_verified){
     const auto mode=step.request[0];
     const auto pid=step.request.size()>1?step.request[1]:0;
-    if((mode!=5&&mode!=6)||pid%32==0){o<<"null";return;}
-    array(o,step.selected,[&](const Data& r){
-        o<<"{\"mode\":"<<unsigned(mode)<<",\"test_id\":"<<unsigned(pid);
-        if(mode==5&&r.size()>=4){
-            o<<",\"sensor_mask\":"<<unsigned(r[2])<<",\"encoded_data_hex\":";quote(o,hex(Bytes(r).subspan(3)));
-        }else if(mode==6&&r.size()==7){
-            o<<",\"component_and_limit_encoded\":"<<unsigned(r[2])
-                <<",\"value_encoded\":"<<(unsigned(r[3])*256+r[4])
-                <<",\"limit_encoded\":"<<(unsigned(r[5])*256+r[6]);
-        }
-        o<<",\"scale_verified\":false,\"diagnostic_verdict\":null}";
-    });
+    if((mode!=5&&mode!=6)||pid%32==0||step.status!="PASSED"||!identity_verified||step.selected.empty()){
+        o<<"null";return;
+    }
+    std::vector<MonitorValue> decoded;
+    for(const auto& r:step.selected){
+        auto m=decode_monitor(step.request,r);
+        if(!m){o<<"null";return;}
+        decoded.push_back(std::move(*m));
+    }
+    array(o,decoded,[&](const auto& m){write_monitor(o,m);});
 }
 }
 std::string scan_report(const Scan& s){
@@ -114,8 +113,8 @@ std::string scan_report(const Scan& s){
         array(o,step.observations,[&](const Frame& f){frame_json(o,f);});
         o<<",\"selected_records\":";array(o,step.selected,[&](const Data& data){quote(o,hex(data));});
         o<<",\"measurement\":";measurement(o,step,s.identity_rechecked);
-        o<<",\"dtc_codes\":";dtcs(o,step);
-        o<<",\"monitor_records\":";monitors(o,step);
+        o<<",\"dtc_codes\":";dtcs(o,step,s.identity_rechecked);
+        o<<",\"monitor_records\":";monitors(o,step,s.identity_rechecked);
         o<<'}';
     });
     std::vector<cd::j1979::Observation> rows;
