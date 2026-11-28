@@ -134,7 +134,8 @@ void replay_projection(){
     struct Cleanup{std::filesystem::path path;~Cleanup(){std::error_code ec;std::filesystem::remove_all(path,ec);}} cleanup{name};
     const auto path=(cleanup.path/"session.lj").string();
     {legacy::CaptureJournal writer(path.c_str(),legacy::LiveCapture{legacy::Protocol::vpw,0x10,plan,{}});
-        for(const auto& row:trace)writer.append(row);writer.finish();}
+        for(const auto& row:trace)writer.append(row);
+        writer.finish();}
     std::ifstream input(path,std::ios::binary);
     const legacy::Data journal(std::istreambuf_iterator<char>(input),{});
     std::array<unsigned char,32> digest{};unsigned digest_size{};
@@ -145,7 +146,11 @@ void replay_projection(){
     assert(from_journal.completed&&from_journal.rows.size()==p.rows.size());
     assert(from_journal.rows[0].signals[0].value->numerator=="2000");
     assert(from_journal.source_sha256==journal_sha&&valid_digest(from_journal.reconstructed_capture_sha256));
-    assert(report(c,from_journal).find("\"journal_terminal_verified\":true")!=std::string::npos);
+    const auto journal_report=cd::json::parse_report(report(c,from_journal));
+    assert(journal_report.at("journal_terminal_verified").boolean());
+    assert(journal_report.at("source_capture_sha256").string()==from_journal.reconstructed_capture_sha256);
+    assert(journal_report.at("source_journal_sha256").string()==journal_sha);
+    assert(!journal_report.at("normative_compliance_verified").boolean());
     assert(projection_csv(c,from_journal).find(from_journal.reconstructed_capture_sha256)!=std::string::npos);
     rejects([&]{project_lj1(journal,vin,2,0x10,c,source,catalogue_sha);});
     auto incomplete=journal;incomplete.pop_back();

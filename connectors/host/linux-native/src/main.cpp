@@ -2281,10 +2281,24 @@ static int catalogue_projection_cli(int argc,char** argv,bool verify,bool csv=fa
             !recheck_input(capture_path,capture_max,capture)||!ref.same(reference_stamp(reference_path)))
             return error("Projection inputs changed");
         if(verify){
-            const auto result=std::string("{\"schema\":\"camarodiag-j1979-catalogue-verification-linux-v1\","
-                "\"verified\":true,\"source_capture_sha256\":\"")+capture.digest+"\",\"catalogue_sha256\":\""+
-                catalogue.digest+"\",\"reference_sha256\":\""+ref.digest+"\",\"projection_sha256\":\""+stored.digest+
-                "\",\"normative_compliance_verified\":false,\"physical_vehicle_verified\":false}\n";
+            using cd::json::Value;
+            const auto text=[](std::string_view v){return Value{std::string(v)};};
+            Value::Object fields{
+                {"schema",text("camarodiag-j1979-catalogue-verification-linux-v1")},
+                {"verified",Value{true}},
+                {"source_capture_sha256",text(projected.reconstructed_capture_sha256.empty()?
+                    projected.source_sha256:projected.reconstructed_capture_sha256)},
+                {"catalogue_sha256",text(catalogue.digest)},{"reference_sha256",text(ref.digest)},
+                {"projection_sha256",text(stored.digest)},{"projection_format",text(csv?"CSV":"JSON")},
+                {"normative_compliance_verified",Value{false}},{"physical_vehicle_verified",Value{false}},
+                {"authenticated",Value{false}},{"permits_programming",Value{false}}
+            };
+            if(kind=="lj1"){
+                fields.emplace("source_journal_sha256",text(capture.digest));
+                fields.emplace("journal_terminal_verified",Value{true});
+                fields.emplace("reconstructed_capture_sha256",text(projected.reconstructed_capture_sha256));
+            }
+            const auto result=cd::json::serialize(Value{std::move(fields)})+"\n";
             if(!atomic_create(proof,result.data(),result.size()))return error("Projection proof destination unavailable");
         }else if(!atomic_create(output,canonical.data(),canonical.size()))return error("Projection destination unavailable");
         return 0;

@@ -76,7 +76,8 @@ std::string report(const Catalogue& c,const Projection& p){
     o<<"{\"schema\":"<<quote(p.mode==Mode::freeze?"camarodiag-j1979-native-freeze-catalogue-projection-linux-v1":
           "camarodiag-j1979-native-catalogue-projection-linux-v1")
       <<",\"reference_edition\":"<<quote(c.edition)<<",\"reference_sha256\":"<<quote(c.reference_sha256)
-      <<",\"catalogue_sha256\":"<<quote(p.catalogue_sha256)<<",\"source_capture_sha256\":"<<quote(p.source_sha256)
+      <<",\"catalogue_sha256\":"<<quote(p.catalogue_sha256)<<",\"source_capture_sha256\":"
+      <<quote(p.reconstructed_capture_sha256.empty()?p.source_sha256:p.reconstructed_capture_sha256)
       <<",\"declared_vin\":"<<quote(p.vin)<<",\"expected_vin_independently_supplied\":true,"
         "\"source_replay_verified\":true,\"native_capture_replayed\":true,"
         "\"transport_frames_replayed\":"<<tf(p.transport==Transport::legacy)
@@ -183,7 +184,8 @@ std::string projection_csv(const Catalogue& c,const Projection& p){
             field(p.vin);field(p.transport==Transport::can?"CAN":"LEGACY");
             if(p.transport==Transport::can){integer(p.tx);integer(p.rx);blank();blank();}
             else{blank();blank();integer(p.legacy_protocol);integer(p.legacy_source);}
-            field(p.source_sha256);field(p.catalogue_sha256);field(c.reference_sha256);
+            field(p.reconstructed_capture_sha256.empty()?p.source_sha256:p.reconstructed_capture_sha256);
+            field(p.catalogue_sha256);field(c.reference_sha256);
             field(tf(p.completed));field(tf(p.identity_rechecked));field("false");field("false");
             if(!p.reconstructed_capture_sha256.empty()){
                 field(p.source_sha256);field(p.reconstructed_capture_sha256);field("true");

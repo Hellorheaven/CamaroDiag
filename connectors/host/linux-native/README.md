@@ -623,3 +623,29 @@ provisoires avant le contrôle VIN final ; \`--quiet\` désactive ces
 lignes sans modifier le journal ni le rapport. Les valeurs numériques
 attribuées restent réservées à la projection après vérification finale.
 Le rejeu n'appelle jamais le callback d'affichage.
+
+
+## Catalogue local documenté : projections exactes JSON et CSV
+
+Le pont Linux permet d'inspecter le catalogue fourni localement, de
+projeter les captures CL/1 (live USB), CF/1 (trames figées) et LLR/1
+(live legacy brut), ainsi que de reconstruire une capture LLR/1 depuis
+un journal LJ/1 terminé. Le SHA-256 de la référence doit être fourni
+indépendamment. Les valeurs du CSV sont des fractions exactes, sans
+arrondi, avec numérateur et dénominateur séparés. Les échantillons non
+interprétés ne disparaissent pas du tableau.
+
+~~~sh
+camarodiag-native --inspect-j1979-catalogue live catalogue.json reference.pdf SHA256 inventory.json
+camarodiag-native --project-j1979-catalogue cl1 catalogue.json reference.pdf SHA256 session.cl VIN projection.json
+camarodiag-native --export-j1979-catalogue-csv lj1 catalogue.json reference.pdf SHA256 session.llr.lj VIN values.csv 2 10
+camarodiag-native --verify-j1979-catalogue-csv lj1 catalogue.json reference.pdf SHA256 session.llr.lj VIN values.csv proof.json 2 10
+~~~
+
+Dans le dernier exemple, 2 désigne J1850 VPW et 10 la source de
+réponse hexadécimale documentée. L'interface graphique expose les cinq
+commandes hors ligne. Elle exige le protocole et la source uniquement
+pour LLR/1 ou LJ/1. Les empreintes du journal original et de la capture
+reconstituée sont distinctes. Les références locales ne constituent
+pas une certification SAE ; un journal déchiré ne peut être promu
+en preuve complète. Aucune connexion au véhicule n'est ouverte.
