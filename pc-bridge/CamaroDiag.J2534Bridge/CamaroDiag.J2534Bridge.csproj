@@ -23,6 +23,7 @@
     <Compile Include="../../connectors/host/windows-discovery/J1979FreezeNativeCli.cs" Link="Connectors/J1979FreezeNativeCli.cs" />
     <Compile Include="../../connectors/host/windows-discovery/J1979LiveNative.cs" Link="Connectors/J1979LiveNative.cs" />
     <Compile Include="../../connectors/host/windows-discovery/J1979LiveUsbCapture.cs" Link="Connectors/J1979LiveUsbCapture.cs" />
+    <Compile Include="../../connectors/host/windows-discovery/J1979LiveScalarProjection.cs" Link="Connectors/J1979LiveScalarProjection.cs" />
     <Compile Include="../../connectors/host/windows-discovery/J1979LiveNativeCli.cs" Link="Connectors/J1979LiveNativeCli.cs" />
     <Compile Include="../../connectors/host/windows-discovery/J1979MaintenanceJournal.cs" Link="Connectors/J1979MaintenanceJournal.cs" />
     <Compile Include="../../connectors/host/windows-discovery/J1979MaintenanceUsb.cs" Link="Connectors/J1979MaintenanceUsb.cs" />

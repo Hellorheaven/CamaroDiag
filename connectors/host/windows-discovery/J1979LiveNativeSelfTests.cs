@@ -112,6 +112,21 @@ internal static class J1979LiveNativeSelfTests
         Check(replay.CaptureIntegrityVerified&&replay.Summary?.Completed==true&&replay.Summary.Raw==4,"complete recording");
         Check(replay.Result?.Samples.Length==4&&replay.Result.Observations.Length==7,"all samples and admission retained");
         Check(!replay.DeviceCredentialAuthenticated&&!replay.PhysicalVehicleVerified&&!replay.PermitsProgramming,"offline provenance");
+        var projection=J1979LiveScalarProjection.Project(replay,Vin);
+        Check(projection.IdentityRechecked&&projection.NumericProjectionComplete&&projection.Samples.Count==4,"scalar projection");
+        Check(projection.Channels[0].Mean==40.5&&projection.Channels[0].Count==2,"temperature statistics");
+        Check(projection.Channels[1].Mean==1165.125&&projection.Channels[1].Missing==0,"RPM statistics");
+        Check(!projection.PhysicalVehicleVerified&&!projection.PermitsProgramming,"projection scope");
+        Check(Encoding.UTF8.GetString(J1979LiveScalarProjection.Csv(projection)).Contains("DOCUMENTED_SCALAR"),"numeric CSV");
+        bool wrongVin=false;
+        try{_ = J1979LiveScalarProjection.Project(replay,"1FA6P8TH0L5100000");}
+        catch(InvalidDataException){wrongVin=true;}
+        Check(wrongVin,"projection VIN required");
+        var noFinal=replay with{Summary=replay.Summary! with{FinalIdentityVerified=false},
+            Result=replay.Result! with{FinalIdentityVerified=false}};
+        var partial=J1979LiveScalarProjection.Project(noFinal,Vin);
+        Check(!partial.IdentityRechecked&&!partial.NumericProjectionComplete&&partial.Samples.All(s=>s.Number is null),
+            "unverified identity cannot produce numbers");
         foreach(var (index,offset,value) in new (int,int,byte)[]{(3,25,6),(4,6,5),(5,8,20),(8,12,5),(1,3,1),(2,28,0),(7,27,0)})
         {
             var bodies=Bodies(profile);bodies[index][offset]=value;
