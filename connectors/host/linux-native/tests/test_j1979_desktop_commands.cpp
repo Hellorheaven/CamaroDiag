@@ -77,6 +77,16 @@ int main(){
     ready=prepare(find("verify-native-live"),verify);
     assert(!ready.physical&&ready.confirmation.empty());
     assert((ready.args==std::vector<std::string>{"--verify-j1979-live-native",capture,report,proof,values["vin"]}));
+    Values live_evidence{{"scj",capture},{"tx","7E0"},{"rx","7E8"},{"vin",values["vin"]},{"output",proof}};
+    assert(prepare(find("project-live-evidence"),live_evidence).args.front()=="project-live-evidence");
+    assert(prepare(find("csv-live-evidence"),live_evidence).args.front()=="export-live-evidence-csv");
+    live_evidence["profile"]="6";
+    rejects([&]{(void)prepare(find("project-live-evidence"),live_evidence);});
+    live_evidence.erase("scj");live_evidence["ecp"]=capture;
+    assert(prepare(find("project-live-evidence"),live_evidence).args.front()=="project-live-evidence");
+    live_evidence["projection"]=report;
+    assert(prepare(find("verify-live-evidence"),live_evidence).args.front()=="verify-live-evidence");
+    live_evidence["cl1"]=second;rejects([&]{(void)prepare(find("verify-live-evidence"),live_evidence);});
     Values usb_live{{"port","/dev/ttyACM0"},{"key",report},{"tx","7E0"},{"rx","7E8"},{"vin",values["vin"]},
         {"pids","0C"},{"capture",directory+"/new.cl"},{"output",directory+"/usb.json"},
         {"numeric-output",directory+"/usb-numeric.json"},{"csv-output",directory+"/usb.csv"}};

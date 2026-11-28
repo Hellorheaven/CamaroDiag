@@ -31,6 +31,7 @@
 #include "j1979_can_history.hpp"
 #include "j1979_network_history.hpp"
 #include "j1979_native_live_inspection.hpp"
+#include "j1979_live_evidence.hpp"
 #include "j1979_historical_can_plan.hpp"
 #include "j1979_legacy_discovery_history.hpp"
 #include "j1979_legacy_scan_history.hpp"
@@ -3090,6 +3091,10 @@ static void usage(FILE *stream) {
         "  camarodiag-native compare-legacy-discovery-scan --discovery DISCOVERY.json --scan SCAN.json --output PROOF.json\n"
         "  camarodiag-native verify-native-live-projection --report RAW.json --projection NUMERIC.json --tx 7E0 --rx 7E8 --vin VIN --output PROOF.json\n"
         "  camarodiag-native project-native-live --report REPORT.json --tx 7E0 --rx 7E8 --vin VIN --output PROJECTION.json\n"
+        "  camarodiag-native project-live-evidence --scj SESSION.scj --tx 7E0 --rx 7E8 --vin VIN --output NUMERIC.json\n"
+        "  camarodiag-native export-live-evidence-csv --ecp SESSION.ecp --profile 6 --tx 7E0 --rx 7E8 --vin VIN --output SAMPLES.csv\n"
+        "  camarodiag-native verify-live-evidence --scj SESSION.scj --projection NUMERIC.json --tx 7E0 --rx 7E8 --vin VIN --output PROOF.json\n"
+        "    Select exactly one of --scj, --ecp, --cl1, --report; --profile is required only for ECP.\n"
         "  camarodiag-native project-cl1-live --capture CAPTURE.cl --tx 7E0 --rx 7E8 --vin VIN --output NUMERIC.json\n"
         "  camarodiag-native export-cl1-live-csv --capture CAPTURE.cl --tx 7E0 --rx 7E8 --vin VIN --output SAMPLES.csv\n"
         "  camarodiag-native verify-cl1-live-projection --capture CAPTURE.cl --projection NUMERIC.json --tx 7E0 --rx 7E8 --vin VIN --output PROOF.json\n"
@@ -3481,6 +3486,66 @@ static int project_native_live_cli(int argc,char** argv,bool csv,bool verify=fal
         return projected.complete?0:2;
     }catch(const std::exception& e){return error(e.what());}
 }
+static int live_evidence_cli(int argc,char** argv,std::string_view command){
+    using namespace cd::network::history;
+    const bool verify=command=="verify-live-evidence";
+    const bool csv=command=="export-live-evidence-csv";
+    const char *source=nullptr,*target=nullptr,*saved=nullptr,*vin=nullptr,*tx=nullptr,*rx=nullptr,*profile=nullptr;
+    LiveEvidenceKind kind{};
+    for(int i=2;i<argc;){
+        const std::string_view key(argv[i++]);
+        if(i>=argc||!*argv[i]||std::string_view(argv[i]).starts_with("--"))
+            return error("Missing live evidence option");
+        const char* value=argv[i++];
+        if(key=="--scj"||key=="--ecp"||key=="--cl1"||key=="--report"){
+            if(source)return error("Exactly one original live evidence source required");
+            source=value;
+            kind=key=="--scj"?LiveEvidenceKind::socket_journal:key=="--ecp"?LiveEvidenceKind::elm_campaign:
+                key=="--cl1"?LiveEvidenceKind::cl1:LiveEvidenceKind::report;
+            continue;
+        }
+        const char** slot=nullptr;
+        if(key=="--output")slot=&target;
+        else if(key=="--projection"&&verify)slot=&saved;
+        else if(key=="--tx")slot=&tx;
+        else if(key=="--rx")slot=&rx;
+        else if(key=="--vin")slot=&vin;
+        else if(key=="--profile")slot=&profile;
+        if(!slot||*slot)return error("Unexpected or duplicate live evidence option");
+        *slot=value;
+    }
+    uint32_t t=0,r=0,p=0;
+    if(!source||!target||!vin||!tx||!rx||!cf1_valid_vin(vin)||!hex_uint32(tx,&t)||
+        !hex_uint32(rx,&r)||!j1979_can_physical_pair(t,r)||(verify&&!saved)||
+        ((kind==LiveEvidenceKind::elm_campaign)!=bool(profile))||
+        (profile&&(!decimal_uint32(profile,&p)||p<6||p>9)))
+        return error("Explicit VIN, CAN pair, original evidence and matching ELM profile required");
+    try{
+        constexpr std::size_t maximum=64u*1024u*1024u;
+        input original{},candidate{};
+        if(!load_regular(source,maximum,&original))return error("Invalid bounded original live evidence");
+        const auto result=project_live_evidence(kind,{original.bytes.get(),original.length},{t,r},vin,p);
+        if(result.source_sha256!=original.digest)return error("Live evidence digest differs");
+        std::string bytes;
+        bool consistent=true;
+        if(verify){
+            if(!load_regular(saved,maximum,&candidate)||!separate(&original,&candidate))
+                return error("Distinct bounded saved projection required");
+            const auto document=cd::json::parse_report(
+                {reinterpret_cast<const char*>(candidate.bytes.get()),candidate.length},maximum);
+            const auto proof=verify_live_evidence(result,document,candidate.digest);
+            consistent=proof.at("consistent").boolean();
+            bytes=cd::json::serialize(proof)+"\n";
+            if(!recheck_input(saved,maximum,candidate))return error("Saved projection changed");
+        }else{
+            bytes=csv?native_live_csv(result.projection):cd::json::serialize(result.projection.report)+"\n";
+        }
+        if(!recheck_input(source,maximum,original))return error("Original live evidence changed");
+        if(!atomic_create(target,bytes.data(),bytes.size()))return error("New live evidence destination unavailable");
+        return consistent&&result.projection.complete?0:2;
+    }catch(const std::exception& e){return error(e.what());}
+}
+
 static int compare_native_live_cli(int argc,char** argv){
     struct Source {const char* path;bool cl1;};
     std::vector<Source> paths;
@@ -3673,6 +3738,8 @@ int main(int argc, char **argv) {
     if(argc>=2&&!strcmp(argv[1],"project-native-live"))return project_native_live_cli(argc,argv,false);
     if(argc>=2&&!strcmp(argv[1],"export-native-live-csv"))return project_native_live_cli(argc,argv,true);
     if(argc>=2&&!strcmp(argv[1],"export-legacy-live-csv"))return legacy_live_csv_cli(argc,argv);
+    if(argc>=2&&(!strcmp(argv[1],"project-live-evidence")||!strcmp(argv[1],"export-live-evidence-csv")||
+        !strcmp(argv[1],"verify-live-evidence")))return live_evidence_cli(argc,argv,argv[1]);
     if(argc>=2&&!strcmp(argv[1],"compare-native-live"))return compare_native_live_cli(argc,argv);
     if(argc>=2&&!strcmp(argv[1],"compare-live"))return compare_live_compat_cli(argc,argv);
     if(argc>=2&&!strcmp(argv[1],"verify-can-mutation"))return historical_maintenance_compat_cli(argc,argv,true);

@@ -51,6 +51,20 @@ Field optional_report(std::string key,std::string label){
 Field optional_cl1(std::string key,std::string label){
     return f(std::move(key),std::move(label),"--cl1",K::input_file,"",false);
 }
+Field optional_evidence(std::string key,std::string label,std::string flag){
+    return f(std::move(key),std::move(label),std::move(flag),K::input_file,"",false);
+}
+Field optional_profile(){auto field=profile();field.required=false;field.hint.clear();return field;}
+std::vector<Field> evidence_fields(bool verify){
+    std::vector<Field> fields{
+        optional_evidence("scj","Journal SocketCAN SCJ","--scj"),
+        optional_evidence("ecp","Capture ELM ECP","--ecp"),
+        optional_cl1("cl1","Capture USB CL/1"),
+        optional_report("report","Rapport brut sans journal"),
+        optional_profile(),tx(),rx(),vin()};
+    if(verify)fields.push_back(projection());
+    fields.push_back(output());return fields;
+}
 Field baseline(){return f("baseline","Rapport avant maintenance","--baseline",K::input_file,"",false);}
 Field trace(bool write=false){return f("trace",write?"Nouvelle trace":"Trace adaptateur","--trace",write?K::output_file:K::input_file,"");}
 Field offline_journal(){return f("journal","Journal source","--journal",K::input_file,"");}
@@ -113,6 +127,9 @@ const std::vector<Operation>& operations(){
         op("verify-scj","Hors ligne — Vérification SCJ","Compare le journal à son rapport exact.","verify-socketcan-journal",{journal(false),report(),tx(),rx(),vin(),output()}),
         op("verify-network","Hors ligne — Vérification réseau","Rattache chaque journal SCJ au rapport réseau et à la découverte.","verify-network-journals",{report(),directory(false),interface(),vin(),output()}),
         op("project-live","Hors ligne — Projection live","Reconstitue les valeurs et statistiques après vérification d’identité.","project-native-live",{report(),tx(),rx(),vin(),output()}),
+        op("project-live-evidence","Hors ligne — Projection depuis la preuve originale","Rejoue SCJ, ECP ou CL/1 et lie le rapport à la source.","project-live-evidence",evidence_fields(false)),
+        op("csv-live-evidence","Hors ligne — CSV depuis la preuve originale","Rejoue la campagne avant les mesures numériques.","export-live-evidence-csv",evidence_fields(false)),
+        op("verify-live-evidence","Hors ligne — Vérification de preuve numérique","Contrôle le rapport numérique depuis le journal ou la capture.","verify-live-evidence",evidence_fields(true)),
         op("csv-live","Hors ligne — CSV CAN","Export des échantillons et signaux ; données manquantes non remplacées par zéro.","export-native-live-csv",{report(),tx(),rx(),vin(),output()}),
         op("verify-projection","Hors ligne — Vérification projection","Vérifie une projection numérique contre le rapport brut.","verify-native-live-projection",{report(),projection(),tx(),rx(),vin(),output()}),
         op("csv-legacy","Hors ligne — CSV legacy","Projection depuis la capture LLR, pas depuis des valeurs déjà éditées.","export-legacy-live-csv",{capture(false),protocol(),source(),vin(),output()}),
@@ -256,6 +273,16 @@ Invocation prepare(const Operation& supplied,const Values& values){
     if(ids.contains("tx")&&ids.contains("rx")&&std::any_of(op.fields.begin(),op.fields.end(),[](const Field& a){return a.key=="extended";})){
         const bool extended=values.contains("extended")&&values.at("extended")=="true";
         require(extended==(ids.at("tx")>0x7ff),"Adressage 11/29 bits incohérent");
+    }
+    if(op.id=="project-live-evidence"||op.id=="csv-live-evidence"||op.id=="verify-live-evidence"){
+        unsigned sources=0;bool ecp=false;
+        for(const auto* name:{"scj","ecp","cl1","report"}){
+            const auto it=values.find(name);
+            if(it!=values.end()&&!it->second.empty()){++sources;ecp=std::string_view(name)=="ecp";}
+        }
+        const auto selected=values.find("profile");
+        const bool has_profile=selected!=values.end()&&!selected->second.empty();
+        require(sources==1&&ecp==has_profile,"Une seule preuve originale ; profil ELM obligatoire uniquement pour ECP");
     }
     if(op.id=="compare-native-live"){
         unsigned sources=0;
