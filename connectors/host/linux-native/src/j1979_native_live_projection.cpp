@@ -41,12 +41,14 @@ struct Row {
 };
 struct Channel {
     std::string name,unit,scale;
+    std::optional<std::string> configuration;
     std::optional<double> value;
     std::optional<std::uint64_t> raw;
 };
 Value channel(const Channel& c){
     return obj({{"name",text(c.name)},{"unit",text(c.unit)},{"number",c.value?number(*c.value):Value{}},
-        {"raw_encoded",c.raw?integer(*c.raw):Value{}},{"scale_source",text(c.scale)}});
+        {"raw_encoded",c.raw?integer(*c.raw):Value{}},{"scale_source",text(c.scale)},
+        {"scale_configuration",c.configuration?text(*c.configuration):Value{}}});
 }
 std::vector<Channel> engineering(const Row& r,const cd::j1979::Context& context,bool identity){
     std::vector<Channel> out;
@@ -59,14 +61,22 @@ std::vector<Channel> engineering(const Row& r,const cd::j1979::Context& context,
         const auto decoded=cd::j1979::trims(observed,context.layout);
         if(!decoded)return out;
         for(const auto& c:decoded->signals)
-            out.push_back({c.name,"%",c.number?"SAE_TRIM":"UPPER_BANK_UNVERIFIED",c.number,c.raw});
+            out.push_back({c.name,"%",c.number?"SAE_TRIM":"UPPER_BANK_UNVERIFIED",c.number,c.raw,{}});
         return out;
     }
-    if(cd::j1979::dependency(r.pid)){
+    if(const auto dependency=cd::j1979::dependency(r.pid)){
         const auto decoded=cd::j1979::scale(observed,context.scaling);
         if(!decoded)return out;
+        const auto& range=*dependency==0x4f?context.scaling.pid4f:context.scaling.pid50;
+        constexpr char digits[]="0123456789ABCDEF";
+        std::optional<std::string> config;
+        if(range.state==cd::j1979::RangeState::ecu_configuration){
+            config=std::string();
+            for(auto byte:range.data){*config+=digits[byte>>4];*config+=digits[byte&15];}
+        }
         for(const auto& c:decoded->signals)
-            out.push_back({c.name,c.unit,std::string(c.scale_source),c.number,c.raw});
+            out.push_back({c.name,c.unit,std::string(c.scale_source),c.number,c.raw,
+                c.scale_source=="ECU_CONFIGURATION"?config:std::nullopt});
         return out;
     }
     if(cd::j1979::multi_width(r.pid)){
@@ -74,13 +84,13 @@ std::vector<Channel> engineering(const Row& r,const cd::j1979::Context& context,
         if(!decoded)return out;
         if(cd::j1979::status_width(r.pid)&&!cd::j1979::status_record(observed))return out;
         for(const auto& c:decoded->signals)
-            out.push_back({std::string(c.name),std::string(c.unit),"DOCUMENTED_DEFINITION",c.number,c.raw});
+            out.push_back({std::string(c.name),std::string(c.unit),"DOCUMENTED_DEFINITION",c.number,c.raw,{}});
         return out;
     }
     j1979_measurement m{};
     if(j1979_measurement_decode(r.request.data(),r.request.size(),r.response.data(),r.response.size(),&m)
         &&m.interpreted&&m.name&&m.unit)
-        out.push_back({m.name,m.unit,"DOCUMENTED_DEFINITION",m.number,{}});
+        out.push_back({m.name,m.unit,"DOCUMENTED_DEFINITION",m.number,{},{}});
     return out;
 }
 struct Stats {
@@ -121,7 +131,7 @@ void csv_line(std::ostringstream& csv,const Value& row,const Value* signal){
     for(auto key:{"cycle","pid_hex","started_elapsed_ms","elapsed_ms","duration_ms","status"})append(row.at(key));
     for(auto key:{"number","unit"})append(signal?signal->at(key):Value{});
     for(auto key:{"request_hex","response_hex","detail"})append(row.at(key));
-    for(auto key:{"name","raw_encoded","scale_source"})append(signal?signal->at(key):Value{});
+    for(auto key:{"name","raw_encoded","scale_source","scale_configuration"})append(signal?signal->at(key):Value{});
     csv<<'\n';
 }
 }
@@ -196,7 +206,7 @@ NativeLiveProjection project_native_live(const json::Value& source,Pair pair,std
 }
 std::string native_live_csv(const NativeLiveProjection& p){
     std::ostringstream csv;csv.imbue(std::locale::classic());
-    csv<<"cycle,pid_hex,started_elapsed_ms,elapsed_ms,duration_ms,status,value,unit,request_hex,response_hex,detail,signal_name,raw_encoded,scale_source\n";
+    csv<<"cycle,pid_hex,started_elapsed_ms,elapsed_ms,duration_ms,status,value,unit,request_hex,response_hex,detail,signal_name,raw_encoded,scale_source,scale_configuration\n";
     for(const auto& row:p.report.at("samples").array()){
         const auto& signals=row.at("signals").array();
         if(signals.empty())csv_line(csv,row,nullptr);

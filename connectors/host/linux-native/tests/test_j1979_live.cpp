@@ -1,6 +1,7 @@
 #include "j1979_live.h"
 #include "j1979_native_live_inspection.hpp"
 #include <stdexcept>
+#include <array>
 #include <string>
 #include <cstdlib>
 #include <assert.h>
@@ -168,6 +169,19 @@ int main(void) {
     assert(channels[1].at("mean").finite_number()==42);
     assert(projection.report.at("samples").array().size()==4);
     assert(!projection.report.at("physical_vehicle_verified").boolean());
+    const std::array digests{std::string(64,'a'),std::string(64,'b')};
+    const std::array projections{projection,projection};
+    const auto comparison=cd::network::history::compare_native_live(projections,digests);
+    assert(comparison.at("shared_pids").array().size()==2);
+    assert(comparison.at("channel_comparison").array().size()==2);
+    assert(comparison.at("channel_comparison").array()[0].at("comparable").boolean());
+    assert(comparison.at("channel_comparison").array()[0].at("mean_range").finite_number()==0);
+    assert(!comparison.at("physical_vehicle_verified").boolean());
+    bool duplicate_denied=false;
+    try{const std::array duplicate{digests[0],digests[0]};
+        (void)cd::network::history::compare_native_live(projections,duplicate);}
+    catch(const std::invalid_argument&){duplicate_denied=true;}
+    assert(duplicate_denied);
     const auto csv=cd::network::history::native_live_csv(projection);
     assert(csv.find("signal_name,raw_encoded,scale_source")!=std::string::npos);
     assert(csv.find("\"engine-rpm\"")!=std::string::npos);
@@ -200,6 +214,11 @@ int main(void) {
     for(const auto& sample:unidentified.report.at("samples").array()){
         assert(!sample.at("engineering_verified").boolean()&&sample.at("signals").array().empty());
     }
+    const std::array missing_identity{projection,unidentified};
+    const auto partial_comparison=cd::network::history::compare_native_live(missing_identity,digests);
+    assert(!partial_comparison.at("all_identities_rechecked").boolean());
+    assert(!partial_comparison.at("channel_comparison").array()[0].at("comparable").boolean());
+    assert(partial_comparison.at("channel_comparison").array()[0].at("mean_range").null());
     j1979_live_free(&r);
 
     f = fake{}; f.clock=1000; f.negative_sample=true;

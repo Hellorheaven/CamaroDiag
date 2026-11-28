@@ -34,7 +34,14 @@ unsigned pid(const Value& row){
     return static_cast<unsigned>(n);
 }
 std::string scale_key(const Value& signal){
-    return signal.at("scale_source").string();
+    const auto& source=signal.at("scale_source").string();
+    const auto& config=signal.at("scale_configuration");
+    if(source=="ECU_CONFIGURATION"){
+        require(!config.null()&&bytes(config,4).size()==4,"Missing verified ECU scaling configuration");
+        return source+":"+config.string();
+    }
+    require(config.null(),"Unexpected configuration on context-free scale");
+    return source;
 }
 struct Channel {
     const Value* summary{};

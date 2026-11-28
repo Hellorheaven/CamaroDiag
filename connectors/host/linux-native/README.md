@@ -462,3 +462,8 @@ camarodiag-native project-native-live --report live.json --tx 7E0 --rx 7E8 --vin
 camarodiag-native export-native-live-csv --report live.json --tx 7E0 --rx 7E8 --vin VIN17 --output samples.csv
 ```
 The source recording is never rewritten. The commands verify the raw request sequence and canonical report before projecting values, preserve missing values, and require initial/final VIN agreement before attaching engineering interpretations. Context-dependent scaling is never silently replaced by historic default arithmetic. Partial projections are retained with exit status 2. JSON binds the original SHA-256; CSV is a convenience view, not an independently authenticated proof. Neither command opens a vehicle connection.
+
+```sh
+camarodiag-native compare-native-live --report run1.json --report run2.json --tx 7E0 --rx 7E8 --vin VIN17 --output comparison.json
+```
+Comparison replays each raw native report, not its exported projections. It requires the same VIN and CAN pair, distinct input hashes, and at most sixteen recordings. Per-channel means are compared only when all recordings retain identity, numeric samples and identical scaling provenance (including configuration bytes where applicable). Missing channels and unverified identity are explicit, not zero. No diagnostic or time alignment claim is made.
