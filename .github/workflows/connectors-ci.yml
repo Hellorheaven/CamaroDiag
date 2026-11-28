@@ -22,7 +22,7 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
-      - name: Build and run native Linux C SAE J1979 bridge tests (final gate only)
+      - name: Build and run native Linux C++20 SAE J1979 bridge tests (final gate only)
         run: |
           set -euo pipefail
           make -C connectors/host/linux-native clean all test
@@ -88,6 +88,76 @@ jobs:
           /tmp/j1979_read_guard_test
           g++ -std=c++11 -Wall -Wextra -Werror -pedantic connectors/firmware/shared/native-tests/kline_observer_test.cpp -o /tmp/kline_observer_test
           /tmp/kline_observer_test
+  linux-native-packages:
+    # Reused only by the explicit protocol/workstream final gate.
+    # ARM is exercised in a matching userspace; not a hardware ECU test.
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            architecture: amd64
+            image: debian:13
+          - platform: linux/arm64
+            architecture: arm64
+            image: debian:13
+          - platform: linux/arm/v7
+            architecture: armhf
+            image: debian:13
+          - platform: linux/amd64
+            architecture: amd64
+            image: ubuntu:24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Enable ARM userspace emulation
+        if: matrix.architecture != 'amd64'
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm,arm64
+      - name: Compile native C++20 CLI and Qt desktop; validate Debian packaging
+        env:
+          TARGET_PLATFORM: ${{ matrix.platform }}
+          TARGET_ARCH: ${{ matrix.architecture }}
+          TARGET_IMAGE: ${{ matrix.image }}
+        run: |
+          set -euo pipefail
+          docker run --rm --platform "$TARGET_PLATFORM" \
+            -e TARGET_ARCH -e DEBIAN_FRONTEND=noninteractive \
+            -v "$GITHUB_WORKSPACE:/source:ro" "$TARGET_IMAGE" sh -ec '
+              apt-get update
+              apt-get install -y --no-install-recommends \
+                build-essential pkg-config libssl-dev qt6-base-dev \
+                dpkg-dev binutils ca-certificates
+              test "$(dpkg --print-architecture)" = "$TARGET_ARCH"
+              mkdir -p /tmp/work
+              cp -a /source/connectors /tmp/work/
+              cd /tmp/work/connectors/host/linux-native
+              make -j2 all gui
+              ./camarodiag-native --help
+              QT_QPA_PLATFORM=offscreen ./camarodiag-j1979-desktop --self-test-ui
+              if [ "$TARGET_ARCH" != amd64 ]; then make -j2 test; fi
+              make deb deb-gui
+              for package in out/*.deb; do
+                test "$(dpkg-deb -f "$package" Architecture)" = "$TARGET_ARCH"
+                dpkg-deb -I "$package"
+                dpkg-deb -c "$package"
+                case "$(dpkg-deb -f "$package" Depends)" in
+                  *python*|*pyserial*) echo "Unexpected Python runtime dependency"; exit 1 ;;
+                esac
+              done
+              desktop=$(find out -name "*desktop*.deb")
+              test -n "$desktop"
+              dpkg-deb -x "$desktop" /tmp/installed
+              test -x /tmp/installed/usr/bin/camarodiag-native
+              test -x /tmp/installed/usr/bin/camarodiag-j1979-desktop
+              test -f /tmp/installed/usr/share/applications/camarodiag-j1979.desktop
+              /tmp/installed/usr/bin/camarodiag-native --help
+              QT_QPA_PLATFORM=offscreen /tmp/installed/usr/bin/camarodiag-j1979-desktop --self-test-ui
+            '
   esp32-build:
     runs-on: ubuntu-latest
     steps:
