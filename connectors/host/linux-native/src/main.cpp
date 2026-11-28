@@ -6,6 +6,7 @@
 #include "cl1_usb.h"
 #include "j1979_can_cli.h"
 #include "j1979_socket_campaign.hpp"
+#include "j1979_live_export.hpp"
 #include "j1979_network_journal.hpp"
 #include "j1979_can_network.hpp"
 #include "j1979_elm_can.hpp"
@@ -2379,6 +2380,7 @@ static int direct_maintenance_cli(int argc,char** argv,bool elm=false){
 struct ElmCanOptions{
     cd::elmcan::Scope scope;
     const char* port{},*vin{},*output{},*adapter_capture{},*adapter_journal{},*campaign_capture{};
+    const char* native_report{},*projection{},*csv{};
     unsigned baud{38400},budget{180000},cycles{30},interval{1000};
     std::vector<uint8_t> pids;
     bool profile{},tx{},rx{},confirmed{},baud_set{},budget_set{},cycles_set{},interval_set{};
@@ -2420,10 +2422,20 @@ static bool parse_elm_can(int argc,char** argv,ElmCanOptions& o,bool live){
             else if(flag=="--adapter-capture")dest=&o.adapter_capture;
             else if(flag=="--adapter-journal")dest=&o.adapter_journal;
             else if(flag=="--campaign-capture")dest=&o.campaign_capture;
+            else if(live&&flag=="--native-report-output")dest=&o.native_report;
+            else if(live&&flag=="--projection-output")dest=&o.projection;
+            else if(live&&flag=="--csv")dest=&o.csv;
             if(!dest||*dest)return false;
             *dest=value;
         }
     }
+    if((o.projection||o.csv)&&!o.native_report)return false;
+    if(o.native_report&&(!o.campaign_capture||!o.adapter_journal))return false;
+    const std::array<const char*,7> destinations{o.output,o.adapter_capture,o.adapter_journal,
+        o.campaign_capture,o.native_report,o.projection,o.csv};
+    for(std::size_t i=0;i<destinations.size();++i)
+        for(std::size_t j=i+1;j<destinations.size();++j)
+            if(destinations[i]&&destinations[j]&&!strcmp(destinations[i],destinations[j]))return false;
     return o.profile&&o.tx&&o.rx&&o.confirmed&&o.port&&o.vin&&cf1_valid_vin(o.vin)&&o.output&&o.scope.valid()&&
         o.budget>=1000&&o.budget<=600000&&(!live||(!o.pids.empty()&&o.cycles>=1&&o.cycles<=1000&&
         o.interval>=100&&o.interval<=60000&&o.pids.size()*o.cycles<=J1979_LIVE_MAX_SAMPLES));
@@ -2441,6 +2453,12 @@ static int elm_can_cli(int argc,char** argv,bool live){
     if(o.adapter_capture&&(trace_out.fd<0||!sync_parent(o.adapter_capture)))return error("Adapter transcript destination unavailable");
     File campaign_out{o.campaign_capture?open(o.campaign_capture,O_WRONLY|O_CREAT|O_EXCL|O_NOFOLLOW|O_CLOEXEC,0600):-1};
     if(o.campaign_capture&&(campaign_out.fd<0||!sync_parent(o.campaign_capture)))return error("Campaign capture destination unavailable");
+    std::unique_ptr<cd::liveexport::Destination> raw_output,projection,csv;
+    try{
+        raw_output=std::make_unique<cd::liveexport::Destination>(o.native_report);
+        projection=std::make_unique<cd::liveexport::Destination>(o.projection);
+        csv=std::make_unique<cd::liveexport::Destination>(o.csv);
+    }catch(const std::exception& e){return error(e.what());}
     legacy_cancelled=0;
     struct Signals{
         struct sigaction oldint{},oldterm{};
@@ -2504,6 +2522,19 @@ static int elm_can_cli(int argc,char** argv,bool live){
         }
         const auto json=cd::elmcan::report(o.scope,o.vin,live?"LIVE":"SCAN",native_report,evidence,reason,completed);
         if(!write_owned_file(out.fd,json.data(),json.size())||!sync_parent(o.output))return error("ELM CAN report persistence failed");
+        // Release the serial channel before any offline interpretation.
+        session.reset();link.reset();
+        if(raw_output->requested()){
+            if(native_report.empty())return error("No replayed ELM live report available");
+            raw_output->persist(native_report);
+            if(projection->requested()||csv->requested()){
+                const auto exported=cd::liveexport::publish(raw_output->descriptor(),raw_output->path(),native_report,
+                    {o.scope.tx,o.scope.rx},o.vin,*projection,*csv);
+                completed=completed&&exported.complete;
+                fprintf(stderr,"J1979 ELM live export: %zu samples, source SHA-256 %s, %s\n",
+                    exported.samples,exported.source_sha256.c_str(),exported.complete?"complete":"incomplete");
+            }
+        }
         return completed?0:2;
     }catch(const std::exception& e){return error(e.what());}
 }
@@ -2927,11 +2958,13 @@ static void usage(FILE *stream) {
         "  camarodiag-native --verify-j1979-elm-trace PROFILE TX RX VIN TRACE.ecr CAPTURE PROOF.json\n"
         "  camarodiag-native --j1979-elm-can-freeze --port /dev/ttyUSB0 --profile 6 --tx 7E0 --rx 7E8 --vin VIN --frame 00 --pid 0C --capture freeze.cf --output freeze.json --confirm-physical-channel [--extended] [--adapter-capture trace.ecr] [--adapter-journal trace.ejr]\n"
         "  camarodiag-native --j1979-elm-can --profile 6 --port /dev/ttyUSB0 --tx 7E0 --rx 7E8 --vin VIN --output scan.json --confirm-physical-channel [--adapter-capture trace.ecr] [--adapter-journal trace.ejr] [--campaign-capture capture.ecp]\n"
-        "  camarodiag-native --j1979-elm-live --profile 6 --port /dev/ttyUSB0 --tx 7E0 --rx 7E8 --vin VIN --pid 0C --output live.json --confirm-physical-channel [--adapter-capture trace.ecr] [--adapter-journal trace.ejr] [--campaign-capture capture.ecp]\n"
+        "  camarodiag-native --j1979-elm-live --profile 6 --port /dev/ttyUSB0 --tx 7E0 --rx 7E8 --vin VIN --pid 0C --output live.json --confirm-physical-channel [--adapter-capture trace.ecr] [--adapter-journal trace.ejr] [--campaign-capture capture.ecp] [--native-report-output RAW.json] [--projection-output NUMERIC.json] [--csv SAMPLES.csv]\n"
+        "    Numeric ELM exports require --native-report-output, --campaign-capture and --adapter-journal.\n"
         "  camarodiag-native --j1979-can-network --interface can0 --rx 7E8 --rx 7E9 --vin VIN --output network.json --confirm-functional-scope [--extended] [--journal-directory NEW_DIR]\n"
         "  camarodiag-native --j1979-can --interface can0 --tx 7E0 --rx 7E8 --output evidence.json --vin VIN --budget-ms 180000 --confirm-physical-channel [--journal capture.scj]\n"
         "  camarodiag-native --j1979-live-usb-native --port /dev/ttyACM0 --key-file key.bin --capture session.cl --output report.json --tx 7E0 --rx 7E8 --vin VIN --pid 0C --cycles 30 --interval-ms 1000 --budget-ms 180000 --confirm-physical-channel\n"
-        "  camarodiag-native --j1979-live --interface can0 --tx 7E0 --rx 7E8 --vin VIN --pid 0C --cycles 30 --interval-ms 1000 --budget-ms 180000 --output live.json --confirm-physical-channel [--journal capture.scj]\n"
+        "  camarodiag-native --j1979-live --interface can0 --tx 7E0 --rx 7E8 --vin VIN --pid 0C --cycles 30 --interval-ms 1000 --budget-ms 180000 --output live.json --confirm-physical-channel [--journal capture.scj] [--projection-output NUMERIC.json] [--csv SAMPLES.csv]\n"
+        "    Numeric SocketCAN exports require --journal. Raw evidence is never overwritten.\n"
         "  camarodiag-native --inspect-j1979-live-native-prefix CAPTURE.cl VIN PREFIX.json\n"
         "  camarodiag-native --inspect-j1979-live-native CAPTURE.cl VIN REPORT.json\n"
         "  camarodiag-native --verify-j1979-live-native-prefix CAPTURE.cl PREFIX.json PROOF.json VIN\n"

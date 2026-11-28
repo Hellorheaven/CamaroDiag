@@ -239,6 +239,7 @@ int j1979_can_cli(int argc, char **argv) {
                     exported.samples,exported.source_sha256.c_str(),exported.complete?"complete":"incomplete");
             }
         }catch(const std::exception& e){
+            complete=false;
             fprintf(stderr,"SocketCAN journal retained without confirmed completion: %s\n",e.what());
             j1979_isotp_close(&link);
         }

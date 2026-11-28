@@ -34,6 +34,12 @@ int main(){
     bad=values;bad["write"]="04";rejects([&]{(void)prepare(find("can-live"),bad);});
     bad=values;bad["journal"]="";rejects([&]{(void)prepare(find("can-live"),bad);});
     bad=values;bad["output"]=directory;rejects([&]{(void)prepare(find("can-live"),bad);});
+    auto numeric=values;
+    numeric["numeric-output"]=directory+"/numeric.json";numeric["csv-output"]=directory+"/samples.csv";
+    ready=prepare(find("can-live"),numeric);
+    assert(std::count(ready.args.begin(),ready.args.end(),"--projection-output")==1);
+    assert(std::count(ready.args.begin(),ready.args.end(),"--csv")==1);
+    numeric["csv-output"]=numeric["journal"];rejects([&]{(void)prepare(find("can-live"),numeric);});
     auto manipulated=find("can-live");manipulated.command="--j1979-maintenance-can";
     assert(prepare(manipulated,values).args.front()=="--j1979-live");
     Values network{{"interface","can0"},{"targets","7E8 7E9"},{"vin",values["vin"]},
@@ -99,6 +105,12 @@ int main(){
     ready=prepare(find("elm-scan"),elm);
     assert(std::count(ready.args.begin(),ready.args.end(),"--adapter-capture")==1);
     assert(std::count(ready.args.begin(),ready.args.end(),"--baud")==1);
+    auto elm_live=elm;elm_live["pids"]="0C 0D";elm_live["numeric-output"]=directory+"/numeric.json";
+    rejects([&]{(void)prepare(find("elm-live"),elm_live);});
+    elm_live["native-output"]=directory+"/raw.json";elm_live["csv-output"]=directory+"/samples.csv";
+    assert(prepare(find("elm-live"),elm_live).physical);
+    auto without=elm_live;without.erase("campaign");rejects([&]{(void)prepare(find("elm-live"),without);});
+    without=elm_live;without.erase("adapter");rejects([&]{(void)prepare(find("elm-live"),without);});
     elm["profile"]="7";rejects([&]{(void)prepare(find("elm-scan"),elm);});
     elm["tx"]="18DA10F1";elm["rx"]="18DAF110";assert(prepare(find("elm-scan"),elm).physical);
     elm["adapter-capture"]=elm["adapter"];rejects([&]{(void)prepare(find("elm-scan"),elm);});

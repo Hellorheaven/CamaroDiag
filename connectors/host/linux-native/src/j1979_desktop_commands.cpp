@@ -40,6 +40,9 @@ Field window(){return f("window","Fenêtre découverte (ms)","--window-ms",K::de
 Field adapter_journal(){return f("adapter","Nouveau journal adaptateur EJR","--adapter-journal",K::output_file,"",false);}
 Field campaign(){return f("campaign","Nouvelle capture ECP","--campaign-capture",K::output_file,"",false);}
 Field projection(){return f("projection","Projection numérique","--projection",K::input_file,"");}
+Field numeric_output(){return f("numeric-output","Nouveau rapport numérique","--projection-output",K::output_file,"",false);}
+Field csv_output(){return f("csv-output","Nouvel export CSV","--csv",K::output_file,"",false);}
+Field native_output(){return f("native-output","Nouveau rapport brut natif","--native-report-output",K::output_file,"",false);}
 Field positional(Field field){field.flag.clear();return field;}
 Field second_report(){return f("second-report","Deuxième rapport source","--report",K::input_file,"");}
 Field baseline(){return f("baseline","Rapport avant maintenance","--baseline",K::input_file,"",false);}
@@ -86,12 +89,12 @@ const std::vector<Operation>& operations(){
     static const std::vector<Operation> ops{
         op("can-discover","CAN — Découverte","Une requête fonctionnelle PID 00 ; ne sélectionne aucun ECU automatiquement.","--j1979-can-discover",{interface(),extended(),window(),output()},functional),
         op("can-scan","CAN — Lecture ECU","VIN, DTC, inventaires et services annoncés. Journal SCJ obligatoire dans l’interface.","--j1979-can",{interface(),tx(),rx(),vin(),budget(),journal(true),output()},physical),
-        op("can-live","CAN — Mesures live","Acquisition brute bornée avec relecture d’identité ; projection numérique séparée.","--j1979-live",{interface(),tx(),rx(),vin(),pids(),cycles(),interval(),budget(),journal(true),output()},physical),
+        op("can-live","CAN — Mesures live","Acquisition brute bornée avec relecture d’identité ; projection numérique séparée.","--j1979-live",{interface(),tx(),rx(),vin(),pids(),cycles(),interval(),budget(),journal(true),numeric_output(),csv_output(),output()},physical),
         op("can-network","CAN — Plusieurs ECU","Découverte puis campagne ordonnée des ECU explicitement choisis.","--j1979-can-network",{interface(),extended(),f("targets","RX sélectionnés (hex)","--rx",K::can_ids,"7E8 7E9"),vin(),window(),budget(),directory(true),output()},functional),
         op("can-freeze","CAN — Trames figées","Lecture Mode 02 sur le calculateur choisi.","--j1979-freeze-can",{interface(),tx(),rx(),vin(),extended(),frames(),pids(),budget(60000),capture(true),output()},physical),
         op("elm-scan","ELM CAN — Lecture ECU","Profil ELM imposé, réponses ISO-TP, journal adaptateur facultatif.","--j1979-elm-can",{port(),baud(),profile(),tx(),rx(),vin(),budget(),adapter_capture(),adapter_journal(),campaign(),output()},physical),
         op("elm-freeze","ELM CAN — Trames figées","Lecture Mode 02 sur un profil ELM fixé et un calculateur choisi.","--j1979-elm-can-freeze",{port(),baud(),profile(),tx(),rx(),vin(),extended(),frames(),pids(),budget(60000),capture(true),adapter_capture(),adapter_journal(),output()},physical),
-        op("elm-live","ELM CAN — Mesures live","Acquisition CAN via adaptateur série, sélection physique.","--j1979-elm-live",{port(),baud(),profile(),tx(),rx(),vin(),pids(),cycles(),interval(),budget(),adapter_capture(),adapter_journal(),campaign(),output()},physical),
+        op("elm-live","ELM CAN — Mesures live","Acquisition CAN via adaptateur série, sélection physique.","--j1979-elm-live",{port(),baud(),profile(),tx(),rx(),vin(),pids(),cycles(),interval(),budget(),adapter_capture(),adapter_journal(),campaign(),native_output(),numeric_output(),csv_output(),output()},physical),
         op("legacy-discover","Legacy — Découverte","J1850, ISO 9141 ou KWP : un protocole sélectionné.","--j1979-legacy-discover",{port(),protocol(),f("baud","Vitesse série","--baud",K::decimal,"38400",false,1200,1000000),output()},physical),
         op("legacy-scan","Legacy — Lecture source","Source de réponse choisie ; pas d’adressage physique revendiqué.","--j1979-legacy",{port(),baud(),protocol(),source(),vin(),budget(),capture(true),output()},physical),
         op("legacy-live","Legacy — Mesures live","Mesures de la source sélectionnée, avec trace LLR.","--j1979-legacy-live",{port(),baud(),protocol(),source(),vin(),pids(),cycles(),interval(),budget(),raw(),capture(true),output()},physical),
@@ -241,6 +244,15 @@ Invocation prepare(const Operation& supplied,const Values& values){
     if(ids.contains("tx")&&ids.contains("rx")&&std::any_of(op.fields.begin(),op.fields.end(),[](const Field& a){return a.key=="extended";})){
         const bool extended=values.contains("extended")&&values.at("extended")=="true";
         require(extended==(ids.at("tx")>0x7ff),"Adressage 11/29 bits incohérent");
+    }
+    if(op.id=="elm-live"){
+        const auto given=[&](std::string_view key){
+            const auto it=values.find(key);return it!=values.end()&&!it->second.empty();
+        };
+        require(!(given("numeric-output")||given("csv-output"))||given("native-output"),
+            "Rapport brut natif requis pour les exports numériques");
+        require(!given("native-output")||(given("campaign")&&given("adapter")),
+            "Capture ECP et journal EJR requis pour le rapport brut natif");
     }
     if(op.physical)invocation.args.push_back(op.confirmation);
     return invocation;

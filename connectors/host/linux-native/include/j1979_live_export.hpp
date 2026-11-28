@@ -17,6 +17,8 @@ public:
     Destination(const Destination&)=delete;
     Destination& operator=(const Destination&)=delete;
     bool requested()const noexcept{return fd_>=0;}
+    int descriptor()const noexcept{return fd_;}
+    const char* path()const noexcept{return path_.c_str();}
     void check_empty()const;
     void persist(std::string_view);
 };

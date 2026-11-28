@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cerrno>
 #include <fcntl.h>
+#include <filesystem>
 #include <stdexcept>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -22,6 +23,15 @@ struct stat private_file(int fd,const char* path){
         !(a.st_mode&0077)&&a.st_size>=0&&static_cast<std::uint64_t>(a.st_size)<=limit,
         "Live evidence path is not the reserved private regular file");
     return a;
+}
+void sync_parent(const char* name){
+    auto path=std::filesystem::path(name).parent_path();
+    if(path.empty())path=".";
+    const int fd=open(path.c_str(),O_RDONLY|O_DIRECTORY|O_CLOEXEC);
+    require(fd>=0,"Live export parent directory unavailable");
+    const bool synced=fsync(fd)==0;
+    const bool closed=close(fd)==0;
+    require(synced&&closed,"Live export parent directory synchronization failed");
 }
 void read_exact(int fd,std::string_view expected){
     char block[16384];
@@ -53,7 +63,7 @@ Destination::Destination(const char* path){
     require(!path_.empty(),"Empty live export destination");
     fd_=open(path_.c_str(),O_RDWR|O_CREAT|O_EXCL|O_NOFOLLOW|O_CLOEXEC,0600);
     require(fd_>=0,"Live export destination already exists or cannot be reserved");
-    try{check_empty();}catch(...){close(fd_);fd_=-1;throw;}
+    try{check_empty();sync_parent(path_.c_str());}catch(...){close(fd_);fd_=-1;throw;}
 }
 Destination::~Destination(){if(fd_>=0)close(fd_);}
 void Destination::verify()const{
