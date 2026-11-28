@@ -50,7 +50,9 @@ internal static class Program
         if (args.Contains(CamaroDiagConnectors.Windows.J1979LiveNativeCli.CaptureCommand,StringComparer.OrdinalIgnoreCase) ||
             args.Contains(CamaroDiagConnectors.Windows.J1979LiveNativeCli.InspectCommand,StringComparer.OrdinalIgnoreCase) ||
             args.Contains(CamaroDiagConnectors.Windows.J1979LiveNativeCli.CsvCommand,StringComparer.OrdinalIgnoreCase) ||
-            args.Contains(CamaroDiagConnectors.Windows.J1979LiveNativeCli.PrefixCommand,StringComparer.OrdinalIgnoreCase))
+            args.Contains(CamaroDiagConnectors.Windows.J1979LiveNativeCli.ScalarCommand,StringComparer.OrdinalIgnoreCase) ||
+    args.Contains(CamaroDiagConnectors.Windows.J1979LiveNativeCli.ScalarCsvCommand,StringComparer.OrdinalIgnoreCase) ||
+    args.Contains(CamaroDiagConnectors.Windows.J1979LiveNativeCli.PrefixCommand,StringComparer.OrdinalIgnoreCase))
             return CamaroDiagConnectors.Windows.J1979LiveNativeCli.Run(args);
 
         // Parse the complete backup invocation first; a mixed command never

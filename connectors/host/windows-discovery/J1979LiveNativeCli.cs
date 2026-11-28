@@ -10,6 +10,7 @@ namespace CamaroDiagConnectors.Windows;
 internal static class J1979LiveNativeCli
 {
     internal const string CaptureCommand="--j1979-live-native",InspectCommand="--inspect-j1979-live-native",CsvCommand="--export-j1979-live-native-csv",PrefixCommand="--inspect-j1979-live-prefix";
+    internal const string ScalarCommand="--project-j1979-live-native",ScalarCsvCommand="--export-j1979-live-native-values-csv";
     internal sealed record Options(string Port,string KeyPath,string CapturePath,string OutputPath,J1979LiveNative.Profile Profile);
 
     internal static Options Parse(string[] args)
@@ -196,6 +197,36 @@ internal static class J1979LiveNativeCli
         output.Write(csv);output.Flush(true);return report;
     }
 
+    internal static J1979LiveScalarProjection.Projection ExportScalar(string source,string vin,string destination,bool csv,Func<bool>? current=null)
+    {
+        if(!J1979LiveNative.ValidVin(vin)||Path.GetFullPath(source).Equals(Path.GetFullPath(destination),StringComparison.OrdinalIgnoreCase))
+            throw new ArgumentException("Independent VIN and distinct new output required");
+        if(current is not null&&!current())throw new OperationCanceledException("Owner revoked");
+        if((File.GetAttributes(source)&(FileAttributes.ReparsePoint|FileAttributes.Directory))!=0)
+            throw new InvalidDataException("Regular capture file required");
+        using var input=new FileStream(source,FileMode.Open,FileAccess.Read,FileShare.Read);
+        var (replay,digest)=ReplayPersisted(input);
+        var projection=J1979LiveScalarProjection.Project(replay,vin);
+        byte[] bytes;
+        if(csv)bytes=J1979LiveScalarProjection.Csv(projection,digest);
+        else{
+            var options=new JsonSerializerOptions{PropertyNamingPolicy=JsonNamingPolicy.SnakeCaseLower,WriteIndented=true};
+            var payload=JsonSerializer.SerializeToElement(projection,options);
+            var fields=payload.EnumerateObject().ToDictionary(p=>p.Name,p=>(object?)p.Value);
+            fields["capture_sha256"]=digest;
+            fields["expected_vin_independently_supplied"]=true;
+            bytes=JsonSerializer.SerializeToUtf8Bytes(fields,options);
+        }
+        if(bytes.Length>64*1024*1024)throw new InvalidDataException("Projection exceeds byte limit");
+        input.Position=0;
+        if(digest!=Convert.ToHexString(SHA256.HashData(input)).ToLowerInvariant())
+            throw new InvalidDataException("CL/1 changed during projection");
+        if(current is not null&&!current())throw new OperationCanceledException("Owner revoked");
+        using var output=new FileStream(destination,FileMode.CreateNew,FileAccess.Write,FileShare.None);
+        output.Write(bytes);output.Flush(true);
+        return projection;
+    }
+
     internal static Dictionary<string,object?> InspectPrefix(string source,string vin,string destination,Func<bool>? current=null)
     {
         if(!J1979LiveNative.ValidVin(vin)||Path.GetFullPath(source).Equals(Path.GetFullPath(destination),StringComparison.OrdinalIgnoreCase))
@@ -226,6 +257,13 @@ internal static class J1979LiveNativeCli
         try
         {
             if(args.Length==0)return 2;
+            if(args[0] is ScalarCommand or ScalarCsvCommand)
+            {
+                if(args.Length!=4)throw new ArgumentException("Expected CL/1 source, independently supplied VIN and new output");
+                var projection=ExportScalar(args[1],args[2],args[3],args[0]==ScalarCsvCommand);
+                Console.WriteLine(JsonSerializer.Serialize(new{projection.IdentityRechecked,projection.NumericProjectionComplete}));
+                return projection.NumericProjectionComplete?0:7;
+            }
             if(args[0]==PrefixCommand)
             {
                 if(args.Length!=4)throw new ArgumentException("Expected CL/1 source, independent VIN and new JSON output");

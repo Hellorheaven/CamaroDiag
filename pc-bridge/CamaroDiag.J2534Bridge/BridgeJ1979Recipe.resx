@@ -238,4 +238,9 @@
   <data name="FreezePrefixTruncatedHeader" xml:space="preserve"><value>incomplete final header</value></data>
   <data name="FreezePrefixTruncatedRecord" xml:space="preserve"><value>incomplete final record</value></data>
   <data name="FreezePrefixIncomplete" xml:space="preserve"><value>interrupted capture</value></data>
+  <data name="LiveNativeScalar" xml:space="preserve"><value>Project CL/1 values (JSON)</value></data>
+  <data name="LiveNativeScalarCsv" xml:space="preserve"><value>Export CL/1 numerical CSV</value></data>
+  <data name="LiveNativeScalarScope" xml:space="preserve"><value>Documented scalar values only; unrecorded ECU scales remain unknown.</value></data>
+  <data name="LiveNativeScalarIdentity" xml:space="preserve"><value>Final identity not verified: no numerical values.</value></data>
+  <data name="LiveNativeScalarMean" xml:space="preserve"><value>Mean</value></data>
 </root>

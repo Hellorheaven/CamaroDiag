@@ -12,6 +12,8 @@ internal sealed partial class BridgeDesktopForm
     private readonly Button functionalRunNativeLive=Button(J1979RecipeText("LiveNativeRun"));
     private readonly Button functionalInspectNativeLive=Button(J1979RecipeText("LiveNativeInspect"));
     private readonly Button functionalExportNativeLiveCsv=Button(J1979RecipeText("LiveNativeCsv"));
+    private readonly Button functionalProjectNativeLive=Button(J1979RecipeText("LiveNativeScalar"));
+    private readonly Button functionalExportNativeScalarCsv=Button(J1979RecipeText("LiveNativeScalarCsv"));
     private readonly Button functionalInspectNativePrefix=Button(J1979RecipeText("LiveNativePrefix"));
 
     private J1979LiveNativeCli.Options? ChooseNativeLiveOptions()
@@ -147,18 +149,21 @@ internal sealed partial class BridgeDesktopForm
     private Task ExportWindowsNativeLiveCsvAsync()=>InspectWindowsNativeLiveAsync(true,false);
     private Task InspectWindowsNativePrefixAsync()=>InspectWindowsNativeLiveAsync(false,true);
 
-    private async Task InspectWindowsNativeLiveAsync(bool csv,bool prefix)
+    private Task ProjectWindowsNativeLiveAsync()=>InspectWindowsNativeLiveAsync(false,false,true);
+    private Task ExportWindowsNativeScalarCsvAsync()=>InspectWindowsNativeLiveAsync(true,false,true);
+
+    private async Task InspectWindowsNativeLiveAsync(bool csv,bool prefix,bool scalar=false)
     {
         if(busy||functionalCancellation is not null||DateTimeOffset.UtcNow>=functionalAuthorizedUntil)return;
         var expiry=functionalAuthorizedUntil;
         string vin=functionalEvapVin.Text.Trim().ToUpperInvariant();
         if(!J1979LiveNative.ValidVin(vin)){ShowError(J1979RecipeText("LiveNativeVinRequired"));return;}
-        using var source=new OpenFileDialog{Title=J1979RecipeText(prefix?"LiveNativePrefix":csv?"LiveNativeCsv":"LiveNativeInspect"),CheckFileExists=true,
+        using var source=new OpenFileDialog{Title=J1979RecipeText(scalar?(csv?"LiveNativeScalarCsv":"LiveNativeScalar"):prefix?"LiveNativePrefix":csv?"LiveNativeCsv":"LiveNativeInspect"),CheckFileExists=true,
             Multiselect=false,Filter=J1979RecipeText("LiveNativeCaptureFilter")};
         if(source.ShowDialog(this)!=DialogResult.OK)return;
         using var destination=new SaveFileDialog{Filter=J1979RecipeText(csv?"LiveNativeCsvFilter":"JsonFilter"),
             DefaultExt=csv?"csv":"json",AddExtension=true,OverwritePrompt=false,
-            FileName=prefix?"CamaroDiag_CL1_Prefix.json":csv?"CamaroDiag_CL1_Samples.csv":"CamaroDiag_CL1_Inspection.json"};
+            FileName=scalar?(csv?"CamaroDiag_CL1_Values.csv":"CamaroDiag_CL1_Projection.json"):prefix?"CamaroDiag_CL1_Prefix.json":csv?"CamaroDiag_CL1_Samples.csv":"CamaroDiag_CL1_Inspection.json"};
         if(destination.ShowDialog(this)!=DialogResult.OK||busy||DateTimeOffset.UtcNow>=expiry||
             functionalAuthorizedUntil!=expiry||functionalEvapVin.Text.Trim().ToUpperInvariant()!=vin)return;
         busy=true;completedFreeze=null;functionalExport.Enabled=false;
@@ -170,6 +175,12 @@ internal sealed partial class BridgeDesktopForm
         try
         {
             bool Current()=>DateTimeOffset.UtcNow<expiry&&functionalAuthorizedUntil==expiry;
+            if(scalar)
+            {
+                var projection=await Task.Run(()=>J1979LiveNativeCli.ExportScalar(source.FileName,vin,destination.FileName,csv,Current));
+                if(!IsDisposed&&!Disposing&&Current())functionalResults.Text=FormatNativeScalar(projection,destination.FileName);
+                return;
+            }
             if(prefix)
             {
                 var partial=await Task.Run(()=>J1979LiveNativeCli.InspectPrefix(source.FileName,vin,destination.FileName,Current));
@@ -196,6 +207,22 @@ internal sealed partial class BridgeDesktopForm
                     DateTimeOffset.UtcNow<functionalAuthorizedUntil;
             }
         }
+    }
+
+    private static string FormatNativeScalar(J1979LiveScalarProjection.Projection projection,string path)
+    {
+        var text=new StringBuilder(J1979RecipeText(projection.NumericProjectionComplete?"Completed":"Partial")).AppendLine();
+        text.AppendLine(J1979RecipeText("LiveNativeScalarScope"));
+        if(!projection.IdentityRechecked)text.AppendLine(J1979RecipeText("LiveNativeScalarIdentity"));
+        string Display(double? value)=>value?.ToString("0.###",CultureInfo.CurrentCulture)??"—";
+        foreach(var channel in projection.Channels)
+        {
+            text.AppendLine($"{channel.Pid:X2} · {channel.Name} · {channel.Count}/{channel.Requested}");
+            text.AppendLine($"Min {Display(channel.Minimum)} · Max {Display(channel.Maximum)} · {J1979RecipeText("LiveNativeScalarMean")} {Display(channel.Mean)} {channel.Unit}");
+            if(channel.Missing>0)text.AppendLine(string.Join(" · ",channel.Outcomes.Select(o=>$"{o.Key}: {o.Value}")));
+        }
+        text.AppendLine(J1979RecipeText("NativeUsbProvenance")).AppendLine(path);
+        return text.ToString();
     }
 
     private static string FormatNativePrefix(Dictionary<string,object?> report,string capture,string json)

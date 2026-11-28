@@ -117,7 +117,7 @@ internal static class J1979LiveNativeSelfTests
         Check(projection.Channels[0].Mean==40.5&&projection.Channels[0].Count==2,"temperature statistics");
         Check(projection.Channels[1].Mean==1165.125&&projection.Channels[1].Missing==0,"RPM statistics");
         Check(!projection.PhysicalVehicleVerified&&!projection.PermitsProgramming,"projection scope");
-        Check(Encoding.UTF8.GetString(J1979LiveScalarProjection.Csv(projection)).Contains("DOCUMENTED_SCALAR"),"numeric CSV");
+        Check(Encoding.UTF8.GetString(J1979LiveScalarProjection.Csv(projection,new string('a',64))).Contains("DOCUMENTED_SCALAR"),"numeric CSV");
         bool wrongVin=false;
         try{_ = J1979LiveScalarProjection.Project(replay,"1FA6P8TH0L5100000");}
         catch(InvalidDataException){wrongVin=true;}

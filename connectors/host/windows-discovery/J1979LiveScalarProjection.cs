@@ -100,9 +100,10 @@ internal static class J1979LiveScalarProjection
             Convert.ToUInt32(profile.RequestCanId,16),Convert.ToUInt32(profile.ResponseCanId,16),identity,complete,
             complete&&identity&&channels.All(c=>c.Count==c.Requested),samples.AsReadOnly(),channels);
     }
-    internal static byte[] Csv(Projection p)
+    internal static byte[] Csv(Projection p,string captureSha256)
     {
-        var output=new StringBuilder("cycle,pid_hex,elapsed_ms,source_status,interpretation,name,number,unit,response_hex\r\n");
+        J1979LiveNative.Require(Regex.IsMatch(captureSha256,@"\A[0-9a-f]{64}\z"),"Invalid capture digest");
+        var output=new StringBuilder("cycle,pid_hex,elapsed_ms,source_status,interpretation,name,number,unit,response_hex,vin,tx_can_id,rx_can_id,capture_sha256\r\n");
         static string Quote(string? s)=>s is null?"":"\""+s.Replace("\"","\"\"")+"\"";
         foreach(var s in p.Samples)
         {
@@ -111,7 +112,9 @@ internal static class J1979LiveScalarProjection
                 .Append(s.ElapsedMs.ToString(CultureInfo.InvariantCulture)).Append(',').Append(s.SourceStatus).Append(',')
                 .Append(s.Interpretation).Append(',').Append(Quote(s.Name)).Append(',')
                 .Append(s.Number?.ToString("R",CultureInfo.InvariantCulture)).Append(',')
-                .Append(Quote(s.Unit)).Append(',').Append(s.ResponseHex).Append("\r\n");
+                .Append(Quote(s.Unit)).Append(',').Append(s.ResponseHex).Append(',').Append(p.Vin).Append(',')
+                .Append(p.Tx.ToString("X",CultureInfo.InvariantCulture)).Append(',')
+                .Append(p.Rx.ToString("X",CultureInfo.InvariantCulture)).Append(',').Append(captureSha256).Append("\r\n");
             J1979LiveNative.Require(output.Length<=40*1024*1024,"Projection CSV exceeds byte limit");
         }
         return Encoding.UTF8.GetBytes(output.ToString());

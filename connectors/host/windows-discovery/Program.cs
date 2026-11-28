@@ -15,6 +15,8 @@ if (args.Contains(J1979MaintenanceJournal.Command,StringComparer.OrdinalIgnoreCa
 if (args.Contains(J1979LiveNativeCli.CaptureCommand,StringComparer.OrdinalIgnoreCase) ||
     args.Contains(J1979LiveNativeCli.InspectCommand,StringComparer.OrdinalIgnoreCase) ||
     args.Contains(J1979LiveNativeCli.CsvCommand,StringComparer.OrdinalIgnoreCase) ||
+    args.Contains(J1979LiveNativeCli.ScalarCommand,StringComparer.OrdinalIgnoreCase) ||
+    args.Contains(J1979LiveNativeCli.ScalarCsvCommand,StringComparer.OrdinalIgnoreCase) ||
     args.Contains(J1979LiveNativeCli.PrefixCommand,StringComparer.OrdinalIgnoreCase))
     return J1979LiveNativeCli.Run(args);
 if (args.Length>0 && J1979FreezeNativeCli.IsCommand(args[0]))
