@@ -439,3 +439,8 @@ The commands independently reconstruct each requested frame, support page, initi
 camarodiag-native verify-live --report LIVE.json --vin VIN17 --output PROOF.json
 ```
 Replays chronological identity admission, selected PID inventory, configuration and trim layout, sample ordering, scalar and multisignal statistics, and available selected-source transport transcripts. Historical raw-only Android CAN data is reassembled independently; legacy ELM headers and checksums are checked and J2534 driver headers are compared without claiming link checksum verification. No vehicle connection, authenticity claim, programming permission or time alignment is implied.
+
+```sh
+camarodiag-native compare-live --report RUN1.json --report RUN2.json --vin VIN17 --output COMPARISON.json
+```
+Compares two to sixteen independently replayed recordings of the same VIN, ECU channel and numeric/raw mode. Duplicate inputs are rejected by SHA-256. Only shared PIDs are compared; missing channels remain null, not zero. A comparison does not synchronize vehicle time or infer diagnostic conclusions.

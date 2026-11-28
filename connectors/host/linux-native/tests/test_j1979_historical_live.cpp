@@ -1,6 +1,8 @@
 #include "j1979_live_history.hpp"
 #include "j1979_can_freeze_history.hpp"
 #include "j1979_historical_freeze.hpp"
+#include "j1979_native_report_detail.hpp"
+#include <array>
 #include <algorithm>
 #include <cassert>
 #include <stdexcept>
@@ -43,7 +45,7 @@ std::string row(std::string_view phase,std::string_view q,std::string_view reply
             R"({"pid":5,"name":"coolant-temperature","unit":"degC","number":60})":
             R"({"pid":12,"name":"engine-rpm","unit":"rpm","number":2000})");
     }
-    if(adapter)out+=",\"raw_adapter_response\":"+quote(can_lines(cd::legacy::unhex(reply)));
+    if(adapter)out+=",\"raw_adapter_response\":"+quote(can_lines(cd::network::history::detail::bytes(Value{std::string(reply)},4095)));
     return out+"}";
 }
 std::string stats(unsigned pid,bool raw){
@@ -104,4 +106,24 @@ int main(){
     rejected(raw,"7E8 03 41 05 64","7E9 03 41 05 64");
     rejected(raw,"\"observed_protocol\":6","\"observed_protocol\":8");
     rejected(raw,"\"RAW_UNINTERPRETED\"","\"INTERPRETED\"");
+
+    const std::array recordings{r,r};
+    const std::array digests{std::string(64,'a'),std::string(64,'b')};
+    const auto comparison=cd::network::history::compare_historical_live(recordings,digests);
+    assert(comparison.at("shared_pids").array().size()==2);
+    assert(comparison.at("comparison").array()[0].at("mean_range").finite_number()==0);
+    assert(!comparison.at("time_aligned").boolean()&&comparison.at("diagnostic_verdict").null());
+    bool denied=false;
+    try{const std::array dup{digests[0],digests[0]};(void)cd::network::history::compare_historical_live(recordings,dup);}
+    catch(const std::invalid_argument&){denied=true;}assert(denied);
+    denied=false;
+    try{const std::array different{r,replay};(void)cd::network::history::compare_historical_live(different,digests);}
+    catch(const std::invalid_argument&){denied=true;}assert(denied);
+    auto second=r;
+    second.pids={5};
+    auto summaries=second.proof.at("summary").array();summaries.resize(1);
+    auto fields=second.proof.object();fields["summary"]=Value{std::move(summaries)};second.proof=Value{std::move(fields)};
+    const std::array subset{r,second};
+    const auto shared=cd::network::history::compare_historical_live(subset,digests);
+    assert(shared.at("shared_pids").array().size()==1&&shared.at("shared_pids").array()[0].unsigned_integer()==5);
 }
