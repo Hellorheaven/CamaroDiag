@@ -39,7 +39,7 @@ struct Journal {
 struct Result {
     std::string report,stop;
     bool completed{},prefix{},pending_exchange{};
-    unsigned exchanges{};
+    unsigned exchanges{},dispatch_calls{},response_records{};
 };
 Data encode_header(const Plan&);
 Data encode_event(const Event&,std::size_t sequence);

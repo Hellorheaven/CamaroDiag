@@ -54,8 +54,10 @@ void validate(const Event& e){
     case Kind::intent:require(e.value>=1&&e.value<=2500&&!e.aux&&j1979_can_allowed_read(e.bytes.data(),e.bytes.size()),"Invalid SCJ read intent");break;
     case Kind::response:
         // value: 0 success, 1 timeout, 2 transport failure, 3 successful oversized reply.
-        require(e.value<=3&&!e.aux&&e.bytes.size()<=J1979_CAN_MAX_PAYLOAD&&
-            (e.value==0||e.bytes.empty()),"Invalid SCJ exchange result");break;
+        // aux is the remaining timeout actually supplied to the transport.
+        // Zero means the durable intent was not dispatched to its callback.
+        require(e.value<=3&&e.aux<=2500&&e.bytes.size()<=J1979_CAN_MAX_PAYLOAD&&
+            (e.value==0||e.bytes.empty())&&(e.aux||e.value==2),"Invalid SCJ exchange result");break;
     case Kind::terminal:require(e.value<=1&&!e.aux&&e.bytes.size()==32,"Invalid SCJ terminal digest");break;
     }
 }

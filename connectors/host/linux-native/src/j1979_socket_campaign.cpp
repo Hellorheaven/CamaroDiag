@@ -69,6 +69,7 @@ class Recording final:public Channel {
     std::uint64_t origin_{},last_{};
     std::size_t event_count_{};
     bool revoked_{};
+    unsigned dispatch_calls_{},response_records_{};
     void buffer(Event e){
         if(event_count_>=max_events-1)throw std::runtime_error("SCJ callback limit");
         ++event_count_;pending_.push_back(std::move(e));
@@ -108,9 +109,20 @@ public:
         // Revalidate physical context after synchronous persistence; if
         // withdrawn, record the failed attempt without dispatching a read.
         int rc=-1;
-        if(link_.current(link_.context))rc=link_.exchange(link_.context,q.data(),q.size(),response.data(),&size,timeout);
-        else{revoked_=true;size=0;}
-        Event result{Kind::response,2,0,{}};
+        unsigned effective=0;
+        const auto now=link_.clock(link_.context);
+        // The engine's last recorded clock precedes intent persistence. Do
+        // not give the transport a new full timeout after fsync/readback.
+        if(!now||now<last_)throw std::runtime_error("SCJ dispatch clock regressed");
+        const auto elapsed=now-last_;
+        if(link_.current(link_.context)){
+            if(elapsed<timeout){
+                effective=timeout-static_cast<unsigned>(elapsed);
+                ++dispatch_calls_;
+                rc=link_.exchange(link_.context,q.data(),q.size(),response.data(),&size,effective);
+            }else size=0;
+        }else{revoked_=true;size=0;}
+        Event result{Kind::response,2,effective,{}};
         if(rc==0){
             if(size>J1979_CAN_MAX_PAYLOAD||size>response.size()){
                 result.value=3;size=J1979_CAN_MAX_PAYLOAD+1;
@@ -122,7 +134,7 @@ public:
             if(rc==1)result.value=1;
             else rc=-1;
         }
-        buffer(std::move(result));flush();
+        buffer(std::move(result));flush();++response_records_;
         return rc;
     }
     bool wait(unsigned ms)override{
@@ -133,13 +145,15 @@ public:
         return ok;
     }
     void drain(){flush();}
+    unsigned dispatch_calls()const{return dispatch_calls_;}
+    unsigned response_records()const{return response_records_;}
 };
 class Replaying final:public Channel{
     const Journal& j_;
     std::size_t cursor_{};
     std::uint64_t clock_{};
     bool revoked_{},pending_{};
-    unsigned exchanges_{};
+    unsigned exchanges_{},dispatch_calls_{},response_records_{};
     const Event& next(Kind kind){
         if(cursor_==j_.events.size()){
             require(!j_.terminal,"Missing SCJ callback before terminal");
@@ -168,7 +182,9 @@ public:
             "SCJ exchange scope or deadline differs from engine");
         pending_=true;++exchanges_;
         const auto& e=next(Kind::response);
-        pending_=false;
+        pending_=false;++response_records_;
+        require(e.aux<=timeout,"SCJ transport timeout exceeds engine request");
+        if(e.aux)++dispatch_calls_;
         if(e.value==0){
             require(e.bytes.size()<=n&&e.bytes.size()<=r.size(),"SCJ response exceeds replay buffer");
             std::copy(e.bytes.begin(),e.bytes.end(),r.begin());n=e.bytes.size();return 0;
@@ -184,6 +200,8 @@ public:
     }
     bool pending()const{return pending_;}
     unsigned exchanges()const{return exchanges_;}
+    unsigned dispatch_calls()const{return dispatch_calls_;}
+    unsigned response_records()const{return response_records_;}
     void verify_terminal(const Result& r){
         const auto& e=next(Kind::terminal);
         const auto expected=network::history::detail::bytes(Value{sha256(std::string_view(r.report))},32);
@@ -199,7 +217,7 @@ Value flag(bool b){return Value{b};}
 Result record(const Plan& p,const Link& link,Writer& w){
     Recording c(link,w);
     auto out=run(p,c);
-    c.drain();
+    c.drain();out.dispatch_calls=c.dispatch_calls();out.response_records=c.response_records();
     return out;
 }
 void finish(Writer& writer,const Result& r){
@@ -220,10 +238,12 @@ Result replay(const Journal& j){
             out.report.clear();out.completed=false;out.prefix=true;out.stop="TERMINAL_NOT_PERSISTED";
         }
         require(out.exchanges==c.exchanges(),"SCJ replay exchange accounting differs");
+        out.dispatch_calls=c.dispatch_calls();out.response_records=c.response_records();
         return out;
     }catch(const PrefixEnd&){
         require(!j.terminal,"Terminal cannot establish an interrupted campaign");
         Result out{};out.prefix=true;out.pending_exchange=c.pending();out.exchanges=c.exchanges();
+        out.dispatch_calls=c.dispatch_calls();out.response_records=c.response_records();
         out.stop=out.pending_exchange?"EXCHANGE_RESULT_NOT_PERSISTED":"CAMPAIGN_PREFIX";
         return out;
     }
@@ -236,6 +256,7 @@ json::Value proof(const Journal& j,const Result& r,std::string_view journal_dige
         {"vin",text(j.plan.vin)},{"tx",num(j.plan.tx)},{"rx",num(j.plan.rx)},{"interface",text(j.plan.interface)},
         {"terminal",flag(j.terminal)},{"torn_tail",flag(j.torn)},{"verified_bytes",num(j.verified_bytes)},
         {"total_bytes",num(j.total_bytes)},{"callback_count",num(j.events.size())},{"exchanges",num(r.exchanges)},
+        {"transport_callback_calls_with_recorded_result",num(r.dispatch_calls)},{"response_records",num(r.response_records)},
         {"pending_exchange",flag(r.pending_exchange)},{"prefix",flag(r.prefix)},{"completed",flag(r.completed)},
         {"stop_reason",r.stop.empty()?Value{}:text(r.stop)},
         {"report_sha256",r.report.empty()?Value{}:text(sha256(std::string_view(r.report)))},

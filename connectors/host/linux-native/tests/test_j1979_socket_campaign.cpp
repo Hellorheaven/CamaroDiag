@@ -31,11 +31,11 @@ struct File{
 };
 struct Fake{
     std::uint64_t time{1000};
-    unsigned calls{},vin_calls{};
+    unsigned calls{},vin_calls{},clock_calls{},stall_at{},stall_ms{};
     bool revoked{},timeout_speed{},bad_final{},oversize{},fail_persistence{};
     int fd{-1};
 };
-std::uint64_t clock(void* p){return static_cast<Fake*>(p)->time;}
+std::uint64_t clock(void* p){auto& f=*static_cast<Fake*>(p);if(++f.clock_calls==f.stall_at)f.time+=f.stall_ms;return f.time;}
 bool current(void* p){return !static_cast<Fake*>(p)->revoked;}
 bool wait(void* p,unsigned n){static_cast<Fake*>(p)->time+=n;return true;}
 int exchange(void* context,const uint8_t* q,std::size_t n,uint8_t* r,std::size_t* size,unsigned timeout){
@@ -93,6 +93,7 @@ void complete(bool live,Fake f={}){
     assert(rebuilt(j)==data);
     const auto same=replay(j);
     assert(same.report==r.report&&same.completed==r.completed&&same.stop==r.stop&&same.exchanges==f.calls);
+    assert(same.dispatch_calls==f.calls&&same.response_records==f.calls);
     assert(r.completed==(!f.timeout_speed&&!f.bad_final&&!f.oversize));
     const auto checked=proof(j,same,sha256(data));
     assert(checked.at("report_sha256").string()==sha256(std::string_view(r.report)));
@@ -127,6 +128,19 @@ int main(){
     p=plan(true);p.vin="INVALID";assert(!p.valid());
     rejects([]{(void)encode_event({Kind::intent,100,0,{4}},0);});
     rejects([]{(void)encode_event({Kind::response,1,0,{0x41,0}},0);});
+    rejects([]{(void)encode_event({Kind::response,0,0,{0x41,0}},0);});
+    // The third clock read in the live engine is the pre-dispatch
+    // recheck after intent fsync. A stall there must prevent dispatch.
+    {
+        File file;Writer w(file.fd,plan(true));Fake transport{};
+        transport.stall_at=3;transport.stall_ms=3000;
+        const auto r=record(plan(true),link(transport),w);
+        assert(transport.calls==0&&!r.completed&&r.exchanges==1&&r.response_records==1&&r.dispatch_calls==0);
+        finish(w,r);
+        const auto j=decode(file.read(),false);
+        const auto checked=replay(j);
+        assert(checked.report==r.report&&!checked.completed&&checked.dispatch_calls==0);
+    }
     // Failure before first intent does not dispatch an ECU request.
     {
         File file;Writer w(file.fd,plan(true));Fake transport{};
