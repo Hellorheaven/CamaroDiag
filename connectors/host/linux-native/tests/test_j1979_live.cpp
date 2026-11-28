@@ -9,7 +9,7 @@ typedef struct {
     uint64_t clock;
     unsigned requests, vin_requests;
     bool bad_final_vin, negative_sample, timeout_sample;
-    bool suppress_advertisement, retire_context;
+    bool suppress_advertisement, retire_context, malformed_sample, oversized_sample;
     uint8_t emitted[64][2];
 } fake;
 static uint64_t clock_fake(void *ctx) {return static_cast<fake *>(ctx)->clock;}
@@ -56,9 +56,10 @@ static int exchange_fake(void *ctx,const uint8_t *request,size_t n,
         return 0;
     }
     if (request[0]==1 && request[1]==0x0c) {
+        if (f->oversized_sample) { *length=4096; return 0; }
         const uint8_t rpm[4]={0x41,0x0c,0x1a,0xf8};
         assert(*length>=sizeof(rpm));
-        memcpy(reply,rpm,sizeof(rpm));*length=sizeof(rpm);
+        memcpy(reply,rpm,sizeof(rpm));*length=f->malformed_sample?3:sizeof(rpm);
         return 0;
     }
     if (request[0]==1 && request[1]==0x0d) {
@@ -152,6 +153,19 @@ int main(void) {
     p=plan(&f);assert(j1979_live_record(&p,&r)==0);
     assert(!r.completed && !strcmp(r.stop_reason,"CONTEXT_CHANGED"));
     assert(f.requests==3);j1979_live_free(&r);
+
+    f = fake{}; f.clock=1000; f.malformed_sample=true;
+    p=plan(&f);assert(j1979_live_record(&p,&r)==0);
+    assert(!r.completed && !strcmp(r.stop_reason,"INVALID_PID_WIDTH"));
+    assert(r.raw_samples==0 && r.missing_samples==1 && f.requests==3);
+    assert(!strcmp(r.steps[2].status,"FAILED"));
+    j1979_live_free(&r);
+
+    f = fake{}; f.clock=1000; f.oversized_sample=true;
+    p=plan(&f);assert(j1979_live_record(&p,&r)==0);
+    assert(!r.completed && !strcmp(r.stop_reason,"UNBOUNDED_REPLY"));
+    assert(r.raw_samples==0 && r.missing_samples==1 && f.requests==3);
+    j1979_live_free(&r);
 
     p=plan(&f);p.pids[1]=p.pids[0];
     assert(!j1979_live_plan_valid(&p));

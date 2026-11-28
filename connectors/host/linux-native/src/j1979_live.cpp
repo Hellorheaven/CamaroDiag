@@ -69,7 +69,7 @@ static j1979_live_step *query(const j1979_live_plan *p,j1979_live_result *r,
     uint64_t end=tick(p);
     if (end>=now && end-now<=UINT_MAX) s->duration_ms=(unsigned)(end-now);
     s->elapsed_ms=end>=start?end-start:0;
-    if (length>J1979_CAN_MAX_PAYLOAD) {halt(r,"UNBOUNDED_REPLY");return s;}
+    if (rc==0 && length>J1979_CAN_MAX_PAYLOAD) {halt(r,"UNBOUNDED_REPLY");return s;}
     if (rc==0 && length && r->raw_bytes+length<=J1979_LIVE_MAX_RAW) {
         std::unique_ptr<uint8_t[]> owned{new (std::nothrow) uint8_t[length]};
         if (!owned) {halt(r,"MEMORY_EXHAUSTED");return s;}
@@ -102,9 +102,13 @@ static j1979_live_step *query(const j1979_live_plan *p,j1979_live_result *r,
         snprintf(s->status,sizeof(s->status),"FAILED");
         halt(r,"WRONG_ECU_RESPONSE");return s;
     }
-    if (mode==1&&!cd::j1979::known_shape({{s->request,2},{s->response,s->response_size},true,true})) {
-        snprintf(s->status,sizeof(s->status),"FAILED");
-        halt(r,"INVALID_KNOWN_PID_DEFINITION");return s;
+    if (mode==1) {
+        j1979_can_step shape{};
+        if (!j1979_can_classify_read(s->request,2,s->response,s->response_size,&shape)) {
+            snprintf(s->status,sizeof(s->status),"FAILED");
+            snprintf(s->detail,sizeof(s->detail),"%s",shape.detail);
+            halt(r,shape.detail);return s;
+        }
     }
     snprintf(s->status,sizeof(s->status),"RAW");
     return s;

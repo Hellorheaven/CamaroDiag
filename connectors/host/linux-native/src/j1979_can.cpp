@@ -61,7 +61,10 @@ static int pid_width(unsigned service, uint8_t pid) {
         case 0x4a: case 0x4b: case 0x4c: case 0x52: case 0x5b: return 1;
         case 0x06: case 0x07: case 0x08: case 0x09:
         case 0x55: case 0x56: case 0x57: case 0x58: return -2; /* one or two trims */
-        default: return -1; /* undecoded RAW, never invented width */
+        default: {
+            const auto width=j1979_measurement_width(pid);
+            return width?static_cast<int>(width):-1;
+        } /* Unknown RAW records do not acquire an invented width. */
     }
 }
 bool j1979_can_classify_read(const uint8_t *request, size_t count,

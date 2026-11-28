@@ -128,6 +128,13 @@ int main(void) {
     assert(!strcmp(check.status,"RAW"));
     assert(!j1979_can_classify_read(q6,2,r6,sizeof(r6)-1,&check));
     assert(!strcmp(check.status,"FAILED")&&!strcmp(check.detail,"INVALID_MODE06_RECORDS"));
+    const uint8_t q21[]{1,0x21},r21[]{0x41,0x21,0x01,0x02};
+    assert(j1979_can_classify_read(q21,2,r21,sizeof(r21),&check));
+    assert(!j1979_can_classify_read(q21,2,r21,3,&check));
+    assert(!strcmp(check.detail,"INVALID_PID_WIDTH"));
+    const uint8_t qfreeze[]{2,0x21,0},rfreeze[]{0x42,0x21,0,0x01,0x02};
+    assert(j1979_can_classify_read(qfreeze,3,rfreeze,sizeof(rfreeze),&check));
+    assert(!j1979_can_classify_read(qfreeze,3,rfreeze,4,&check));
     const uint8_t q50[]{1,0x50},r50[]{0x41,0x50,1,0,0,1};
     assert(!j1979_can_classify_read(q50,2,r50,sizeof(r50),&check));
     assert(!strcmp(check.detail,"INVALID_PID50_CONFIGURATION"));
