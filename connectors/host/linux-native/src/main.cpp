@@ -8,6 +8,7 @@
 #include "j1979_can_network.hpp"
 #include "j1979_elm_can.hpp"
 #include "j1979_elm_can_trace.hpp"
+#include "j1979_elm_can_journal.hpp"
 #include "j1979_catalogue_projection.hpp"
 #include "j1979_isotp.h"
 #include "j1979_cm1.hpp"
@@ -2085,6 +2086,40 @@ static int catalogue_projection_cli(int argc,char** argv,bool verify){
     }catch(const std::exception& e){return error(e.what());}
 }
 
+class AdapterJournalOutput{
+    int fd_{-1};
+    const char* path_{};
+    std::unique_ptr<cd::elmcan::EvidenceJournal> journal_;
+public:
+    AdapterJournalOutput()=default;
+    AdapterJournalOutput(const AdapterJournalOutput&)=delete;
+    AdapterJournalOutput& operator=(const AdapterJournalOutput&)=delete;
+    ~AdapterJournalOutput(){if(fd_>=0)close(fd_);}
+    void begin(const char* path,cd::elmcan::Scope scope,std::string_view vin,cd::elmcan::TraceOperation op){
+        if(!path)return;
+        if(journal_||fd_>=0)throw std::logic_error("Adapter journal already reserved");
+        path_=path;
+        fd_=open(path,O_RDWR|O_CREAT|O_EXCL|O_NOFOLLOW|O_CLOEXEC,0600);
+        if(fd_<0||!sync_parent(path))throw std::runtime_error("Adapter journal reservation unavailable");
+        journal_=std::make_unique<cd::elmcan::EvidenceJournal>(fd_,scope,vin,op);
+    }
+    cd::elmcan::EvidenceSink sink(){
+        if(!journal_)return {};
+        return [this](const cd::elmcan::Observation& row){journal_->append(row);};
+    }
+    void finish(const cd::elmcan::Trace& expected){
+        if(!journal_)return;
+        journal_->finish();journal_.reset();
+        const bool closed=close(fd_)==0;fd_=-1;
+        if(!closed)throw std::runtime_error("Adapter journal close failed");
+        input raw{};
+        if(!load_regular(path_,cd::elmcan::journal_max_bytes,&raw))
+            throw std::runtime_error("Persisted adapter journal unavailable");
+        const auto recovered=cd::elmcan::recover_trace({raw.bytes.get(),raw.length});
+        if(recovered!=cd::elmcan::encode_trace(expected)||!recheck_input(path_,cd::elmcan::journal_max_bytes,raw))
+            throw std::runtime_error("Persisted adapter journal differs from session");
+    }
+};
 struct DirectMaintenanceOptions {
     cd::hostmaint::Scope scope{};
     const char* interface{},*directory{},*journal{},*output{},*adapter_capture{};
@@ -2131,6 +2166,7 @@ static bool parse_direct_maintenance(int argc,char** argv,DirectMaintenanceOptio
             else if(flag=="--journal-name")slot=&o.journal;
             else if(flag=="--output")slot=&o.output;
             else if(elm&&flag=="--adapter-capture")slot=&o.adapter_capture;
+            else if(elm&&flag=="--adapter-journal")slot=&o.adapter_journal;
             if(!slot||*slot)return false;
             *slot=value;
         }
@@ -2170,13 +2206,15 @@ static int direct_maintenance_cli(int argc,char** argv,bool elm=false){
     } signals;
     cd::hostmaint::Result r{};r.evidence.scope=o.scope;r.elm_transport=elm;
     std::vector<cd::elmcan::Observation> adapter;
+    AdapterJournalOutput journal;
     try{
         if(!signals.term)throw std::runtime_error("SIGNAL_HANDLERS_UNAVAILABLE");
         if(elm){
+            journal.begin(o.adapter_journal,{o.profile,o.scope.tx,o.scope.rx},{reinterpret_cast<const char*>(o.scope.vin),17},cd::elmcan::TraceOperation::maintenance);
             const auto current=[](){return legacy_cancelled==0;};
             auto link=cd::legacy::serial_link(o.interface,o.baud,current);
             auto result=cd::hostmaint::run_elm(o.scope,{o.profile,o.scope.tx,o.scope.rx},*link,current,
-                o.directory,o.journal,true,true);
+                o.directory,o.journal,true,true,journal.sink());
             r=std::move(result.result);adapter=std::move(result.observations);
         }else r=cd::hostmaint::run_socket(o.scope,o.interface,o.directory,o.journal,true,true,&legacy_cancelled);
     }catch(const std::exception& e){r.error=e.what();}
@@ -2184,6 +2222,7 @@ static int direct_maintenance_cli(int argc,char** argv,bool elm=false){
         std::string digest,replay;
         const std::string vin_text(reinterpret_cast<const char*>(o.scope.vin),17);
         const cd::elmcan::Trace trace{{o.profile,o.scope.tx,o.scope.rx},vin_text,cd::elmcan::TraceOperation::maintenance,adapter};
+        journal.finish(trace);
         if(o.adapter_capture){
             const auto bytes=cd::elmcan::encode_trace(trace);
             if(!write_owned_file(trace_out.fd,bytes.data(),bytes.size()))return error("Adapter trace persistence failed; recovery marker retained");
@@ -2229,7 +2268,7 @@ static int direct_maintenance_cli(int argc,char** argv,bool elm=false){
 
 struct ElmCanOptions{
     cd::elmcan::Scope scope;
-    const char* port{},*vin{},*output{},*adapter_capture{};
+    const char* port{},*vin{},*output{},*adapter_capture{},*adapter_journal{};
     unsigned baud{38400},budget{180000},cycles{30},interval{1000};
     std::vector<uint8_t> pids;
     bool profile{},tx{},rx{},confirmed{},baud_set{},budget_set{},cycles_set{},interval_set{};
@@ -2269,6 +2308,7 @@ static bool parse_elm_can(int argc,char** argv,ElmCanOptions& o,bool live){
             else if(flag=="--vin")dest=&o.vin;
             else if(flag=="--output")dest=&o.output;
             else if(flag=="--adapter-capture")dest=&o.adapter_capture;
+            else if(flag=="--adapter-journal")dest=&o.adapter_journal;
             if(!dest||*dest)return false;
             *dest=value;
         }
@@ -2302,12 +2342,14 @@ static int elm_can_cli(int argc,char** argv,bool live){
     std::unique_ptr<cd::legacy::Link> link;
     std::unique_ptr<cd::elmcan::Session> session;
     std::string native_report,reason;
+    AdapterJournalOutput journal;
     bool completed=false;
     try{
         if(!signals.term)throw std::runtime_error("SIGNAL_HANDLERS_UNAVAILABLE");
         const auto current=[](){return legacy_cancelled==0;};
+        journal.begin(o.adapter_journal,o.scope,o.vin,live?cd::elmcan::TraceOperation::live:cd::elmcan::TraceOperation::scan);
         link=cd::legacy::serial_link(o.port,o.baud,current);
-        session=std::make_unique<cd::elmcan::Session>(*link,o.scope,current);
+        session=std::make_unique<cd::elmcan::Session>(*link,o.scope,current,journal.sink());
         session->configure();
         j1979_can_plan plan{cd::elmcan::Session::exchange_callback,nullptr,cd::elmcan::Session::current_callback,
             session.get(),o.scope.tx,o.scope.rx,o.budget,o.vin};
@@ -2347,6 +2389,7 @@ static int elm_can_cli(int argc,char** argv,bool live){
             std::span<const cd::elmcan::Observation>(session->evidence()):std::span<const cd::elmcan::Observation>{};
         const cd::elmcan::Trace trace{o.scope,o.vin,live?cd::elmcan::TraceOperation::live:cd::elmcan::TraceOperation::scan,
             std::vector<cd::elmcan::Observation>(evidence.begin(),evidence.end())};
+        journal.finish(trace);
         const auto replay=cd::elmcan::replay_trace(trace);
         if(completed&&(!replay.configured||replay.terminal_fault))return error("Adapter raw evidence does not support completion");
         if(o.adapter_capture){
@@ -2421,15 +2464,16 @@ static int elm_freeze_cli(int argc,char** argv){
     capture_options o{};
     unsigned profile=0,baud=38400;
     bool profile_set=false,baud_set=false;
-    const char* adapter_path=nullptr;
+    const char* adapter_path=nullptr,*journal_path=nullptr;
     std::vector<char*> args{argv[0],argv[1]};
     // Consume the two adapter options; the common parser handles all
     // physical scope and capture options without replacing the serial path.
     for(int i=2;i<argc;++i){
         const std::string_view flag=argv[i];
-        if(flag=="--adapter-capture"){
-            if(adapter_path||i+1>=argc||!*argv[i+1]||argv[i+1][0]=='-')return error("Invalid adapter capture destination");
-            adapter_path=argv[++i];continue;
+        if(flag=="--adapter-capture"||flag=="--adapter-journal"){
+            auto& path=flag=="--adapter-capture"?adapter_path:journal_path;
+            if(path||i+1>=argc||!*argv[i+1]||argv[i+1][0]=='-')return error("Invalid adapter evidence destination");
+            path=argv[++i];continue;
         }
         if(flag=="--profile"||flag=="--baud"){
             auto& seen=flag=="--profile"?profile_set:baud_set;
@@ -2474,11 +2518,14 @@ static int elm_freeze_cli(int argc,char** argv){
     try{
         if(!signals.term)return error("Signal handlers unavailable");
         const auto current=[](){return legacy_cancelled==0;};
+        AdapterJournalOutput journal;
+        journal.begin(journal_path,target,o.plan.vin,cd::elmcan::TraceOperation::freeze);
         auto serial=cd::legacy::serial_link(port,baud,current);
-        const auto acquired=cd::hostfreeze::run_elm(o.plan,target,*serial,current,capture.fd);
+        const auto acquired=cd::hostfreeze::run_elm(o.plan,target,*serial,current,capture.fd,journal.sink());
         serial.reset();
         const auto& result=acquired.capture;
         const cd::elmcan::Trace trace{target,o.plan.vin,cd::elmcan::TraceOperation::freeze,acquired.observations};
+        journal.finish(trace);
         if(adapter_path){
             const auto bytes=cd::elmcan::encode_trace(trace);
             if(!write_owned_file(adapter.fd,bytes.data(),bytes.size()))return error("Adapter transcript persistence failed");
@@ -2606,9 +2653,9 @@ static void usage(FILE *stream) {
         "  camarodiag-native --j1979-can-discover --interface can0 --window-ms 1500 --output responders.json --confirm-functional-scope [--extended]\n"
         "  camarodiag-native --inspect-j1979-elm-trace PROFILE TX RX VIN TRACE.ecr PROOF.json\n"
         "  camarodiag-native --verify-j1979-elm-trace PROFILE TX RX VIN TRACE.ecr CAPTURE PROOF.json\n"
-        "  camarodiag-native --j1979-elm-can-freeze --port /dev/ttyUSB0 --profile 6 --tx 7E0 --rx 7E8 --vin VIN --frame 00 --pid 0C --capture freeze.cf --output freeze.json --confirm-physical-channel [--extended] [--adapter-capture trace.ecr]\n"
-        "  camarodiag-native --j1979-elm-can --profile 6 --port /dev/ttyUSB0 --tx 7E0 --rx 7E8 --vin VIN --output scan.json --confirm-physical-channel [--adapter-capture trace.ecr]\n"
-        "  camarodiag-native --j1979-elm-live --profile 6 --port /dev/ttyUSB0 --tx 7E0 --rx 7E8 --vin VIN --pid 0C --output live.json --confirm-physical-channel [--adapter-capture trace.ecr]\n"
+        "  camarodiag-native --j1979-elm-can-freeze --port /dev/ttyUSB0 --profile 6 --tx 7E0 --rx 7E8 --vin VIN --frame 00 --pid 0C --capture freeze.cf --output freeze.json --confirm-physical-channel [--extended] [--adapter-capture trace.ecr] [--adapter-journal trace.ejr]\n"
+        "  camarodiag-native --j1979-elm-can --profile 6 --port /dev/ttyUSB0 --tx 7E0 --rx 7E8 --vin VIN --output scan.json --confirm-physical-channel [--adapter-capture trace.ecr] [--adapter-journal trace.ejr]\n"
+        "  camarodiag-native --j1979-elm-live --profile 6 --port /dev/ttyUSB0 --tx 7E0 --rx 7E8 --vin VIN --pid 0C --output live.json --confirm-physical-channel [--adapter-capture trace.ecr] [--adapter-journal trace.ejr]\n"
         "  camarodiag-native --j1979-can-network --interface can0 --rx 7E8 --rx 7E9 --vin VIN --output network.json --confirm-functional-scope [--extended]\n"
         "  camarodiag-native --j1979-can --interface can0 --tx 7E0 --rx 7E8 --output evidence.json --vin VIN --budget-ms 180000 --confirm-physical-channel\n"
         "  camarodiag-native --j1979-live-usb-native --port /dev/ttyACM0 --key-file key.bin --capture session.cl --output report.json --tx 7E0 --rx 7E8 --vin VIN --pid 0C --cycles 30 --interval-ms 1000 --budget-ms 180000 --confirm-physical-channel\n"
