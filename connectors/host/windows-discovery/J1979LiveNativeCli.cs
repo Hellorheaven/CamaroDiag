@@ -248,18 +248,12 @@ internal static class J1979LiveNativeCli
         var (replay,digest)=ReplayPersisted(capture);
         var projection=J1979LiveScalarProjection.Project(replay,vin);
         byte[] expected=EncodeScalarJson(projection,digest);
-        if(candidate.Length!=expected.Length)
-            throw new InvalidDataException("Projection differs from the canonical Windows export");
-
-        Span<byte> block=stackalloc byte[4096];
-        for(int offset=0;offset<expected.Length;offset+=block.Length)
-        {
-            int count=Math.Min(block.Length,expected.Length-offset);
-            candidate.ReadExactly(block[..count]);
-            if(!block[..count].SequenceEqual(expected.AsSpan(offset,count)))
-                throw new InvalidDataException("Projection differs from the canonical Windows export");
-        }
-        if(candidate.ReadByte()!=-1)
+        byte[] supplied=new byte[(int)candidate.Length];
+        candidate.ReadExactly(supplied);
+        if(candidate.ReadByte()!=-1)throw new InvalidDataException("Projection changed during verification");
+        J1979PortableScalarVerification.Verify(expected,supplied);
+        candidate.Position=0;
+        if(!CryptographicOperations.FixedTimeEquals(SHA256.HashData(supplied),SHA256.HashData(candidate)))
             throw new InvalidDataException("Projection changed during verification");
         capture.Position=0;
         if(digest!=Convert.ToHexString(SHA256.HashData(capture)).ToLowerInvariant())

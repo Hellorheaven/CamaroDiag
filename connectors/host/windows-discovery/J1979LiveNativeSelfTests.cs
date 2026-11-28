@@ -114,6 +114,18 @@ internal static class J1979LiveNativeSelfTests
 
             Reject("1FA6P8TH0L5100000","projection verification accepted a different VIN");
             byte[] original=File.ReadAllBytes(report);
+            using(var json=System.Text.Json.JsonDocument.Parse(original))
+            {
+                // Different property order and whitespace are valid across hosts.
+                var reordered=json.RootElement.EnumerateObject().Reverse().ToDictionary(p=>p.Name,p=>p.Value);
+                File.WriteAllBytes(report,System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(reordered));
+                Check(J1979LiveNativeCli.VerifyScalar(source,Vin,report).NumericProjectionComplete,"portable property order");
+            }
+            string text=Encoding.UTF8.GetString(original);
+            File.WriteAllText(report,text.Replace("\"count\": 2","\"count\": 2.0"));
+            Reject(Vin,"integer counters accepted as decimals");
+            File.WriteAllText(report,text.Insert(text.IndexOf('{')+1,"\"vin\":\""+Vin+"\","));
+            Reject(Vin,"duplicate JSON property accepted");
             var tampered=(byte[])original.Clone();
             tampered[1]=(byte)(tampered[1]^1);
             File.WriteAllBytes(report,tampered);
