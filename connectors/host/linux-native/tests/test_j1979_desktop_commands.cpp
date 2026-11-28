@@ -3,6 +3,8 @@
 #include <cassert>
 #include <cstdlib>
 #include <filesystem>
+#include <fstream>
+#include <set>
 #include <stdexcept>
 #include <unistd.h>
 using namespace cd::desktop;
@@ -50,5 +52,48 @@ int main(){
     freeze["pids"]="0C";freeze["tx"]="18DA10F1";freeze["rx"]="18DAF110";
     rejects([&]{(void)prepare(find("can-freeze"),freeze);});
     freeze["extended"]="true";assert(prepare(find("can-freeze"),freeze).physical);
+    // Every command ID and CLI command is unique; every invocation has a destination.
+    std::set<std::string> operation_ids,commands;
+    for(const auto& op:operations()){
+        assert(operation_ids.insert(op.id).second);
+        assert(commands.insert(op.command).second);
+        std::set<std::string> fields;
+        for(const auto& field:op.fields)assert(fields.insert(field.key).second);
+        assert(fields.contains("output"));
+        if(!op.physical)assert(op.confirmation.empty());
+    }
+    const auto capture=directory+"/native.cl";
+    const auto report=directory+"/native.json";
+    const auto second=directory+"/second.json";
+    for(const auto& path:{capture,report,second}){std::ofstream file(path);file<<"fixture";}
+    const auto proof=directory+"/verified.json";
+    Values verify{{"capture",capture},{"report",report},{"output",proof},{"vin",values["vin"]}};
+    ready=prepare(find("verify-native-live"),verify);
+    assert(!ready.physical&&ready.confirmation.empty());
+    assert((ready.args==std::vector<std::string>{"--verify-j1979-live-native",capture,report,proof,values["vin"]}));
+    auto invalid=verify;invalid["output"]=report;
+    rejects([&]{(void)prepare(find("verify-native-live"),invalid);});
+    invalid=verify;invalid["capture"]=directory+"/missing.cl";
+    rejects([&]{(void)prepare(find("verify-native-live"),invalid);});
+    invalid=verify;invalid["vin"]="--confirm-physical-channel";
+    rejects([&]{(void)prepare(find("verify-native-live"),invalid);});
+    invalid=verify;invalid["confirm"]="true";
+    rejects([&]{(void)prepare(find("verify-native-live"),invalid);});
+    Values compare{{"report",report},{"second-report",second},{"tx","7E0"},{"rx","7E8"},{"vin",values["vin"]},{"output",proof}};
+    ready=prepare(find("compare-native-live"),compare);
+    assert(std::count(ready.args.begin(),ready.args.end(),"--report")==2);
+    assert(ready.args.front()=="compare-native-live"&&!ready.physical);
+    compare["second-report"]=report;
+    rejects([&]{(void)prepare(find("compare-native-live"),compare);});
+    Values legacy{{"protocol","2"},{"source","10"},{"vin",values["vin"]},{"capture",capture},{"report",report},{"output",proof}};
+    ready=prepare(find("verify-legacy-live-capture"),legacy);
+    assert((ready.args==std::vector<std::string>{"--verify-j1979-legacy-live","2","10",values["vin"],capture,report,proof}));
+    legacy["source"]="F1";rejects([&]{(void)prepare(find("verify-legacy-live-capture"),legacy);});
+    Values mutation{{"report",report},{"vin",values["vin"]},{"output",proof}};
+    ready=prepare(find("verify-can-mutation"),mutation);
+    assert(!ready.physical&&std::count(ready.args.begin(),ready.args.end(),"--baseline")==0);
+    mutation["baseline"]=second;ready=prepare(find("verify-can-mutation"),mutation);
+    assert(std::count(ready.args.begin(),ready.args.end(),"--baseline")==1);
+    for(const auto& path:{capture,report,second})assert(std::filesystem::remove(path));
     assert(rmdir(name)==0);
 }

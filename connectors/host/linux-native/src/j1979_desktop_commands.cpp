@@ -38,6 +38,14 @@ Field window(){return f("window","Fenêtre découverte (ms)","--window-ms",K::de
 Field adapter_journal(){return f("adapter","Nouveau journal adaptateur EJR","--adapter-journal",K::output_file,"",false);}
 Field campaign(){return f("campaign","Nouvelle capture ECP","--campaign-capture",K::output_file,"",false);}
 Field projection(){return f("projection","Projection numérique","--projection",K::input_file,"");}
+Field positional(Field field){field.flag.clear();return field;}
+Field second_report(){return f("second-report","Deuxième rapport source","--report",K::input_file,"");}
+Field baseline(){return f("baseline","Rapport avant maintenance","--baseline",K::input_file,"",false);}
+Field trace(bool write=false){return f("trace",write?"Nouvelle trace":"Trace adaptateur","--trace",write?K::output_file:K::input_file,"");}
+Field offline_journal(){return f("journal","Journal source","--journal",K::input_file,"");}
+Field discovery_report(){return f("discovery","Rapport de découverte","--discovery",K::input_file,"");}
+Field scan_report(){return f("scan","Rapport de lecture","--scan",K::input_file,"");}
+Field prefix_report(){return f("report","Rapport de préfixe","--report",K::input_file,"");}
 constexpr std::string_view physical="--confirm-physical-channel";
 constexpr std::string_view functional="--confirm-functional-scope";
 Operation op(std::string id,std::string title,std::string description,std::string cmd,
@@ -102,7 +110,41 @@ const std::vector<Operation>& operations(){
         op("verify-legacy","Hors ligne — Scan legacy historique","Rejeu de la source sélectionnée et des champs dérivés.","verify-legacy",{report(),vin(),output()}),
         op("verify-live","Hors ligne — Live historique","Rejeu d’un rapport historique et de ses statistiques.","verify-live",{report(),vin(),output()}),
         op("verify-freeze","Hors ligne — Freeze historique CAN","Reconstruction de la recette et des déclencheurs.","verify-freeze",{report(),vin(),output()}),
-        op("verify-legacy-freeze","Hors ligne — Freeze historique legacy","Reconstruction des échanges de la source sélectionnée.","verify-legacy-freeze",{report(),vin(),output()})
+        op("verify-legacy-freeze","Hors ligne — Freeze historique legacy","Reconstruction des échanges de la source sélectionnée.","verify-legacy-freeze",{report(),vin(),output()}),
+        op("compare-native-live","Hors ligne — Comparer les mesures CAN","Compare deux rapports CAN natifs sur le même périmètre.","compare-native-live",{report(),second_report(),tx(),rx(),vin(),output()}),
+        op("compare-live","Hors ligne — Comparer les mesures historiques","Compare les rapports historiques sans interroger le véhicule.","compare-live",{report(),second_report(),vin(),output()}),
+        op("verify-network-report","Hors ligne — Rapport réseau historique","Vérifie le rapport réseau indépendamment des journaux SCJ.","verify-network",{report(),vin(),output()}),
+        op("verify-can-mutation","Hors ligne — Maintenance CAN historique","Vérifie la cohérence des preuves existantes ; aucune émission.","verify-can-mutation",{report(),baseline(),vin(),output()}),
+        op("verify-legacy-mutation","Hors ligne — Maintenance legacy historique","Vérifie les preuves existantes ; aucune émission.","verify-legacy-mutation",{report(),baseline(),vin(),output()}),
+        op("verify-legacy-discovery","Hors ligne — Découverte legacy","Vérifie les données de découverte sauvegardées.","verify-legacy-discovery",{report(),output()}),
+        op("compare-legacy-discovery","Hors ligne — Rapprocher découverte et scan","Compare la découverte et le rapport de lecture.","compare-legacy-discovery-scan",{discovery_report(),scan_report(),output()}),
+        op("inspect-native-live","Hors ligne — Lire CL/1","Reconstruit un rapport de campagne USB live depuis sa capture.","--inspect-j1979-live-native",{positional(capture(false)),positional(vin()),positional(output())}),
+        op("inspect-native-live-prefix","Hors ligne — Préfixe CL/1","Inspecte une capture live partielle sans prétendre à sa complétude.","--inspect-j1979-live-native-prefix",{positional(capture(false)),positional(vin()),positional(output())}),
+        op("verify-native-live","Hors ligne — Vérifier CL/1","Compare le rapport live à la capture USB native.","--verify-j1979-live-native",{positional(capture(false)),positional(report()),positional(output()),positional(vin())}),
+        op("verify-native-live-prefix","Hors ligne — Vérifier préfixe CL/1","Compare uniquement les observations du préfixe.","--verify-j1979-live-native-prefix",{positional(capture(false)),positional(prefix_report()),positional(output()),positional(vin())}),
+        op("inspect-native-freeze","Hors ligne — Lire CF/1","Reconstruit les résultats de trames figées depuis la capture.","--inspect-j1979-freeze-native",{positional(capture(false)),positional(vin()),positional(output())}),
+        op("inspect-native-freeze-prefix","Hors ligne — Préfixe CF/1","Inspecte la partie conservée d’une capture interrompue.","--inspect-j1979-freeze-native-prefix",{positional(capture(false)),positional(vin()),positional(output())}),
+        op("verify-native-freeze-prefix","Hors ligne — Vérifier préfixe CF/1","Compare un rapport partiel à son préfixe de capture.","--verify-j1979-freeze-native-prefix",{positional(capture(false)),positional(prefix_report()),positional(output()),positional(vin())}),
+        op("inspect-native-campaign","Hors ligne — Lire CJ/1","Reconstruit la campagne de lecture depuis la capture USB.","--inspect-j1979-campaign",{positional(capture(false)),positional(vin()),positional(output())}),
+        op("verify-native-campaign","Hors ligne — Vérifier CJ/1 natif","Vérifie le rapport natif contre la capture.","--verify-j1979-campaign",{positional(capture(false)),positional(report()),positional(output()),positional(vin())}),
+        op("inspect-native-maintenance","Hors ligne — Lire CM/1","Inspecte le journal de maintenance, sans réexécuter l’opération.","--inspect-j1979-maintenance",{positional(offline_journal()),positional(vin()),positional(output())}),
+        op("inspect-native-maintenance-prefix","Hors ligne — Préfixe CM/1","Inspecte un journal interrompu sans conclure à la réussite.","--inspect-j1979-maintenance-prefix",{positional(offline_journal()),positional(vin()),positional(output())}),
+        op("verify-native-maintenance","Hors ligne — Vérifier CM/1","Compare un rapport de maintenance au journal existant.","--verify-j1979-maintenance",{positional(offline_journal()),positional(report()),positional(output()),positional(vin())}),
+        op("verify-native-maintenance-prefix","Hors ligne — Vérifier préfixe CM/1","Vérifie le rapport de préfixe sans rejouer de mutation.","--verify-j1979-maintenance-prefix",{positional(offline_journal()),positional(prefix_report()),positional(output()),positional(vin())}),
+        op("inspect-elm-campaign","Hors ligne — Lire ECP","Rejoue une campagne ELM conservée sur disque.","--inspect-j1979-elm-campaign",{positional(profile()),positional(tx()),positional(rx()),positional(vin()),positional(capture(false)),positional(output())}),
+        op("verify-elm-campaign","Hors ligne — Vérifier ECP","Compare le rapport à la campagne ELM conservée.","--verify-j1979-elm-campaign",{positional(profile()),positional(tx()),positional(rx()),positional(vin()),positional(capture(false)),positional(report()),positional(output())}),
+        op("inspect-elm-journal","Hors ligne — Lire EJR","Inspecte le journal adaptateur ELM.","--inspect-j1979-elm-journal",{positional(profile()),positional(tx()),positional(rx()),positional(vin()),positional(offline_journal()),positional(output())}),
+        op("recover-elm-journal","Hors ligne — Récupérer ECR","Reconstruit une trace depuis le journal EJR terminal.","--recover-j1979-elm-journal",{positional(profile()),positional(tx()),positional(rx()),positional(vin()),positional(offline_journal()),positional(output())}),
+        op("inspect-elm-trace","Hors ligne — Lire ECR","Inspecte les échanges adaptateur sauvegardés.","--inspect-j1979-elm-trace",{positional(profile()),positional(tx()),positional(rx()),positional(vin()),positional(trace()),positional(output())}),
+        op("verify-elm-trace","Hors ligne — Vérifier ECR","Compare une trace adaptateur à une capture existante.","--verify-j1979-elm-trace",{positional(profile()),positional(tx()),positional(rx()),positional(vin()),positional(trace()),positional(capture(false)),positional(output())}),
+        op("inspect-legacy-live","Hors ligne — Lire LLR","Rejoue les mesures legacy depuis la capture.","--inspect-j1979-legacy-live",{positional(protocol()),positional(source()),positional(vin()),positional(capture(false)),positional(output())}),
+        op("verify-legacy-live-capture","Hors ligne — Vérifier LLR","Compare un rapport legacy à sa capture live.","--verify-j1979-legacy-live",{positional(protocol()),positional(source()),positional(vin()),positional(capture(false)),positional(report()),positional(output())}),
+        op("inspect-legacy-freeze","Hors ligne — Lire LFR","Reconstruit les trames figées legacy depuis la capture.","--inspect-j1979-legacy-freeze",{positional(protocol()),positional(source()),positional(vin()),positional(capture(false)),positional(output())}),
+        op("verify-legacy-freeze-capture","Hors ligne — Vérifier LFR","Compare le rapport legacy à sa capture de trames figées.","--verify-j1979-legacy-freeze",{positional(protocol()),positional(source()),positional(vin()),positional(capture(false)),positional(report()),positional(output())}),
+        op("inspect-legacy-scan","Hors ligne — Lire LSR","Reconstruit le scan legacy depuis la capture.","--inspect-j1979-legacy-scan",{positional(protocol()),positional(source()),positional(vin()),positional(capture(false)),positional(output())}),
+        op("verify-legacy-scan-capture","Hors ligne — Vérifier LSR","Compare le rapport legacy à sa capture de lecture.","--verify-j1979-legacy-scan",{positional(protocol()),positional(source()),positional(vin()),positional(capture(false)),positional(report()),positional(output())}),
+        op("inspect-legacy-journal","Hors ligne — Lire LJ","Inspecte le journal d’une campagne legacy.","--inspect-j1979-legacy-journal",{positional(protocol()),positional(source()),positional(vin()),positional(offline_journal()),positional(output())}),
+        op("recover-legacy-journal","Hors ligne — Récupérer LJ","Reconstruit la capture canonique d’une campagne terminée.","--recover-j1979-legacy-journal",{positional(protocol()),positional(source()),positional(vin()),positional(offline_journal()),positional(output())})
     };
     return ops;
 }
@@ -169,9 +211,11 @@ Invocation prepare(const Operation& supplied,const Values& values){
                 ec.clear();require(fs::is_directory(path.parent_path(),ec)&&!ec,"Répertoire parent inexistant");
             }
             require(paths.insert(path).second,"Chemins de preuve et sortie distincts requis");
-            invocation.args.push_back(field.flag);invocation.args.push_back(path.string());continue;
+            if(!field.flag.empty())invocation.args.push_back(field.flag);
+            invocation.args.push_back(path.string());continue;
         }
-        invocation.args.push_back(field.flag);invocation.args.push_back(value);
+        if(!field.flag.empty())invocation.args.push_back(field.flag);
+        invocation.args.push_back(value);
     }
     if(ids.contains("tx")&&ids.contains("rx"))
         require(j1979_can_physical_pair(ids.at("tx"),ids.at("rx")),"Paire CAN physique invalide");
