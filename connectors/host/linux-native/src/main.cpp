@@ -973,21 +973,30 @@ static int capture_cl1_native(int argc,char **argv) {
     cl1_result replay{};
     bool complete=received==0 &&
         load_regular(o.capture,CL1_MAX_CAPTURE,&capture);
-    const bool captured=complete;
-    if (complete) complete=cl1_project(&capture,o.plan.vin,false,
-                                      &report,&size,&replay) &&
-                           replay.completed && replay.initial_vin &&
-                           replay.final_vin && replay.inventory_complete;
-    if (complete) complete=load_regular(o.capture,CL1_MAX_CAPTURE,&again) &&
-                           same_input(&capture,&again);
-    if (complete) {
+    // Compare the persisted plan with the approved scope, not only its VIN.
+    // An inventory that ends early after all selected PIDs are advertised is
+    // distinct from whole-inventory coverage; keep the reported flag intact.
+    const bool replayed=complete&&cl1_project(&capture,o.plan.vin,false,&report,&size,&replay);
+    const auto& approved=o.plan;const auto& observed=replay.plan;
+    const bool captured=replayed&&replay.capture_integrity_verified&&
+        observed.tx==approved.tx&&observed.rx==approved.rx&&observed.extended==approved.extended&&
+        observed.budget_ms==approved.budget_ms&&observed.cycles==approved.cycles&&
+        observed.interval_ms==approved.interval_ms&&observed.pid_count==approved.pid_count&&
+        !memcmp(observed.pids,approved.pids,approved.pid_count);
+    complete=captured&&replay.completed&&replay.initial_vin&&replay.final_vin;
+    // Keep a valid negative terminal as a canonical report, with a nonzero
+    // process exit code; only a rejected capture gets a failure envelope.
+    const bool canonical=captured&&load_regular(o.capture,CL1_MAX_CAPTURE,&again)&&
+        same_input(&capture,&again);
+    complete=complete&&canonical;
+    if (canonical) {
         try{output->persist(std::string_view(report.get(),size));}
         catch(const std::exception& e){
             // Do not replace a partial report or retry the physical operation.
             return error(e.what());
         }
     }
-    if (!complete) {
+    if (!canonical) {
         /* A failed live capture is still a valuable forensic prefix.
          * Never turn its incomplete/unsafe status into a successful report.
          */
@@ -1022,7 +1031,7 @@ static int capture_cl1_native(int argc,char **argv) {
     bool exports_complete=true;
     if(projection->requested()||csv->requested()){
         exports_complete=false;
-        if(captured){
+        if(canonical){
             try{
                 const auto projected=cd::network::history::bind_native_live_projection(
                     cd::network::history::project_cl1_live({capture.bytes.get(),capture.length},
@@ -1706,6 +1715,7 @@ static int legacy_freeze_replay(const char* protocol,const char* source,const ch
     }catch(const std::exception& e){return error(e.what());}
 }
 
+static bool sync_parent(const char* path);
 struct LegacyLiveOptions{
     cd::legacy::Protocol protocol{};
     unsigned source{};

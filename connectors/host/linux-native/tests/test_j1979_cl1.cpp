@@ -43,7 +43,8 @@ static void observation(fixture *f,unsigned *sequence,unsigned phase,
     memcpy(data+CL1_EVENT_SIZE,response,size);
     record(f,2,(*sequence)++,data,CL1_EVENT_SIZE+size);
 }
-static fixture complete(void) {
+enum class Case { success, timeout, wrong_final, early_inventory, unknown_width };
+static fixture complete(Case variant=Case::success) {
     fixture f{};
     uint8_t plan[CL1_PLAN_SIZE]={0};
     le32(plan,0x7e0);le32(plan+4,0x7e8);
@@ -58,22 +59,28 @@ static fixture complete(void) {
     const uint8_t read_vin[2]={9,2};
     observation(&f,&seq,1,1,0,0,0,1,read_vin,vin_reply,sizeof(vin_reply));
     const uint8_t support_req[2]={1,0};
-    const uint8_t bitmap[6]={0x41,0,0,0x10,0,0};
+    const uint8_t bitmap[6]={0x41,0,0,0x10,0,
+        static_cast<uint8_t>(variant==Case::early_inventory?1:0)};
     observation(&f,&seq,2,1,0,0,2,3,support_req,bitmap,sizeof(bitmap));
     const uint8_t sample_req[2]={1,0x0c};
     const uint8_t sample[4]={0x41,0x0c,0x1a,0xf8};
-    observation(&f,&seq,4,2,1,0x0c,100,101,sample_req,sample,sizeof(sample));
+    const bool timeout=variant==Case::timeout;
+    const auto sample_size=timeout?0u:variant==Case::unknown_width?3u:static_cast<unsigned>(sizeof(sample));
+    observation(&f,&seq,4,timeout?4:2,1,0x0c,100,101,sample_req,sample,sample_size);
+    if(variant==Case::wrong_final)vin_reply[19]='7';
     observation(&f,&seq,5,1,0,0,102,103,read_vin,vin_reply,sizeof(vin_reply));
     uint8_t terminal[CL1_TERMINAL_SIZE]={0};
-    terminal[1]=15; /* initial/final VIN, inventory, completed */
+    terminal[0]=timeout?8:variant==Case::wrong_final?6:0;
+    terminal[1]=variant==Case::wrong_final?5:timeout?7:variant==Case::early_inventory?11:15;
     le16(terminal+2,1); /* completed cycles */
     le32(terminal+4,4); /* observations */
     le32(terminal+8,1); /* samples */
-    le32(terminal+12,1);/* RAW */
+    le32(terminal+12,timeout?0:1);/* RAW */
+    le32(terminal+20,timeout?1:0);
     le32(terminal+24,103); /* final observation elapsed ms */
-    le32(terminal+28,50); /* 20+6+4+20 raw bytes */
+    le32(terminal+28,46+sample_size);
     terminal[33]=0x10; /* advertised PID 0C */
-    le16(terminal+64,1); /* one RAW per selected PID */
+    le16(terminal+64,timeout?0:1);
     record(&f,3,seq++,terminal,sizeof(terminal));
     assert(seq==6);
     return f;
@@ -115,6 +122,29 @@ int main(void) {
     try{(void)project_cl1_live({f.bytes,f.used-1},{0x7e0,0x7e8},vin);}
     catch(const std::invalid_argument&){refused=true;}assert(refused);
 
+    for(auto variant:{Case::timeout,Case::wrong_final,Case::early_inventory,Case::unknown_width}){
+        const auto input=complete(variant);
+        cl1_result replay{};
+        assert(cl1_inspect_complete(input.bytes,input.used,vin,&replay,error,sizeof(error))==0);
+        const auto numeric=project_cl1_live({input.bytes,input.used},{0x7e0,0x7e8},vin);
+        assert(numeric.complete==(variant==Case::early_inventory));
+        assert(numeric.report.at("identity_rechecked").boolean()==(variant!=Case::wrong_final));
+        const auto& row=numeric.report.at("samples").array()[0];
+        if(variant!=Case::early_inventory){
+            assert(row.at("signals").array().empty());
+            assert(!row.at("engineering_verified").boolean());
+        }else{
+            assert(!replay.inventory_complete&&replay.completed);
+            assert(row.at("engineering_verified").boolean());
+        }
+        if(variant==Case::timeout){
+            assert(row.at("status").string()=="TIMEOUT"&&row.at("response_hex").null());
+        }
+        if(variant==Case::unknown_width){
+            assert(row.at("response_hex").string()=="410C1A");
+            assert(replay.completed&&!numeric.complete);
+        }
+    }
     /* Full receipt never qualifies as interrupted prefix. */
     assert(cl1_inspect_prefix(f.bytes,f.used,vin,&result,error,sizeof(error))!=0);
 

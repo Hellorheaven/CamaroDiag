@@ -491,3 +491,61 @@ make all gui
 make deb-gui
 ```
 L’interface utilise le binaire `camarodiag-native` voisin, sans shell ni élévation de privilèges. Elle fournit les formulaires des acquisitions CAN, ELM, legacy, USB et des vérifications hors ligne, un aperçu de commande, un journal d’exécution borné et un lecteur de rapports JSON/CSV. La confirmation explicite est transmise uniquement après la demande du moteur via un pseudo-terminal local ; pas de réessai automatique. Les opérations mutatrices restent dans la CLI distincte. Le paquet desktop inclut le binaire CLI, sans Python ; les dépendances Qt sont résolues par `dpkg-shlibdeps`. Ne pas installer simultanément le paquet CLI et le paquet desktop (ils fournissent le même exécutable). Qualification ARM/x64 et tests à exécuter au gate de clôture.
+
+
+## Exports numériques natifs — SocketCAN, ELM CAN, CU/3 et legacy
+
+Les commandes d'acquisition restent en lecture seule, avec confirmation locale
+et sélection indépendante du VIN et du calculateur. Les exports sont générés
+après la fermeture du transport à partir des octets relus et rejoués.
+Les exemples suivants utilisent des noms de fichiers nouveaux.
+
+~~~sh
+# SocketCAN : journal SCJ, rapport brut et exports distincts
+./camarodiag-native --j1979-live --interface can0 --tx 7E0 --rx 7E8 \
+  --vin VIN --pid 0C --pid 0D --cycles 30 --journal session.scj \
+  --output raw.json --projection-output numeric.json --csv samples.csv \
+  --confirm-physical-channel
+
+# ELM CAN : capture ECP et journal EJR obligatoires pour le rapport brut séparé
+./camarodiag-native --j1979-elm-live --port /dev/ttyUSB0 --profile 6 \
+  --tx 7E0 --rx 7E8 --vin VIN --pid 0C --adapter-journal session.ejr \
+  --campaign-capture session.ecp --output adapter.json \
+  --native-report-output raw.json --projection-output numeric.json \
+  --csv samples.csv --confirm-physical-channel
+
+# CU/3 : export depuis une capture CL/1 déjà enregistrée, sans véhicule
+./camarodiag-native project-cl1-live --capture session.cl --tx 7E0 --rx 7E8 \
+  --vin VIN --output numeric.json
+./camarodiag-native export-cl1-live-csv --capture session.cl --tx 7E0 --rx 7E8 \
+  --vin VIN --output samples.csv
+./camarodiag-native verify-cl1-live-projection --capture session.cl \
+  --projection numeric.json --tx 7E0 --rx 7E8 --vin VIN --output proof.json
+
+# Comparaison de deux preuves originelles (également possible avec deux CL/1)
+./camarodiag-native compare-native-live --report raw.json --cl1 session.cl \
+  --tx 7E0 --rx 7E8 --vin VIN --output comparison.json
+
+# Legacy : PID sélectionnés et source documentée, pas d'adressage physique
+./camarodiag-native --j1979-legacy-live --port /dev/ttyUSB0 --protocol 2 \
+  --source 10 --vin VIN --pid 0C --capture legacy.llr --output legacy.json \
+  --csv legacy.csv --confirm-physical-channel
+~~~
+
+Remplacer VIN par le VIN réel indépendant. L'acquisition CU/3 accepte aussi
+les options --projection-output et --csv. Les variantes à terminal négatif
+restent incomplètes ; un VIN final non vérifié supprime toute attribution de
+valeur numérique. Une capture CL/1 peut ne pas couvrir la totalité des pages
+PID lorsque tous les PID sélectionnés sont déjà annoncés ; ce résultat
+ne constitue pas une découverte exhaustive. Les champs de contexte absents
+ne sont pas déduits des échantillons. Aucun réessai automatique.
+
+EN: Optional JSON and CSV outputs are separate from raw evidence and are
+reserved before acquisition. CL/1 numeric replay and comparison use original
+captures, never editable numeric summaries. Missing or unverified values are
+not converted to zero. Completion of selected measurements is not proof of
+whole-vehicle coverage or physical authenticity.
+
+État : chemins natifs écrits, tests de régression ajoutés, validation de
+clôture non exécutée. Les contrats historiques Python et les autres protocoles
+restent à migrer intégralement avant leur suppression.
