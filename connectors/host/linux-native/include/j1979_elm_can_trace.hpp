@@ -5,7 +5,7 @@
 namespace cd::elmcan {
 constexpr std::size_t trace_max_rows=J1979_LIVE_MAX_STEPS*2+64;
 constexpr std::size_t trace_max_raw=32*1024*1024;
-constexpr std::size_t trace_max_bytes=trace_max_raw+trace_max_rows*4300+128;
+constexpr std::size_t trace_max_bytes=trace_max_raw+trace_max_rows*4700+128;
 enum class TraceOperation:std::uint8_t {scan=1,live=2,freeze=3,maintenance=4};
 struct Trace{
     Scope target;
