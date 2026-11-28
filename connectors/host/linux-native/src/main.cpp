@@ -2990,6 +2990,7 @@ static void usage(FILE *stream) {
         "  camarodiag-native verify-freeze --report REPORT.json [--vin VIN] --output PROOF.json\n"
         "  camarodiag-native verify-legacy-freeze --report REPORT.json [--vin VIN] --output PROOF.json\n"
         "  camarodiag-native verify-legacy --report REPORT.json [--vin VIN] --output PROOF.json\n"
+        "  camarodiag-native verify-network-journals --report NETWORK.json --journal-directory DIR --interface can0 --vin VIN --output PROOF.json\n"
         "  camarodiag-native verify-network --report REPORT.json [--vin VIN] --output PROOF.json\n"
         "  camarodiag-native --inspect-j1979-historical-can-network VIN|- REPORT.json PROOF.json\n"
         "  camarodiag-native --inspect-j1979-historical-can-plan historical|android VIN|- REPORT.json PROOF.json\n"
@@ -3114,6 +3115,34 @@ static int native_can_plan_cli(const char* tx_text,const char* rx_text,const cha
         if(!load_regular(path,maximum,&again)||!same_input(&original,&again))return error("Native physical report changed");
         if(!atomic_create(output,proof.data(),proof.size()))return error("Native physical proof destination unavailable");
         return 0;
+    }catch(const std::exception& e){return error(e.what());}
+}
+static int verify_network_journal_cli(int argc,char** argv){
+    const char* report=nullptr;const char* directory=nullptr;const char* vin=nullptr;const char* interface=nullptr;const char* output=nullptr;
+    for(int i=2;i<argc;){
+        const std::string_view key(argv[i++]);
+        if(i>=argc||std::string_view(argv[i]).starts_with("--"))return error("Missing network journal option value");
+        const char* value=argv[i++];
+        if(key=="--report"&&!report)report=value;
+        else if(key=="--journal-directory"&&!directory)directory=value;
+        else if(key=="--vin"&&!vin)vin=value;
+        else if(key=="--interface"&&!interface)interface=value;
+        else if(key=="--output"&&!output)output=value;
+        else return error("Unexpected or duplicate network journal option");
+    }
+    if(!report||!directory||!vin||!interface||!output)return error("Network report, directory, independent interface/VIN and output required");
+    try{
+        constexpr std::size_t maximum=64u*1024u*1024u;
+        input original{},again{};
+        if(!load_regular(report,maximum,&original))return error("Bounded native network report required");
+        const auto root=cd::json::parse_report({reinterpret_cast<const char*>(original.bytes.get()),original.length},maximum);
+        const auto scope=cd::network::history::inspect_network(root,std::string(vin));
+        auto journals=cd::network::history::load_network_journals(directory,scope.selected);
+        const auto proof=cd::network::history::verify_network_journals(root,journals,vin,interface,original.digest);
+        const auto encoded=cd::json::serialize(proof)+"\n";
+        if(!load_regular(report,maximum,&again)||!same_input(&original,&again))return error("Network report changed");
+        if(!atomic_create(output,encoded.data(),encoded.size()))return error("Network journal proof destination unavailable");
+        return proof.at("completed").boolean()?0:2;
     }catch(const std::exception& e){return error(e.what());}
 }
 static int socket_campaign_cli(int argc,char** argv,std::string_view command){
@@ -3391,6 +3420,7 @@ int main(int argc, char **argv) {
     if(argc==7&&!strcmp(argv[1],"--inspect-j1979-native-live"))return native_can_plan_cli(argv[2],argv[3],argv[4],argv[5],argv[6],true);
     if(argc==7&&!strcmp(argv[1],"--inspect-j1979-native-can-plan"))return native_can_plan_cli(argv[2],argv[3],argv[4],argv[5],argv[6]);
     if(argc>=2&&!strcmp(argv[1],"verify-native-live-projection"))return project_native_live_cli(argc,argv,false,true);
+    if(argc>=2&&!strcmp(argv[1],"verify-network-journals"))return verify_network_journal_cli(argc,argv);
     if(argc>=2&&(!strcmp(argv[1],"inspect-socketcan-journal")||!strcmp(argv[1],"recover-socketcan-report")||!strcmp(argv[1],"verify-socketcan-journal")))return socket_campaign_cli(argc,argv,argv[1]);
     if(argc>=2&&!strcmp(argv[1],"project-native-live"))return project_native_live_cli(argc,argv,false);
     if(argc>=2&&!strcmp(argv[1],"export-native-live-csv"))return project_native_live_cli(argc,argv,true);
