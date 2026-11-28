@@ -16,6 +16,8 @@ typedef struct {
     bool bad_final_vin, negative_sample, timeout_sample;
     bool suppress_advertisement, retire_context, malformed_sample, oversized_sample;
     unsigned clock_reads{}, stall_at_read{}, stall_ms{};
+    uint8_t pressure_range{};
+    bool scaling_fixture{};
     uint8_t emitted[64][2];
 } fake;
 static uint64_t clock_fake(void *ctx) {
@@ -49,6 +51,22 @@ static int exchange_fake(void *ctx,const uint8_t *request,size_t n,
                    "2G1FA1RXXR0123456":vin,17);
         *length=20;
         return 0;
+    }
+    if(f->scaling_fixture&&request[0]==1){
+        const auto pid=request[1];
+        if(pid==0||pid==0x20||pid==0x40||pid==0x4f||pid==0x50){
+            const uint8_t support0[]{0x41,0,0,0x21,0,1};
+            const uint8_t support20[]{0x41,0x20,0,0,0,1};
+            const uint8_t support40[]{0x41,0x40,0,3,0,0};
+            const uint8_t scale4f[]{0x41,0x4f,0,0,0,f->pressure_range};
+            const uint8_t scale50[]{0x41,0x50,0,0,0,0};
+            const auto* data=pid==0?support0:pid==0x20?support20:pid==0x40?support40:pid==0x4f?scale4f:scale50;
+            assert(*length>=6);memcpy(reply,data,6);*length=6;return 0;
+        }
+        if(pid==0x0b){const uint8_t pressure[]{0x41,0x0b,51};
+            assert(*length>=3);memcpy(reply,pressure,3);*length=3;return 0;}
+        if(pid==0x10){const uint8_t airflow[]{0x41,0x10,0x03,0xe8};
+            assert(*length>=4);memcpy(reply,airflow,4);*length=4;return 0;}
     }
     if (request[0]==1 && request[1]==0) {
         assert(*length>=6);
@@ -260,6 +278,24 @@ int main(void) {
     check_replay(p,r);
     j1979_live_free(&r);
 
+    // Identical selected PIDs with different ECU configuration bytes
+    // cannot be combined into one comparable engineering series.
+    const auto scaled_run=[&](uint8_t maximum){
+        f=fake{};f.clock=1000;f.scaling_fixture=true;f.pressure_range=maximum;
+        p=plan(&f);p.pids[0]=0x0b;p.pids[1]=0x10;
+        assert(j1979_live_record(&p,&r)==0&&r.completed);
+        auto result=project(p,r);assert(result.complete);
+        j1979_live_free(&r);return result;
+    };
+    const auto scale_a=scaled_run(50),scale_b=scaled_run(100);
+    const std::array different_scales{scale_a,scale_b};
+    const auto scaled_comparison=cd::network::history::compare_native_live(different_scales,digests);
+    const auto& compared=scaled_comparison.at("channel_comparison").array();
+    assert(compared.size()==2);
+    assert(compared[0].at("pid").unsigned_integer()==0x0b);
+    assert(!compared[0].at("comparable").boolean()&&compared[0].at("mean_range").null());
+    assert(compared[1].at("pid").unsigned_integer()==0x10&&compared[1].at("comparable").boolean());
+    assert(compared[1].at("mean_range").finite_number()==0);
     // Vary scheduler delay at each clock observation. Archive replay must
     // accept actual completed recordings despite unrecorded callback gaps.
     for(unsigned at=1;at<=45;++at){

@@ -41,9 +41,9 @@ struct Row {
 };
 struct Channel {
     std::string name,unit,scale;
-    std::optional<std::string> configuration;
     std::optional<double> value;
     std::optional<std::uint64_t> raw;
+    std::optional<std::string> configuration;
 };
 Value channel(const Channel& c){
     return obj({{"name",text(c.name)},{"unit",text(c.unit)},{"number",c.value?number(*c.value):Value{}},
