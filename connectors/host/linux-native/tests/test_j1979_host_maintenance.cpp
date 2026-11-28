@@ -1,6 +1,7 @@
 #include <algorithm>
 #include "j1979_host_maintenance.hpp"
 #include "j1979_cm1.hpp"
+#include "j1979_elm_can_trace.hpp"
 #include <cassert>
 #include <cstdlib>
 #include <filesystem>
@@ -170,6 +171,19 @@ void elm_maintenance(){
             const auto raw=read(d.path/"session.cm");
             const auto inspected=cd::cm1::inspect(raw,"1G1FA1RXXR0123456",false);
             assert(inspected.terminal&&!inspected.recovery_required()&&inspected.records.size()==4);
+            const cd::elmcan::Trace trace{target,"1G1FA1RXXR0123456",cd::elmcan::TraceOperation::maintenance,result.observations};
+            const auto encoded=cd::elmcan::encode_trace(trace);
+            const auto parsed=cd::elmcan::decode_trace(encoded);
+            const auto replayed=cd::elmcan::correlate_maintenance(parsed,inspected);
+            assert(replayed.configured&&replayed.diagnostic_rows==(clear?16u:9u));
+            auto forged=parsed;forged.rows.push_back(parsed.rows[clear?25:23]);
+            rejected([&]{cd::elmcan::replay_trace(forged);});
+            forged=parsed;forged.rows.back().duration_ms=4000;
+            rejected([&]{cd::elmcan::replay_trace(forged);});
+            forged=parsed;forged.rows.pop_back();
+            rejected([&]{cd::elmcan::correlate_maintenance(forged,inspected);});
+            forged=parsed;forged.operation=cd::elmcan::TraceOperation::scan;
+            rejected([&]{cd::elmcan::replay_trace(forged);});
             const auto text=report(r,std::string(64,'a'),cd::cm1::report(inspected,std::string(64,'a')));
             assert(text.find("\"local_serial_closed\":true")!=std::string::npos);
             assert(text.find("\"physical_transceiver_disabled_verified\":false")!=std::string::npos);

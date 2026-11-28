@@ -1,5 +1,6 @@
 #include "j1979_can.h"
 #include "j1979_host_freeze.hpp"
+#include "j1979_elm_can_trace.hpp"
 #include <algorithm>
 #include <cassert>
 #include <cstdlib>
@@ -110,6 +111,25 @@ void elm_capture(){
             const auto raw=out.data();cf1_evidence evidence{};char failure[256]{};
             assert(cf1_inspect_complete(raw.data(),raw.size(),p.vin,&evidence,failure,sizeof(failure))==0);
             assert(evidence.execution_completed&&evidence.observation_count==8);
+            const cd::elmcan::Trace trace{target,p.vin,cd::elmcan::TraceOperation::freeze,result.observations};
+            const auto encoded=cd::elmcan::encode_trace(trace);
+            const auto parsed=cd::elmcan::decode_trace(encoded);
+            const auto verified=cd::elmcan::correlate_freeze(parsed,evidence);
+            assert(verified.configured&&verified.setup_rows==15&&verified.diagnostic_rows==8&&verified.positive==8);
+            auto bad=encoded;bad.back()^=1;
+            rejects([&]{cd::elmcan::decode_trace(bad);});
+            bad=encoded;bad.pop_back();
+            rejects([&]{cd::elmcan::decode_trace(bad);});
+            bad=encoded;bad.push_back(0);
+            rejects([&]{cd::elmcan::decode_trace(bad);});
+            auto forged=parsed;forged.rows.back().response.back()^=1;
+            rejects([&]{cd::elmcan::replay_trace(forged);});
+            forged=parsed;forged.rows[8].command="ATSH7DF";
+            rejects([&]{cd::elmcan::replay_trace(forged);});
+            forged=parsed;forged.rows.pop_back();
+            rejects([&]{cd::elmcan::correlate_freeze(forged,evidence);});
+            forged=parsed;forged.vin.back()='7';
+            rejects([&]{cd::elmcan::correlate_freeze(forged,evidence);});
             cf1_evidence_free(&evidence);
         }
         Temporary out;ElmFixture wrong;wrong.configure(profile);
