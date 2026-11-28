@@ -91,6 +91,28 @@ int main(){
     ready=prepare(find("verify-native-live"),verify);
     assert(!ready.physical&&ready.confirmation.empty());
     assert((ready.args==std::vector<std::string>{"--verify-j1979-live-native",capture,report,proof,values["vin"]}));
+    const auto normative=directory+"/reference.pdf",catalogue=directory+"/catalogue.json";
+    for(const auto& path:{normative,catalogue}){std::ofstream file(path);file<<"synthetic fixture";}
+    const std::string pin(64,'a');
+    Values cat{{"catalogue-kind","live"},{"catalogue",catalogue},{"reference",normative},{"pin",pin},{"output",proof}};
+    assert((prepare(find("inspect-catalogue"),cat).args==std::vector<std::string>{
+        "--inspect-j1979-catalogue","live",catalogue,normative,pin,proof}));
+    cat["catalogue-kind"]="cl1";cat["capture"]=capture;cat["vin"]=values["vin"];
+    assert((prepare(find("project-catalogue"),cat).args==std::vector<std::string>{
+        "--project-j1979-catalogue","cl1",catalogue,normative,pin,capture,values["vin"],proof}));
+    cat["projection"]=report;
+    assert((prepare(find("verify-catalogue"),cat).args==std::vector<std::string>{
+        "--verify-j1979-catalogue","cl1",catalogue,normative,pin,capture,values["vin"],report,proof}));
+    cat["catalogue-kind"]="llr1";
+    rejects([&]{(void)prepare(find("verify-catalogue"),cat);});
+    cat["protocol"]="2";cat["source"]="10";
+    const auto legacy=prepare(find("verify-catalogue"),cat);
+    assert(legacy.args[legacy.args.size()-2]=="2"&&legacy.args.back()=="10"&&!legacy.physical);
+    cat["catalogue-kind"]="cf1";rejects([&]{(void)prepare(find("verify-catalogue"),cat);});
+    cat.erase("protocol");cat.erase("source");cat["pin"]=std::string(64,'G');
+    rejects([&]{(void)prepare(find("verify-catalogue"),cat);});
+    cat["pin"]=pin;cat["reference"]=catalogue;
+    rejects([&]{(void)prepare(find("verify-catalogue"),cat);});
     Values live_evidence{{"scj",capture},{"tx","7E0"},{"rx","7E8"},{"vin",values["vin"]},{"output",proof}};
     assert(prepare(find("project-live-evidence"),live_evidence).args.front()=="project-live-evidence");
     assert(prepare(find("csv-live-evidence"),live_evidence).args.front()=="export-live-evidence-csv");
