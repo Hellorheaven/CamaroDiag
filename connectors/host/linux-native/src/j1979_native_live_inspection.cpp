@@ -184,20 +184,27 @@ class Replay{
         return true;
     }
     void samples(){
-        unsigned previous_anchor=0,last_identity=0;
-        // Clock callbacks between exchanges are not present in JSON. Use
-        // observable cycle bounds; do not claim reconstruction of wait calls.
+        // The archive has exchange timestamps, not the intermediate clock
+        // callbacks that establish cycle starts or periodic identity deadlines.
+        // Propagate the earliest feasible cycle start and the range in which
+        // the last successful identity clock could have been observed. Do not
+        // equate the first recorded exchange with the actual cycle start.
+        std::uint64_t earliest_previous=0,identity_lower=0,identity_upper=0;
         for(unsigned cycle=1;cycle<=plan_.cycles&&!halted();++cycle){
             if(!next()){no_row(cycle>1);break;}
-            const auto anchor=next()->start;
-            if(cycle>1)require(anchor>=previous_anchor+plan_.interval_ms,
-                "Native live cycle begins before configured interval");
+            const auto anchor=std::uint64_t(next()->start);
+            auto lower=std::uint64_t(last_end_);
+            if(cycle>1)lower=std::max(lower,earliest_previous+plan_.interval_ms);
             if(next()->phase=="PERIODIC_VIN"){
-                require(anchor>=last_identity+30000,"Unexpected early periodic identity");
+                lower=std::max(lower,identity_lower+30000);
+                require(lower<=anchor,"Unexpected early periodic identity or cycle");
                 if(!identity("PERIODIC_VIN",false))break;
-                last_identity=last_end_;
+                identity_lower=last_end_;
+                identity_upper=next()?next()->start:last_end_;
+                require(identity_upper>=identity_lower,"Invalid post-identity chronology");
             }else{
-                require(anchor<=last_identity+30000,"Native live cycle lacks timely identity recheck");
+                require(lower<=anchor,"Native live cycle begins before configured interval");
+                require(lower<identity_upper+30000,"Native live cycle lacks timely identity recheck");
             }
             for(unsigned i=0;i<plan_.pid_count&&!halted();++i){
                 auto* s=take("SAMPLE",cycle,{1,plan_.pids[i]});
@@ -207,7 +214,7 @@ class Replay{
                 else ++result_.missing_samples;
             }
             if(halted())break;
-            ++result_.cycles_completed;previous_anchor=anchor;
+            ++result_.cycles_completed;earliest_previous=lower;
         }
     }
 public:

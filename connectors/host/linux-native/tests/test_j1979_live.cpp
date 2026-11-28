@@ -14,9 +14,14 @@ typedef struct {
     unsigned requests, vin_requests;
     bool bad_final_vin, negative_sample, timeout_sample;
     bool suppress_advertisement, retire_context, malformed_sample, oversized_sample;
+    unsigned clock_reads{}, stall_at_read{}, stall_ms{};
     uint8_t emitted[64][2];
 } fake;
-static uint64_t clock_fake(void *ctx) {return static_cast<fake *>(ctx)->clock;}
+static uint64_t clock_fake(void *ctx) {
+    auto* f=static_cast<fake*>(ctx);
+    if(++f->clock_reads==f->stall_at_read)f->clock+=f->stall_ms;
+    return f->clock;
+}
 static bool current_fake(void *ctx) {
     auto *f = static_cast<fake *>(ctx);
     return !f->retire_context || f->requests<3;
@@ -211,6 +216,15 @@ int main(void) {
     assert(r.raw_samples==0 && r.missing_samples==1 && f.requests==3);
     check_replay(p,r);
     j1979_live_free(&r);
+
+    // Vary scheduler delay at each clock observation. Archive replay must
+    // accept actual completed recordings despite unrecorded callback gaps.
+    for(unsigned at=1;at<=45;++at){
+        f=fake{};f.clock=1000;f.stall_at_read=at;f.stall_ms=25;
+        p=plan(&f);assert(j1979_live_record(&p,&r)==0);
+        if(r.completed)check_replay(p,r);
+        j1979_live_free(&r);
+    }
 
     p=plan(&f);p.pids[1]=p.pids[0];
     assert(!j1979_live_plan_valid(&p));
