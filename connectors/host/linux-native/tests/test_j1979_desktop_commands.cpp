@@ -77,6 +77,14 @@ int main(){
     ready=prepare(find("verify-native-live"),verify);
     assert(!ready.physical&&ready.confirmation.empty());
     assert((ready.args==std::vector<std::string>{"--verify-j1979-live-native",capture,report,proof,values["vin"]}));
+    Values usb_numeric{{"capture",capture},{"tx","7E0"},{"rx","7E8"},{"vin",values["vin"]},{"output",proof}};
+    auto usb_inv=prepare(find("project-cl1"),usb_numeric);
+    assert(!usb_inv.physical&&usb_inv.args.front()=="project-cl1-live");
+    assert(prepare(find("csv-cl1"),usb_numeric).args.front()=="export-cl1-live-csv");
+    rejects([&]{(void)prepare(find("verify-cl1-projection"),usb_numeric);});
+    usb_numeric["projection"]=report;
+    assert(prepare(find("verify-cl1-projection"),usb_numeric).args.front()=="verify-cl1-live-projection");
+    usb_numeric["rx"]="7E9";rejects([&]{(void)prepare(find("verify-cl1-projection"),usb_numeric);});
     auto invalid=verify;invalid["output"]=report;
     rejects([&]{(void)prepare(find("verify-native-live"),invalid);});
     invalid=verify;invalid["capture"]=directory+"/missing.cl";

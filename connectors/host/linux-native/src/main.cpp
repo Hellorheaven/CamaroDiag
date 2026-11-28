@@ -3027,6 +3027,9 @@ static void usage(FILE *stream) {
         "  camarodiag-native compare-legacy-discovery-scan --discovery DISCOVERY.json --scan SCAN.json --output PROOF.json\n"
         "  camarodiag-native verify-native-live-projection --report RAW.json --projection NUMERIC.json --tx 7E0 --rx 7E8 --vin VIN --output PROOF.json\n"
         "  camarodiag-native project-native-live --report REPORT.json --tx 7E0 --rx 7E8 --vin VIN --output PROJECTION.json\n"
+        "  camarodiag-native project-cl1-live --capture CAPTURE.cl --tx 7E0 --rx 7E8 --vin VIN --output NUMERIC.json\n"
+        "  camarodiag-native export-cl1-live-csv --capture CAPTURE.cl --tx 7E0 --rx 7E8 --vin VIN --output SAMPLES.csv\n"
+        "  camarodiag-native verify-cl1-live-projection --capture CAPTURE.cl --projection NUMERIC.json --tx 7E0 --rx 7E8 --vin VIN --output PROOF.json\n"
         "  camarodiag-native export-native-live-csv --report REPORT.json --tx 7E0 --rx 7E8 --vin VIN --output SAMPLES.csv\n"
         "  camarodiag-native export-legacy-live-csv --capture CAPTURE.llr --protocol 2 --source 10 --vin VIN --output SAMPLES.csv\n"
         "  camarodiag-native compare-native-live --report A.json --report B.json --tx 7E0 --rx 7E8 --vin VIN --output PROOF.json\n"
@@ -3250,6 +3253,63 @@ static int socket_campaign_cli(int argc,char** argv,std::string_view command){
         return replay.completed&&!replay.prefix?0:2;
     }catch(const std::exception& e){return error(e.what());}
 }
+static int cl1_numeric_cli(int argc,char** argv,std::string_view operation){
+    const char *capture=nullptr,*vin=nullptr,*tx=nullptr,*rx=nullptr,*output=nullptr,*projection=nullptr;
+    const bool verify=operation=="verify-cl1-live-projection",csv=operation=="export-cl1-live-csv";
+    for(int i=2;i<argc;){
+        const std::string_view key(argv[i++]);
+        if(i>=argc||!*argv[i]||std::string_view(argv[i]).starts_with("--"))
+            return error("Missing CL/1 numeric option value");
+        const char* value=argv[i++];
+        const char** slot=nullptr;
+        if(key=="--capture")slot=&capture;
+        else if(key=="--vin")slot=&vin;
+        else if(key=="--tx")slot=&tx;
+        else if(key=="--rx")slot=&rx;
+        else if(key=="--output")slot=&output;
+        else if(key=="--projection"&&verify)slot=&projection;
+        if(!slot||*slot)return error("Unexpected or duplicate CL/1 numeric option");
+        *slot=value;
+    }
+    if(!capture||!vin||!tx||!rx||!output||(verify&&!projection))
+        return error("CL/1 numeric replay requires capture, VIN, TX, RX, output and projection when verifying");
+    const auto address=[](std::string_view value){
+        std::uint32_t n{};
+        const auto [end,ec]=std::from_chars(value.data(),value.data()+value.size(),n,16);
+        if(value.empty()||value.size()>8||ec!=std::errc{}||end!=value.data()+value.size()||n>0x1fffffffu)
+            throw std::invalid_argument("Explicit hexadecimal CAN address required");
+        return n;
+    };
+    try{
+        constexpr std::size_t max_report=64u*1024u*1024u;
+        input raw{},stored{};
+        if(!load_regular(capture,CL1_MAX_CAPTURE,&raw))return error("Invalid bounded CL/1 capture");
+        auto result=cd::network::history::bind_native_live_projection(
+            cd::network::history::project_cl1_live({raw.bytes.get(),raw.length},{address(tx),address(rx)},vin),
+            raw.digest);
+        const auto canonical=cd::json::serialize(result.report)+"\n";
+        if(verify){
+            if(!load_regular(projection,max_report,&stored)||!separate(&raw,&stored))
+                return error("Distinct bounded CL/1 projection required");
+            const bool matches=stored.length==canonical.size()&&
+                !memcmp(stored.bytes.get(),canonical.data(),canonical.size());
+            if(!matches)return error("Stored CL/1 projection differs from independent replay");
+            if(!recheck_input(projection,max_report,stored)||!recheck_input(capture,CL1_MAX_CAPTURE,raw))
+                return error("CL/1 projection or capture changed during replay");
+            const auto proof=std::string("{\"schema\":\"camarodiag-j1979-cl1-projection-verification-v1\","
+                "\"consistent\":true,\"capture_sha256\":\"")+raw.digest+"\",\"projection_sha256\":\""+stored.digest+
+                "\",\"numeric_projection_complete\":"+(result.complete?"true":"false")+
+                ",\"physical_vehicle_verified\":false,\"authenticated\":false,\"permits_programming\":false}\n";
+            if(!atomic_create(output,proof.data(),proof.size()))return error("CL/1 proof destination unavailable");
+            return 0;
+        }
+        const auto data=csv?cd::network::history::native_live_csv(result):canonical;
+        if(!recheck_input(capture,CL1_MAX_CAPTURE,raw))return error("CL/1 source changed during numeric replay");
+        if(!atomic_create(output,data.data(),data.size()))return error("CL/1 numeric destination unavailable");
+        return result.complete?0:2;
+    }catch(const std::exception& e){return error(e.what());}
+}
+
 static int project_native_live_cli(int argc,char** argv,bool csv,bool verify=false){
     const char* path=nullptr;const char* output=nullptr;const char* vin=nullptr;const char* tx=nullptr;const char* rx=nullptr;const char* projection=nullptr;
     for(int i=2;i<argc;){
@@ -3471,6 +3531,8 @@ int main(int argc, char **argv) {
     if(argc>=2&&!strcmp(argv[1],"verify-native-live-projection"))return project_native_live_cli(argc,argv,false,true);
     if(argc>=2&&!strcmp(argv[1],"verify-network-journals"))return verify_network_journal_cli(argc,argv);
     if(argc>=2&&(!strcmp(argv[1],"inspect-socketcan-journal")||!strcmp(argv[1],"recover-socketcan-report")||!strcmp(argv[1],"verify-socketcan-journal")))return socket_campaign_cli(argc,argv,argv[1]);
+    if(argc>=2&&(!strcmp(argv[1],"project-cl1-live")||!strcmp(argv[1],"export-cl1-live-csv")||
+        !strcmp(argv[1],"verify-cl1-live-projection")))return cl1_numeric_cli(argc,argv,argv[1]);
     if(argc>=2&&!strcmp(argv[1],"project-native-live"))return project_native_live_cli(argc,argv,false);
     if(argc>=2&&!strcmp(argv[1],"export-native-live-csv"))return project_native_live_cli(argc,argv,true);
     if(argc>=2&&!strcmp(argv[1],"export-legacy-live-csv"))return legacy_live_csv_cli(argc,argv);
