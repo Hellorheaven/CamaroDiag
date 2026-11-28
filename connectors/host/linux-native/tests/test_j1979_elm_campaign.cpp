@@ -1,5 +1,6 @@
 #include "j1979_elm_can_campaign.hpp"
 #include "j1979_native_live_inspection.hpp"
+#include "j1979_live_evidence.hpp"
 #include <algorithm>
 #include <cassert>
 #include <deque>
@@ -64,6 +65,17 @@ CampaignCapture acquire(Fake& fake,const CampaignPlan& p,bool want_completed=tru
     assert(fake.rows.empty()&&r.completed==want_completed&&r.steps>0&&!r.native_report.empty());
     const auto replay=replay_campaign(captured);
     assert(replay.completed==r.completed&&replay.native_report==r.native_report);
+    using cd::network::history::LiveEvidenceKind;
+    const auto encoded=encode_campaign(captured);
+    const cd::network::Pair pair{p.target.tx,p.target.rx};
+    if(p.operation==TraceOperation::live){
+        const auto projected=cd::network::history::project_live_evidence(LiveEvidenceKind::elm_campaign,encoded,pair,vin,p.target.profile);
+        assert(projected.projection.report.at("transport_recipe_replayed").boolean());
+        assert(projected.projection.report.at("source_completed").boolean()==want_completed);
+        assert(projected.projection.report.at("evidence_kind").string()=="ECP/1");
+        rejects([&]{cd::network::history::project_live_evidence(LiveEvidenceKind::elm_campaign,encoded,pair,vin,0);});
+        rejects([&]{cd::network::history::project_live_evidence(LiveEvidenceKind::elm_campaign,encoded,pair,"1FA6P8TH0L5100000",p.target.profile);});
+    }else rejects([&]{cd::network::history::project_live_evidence(LiveEvidenceKind::elm_campaign,encoded,pair,vin,p.target.profile);});
     return captured;
 }
 void variants(){

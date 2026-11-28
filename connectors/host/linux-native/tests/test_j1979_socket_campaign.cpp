@@ -1,5 +1,6 @@
 #include "j1979_socket_campaign.hpp"
 #include "j1979_live_export.hpp"
+#include "j1979_live_evidence.hpp"
 #include "j1979_native_live_inspection.hpp"
 #include <filesystem>
 #include <algorithm>
@@ -101,6 +102,21 @@ void complete(bool live,Fake f={}){
     const auto checked=proof(j,same,sha256(data));
     assert(checked.at("report_sha256").string()==sha256(std::string_view(r.report)));
     assert(!checked.at("physical_vehicle_verified").boolean()&&!checked.at("permits_automatic_retry").boolean());
+    using cd::network::history::LiveEvidenceKind;
+    if(live){
+        const auto projected=cd::network::history::project_live_evidence(LiveEvidenceKind::socket_journal,data,{0x7e0,0x7e8},vin);
+        assert(projected.source_sha256==sha256(data)&&projected.raw_report_sha256==sha256(r.report));
+        assert(projected.projection.report.at("transport_recipe_replayed").boolean());
+        assert(projected.projection.report.at("evidence_kind").string()=="SCJ/1");
+        const auto proof=cd::network::history::verify_live_evidence(projected,projected.projection.report,std::string(64,'a'));
+        assert(proof.at("consistent").boolean());
+        auto tampered=projected.projection.report.object();
+        tampered["raw_report_sha256"]=cd::json::Value{std::string(64,'b')};
+        assert(!cd::network::history::verify_live_evidence(projected,cd::json::Value{tampered},std::string(64,'a')).at("consistent").boolean());
+        rejects([&]{cd::network::history::project_live_evidence(LiveEvidenceKind::socket_journal,data,{0x7e1,0x7e9},vin);});
+        auto torn=data;torn.pop_back();
+        rejects([&]{cd::network::history::project_live_evidence(LiveEvidenceKind::socket_journal,torn,{0x7e0,0x7e8},vin);});
+    }else rejects([&]{cd::network::history::project_live_evidence(LiveEvidenceKind::socket_journal,data,{0x7e0,0x7e8},vin);});
     auto corrupt=data;corrupt.back()^=1;rejects([&]{(void)decode(corrupt,true);});
     auto extra=data;extra.push_back('E');rejects([&]{(void)decode(extra,true);});
     auto short_tail=data;short_tail.pop_back();
