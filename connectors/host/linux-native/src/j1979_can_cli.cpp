@@ -4,6 +4,7 @@
 #include "j1979_isotp.h"
 #include "j1979_live.h"
 #include "j1979_socket_campaign.hpp"
+#include "j1979_live_export.hpp"
 #include <time.h>
 #include <memory>
 #include <exception>
@@ -28,7 +29,7 @@ static void cancel_handler(int signal_number) {
     cancel_requested = 1;
 }
 typedef struct {
-    const char *interface_name, *output, *vin, *journal;
+    const char *interface_name, *output, *vin, *journal, *projection, *csv;
     uint32_t tx, rx;
     unsigned budget_ms, cycles, interval_ms, pid_count;
     uint8_t pids[J1979_LIVE_MAX_PIDS];
@@ -84,6 +85,12 @@ static bool parse(int argc, char **argv, options *o) {
         } else if (!strcmp(flag,"--journal")) {
             if (o->journal) return false;
             o->journal=value;
+        } else if (!strcmp(flag,"--projection-output") && o->live) {
+            if(o->projection)return false;
+            o->projection=value;
+        } else if (!strcmp(flag,"--csv") && o->live) {
+            if(o->csv)return false;
+            o->csv=value;
         } else if (!strcmp(flag,"--vin")) {
             if (o->vin||!j1979_can_valid_vin(value)) return false;
             o->vin=value;
@@ -107,6 +114,11 @@ static bool parse(int argc, char **argv, options *o) {
             o->interval_set=true;
         } else return false;
     }
+    // Numeric exports require a durable independently replayed campaign.
+    if((o->projection||o->csv)&&!o->journal)return false;
+    const std::array<const char*,4> outputs{o->output,o->journal,o->projection,o->csv};
+    for(std::size_t i=0;i<outputs.size();++i)for(std::size_t j=i+1;j<outputs.size();++j)
+        if(outputs[i]&&outputs[j]&&!strcmp(outputs[i],outputs[j]))return false;
     return (!o->journal || o->budget_ms>=1000) && o->confirmed && o->tx_set && o->rx_set && o->output &&
         o->vin && (!o->live || (o->pid_count &&
         o->pid_count * o->cycles <= J1979_LIVE_MAX_SAMPLES)) &&
@@ -162,13 +174,21 @@ int j1979_can_cli(int argc, char **argv) {
     }
     /* Reserve output before opening any ECU-capable transport. Preserve
      * evidence if the physical link fails or the user cancels mid-session. */
-    int fd=open(o.output,O_WRONLY|O_CREAT|O_EXCL|O_NOFOLLOW|O_CLOEXEC,0600);
+    int fd=open(o.output,O_RDWR|O_CREAT|O_EXCL|O_NOFOLLOW|O_CLOEXEC,0600);
     if (fd<0) {
         fprintf(stderr,"Native J1979: output already exists or is not safe\n");
         return 2;
     }
     FILE *stream=fdopen(fd,"w");
     if (!stream) {close(fd);unlink(o.output);return 2;}
+    std::unique_ptr<cd::liveexport::Destination> projection,csv;
+    try{
+        projection=std::make_unique<cd::liveexport::Destination>(o.projection);
+        csv=std::make_unique<cd::liveexport::Destination>(o.csv);
+    }catch(const std::exception& e){
+        fprintf(stderr,"Native J1979: %s\n",e.what());
+        fclose(stream);return 2;
+    }
     JournalFd journal_fd;
     std::unique_ptr<cd::socketcampaign::Writer> journal;
     cd::socketcampaign::Plan scope{};
@@ -211,6 +231,13 @@ int j1979_can_cli(int argc, char **argv) {
             // The terminal binds the exact report only after durable output.
             cd::socketcampaign::finish(*journal,result);
             complete=result.completed;
+            if(projection->requested()||csv->requested()){
+                const auto exported=cd::liveexport::publish(fd,o.output,result.report,
+                    {o.tx,o.rx},o.vin,*projection,*csv);
+                complete=complete&&exported.complete;
+                fprintf(stderr,"J1979 live export: %zu samples, source SHA-256 %s, %s\n",
+                    exported.samples,exported.source_sha256.c_str(),exported.complete?"complete":"incomplete");
+            }
         }catch(const std::exception& e){
             fprintf(stderr,"SocketCAN journal retained without confirmed completion: %s\n",e.what());
             j1979_isotp_close(&link);

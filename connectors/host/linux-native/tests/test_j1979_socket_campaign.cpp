@@ -1,4 +1,6 @@
 #include "j1979_socket_campaign.hpp"
+#include "j1979_live_export.hpp"
+#include <filesystem>
 #include <algorithm>
 #include <array>
 #include <cassert>
@@ -123,6 +125,35 @@ int main(){
     Fake f{};f.timeout_speed=true;complete(true,f);
     f={};f.bad_final=true;complete(true,f);complete(false,f);
     f={};f.oversize=true;complete(true,f);complete(false,f);
+    // Numeric exports are based on durable raw bytes, never on a second
+    // acquisition or a caller-supplied numeric summary.
+    {
+        File file,raw;
+        Writer w(file.fd,plan(true));Fake transport{};
+        const auto result=record(plan(true),link(transport),w);
+        assert(write(raw.fd,result.report.data(),result.report.size())==static_cast<ssize_t>(result.report.size()));
+        finish(w,result);
+        const auto json=raw.name+".json",csv=raw.name+".csv";
+        {
+            cd::liveexport::Destination projection(json.c_str()),table(csv.c_str());
+            rejects([&]{cd::liveexport::Destination collision(json.c_str());});
+            rejects([&]{(void)cd::liveexport::publish(raw.fd,raw.name.c_str(),result.report+" ",
+                {0x7e0,0x7e8},vin,projection,table);});
+            rejects([&]{(void)cd::liveexport::publish(raw.fd,raw.name.c_str(),result.report,
+                {0x7e1,0x7e9},vin,projection,table);});
+            projection.check_empty();table.check_empty();
+            const auto exported=cd::liveexport::publish(raw.fd,raw.name.c_str(),result.report,
+                {0x7e0,0x7e8},vin,projection,table);
+            assert(exported.complete&&exported.samples==4&&exported.source_sha256==sha256(result.report));
+            assert(std::filesystem::file_size(json)>0&&std::filesystem::file_size(csv)>0);
+            rejects([&]{(void)cd::liveexport::publish(raw.fd,raw.name.c_str(),result.report,
+                {0x7e0,0x7e8},vin,projection,table);});
+        }
+        assert(unlink(json.c_str())==0&&unlink(csv.c_str())==0);
+        assert(symlink(raw.name.c_str(),json.c_str())==0);
+        rejects([&]{cd::liveexport::Destination forbidden(json.c_str());});
+        assert(unlink(json.c_str())==0);
+    }
     auto p=plan(true);p.pids={12,12};assert(!p.valid());
     p=plan(true);p.tx=0x7df;assert(!p.valid());
     p=plan(true);p.vin="INVALID";assert(!p.valid());
