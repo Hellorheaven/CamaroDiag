@@ -2827,6 +2827,7 @@ static void usage(FILE *stream) {
         "  camarodiag-native --inspect-j1979-legacy-discovery PROTOCOL RAW_RESPONSE RAW_ATDPN REPORT.json\n"
         "  camarodiag-native --inspect-j1979-native-live TX RX VIN REPORT.json PROOF.json\n"
         "  camarodiag-native --inspect-j1979-native-can-plan TX RX VIN REPORT.json PROOF.json\n"
+        "  camarodiag-native compare-live --report A.json --report B.json [--vin VIN] --output PROOF.json\n"
         "  camarodiag-native verify-live --report REPORT.json [--vin VIN] --output PROOF.json\n"
         "  camarodiag-native verify-freeze --report REPORT.json [--vin VIN] --output PROOF.json\n"
         "  camarodiag-native verify-legacy-freeze --report REPORT.json [--vin VIN] --output PROOF.json\n"
@@ -2957,6 +2958,46 @@ static int native_can_plan_cli(const char* tx_text,const char* rx_text,const cha
         return 0;
     }catch(const std::exception& e){return error(e.what());}
 }
+static int compare_live_compat_cli(int argc,char** argv){
+    std::vector<const char*> paths;
+    const char* output=nullptr;std::optional<std::string> vin;
+    for(int i=2;i<argc;){
+        const std::string_view key(argv[i++]);
+        if(i>=argc||std::string_view(argv[i]).starts_with("--"))return error("Missing compare-live option value");
+        const char* value=argv[i++];
+        if(key=="--report"&&paths.size()<16)paths.push_back(value);
+        else if(key=="--output"&&!output)output=value;
+        else if(key=="--vin"&&!vin)vin=value;
+        else return error("Unexpected or duplicate compare-live option");
+    }
+    if(paths.size()<2||!output)return error("compare-live requires 2 to 16 --report arguments and --output");
+    try{
+        constexpr std::size_t maximum=64u*1024u*1024u,total_maximum=128u*1024u*1024u;
+        std::size_t total=0;
+        std::vector<input> snapshots(paths.size());
+        std::vector<cd::network::history::HistoricalLive> checked;
+        std::vector<std::string> digests;
+        checked.reserve(paths.size());digests.reserve(paths.size());
+        for(std::size_t i=0;i<paths.size();++i){
+            auto& original=snapshots[i];
+            if(!load_regular(paths[i],maximum,&original)||original.length>total_maximum-total)
+                return error("Bounded historical live inputs required");
+            total+=original.length;
+            const std::string_view raw(reinterpret_cast<const char*>(original.bytes.get()),original.length);
+            checked.push_back(cd::network::history::inspect_historical_live(cd::json::parse_report(raw,maximum),vin));
+            digests.emplace_back(original.digest);
+        }
+        const auto proof=cd::network::history::encode_historical_json(
+            cd::network::history::compare_historical_live(checked,digests))+"\n";
+        for(std::size_t i=0;i<paths.size();++i){
+            input again{};
+            if(!load_regular(paths[i],maximum,&again)||!same_input(&snapshots[i],&again))
+                return error("Historical live recording changed during comparison");
+        }
+        if(!atomic_create(output,proof.data(),proof.size()))return error("Comparison proof destination unavailable");
+        return 0;
+    }catch(const std::exception& e){return error(e.what());}
+}
 static int verify_legacy_compat_cli(int argc,char** argv,bool freeze=false,bool can_freeze=false,bool live=false){
     const char* path=nullptr;const char* output=nullptr;std::optional<std::string> vin;
     for(int i=2;i<argc;){
@@ -3005,6 +3046,7 @@ static int verify_network_compat_cli(int argc,char** argv){
 int main(int argc, char **argv) {
     if(argc==7&&!strcmp(argv[1],"--inspect-j1979-native-live"))return native_can_plan_cli(argv[2],argv[3],argv[4],argv[5],argv[6],true);
     if(argc==7&&!strcmp(argv[1],"--inspect-j1979-native-can-plan"))return native_can_plan_cli(argv[2],argv[3],argv[4],argv[5],argv[6]);
+    if(argc>=2&&!strcmp(argv[1],"compare-live"))return compare_live_compat_cli(argc,argv);
     if(argc>=2&&!strcmp(argv[1],"verify-live"))return verify_legacy_compat_cli(argc,argv,false,false,true);
     if(argc>=2&&!strcmp(argv[1],"verify-freeze"))return verify_legacy_compat_cli(argc,argv,false,true);
     if(argc>=2&&!strcmp(argv[1],"verify-legacy-freeze"))return verify_legacy_compat_cli(argc,argv,true);

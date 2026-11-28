@@ -23,5 +23,6 @@ struct HistoricalLive {
 // independent physical transcript verifier for source-specific formats.
 HistoricalLive inspect_historical_live(const json::Value&,std::optional<std::string> expected={});
 void verify_live_transport(const json::Value& root,HistoricalLive&,std::span<const HistoricalLiveRow> rows);
+json::Value compare_historical_live(std::span<const HistoricalLive>,std::span<const std::string> digests);
 std::string historical_live_report(const HistoricalLive&,std::string_view digest={});
 }
