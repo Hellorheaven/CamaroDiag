@@ -22,6 +22,7 @@
 #include "j1979_legacy_scan_wire.hpp"
 #include "j1979_legacy_journal.hpp"
 #include "j1979_legacy_mutation.hpp"
+#include "j1979_legacy_mutation_inspection.hpp"
 #include "j1979_legacy_freeze_wire.hpp"
 #include "j1979_legacy_live_wire.hpp"
 #include <time.h>
@@ -2716,6 +2717,30 @@ static int elm_campaign_cli(int argc,char** argv,bool verify){
     }catch(const std::exception& e){return error(e.what());}
 }
 
+static int legacy_mutation_inspect_cli(int argc,char** argv){
+    if(argc!=7||!cf1_valid_vin(argv[2]))return error("Independent VIN, final report, baseline, intent and proof required (use - for absent unattempted evidence)");
+    try{
+        input final{},baseline{},intent{};
+        if(!load_regular(argv[3],cd::legacy::mutation_report_max,&final))
+            return error("Invalid native legacy maintenance report");
+        const bool has_baseline=strcmp(argv[4],"-")!=0,has_intent=strcmp(argv[5],"-")!=0;
+        if(has_baseline&&(!load_regular(argv[4],cd::legacy::mutation_report_max,&baseline)||!separate(&final,&baseline)))
+            return error("Distinct baseline report required");
+        if(has_intent&&(!load_regular(argv[5],cd::legacy::mutation_report_max,&intent)||!separate(&final,&intent)||
+            (has_baseline&&!separate(&baseline,&intent))))return error("Distinct intent report required");
+        const auto view=[](const input& file){
+            return file.length?std::string_view(reinterpret_cast<const char*>(file.bytes.get()),file.length):std::string_view{};
+        };
+        const auto e=cd::legacy::inspect_mutation(view(final),view(baseline),view(intent),argv[2]);
+        if(!recheck_input(argv[3],cd::legacy::mutation_report_max,final)||
+            (has_baseline&&!recheck_input(argv[4],cd::legacy::mutation_report_max,baseline))||
+            (has_intent&&!recheck_input(argv[5],cd::legacy::mutation_report_max,intent)))return error("Maintenance evidence changed");
+        const auto json=cd::legacy::inspection_report(e,final.digest,has_baseline?baseline.digest:"",has_intent?intent.digest:"");
+        if(!atomic_create(argv[6],json.data(),json.size()))return error("Maintenance proof destination unavailable");
+        return e.sequence_complete&&e.result.complete_ack&&e.baseline_correlated&&e.intent_correlated?0:2;
+    }catch(const std::exception& e){return error(e.what());}
+}
+
 static void usage(FILE *stream) {
     fprintf(stream,
         "CamaroDiag Linux native C++20 — SAE J1979\n"
@@ -2767,6 +2792,7 @@ static void usage(FILE *stream) {
         "  camarodiag-native --recover-j1979-legacy-journal PROTOCOL SOURCE VIN JOURNAL.lj CAPTURE\n"
         "  camarodiag-native --inspect-j1979-legacy-scan PROTOCOL SOURCE VIN CAPTURE.lsr REPORT.json\n"
         "  camarodiag-native --verify-j1979-legacy-scan PROTOCOL SOURCE VIN CAPTURE.lsr REPORT.json PROOF.json\n"
+        "  camarodiag-native --inspect-j1979-legacy-maintenance VIN FINAL.json BASELINE.json INTENT.json PROOF.json\n"
         "  camarodiag-native --j1979-legacy-maintenance --operation clear --port /dev/ttyUSB0 --protocol 2 --engine-source 10 --source 10 --vin VIN --baseline baseline.json --intent intent.json --output result.json --confirm-functional-scope --acknowledge-maintenance-warning\n"
         "  camarodiag-native --inspect-j1979-legacy-discovery PROTOCOL RAW_RESPONSE RAW_ATDPN REPORT.json\n"
         "  camarodiag-native --inspect-j1979-catalogue live|freeze CATALOGUE REFERENCE SHA256 OUTPUT\n"
@@ -2796,6 +2822,7 @@ int main(int argc, char **argv) {
     if (argc==7 && !strcmp(argv[1],"--recover-j1979-legacy-journal"))return legacy_journal_cli(argv[2],argv[3],argv[4],argv[5],argv[6],true);
     if (argc==7 && !strcmp(argv[1],"--inspect-j1979-legacy-scan"))return legacy_scan_replay(argv[2],argv[3],argv[4],argv[5],argv[6],nullptr);
     if (argc==8 && !strcmp(argv[1],"--verify-j1979-legacy-scan"))return legacy_scan_replay(argv[2],argv[3],argv[4],argv[5],argv[6],argv[7]);
+    if (argc>=3 && !strcmp(argv[1],"--inspect-j1979-legacy-maintenance"))return legacy_mutation_inspect_cli(argc,argv);
     if (argc>=3 && !strcmp(argv[1],"--j1979-legacy-maintenance"))return legacy_maintenance_cli(argc,argv);
     if (argc>=3 && !strcmp(argv[1],"--j1979-legacy"))return legacy_discovery_cli(argc,argv,true);
     if (argc>=3 && !strcmp(argv[1],"--j1979-legacy-discover"))return legacy_discovery_cli(argc,argv);
